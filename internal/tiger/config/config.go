@@ -50,6 +50,8 @@ func Load() (*Config, error) {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("api_url", DefaultAPIURL)
+	viper.SetDefault("project_id", "")
+	viper.SetDefault("service_id", "")
 	viper.SetDefault("output", DefaultOutput)
 	viper.SetDefault("analytics", DefaultAnalytics)
 
@@ -185,4 +187,9 @@ func Get() *Config {
 		return cfg
 	}
 	return globalConfig
+}
+
+// ResetGlobalConfig clears the global config singleton for testing
+func ResetGlobalConfig() {
+	globalConfig = nil
 }

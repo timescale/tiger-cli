@@ -78,23 +78,30 @@ func Execute() {
 	}
 }
 
+func addPersistentFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/tiger/config.yaml)")
+	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+	cmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (json, yaml, table)")
+	cmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "TigerData API key")
+	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
+	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
+	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
+}
+
+func bindFlags(cmd *cobra.Command) {
+	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
+	viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
+	viper.BindPFlag("api_key", cmd.PersistentFlags().Lookup("api-key"))
+	viper.BindPFlag("project_id", cmd.PersistentFlags().Lookup("project-id"))
+	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
+	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/tiger/config.yaml)")
-	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (json, yaml, table)")
-	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "TigerData API key")
-	rootCmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
-	rootCmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
-	rootCmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
-
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
-	viper.BindPFlag("api_key", rootCmd.PersistentFlags().Lookup("api-key"))
-	viper.BindPFlag("project_id", rootCmd.PersistentFlags().Lookup("project-id"))
-	viper.BindPFlag("service_id", rootCmd.PersistentFlags().Lookup("service-id"))
-	viper.BindPFlag("analytics", rootCmd.PersistentFlags().Lookup("analytics"))
+	addPersistentFlags(rootCmd)
+	bindFlags(rootCmd)
 }
 
 func initConfig() {

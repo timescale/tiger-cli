@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -31,11 +30,11 @@ var configShowCmd = &cobra.Command{
 
 		switch cfg.Output {
 		case "json":
-			return outputJSON(cfg)
+			return outputJSON(cfg, cmd)
 		case "yaml":
-			return outputYAML(cfg)
+			return outputYAML(cfg, cmd)
 		default:
-			return outputTable(cfg)
+			return outputTable(cfg, cmd)
 		}
 	},
 }
@@ -58,7 +57,7 @@ var configSetCmd = &cobra.Command{
 		}
 
 		logging.Info("Configuration updated", zap.String("key", key), zap.String("value", value))
-		fmt.Printf("Set %s = %s\n", key, value)
+		fmt.Fprintf(cmd.OutOrStdout(), "Set %s = %s\n", key, value)
 		return nil
 	},
 }
@@ -81,7 +80,7 @@ var configUnsetCmd = &cobra.Command{
 		}
 
 		logging.Info("Configuration updated", zap.String("key", key))
-		fmt.Printf("Unset %s\n", key)
+		fmt.Fprintf(cmd.OutOrStdout(), "Unset %s\n", key)
 		return nil
 	},
 }
@@ -101,23 +100,24 @@ var configResetCmd = &cobra.Command{
 		}
 
 		logging.Info("Configuration reset to defaults")
-		fmt.Println("Configuration reset to defaults")
+		fmt.Fprintln(cmd.OutOrStdout(), "Configuration reset to defaults")
 		return nil
 	},
 }
 
-func outputTable(cfg *config.Config) error {
-	fmt.Println("Current Configuration:")
-	fmt.Printf("  API URL:     %s\n", cfg.APIURL)
-	fmt.Printf("  Project ID:  %s\n", valueOrEmpty(cfg.ProjectID))
-	fmt.Printf("  Service ID:  %s\n", valueOrEmpty(cfg.ServiceID))
-	fmt.Printf("  Output:      %s\n", cfg.Output)
-	fmt.Printf("  Analytics:   %t\n", cfg.Analytics)
-	fmt.Printf("  Config Dir:  %s\n", cfg.ConfigDir)
+func outputTable(cfg *config.Config, cmd *cobra.Command) error {
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out, "Current Configuration:")
+	fmt.Fprintf(out, "  API URL:     %s\n", cfg.APIURL)
+	fmt.Fprintf(out, "  Project ID:  %s\n", valueOrEmpty(cfg.ProjectID))
+	fmt.Fprintf(out, "  Service ID:  %s\n", valueOrEmpty(cfg.ServiceID))
+	fmt.Fprintf(out, "  Output:      %s\n", cfg.Output)
+	fmt.Fprintf(out, "  Analytics:   %t\n", cfg.Analytics)
+	fmt.Fprintf(out, "  Config Dir:  %s\n", cfg.ConfigDir)
 	return nil
 }
 
-func outputJSON(cfg *config.Config) error {
+func outputJSON(cfg *config.Config, cmd *cobra.Command) error {
 	data := map[string]interface{}{
 		"api_url":    cfg.APIURL,
 		"project_id": cfg.ProjectID,
@@ -127,12 +127,12 @@ func outputJSON(cfg *config.Config) error {
 		"config_dir": cfg.ConfigDir,
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(cmd.OutOrStdout())
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
 }
 
-func outputYAML(cfg *config.Config) error {
+func outputYAML(cfg *config.Config, cmd *cobra.Command) error {
 	data := map[string]interface{}{
 		"api_url":    cfg.APIURL,
 		"project_id": cfg.ProjectID,
@@ -142,7 +142,7 @@ func outputYAML(cfg *config.Config) error {
 		"config_dir": cfg.ConfigDir,
 	}
 
-	encoder := yaml.NewEncoder(os.Stdout)
+	encoder := yaml.NewEncoder(cmd.OutOrStdout())
 	defer encoder.Close()
 	return encoder.Encode(data)
 }
