@@ -1,0 +1,1088 @@
+openapi: 3.0.3
+info:
+  title: TigerData Cloud API
+  description: |
+    A RESTful API for TigerData Cloud Platform.
+  version: 1.0.0
+  license:
+    name: Proprietary
+    url: https://www.tigerdata.com/legal/terms
+  contact:
+    name: TigerData Support
+    url: https://www.tigerdata.com/contact
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.tigerdata.com/public/v1
+    description: API server for TigerData Cloud
+
+tags:
+  - name: VPCs
+    description: Manage VPCs and their peering connections.
+  - name: Services
+    description: Manage services, read replicas, and their associated actions.
+
+paths:
+  /projects/{project_id}/vpcs:
+    get:
+      tags:
+        - VPCs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      summary: List All VPCs
+      description: Retrieves a list of all Virtual Private Clouds (VPCs).
+      responses:
+        '200':
+          description: A list of VPCs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VPC'
+    post:
+      tags:
+        - VPCs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      summary: Create a VPC
+      description: Creates a new Virtual Private Cloud (VPC).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VPCCreate'
+      responses:
+        '201':
+          description: VPC created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VPC'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{project_id}/vpcs/{vpc_id}:
+    get:
+      tags:
+        - VPCs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+      summary: Get a VPC
+      description: Retrieves the details of a specific VPC by its ID.
+      responses:
+        '200':
+          description: VPC details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VPC'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - VPCs
+      summary: Delete a VPC
+      description: Deletes a specific VPC.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+      responses:
+        '204':
+          description: VPC deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/vpcs/{vpc_id}/rename:
+    post:
+      tags:
+        - VPCs
+      summary: Rename a VPC
+      description: Updates the name of a specific VPC.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VPCRename'
+      responses:
+        '200':
+          description: VPC renamed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VPC'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/vpcs/{vpc_id}/peerings:
+    get:
+      tags:
+        - VPCs
+      summary: List VPC Peerings
+      description: Retrieves a list of all VPC peering connections for a given VPC.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+      responses:
+        '200':
+          description: A list of VPC peering connections.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peering'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - VPCs
+      summary: Create a VPC Peering
+      description: Creates a new VPC peering connection.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeeringCreate'
+      responses:
+        '201':
+          description: VPC peering created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Peering'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id}:
+    get:
+      tags:
+        - VPCs
+      summary: Get a VPC Peering
+      description: Retrieves the details of a specific VPC peering connection.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+        - $ref: '#/components/parameters/PeeringId'
+      responses:
+        '200':
+          description: VPC peering details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Peering'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - VPCs
+      summary: Delete a VPC Peering
+      description: Deletes a specific VPC peering connection.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VPCId'
+        - $ref: '#/components/parameters/PeeringId'
+      responses:
+        '204':
+          description: VPC peering deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services:
+    get:
+      tags:
+        - Services
+      summary: List All Services
+      description: Retrieves a list of all services within a specific project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: A list of services.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Services
+      summary: Create a Service
+      description: Creates a new database service within a project. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceCreate'
+      responses:
+        '202':
+          description: Service creation request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{project_id}/services/{service_id}:
+    get:
+      tags:
+        - Services
+      summary: Get a Service
+      description: Retrieves the details of a specific service by its ID.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: Service details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Services
+      summary: Delete a Service
+      description: Deletes a specific service. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '202':
+          description: Deletion request has been accepted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/attachToVPC:
+    post:
+      tags:
+        - Services
+      summary: Attach Service to VPC
+      description: Associates a service with a VPC.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceVPCInput'
+      responses:
+        '202':
+          $ref: '#/components/responses/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/detachFromVPC:
+    post:
+      tags:
+        - Services
+      summary: Detach Service from VPC
+      description: Disassociates a service from its VPC.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceVPCInput'
+      responses:
+        '202':
+          $ref: '#/components/responses/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/resize:
+    post:
+      tags:
+        - Services
+      summary: Resize a Service
+      description: Changes the CPU and memory allocation for a specific service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResizeInput'
+      responses:
+        '202':
+          description: Resize request has been accepted and is in progress.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/enablePooler:
+    post:
+      tags:
+        - Services
+      summary: Enable Connection Pooler for a Service
+      description: Activates the connection pooler for a specific service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/disablePooler:
+    post:
+      tags:
+        - Services
+      summary: Disable Connection Pooler for a Service
+      description: Deactivates the connection pooler for a specific service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/forkService:
+    post:
+      tags:
+        - Services
+      summary: Fork a Service
+      description: Creates a new, independent service within a project by taking a snapshot of an existing one.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForkInput'
+      responses:
+        '202':
+          description: Fork request accepted. The response contains the details of the new service being created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/updatePassword:
+    post:
+      tags:
+        - Services
+      summary: Update Service Password
+      description: Sets a new master password for the service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordInput'
+      responses:
+        '204':
+          description: Password updated successfully. No content returned.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/setEnvironment:
+    post:
+      tags:
+        - Services
+      summary: Set Environment for a Service
+      description: Sets the environment type for the service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnvironmentInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/setHA:
+    post:
+      tags:
+        - Services
+      summary: Change HA configuration for a Service
+      description: Changes the HA configuration for a specific service. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetHAReplicaInput'
+      responses:
+        '202':
+          $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/replicaSets:
+    get:
+      tags:
+        - Read Replica Sets
+      summary: Get Read Replica Sets
+      description: Retrieves a list of all read replica sets associated with a primary service within a project.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: A list of read replica sets.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReadReplicaSet'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags:
+        - Read Replica Sets
+      summary: Create a Read Replica Set
+      description: Creates a new read replica set for a service. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadReplicaSetCreate'
+      responses:
+        '202':
+          description: Read replica set creation request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadReplicaSet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}:
+    delete:
+      tags:
+        - Read Replica Sets
+      summary: Delete a Read Replica Set
+      description: Deletes a specific read replica set. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/ReplicaSetId'
+      responses:
+        '202':
+          description: Deletion request has been accepted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/resize:
+    post:
+      tags:
+        - Read Replica Sets
+      summary: Resize a Read Replica Set
+      description: Changes the resource allocation for a specific read replica set.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/ReplicaSetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResizeInput'
+      responses:
+        '202':
+          description: Resize request has been accepted and is in progress.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/enablePooler:
+    post:
+      tags:
+        - Read Replica Sets
+      summary: Enable Connection Pooler for a Read Replica
+      description: Activates the connection pooler for a specific read replica set.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/ReplicaSetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/disablePooler:
+    post:
+      tags:
+        - Read Replica Sets
+      summary: Disable Connection Pooler for a Read Replica
+      description: Deactivates the connection pooler for a specific read replica set.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/ReplicaSetId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/setEnvironment:
+    post:
+      tags:
+        - Read Replica Sets
+      summary: Set Environment for a Read Replica
+      description: Sets the environment type for the read replica set.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/ReplicaSetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetEnvironmentInput'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      description: The unique identifier of the project.
+      schema:
+        type: string
+        example: "rp1pz7uyae"
+    ServiceId:
+      name: service_id
+      in: path
+      required: true
+      description: The unique identifier of the service.
+      schema:
+        type: string
+        example: "d1k5vk7hf2"
+    ReplicaSetId:
+      name: replica_set_id
+      in: path
+      required: true
+      description: The unique identifier of the read replica set.
+      schema:
+        type: string
+        example: "alb8jicdpr"
+    VPCId:
+      name: vpc_id
+      in: path
+      required: true
+      description: The unique identifier of the VPC.
+      schema:
+        type: string
+        example: "1234567890"
+    PeeringId:
+      name: peering_id
+      in: path
+      required: true
+      description: The unique identifier of the VPC peering connection.
+      schema:
+        type: string
+        example: "1234567890"
+
+  schemas:
+    VPC:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+          example: "1234567890"
+        name:
+          type: string
+          example: "my-production-vpc"
+        cidr:
+          type: string
+          example: "10.0.0.0/16"
+        region_code:
+          type: string
+          example: "google-europe-west1"
+    VPCCreate:
+      type: object
+      required:
+        - name
+        - cidr
+        - region_code
+      properties:
+        name:
+          type: string
+          example: "my-production-vpc"
+        cidr:
+          type: string
+          example: "10.0.0.0/16"
+        region_code:
+          type: string
+          example: "google-europe-west1"
+    VPCRename:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The new name for the VPC.
+          example: "my-renamed-vpc"
+    Peering:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+          example: "1234567890"
+        peer_account_id:
+          type: string
+          example: "acc-12345"
+        peer_region_code:
+          type: string
+          example: "aws-us-east-1"
+        peer_vpc_id:
+          type: string
+          example: "1234567890"
+        provisioned_id:
+          type: string
+          example: "1234567890"
+        status:
+          type: string
+          example: "active"
+        error_message:
+          type: string
+          example: "VPC not found"
+    PeeringCreate:
+      type: object
+      required:
+        - peer_account_id
+        - peer_region_code
+        - peer_vpc_id
+      properties:
+        peer_account_id:
+          type: string
+          example: "acc-12345"
+        peer_region_code:
+          type: string
+          example: "aws-us-east-1"
+        peer_vpc_id:
+          type: string
+          example: "1234567890"
+    Endpoint:
+      type: object
+      properties:
+        host:
+          type: string
+          example: "my-service.com"
+        port:
+          type: integer
+          example: 8080
+    ConnectionPooler:
+      type: object
+      properties:
+        endpoint:
+          $ref: '#/components/schemas/Endpoint'
+    Service:
+      type: object
+      properties:
+        service_id:
+          type: string
+          format: uuid
+          description: The unique identifier for the service.
+        project_id:
+          type: string
+          format: uuid
+          description: The project this service belongs to.
+        name:
+          type: string
+          description: The name of the service.
+        region_code:
+          type: string
+          description: The cloud region where the service is hosted.
+          example: "google-europe-west1"
+        service_type:
+          $ref: '#/components/schemas/ServiceType'
+          description: The type of the service.
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        initial_password:
+          type: string
+          description: The initial password for the service.
+          format: password
+          example: "a-very-secure-initial-password"
+        paused:
+          type: boolean
+          description: Whether the service is paused
+        status:
+          $ref: '#/components/schemas/DeployStatus'
+          description: Current status of the service
+        resources:
+          type: array
+          description: List of resources allocated to the service
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Resource identifier
+              spec:
+                type: object
+                description: Resource specification
+                properties:
+                  cpu_millis:
+                    type: integer
+                    description: CPU allocation in millicores
+                  memory_gbs:
+                    type: integer
+                    description: Memory allocation in gigabytes
+                  volume_type:
+                    type: string
+                    description: Type of storage volume
+        metadata:
+          type: object
+          description: Additional metadata for the service
+          properties:
+            environment:
+              type: string
+              description: Environment tag for the service
+        endpoint:
+          $ref: '#/components/schemas/Endpoint'
+        vpcEndpoint:
+          type: object
+          nullable: true
+          description: VPC endpoint configuration if available
+        forked_from:
+          $ref: '#/components/schemas/ForkSpec'
+        ha_replicas:
+          $ref: '#/components/schemas/HAReplica'
+        connection_pooler:
+          $ref: '#/components/schemas/ConnectionPooler'
+        read_replica_sets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadReplicaSet'
+    ServiceType:
+      type: string
+      enum:
+      - TIMESCALEDB
+      - POSTGRES
+      - VECTOR
+    DeployStatus:
+      type: string
+      enum:
+      - QUEUED
+      - DELETING
+      - CONFIGURING
+      - READY
+      - DELETED
+      - UNSTABLE
+      - PAUSING
+      - PAUSED
+      - RESUMING
+      - UPGRADING
+      - OPTIMIZING
+    ForkSpec:
+      type: object
+      properties:
+        project_id:
+          type: string
+          example: "asda1b2c3"
+        service_id:
+          type: string
+          example: "bbss422fg"
+        is_standby:
+          type: boolean
+          example: false
+    ReadReplicaSet:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "alb8jicdpr"
+        name:
+          type: string
+          example: "reporting-replica-1"
+        status:
+          type: string
+          enum: [creating, active, resizing, deleting, error]
+          example: "active"
+        nodes:
+          type: integer
+          description: Number of nodes in the replica set.
+          example: 2
+        cpu_millis:
+          type: integer
+          description: CPU allocation in milli-cores.
+          example: 250
+        memory_gbs:
+          type: number
+          format: float
+          description: Memory allocation in gigabytes.
+          example: 0.5
+        metadata:
+          type: object
+          description: Additional metadata for the read replica set
+          properties:
+            environment:
+              type: string
+              description: Environment tag for the read replica set
+        endpoint:
+          $ref: '#/components/schemas/Endpoint'
+        connection_pooler:
+          $ref: '#/components/schemas/ConnectionPooler'
+    ServiceCreate:
+      type: object
+      required:
+        - name
+        - service_type
+        - region_code
+        - replica_count
+        - cpu_millis
+        - memory_gbs
+      properties:
+        name:
+          type: string
+          description: A human-readable name for the service.
+          example: "my-production-db"
+        service_type:
+          $ref: '#/components/schemas/ServiceType'
+          description: The type of the service.
+          default: TIMESCALEDB
+        region_code:
+          type: string
+          example: "google-europe-west1"
+        replica_count:
+          type: integer
+          description: Number of high-availability replicas to create (all replicas are asynchronous by default).
+          example: 2
+        cpu_millis:
+          type: integer
+          description: The initial CPU allocation in milli-cores.
+          example: 1000
+        memory_gbs:
+          type: number
+          format: float
+          description: The initial memory allocation in gigabytes.
+          example: 4
+    HAReplica:
+      type: object
+      properties:
+        sync_replica_count:
+          type: integer
+          description: Number of synchronous high-availability replicas.
+          example: 1
+        replica_count:
+          type: integer
+          description: Number of high-availability replicas (all replicas are asynchronous by default).
+          example: 1
+    SetHAReplicaInput:
+      type: object
+      properties:
+        sync_replica_count:
+          type: integer
+          description: Number of synchronous high-availability replicas.
+          example: 1
+        replica_count:
+          type: integer
+          description: Number of high-availability replicas (all replicas are asynchronous by default).
+          example: 1
+      description: At least one of sync_replica_count or replica_count must be provided.
+    ReadReplicaSetCreate:
+      type: object
+      required:
+        - name
+        - nodes
+        - cpu_millis
+        - memory_gbs
+      properties:
+        name:
+          type: string
+          description: A human-readable name for the read replica.
+          example: "my-reporting-replica"
+        nodes:
+          type: integer
+          description: Number of nodes to create in the replica set.
+          example: 2
+        cpu_millis:
+          type: integer
+          description: The initial CPU allocation in milli-cores.
+          example: 250
+        memory_gbs:
+          type: number
+          format: float
+          description: The initial memory allocation in gigabytes.
+          example: 0.5
+    ResizeInput:
+      type: object
+      required:
+        - cpu_millis
+        - memory_gbs
+      properties:
+        cpu_millis:
+          type: integer
+          description: The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
+          example: 1000
+        memory_gbs:
+          type: number
+          format: float
+          description: The new memory allocation in gigabytes.
+          example: 4
+        nodes:
+          type: integer
+          description: The new number of nodes in the replica set.
+          example: 2
+    ForkInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name for the new forked service.
+          example: "forked-customer-db"
+    UpdatePasswordInput:
+      type: object
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          description: The new password.
+          format: password
+          example: "a-very-secure-new-password"
+    SetEnvironmentInput:
+      type: object
+      required:
+        - environment
+      properties:
+        environment:
+          type: string
+          description: The target environment for the service.
+          enum: [PROD, DEV]
+      example:
+        environment: "PROD"
+    ServiceVPCInput:
+      type: object
+      required:
+        - vpc_id
+      properties:
+        vpc_id:
+          type: string
+          description: The ID of the VPC to attach the service to.
+          example: "1234567890"
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+  responses:
+    SuccessMessage:
+      description: The action was completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Action completed successfully."
+    NotFound:
+      description: The specified resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: The request was malformed or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: The request could not be completed due to a conflict with the current state of the resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

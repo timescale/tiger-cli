@@ -1,0 +1,5 @@
+- can a service be created with a vpc id attached at creation time?
+- get project id from token
+- is there any way to get a "whoami" answer from a token? does that even make sense?\
+- can we have a "24-hour" safe delete for service deletion via mcp? The deletion should be able to be rolled back within 24 hours.
+- add service start/stop/pause/resume endpoints - currently services have `paused` field and `PAUSING`/`PAUSED`/`RESUMING` status values but no API endpoints to control them

@@ -1,0 +1,495 @@
+# Tiger MCP Server Specification
+
+## Overview
+
+The Tiger MCP (Model Context Protocol) Server provides programmatic access to TigerData Cloud Platform resources through Claude and other AI assistants. It mirrors the functionality of the Tiger CLI and is integrated directly into the CLI binary for seamless operation.
+
+The MCP server is written in Go and launched via the Tiger CLI, sharing the same authentication, configuration, and API client.
+
+## v0 Tool Priority
+
+For the initial v0 release, implement these essential tools first:
+
+**Core Service Management:**
+- `tiger_services_list` - List all services
+- `tiger_services_show` - Show service details  
+- `tiger_services_create` - Create new services
+- `tiger_services_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
+- `tiger_services_update_password` - Update service master password
+
+**Database Operations:**
+- `tiger_db_connection_string` - Get connection strings
+- `tiger_db_execute_query` - Execute SQL queries
+- `tiger_db_test_connection` - Test connectivity
+
+**Future v1+ Tools:**
+- Service lifecycle (start/stop/restart) - pending API endpoints
+- HA management tools
+- Read replica management
+- Basic VPC management
+- VPC peering management
+- Advanced service operations (resize, pooler, VPC attach/detach)
+
+## Configuration
+
+### Claude Desktop Configuration
+
+Add to `~/.claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "tigerdata": {
+      "command": "tiger",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+The MCP server will automatically use the CLI's stored authentication and configuration.
+
+### CLI MCP Commands
+
+#### `tiger mcp start`
+Start the MCP server.
+
+**Options:**
+- `--port`: Port to run MCP server on (default: 3000)
+- `--host`: Host to bind to (default: localhost)
+
+**Examples:**
+```bash
+# Start MCP server (uses stored CLI auth and config)
+tiger mcp start
+
+# Start on custom port
+tiger mcp start --port 3001
+```
+
+#### `tiger mcp stop`
+Stop the MCP server.
+
+#### `tiger mcp status`
+Show MCP server status and connection information.
+
+#### `tiger mcp logs`
+Show MCP server logs.
+
+**Options:**
+- `--follow`: Follow log output
+- `--lines`: Number of log lines to show (default: 100)
+
+## Available Tools
+
+### Service Management
+
+#### `tiger_services_list`
+List all database services.
+
+**Parameters:** None
+
+**Returns:** Array of service objects with id, name, status, type, region, and resource information.
+
+#### `tiger_services_show`
+Show details of a specific service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to show
+
+**Returns:** Detailed service object with configuration, endpoints, and status.
+
+#### `tiger_services_create`
+Create a new database service.
+
+**Parameters:**
+- `name` (string, required): Service name
+- `type` (string, optional): Service type (timescaledb, postgres, vector) - default: timescaledb
+- `region` (string, required): Region code
+- `cpu` (string, required): CPU allocation - supports cores or millicores (e.g., "2", "2000m")
+- `memory` (string, required): Memory allocation with units (e.g., "8GB", "4096MB")
+- `replicas` (number, optional): Number of high-availability replicas - default: 1
+- `vpc_id` (string, optional): VPC ID to deploy in
+- `wait` (boolean, optional): Wait for service to be ready - default: true
+- `timeout` (number, optional): Timeout for waiting in minutes - default: 30
+
+**Returns:** Service object with creation status and details.
+
+#### `tiger_services_delete`
+Delete a database service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to delete
+- `confirmed` (boolean, required): Confirmation that deletion is intended - must be true
+
+**Returns:** Deletion confirmation with operation status.
+
+#### `tiger_services_start`
+Start a stopped service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to start
+
+**Returns:** Operation status.
+
+#### `tiger_services_stop`
+Stop a running service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to stop
+
+**Returns:** Operation status.
+
+#### `tiger_services_restart`
+Restart a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to restart
+
+**Returns:** Operation status.
+
+#### `tiger_services_resize`
+Resize service resources.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to resize
+- `cpu` (string, optional): New CPU allocation
+- `memory` (string, optional): New memory allocation
+
+**Returns:** Resize operation status.
+
+#### `tiger_services_enable_pooler`
+Enable connection pooling for a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+
+**Returns:** Operation status.
+
+#### `tiger_services_disable_pooler`
+Disable connection pooling for a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+
+**Returns:** Operation status.
+
+#### `tiger_services_attach_vpc`
+Attach a service to a VPC.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+- `vpc_id` (string, required): VPC ID to attach to
+
+**Returns:** Operation status.
+
+#### `tiger_services_detach_vpc`
+Detach a service from a VPC.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+- `vpc_id` (string, required): VPC ID to detach from
+
+**Returns:** Operation status.
+
+#### `tiger_services_update_password`
+Update the master password for a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+- `password` (string, required): New password for the service
+
+**Returns:** Operation status confirmation.
+
+### Database Operations
+
+#### `tiger_db_connection_string`
+Get connection string for a service.
+
+**Parameters:**
+- `service_id` (string, optional): Service ID (uses default if not provided)
+- `pooled` (boolean, optional): Use connection pooling - default: false
+- `role` (string, optional): Database role to use
+
+**Returns:** Connection string for the database.
+
+#### `tiger_db_test_connection`
+Test database connectivity.
+
+**Parameters:**
+- `service_id` (string, optional): Service ID (uses default if not provided)
+
+**Returns:** Connection test results with status and latency information.
+
+#### `tiger_db_execute_query`
+Execute a SQL query on a service database.
+
+**Parameters:**
+- `service_id` (string, optional): Service ID (uses default if not provided)
+- `query` (string, required): SQL query to execute
+- `timeout` (number, optional): Query timeout in seconds (default: 30)
+
+**Returns:** Query results with rows, columns, and execution metadata.
+
+**Example Response:**
+```json
+{
+  "columns": ["id", "name", "created_at"],
+  "rows": [
+    [1, "example", "2024-01-01T00:00:00Z"],
+    [2, "test", "2024-01-02T00:00:00Z"]
+  ],
+  "row_count": 2,
+  "execution_time_ms": 15
+}
+```
+
+### High-Availability Management
+
+#### `tiger_ha_show`
+Show current HA configuration for a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+
+**Returns:** Current HA configuration with replica counts and levels.
+
+#### `tiger_ha_set`
+Set HA configuration level for a service.
+
+**Parameters:**
+- `service_id` (string, required): Service ID
+- `level` (string, required): HA level (none, high, highest-performance, highest-dataintegrity)
+
+**Returns:** HA configuration update status.
+
+### Read Replica Sets Management
+
+#### `tiger_read_replicas_list`
+List all read replica sets for a service.
+
+**Parameters:**
+- `service_id` (string, required): Primary service ID
+
+**Returns:** Array of read replica set objects.
+
+#### `tiger_read_replicas_show`
+Show details of a specific read replica set.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+
+**Returns:** Detailed replica set object.
+
+#### `tiger_read_replicas_create`
+Create a new read replica set.
+
+**Parameters:**
+- `service_id` (string, required): Primary service ID
+- `name` (string, required): Replica set name
+- `nodes` (number, required): Number of nodes in replica set
+- `cpu` (string, required): CPU allocation per node
+- `memory` (string, required): Memory allocation per node
+- `vpc_id` (string, optional): VPC ID to deploy in
+
+**Returns:** Replica set creation status and details.
+
+#### `tiger_read_replicas_delete`
+Delete a read replica set.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID to delete
+
+**Returns:** Deletion confirmation.
+
+#### `tiger_read_replicas_resize`
+Resize a read replica set.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+- `nodes` (number, optional): New number of nodes
+- `cpu` (string, optional): New CPU allocation per node
+- `memory` (string, optional): New memory allocation per node
+
+**Returns:** Resize operation status.
+
+#### `tiger_read_replicas_enable_pooler`
+Enable connection pooler for a read replica set.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+
+**Returns:** Operation status.
+
+#### `tiger_read_replicas_disable_pooler`
+Disable connection pooler for a read replica set.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+
+**Returns:** Operation status.
+
+#### `tiger_read_replicas_attach_vpc`
+Attach a read replica set to a VPC.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+- `vpc_id` (string, required): VPC ID
+
+**Returns:** Operation status.
+
+#### `tiger_read_replicas_detach_vpc`
+Detach a read replica set from a VPC.
+
+**Parameters:**
+- `replica_set_id` (string, required): Replica set ID
+- `vpc_id` (string, required): VPC ID
+
+**Returns:** Operation status.
+
+### VPC Management
+
+#### `tiger_vpcs_list`
+List all Virtual Private Clouds.
+
+**Parameters:** None
+
+**Returns:** Array of VPC objects with id, name, CIDR, and region information.
+
+#### `tiger_vpcs_show`
+Show details of a specific VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID to show
+
+**Returns:** Detailed VPC object with configuration and attached services.
+
+#### `tiger_vpcs_create`
+Create a new VPC.
+
+**Parameters:**
+- `name` (string, required): VPC name
+- `cidr` (string, required): CIDR block (e.g., "10.0.0.0/16")
+- `region` (string, required): Region code
+
+**Returns:** VPC creation status and details.
+
+#### `tiger_vpcs_delete`
+Delete a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID to delete
+
+**Returns:** Deletion confirmation.
+
+#### `tiger_vpcs_rename`
+Rename a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID to rename
+- `name` (string, required): New VPC name
+
+**Returns:** Rename operation status.
+
+#### `tiger_vpcs_list_services`
+List services attached to a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+
+**Returns:** Array of services attached to the VPC.
+
+#### `tiger_vpcs_attach_service`
+Attach a service to a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+- `service_id` (string, required): Service ID to attach
+
+**Returns:** Operation status.
+
+#### `tiger_vpcs_detach_service`
+Detach a service from a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+- `service_id` (string, required): Service ID to detach
+
+**Returns:** Operation status.
+
+### VPC Peering Management
+
+#### `tiger_vpcs_peering_list`
+List all peering connections for a VPC.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+
+**Returns:** Array of peering connection objects.
+
+#### `tiger_vpcs_peering_show`
+Show details of a specific peering connection.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+- `peering_id` (string, required): Peering connection ID
+
+**Returns:** Detailed peering connection object.
+
+#### `tiger_vpcs_peering_create`
+Create a new VPC peering connection.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+- `peer_account_id` (string, required): Account ID of the peer VPC
+- `peer_vpc_id` (string, required): VPC ID of the peer VPC
+- `peer_region` (string, required): Region code of the peer VPC
+
+**Returns:** Peering connection creation status and details.
+
+#### `tiger_vpcs_peering_delete`
+Delete a VPC peering connection.
+
+**Parameters:**
+- `vpc_id` (string, required): VPC ID
+- `peering_id` (string, required): Peering connection ID to delete
+
+**Returns:** Deletion confirmation.
+
+## Error Handling
+
+All tools return structured error responses when operations fail:
+
+```json
+{
+  "error": {
+    "code": "SERVICE_NOT_FOUND",
+    "message": "Service 'svc-invalid' not found in project 'proj-12345'",
+    "details": {
+      "service_id": "svc-invalid",
+      "project_id": "proj-12345"
+    }
+  }
+}
+```
+
+Common error codes:
+- `AUTHENTICATION_ERROR`: Invalid or missing API key
+- `SERVICE_NOT_FOUND`: Requested service does not exist
+- `VPC_NOT_FOUND`: Requested VPC does not exist
+- `PERMISSION_DENIED`: Insufficient permissions for operation
+- `RESOURCE_CONFLICT`: Resource is in a state that prevents the operation
+- `VALIDATION_ERROR`: Invalid parameters provided
+- `TIMEOUT_ERROR`: Operation timed out
+- `SERVICE_UNAVAILABLE`: TigerData API is temporarily unavailable
+
+## Implementation Notes
+
+- The MCP server is embedded within the Tiger CLI binary
+- Shares the same API client library and configuration system as the CLI
+- Uses the CLI's stored authentication (keyring or file-based)
+- Inherits the CLI's project and service defaults from configuration
+- Implements proper graceful shutdown and signal handling
+- Uses structured logging compatible with the CLI logging system
+- All tools are idempotent where possible
+- Follows the same error handling patterns as CLI commands
