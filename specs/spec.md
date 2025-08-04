@@ -72,7 +72,7 @@ For the initial v0 release, implement these essential commands first:
 
 **Core Service Management:**
 - `tiger services list` - List all services
-- `tiger services show` - Show service details
+- `tiger services describe` - Show service details
 - `tiger services create` - Create new services
 - `tiger services update-password` - Update service master password
 
@@ -148,7 +148,7 @@ Manage database services.
 
 **Subcommands:**
 - `list`: List all services
-- `show`: Show service details
+- `describe`: Show service details
 - `create`: Create a new service
 - `delete`: Delete a service
 - `start`: Start a service
@@ -163,13 +163,26 @@ Manage database services.
 - `update-password`: Update service master password
 - `set-default`: Set default service
 
+**Commands with Wait/Timeout Behavior:**
+The following commands support `--wait`, `--no-wait`, and `--timeout` options:
+- `create`: Wait for service to be ready
+- `delete`: Wait for service to be fully deleted
+- `start`: Wait for service to be running
+- `stop`: Wait for service to be stopped
+- `restart`: Wait for service to restart completely
+- `resize`: Wait for resize operation to complete
+- `attach-vpc`: Wait for VPC attachment to complete
+- `detach-vpc`: Wait for VPC detachment to complete
+- `enable-pooler`: Wait for pooler to be enabled
+- `disable-pooler`: Wait for pooler to be disabled
+
 **Examples:**
 ```bash
 # List services
 tiger services list
 
 # Show service details
-tiger services show svc-12345
+tiger services describe svc-12345
 
 # Create a TimescaleDB service
 tiger services create \
@@ -212,9 +225,21 @@ tiger services create \
 # Resize service
 tiger services resize svc-12345 --cpu 4 --memory 16GB
 
+# Resize service without waiting
+tiger services resize svc-12345 --cpu 4 --memory 16GB --no-wait
+
+# Resize service with custom timeout
+tiger services resize svc-12345 --cpu 4 --memory 16GB --timeout 15
+
 # Start/stop service
 tiger services start svc-12345
 tiger services stop svc-12345
+
+# Stop service without waiting
+tiger services stop svc-12345 --no-wait
+
+# Stop service with custom timeout
+tiger services stop svc-12345 --timeout 10
 
 # Attach/detach VPC
 tiger services attach-vpc svc-12345 --vpc-id vpc-67890
@@ -235,23 +260,59 @@ tiger services set-default svc-12345
 - `--name`: Service name (required)
 - `--type`: Service type (timescaledb, postgres, vector) - default: timescaledb
 - `--region`: Region code (required)
-- `--cpu`: CPU allocation - supports cores (e.g., "2") or millicores (e.g., "2000m")
-- `--memory`: Memory allocation with units (e.g., "8GB", "4096MB")
+- `--cpu`: CPU allocation - must be from allowed configurations (see below)
+- `--memory`: Memory allocation - must be from allowed configurations (see below)
 - `--replicas`: Number of high-availability replicas (default: 1)
 - `--vpc-id`: VPC ID for attach/detach operations
 - `--save-password`: Save password to ~/.pgpass file (default: true)
 - `--no-save-password`: Don't save password to ~/.pgpass file
 - `--set-default`: Set this service as the default service (default: true)
 - `--no-set-default`: Don't set this service as the default service
-- `--wait`: Wait for service to be ready (default: true)
-- `--no-wait`: Don't wait for service to be ready, return immediately
+- `--wait`: Wait for operation to complete (default: true for commands listed above)
+- `--no-wait`: Don't wait for operation to complete, return immediately
 - `--timeout`: Timeout for waiting in minutes (default: 30)
 - `--password`: New password (for update-password command)
 
 **Default Behavior:**
 - **Password Management**: By default, service creation will save the generated password to `~/.pgpass` for automatic authentication. Use `--no-save-password` to disable this behavior and manage passwords manually.
 - **Default Service**: By default, newly created services will be set as the default service in your configuration. Use `--no-set-default` to disable this behavior and keep your current default service unchanged.
-- **Wait for Ready**: By default, the command will wait for the service to be ready before returning, displaying "Waiting for service to be ready..." every 10 seconds. Use `--no-wait` to return immediately after creation request is accepted, or `--timeout` to specify a custom timeout period.
+- **Wait for Completion**: By default, asynchronous service commands (see list above) will wait for the operation to complete before returning, displaying status updates every 10 seconds. Use `--no-wait` to return immediately after the request is accepted, or `--timeout` to specify a custom timeout period.
+
+**Allowed CPU/Memory Configurations:**
+Service creation and resizing support the following CPU and memory combinations. You can specify both CPU and memory together, or specify only one (the other will be automatically set to the corresponding value):
+
+| CPU | Memory |
+|-----|---------|
+| 0.5 | 2GB |
+| 1 | 4GB |
+| 2 | 8GB |
+| 4 | 16GB |
+| 8 | 32GB |
+| 16 | 64GB |
+| 32 | 128GB |
+
+CPU can be specified as cores (e.g., "0.5", "1", "2") or millicores (e.g., "500m", "1000m", "2000m").
+Memory must include units (e.g., "2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "128GB").
+
+**Examples:**
+```bash
+# Specify both CPU and memory
+tiger services create --name "my-service" --cpu 2 --memory 8GB
+
+# Specify only CPU (memory will be automatically set to 8GB)
+tiger services create --name "my-service" --cpu 2
+
+# Specify only memory (CPU will be automatically set to 2)
+tiger services create --name "my-service" --memory 8GB
+
+# Resize with only CPU
+tiger services resize svc-12345 --cpu 4
+
+# Resize with only memory
+tiger services resize svc-12345 --memory 16GB
+```
+
+**Note:** A future command like `tiger services list-types` or `tiger services list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.
 
 ### Database Operations
 
@@ -281,6 +342,9 @@ tiger db connection-string svc-12345 --pooled
 # Test database connectivity
 tiger db test-connection svc-12345
 
+# Test with custom timeout
+tiger db test-connection svc-12345 --timeout 10
+
 # Save password to .pgpass
 tiger db save-password svc-12345 --password your-password
 tiger db save-password svc-12345 --password your-password --role readonly
@@ -289,6 +353,13 @@ tiger db save-password svc-12345 --password your-password --role readonly
 tiger db remove-password svc-12345
 tiger db remove-password svc-12345 --role readonly
 ```
+
+**Return Codes for test-connection:**
+The `test-connection` command follows `pg_isready` conventions:
+- `0`: Server is accepting connections normally
+- `1`: Server is rejecting connections (e.g., during startup)
+- `2`: No response to connection attempt (server unreachable)
+- `3`: No attempt made (e.g., invalid parameters)
 
 **Authentication:**
 The `connect` and `psql` commands automatically handle authentication using:
@@ -300,6 +371,7 @@ The `connect` and `psql` commands automatically handle authentication using:
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
 - `--password`: Password to save (for save-password command)
+- `-t, --timeout`: Timeout in seconds for test-connection (default: 3, set to 0 to disable)
 
 ### High-Availability Management
 
@@ -307,13 +379,13 @@ The `connect` and `psql` commands automatically handle authentication using:
 Manage high-availability replicas for fault tolerance.
 
 **Subcommands:**
-- `show`: Show current HA configuration
+- `describe`: Show current HA configuration
 - `set`: Set HA configuration level
 
 **Examples:**
 ```bash
 # Show current HA configuration
-tiger ha show svc-12345
+tiger ha describe svc-12345
 
 # Set HA level
 tiger ha set svc-12345 --level none
@@ -338,7 +410,7 @@ Manage read replica sets for scaling read workloads.
 
 **Subcommands:**
 - `list`: List all read replica sets
-- `show`: Show replica set details
+- `describe`: Show replica set details
 - `create`: Create a read replica set
 - `delete`: Delete a replica set
 - `resize`: Resize replica set resources
@@ -393,7 +465,7 @@ Manage Virtual Private Clouds.
 
 **Subcommands:**
 - `list`: List all VPCs
-- `show`: Show VPC details
+- `describe`: Show VPC details
 - `create`: Create a new VPC
 - `delete`: Delete a VPC
 - `rename`: Rename a VPC
@@ -414,7 +486,7 @@ tiger vpcs create \
   --region google-us-central1
 
 # Show VPC details
-tiger vpcs show vpc-12345
+tiger vpcs describe vpc-12345
 
 # Attach/detach services
 tiger vpcs attach-service vpc-12345 --service-id svc-67890
@@ -440,7 +512,7 @@ Manage VPC peering connections for a specific VPC.
 
 **Subcommands:**
 - `list`: List all peering connections for a VPC
-- `show`: Show details of a specific peering connection
+- `describe`: Show details of a specific peering connection
 - `create`: Create a new peering connection
 - `delete`: Delete a peering connection
 
@@ -450,7 +522,7 @@ Manage VPC peering connections for a specific VPC.
 tiger vpcs peering list vpc-12345
 
 # Show details of a specific peering connection
-tiger vpcs peering show vpc-12345 peer-67890
+tiger vpcs peering describe vpc-12345 peer-67890
 
 # Create a new peering connection
 tiger vpcs peering create vpc-12345 \
@@ -552,7 +624,7 @@ svc-12345  production-db  running   production
 Errors are returned with descriptive messages and appropriate exit codes:
 
 ```bash
-$ tiger services show invalid-id
+$ tiger services describe invalid-id
 Error: Service 'invalid-id' not found in project 'proj-12345'
 Use 'tiger services list' to see available services.
 ```
@@ -662,15 +734,12 @@ tiger db connect svc-12345
 tiger migrations new --name "add_index_on_users"
 # Edit the migration file
 tiger migrations up svc-12345
-
-# Backup database
-tiger db dump svc-12345 --output backup-$(date +%Y%m%d).sql
 ```
 
 ### Monitoring and Maintenance
 ```bash
 # Check service status
-tiger services show svc-12345
+tiger services describe svc-12345
 
 # Inspect performance
 tiger inspect slow-queries svc-12345
