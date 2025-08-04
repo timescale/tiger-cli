@@ -18,6 +18,12 @@ import (
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
 	
+	// Reset viper state to ensure clean test environment
+	viper.Reset()
+	
+	// Reset global config in the config package
+	config.ResetGlobalConfig()
+	
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
 	if err != nil {
