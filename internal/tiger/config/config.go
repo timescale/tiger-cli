@@ -39,7 +39,7 @@ func Load() (*Config, error) {
 		Analytics: DefaultAnalytics,
 	}
 
-	configDir := getConfigDir()
+	configDir := GetConfigDir()
 	cfg.ConfigDir = configDir
 
 	viper.SetConfigName("config")
@@ -147,7 +147,7 @@ func (c *Config) Reset() error {
 	return c.Save()
 }
 
-func getConfigDir() string {
+func GetConfigDir() string {
 	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
 		return expandPath(dir)
 	}
@@ -174,20 +174,6 @@ func expandPath(path string) string {
 	return path
 }
 
-func Get() *Config {
-	if globalConfig == nil {
-		cfg, err := Load()
-		if err != nil {
-			return &Config{
-				APIURL:    DefaultAPIURL,
-				Output:    DefaultOutput,
-				Analytics: DefaultAnalytics,
-			}
-		}
-		return cfg
-	}
-	return globalConfig
-}
 
 // ResetGlobalConfig clears the global config singleton for testing
 func ResetGlobalConfig() {

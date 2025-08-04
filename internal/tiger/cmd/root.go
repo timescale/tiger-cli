@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,7 +80,10 @@ func Execute() {
 }
 
 func addPersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/tiger/config.yaml)")
+	// Compute the actual default config file path
+	defaultConfigFile := filepath.Join(config.GetConfigDir(), config.ConfigFileName)
+	
+	cmd.PersistentFlags().StringVar(&cfgFile, "config", defaultConfigFile, "config file")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	cmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (json, yaml, table)")
 	cmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "TigerData API key")
@@ -105,14 +109,8 @@ func init() {
 }
 
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		cfg := config.Get()
-		viper.AddConfigPath(cfg.ConfigDir)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("config")
-	}
+	// cfgFile now always has a value (either default or user-specified)
+	viper.SetConfigFile(cfgFile)
 
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()

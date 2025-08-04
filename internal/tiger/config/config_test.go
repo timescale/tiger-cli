@@ -495,20 +495,23 @@ func TestReset(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
+func TestLoad_Singleton(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	
-	// Test when globalConfig is nil
+	// Test when globalConfig is nil (Load succeeds with missing file)
 	globalConfig = nil
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 	
-	cfg := Get()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
 	if cfg == nil {
-		t.Error("Get() returned nil")
+		t.Error("Load() returned nil config")
 	}
 	
-	// Should return defaults when Load fails
+	// Should return defaults when config file is missing
 	if cfg.APIURL != DefaultAPIURL {
 		t.Errorf("Expected default APIURL %s, got %s", DefaultAPIURL, cfg.APIURL)
 	}
@@ -518,6 +521,44 @@ func TestGet(t *testing.T) {
 	if cfg.Analytics != DefaultAnalytics {
 		t.Errorf("Expected default Analytics %t, got %t", DefaultAnalytics, cfg.Analytics)
 	}
+	
+	// Test when globalConfig is already set (singleton behavior)
+	cfg2, err := Load()
+	if err != nil {
+		t.Fatalf("Second Load() failed: %v", err)
+	}
+	if cfg != cfg2 {
+		t.Error("Expected Load() to return same instance when globalConfig is already set")
+	}
+}
+
+func TestLoad_ErrorHandling(t *testing.T) {
+	// Test Load() when it fails due to invalid config file
+	tmpDir := setupTestConfig(t)
+	
+	// Create invalid YAML config file
+	invalidConfig := `api_url: https://test.api.com/v1
+project_id: test-project
+invalid yaml content [
+`
+	configFile := filepath.Join(tmpDir, ConfigFileName)
+	if err := os.WriteFile(configFile, []byte(invalidConfig), 0644); err != nil {
+		t.Fatalf("Failed to write invalid config file: %v", err)
+	}
+	
+	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("TIGER_CONFIG_DIR")
+	
+	globalConfig = nil
+	cfg, err := Load()
+	
+	// Should return error when Load fails
+	if err == nil {
+		t.Error("Expected Load() to fail with invalid config file, but it succeeded")
+	}
+	if cfg != nil {
+		t.Error("Expected Load() to return nil config when it fails")
+	}
 }
 
 func TestGetConfigDir(t *testing.T) {
@@ -525,14 +566,14 @@ func TestGetConfigDir(t *testing.T) {
 	os.Setenv("TIGER_CONFIG_DIR", "/custom/config/path")
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 	
-	dir := getConfigDir()
+	dir := GetConfigDir()
 	if dir != "/custom/config/path" {
 		t.Errorf("Expected /custom/config/path, got %s", dir)
 	}
 	
 	// Test with tilde expansion
 	os.Setenv("TIGER_CONFIG_DIR", "~/tiger-config")
-	dir = getConfigDir()
+	dir = GetConfigDir()
 	homeDir, _ := os.UserHomeDir()
 	expected := filepath.Join(homeDir, "tiger-config")
 	if dir != expected {
@@ -541,7 +582,7 @@ func TestGetConfigDir(t *testing.T) {
 	
 	// Test default behavior
 	os.Unsetenv("TIGER_CONFIG_DIR")
-	dir = getConfigDir()
+	dir = GetConfigDir()
 	homeDir, _ = os.UserHomeDir()
 	expected = filepath.Join(homeDir, ".config", "tiger")
 	if dir != expected {
@@ -620,5 +661,43 @@ func TestSave_CreateDirectory(t *testing.T) {
 	configFile := filepath.Join(configDir, ConfigFileName)
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("Config file was not created")
+	}
+}
+
+func TestResetGlobalConfig(t *testing.T) {
+	tmpDir := setupTestConfig(t)
+	
+	// Set environment variable for test
+	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("TIGER_CONFIG_DIR")
+	
+	// Load config to populate globalConfig
+	cfg1, err := Load()
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	
+	// Verify globalConfig is set
+	if globalConfig == nil {
+		t.Error("Expected globalConfig to be set after Load()")
+	}
+	
+	// Reset global config
+	ResetGlobalConfig()
+	
+	// Verify globalConfig is nil
+	if globalConfig != nil {
+		t.Error("Expected globalConfig to be nil after ResetGlobalConfig()")
+	}
+	
+	// Load again should create new instance
+	cfg2, err := Load()
+	if err != nil {
+		t.Fatalf("Second Load() failed: %v", err)
+	}
+	
+	// Should be different instances since we reset
+	if cfg1 == cfg2 {
+		t.Error("Expected different config instances after reset, got same instance")
 	}
 }
