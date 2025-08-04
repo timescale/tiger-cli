@@ -28,39 +28,42 @@ const (
 
 var globalConfig *Config
 
+// SetupViper configures the global Viper instance with defaults, env vars, and config file
+func SetupViper(configFile string) error {
+	viper.SetConfigFile(configFile)
+	viper.SetEnvPrefix("TIGER")
+	viper.AutomaticEnv()
+	
+	// Set defaults for all config values
+	viper.SetDefault("api_url", DefaultAPIURL)
+	viper.SetDefault("project_id", "")
+	viper.SetDefault("service_id", "")
+	viper.SetDefault("output", DefaultOutput)
+	viper.SetDefault("analytics", DefaultAnalytics)
+	
+	// Try to read config file if it exists
+	if _, err := os.Stat(configFile); err == nil {
+		// File exists, try to read it
+		if err := viper.ReadInConfig(); err != nil {
+			return fmt.Errorf("error reading config file: %w", err)
+		}
+	}
+	// If file doesn't exist, that's okay - we'll use defaults and env vars
+	
+	return nil
+}
+
 func Load() (*Config, error) {
 	if globalConfig != nil {
 		return globalConfig, nil
 	}
 
 	cfg := &Config{
-		APIURL:    DefaultAPIURL,
-		Output:    DefaultOutput,
-		Analytics: DefaultAnalytics,
+		ConfigDir: GetConfigDir(),
 	}
 
-	configDir := GetConfigDir()
-	cfg.ConfigDir = configDir
-
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(configDir)
-
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
-
-	viper.SetDefault("api_url", DefaultAPIURL)
-	viper.SetDefault("project_id", "")
-	viper.SetDefault("service_id", "")
-	viper.SetDefault("output", DefaultOutput)
-	viper.SetDefault("analytics", DefaultAnalytics)
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("error reading config file: %w", err)
-		}
-	}
-
+	// Use the global Viper instance that's already configured by initConfig() and bindFlags()
+	// This gives us proper precedence: CLI flags > env vars > config file > defaults
 	if err := viper.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}

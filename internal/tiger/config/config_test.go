@@ -38,8 +38,19 @@ func setupTestConfig(t *testing.T) string {
 	return tmpDir
 }
 
+func setupViper(t *testing.T, tmpDir string) {
+	t.Helper()
+	
+	// Set up Viper configuration using the shared function
+	configFile := filepath.Join(tmpDir, ConfigFileName)
+	if err := SetupViper(configFile); err != nil {
+		t.Fatalf("Failed to setup Viper: %v", err)
+	}
+}
+
 func TestLoad_DefaultValues(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
@@ -80,6 +91,8 @@ analytics: false
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 	
+	setupViper(t, tmpDir)
+	
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
@@ -117,6 +130,8 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	os.Setenv("TIGER_SERVICE_ID", "env-service-101")
 	os.Setenv("TIGER_OUTPUT", "yaml")
 	os.Setenv("TIGER_ANALYTICS", "false")
+	
+	setupViper(t, tmpDir)
 	
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
@@ -169,6 +184,8 @@ analytics: true
 	os.Setenv("TIGER_PROJECT_ID", "env-project-override")
 	os.Setenv("TIGER_OUTPUT", "json")
 	
+	setupViper(t, tmpDir)
+	
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_PROJECT_ID")
@@ -199,6 +216,7 @@ analytics: true
 
 func TestLoad_GlobalConfigSingleton(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
@@ -222,6 +240,7 @@ func TestLoad_GlobalConfigSingleton(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	cfg := &Config{
 		APIURL:    "https://test.api.com/v1",
@@ -250,6 +269,9 @@ func TestSave(t *testing.T) {
 	viper.Reset()
 	globalConfig = nil
 	
+	// Setup Viper again to read the saved config file
+	setupViper(t, tmpDir)
+	
 	loadedCfg, err := Load()
 	if err != nil {
 		t.Fatalf("Failed to load saved config: %v", err)
@@ -274,6 +296,7 @@ func TestSave(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	cfg := &Config{
 		APIURL:    DefaultAPIURL,
@@ -386,6 +409,7 @@ func TestSet(t *testing.T) {
 
 func TestUnset(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
@@ -462,6 +486,7 @@ func TestUnset(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
@@ -497,6 +522,7 @@ func TestReset(t *testing.T) {
 
 func TestLoad_Singleton(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	// Test when globalConfig is nil (Load succeeds with missing file)
 	globalConfig = nil
@@ -533,7 +559,7 @@ func TestLoad_Singleton(t *testing.T) {
 }
 
 func TestLoad_ErrorHandling(t *testing.T) {
-	// Test Load() when it fails due to invalid config file
+	// Test SetupViper() when it fails due to invalid config file
 	tmpDir := setupTestConfig(t)
 	
 	// Create invalid YAML config file
@@ -550,14 +576,11 @@ invalid yaml content [
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 	
 	globalConfig = nil
-	cfg, err := Load()
 	
-	// Should return error when Load fails
+	// SetupViper should fail with invalid config file
+	err := SetupViper(configFile)
 	if err == nil {
-		t.Error("Expected Load() to fail with invalid config file, but it succeeded")
-	}
-	if cfg != nil {
-		t.Error("Expected Load() to return nil config when it fails")
+		t.Error("Expected SetupViper() to fail with invalid config file, but it succeeded")
 	}
 }
 
@@ -614,28 +637,6 @@ func TestExpandPath(t *testing.T) {
 	}
 }
 
-func TestLoad_InvalidConfigFile(t *testing.T) {
-	tmpDir := setupTestConfig(t)
-	
-	// Create invalid YAML config file
-	invalidConfig := `api_url: https://test.api.com/v1
-project_id: test-project
-invalid yaml content [
-`
-	configFile := filepath.Join(tmpDir, ConfigFileName)
-	if err := os.WriteFile(configFile, []byte(invalidConfig), 0644); err != nil {
-		t.Fatalf("Failed to write invalid config file: %v", err)
-	}
-	
-	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	defer os.Unsetenv("TIGER_CONFIG_DIR")
-	
-	_, err := Load()
-	if err == nil {
-		t.Error("Expected error for invalid config file, got nil")
-	}
-}
-
 func TestSave_CreateDirectory(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	
@@ -666,6 +667,7 @@ func TestSave_CreateDirectory(t *testing.T) {
 
 func TestResetGlobalConfig(t *testing.T) {
 	tmpDir := setupTestConfig(t)
+	setupViper(t, tmpDir)
 	
 	// Set environment variable for test
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)

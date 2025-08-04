@@ -40,25 +40,6 @@ VPCs, replicas, and related infrastructure components.`,
 			return err
 		}
 
-		if output != "" {
-			cfg.Output = output
-		}
-		if apiKey != "" {
-			cfg.APIURL = apiKey
-		}
-		if projectID != "" {
-			cfg.ProjectID = projectID
-		}
-		if serviceID != "" {
-			cfg.ServiceID = serviceID
-		}
-		if cmd.Flags().Changed("analytics") {
-			cfg.Analytics = analytics
-		}
-		if debug {
-			cfg.Debug = debug
-		}
-
 		logging.Debug("CLI initialized",
 			zap.String("config_dir", cfg.ConfigDir),
 			zap.String("output", cfg.Output),
@@ -110,14 +91,14 @@ func init() {
 
 func initConfig() {
 	// cfgFile now always has a value (either default or user-specified)
-	viper.SetConfigFile(cfgFile)
-
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		if debug {
-			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if err := config.SetupViper(cfgFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting up config: %v\n", err)
+		os.Exit(1)
+	}
+	
+	if debug {
+		if configFile := viper.ConfigFileUsed(); configFile != "" {
+			fmt.Fprintln(os.Stderr, "Using config file:", configFile)
 		}
 	}
 }
