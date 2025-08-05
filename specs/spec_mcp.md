@@ -51,34 +51,29 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
-#### `tiger mcp start`
-Start the MCP server.
+#### `tiger mcp start [transport]`
+Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
-**Options:**
-- `--port`: Port to run MCP server on (default: 3000)
+**Transports:**
+- `stdio` (default): Standard input/output transport for AI assistant integration  
+- `http`: HTTP server transport for web-based integrations
+
+**Options for HTTP transport:**
+- `--port`: Port to run HTTP server on (default: 3001)
 - `--host`: Host to bind to (default: localhost)
 
 **Examples:**
 ```bash
-# Start MCP server (uses stored CLI auth and config)
+# Start MCP server with stdio transport (default)
 tiger mcp start
+tiger mcp start stdio
 
-# Start on custom port
-tiger mcp start --port 3001
+# Start HTTP server for web integrations
+tiger mcp start http --port 3001
+tiger mcp start http --port 8080 --host 0.0.0.0
 ```
 
-#### `tiger mcp stop`
-Stop the MCP server.
-
-#### `tiger mcp status`
-Show MCP server status and connection information.
-
-#### `tiger mcp logs`
-Show MCP server logs.
-
-**Options:**
-- `--follow`: Follow log output
-- `--lines`: Number of log lines to show (default: 100)
+**Note:** The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process.
 
 ## Available Tools
 

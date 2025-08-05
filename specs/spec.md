@@ -38,7 +38,7 @@ Location: `~/.config/tiger/config.yaml`
 ```yaml
 api_url: https://api.tigerdata.com/public/v1
 project_id: your-default-project-id
-service_id: your-default-service-id  # optional
+service_id: your-default-service-id
 output: table
 analytics: true
 ```
