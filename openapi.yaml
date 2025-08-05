@@ -469,7 +469,11 @@ paths:
               $ref: '#/components/schemas/SetHAReplicaInput'
       responses:
         '202':
-          $ref: '#/components/schemas/Service'
+          description: HA replica configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
