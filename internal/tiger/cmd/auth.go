@@ -11,6 +11,7 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/term"
 
+	"github.com/tigerdata/tiger-cli/internal/tiger/api"
 	"github.com/tigerdata/tiger-cli/internal/tiger/config"
 )
 
@@ -21,6 +22,8 @@ const (
 
 var (
 	apiKeyFlag string
+	// validateAPIKeyForLogin can be overridden for testing
+	validateAPIKeyForLogin = api.ValidateAPIKey
 )
 
 // authCmd represents the auth command
@@ -55,6 +58,12 @@ The API key will be stored securely in the system keyring or as a fallback file.
 
 		if apiKey == "" {
 			return fmt.Errorf("API key is required")
+		}
+
+		// Validate the API key by making a test API call
+		fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
+		if err := validateAPIKeyForLogin(apiKey); err != nil {
+			return fmt.Errorf("API key validation failed: %w", err)
 		}
 
 		// Store the API key securely

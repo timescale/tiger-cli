@@ -17,6 +17,13 @@ func setupAuthTest(t *testing.T) string {
 	// Reset global variables to ensure test isolation
 	apiKeyFlag = ""
 	
+	// Mock the API key validation for testing
+	originalValidator := validateAPIKeyForLogin
+	validateAPIKeyForLogin = func(apiKey string) error {
+		// Always return success for testing
+		return nil
+	}
+	
 	// Aggressively clean up any existing keyring entries before starting
 	keyring.Delete(serviceName, username)
 	
@@ -32,6 +39,7 @@ func setupAuthTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global variables first
 		apiKeyFlag = ""
+		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Clean up keyring
 		keyring.Delete(serviceName, username)
 		// Clean up environment variable BEFORE cleaning up file system
@@ -75,7 +83,8 @@ func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 	
-	if output != "Successfully logged in and stored API key securely\n" {
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 	
@@ -111,7 +120,8 @@ func TestAuthLogin_WithEnvironmentVariable(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 	
-	if output != "Successfully logged in and stored API key securely\n" {
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 	
@@ -156,7 +166,8 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 	
-	if output != "Successfully logged in and stored API key securely\n" {
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 	
@@ -222,7 +233,8 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 	
-	if output != "Successfully logged in and stored API key securely\n" {
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 	
