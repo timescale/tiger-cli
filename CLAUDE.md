@@ -31,6 +31,14 @@ go test -v ./...
 go run ./cmd/tiger --help
 ```
 
+### Code Generation
+```bash
+# Generate OpenAPI client code from openapi.yaml
+go generate ./internal/tiger/api
+
+# This runs automatically as part of normal Go tooling when needed
+```
+
 ## Architecture Overview
 
 Tiger CLI is a Go-based command-line interface for managing TigerData Cloud Platform resources. The architecture follows standard Go CLI patterns using Cobra and Viper.
@@ -79,6 +87,7 @@ Global flags available on all commands:
 - **Cobra**: CLI framework and command structure
 - **Viper**: Configuration management with multiple sources
 - **Zap**: Structured logging
+- **oapi-codegen**: OpenAPI client generation (build-time dependency)
 - **Go 1.23+**: Required Go version
 
 ## Project Structure
@@ -89,10 +98,13 @@ internal/tiger/         # Internal packages
   cmd/                  # Cobra command definitions
   config/               # Configuration management
   logging/              # Structured logging utilities
+  api/                  # Generated OpenAPI client (oapi-codegen)
 specs/                  # CLI specifications and API documentation
   spec.md               # Basic project specification
   spec_mcp.md           # MCP (Model Context Protocol) specification
 bin/                    # Built binaries (created during build)
+openapi.yaml            # OpenAPI 3.0 specification for TigerData API
+tools.go                # Build-time dependencies
 ```
 
 The `internal/` directory follows Go conventions to prevent external imports of internal packages.

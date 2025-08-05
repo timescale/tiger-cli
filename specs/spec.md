@@ -645,7 +645,8 @@ Use 'tiger services list' to see available services.
 - [`github.com/spf13/pflag`](https://github.com/spf13/pflag) - POSIX/GNU-style flag library (included with Cobra)
 
 **API Client Generation:**
-- [`github.com/go-swagger/go-swagger`](https://github.com/go-swagger/go-swagger) - OpenAPI client generation (integrates with existing go-openapi dependencies)
+- [`github.com/oapi-codegen/oapi-codegen/v2`](https://github.com/oapi-codegen/oapi-codegen) - OpenAPI 3.0 client generation with clean, idiomatic Go code
+- [`github.com/oapi-codegen/runtime`](https://github.com/oapi-codegen/runtime) - Runtime types and utilities for generated client code
 - [`net/http`](https://pkg.go.dev/net/http) - Standard library HTTP client (used by generated code)
 
 **Configuration Management:**
@@ -685,9 +686,9 @@ Use 'tiger services list' to see available services.
 ### Library Selection Rationale
 
 1. **Cobra + Viper**: Industry standard for Go CLI applications, excellent integration, robust feature set
-2. **go-swagger**: Leverages existing go-openapi dependencies in the repo, generates clean client code
+2. **oapi-codegen**: Generates clean, idiomatic Go code from OpenAPI 3.0 specs with minimal dependencies
 3. **go-keyring**: Referenced in the spec, mature library with cross-platform support
-4. **Standard library HTTP**: Works seamlessly with generated swagger clients, reduces dependencies  
+4. **Standard library HTTP**: Works seamlessly with generated OpenAPI clients, reduces dependencies  
 5. **tablewriter**: Clean ASCII table output, good for terminal display
 6. **lib/pq**: Most popular PostgreSQL driver for Go, stable and well-maintained
 
