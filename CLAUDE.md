@@ -33,10 +33,14 @@ go run ./cmd/tiger --help
 
 ### Code Generation
 ```bash
-# Generate OpenAPI client code from openapi.yaml
+# Generate OpenAPI client code and mocks from openapi.yaml
 go generate ./internal/tiger/api
 
 # This runs automatically as part of normal Go tooling when needed
+# Generates:
+# - client.go: HTTP client implementation
+# - types.go: Type definitions for API models
+# - mocks/mock_client.go: Mock implementations for testing
 ```
 
 ## Architecture Overview
@@ -88,6 +92,7 @@ Global flags available on all commands:
 - **Viper**: Configuration management with multiple sources
 - **Zap**: Structured logging
 - **oapi-codegen**: OpenAPI client generation (build-time dependency)
+- **gomock**: Mock generation for testing (build-time dependency)
 - **Go 1.23+**: Required Go version
 
 ## Project Structure
@@ -99,6 +104,7 @@ internal/tiger/         # Internal packages
   config/               # Configuration management
   logging/              # Structured logging utilities
   api/                  # Generated OpenAPI client (oapi-codegen)
+    mocks/              # Generated mocks for testing
 specs/                  # CLI specifications and API documentation
   spec.md               # Basic project specification
   spec_mcp.md           # MCP (Model Context Protocol) specification
