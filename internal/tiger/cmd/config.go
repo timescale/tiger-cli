@@ -23,6 +23,8 @@ var configShowCmd = &cobra.Command{
 	Short: "Show current configuration",
 	Long:  `Display the current CLI configuration settings`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
@@ -46,6 +48,8 @@ var configSetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key, value := args[0], args[1]
+		
+		cmd.SilenceUsage = true
 
 		cfg, err := config.Load()
 		if err != nil {
@@ -69,6 +73,8 @@ var configUnsetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
+		
+		cmd.SilenceUsage = true
 
 		cfg, err := config.Load()
 		if err != nil {
@@ -90,6 +96,8 @@ var configResetCmd = &cobra.Command{
 	Short: "Reset to defaults",
 	Long:  `Reset all configuration settings to their default values`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		cfg, err := config.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
@@ -113,6 +121,7 @@ func outputTable(cfg *config.Config, cmd *cobra.Command) error {
 	fmt.Fprintf(out, "  Service ID:  %s\n", valueOrEmpty(cfg.ServiceID))
 	fmt.Fprintf(out, "  Output:      %s\n", cfg.Output)
 	fmt.Fprintf(out, "  Analytics:   %t\n", cfg.Analytics)
+	fmt.Fprintf(out, "  Debug:       %t\n", cfg.Debug)
 	fmt.Fprintf(out, "  Config Dir:  %s\n", cfg.ConfigDir)
 	return nil
 }
@@ -124,6 +133,7 @@ func outputJSON(cfg *config.Config, cmd *cobra.Command) error {
 		"service_id": cfg.ServiceID,
 		"output":     cfg.Output,
 		"analytics":  cfg.Analytics,
+		"debug":      cfg.Debug,
 		"config_dir": cfg.ConfigDir,
 	}
 
@@ -139,6 +149,7 @@ func outputYAML(cfg *config.Config, cmd *cobra.Command) error {
 		"service_id": cfg.ServiceID,
 		"output":     cfg.Output,
 		"analytics":  cfg.Analytics,
+		"debug":      cfg.Debug,
 		"config_dir": cfg.ConfigDir,
 	}
 

@@ -15,13 +15,14 @@ type Config struct {
 	Output     string `mapstructure:"output" yaml:"output"`
 	Analytics  bool   `mapstructure:"analytics" yaml:"analytics"`
 	ConfigDir  string `mapstructure:"config_dir" yaml:"-"`
-	Debug      bool   `mapstructure:"debug" yaml:"-"`
+	Debug      bool   `mapstructure:"debug" yaml:"debug"`
 }
 
 const (
 	DefaultAPIURL     = "https://api.tigerdata.com/public/v1"
 	DefaultOutput     = "table"
 	DefaultAnalytics  = true
+	DefaultDebug      = false
 	DefaultConfigDir  = "~/.config/tiger"
 	ConfigFileName    = "config.yaml"
 )
@@ -40,6 +41,7 @@ func SetupViper(configFile string) error {
 	viper.SetDefault("service_id", "")
 	viper.SetDefault("output", DefaultOutput)
 	viper.SetDefault("analytics", DefaultAnalytics)
+	viper.SetDefault("debug", DefaultDebug)
 	
 	// Try to read config file if it exists
 	if _, err := os.Stat(configFile); err == nil {
@@ -85,6 +87,7 @@ func (c *Config) Save() error {
 	viper.Set("service_id", c.ServiceID)
 	viper.Set("output", c.Output)
 	viper.Set("analytics", c.Analytics)
+	viper.Set("debug", c.Debug)
 
 	if err := viper.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
@@ -114,6 +117,14 @@ func (c *Config) Set(key, value string) error {
 		} else {
 			return fmt.Errorf("invalid analytics value: %s (must be true or false)", value)
 		}
+	case "debug":
+		if value == "true" {
+			c.Debug = true
+		} else if value == "false" {
+			c.Debug = false
+		} else {
+			return fmt.Errorf("invalid debug value: %s (must be true or false)", value)
+		}
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -133,6 +144,8 @@ func (c *Config) Unset(key string) error {
 		c.Output = DefaultOutput
 	case "analytics":
 		c.Analytics = DefaultAnalytics
+	case "debug":
+		c.Debug = DefaultDebug
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -146,6 +159,7 @@ func (c *Config) Reset() error {
 	c.ServiceID = ""
 	c.Output = DefaultOutput
 	c.Analytics = DefaultAnalytics
+	c.Debug = DefaultDebug
 
 	return c.Save()
 }

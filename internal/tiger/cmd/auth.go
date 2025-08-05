@@ -60,6 +60,8 @@ The API key will be stored securely in the system keyring or as a fallback file.
 			return fmt.Errorf("API key is required")
 		}
 
+		cmd.SilenceUsage = true
+
 		// Validate the API key by making a test API call
 		fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
 		if err := validateAPIKeyForLogin(apiKey); err != nil {
@@ -74,7 +76,7 @@ The API key will be stored securely in the system keyring or as a fallback file.
 		// TODO: Retrieve project ID from API and store in config
 		// For now, just confirm successful storage
 		fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key securely")
-		
+
 		return nil
 	},
 }
@@ -85,6 +87,8 @@ var logoutCmd = &cobra.Command{
 	Short: "Remove stored credentials",
 	Long:  `Remove stored API key and clear authentication credentials.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		if err := removeAPIKey(); err != nil {
 			return fmt.Errorf("failed to remove API key: %w", err)
 		}
@@ -100,6 +104,8 @@ var whoamiCmd = &cobra.Command{
 	Short: "Show current user information",
 	Long:  `Show information about the currently authenticated user.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		apiKey, err := getAPIKey()
 		if err != nil {
 			return fmt.Errorf("not logged in: %w", err)
@@ -112,7 +118,7 @@ var whoamiCmd = &cobra.Command{
 
 		// TODO: Make API call to get user information
 		fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
-		
+
 		return nil
 	},
 }

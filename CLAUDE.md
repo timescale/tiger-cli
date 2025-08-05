@@ -115,6 +115,35 @@ tools.go                # Build-time dependencies
 
 The `internal/` directory follows Go conventions to prevent external imports of internal packages.
 
+## Cobra Usage Display Pattern
+
+When implementing Cobra commands, use this pattern to control when usage information is displayed on errors:
+
+```go
+RunE: func(cmd *cobra.Command, args []string) error {
+    // 1. Do argument validation first - errors here show usage
+    if len(args) < 1 {
+        return fmt.Errorf("service ID is required")
+    }
+    
+    // 2. Set SilenceUsage = true after argument validation
+    cmd.SilenceUsage = true
+    
+    // 3. Proceed with business logic - errors here don't show usage
+    if err := someAPICall(); err != nil {
+        return fmt.Errorf("operation failed: %w", err)
+    }
+    
+    return nil
+},
+```
+
+**Philosophy**: 
+- Early argument/syntax errors → show usage (helps users learn command syntax)
+- Operational errors after arguments are validated → don't show usage (avoids cluttering output with irrelevant usage info)
+
+This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
+
 ## Specifications
 
 The project specifications are located in the `specs/` directory:
