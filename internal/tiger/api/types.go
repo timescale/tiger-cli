@@ -5,8 +5,6 @@ package api
 
 import (
 	"time"
-
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for DeployStatus.
@@ -186,8 +184,8 @@ type Service struct {
 	Paused *bool `json:"paused,omitempty"`
 
 	// ProjectId The project this service belongs to.
-	ProjectId       *openapi_types.UUID `json:"project_id,omitempty"`
-	ReadReplicaSets *[]ReadReplicaSet   `json:"read_replica_sets,omitempty"`
+	ProjectId       *string           `json:"project_id,omitempty"`
+	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
 
 	// RegionCode The cloud region where the service is hosted.
 	RegionCode *string `json:"region_code,omitempty"`
@@ -211,9 +209,9 @@ type Service struct {
 	} `json:"resources,omitempty"`
 
 	// ServiceId The unique identifier for the service.
-	ServiceId   *openapi_types.UUID `json:"service_id,omitempty"`
-	ServiceType *ServiceType        `json:"service_type,omitempty"`
-	Status      *DeployStatus       `json:"status,omitempty"`
+	ServiceId   *string       `json:"service_id,omitempty"`
+	ServiceType *ServiceType  `json:"service_type,omitempty"`
+	Status      *DeployStatus `json:"status,omitempty"`
 
 	// VpcEndpoint VPC endpoint configuration if available
 	VpcEndpoint *map[string]interface{} `json:"vpcEndpoint"`

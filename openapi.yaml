@@ -768,11 +768,9 @@ components:
       properties:
         service_id:
           type: string
-          format: uuid
           description: The unique identifier for the service.
         project_id:
           type: string
-          format: uuid
           description: The project this service belongs to.
         name:
           type: string
