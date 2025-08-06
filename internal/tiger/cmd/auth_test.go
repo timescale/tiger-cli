@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/zalando/go-keyring"
+	"github.com/tigerdata/tiger-cli/internal/tiger/config"
 )
 
 func setupAuthTest(t *testing.T) string {
@@ -16,10 +18,11 @@ func setupAuthTest(t *testing.T) string {
 	
 	// Reset global variables to ensure test isolation
 	apiKeyFlag = ""
+	projectIDFlag = ""
 	
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
-	validateAPIKeyForLogin = func(apiKey string) error {
+	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		// Always return success for testing
 		return nil
 	}
@@ -36,12 +39,27 @@ func setupAuthTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	
+	// Reset global config and viper to ensure test isolation
+	config.ResetGlobalConfig()
+	viper.Reset()
+	
+	// Also ensure config file doesn't exist
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	os.Remove(configFile)
+	
 	t.Cleanup(func() {
+		// Reset global config and viper first
+		config.ResetGlobalConfig()
+		viper.Reset()
 		// Reset global variables first
 		apiKeyFlag = ""
+		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Clean up keyring
 		keyring.Delete(serviceName, username)
+		// Remove config file explicitly
+		configFile := filepath.Join(tmpDir, "config.yaml")
+		os.Remove(configFile)
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		// Then clean up file system
@@ -432,5 +450,71 @@ func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
 	err := removeAPIKeyFromFile()
 	if err != nil {
 		t.Fatalf("Should not error when removing non-existent file: %v", err)
+	}
+}
+
+func TestAuthLogin_WithProjectID(t *testing.T) {
+	setupAuthTest(t)
+	
+	// Execute login command with API key and project ID flags
+	output, err := executeAuthCommand("auth", "login", "--api-key", "test-api-key-123", "--project-id", "test-project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-456\n"
+	if output != expectedOutput {
+		t.Errorf("Unexpected output: '%s'", output)
+	}
+	
+	// Verify API key was stored (try keyring first, then file fallback)
+	apiKey, err := getAPIKey()
+	if err != nil {
+		t.Fatalf("Failed to get stored API key: %v", err)
+	}
+	if apiKey != "test-api-key-123" {
+		t.Errorf("Expected API key 'test-api-key-123', got '%s'", apiKey)
+	}
+	
+	// Verify project ID was stored in config
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ProjectID != "test-project-456" {
+		t.Errorf("Expected project ID 'test-project-456', got '%s'", cfg.ProjectID)
+	}
+}
+
+func TestAuthLogin_WithoutProjectID(t *testing.T) {
+	setupAuthTest(t)
+	
+	// Execute login command with only API key flag (no project ID)
+	output, err := executeAuthCommand("auth", "login", "--api-key", "test-api-key-789")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	if output != expectedOutput {
+		t.Errorf("Unexpected output: '%s'", output)
+	}
+	
+	// Verify API key was stored
+	apiKey, err := getAPIKey()
+	if err != nil {
+		t.Fatalf("Failed to get stored API key: %v", err)
+	}
+	if apiKey != "test-api-key-789" {
+		t.Errorf("Expected API key 'test-api-key-789', got '%s'", apiKey)
+	}
+	
+	// Verify project ID was not set in config (should be empty)
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ProjectID != "" {
+		t.Errorf("Expected empty project ID, got '%s'", cfg.ProjectID)
 	}
 }

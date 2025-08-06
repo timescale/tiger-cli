@@ -20,15 +20,17 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 
 	// Reset global variables
 	apiKeyFlag = ""
+	projectIDFlag = ""
 	originalValidator := validateAPIKeyForLogin
 	
 	// Mock the validator to return an error
-	validateAPIKeyForLogin = func(apiKey string) error {
+	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		return errors.New("invalid API key: authentication failed")
 	}
 	
 	defer func() {
 		apiKeyFlag = ""
+		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator
 	}()
 
@@ -79,15 +81,17 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 
 	// Reset global variables
 	apiKeyFlag = ""
+	projectIDFlag = ""
 	originalValidator := validateAPIKeyForLogin
 	
 	// Mock the validator to return success
-	validateAPIKeyForLogin = func(apiKey string) error {
+	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		return nil // Success
 	}
 	
 	defer func() {
 		apiKeyFlag = ""
+		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator
 	}()
 

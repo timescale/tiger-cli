@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,54 +16,56 @@ func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	// Create HTTP client with reasonable timeout
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	
+
 	// Create the API client
 	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient), WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
 		// Add API key to Authorization header
-		req.Header.Set("Authorization", "Bearer "+apiKey)
+		encodedKey := base64.StdEncoding.EncodeToString([]byte(apiKey))
+		req.Header.Set("Authorization", "Basic "+encodedKey)
 		return nil
 	}))
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client: %w", err)
 	}
-	
+
 	return client, nil
 }
 
 // ValidateAPIKey validates the API key by making a test API call
-func ValidateAPIKey(apiKey string) error {
+func ValidateAPIKey(apiKey string, projectID string) error {
 	client, err := NewTigerClient(apiKey)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-	
-	return ValidateAPIKeyWithClient(client)
+
+	return ValidateAPIKeyWithClient(client, projectID)
 }
 
 // ValidateAPIKeyWithClient validates the API key using the provided client interface
-func ValidateAPIKeyWithClient(client ClientWithResponsesInterface) error {
+func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
-	// We need a project ID to make most API calls, but we don't have one yet during login.
-	// For now, let's try to get any project's services which should fail with 400/404 if the API key is invalid
-	// and succeed (even if empty) if the API key is valid.
-	// TODO: Find a better endpoint for API key validation that doesn't require project ID
-	
-	// Try to call a simple endpoint - we'll use a dummy project ID
+
+	// Use provided project ID if available, otherwise use a dummy one
+	targetProjectID := projectID
+	if targetProjectID == "" {
+		// Use a dummy project ID for validation when none is provided
+		targetProjectID = "00000000-0000-0000-0000-000000000000"
+	}
+
+	// Try to call a simple endpoint
 	// The API should return 401/403 for invalid API key, and 404 for non-existent project
-	dummyProjectID := "00000000-0000-0000-0000-000000000000"
-	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, dummyProjectID)
+	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, targetProjectID)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
-	
+
 	// Check the response status
 	switch resp.StatusCode() {
 	case 401, 403:

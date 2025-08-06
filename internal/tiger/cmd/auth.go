@@ -22,8 +22,11 @@ const (
 
 var (
 	apiKeyFlag string
+	projectIDFlag string
 	// validateAPIKeyForLogin can be overridden for testing
-	validateAPIKeyForLogin = api.ValidateAPIKey
+	validateAPIKeyForLogin = func(apiKey, projectID string) error {
+		return api.ValidateAPIKey(apiKey, projectID)
+	}
 )
 
 // authCmd represents the auth command
@@ -36,11 +39,13 @@ var authCmd = &cobra.Command{
 // loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Authenticate with API token",
-	Long: `Authenticate with TigerData API using an API token.
-The API key will be stored securely in the system keyring or as a fallback file.`,
+	Short: "Authenticate with API token and optional project ID",
+	Long: `Authenticate with TigerData API using an API token and optionally set a default project ID.
+The API key will be stored securely in the system keyring or as a fallback file.
+The project ID will be stored in the configuration file.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiKey := apiKeyFlag
+		projectID := projectIDFlag
 
 		// If no API key provided via flag, check environment variable
 		if apiKey == "" {
@@ -64,7 +69,7 @@ The API key will be stored securely in the system keyring or as a fallback file.
 
 		// Validate the API key by making a test API call
 		fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-		if err := validateAPIKeyForLogin(apiKey); err != nil {
+		if err := validateAPIKeyForLogin(apiKey, projectID); err != nil {
 			return fmt.Errorf("API key validation failed: %w", err)
 		}
 
@@ -73,9 +78,15 @@ The API key will be stored securely in the system keyring or as a fallback file.
 			return fmt.Errorf("failed to store API key: %w", err)
 		}
 
-		// TODO: Retrieve project ID from API and store in config
-		// For now, just confirm successful storage
-		fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key securely")
+		// Store project ID in config if provided
+		if projectID != "" {
+			if err := storeProjectID(projectID); err != nil {
+				return fmt.Errorf("failed to store project ID: %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in and stored API key securely. Set default project ID to: %s\n", projectID)
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key securely")
+		}
 
 		return nil
 	},
@@ -131,6 +142,7 @@ func init() {
 
 	// Add flags
 	loginCmd.Flags().StringVar(&apiKeyFlag, "api-key", "", "API key for authentication")
+	loginCmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Default project ID to set in configuration")
 }
 
 // storeAPIKey stores the API key using keyring with file fallback
@@ -238,4 +250,14 @@ func promptForAPIKey() (string, error) {
 		}
 		return strings.TrimSpace(apiKey), nil
 	}
+}
+
+// storeProjectID stores the project ID in the configuration file
+func storeProjectID(projectID string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	return cfg.Set("project_id", projectID)
 }
