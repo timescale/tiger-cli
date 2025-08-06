@@ -1,0 +1,175 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/tigerdata/tiger-cli/internal/tiger/api"
+	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+)
+
+var (
+	// getAPIKeyForDB can be overridden for testing
+	getAPIKeyForDB = getAPIKey
+)
+
+// dbCmd represents the db command
+var dbCmd = &cobra.Command{
+	Use:   "db",
+	Short: "Database operations and management",
+	Long:  `Database-specific operations including connection management, testing, and configuration.`,
+}
+
+// dbConnectionStringCmd represents the connection-string command under db
+var dbConnectionStringCmd = &cobra.Command{
+	Use:   "connection-string [service-id]",
+	Short: "Get connection string for a service",
+	Long: `Get a PostgreSQL connection string for connecting to a database service.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. The connection string includes all necessary parameters
+for establishing a database connection to the TimescaleDB/PostgreSQL service.
+
+Examples:
+  # Get connection string for default service
+  tiger db connection-string
+
+  # Get connection string for specific service
+  tiger db connection-string svc-12345
+
+  # Get pooled connection string (uses connection pooler if available)
+  tiger db connection-string svc-12345 --pooled
+
+  # Get connection string with custom role/username
+  tiger db connection-string svc-12345 --role readonly`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Get config
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		projectID := cfg.ProjectID
+		if projectID == "" {
+			return fmt.Errorf("project ID is required. Set it using login with --project-id")
+		}
+
+		// Determine service ID
+		var serviceID string
+		if len(args) > 0 {
+			serviceID = args[0]
+		} else {
+			serviceID = cfg.ServiceID
+		}
+
+		if serviceID == "" {
+			return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+		}
+
+		cmd.SilenceUsage = true
+
+		// Get API key for authentication
+		apiKey, err := getAPIKeyForDB()
+		if err != nil {
+			return fmt.Errorf("authentication required: %w", err)
+		}
+
+		// Create API client
+		client, err := api.NewTigerClient(apiKey)
+		if err != nil {
+			return fmt.Errorf("failed to create API client: %w", err)
+		}
+
+		// Fetch service details
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch service details: %w", err)
+		}
+
+		// Handle API response
+		switch resp.StatusCode() {
+		case 200:
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+
+			service := *resp.JSON200
+			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
+			if err != nil {
+				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
+			return nil
+
+		case 401, 403:
+			return fmt.Errorf("authentication failed: invalid API key")
+		case 404:
+			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+		default:
+			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		}
+	},
+}
+
+// Command-line flags for db connection-string
+var (
+	dbConnectionStringPooled bool
+	dbConnectionStringRole   string
+)
+
+func init() {
+	rootCmd.AddCommand(dbCmd)
+	dbCmd.AddCommand(dbConnectionStringCmd)
+
+	// Add flags for db connection-string command
+	dbConnectionStringCmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
+	dbConnectionStringCmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
+}
+
+// buildConnectionString creates a PostgreSQL connection string from service details
+func buildConnectionString(service api.Service, pooled bool, role string, cmd *cobra.Command) (string, error) {
+	if service.Endpoint == nil {
+		return "", fmt.Errorf("service endpoint not available")
+	}
+
+	var endpoint *api.Endpoint
+	var host string
+	var port int
+
+	// Use pooler endpoint if requested and available, otherwise use direct endpoint
+	if pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
+		endpoint = service.ConnectionPooler.Endpoint
+	} else {
+		// If pooled was requested but no pooler is available, warn the user
+		if pooled {
+			fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
+		}
+		endpoint = service.Endpoint
+	}
+
+	if endpoint.Host == nil {
+		return "", fmt.Errorf("endpoint host not available")
+	}
+	host = *endpoint.Host
+
+	if endpoint.Port != nil {
+		port = *endpoint.Port
+	} else {
+		port = 5432 // Default PostgreSQL port
+	}
+
+	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
+	database := "tsdb"
+
+	// Build connection string in PostgreSQL URI format
+	connectionString := fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
+
+	return connectionString, nil
+}
