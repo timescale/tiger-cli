@@ -241,6 +241,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			fmt.Fprintf(cmd.OutOrStdout(), "✅ Service creation request accepted!\n")
 			fmt.Fprintf(cmd.OutOrStdout(), "📋 Service ID: %s\n", serviceID)
 
+			// Capture initial password from creation response and save it immediately
+			var initialPassword string
+			if service.InitialPassword != nil {
+				initialPassword = *service.InitialPassword
+			}
+
+			// Save password immediately after service creation, before any waiting
+			// This ensures users have access even if they interrupt the wait or it fails
+			handlePasswordSaving(service, initialPassword, cmd)
+
 			// Handle wait behavior
 			if createNoWait {
 				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
@@ -388,25 +398,26 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			switch status {
 			case "READY":
 				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service is ready and running!\n")
-
-				// Save password to ~/.pgpass if available
-				if service.InitialPassword != nil && service.Endpoint != nil {
-					err := savePgPassEntry(service, *service.InitialPassword)
-					if err != nil {
-						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to save password to ~/.pgpass: %v\n", err)
-						fmt.Fprintf(cmd.OutOrStdout(), "🔐 Initial password: %s\n", *service.InitialPassword)
-						fmt.Fprintf(cmd.OutOrStdout(), "💡 Save this password - it won't be shown again!\n")
-					} else {
-						fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password saved to ~/.pgpass for automatic authentication\n")
-					}
-				}
-
 				return nil
 			case "FAILED", "ERROR":
 				return fmt.Errorf("service creation failed with status: %s", status)
 			default:
 				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service status: %s...\n", status)
 			}
+		}
+	}
+}
+
+// handlePasswordSaving handles saving password to ~/.pgpass and displaying appropriate messages
+func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
+	if initialPassword != "" && service.Endpoint != nil {
+		err := savePgPassEntry(service, initialPassword)
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to save password to ~/.pgpass: %v\n", err)
+			fmt.Fprintf(cmd.OutOrStdout(), "🔐 Initial password: %s\n", initialPassword)
+			fmt.Fprintf(cmd.OutOrStdout(), "💡 Save this password - it won't be shown again!\n")
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password saved to ~/.pgpass for automatic authentication\n")
 		}
 	}
 }
