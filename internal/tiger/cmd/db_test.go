@@ -342,7 +342,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, cmd)
 	
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -354,6 +354,122 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	if !strings.Contains(output, "Connecting to database") {
 		t.Errorf("Expected connecting message, got: %q", output)
 	}
+}
+
+func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
+	// This test verifies that additional flags are passed correctly to psql
+	
+	// Create a test command to capture output
+	cmd := &cobra.Command{}
+	outBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
+	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
+	
+	// This will fail because psql path doesn't exist, but we can verify the error
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, cmd)
+	
+	// Should fail with exec error since fake psql path doesn't exist
+	if err == nil {
+		t.Error("Expected error when using fake psql path")
+	}
+	
+	// Should have printed connecting message
+	output := outBuf.String()
+	if !strings.Contains(output, "Connecting to database") {
+		t.Errorf("Expected connecting message, got: %q", output)
+	}
+}
+
+func TestSeparateServiceAndPsqlArgs(t *testing.T) {
+	testCases := []struct {
+		name                string
+		args                []string
+		argsLenAtDash       int  // What ArgsLenAtDash should return
+		expectedServiceArgs []string
+		expectedPsqlFlags   []string
+	}{
+		{
+			name:                "No separator - service only",
+			args:                []string{"svc-12345"},
+			argsLenAtDash:       -1, // No -- found
+			expectedServiceArgs: []string{"svc-12345"},
+			expectedPsqlFlags:   []string{},
+		},
+		{
+			name:                "No arguments at all",
+			args:                []string{},
+			argsLenAtDash:       -1,
+			expectedServiceArgs: []string{},
+			expectedPsqlFlags:   []string{},
+		},
+		{
+			name:                "Service with psql flags after --",
+			args:                []string{"svc-12345", "-c", "SELECT 1;"},
+			argsLenAtDash:       1, // -- was after first arg
+			expectedServiceArgs: []string{"svc-12345"},
+			expectedPsqlFlags:   []string{"-c", "SELECT 1;"},
+		},
+		{
+			name:                "No service, just psql flags after --",
+			args:                []string{"--single-transaction", "--quiet"},
+			argsLenAtDash:       0, // -- was at the beginning
+			expectedServiceArgs: []string{},
+			expectedPsqlFlags:   []string{"--single-transaction", "--quiet"},
+		},
+		{
+			name:                "Service with multiple psql flags",
+			args:                []string{"svc-test", "-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"},
+			argsLenAtDash:       1,
+			expectedServiceArgs: []string{"svc-test"},
+			expectedPsqlFlags:   []string{"-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a mock command that returns the expected ArgsLenAtDash
+			mockCmd := &mockCobraCommand{
+				args:          tc.args,
+				argsLenAtDash: tc.argsLenAtDash,
+			}
+			
+			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(mockCmd, tc.args)
+			
+			if !equalStringSlices(serviceArgs, tc.expectedServiceArgs) {
+				t.Errorf("Expected serviceArgs %v, got %v", tc.expectedServiceArgs, serviceArgs)
+			}
+			
+			if !equalStringSlices(psqlFlags, tc.expectedPsqlFlags) {
+				t.Errorf("Expected psqlFlags %v, got %v", tc.expectedPsqlFlags, psqlFlags)
+			}
+		})
+	}
+}
+
+// mockCobraCommand implements the minimal interface needed for testing
+type mockCobraCommand struct {
+	args          []string
+	argsLenAtDash int
+}
+
+func (m *mockCobraCommand) ArgsLenAtDash() int {
+	return m.argsLenAtDash
+}
+
+// Helper function to compare string slices
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestBuildConnectionString(t *testing.T) {

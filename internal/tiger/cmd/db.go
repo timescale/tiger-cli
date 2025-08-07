@@ -94,9 +94,16 @@ Examples:
 
   # Connect with custom role/username
   tiger db connect svc-12345 --role readonly
-  tiger db psql svc-12345 --role readonly`,
+  tiger db psql svc-12345 --role readonly
+
+  # Pass additional flags to psql (use -- to separate)
+  tiger db connect svc-12345 -- --single-transaction --quiet
+  tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		service, err := getServiceDetails(cmd, args)
+		// Separate service ID from additional psql flags
+		serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
+
+		service, err := getServiceDetails(cmd, serviceArgs)
 		if err != nil {
 			return err
 		}
@@ -113,8 +120,8 @@ Examples:
 			return fmt.Errorf("failed to build connection string: %w", err)
 		}
 
-		// Launch psql
-		return launchPsqlWithConnectionString(connectionString, psqlPath, cmd)
+		// Launch psql with additional flags
+		return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, cmd)
 	},
 }
 
@@ -247,11 +254,36 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 }
 
-// launchPsqlWithConnectionString launches psql using the connection string
-func launchPsqlWithConnectionString(connectionString, psqlPath string, cmd *cobra.Command) error {
-	fmt.Fprintf(cmd.OutOrStdout(), "Connecting to database...\n")
-	
-	psqlCmd := exec.Command(psqlPath, connectionString)
+// ArgsLenAtDashProvider defines the interface for getting ArgsLenAtDash
+type ArgsLenAtDashProvider interface {
+	ArgsLenAtDash() int
+}
+
+// separateServiceAndPsqlArgs separates service arguments from psql flags using Cobra's ArgsLenAtDash
+func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]string, []string) {
+	serviceArgs := []string{}
+	psqlFlags := []string{}
+
+	argsLenAtDash := cmd.ArgsLenAtDash()
+	if argsLenAtDash >= 0 {
+		// There was a -- separator
+		serviceArgs = args[:argsLenAtDash]
+		psqlFlags = args[argsLenAtDash:]
+	} else {
+		// No -- separator
+		serviceArgs = args
+	}
+
+	return serviceArgs, psqlFlags
+}
+
+// launchPsqlWithConnectionString launches psql using the connection string and additional flags
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, cmd *cobra.Command) error {
+	// Build command arguments: connection string first, then additional flags
+	args := []string{connectionString}
+	args = append(args, additionalFlags...)
+
+	psqlCmd := exec.Command(psqlPath, args...)
 	psqlCmd.Stdin = os.Stdin
 	psqlCmd.Stdout = os.Stdout
 	psqlCmd.Stderr = os.Stderr
