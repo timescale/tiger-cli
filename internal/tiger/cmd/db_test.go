@@ -6,7 +6,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -349,10 +351,10 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 		t.Error("Expected error when using fake psql path")
 	}
 	
-	// Should have printed connecting message
+	// No output expected since we removed the connecting message
 	output := outBuf.String()
-	if !strings.Contains(output, "Connecting to database") {
-		t.Errorf("Expected connecting message, got: %q", output)
+	if output != "" {
+		t.Errorf("Expected no output, got: %q", output)
 	}
 }
 
@@ -376,10 +378,10 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 		t.Error("Expected error when using fake psql path")
 	}
 	
-	// Should have printed connecting message
+	// No output expected since we removed the connecting message
 	output := outBuf.String()
-	if !strings.Contains(output, "Connecting to database") {
-		t.Errorf("Expected connecting message, got: %q", output)
+	if output != "" {
+		t.Errorf("Expected no output, got: %q", output)
 	}
 }
 
@@ -470,6 +472,234 @@ func equalStringSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func TestDBTestConnection_NoProjectID(t *testing.T) {
+	setupDBTest(t)
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db test-connection command without project ID
+	_, err := executeDBCommand("db", "test-connection", "svc-12345")
+	if err == nil {
+		t.Fatal("Expected error when no project ID is configured")
+	}
+	
+	if !strings.Contains(err.Error(), "project ID is required") {
+		t.Errorf("Expected error about missing project ID, got: %v", err)
+	}
+}
+
+func TestDBTestConnection_NoServiceID(t *testing.T) {
+	tmpDir := setupDBTest(t)
+	
+	// Set up config with project ID but no default service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db test-connection command without service ID
+	_, err = executeDBCommand("db", "test-connection")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided or configured")
+	}
+	
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestDBTestConnection_NoAuth(t *testing.T) {
+	tmpDir := setupDBTest(t)
+	
+	// Set up config with project ID and service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db test-connection command
+	_, err = executeDBCommand("db", "test-connection")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+	
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
+	// Test with truly invalid connection string that should fail at sql.Open
+	
+	cmd := &cobra.Command{}
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	cmd.SetErr(errBuf)
+	
+	// Test with malformed connection string (should return exit code 3)
+	invalidConnectionString := "this is not a valid connection string at all"
+	err := testDatabaseConnection(invalidConnectionString, 1, cmd)
+	
+	if err == nil {
+		t.Error("Expected error for invalid connection string")
+	}
+	
+	// Should be an exitCodeError
+	if exitErr, ok := err.(exitCodeError); ok {
+		// The exact code depends on where it fails - could be 2 or 3
+		if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
+			t.Errorf("Expected exit code 2 or 3 for invalid connection string, got %d", exitErr.ExitCode())
+		}
+	} else {
+		t.Error("Expected exitCodeError for invalid connection string")
+	}
+}
+
+func TestTestDatabaseConnection_Timeout(t *testing.T) {
+	// Test timeout functionality with a connection to a non-existent server
+	cmd := &cobra.Command{}
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	cmd.SetErr(errBuf)
+	
+	// Use a connection string to a non-routable IP to test timeout
+	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
+	
+	start := time.Now()
+	err := testDatabaseConnection(timeoutConnectionString, 1, cmd) // 1 second timeout
+	duration := time.Since(start)
+	
+	if err == nil {
+		t.Error("Expected error for timeout connection")
+	}
+	
+	// Should complete within reasonable time (not hang)
+	if duration > 3*time.Second {
+		t.Errorf("Connection test took too long: %v", duration)
+	}
+	
+	// Check exit code (should be 2 for unreachable)
+	if exitErr, ok := err.(exitCodeError); ok {
+		if exitErr.ExitCode() != 2 {
+			t.Errorf("Expected exit code 2 for timeout, got %d", exitErr.ExitCode())
+		}
+	} else {
+		t.Error("Expected exitCodeError for timeout")
+	}
+}
+
+func TestExitCodeError(t *testing.T) {
+	// Test the exitCodeError type
+	originalErr := fmt.Errorf("test error")
+	exitErr := exitWithCode(42, originalErr)
+	
+	if exitErr.Error() != "test error" {
+		t.Errorf("Expected error message 'test error', got '%s'", exitErr.Error())
+	}
+	
+	if exitCodeErr, ok := exitErr.(exitCodeError); ok {
+		if exitCodeErr.ExitCode() != 42 {
+			t.Errorf("Expected exit code 42, got %d", exitCodeErr.ExitCode())
+		}
+	} else {
+		t.Error("exitWithCode should return exitCodeError")
+	}
+}
+
+func TestIsConnectionRejected(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name: "PostgreSQL error code 57P03 (ERRCODE_CANNOT_CONNECT_NOW)",
+			err: &pgconn.PgError{
+				Code:    "57P03",
+				Message: "the database system is starting up",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL authentication error (28P01)",
+			err: &pgconn.PgError{
+				Code:    "28P01",
+				Message: "password authentication failed for user \"test\"",
+			},
+			expected: false,
+		},
+		{
+			name: "PostgreSQL invalid authorization error (28000)",
+			err: &pgconn.PgError{
+				Code:    "28000",
+				Message: "role \"nonexistent\" does not exist",
+			},
+			expected: false,
+		},
+		{
+			name: "PostgreSQL database does not exist (3D000)",
+			err: &pgconn.PgError{
+				Code:    "3D000",
+				Message: "database \"nonexistent\" does not exist",
+			},
+			expected: false,
+		},
+		{
+			name:     "Non-PostgreSQL error (connection refused)",
+			err:      fmt.Errorf("dial tcp: connection refused"),
+			expected: false,
+		},
+		{
+			name:     "Non-PostgreSQL error (network unreachable)",
+			err:      fmt.Errorf("dial tcp: network is unreachable"),
+			expected: false,
+		},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isConnectionRejected(tc.err)
+			
+			if result != tc.expected {
+				t.Errorf("Expected isConnectionRejected to return %v for error %v, got %v", 
+					tc.expected, tc.err, result)
+			}
+		})
+	}
 }
 
 func TestBuildConnectionString(t *testing.T) {

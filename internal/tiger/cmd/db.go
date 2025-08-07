@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
 	"github.com/tigerdata/tiger-cli/internal/tiger/api"
@@ -125,18 +127,67 @@ Examples:
 	},
 }
 
+// dbTestConnectionCmd represents the test-connection command under db
+var dbTestConnectionCmd = &cobra.Command{
+	Use:   "test-connection [service-id]",
+	Short: "Test database connectivity",
+	Long: `Test database connectivity to a service.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command tests if the database is accepting
+connections and returns appropriate exit codes following pg_isready conventions.
+
+Return Codes:
+  0: Server is accepting connections normally
+  1: Server is rejecting connections (e.g., during startup)
+  2: No response to connection attempt (server unreachable)
+  3: No attempt made (e.g., invalid parameters)
+
+Examples:
+  # Test connection to default service
+  tiger db test-connection
+
+  # Test connection to specific service
+  tiger db test-connection svc-12345
+
+  # Test connection with custom timeout (10 seconds)
+  tiger db test-connection svc-12345 --timeout 10
+
+  # Test connection with no timeout (wait indefinitely)
+  tiger db test-connection svc-12345 --timeout 0`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		service, err := getServiceDetails(cmd, args)
+		if err != nil {
+			return exitWithCode(3, err) // Invalid parameters
+		}
+
+		// Build connection string for testing
+		connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, cmd)
+		if err != nil {
+			return exitWithCode(3, fmt.Errorf("failed to build connection string: %w", err))
+		}
+
+		// Test the connection
+		return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
+	},
+}
+
 // Command-line flags for db commands
 var (
 	dbConnectionStringPooled bool
 	dbConnectionStringRole   string
 	dbConnectPooled          bool
 	dbConnectRole            string
+	dbTestConnectionTimeout  int
+	dbTestConnectionPooled   bool
+	dbTestConnectionRole     string
 )
 
 func init() {
 	rootCmd.AddCommand(dbCmd)
 	dbCmd.AddCommand(dbConnectionStringCmd)
 	dbCmd.AddCommand(dbConnectCmd)
+	dbCmd.AddCommand(dbTestConnectionCmd)
 
 	// Add flags for db connection-string command
 	dbConnectionStringCmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
@@ -145,6 +196,11 @@ func init() {
 	// Add flags for db connect command (works for both connect and psql)
 	dbConnectCmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
 	dbConnectCmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
+
+	// Add flags for db test-connection command
+	dbTestConnectionCmd.Flags().IntVarP(&dbTestConnectionTimeout, "timeout", "t", 3, "Timeout in seconds (0 for no timeout)")
+	dbTestConnectionCmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
+	dbTestConnectionCmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
 }
 
 // buildConnectionString creates a PostgreSQL connection string from service details
@@ -290,3 +346,118 @@ func launchPsqlWithConnectionString(connectionString, psqlPath string, additiona
 
 	return psqlCmd.Run()
 }
+
+// exitWithCode creates an error that will cause the program to exit with the specified code
+type exitCodeError struct {
+	code int
+	err  error
+}
+
+func (e exitCodeError) Error() string {
+	if e.err == nil {
+		return ""
+	}
+	return e.err.Error()
+}
+
+func (e exitCodeError) ExitCode() int {
+	return e.code
+}
+
+// exitWithCode returns an error that will cause the program to exit with the specified code
+func exitWithCode(code int, err error) error {
+	return exitCodeError{code: code, err: err}
+}
+
+// testDatabaseConnection tests the database connection and returns appropriate exit codes
+func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *cobra.Command) error {
+	// Create context with timeout if specified
+	var ctx context.Context
+	var cancel context.CancelFunc
+	
+	if timeoutSeconds > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
+
+	// Parse the connection string first to validate it
+	config, err := pgx.ParseConfig(connectionString)
+	if err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to parse connection string: %v\n", err)
+		return exitWithCode(3, err) // Invalid parameters
+	}
+
+	// Attempt to connect to the database
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		// Determine the appropriate exit code based on error type
+		if isContextDeadlineExceeded(ctx, err) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
+			return exitWithCode(2, err) // No response to connection attempt
+		}
+		
+		// Check if it's a connection rejection vs unreachable
+		if isConnectionRejected(err) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
+			return exitWithCode(1, err) // Server is rejecting connections
+		}
+		
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
+		return exitWithCode(2, err) // No response to connection attempt
+	}
+	defer conn.Close(ctx)
+
+	// Test the connection with a simple ping
+	err = conn.Ping(ctx)
+	if err != nil {
+		// Determine the appropriate exit code based on error type
+		if isContextDeadlineExceeded(ctx, err) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
+			return exitWithCode(2, err) // No response to connection attempt
+		}
+		
+		// Check if it's a connection rejection vs unreachable
+		if isConnectionRejected(err) {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
+			return exitWithCode(1, err) // Server is rejecting connections
+		}
+		
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
+		return exitWithCode(2, err) // No response to connection attempt
+	}
+
+	// Connection successful
+	fmt.Fprintf(cmd.OutOrStdout(), "Connection successful\n")
+	return nil // Server is accepting connections normally
+}
+
+// isContextDeadlineExceeded checks if the error is due to context timeout
+func isContextDeadlineExceeded(ctx context.Context, err error) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+// isConnectionRejected determines if the connection was actively rejected vs unreachable
+func isConnectionRejected(err error) bool {
+	// According to PostgreSQL error codes, only ERRCODE_CANNOT_CONNECT_NOW (57P03)
+	// should be considered as "server rejecting connections" (exit code 1).
+	// This occurs when the server is running but cannot accept new connections
+	// (e.g., during startup, shutdown, or when max_connections is reached).
+	
+	// Check if this is a PostgreSQL error with the specific error code
+	if pgxErr, ok := err.(*pgconn.PgError); ok {
+		// ERRCODE_CANNOT_CONNECT_NOW is 57P03
+		return pgxErr.Code == "57P03"
+	}
+	
+	// All other errors (authentication, authorization, network issues, etc.) 
+	// should be treated as "unreachable" (exit code 2)
+	return false
+}
+

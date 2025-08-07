@@ -682,8 +682,7 @@ Use 'tiger services list' to see available services.
 - [`github.com/logrusorgru/aurora/v4`](https://github.com/logrusorgru/aurora) - Terminal colors and formatting
 
 **Database Connectivity:**
-- [`github.com/lib/pq`](https://github.com/lib/pq) - PostgreSQL driver for database connections
-- [`database/sql`](https://pkg.go.dev/database/sql) - Standard library database interface
+- [`github.com/jackc/pgx/v5`](https://github.com/jackc/pgx) - Modern PostgreSQL driver with native Go implementation
 
 **Shell Completion:**
 - Built into `github.com/spf13/cobra` - Automatic completion generation for bash, zsh, fish, PowerShell
@@ -708,7 +707,7 @@ Use 'tiger services list' to see available services.
 3. **go-keyring**: Referenced in the spec, mature library with cross-platform support
 4. **Standard library HTTP**: Works seamlessly with generated OpenAPI clients, reduces dependencies  
 5. **tablewriter**: Clean ASCII table output, good for terminal display
-6. **lib/pq**: Most popular PostgreSQL driver for Go, stable and well-maintained
+6. **jackc/pgx**: Modern PostgreSQL driver with better performance and active maintenance (replaces deprecated lib/pq)
 
 ## Examples and Common Workflows
 

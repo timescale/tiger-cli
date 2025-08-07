@@ -56,6 +56,10 @@ VPCs, replicas, and related infrastructure components.`,
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		// Check if it's a custom exit code error
+		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+			os.Exit(exitErr.ExitCode())
+		}
 		os.Exit(1)
 	}
 }
