@@ -34,6 +34,10 @@ func setupServiceTest(t *testing.T) string {
 	config.ResetGlobalConfig()
 	viper.Reset()
 	
+	// Re-establish viper environment configuration after reset
+	viper.SetEnvPrefix("TIGER")
+	viper.AutomaticEnv()
+	
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
@@ -58,6 +62,17 @@ func executeServiceCommand(args ...string) (string, error) {
 	createNoWait = false
 	createTimeoutMinutes = 30
 	
+	// Reset update-password flags
+	updatePasswordValue = ""
+	updatePasswordSaveToFile = true
+	
+	// Reset flag changed status to avoid interference between tests
+	if serviceUpdatePasswordCmd != nil && serviceUpdatePasswordCmd.Flags() != nil {
+		if flag := serviceUpdatePasswordCmd.Flags().Lookup("password"); flag != nil {
+			flag.Changed = false
+		}
+	}
+	
 	// Create a test root command with service subcommand
 	testRoot := &cobra.Command{
 		Use: "tiger",
@@ -67,6 +82,9 @@ func executeServiceCommand(args ...string) (string, error) {
 	// Add persistent flags and bind them
 	addPersistentFlags(testRoot)
 	bindFlags(testRoot)
+	
+	// Bind service-specific flags
+	bindServiceFlags()
 	
 	// Add the service command to our test root
 	testRoot.AddCommand(serviceCmd)
@@ -410,7 +428,7 @@ func TestSavePgPassEntry(t *testing.T) {
 	}
 	
 	// Test saving entry
-	err = savePgPassEntry(service, password)
+	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
@@ -479,7 +497,7 @@ func TestSavePgPassEntry_DefaultPort(t *testing.T) {
 	}
 	
 	// Test saving entry
-	err = savePgPassEntry(service, password)
+	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
@@ -542,7 +560,7 @@ func TestSavePgPassEntry_AppendToExisting(t *testing.T) {
 	}
 	
 	// Test saving entry
-	err = savePgPassEntry(service, password)
+	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
@@ -673,7 +691,7 @@ func TestSavePgPassEntry_SkipDuplicate(t *testing.T) {
 	}
 	
 	// Test saving entry (should not add duplicate)
-	err = savePgPassEntry(service, password)
+	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
@@ -694,7 +712,7 @@ func TestSavePgPassEntry_ErrorCases(t *testing.T) {
 	service := api.Service{
 		Endpoint: nil,
 	}
-	err := savePgPassEntry(service, "password")
+	err := savePgPassEntry(service, "password", false)
 	if err == nil {
 		t.Error("Expected error when endpoint is nil")
 	}
@@ -708,7 +726,7 @@ func TestSavePgPassEntry_ErrorCases(t *testing.T) {
 			Host: nil,
 		},
 	}
-	err = savePgPassEntry(service, "password")
+	err = savePgPassEntry(service, "password", false)
 	if err == nil {
 		t.Error("Expected error when host is nil")
 	}
@@ -1364,5 +1382,318 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 		if _, exists := service["name"]; !exists {
 			t.Errorf("Expected name to be preserved in sanitized service %d", i)
 		}
+	}
+}
+
+func TestServiceUpdatePassword_NoProjectID(t *testing.T) {
+	setupServiceTest(t)
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	
+	// Execute service update-password command without project ID
+	_, err := executeServiceCommand("service", "update-password", "svc-12345", "--password", "new-password")
+	if err == nil {
+		t.Fatal("Expected error when no project ID is configured")
+	}
+	
+	if !strings.Contains(err.Error(), "project ID is required") {
+		t.Errorf("Expected error about missing project ID, got: %v", err)
+	}
+}
+
+func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Set up config with project ID but no default service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	
+	// Execute service update-password command without service ID
+	_, err = executeServiceCommand("service", "update-password", "--password", "new-password")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided or configured")
+	}
+	
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestServiceUpdatePassword_NoPassword(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Set up config with project ID and service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	
+	// Execute service update-password command without password
+	_, err = executeServiceCommand("service", "update-password")
+	if err == nil {
+		t.Fatal("Expected error when no password is provided")
+	}
+	
+	if !strings.Contains(err.Error(), "password is required") {
+		t.Errorf("Expected error about missing password, got: %v", err)
+	}
+}
+
+func TestServiceUpdatePassword_NoAuth(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Set up config with project ID and service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	
+	// Execute service update-password command
+	_, err = executeServiceCommand("service", "update-password", "--password", "new-password")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+	
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
+		ProjectID: "test-project-123",
+		ServiceID: "test-service-456",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	
+	// Set environment variable BEFORE creating command (like root test does)
+	originalEnv := os.Getenv("TIGER_PASSWORD")
+	os.Setenv("TIGER_PASSWORD", "env-password-123")
+	defer func() {
+		if originalEnv != "" {
+			os.Setenv("TIGER_PASSWORD", originalEnv)
+		} else {
+			os.Unsetenv("TIGER_PASSWORD")
+		}
+	}()
+	
+	// Execute command without --password flag (should use environment variable)
+	_, err = executeServiceCommand("service", "update-password", "test-service-456")
+	
+	// Should fail with network error (not password missing error) since we have password from env
+	if err == nil {
+		t.Fatal("Expected network error since we're using a mock URL")
+	}
+	
+	// Should not be a password validation error - if it gets to network call, env var worked
+	if strings.Contains(err.Error(), "password is required") {
+		t.Errorf("Environment variable was not picked up, got password required error: %v", err)
+	}
+	
+	// Should be network/API error showing the password was found
+	if !strings.Contains(err.Error(), "API request failed") && !strings.Contains(err.Error(), "failed to update service password") {
+		t.Errorf("Expected network/API error indicating password was found, got: %v", err)
+	}
+}
+
+func TestSavePgPassEntryForceOverride(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Create a temporary home directory for testing
+	testHomeDir := filepath.Join(tmpDir, "home")
+	err := os.MkdirAll(testHomeDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create test home directory: %v", err)
+	}
+	
+	// Set HOME environment variable for testing
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", testHomeDir)
+	defer func() { 
+		if originalHome != "" {
+			os.Setenv("HOME", originalHome)
+		} else {
+			os.Unsetenv("HOME")
+		}
+	}()
+	
+	// Create existing .pgpass file with initial entry
+	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
+	initialContent := "test-host.tigerdata.com:5432:tsdb:tsdbadmin:old-password\nother-host:5432:db:user:pass\n"
+	err = os.WriteFile(pgpassPath, []byte(initialContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create initial .pgpass file: %v", err)
+	}
+	
+	// Create test service data
+	host := "test-host.tigerdata.com"
+	port := 5432
+	newPassword := "new-password-123"
+	serviceID := "svc-12345"
+	
+	service := api.Service{
+		ServiceId: &serviceID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+	
+	// Test saving entry with force override = false (should not override)
+	err = savePgPassEntry(service, newPassword, false)
+	if err != nil {
+		t.Fatalf("Failed to save pgpass entry without override: %v", err)
+	}
+	
+	// Verify original password is still there
+	content, err := os.ReadFile(pgpassPath)
+	if err != nil {
+		t.Fatalf("Failed to read .pgpass file: %v", err)
+	}
+	
+	if strings.Contains(string(content), newPassword) {
+		t.Error("New password should not be present when forceOverride=false")
+	}
+	
+	if !strings.Contains(string(content), "old-password") {
+		t.Error("Original password should still be present when forceOverride=false")
+	}
+	
+	// Test saving entry with force override = true (should override)
+	err = savePgPassEntry(service, newPassword, true)
+	if err != nil {
+		t.Fatalf("Failed to save pgpass entry with override: %v", err)
+	}
+	
+	// Verify new password replaced old one
+	content, err = os.ReadFile(pgpassPath)
+	if err != nil {
+		t.Fatalf("Failed to read .pgpass file: %v", err)
+	}
+	
+	if !strings.Contains(string(content), newPassword) {
+		t.Error("New password should be present when forceOverride=true")
+	}
+	
+	if strings.Contains(string(content), "old-password") {
+		t.Error("Original password should be replaced when forceOverride=true")
+	}
+	
+	// Verify other entries are preserved
+	if !strings.Contains(string(content), "other-host:5432:db:user:pass") {
+		t.Error("Other .pgpass entries should be preserved")
+	}
+}
+
+func TestRemovePgPassEntry(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	
+	// Create a temporary home directory for testing
+	testHomeDir := filepath.Join(tmpDir, "home")
+	err := os.MkdirAll(testHomeDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create test home directory: %v", err)
+	}
+	
+	// Create test .pgpass file with multiple entries
+	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
+	initialContent := `test-host.tigerdata.com:5432:tsdb:tsdbadmin:password1
+other-host.example.com:5432:db:user:password2
+test-host.tigerdata.com:5433:tsdb:tsdbadmin:password3
+another-host:3306:mysql:root:password4
+`
+	err = os.WriteFile(pgpassPath, []byte(initialContent), 0600)
+	if err != nil {
+		t.Fatalf("Failed to create test .pgpass file: %v", err)
+	}
+	
+	// Remove specific entry
+	err = removePgPassEntry(pgpassPath, "test-host.tigerdata.com", "5432", "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to remove pgpass entry: %v", err)
+	}
+	
+	// Verify entry was removed
+	content, err := os.ReadFile(pgpassPath)
+	if err != nil {
+		t.Fatalf("Failed to read .pgpass file: %v", err)
+	}
+	
+	contentStr := string(content)
+	
+	// Target entry should be removed
+	if strings.Contains(contentStr, "test-host.tigerdata.com:5432:tsdb:tsdbadmin:password1") {
+		t.Error("Target entry should be removed")
+	}
+	
+	// Other entries should remain
+	if !strings.Contains(contentStr, "other-host.example.com:5432:db:user:password2") {
+		t.Error("Other entries should remain")
+	}
+	if !strings.Contains(contentStr, "test-host.tigerdata.com:5433:tsdb:tsdbadmin:password3") {
+		t.Error("Entries with different ports should remain")
+	}
+	if !strings.Contains(contentStr, "another-host:3306:mysql:root:password4") {
+		t.Error("Unrelated entries should remain")
 	}
 }
