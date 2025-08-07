@@ -47,6 +47,8 @@ func executeDBCommand(args ...string) (string, error) {
 	// Reset global flag variables to ensure clean state for each test
 	dbConnectionStringPooled = false
 	dbConnectionStringRole = "tsdbadmin"
+	dbConnectPooled = false
+	dbConnectRole = "tsdbadmin"
 	
 	// Create a test root command with db subcommand
 	testRoot := &cobra.Command{
@@ -196,6 +198,161 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// Verify the warning mentions using direct connection
 	if !strings.Contains(stderrOutput, "using direct connection") {
 		t.Errorf("Expected warning to mention direct connection fallback, but got: %q", stderrOutput)
+	}
+}
+
+func TestDBConnect_NoProjectID(t *testing.T) {
+	setupDBTest(t)
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db connect command without project ID
+	_, err := executeDBCommand("db", "connect", "svc-12345")
+	if err == nil {
+		t.Fatal("Expected error when no project ID is configured")
+	}
+	
+	if !strings.Contains(err.Error(), "project ID is required") {
+		t.Errorf("Expected error about missing project ID, got: %v", err)
+	}
+}
+
+func TestDBConnect_NoServiceID(t *testing.T) {
+	tmpDir := setupDBTest(t)
+	
+	// Set up config with project ID but no default service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db connect command without service ID
+	_, err = executeDBCommand("db", "connect")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided or configured")
+	}
+	
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestDBConnect_NoAuth(t *testing.T) {
+	tmpDir := setupDBTest(t)
+	
+	// Set up config with project ID and service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Execute db connect command
+	_, err = executeDBCommand("db", "connect")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+	
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestDBConnect_PsqlNotFound(t *testing.T) {
+	tmpDir := setupDBTest(t)
+	
+	// Set up config
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999",
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	
+	// Test that psql alias works the same as connect
+	_, err1 := executeDBCommand("db", "connect")
+	_, err2 := executeDBCommand("db", "psql")
+	
+	// Both should behave identically (both will fail due to network/psql not found, but with same error pattern)
+	if err1 == nil || err2 == nil {
+		t.Fatal("Expected both connect and psql to fail in test environment")
+	}
+	
+	// Both should have similar error patterns (either network error or psql not found)
+	connectErrStr := err1.Error()
+	psqlErrStr := err2.Error()
+	
+	// They should both fail for the same fundamental reason
+	if strings.Contains(connectErrStr, "authentication") != strings.Contains(psqlErrStr, "authentication") ||
+		strings.Contains(connectErrStr, "psql client not found") != strings.Contains(psqlErrStr, "psql client not found") ||
+		strings.Contains(connectErrStr, "failed to fetch") != strings.Contains(psqlErrStr, "failed to fetch") {
+		t.Errorf("Connect and psql should behave identically. Connect error: %v, Psql error: %v", err1, err2)
+	}
+}
+
+func TestLaunchPsqlWithConnectionString(t *testing.T) {
+	// This test verifies the psql launching logic without actually running psql
+	
+	// Create a test command to capture output
+	cmd := &cobra.Command{}
+	outBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
+	
+	// This will fail because psql path doesn't exist, but we can verify the error
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, cmd)
+	
+	// Should fail with exec error since fake psql path doesn't exist
+	if err == nil {
+		t.Error("Expected error when using fake psql path")
+	}
+	
+	// Should have printed connecting message
+	output := outBuf.String()
+	if !strings.Contains(output, "Connecting to database") {
+		t.Errorf("Expected connecting message, got: %q", output)
 	}
 }
 

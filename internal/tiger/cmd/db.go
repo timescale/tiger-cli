@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,91 +48,96 @@ Examples:
   # Get connection string with custom role/username
   tiger db connection-string svc-12345 --role readonly`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get config
-		cfg, err := config.Load()
+		service, err := getServiceDetails(cmd, args)
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return err
 		}
 
-		projectID := cfg.ProjectID
-		if projectID == "" {
-			return fmt.Errorf("project ID is required. Set it using login with --project-id")
-		}
-
-		// Determine service ID
-		var serviceID string
-		if len(args) > 0 {
-			serviceID = args[0]
-		} else {
-			serviceID = cfg.ServiceID
-		}
-
-		if serviceID == "" {
-			return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-		}
-
-		cmd.SilenceUsage = true
-
-		// Get API key for authentication
-		apiKey, err := getAPIKeyForDB()
+		connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
 		if err != nil {
-			return fmt.Errorf("authentication required: %w", err)
+			return fmt.Errorf("failed to build connection string: %w", err)
 		}
 
-		// Create API client
-		client, err := api.NewTigerClient(apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to create API client: %w", err)
-		}
-
-		// Fetch service details
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-		if err != nil {
-			return fmt.Errorf("failed to fetch service details: %w", err)
-		}
-
-		// Handle API response
-		switch resp.StatusCode() {
-		case 200:
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-
-			service := *resp.JSON200
-			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
-			if err != nil {
-				return fmt.Errorf("failed to build connection string: %w", err)
-			}
-
-			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
-			return nil
-
-		case 401, 403:
-			return fmt.Errorf("authentication failed: invalid API key")
-		case 404:
-			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
-		default:
-			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
-		}
+		fmt.Fprintln(cmd.OutOrStdout(), connectionString)
+		return nil
 	},
 }
 
-// Command-line flags for db connection-string
+// dbConnectCmd represents the connect/psql command under db
+var dbConnectCmd = &cobra.Command{
+	Use:     "connect [service-id]",
+	Aliases: []string{"psql"},
+	Short:   "Connect to a database",
+	Long: `Connect to a database service using psql client.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command will launch an interactive psql session
+with the appropriate connection parameters.
+
+Authentication is handled automatically using:
+1. ~/.pgpass file (if password was saved during service creation)  
+2. PGPASSWORD environment variable
+3. Interactive password prompt (if neither above is available)
+
+Examples:
+  # Connect to default service
+  tiger db connect
+  tiger db psql
+
+  # Connect to specific service
+  tiger db connect svc-12345
+  tiger db psql svc-12345
+
+  # Connect using connection pooler (if available)
+  tiger db connect svc-12345 --pooled
+  tiger db psql svc-12345 --pooled
+
+  # Connect with custom role/username
+  tiger db connect svc-12345 --role readonly
+  tiger db psql svc-12345 --role readonly`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		service, err := getServiceDetails(cmd, args)
+		if err != nil {
+			return err
+		}
+
+		// Check if psql is available
+		psqlPath, err := exec.LookPath("psql")
+		if err != nil {
+			return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
+		}
+
+		// Get connection string using existing logic
+		connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, cmd)
+		if err != nil {
+			return fmt.Errorf("failed to build connection string: %w", err)
+		}
+
+		// Launch psql
+		return launchPsqlWithConnectionString(connectionString, psqlPath, cmd)
+	},
+}
+
+// Command-line flags for db commands
 var (
 	dbConnectionStringPooled bool
 	dbConnectionStringRole   string
+	dbConnectPooled          bool
+	dbConnectRole            string
 )
 
 func init() {
 	rootCmd.AddCommand(dbCmd)
 	dbCmd.AddCommand(dbConnectionStringCmd)
+	dbCmd.AddCommand(dbConnectCmd)
 
 	// Add flags for db connection-string command
 	dbConnectionStringCmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
 	dbConnectionStringCmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
+
+	// Add flags for db connect command (works for both connect and psql)
+	dbConnectCmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
+	dbConnectCmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
 }
 
 // buildConnectionString creates a PostgreSQL connection string from service details
@@ -172,4 +179,82 @@ func buildConnectionString(service api.Service, pooled bool, role string, cmd *c
 	connectionString := fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
 
 	return connectionString, nil
+}
+
+// getServiceDetails is a helper that handles common service lookup logic and returns the service details
+func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
+	// Get config
+	cfg, err := config.Load()
+	if err != nil {
+		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	projectID := cfg.ProjectID
+	if projectID == "" {
+		return api.Service{}, fmt.Errorf("project ID is required. Set it using login with --project-id")
+	}
+
+	// Determine service ID
+	var serviceID string
+	if len(args) > 0 {
+		serviceID = args[0]
+	} else {
+		serviceID = cfg.ServiceID
+	}
+
+	if serviceID == "" {
+		return api.Service{}, fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+	}
+
+	cmd.SilenceUsage = true
+
+	// Get API key for authentication
+	apiKey, err := getAPIKeyForDB()
+	if err != nil {
+		return api.Service{}, fmt.Errorf("authentication required: %w", err)
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient(apiKey)
+	if err != nil {
+		return api.Service{}, fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	// Fetch service details
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+	if err != nil {
+		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
+	}
+
+	// Handle API response
+	switch resp.StatusCode() {
+	case 200:
+		if resp.JSON200 == nil {
+			return api.Service{}, fmt.Errorf("empty response from API")
+		}
+
+		return *resp.JSON200, nil
+
+	case 401, 403:
+		return api.Service{}, fmt.Errorf("authentication failed: invalid API key")
+	case 404:
+		return api.Service{}, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+	default:
+		return api.Service{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	}
+}
+
+// launchPsqlWithConnectionString launches psql using the connection string
+func launchPsqlWithConnectionString(connectionString, psqlPath string, cmd *cobra.Command) error {
+	fmt.Fprintf(cmd.OutOrStdout(), "Connecting to database...\n")
+	
+	psqlCmd := exec.Command(psqlPath, connectionString)
+	psqlCmd.Stdin = os.Stdin
+	psqlCmd.Stdout = os.Stdout
+	psqlCmd.Stderr = os.Stderr
+
+	return psqlCmd.Run()
 }
