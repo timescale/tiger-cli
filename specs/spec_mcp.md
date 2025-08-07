@@ -41,7 +41,7 @@ Add to `~/.claude_desktop_config.json`:
   "mcpServers": {
     "tigerdata": {
       "command": "tiger",
-      "args": ["mcp", "start"]
+      "args": ["mcp"]
     }
   }
 }
@@ -51,7 +51,7 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
-#### `tiger mcp start [transport]`
+#### `tiger mcp [transport]`
 Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
 **Transports:**
@@ -59,21 +59,24 @@ Start the MCP server with the specified transport. The server runs in the foregr
 - `http`: HTTP server transport for web-based integrations
 
 **Options for HTTP transport:**
-- `--port`: Port to run HTTP server on (default: 3001)
+- `--port`: Port to run HTTP server on (default: 8080, or a free port if 8080 is unavailable)
 - `--host`: Host to bind to (default: localhost)
 
 **Examples:**
 ```bash
 # Start MCP server with stdio transport (default)
-tiger mcp start
-tiger mcp start stdio
+tiger mcp
+tiger mcp stdio
 
 # Start HTTP server for web integrations
-tiger mcp start http --port 3001
-tiger mcp start http --port 8080 --host 0.0.0.0
+tiger mcp http
+tiger mcp http --port 3001
+tiger mcp http --port 8080 --host 0.0.0.0
 ```
 
-**Note:** The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process.
+**Notes:** 
+- The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process
+- For HTTP transport, the server will print the listening address (including port) on startup for easy connection
 
 ## Available Tools
 
