@@ -164,7 +164,7 @@ Manage database services.
 - `set-default`: Set default service
 
 **Commands with Wait/Timeout Behavior:**
-The following commands support `--wait`, `--no-wait`, and `--timeout` options:
+The following commands support `--wait`, `--no-wait`, and `--wait-timeout` options:
 - `create`: Wait for service to be ready
 - `delete`: Wait for service to be fully deleted
 - `start`: Wait for service to be running
@@ -220,7 +220,7 @@ tiger services create \
   --cpu 2000m \
   --memory 8GB \
   --replicas 2 \
-  --timeout 60
+  --wait-timeout 60m
 
 # Resize service
 tiger services resize svc-12345 --cpu 4 --memory 16GB
@@ -229,7 +229,7 @@ tiger services resize svc-12345 --cpu 4 --memory 16GB
 tiger services resize svc-12345 --cpu 4 --memory 16GB --no-wait
 
 # Resize service with custom timeout
-tiger services resize svc-12345 --cpu 4 --memory 16GB --timeout 15
+tiger services resize svc-12345 --cpu 4 --memory 16GB --wait-timeout 15m
 
 # Start/stop service
 tiger services start svc-12345
@@ -239,7 +239,7 @@ tiger services stop svc-12345
 tiger services stop svc-12345 --no-wait
 
 # Stop service with custom timeout
-tiger services stop svc-12345 --timeout 10
+tiger services stop svc-12345 --wait-timeout 10m
 
 # Attach/detach VPC
 tiger services attach-vpc svc-12345 --vpc-id vpc-67890
@@ -270,13 +270,13 @@ tiger services set-default svc-12345
 - `--no-set-default`: Don't set this service as the default service
 - `--wait`: Wait for operation to complete (default: true for commands listed above)
 - `--no-wait`: Don't wait for operation to complete, return immediately
-- `--timeout`: Timeout for waiting in minutes (default: 30)
+- `--wait-timeout`: Timeout for waiting (accepts any duration format from Go's time.ParseDuration: "30m", "1h30m", "90s", etc.) (default: 30m)
 - `--password`: New password (for update-password command)
 
 **Default Behavior:**
 - **Password Management**: By default, service creation will save the generated password to `~/.pgpass` for automatic authentication. Use `--no-save-password` to disable this behavior and manage passwords manually.
 - **Default Service**: By default, newly created services will be set as the default service in your configuration. Use `--no-set-default` to disable this behavior and keep your current default service unchanged.
-- **Wait for Completion**: By default, asynchronous service commands (see list above) will wait for the operation to complete before returning, displaying status updates every 10 seconds. Use `--no-wait` to return immediately after the request is accepted, or `--timeout` to specify a custom timeout period.
+- **Wait for Completion**: By default, asynchronous service commands (see list above) will wait for the operation to complete before returning, displaying status updates every 10 seconds. Use `--no-wait` to return immediately after the request is accepted, or `--wait-timeout` to specify a custom timeout period. If the wait timeout is exceeded, the command will exit with code 2, but the operation will continue running on the server.
 
 **Allowed CPU/Memory Configurations:**
 Service creation and resizing support the following CPU and memory combinations. You can specify both CPU and memory together, or specify only one (the other will be automatically set to the corresponding value):
@@ -358,7 +358,7 @@ tiger db connection-string svc-12345 --pooled
 tiger db test-connection svc-12345
 
 # Test with custom timeout
-tiger db test-connection svc-12345 --timeout 10
+tiger db test-connection svc-12345 --timeout 10s
 
 # Save password to .pgpass
 tiger db save-password svc-12345 --password your-password
@@ -389,7 +389,7 @@ The `connect` and `psql` commands support passing additional flags directly to t
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
 - `--password`: Password to save (for save-password command)
-- `-t, --timeout`: Timeout in seconds for test-connection (default: 3, set to 0 to disable)
+- `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
 ### High-Availability Management
 
@@ -605,11 +605,12 @@ tiger config reset
 
 - `0`: Success
 - `1`: General error
-- `2`: Authentication error
-- `3`: Resource not found
-- `4`: Permission denied
-- `5`: Service unavailable
-- `6`: Invalid configuration
+- `2`: Operation timeout (wait-timeout exceeded for service operations) or connection timeout (for db test-connection)
+- `3`: Authentication error
+- `4`: Resource not found
+- `5`: Permission denied
+- `6`: Service unavailable
+- `7`: Invalid configuration
 
 ## Output Formats
 
