@@ -11,6 +11,7 @@ spec updates needed:
  - implement exit code 2 for wait-timeout scenarios (operation continues on server)
  - update global exit code mapping per new spec (authentication moved to code 3, etc.)
  - ensure wait-timeout operations display status updates every 10 seconds while waiting
+ - change from "tiger services" to "tiger service" with aliases for "services" and "svc"
 
 small things:
  - implement flag not to save password to ~/.pgpass

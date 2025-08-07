@@ -71,10 +71,10 @@ For the initial v0 release, implement these essential commands first:
 - `tiger auth whoami` - Show current user
 
 **Core Service Management:**
-- `tiger services list` - List all services
-- `tiger services describe` - Show service details
-- `tiger services create` - Create new services
-- `tiger services update-password` - Update service master password
+- `tiger service list` - List all services
+- `tiger service describe` - Show service details
+- `tiger service create` - Create new services
+- `tiger service update-password` - Update service master password
 
 **Database Operations:**
 - `tiger db connect` / `tiger db psql` - Connect to databases
@@ -143,8 +143,10 @@ The API key is stored securely using:
 
 ### Service Management
 
-#### `tiger services`
+#### `tiger service`
 Manage database services.
+
+**Aliases:** `services`, `svc`
 
 **Subcommands:**
 - `list`: List all services
@@ -178,14 +180,17 @@ The following commands support `--wait`, `--no-wait`, and `--wait-timeout` optio
 
 **Examples:**
 ```bash
-# List services
+# List services (all forms work identically)
+tiger service list
 tiger services list
+tiger svc list
 
 # Show service details
-tiger services describe svc-12345
+tiger service describe svc-12345
+tiger svc describe svc-12345
 
 # Create a TimescaleDB service
-tiger services create \
+tiger service create \
   --name "production-db" \
   --type timescaledb \
   --region google-us-central1 \
@@ -194,7 +199,7 @@ tiger services create \
   --replicas 2
 
 # Create a PostgreSQL service (waits for ready by default)
-tiger services create \
+tiger service create \
   --name "postgres-db" \
   --type postgres \
   --region google-europe-west1 \
@@ -203,7 +208,7 @@ tiger services create \
   --replicas 1
 
 # Create service without waiting
-tiger services create \
+tiger service create \
   --name "quick-service" \
   --type timescaledb \
   --region google-us-central1 \
@@ -213,7 +218,7 @@ tiger services create \
   --no-wait
 
 # Create service with custom timeout
-tiger services create \
+tiger service create \
   --name "patient-service" \
   --type postgres \
   --region google-europe-west1 \
@@ -223,37 +228,37 @@ tiger services create \
   --wait-timeout 60m
 
 # Resize service
-tiger services resize svc-12345 --cpu 4 --memory 16GB
+tiger service resize svc-12345 --cpu 4 --memory 16GB
 
 # Resize service without waiting
-tiger services resize svc-12345 --cpu 4 --memory 16GB --no-wait
+tiger service resize svc-12345 --cpu 4 --memory 16GB --no-wait
 
 # Resize service with custom timeout
-tiger services resize svc-12345 --cpu 4 --memory 16GB --wait-timeout 15m
+tiger service resize svc-12345 --cpu 4 --memory 16GB --wait-timeout 15m
 
 # Start/stop service
-tiger services start svc-12345
-tiger services stop svc-12345
+tiger service start svc-12345
+tiger service stop svc-12345
 
 # Stop service without waiting
-tiger services stop svc-12345 --no-wait
+tiger service stop svc-12345 --no-wait
 
 # Stop service with custom timeout
-tiger services stop svc-12345 --wait-timeout 10m
+tiger service stop svc-12345 --wait-timeout 10m
 
 # Attach/detach VPC
-tiger services attach-vpc svc-12345 --vpc-id vpc-67890
-tiger services detach-vpc svc-12345 --vpc-id vpc-67890
+tiger service attach-vpc svc-12345 --vpc-id vpc-67890
+tiger service detach-vpc svc-12345 --vpc-id vpc-67890
 
 # Enable/disable connection pooling
-tiger services enable-pooler svc-12345
-tiger services disable-pooler svc-12345
+tiger service enable-pooler svc-12345
+tiger service disable-pooler svc-12345
 
 # Update service password
-tiger services update-password svc-12345 --password new-secure-password
+tiger service update-password svc-12345 --password new-secure-password
 
 # Set default service
-tiger services set-default svc-12345
+tiger service set-default svc-12345
 ```
 
 **Options:**
@@ -297,22 +302,22 @@ Memory must include units (e.g., "2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "1
 **Examples:**
 ```bash
 # Specify both CPU and memory
-tiger services create --name "my-service" --cpu 2 --memory 8GB
+tiger service create --name "my-service" --cpu 2 --memory 8GB
 
 # Specify only CPU (memory will be automatically set to 8GB)
-tiger services create --name "my-service" --cpu 2
+tiger service create --name "my-service" --cpu 2
 
 # Specify only memory (CPU will be automatically set to 2)
-tiger services create --name "my-service" --memory 8GB
+tiger service create --name "my-service" --memory 8GB
 
 # Resize with only CPU
-tiger services resize svc-12345 --cpu 4
+tiger service resize svc-12345 --cpu 4
 
 # Resize with only memory
-tiger services resize svc-12345 --memory 16GB
+tiger service resize svc-12345 --memory 16GB
 ```
 
-**Note:** A future command like `tiger services list-types` or `tiger services list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.
+**Note:** A future command like `tiger service list-types` or `tiger service list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.
 
 ### Database Operations
 
@@ -643,9 +648,9 @@ svc-12345  production-db  running   production
 Errors are returned with descriptive messages and appropriate exit codes:
 
 ```bash
-$ tiger services describe invalid-id
+$ tiger service describe invalid-id
 Error: Service 'invalid-id' not found in project 'proj-12345'
-Use 'tiger services list' to see available services.
+Use 'tiger service list' to see available services.
 ```
 
 ## Configuration Precedence
@@ -721,7 +726,7 @@ tiger auth login
 tiger projects set-default proj-12345
 
 # List available resources
-tiger services list
+tiger service list
 tiger vpcs list
 ```
 
@@ -731,7 +736,7 @@ tiger vpcs list
 tiger vpcs create --name "prod-vpc" --cidr "10.0.0.0/16" --region google-us-central1
 
 # Create production service
-tiger services create \
+tiger service create \
   --name "production-db" \
   --tier "production" \
   --vpc-id vpc-12345 \
@@ -758,7 +763,7 @@ tiger migrations up svc-12345
 ### Monitoring and Maintenance
 ```bash
 # Check service status
-tiger services describe svc-12345
+tiger service describe svc-12345
 
 # Inspect performance
 tiger inspect slow-queries svc-12345
