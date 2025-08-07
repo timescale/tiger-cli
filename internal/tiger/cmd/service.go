@@ -31,6 +31,97 @@ var serviceCmd = &cobra.Command{
 	Long:  `Manage database services within TigerData Cloud Platform.`,
 }
 
+// serviceDescribeCmd represents the describe command under service
+var serviceDescribeCmd = &cobra.Command{
+	Use:   "describe [service-id]",
+	Short: "Show detailed information about a service",
+	Long: `Show detailed information about a specific database service.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command displays comprehensive information about
+the service including configuration, status, endpoints, and resource usage.
+
+Examples:
+  # Describe default service
+  tiger service describe
+
+  # Describe specific service
+  tiger service describe svc-12345
+
+  # Get service details in JSON format
+  tiger service describe svc-12345 --output json
+
+  # Get service details in YAML format
+  tiger service describe svc-12345 --output yaml`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Get config
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		projectID := cfg.ProjectID
+		if projectID == "" {
+			return fmt.Errorf("project ID is required. Set it using login with --project-id")
+		}
+
+		// Determine service ID
+		var serviceID string
+		if len(args) > 0 {
+			serviceID = args[0]
+		} else {
+			serviceID = cfg.ServiceID
+		}
+
+		if serviceID == "" {
+			return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+		}
+
+		cmd.SilenceUsage = true
+
+		// Get API key for authentication
+		apiKey, err := getAPIKeyForService()
+		if err != nil {
+			return fmt.Errorf("authentication required: %w", err)
+		}
+
+		// Create API client
+		client, err := api.NewTigerClient(apiKey)
+		if err != nil {
+			return fmt.Errorf("failed to create API client: %w", err)
+		}
+
+		// Make API call to get service details
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+		if err != nil {
+			return fmt.Errorf("failed to get service details: %w", err)
+		}
+
+		// Handle API response
+		switch resp.StatusCode() {
+		case 200:
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+
+			service := *resp.JSON200
+			
+			// Output service in requested format
+			return outputService(cmd, service, cfg.Output)
+
+		case 401, 403:
+			return fmt.Errorf("authentication failed: invalid API key")
+		case 404:
+			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+		default:
+			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		}
+	},
+}
+
 // serviceListCmd represents the list command under service
 var serviceListCmd = &cobra.Command{
 	Use:   "list",
@@ -287,6 +378,7 @@ var (
 
 func init() {
 	rootCmd.AddCommand(serviceCmd)
+	serviceCmd.AddCommand(serviceDescribeCmd)
 	serviceCmd.AddCommand(serviceListCmd)
 	serviceCmd.AddCommand(serviceCreateCmd)
 
@@ -301,20 +393,109 @@ func init() {
 	serviceCreateCmd.Flags().IntVar(&createTimeoutMinutes, "timeout", 30, "Timeout for waiting in minutes")
 }
 
+// outputService formats and outputs a single service based on the specified format
+func outputService(cmd *cobra.Command, service api.Service, format string) error {
+	switch strings.ToLower(format) {
+	case "json":
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(sanitizeServiceForOutput(service))
+	case "yaml":
+		encoder := yaml.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent(2)
+		return encoder.Encode(sanitizeServiceForOutput(service))
+	default: // table format (default)
+		return outputServiceTable(cmd, service)
+	}
+}
+
 // outputServices formats and outputs the services list based on the specified format
 func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
 	switch strings.ToLower(format) {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(services)
+		return encoder.Encode(sanitizeServicesForOutput(services))
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(services)
+		return encoder.Encode(sanitizeServicesForOutput(services))
 	default: // table format (default)
 		return outputServicesTable(cmd, services)
 	}
+}
+
+// outputServiceTable outputs detailed service information in a formatted table
+func outputServiceTable(cmd *cobra.Command, service api.Service) error {
+	table := tablewriter.NewWriter(cmd.OutOrStdout())
+	table.Header("PROPERTY", "VALUE")
+
+	// Basic service information
+	table.Append("Service ID", derefString(service.ServiceId))
+	table.Append("Name", derefString(service.Name))
+	table.Append("Status", formatDeployStatus(service.Status))
+	table.Append("Type", formatServiceType(service.ServiceType))
+	table.Append("Region", derefString(service.RegionCode))
+	
+	// Resource information from Resources slice
+	if service.Resources != nil && len(*service.Resources) > 0 {
+		resource := (*service.Resources)[0] // Get first resource
+		if resource.Spec != nil {
+			if resource.Spec.CpuMillis != nil {
+				cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+				if cpuCores == float64(int(cpuCores)) {
+					table.Append("CPU", fmt.Sprintf("%.0f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
+				} else {
+					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
+				}
+			}
+			
+			if resource.Spec.MemoryGbs != nil {
+				table.Append("Memory", fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs))
+			}
+		}
+	}
+	
+	// High availability replicas
+	if service.HaReplicas != nil {
+		if service.HaReplicas.ReplicaCount != nil {
+			table.Append("Replicas", fmt.Sprintf("%d", *service.HaReplicas.ReplicaCount))
+		}
+	}
+
+	// Endpoint information
+	if service.Endpoint != nil {
+		if service.Endpoint.Host != nil {
+			port := "5432"
+			if service.Endpoint.Port != nil {
+				port = fmt.Sprintf("%d", *service.Endpoint.Port)
+			}
+			table.Append("Direct Endpoint", fmt.Sprintf("%s:%s", *service.Endpoint.Host, port))
+		}
+	}
+
+	// Connection pooler information
+	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
+		if service.ConnectionPooler.Endpoint.Host != nil {
+			port := "6432"
+			if service.ConnectionPooler.Endpoint.Port != nil {
+				port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
+			}
+			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port))
+		}
+	}
+
+	// Pause status
+	if service.Paused != nil && *service.Paused {
+		table.Append("Paused", "Yes")
+	}
+
+	// Timestamps
+	if service.Created != nil {
+		table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
+	}
+
+	return table.Render()
 }
 
 // outputServicesTable outputs services in a formatted table using tablewriter
@@ -334,6 +515,29 @@ func outputServicesTable(cmd *cobra.Command, services []api.Service) error {
 	}
 
 	return table.Render()
+}
+
+// sanitizeServiceForOutput creates a copy of the service with sensitive fields removed
+func sanitizeServiceForOutput(service api.Service) map[string]interface{} {
+	// Convert service to map and remove sensitive fields
+	serviceBytes, _ := json.Marshal(service)
+	var serviceMap map[string]interface{}
+	json.Unmarshal(serviceBytes, &serviceMap)
+	
+	// Remove sensitive fields
+	delete(serviceMap, "initial_password")
+	delete(serviceMap, "initialpassword")
+	
+	return serviceMap
+}
+
+// sanitizeServicesForOutput creates copies of services with sensitive fields removed
+func sanitizeServicesForOutput(services []api.Service) []map[string]interface{} {
+	sanitized := make([]map[string]interface{}, len(services))
+	for i, service := range services {
+		sanitized[i] = sanitizeServiceForOutput(service)
+	}
+	return sanitized
 }
 
 // derefString safely dereferences a string pointer, returning empty string if nil
