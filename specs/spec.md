@@ -334,6 +334,21 @@ tiger db connect svc-12345
 # or use psql alias
 tiger db psql svc-12345
 
+# Connect with custom role/username
+tiger db connect svc-12345 --role readonly
+tiger db psql svc-12345 --role readonly
+
+# Connect using connection pooler (if available)
+tiger db connect svc-12345 --pooled
+tiger db psql svc-12345 --pooled
+
+# Pass additional flags to psql (use -- to separate)
+tiger db connect svc-12345 -- --single-transaction --quiet
+tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc
+
+# Combine tiger flags with psql flags
+tiger db connect svc-12345 --pooled --role readonly -- --no-psqlrc -v ON_ERROR_STOP=1
+
 # Get connection string
 tiger db connection-string svc-12345
 # Get pooled connection string
@@ -366,6 +381,9 @@ The `connect` and `psql` commands automatically handle authentication using:
 1. `~/.pgpass` file (if password was saved during service creation)
 2. `PGPASSWORD` environment variable
 3. Interactive password prompt (if neither above is available)
+
+**Advanced psql Usage:**
+The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
