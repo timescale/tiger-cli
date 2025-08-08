@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,18 +21,14 @@ var (
 	getAPIKeyForDB = getAPIKey
 )
 
-// dbCmd represents the db command
-var dbCmd = &cobra.Command{
-	Use:   "db",
-	Short: "Database operations and management",
-	Long:  `Database-specific operations including connection management, testing, and configuration.`,
-}
+func buildDbConnectionStringCmd() *cobra.Command {
+	var dbConnectionStringPooled bool
+	var dbConnectionStringRole string
 
-// dbConnectionStringCmd represents the connection-string command under db
-var dbConnectionStringCmd = &cobra.Command{
-	Use:   "connection-string [service-id]",
-	Short: "Get connection string for a service",
-	Long: `Get a PostgreSQL connection string for connecting to a database service.
+	cmd := &cobra.Command{
+		Use:   "connection-string [service-id]",
+		Short: "Get connection string for a service",
+		Long: `Get a PostgreSQL connection string for connecting to a database service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. The connection string includes all necessary parameters
@@ -49,28 +46,38 @@ Examples:
 
   # Get connection string with custom role/username
   tiger db connection-string svc-12345 --role readonly`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		service, err := getServiceDetails(cmd, args)
-		if err != nil {
-			return err
-		}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			service, err := getServiceDetails(cmd, args)
+			if err != nil {
+				return err
+			}
 
-		connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
-		if err != nil {
-			return fmt.Errorf("failed to build connection string: %w", err)
-		}
+			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
+			if err != nil {
+				return fmt.Errorf("failed to build connection string: %w", err)
+			}
 
-		fmt.Fprintln(cmd.OutOrStdout(), connectionString)
-		return nil
-	},
+			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
+			return nil
+		},
+	}
+
+	// Add flags for db connection-string command
+	cmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
+
+	return cmd
 }
 
-// dbConnectCmd represents the connect/psql command under db
-var dbConnectCmd = &cobra.Command{
-	Use:     "connect [service-id]",
-	Aliases: []string{"psql"},
-	Short:   "Connect to a database",
-	Long: `Connect to a database service using psql client.
+func buildDbConnectCmd() *cobra.Command {
+	var dbConnectPooled bool
+	var dbConnectRole string
+
+	cmd := &cobra.Command{
+		Use:     "connect [service-id]",
+		Aliases: []string{"psql"},
+		Short:   "Connect to a database",
+		Long: `Connect to a database service using psql client.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command will launch an interactive psql session
@@ -101,37 +108,48 @@ Examples:
   # Pass additional flags to psql (use -- to separate)
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Separate service ID from additional psql flags
-		serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Separate service ID from additional psql flags
+			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-		service, err := getServiceDetails(cmd, serviceArgs)
-		if err != nil {
-			return err
-		}
+			service, err := getServiceDetails(cmd, serviceArgs)
+			if err != nil {
+				return err
+			}
 
-		// Check if psql is available
-		psqlPath, err := exec.LookPath("psql")
-		if err != nil {
-			return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
-		}
+			// Check if psql is available
+			psqlPath, err := exec.LookPath("psql")
+			if err != nil {
+				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
+			}
 
-		// Get connection string using existing logic
-		connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, cmd)
-		if err != nil {
-			return fmt.Errorf("failed to build connection string: %w", err)
-		}
+			// Get connection string using existing logic
+			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, cmd)
+			if err != nil {
+				return fmt.Errorf("failed to build connection string: %w", err)
+			}
 
-		// Launch psql with additional flags
-		return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, cmd)
-	},
+			// Launch psql with additional flags
+			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, cmd)
+		},
+	}
+
+	// Add flags for db connect command (works for both connect and psql)
+	cmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
+
+	return cmd
 }
 
-// dbTestConnectionCmd represents the test-connection command under db
-var dbTestConnectionCmd = &cobra.Command{
-	Use:   "test-connection [service-id]",
-	Short: "Test database connectivity",
-	Long: `Test database connectivity to a service.
+func buildDbTestConnectionCmd() *cobra.Command {
+	var dbTestConnectionTimeout int
+	var dbTestConnectionPooled bool
+	var dbTestConnectionRole string
+
+	cmd := &cobra.Command{
+		Use:   "test-connection [service-id]",
+		Short: "Test database connectivity",
+		Long: `Test database connectivity to a service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command tests if the database is accepting
@@ -155,52 +173,48 @@ Examples:
 
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		service, err := getServiceDetails(cmd, args)
-		if err != nil {
-			return exitWithCode(3, err) // Invalid parameters
-		}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			service, err := getServiceDetails(cmd, args)
+			if err != nil {
+				return exitWithCode(3, err) // Invalid parameters
+			}
 
-		// Build connection string for testing
-		connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, cmd)
-		if err != nil {
-			return exitWithCode(3, fmt.Errorf("failed to build connection string: %w", err))
-		}
+			// Build connection string for testing
+			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, cmd)
+			if err != nil {
+				return exitWithCode(3, fmt.Errorf("failed to build connection string: %w", err))
+			}
 
-		// Test the connection
-		return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
-	},
-}
-
-// Command-line flags for db commands
-var (
-	dbConnectionStringPooled bool
-	dbConnectionStringRole   string
-	dbConnectPooled          bool
-	dbConnectRole            string
-	dbTestConnectionTimeout  int
-	dbTestConnectionPooled   bool
-	dbTestConnectionRole     string
-)
-
-func init() {
-	rootCmd.AddCommand(dbCmd)
-	dbCmd.AddCommand(dbConnectionStringCmd)
-	dbCmd.AddCommand(dbConnectCmd)
-	dbCmd.AddCommand(dbTestConnectionCmd)
-
-	// Add flags for db connection-string command
-	dbConnectionStringCmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
-	dbConnectionStringCmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
-
-	// Add flags for db connect command (works for both connect and psql)
-	dbConnectCmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
-	dbConnectCmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
+			// Test the connection
+			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
+		},
+	}
 
 	// Add flags for db test-connection command
-	dbTestConnectionCmd.Flags().IntVarP(&dbTestConnectionTimeout, "timeout", "t", 3, "Timeout in seconds (0 for no timeout)")
-	dbTestConnectionCmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
-	dbTestConnectionCmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().IntVarP(&dbTestConnectionTimeout, "timeout", "t", 3, "Timeout in seconds (0 for no timeout)")
+	cmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
+
+	return cmd
+}
+
+func buildDbCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "db",
+		Short: "Database operations and management",
+		Long:  `Database-specific operations including connection management, testing, and configuration.`,
+	}
+
+	cmd.AddCommand(buildDbConnectionStringCmd())
+	cmd.AddCommand(buildDbConnectCmd())
+	cmd.AddCommand(buildDbTestConnectionCmd())
+
+	return cmd
+}
+
+func init() {
+	dbCmd := buildDbCmd()
+	rootCmd.AddCommand(dbCmd)
 }
 
 // buildConnectionString creates a PostgreSQL connection string from service details
@@ -334,7 +348,7 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, cmd *cobra.Command) error {
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, _ *cobra.Command) error {
 	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
@@ -393,7 +407,7 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
-		if isContextDeadlineExceeded(ctx, err) {
+		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
@@ -413,7 +427,7 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 	err = conn.Ping(ctx)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
-		if isContextDeadlineExceeded(ctx, err) {
+		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
@@ -434,13 +448,8 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 }
 
 // isContextDeadlineExceeded checks if the error is due to context timeout
-func isContextDeadlineExceeded(ctx context.Context, err error) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-		return false
-	}
+func isContextDeadlineExceeded(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded)
 }
 
 // isConnectionRejected determines if the connection was actively rejected vs unreachable

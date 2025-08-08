@@ -16,10 +16,6 @@ import (
 func setupAuthTest(t *testing.T) string {
 	t.Helper()
 	
-	// Reset global variables to ensure test isolation
-	apiKeyFlag = ""
-	projectIDFlag = ""
-	
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
@@ -51,9 +47,6 @@ func setupAuthTest(t *testing.T) string {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
 		viper.Reset()
-		// Reset global variables first
-		apiKeyFlag = ""
-		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Clean up keyring
 		keyring.Delete(serviceName, username)
@@ -81,6 +74,7 @@ func executeAuthCommand(args ...string) (string, error) {
 	bindFlags(testRoot)
 	
 	// Add the auth command to our test root
+	authCmd := buildAuthCmd()
 	testRoot.AddCommand(authCmd)
 	
 	buf := new(bytes.Buffer)

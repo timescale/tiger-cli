@@ -46,12 +46,6 @@ func setupDBTest(t *testing.T) string {
 }
 
 func executeDBCommand(args ...string) (string, error) {
-	// Reset global flag variables to ensure clean state for each test
-	dbConnectionStringPooled = false
-	dbConnectionStringRole = "tsdbadmin"
-	dbConnectPooled = false
-	dbConnectRole = "tsdbadmin"
-	
 	// Create a test root command with db subcommand
 	testRoot := &cobra.Command{
 		Use: "tiger",
@@ -63,6 +57,7 @@ func executeDBCommand(args ...string) (string, error) {
 	bindFlags(testRoot)
 	
 	// Add the db command to our test root
+	dbCmd := buildDbCmd()
 	testRoot.AddCommand(dbCmd)
 	
 	buf := new(bytes.Buffer)

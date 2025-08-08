@@ -18,9 +18,6 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Reset global variables
-	apiKeyFlag = ""
-	projectIDFlag = ""
 	originalValidator := validateAPIKeyForLogin
 	
 	// Mock the validator to return an error
@@ -29,8 +26,6 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 	
 	defer func() {
-		apiKeyFlag = ""
-		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator
 	}()
 
@@ -79,9 +74,6 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Reset global variables
-	apiKeyFlag = ""
-	projectIDFlag = ""
 	originalValidator := validateAPIKeyForLogin
 	
 	// Mock the validator to return success
@@ -90,8 +82,6 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 	
 	defer func() {
-		apiKeyFlag = ""
-		projectIDFlag = ""
 		validateAPIKeyForLogin = originalValidator
 	}()
 

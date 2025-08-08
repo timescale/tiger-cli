@@ -21,128 +21,139 @@ const (
 )
 
 var (
-	apiKeyFlag string
-	projectIDFlag string
 	// validateAPIKeyForLogin can be overridden for testing
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		return api.ValidateAPIKey(apiKey, projectID)
 	}
 )
 
-// authCmd represents the auth command
-var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Manage authentication and credentials",
-	Long:  `Manage authentication and credentials for TigerData Cloud Platform.`,
-}
+func buildLoginCmd() *cobra.Command {
+	var apiKeyFlag string
+	var projectIDFlag string
 
-// loginCmd represents the login command
-var loginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate with API token and optional project ID",
-	Long: `Authenticate with TigerData API using an API token and optionally set a default project ID.
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Authenticate with API token and optional project ID",
+		Long: `Authenticate with TigerData API using an API token and optionally set a default project ID.
 The API key will be stored securely in the system keyring or as a fallback file.
 The project ID will be stored in the configuration file.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		apiKey := apiKeyFlag
-		projectID := projectIDFlag
+		RunE: func(cmd *cobra.Command, args []string) error {
+			apiKey := apiKeyFlag
+			projectID := projectIDFlag
 
-		// If no API key provided via flag, check environment variable
-		if apiKey == "" {
-			apiKey = os.Getenv("TIGER_API_KEY")
-		}
-
-		// If still no API key, prompt for it interactively
-		if apiKey == "" {
-			var err error
-			apiKey, err = promptForAPIKey()
-			if err != nil {
-				return fmt.Errorf("failed to get API key: %w", err)
+			// If no API key provided via flag, check environment variable
+			if apiKey == "" {
+				apiKey = os.Getenv("TIGER_API_KEY")
 			}
-		}
 
-		if apiKey == "" {
-			return fmt.Errorf("API key is required")
-		}
-
-		cmd.SilenceUsage = true
-
-		// Validate the API key by making a test API call
-		fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-		if err := validateAPIKeyForLogin(apiKey, projectID); err != nil {
-			return fmt.Errorf("API key validation failed: %w", err)
-		}
-
-		// Store the API key securely
-		if err := storeAPIKey(apiKey); err != nil {
-			return fmt.Errorf("failed to store API key: %w", err)
-		}
-
-		// Store project ID in config if provided
-		if projectID != "" {
-			if err := storeProjectID(projectID); err != nil {
-				return fmt.Errorf("failed to store project ID: %w", err)
+			// If still no API key, prompt for it interactively
+			if apiKey == "" {
+				var err error
+				apiKey, err = promptForAPIKey()
+				if err != nil {
+					return fmt.Errorf("failed to get API key: %w", err)
+				}
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in and stored API key securely. Set default project ID to: %s\n", projectID)
-		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key securely")
-		}
 
-		return nil
-	},
-}
+			if apiKey == "" {
+				return fmt.Errorf("API key is required")
+			}
 
-// logoutCmd represents the logout command
-var logoutCmd = &cobra.Command{
-	Use:   "logout",
-	Short: "Remove stored credentials",
-	Long:  `Remove stored API key and clear authentication credentials.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		
-		if err := removeAPIKey(); err != nil {
-			return fmt.Errorf("failed to remove API key: %w", err)
-		}
+			cmd.SilenceUsage = true
 
-		fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged out and removed stored credentials")
-		return nil
-	},
-}
+			// Validate the API key by making a test API call
+			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
+			if err := validateAPIKeyForLogin(apiKey, projectID); err != nil {
+				return fmt.Errorf("API key validation failed: %w", err)
+			}
 
-// whoamiCmd represents the whoami command
-var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Short: "Show current user information",
-	Long:  `Show information about the currently authenticated user.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		
-		apiKey, err := getAPIKey()
-		if err != nil {
-			return fmt.Errorf("not logged in: %w", err)
-		}
+			// Store the API key securely
+			if err := storeAPIKey(apiKey); err != nil {
+				return fmt.Errorf("failed to store API key: %w", err)
+			}
 
-		if apiKey == "" {
-			fmt.Fprintln(cmd.OutOrStdout(), "Not logged in")
+			// Store project ID in config if provided
+			if projectID != "" {
+				if err := storeProjectID(projectID); err != nil {
+					return fmt.Errorf("failed to store project ID: %w", err)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in and stored API key securely. Set default project ID to: %s\n", projectID)
+			} else {
+				fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key securely")
+			}
+
 			return nil
-		}
+		},
+	}
 
-		// TODO: Make API call to get user information
-		fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
+	// Add flags
+	cmd.Flags().StringVar(&apiKeyFlag, "api-key", "", "API key for authentication")
+	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Default project ID to set in configuration")
 
-		return nil
-	},
+	return cmd
+}
+
+func buildLogoutCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "logout",
+		Short: "Remove stored credentials",
+		Long:  `Remove stored API key and clear authentication credentials.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			
+			if err := removeAPIKey(); err != nil {
+				return fmt.Errorf("failed to remove API key: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged out and removed stored credentials")
+			return nil
+		},
+	}
+}
+
+func buildWhoamiCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "whoami",
+		Short: "Show current user information",
+		Long:  `Show information about the currently authenticated user.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			
+			apiKey, err := getAPIKey()
+			if err != nil {
+				return fmt.Errorf("not logged in: %w", err)
+			}
+
+			if apiKey == "" {
+				fmt.Fprintln(cmd.OutOrStdout(), "Not logged in")
+				return nil
+			}
+
+			// TODO: Make API call to get user information
+			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
+
+			return nil
+		},
+	}
+}
+
+func buildAuthCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Manage authentication and credentials",
+		Long:  `Manage authentication and credentials for TigerData Cloud Platform.`,
+	}
+
+	cmd.AddCommand(buildLoginCmd())
+	cmd.AddCommand(buildLogoutCmd())
+	cmd.AddCommand(buildWhoamiCmd())
+
+	return cmd
 }
 
 func init() {
+	authCmd := buildAuthCmd()
 	rootCmd.AddCommand(authCmd)
-	authCmd.AddCommand(loginCmd)
-	authCmd.AddCommand(logoutCmd)
-	authCmd.AddCommand(whoamiCmd)
-
-	// Add flags
-	loginCmd.Flags().StringVar(&apiKeyFlag, "api-key", "", "API key for authentication")
-	loginCmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Default project ID to set in configuration")
 }
 
 // storeAPIKey stores the API key using keyring with file fallback

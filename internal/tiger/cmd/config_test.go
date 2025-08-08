@@ -71,6 +71,7 @@ func executeConfigCommand(args ...string) (string, error) {
 	bindFlags(testRoot)
 	
 	// Add the config command to our test root
+	configCmd := buildConfigCmd()
 	testRoot.AddCommand(configCmd)
 	
 	buf := new(bytes.Buffer)
