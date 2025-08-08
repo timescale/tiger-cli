@@ -33,7 +33,8 @@ var serviceCmd = &cobra.Command{
 }
 
 // serviceDescribeCmd represents the describe command under service
-var serviceDescribeCmd = &cobra.Command{
+func buildServiceDescribeCmd() *cobra.Command {
+	cmd := &cobra.Command{
 	Use:   "describe [service-id]",
 	Short: "Show detailed information about a service",
 	Long: `Show detailed information about a specific database service.
@@ -121,10 +122,14 @@ Examples:
 			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 		}
 	},
+	}
+
+	return cmd
 }
 
 // serviceListCmd represents the list command under service
-var serviceListCmd = &cobra.Command{
+func buildServiceListCmd() *cobra.Command {
+	cmd := &cobra.Command{
 	Use:   "list",
 	Short: "List all services",
 	Long:  `List all database services in the current project.`,
@@ -191,10 +196,23 @@ var serviceListCmd = &cobra.Command{
 			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 		}
 	},
+	}
+
+	return cmd
 }
 
 // serviceCreateCmd represents the create command under service
-var serviceCreateCmd = &cobra.Command{
+func buildServiceCreateCmd() *cobra.Command {
+	var createServiceName string
+	var createServiceType string
+	var createRegionCode string
+	var createCpuMillis int
+	var createMemoryGbs float64
+	var createReplicaCount int
+	var createNoWait bool
+	var createTimeoutMinutes int
+
+	cmd := &cobra.Command{
 	Use:   "create",
 	Short: "Create a new database service",
 	Long: `Create a new database service in the current project.
@@ -363,6 +381,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 		}
 	},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
+	cmd.Flags().StringVar(&createServiceType, "type", "timescaledb", "Service type (timescaledb, postgres, vector)")
+	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
+	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
+	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
+	cmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
+	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
+	cmd.Flags().IntVar(&createTimeoutMinutes, "timeout", 30, "Timeout for waiting in minutes")
+
+	return cmd
 }
 
 // buildServiceUpdatePasswordCmd creates a new update-password command
@@ -493,23 +524,19 @@ Examples:
 	return cmd
 }
 
-// Command-line flags for service create
+// Global command variables (built in init)
 var (
-	createServiceName    string
-	createServiceType    string
-	createRegionCode     string
-	createCpuMillis      int
-	createMemoryGbs      float64
-	createReplicaCount   int
-	createNoWait         bool
-	createTimeoutMinutes int
+	serviceDescribeCmd        *cobra.Command
+	serviceListCmd           *cobra.Command
+	serviceCreateCmd         *cobra.Command
+	serviceUpdatePasswordCmd *cobra.Command
 )
 
-// Global command variable (built in init)
-var serviceUpdatePasswordCmd *cobra.Command
-
 func init() {
-	// Build the update-password command
+	// Build all service commands
+	serviceDescribeCmd = buildServiceDescribeCmd()
+	serviceListCmd = buildServiceListCmd()
+	serviceCreateCmd = buildServiceCreateCmd()
 	serviceUpdatePasswordCmd = buildServiceUpdatePasswordCmd()
 	
 	rootCmd.AddCommand(serviceCmd)
@@ -517,16 +544,6 @@ func init() {
 	serviceCmd.AddCommand(serviceListCmd)
 	serviceCmd.AddCommand(serviceCreateCmd)
 	serviceCmd.AddCommand(serviceUpdatePasswordCmd)
-
-	// Add flags for service create command (keep existing pattern for now)
-	serviceCreateCmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	serviceCreateCmd.Flags().StringVar(&createServiceType, "type", "timescaledb", "Service type (timescaledb, postgres, vector)")
-	serviceCreateCmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
-	serviceCreateCmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
-	serviceCreateCmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
-	serviceCreateCmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
-	serviceCreateCmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
-	serviceCreateCmd.Flags().IntVar(&createTimeoutMinutes, "timeout", 30, "Timeout for waiting in minutes")
 }
 
 // outputService formats and outputs a single service based on the specified format

@@ -51,18 +51,8 @@ func setupServiceTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeServiceCommand(args ...string) (string, error) {
-	// Reset global flag variables to ensure clean state for each test
-	createServiceName = ""
-	createServiceType = "timescaledb"
-	createRegionCode = "us-east-1"
-	createCpuMillis = 500
-	createMemoryGbs = 2.0
-	createReplicaCount = 1
-	createNoWait = false
-	createTimeoutMinutes = 30
-	
-	// No need to reset update-password flags - we build fresh commands
+func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
+	// No need to reset any flags - we build fresh commands with local variables
 	
 	// Create a test root command with service subcommand
 	testRoot := &cobra.Command{
@@ -74,7 +64,10 @@ func executeServiceCommand(args ...string) (string, error) {
 	addPersistentFlags(testRoot)
 	bindFlags(testRoot)
 	
-	// Build a fresh update-password command for testing
+	// Build fresh commands for testing
+	testServiceDescribeCmd := buildServiceDescribeCmd()
+	testServiceListCmd := buildServiceListCmd()
+	testServiceCreateCmd := buildServiceCreateCmd()
 	testServiceUpdatePasswordCmd := buildServiceUpdatePasswordCmd()
 	
 	// Create a fresh service command for testing
@@ -82,9 +75,9 @@ func executeServiceCommand(args ...string) (string, error) {
 		Use:   "service",
 		Short: "Manage database services",
 	}
-	testServiceCmd.AddCommand(serviceDescribeCmd)
-	testServiceCmd.AddCommand(serviceListCmd)
-	testServiceCmd.AddCommand(serviceCreateCmd)
+	testServiceCmd.AddCommand(testServiceDescribeCmd)
+	testServiceCmd.AddCommand(testServiceListCmd)
+	testServiceCmd.AddCommand(testServiceCreateCmd)
 	testServiceCmd.AddCommand(testServiceUpdatePasswordCmd)
 	
 	// Add the service command to our test root
@@ -96,7 +89,7 @@ func executeServiceCommand(args ...string) (string, error) {
 	testRoot.SetArgs(args)
 	
 	err := testRoot.Execute()
-	return buf.String(), err
+	return buf.String(), err, testServiceCreateCmd
 }
 
 func TestServiceList_NoProjectID(t *testing.T) {
@@ -110,7 +103,7 @@ func TestServiceList_NoProjectID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service list command without project ID
-	_, err := executeServiceCommand("service", "list")
+	_, err, _ := executeServiceCommand("service", "list")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
@@ -142,7 +135,7 @@ func TestServiceList_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service list command
-	_, err = executeServiceCommand("service", "list")
+	_, err, _ = executeServiceCommand("service", "list")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -314,14 +307,14 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	
 	// Test with no name (should auto-generate) - this should now work without error
 	// Just test that it doesn't fail due to missing name
-	_, err = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
+	_, err, _ = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
 	// This should fail due to network/API call, not due to missing name
 	if err != nil && (strings.Contains(err.Error(), "name") && strings.Contains(err.Error(), "required")) {
 		t.Errorf("Should not fail due to missing name anymore (should auto-generate), got: %v", err)
 	}
 	
 	// Test with explicit empty region (should still fail validation)
-	_, err = executeServiceCommand("service", "create", "--name", "test", "--type", "postgres", "--region", "")
+	_, err, _ = executeServiceCommand("service", "create", "--name", "test", "--type", "postgres", "--region", "")
 	if err == nil {
 		t.Fatal("Expected error when region is empty")
 	}
@@ -330,7 +323,7 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	}
 	
 	// Test invalid service type - this should fail validation before making API call
-	_, err = executeServiceCommand("service", "create", "--type", "invalid-type", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
+	_, err, _ = executeServiceCommand("service", "create", "--type", "invalid-type", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
 		t.Fatal("Expected error when service type is invalid")
 	}
@@ -350,7 +343,7 @@ func TestServiceCreate_NoProjectID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service create command without project ID (name will be auto-generated)
-	_, err := executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
+	_, err, _ := executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
@@ -382,7 +375,7 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service create command with valid parameters (name will be auto-generated)
-	_, err = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
+	_, err, _ = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -978,23 +971,33 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 
 	// Test that service name is auto-generated when not provided
 	// We expect this to fail at the API call stage, not at validation
-	_, err = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
+	var createCmd *cobra.Command
+	_, err, createCmd = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
 	
 	// The command should not fail due to missing service name
 	if err != nil && strings.Contains(err.Error(), "service name is required") {
 		t.Error("Service name should be auto-generated, not required")
 	}
 	
-	// Verify that createServiceName gets set to something like "db-####"
-	// by checking it's not empty after reset and execution
-	// This is a bit indirect but tests the core functionality
-	if createServiceName == "" {
+	// Get the service name flag value from the create command that was actually used
+	// The createCmd variable contains the command that was executed in the test
+	if createCmd == nil {
+		t.Fatal("createCmd should not be nil")
+	}
+	
+	nameFlag := createCmd.Flags().Lookup("name")
+	if nameFlag == nil {
+		t.Fatal("name flag should exist on create command")
+	}
+	
+	serviceName := nameFlag.Value.String()
+	if serviceName == "" {
 		t.Error("Service name should have been auto-generated")
 	}
 	
 	// Check pattern (should start with "db-" followed by numbers)
-	if !strings.HasPrefix(createServiceName, "db-") {
-		t.Errorf("Auto-generated name should start with 'db-', got: %s", createServiceName)
+	if !strings.HasPrefix(serviceName, "db-") {
+		t.Errorf("Auto-generated name should start with 'db-', got: %s", serviceName)
 	}
 }
 
@@ -1009,7 +1012,7 @@ func TestServiceDescribe_NoProjectID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service describe command without project ID
-	_, err := executeServiceCommand("service", "describe", "svc-12345")
+	_, err, _ := executeServiceCommand("service", "describe", "svc-12345")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
@@ -1041,7 +1044,7 @@ func TestServiceDescribe_NoServiceID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service describe command without service ID
-	_, err = executeServiceCommand("service", "describe")
+	_, err, _ = executeServiceCommand("service", "describe")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1074,7 +1077,7 @@ func TestServiceDescribe_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service describe command
-	_, err = executeServiceCommand("service", "describe")
+	_, err, _ = executeServiceCommand("service", "describe")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1397,7 +1400,7 @@ func TestServiceUpdatePassword_NoProjectID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service update-password command without project ID
-	_, err := executeServiceCommand("service", "update-password", "svc-12345", "--password", "new-password")
+	_, err, _ := executeServiceCommand("service", "update-password", "svc-12345", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
@@ -1429,7 +1432,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service update-password command without service ID
-	_, err = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1462,7 +1465,7 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service update-password command without password
-	_, err = executeServiceCommand("service", "update-password")
+	_, err, _ = executeServiceCommand("service", "update-password")
 	if err == nil {
 		t.Fatal("Expected error when no password is provided")
 	}
@@ -1495,7 +1498,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 	
 	// Execute service update-password command
-	_, err = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1539,7 +1542,7 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	}()
 	
 	// Execute command without --password flag (should use environment variable)
-	_, err = executeServiceCommand("service", "update-password", "test-service-456")
+	_, err, _ = executeServiceCommand("service", "update-password", "test-service-456")
 	
 	// Should fail with network error (not password missing error) since we have password from env
 	if err == nil {
