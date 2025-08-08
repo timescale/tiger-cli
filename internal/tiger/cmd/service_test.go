@@ -62,16 +62,7 @@ func executeServiceCommand(args ...string) (string, error) {
 	createNoWait = false
 	createTimeoutMinutes = 30
 	
-	// Reset update-password flags
-	updatePasswordValue = ""
-	updatePasswordSaveToFile = true
-	
-	// Reset flag changed status to avoid interference between tests
-	if serviceUpdatePasswordCmd != nil && serviceUpdatePasswordCmd.Flags() != nil {
-		if flag := serviceUpdatePasswordCmd.Flags().Lookup("password"); flag != nil {
-			flag.Changed = false
-		}
-	}
+	// No need to reset update-password flags - we build fresh commands
 	
 	// Create a test root command with service subcommand
 	testRoot := &cobra.Command{
@@ -83,11 +74,21 @@ func executeServiceCommand(args ...string) (string, error) {
 	addPersistentFlags(testRoot)
 	bindFlags(testRoot)
 	
-	// Bind service-specific flags
-	bindServiceFlags()
+	// Build a fresh update-password command for testing
+	testServiceUpdatePasswordCmd := buildServiceUpdatePasswordCmd()
+	
+	// Create a fresh service command for testing
+	testServiceCmd := &cobra.Command{
+		Use:   "service",
+		Short: "Manage database services",
+	}
+	testServiceCmd.AddCommand(serviceDescribeCmd)
+	testServiceCmd.AddCommand(serviceListCmd)
+	testServiceCmd.AddCommand(serviceCreateCmd)
+	testServiceCmd.AddCommand(testServiceUpdatePasswordCmd)
 	
 	// Add the service command to our test root
-	testRoot.AddCommand(serviceCmd)
+	testRoot.AddCommand(testServiceCmd)
 	
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

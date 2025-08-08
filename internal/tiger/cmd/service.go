@@ -365,8 +365,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	},
 }
 
-// serviceUpdatePasswordCmd represents the update-password command under service
-var serviceUpdatePasswordCmd = &cobra.Command{
+// buildServiceUpdatePasswordCmd creates a new update-password command
+func buildServiceUpdatePasswordCmd() *cobra.Command {
+	var updatePasswordValue string
+	var updatePasswordSaveToFile bool
+
+	cmd := &cobra.Command{
 	Use:   "update-password [service-id]",
 	Short: "Update the master password for a service",
 	Long: `Update the master password for a specific database service.
@@ -477,6 +481,16 @@ Examples:
 			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 		}
 	},
+	}
+	
+	// Add flags
+	cmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
+	cmd.Flags().BoolVar(&updatePasswordSaveToFile, "no-save-password", false, "Don't save the new password to ~/.pgpass file")
+	
+	// Bind flags to viper
+	viper.BindPFlag("password", cmd.Flags().Lookup("password"))
+	
+	return cmd
 }
 
 // Command-line flags for service create
@@ -491,25 +505,20 @@ var (
 	createTimeoutMinutes int
 )
 
-// Command-line flags for service update-password
-var (
-	updatePasswordValue      string
-	updatePasswordSaveToFile bool
-)
-
-// bindServiceFlags binds service command flags to viper (like bindFlags in root.go)
-func bindServiceFlags() {
-	viper.BindPFlag("password", serviceUpdatePasswordCmd.Flags().Lookup("password"))
-}
+// Global command variable (built in init)
+var serviceUpdatePasswordCmd *cobra.Command
 
 func init() {
+	// Build the update-password command
+	serviceUpdatePasswordCmd = buildServiceUpdatePasswordCmd()
+	
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(serviceDescribeCmd)
 	serviceCmd.AddCommand(serviceListCmd)
 	serviceCmd.AddCommand(serviceCreateCmd)
 	serviceCmd.AddCommand(serviceUpdatePasswordCmd)
 
-	// Add flags for service create command
+	// Add flags for service create command (keep existing pattern for now)
 	serviceCreateCmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
 	serviceCreateCmd.Flags().StringVar(&createServiceType, "type", "timescaledb", "Service type (timescaledb, postgres, vector)")
 	serviceCreateCmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
@@ -518,15 +527,6 @@ func init() {
 	serviceCreateCmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
 	serviceCreateCmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	serviceCreateCmd.Flags().IntVar(&createTimeoutMinutes, "timeout", 30, "Timeout for waiting in minutes")
-
-	// Add flags for service update-password command
-	serviceUpdatePasswordCmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
-	serviceUpdatePasswordCmd.Flags().BoolVar(&updatePasswordSaveToFile, "no-save-password", false, "Don't save the new password to ~/.pgpass file")
-	// Set default to true for saving passwords
-	updatePasswordSaveToFile = true
-	
-	// Bind service flags to viper for environment variable support
-	bindServiceFlags()
 }
 
 // outputService formats and outputs a single service based on the specified format
