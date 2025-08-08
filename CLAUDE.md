@@ -144,6 +144,154 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
 
+## Command Builder Pattern
+
+Tiger CLI uses a functional builder pattern for creating Cobra commands that ensures proper test isolation and eliminates global state issues. This pattern should be followed for all new commands.
+
+### Philosophy
+
+- **No global command variables** - Commands are built fresh each time
+- **Local flag variables** - Flag variables are scoped within builder functions
+- **Perfect test isolation** - Each test gets completely fresh command instances
+- **Functional approach** - Builder functions return complete command trees
+
+### Basic Pattern
+
+For simple commands without flags:
+
+```go
+func buildMyCmd() *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "my-command",
+        Short: "Description of my command",
+        Long:  `Detailed description...`,
+        RunE: func(cmd *cobra.Command, args []string) error {
+            // Command logic here
+            return nil
+        },
+    }
+    
+    return cmd
+}
+```
+
+### Commands with Flags
+
+For commands that need flags, declare flag variables locally within the builder:
+
+```go
+func buildMyFlaggedCmd() *cobra.Command {
+    // Declare flag variables locally (not globally!)
+    var myFlag string
+    var myBoolFlag bool
+    var myIntFlag int
+    
+    cmd := &cobra.Command{
+        Use:   "my-command",
+        Short: "Command with flags",
+        RunE: func(cmd *cobra.Command, args []string) error {
+            // Use flag variables directly (they're in scope)
+            fmt.Printf("Flag value: %s\n", myFlag)
+            return nil
+        },
+    }
+    
+    // Add flags after command definition
+    cmd.Flags().StringVar(&myFlag, "my-flag", "", "Description of my flag")
+    cmd.Flags().BoolVar(&myBoolFlag, "my-bool", false, "Boolean flag")
+    cmd.Flags().IntVar(&myIntFlag, "my-int", 0, "Integer flag")
+    
+    // Bind flags to viper for environment variable support
+    viper.BindPFlag("my_flag", cmd.Flags().Lookup("my-flag"))
+    
+    return cmd
+}
+```
+
+### Parent Commands with Subcommands
+
+For commands that contain subcommands, build the entire tree in one function:
+
+```go
+func buildParentCmd() *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "parent",
+        Short: "Parent command with subcommands",
+        Long:  `Parent command that contains multiple subcommands.`,
+    }
+    
+    // Add all subcommands
+    cmd.AddCommand(buildChildCmd1())
+    cmd.AddCommand(buildChildCmd2())
+    cmd.AddCommand(buildChildCmd3())
+    
+    return cmd
+}
+```
+
+### Integration in init()
+
+The init() function should be minimal and use local variables:
+
+```go
+func init() {
+    // Build command tree (no global variables needed)
+    myCmd := buildMyCmd()
+    
+    // Add to parent command
+    rootCmd.AddCommand(myCmd)
+}
+```
+
+### Testing Commands with Builder Pattern
+
+When testing commands built with this pattern:
+
+```go
+func executeTestCommand(args ...string) (string, error, *cobra.Command) {
+    // Build fresh command tree for testing
+    testCmd := buildMyCmd()
+    
+    // Create test root
+    testRoot := &cobra.Command{Use: "test"}
+    testRoot.AddCommand(testCmd)
+    
+    // Execute and return root for flag access
+    buf := new(bytes.Buffer)
+    testRoot.SetOut(buf)
+    testRoot.SetArgs(args)
+    
+    err := testRoot.Execute()
+    return buf.String(), err, testRoot
+}
+
+func TestMyCommand(t *testing.T) {
+    output, err, rootCmd := executeTestCommand("my-command", "--my-flag", "value")
+    
+    // Navigate to specific command to check flags if needed
+    myCmd, _, err := rootCmd.Find([]string{"my-command"})
+    if err != nil {
+        t.Fatalf("Failed to find command: %v", err)
+    }
+    
+    // Access flag values through cobra's flag system
+    flagValue := myCmd.Flags().Lookup("my-flag").Value.String()
+    // Test assertions...
+}
+```
+
+### Benefits of This Pattern
+
+1. **Perfect Test Isolation**: Each test gets completely fresh commands with no shared state
+2. **No Global State**: Eliminates issues with flag variables persisting between tests  
+3. **Clean Architecture**: Commands are self-contained and easier to understand
+4. **Easy Testing**: Can access any part of the command tree for verification
+5. **Maintainable**: No complex reset logic or global variable management needed
+
+### Example: Service Command Implementation
+
+The service command demonstrates this pattern in action. See `buildServiceCmd()` in `internal/tiger/cmd/service.go` for a complete example of a parent command with multiple subcommands, each with their own flags.
+
 ## Specifications
 
 The project specifications are located in the `specs/` directory:

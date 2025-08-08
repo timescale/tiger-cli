@@ -25,11 +25,21 @@ var (
 	getAPIKeyForService = getAPIKey
 )
 
-// serviceCmd represents the service command
-var serviceCmd = &cobra.Command{
-	Use:   "service",
-	Short: "Manage database services",
-	Long:  `Manage database services within TigerData Cloud Platform.`,
+// buildServiceCmd creates the main service command with all subcommands
+func buildServiceCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "service",
+		Short: "Manage database services",
+		Long:  `Manage database services within TigerData Cloud Platform.`,
+	}
+
+	// Add all subcommands
+	cmd.AddCommand(buildServiceDescribeCmd())
+	cmd.AddCommand(buildServiceListCmd())
+	cmd.AddCommand(buildServiceCreateCmd())
+	cmd.AddCommand(buildServiceUpdatePasswordCmd())
+
+	return cmd
 }
 
 // serviceDescribeCmd represents the describe command under service
@@ -524,26 +534,12 @@ Examples:
 	return cmd
 }
 
-// Global command variables (built in init)
-var (
-	serviceDescribeCmd        *cobra.Command
-	serviceListCmd           *cobra.Command
-	serviceCreateCmd         *cobra.Command
-	serviceUpdatePasswordCmd *cobra.Command
-)
-
 func init() {
-	// Build all service commands
-	serviceDescribeCmd = buildServiceDescribeCmd()
-	serviceListCmd = buildServiceListCmd()
-	serviceCreateCmd = buildServiceCreateCmd()
-	serviceUpdatePasswordCmd = buildServiceUpdatePasswordCmd()
+	// Build the service command tree (includes all subcommands)
+	serviceCmd := buildServiceCmd()
 	
+	// Add to root command
 	rootCmd.AddCommand(serviceCmd)
-	serviceCmd.AddCommand(serviceDescribeCmd)
-	serviceCmd.AddCommand(serviceListCmd)
-	serviceCmd.AddCommand(serviceCreateCmd)
-	serviceCmd.AddCommand(serviceUpdatePasswordCmd)
 }
 
 // outputService formats and outputs a single service based on the specified format
