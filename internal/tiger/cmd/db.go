@@ -212,10 +212,6 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-func init() {
-	dbCmd := buildDbCmd()
-	rootCmd.AddCommand(dbCmd)
-}
 
 // buildConnectionString creates a PostgreSQL connection string from service details
 func buildConnectionString(service api.Service, pooled bool, role string, cmd *cobra.Command) (string, error) {

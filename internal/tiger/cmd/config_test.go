@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
@@ -39,15 +38,6 @@ func setupConfigTest(t *testing.T) (string, func()) {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		viper.Reset()
 		
-		// Reset global variables
-		cfgFile = ""
-		debug = false
-		output = ""
-		apiKey = ""
-		projectID = ""
-		serviceID = ""
-		analytics = true
-		
 		// Reset global config in the config package
 		// This is important for test isolation
 		// We need to clear the singleton
@@ -60,19 +50,8 @@ func setupConfigTest(t *testing.T) (string, func()) {
 }
 
 func executeConfigCommand(args ...string) (string, error) {
-	// Create a test root command with config subcommand
-	testRoot := &cobra.Command{
-		Use: "tiger",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-	}
-	
-	// Add persistent flags and bind them
-	addPersistentFlags(testRoot)
-	bindFlags(testRoot)
-	
-	// Add the config command to our test root
-	configCmd := buildConfigCmd()
-	testRoot.AddCommand(configCmd)
+	// Use buildRootCmd() to get a complete root command with all flags and subcommands
+	testRoot := buildRootCmd()
 	
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

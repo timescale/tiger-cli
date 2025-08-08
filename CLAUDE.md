@@ -144,65 +144,136 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
 
-## Command Builder Pattern
+## Command Architecture: Pure Functional Builder Pattern
 
-Tiger CLI uses a functional builder pattern for creating Cobra commands that ensures proper test isolation and eliminates global state issues. This pattern should be followed for all new commands.
+Tiger CLI uses a pure functional builder pattern with **zero global command state**. This architecture ensures perfect test isolation, eliminates shared state issues, and provides a clean, maintainable command structure.
 
 ### Philosophy
 
-- **No global command variables** - Commands are built fresh each time
-- **Local flag variables** - Flag variables are scoped within builder functions
+- **No global variables** - All commands, flags, and state are locally scoped
+- **Functional builders** - Every command is built by a dedicated function 
+- **Complete tree building** - `buildRootCmd()` constructs the entire CLI structure
 - **Perfect test isolation** - Each test gets completely fresh command instances
-- **Functional approach** - Builder functions return complete command trees
+- **Self-contained commands** - All dependencies passed explicitly via parameters
 
-### Basic Pattern
+### Architecture Overview
 
-For simple commands without flags:
+```
+buildRootCmd() → Complete CLI with all commands and flags
+├── buildVersionCmd()
+├── buildConfigCmd()
+│   ├── buildConfigShowCmd()
+│   ├── buildConfigSetCmd()
+│   ├── buildConfigUnsetCmd()
+│   └── buildConfigResetCmd()
+├── buildAuthCmd()
+│   ├── buildLoginCmd()
+│   ├── buildLogoutCmd()  
+│   └── buildWhoamiCmd()
+├── buildServiceCmd()
+│   ├── buildServiceListCmd()
+│   ├── buildServiceDescribeCmd()
+│   ├── buildServiceCreateCmd()
+│   └── buildServiceUpdatePasswordCmd()
+└── buildDbCmd()
+    ├── buildDbConnectionStringCmd()
+    ├── buildDbConnectCmd()
+    └── buildDbTestConnectionCmd()
+```
+
+### Root Command Builder
+
+The root command builder creates the complete CLI structure:
 
 ```go
-func buildMyCmd() *cobra.Command {
+func buildRootCmd() *cobra.Command {
+    // Declare ALL flag variables locally within this function
+    var cfgFile string
+    var debug bool
+    var output string
+    var apiKey string
+    var projectID string
+    var serviceID string
+    var analytics bool
+
     cmd := &cobra.Command{
-        Use:   "my-command",
-        Short: "Description of my command",
-        Long:  `Detailed description...`,
-        RunE: func(cmd *cobra.Command, args []string) error {
-            // Command logic here
+        Use:   "tiger",
+        Short: "Tiger CLI - TigerData Cloud Platform CLI",
+        Long:  `Complete CLI description...`,
+        PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+            // Use local flag variables in scope
+            if err := logging.Init(debug); err != nil {
+                return fmt.Errorf("failed to initialize logging: %w", err)
+            }
+            // ... rest of initialization
             return nil
         },
     }
+
+    // Setup configuration and flags
+    setupConfigAndFlags(cmd, &cfgFile, &debug, &output, &apiKey, &projectID, &serviceID, &analytics)
     
+    // Add all subcommands (complete tree building)
+    cmd.AddCommand(buildVersionCmd())
+    cmd.AddCommand(buildConfigCmd())
+    cmd.AddCommand(buildAuthCmd())
+    cmd.AddCommand(buildServiceCmd())
+    cmd.AddCommand(buildDbCmd())
+
     return cmd
 }
 ```
 
-### Commands with Flags
+### Simple Command Pattern
 
-For commands that need flags, declare flag variables locally within the builder:
+For commands without flags:
+
+```go
+func buildVersionCmd() *cobra.Command {
+    return &cobra.Command{
+        Use:   "version",
+        Short: "Show version information", 
+        Long:  `Display version, build time, and git commit information.`,
+        Run: func(cmd *cobra.Command, args []string) {
+            fmt.Printf("Tiger CLI %s\n", Version)
+            // ... version output
+        },
+    }
+}
+```
+
+### Commands with Local Flags
+
+For commands that need their own flags:
 
 ```go
 func buildMyFlaggedCmd() *cobra.Command {
-    // Declare flag variables locally (not globally!)
+    // Declare flag variables locally (NEVER globally!)
     var myFlag string
-    var myBoolFlag bool
-    var myIntFlag int
+    var enableFeature bool
+    var retryCount int
     
     cmd := &cobra.Command{
         Use:   "my-command",
-        Short: "Command with flags",
+        Short: "Command with local flags",
         RunE: func(cmd *cobra.Command, args []string) error {
-            // Use flag variables directly (they're in scope)
-            fmt.Printf("Flag value: %s\n", myFlag)
+            if len(args) < 1 {
+                return fmt.Errorf("argument required")
+            }
+            
+            cmd.SilenceUsage = true
+            
+            // Use flag variables (they're in scope)
+            fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n", 
+                myFlag, enableFeature, retryCount)
             return nil
         },
     }
     
-    // Add flags after command definition
-    cmd.Flags().StringVar(&myFlag, "my-flag", "", "Description of my flag")
-    cmd.Flags().BoolVar(&myBoolFlag, "my-bool", false, "Boolean flag")
-    cmd.Flags().IntVar(&myIntFlag, "my-int", 0, "Integer flag")
-    
-    // Bind flags to viper for environment variable support
-    viper.BindPFlag("my_flag", cmd.Flags().Lookup("my-flag"))
+    // Add flags - bound to local variables
+    cmd.Flags().StringVar(&myFlag, "flag", "", "My flag description")  
+    cmd.Flags().BoolVar(&enableFeature, "enable", false, "Enable feature")
+    cmd.Flags().IntVar(&retryCount, "retries", 3, "Retry count")
     
     return cmd
 }
@@ -210,87 +281,143 @@ func buildMyFlaggedCmd() *cobra.Command {
 
 ### Parent Commands with Subcommands
 
-For commands that contain subcommands, build the entire tree in one function:
+For commands that contain subcommands, build the complete tree:
 
 ```go
 func buildParentCmd() *cobra.Command {
     cmd := &cobra.Command{
         Use:   "parent",
         Short: "Parent command with subcommands",
-        Long:  `Parent command that contains multiple subcommands.`,
+        Long:  `Parent command containing multiple subcommands.`,
     }
     
-    // Add all subcommands
-    cmd.AddCommand(buildChildCmd1())
-    cmd.AddCommand(buildChildCmd2())
-    cmd.AddCommand(buildChildCmd3())
+    // Add all subcommands (builds complete subtree)
+    cmd.AddCommand(buildChild1Cmd())
+    cmd.AddCommand(buildChild2Cmd())
+    cmd.AddCommand(buildChild3Cmd())
     
     return cmd
 }
 ```
 
-### Integration in init()
+### Application Entry Point
 
-The init() function should be minimal and use local variables:
+The main application uses a single builder call:
 
 ```go
-func init() {
-    // Build command tree (no global variables needed)
-    myCmd := buildMyCmd()
+func Execute() {
+    // Build complete command tree fresh each time
+    rootCmd := buildRootCmd()
     
-    // Add to parent command
-    rootCmd.AddCommand(myCmd)
+    err := rootCmd.Execute()
+    if err != nil {
+        if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+            os.Exit(exitErr.ExitCode())
+        }
+        os.Exit(1)
+    }
 }
 ```
 
-### Testing Commands with Builder Pattern
+### No init() Functions Needed
 
-When testing commands built with this pattern:
+With this pattern, commands don't need init() functions because the root command builder handles complete tree construction:
 
 ```go
-func executeTestCommand(args ...string) (string, error, *cobra.Command) {
-    // Build fresh command tree for testing
-    testCmd := buildMyCmd()
+// OLD PATTERN (don't do this):
+func init() {
+    myCmd := buildMyCmd()
+    rootCmd.AddCommand(myCmd)  // Global state dependency
+}
+
+// NEW PATTERN (do this):
+// No init() function needed - buildRootCmd() handles everything
+```
+
+### Testing with Complete Architecture
+
+Tests use the full root command builder:
+
+```go
+func executeCommand(args ...string) (string, error) {
+    // Build complete CLI fresh for each test
+    rootCmd := buildRootCmd()
     
-    // Create test root
-    testRoot := &cobra.Command{Use: "test"}
-    testRoot.AddCommand(testCmd)
-    
-    // Execute and return root for flag access
     buf := new(bytes.Buffer)
-    testRoot.SetOut(buf)
-    testRoot.SetArgs(args)
+    rootCmd.SetOut(buf)  
+    rootCmd.SetErr(buf)
+    rootCmd.SetArgs(args)
     
-    err := testRoot.Execute()
-    return buf.String(), err, testRoot
+    err := rootCmd.Execute()
+    return buf.String(), err
 }
 
 func TestMyCommand(t *testing.T) {
-    output, err, rootCmd := executeTestCommand("my-command", "--my-flag", "value")
+    // Each test gets completely fresh CLI instance
+    output, err := executeCommand("my-command", "--flag", "value")
     
-    // Navigate to specific command to check flags if needed
-    myCmd, _, err := rootCmd.Find([]string{"my-command"})
     if err != nil {
-        t.Fatalf("Failed to find command: %v", err)
+        t.Fatalf("Command failed: %v", err)
     }
     
-    // Access flag values through cobra's flag system
-    flagValue := myCmd.Flags().Lookup("my-flag").Value.String()
-    // Test assertions...
+    if !strings.Contains(output, "expected") {
+        t.Errorf("Expected 'expected' in output: %s", output)
+    }
 }
 ```
 
-### Benefits of This Pattern
+### Advanced Testing: Flag Access
 
-1. **Perfect Test Isolation**: Each test gets completely fresh commands with no shared state
-2. **No Global State**: Eliminates issues with flag variables persisting between tests  
-3. **Clean Architecture**: Commands are self-contained and easier to understand
-4. **Easy Testing**: Can access any part of the command tree for verification
-5. **Maintainable**: No complex reset logic or global variable management needed
+For tests that need to verify flag values:
 
-### Example: Service Command Implementation
+```go
+func executeAndReturnRoot(args ...string) (*cobra.Command, string, error) {
+    rootCmd := buildRootCmd()
+    
+    buf := new(bytes.Buffer)
+    rootCmd.SetOut(buf)
+    rootCmd.SetArgs(args)
+    
+    err := rootCmd.Execute()
+    return rootCmd, buf.String(), err
+}
 
-The service command demonstrates this pattern in action. See `buildServiceCmd()` in `internal/tiger/cmd/service.go` for a complete example of a parent command with multiple subcommands, each with their own flags.
+func TestFlagValues(t *testing.T) {
+    rootCmd, output, err := executeAndReturnRoot("service", "create", "--name", "test")
+    
+    // Navigate to specific command
+    serviceCmd, _, _ := rootCmd.Find([]string{"service"})
+    createCmd, _, _ := serviceCmd.Find([]string{"create"})
+    
+    // Check flag value
+    nameFlag := createCmd.Flags().Lookup("name")
+    if nameFlag.Value.String() != "test" {
+        t.Errorf("Expected name=test, got %s", nameFlag.Value.String())
+    }
+}
+```
+
+### Benefits of This Architecture
+
+1. **Zero Global State**: No shared variables between commands or tests
+2. **Perfect Test Isolation**: Each test builds completely fresh command trees  
+3. **Simplified Initialization**: Single entry point builds everything
+4. **Maintainable Code**: No complex global variable management
+5. **Easy Development**: Add new commands by creating builders and adding to root
+6. **Predictable Behavior**: No hidden dependencies or initialization order issues
+7. **Memory Efficient**: Commands built only when needed
+
+### Migration Guide
+
+When adding new commands to this architecture:
+
+1. **Create a builder function** following the `buildXXXCmd()` pattern
+2. **Declare flags locally** within the builder function scope
+3. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
+4. **No init() function** required - everything goes through the root builder
+5. **Test with `buildRootCmd()`** instead of recreating flag setup
+
+This architecture ensures Tiger CLI remains maintainable and testable as it grows.
 
 ## Specifications
 

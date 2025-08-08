@@ -151,10 +151,6 @@ func buildAuthCmd() *cobra.Command {
 	return cmd
 }
 
-func init() {
-	authCmd := buildAuthCmd()
-	rootCmd.AddCommand(authCmd)
-}
 
 // storeAPIKey stores the API key using keyring with file fallback
 func storeAPIKey(apiKey string) error {

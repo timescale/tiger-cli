@@ -46,19 +46,8 @@ func setupDBTest(t *testing.T) string {
 }
 
 func executeDBCommand(args ...string) (string, error) {
-	// Create a test root command with db subcommand
-	testRoot := &cobra.Command{
-		Use: "tiger",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-	}
-	
-	// Add persistent flags and bind them
-	addPersistentFlags(testRoot)
-	bindFlags(testRoot)
-	
-	// Add the db command to our test root
-	dbCmd := buildDbCmd()
-	testRoot.AddCommand(dbCmd)
+	// Use buildRootCmd() to get a complete root command with all flags and subcommands
+	testRoot := buildRootCmd()
 	
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

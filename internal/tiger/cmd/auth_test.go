@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/zalando/go-keyring"
 	"github.com/tigerdata/tiger-cli/internal/tiger/config"
@@ -63,19 +62,8 @@ func setupAuthTest(t *testing.T) string {
 }
 
 func executeAuthCommand(args ...string) (string, error) {
-	// Create a test root command with auth subcommand
-	testRoot := &cobra.Command{
-		Use: "tiger",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-	}
-	
-	// Add persistent flags and bind them
-	addPersistentFlags(testRoot)
-	bindFlags(testRoot)
-	
-	// Add the auth command to our test root
-	authCmd := buildAuthCmd()
-	testRoot.AddCommand(authCmd)
+	// Use buildRootCmd() to get a complete root command with all flags and subcommands
+	testRoot := buildRootCmd()
 	
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

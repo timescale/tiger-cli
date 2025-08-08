@@ -534,13 +534,6 @@ Examples:
 	return cmd
 }
 
-func init() {
-	// Build the service command tree (includes all subcommands)
-	serviceCmd := buildServiceCmd()
-	
-	// Add to root command
-	rootCmd.AddCommand(serviceCmd)
-}
 
 // outputService formats and outputs a single service based on the specified format
 func outputService(cmd *cobra.Command, service api.Service, format string) error {

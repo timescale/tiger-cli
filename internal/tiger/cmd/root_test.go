@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -29,15 +28,6 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		viper.Reset()
-		
-		// Reset global variables
-		cfgFile = ""
-		debug = false
-		output = ""
-		apiKey = ""
-		projectID = ""
-		serviceID = ""
-		analytics = true
 	}
 	
 	t.Cleanup(cleanup)
@@ -75,18 +65,8 @@ analytics: true
 		os.Unsetenv("TIGER_ANALYTICS")
 	}()
 	
-	// Create a test command that uses the same persistent pre-run logic
-	testCmd := &cobra.Command{
-		Use: "test",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Test command - just verify flag values
-		},
-	}
-	
-	// Use the same flag setup as the real application
-	addPersistentFlags(testCmd)
-	bindFlags(testCmd)
+	// Use buildRootCmd() to get a complete root command
+	testCmd := buildRootCmd()
 	
 	// Set CLI flags (these should take precedence)
 	args := []string{
@@ -96,6 +76,7 @@ analytics: true
 		"--output", "yaml",
 		"--analytics=false",
 		"--debug",
+		"version", // Need a subcommand to execute
 	}
 	
 	testCmd.SetArgs(args)
@@ -106,24 +87,7 @@ analytics: true
 		t.Fatalf("Command execution failed: %v", err)
 	}
 	
-	// Verify CLI flags take precedence
-	if projectID != "flag-project" {
-		t.Errorf("Expected projectID 'flag-project' (from CLI flag), got '%s'", projectID)
-	}
-	if serviceID != "flag-service" {
-		t.Errorf("Expected serviceID 'flag-service' (from CLI flag), got '%s'", serviceID)
-	}
-	if output != "yaml" {
-		t.Errorf("Expected output 'yaml' (from CLI flag), got '%s'", output)
-	}
-	if analytics != false {
-		t.Errorf("Expected analytics false (from CLI flag), got %t", analytics)
-	}
-	if debug != true {
-		t.Errorf("Expected debug true (from CLI flag), got %t", debug)
-	}
-	
-	// Verify Viper also reflects the flag values
+	// Verify Viper reflects the CLI flag values (highest precedence)
 	if viper.GetString("project_id") != "flag-project" {
 		t.Errorf("Expected Viper project_id 'flag-project', got '%s'", viper.GetString("project_id"))
 	}
@@ -145,16 +109,8 @@ func TestFlagBindingWithViper(t *testing.T) {
 	}()
 	
 	// Test 1: Environment variable should be used when no flag is set
-	testCmd1 := &cobra.Command{
-		Use: "test1",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-		Run: func(cmd *cobra.Command, args []string) {},
-	}
-	
-	addPersistentFlags(testCmd1)
-	bindFlags(testCmd1)
-	
-	testCmd1.SetArgs([]string{})
+	testCmd1 := buildRootCmd()
+	testCmd1.SetArgs([]string{"version"}) // Need a subcommand
 	err := testCmd1.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
@@ -168,16 +124,8 @@ func TestFlagBindingWithViper(t *testing.T) {
 	viper.Reset()
 	
 	// Test 2: Flag should override environment variable
-	testCmd2 := &cobra.Command{
-		Use: "test2", 
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-		Run: func(cmd *cobra.Command, args []string) {},
-	}
-	
-	addPersistentFlags(testCmd2)
-	bindFlags(testCmd2)
-	
-	testCmd2.SetArgs([]string{"--output", "table"})
+	testCmd2 := buildRootCmd()
+	testCmd2.SetArgs([]string{"--output", "table", "version"})
 	err = testCmd2.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
@@ -205,18 +153,11 @@ analytics: false
 	
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 	
-	// Create test command
-	testCmd := &cobra.Command{
-		Use: "test",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-		Run: func(cmd *cobra.Command, args []string) {},
-	}
-	
-	addPersistentFlags(testCmd)
-	bindFlags(testCmd)
+	// Use buildRootCmd() to get a complete root command
+	testCmd := buildRootCmd()
 	
 	// Execute with config file specified
-	testCmd.SetArgs([]string{"--config", configFile})
+	testCmd.SetArgs([]string{"--config", configFile, "version"})
 	err := testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)

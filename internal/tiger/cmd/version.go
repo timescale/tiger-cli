@@ -26,7 +26,3 @@ func buildVersionCmd() *cobra.Command {
 	}
 }
 
-func init() {
-	versionCmd := buildVersionCmd()
-	rootCmd.AddCommand(versionCmd)
-}

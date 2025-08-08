@@ -182,7 +182,3 @@ func valueOrEmpty(s string) string {
 	return s
 }
 
-func init() {
-	configCmd := buildConfigCmd()
-	rootCmd.AddCommand(configCmd)
-}

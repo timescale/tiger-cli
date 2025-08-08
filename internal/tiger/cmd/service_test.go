@@ -54,21 +54,8 @@ func setupServiceTest(t *testing.T) string {
 func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
 	// No need to reset any flags - we build fresh commands with local variables
 	
-	// Create a test root command with service subcommand
-	testRoot := &cobra.Command{
-		Use: "tiger",
-		PersistentPreRunE: rootCmd.PersistentPreRunE,
-	}
-	
-	// Add persistent flags and bind them
-	addPersistentFlags(testRoot)
-	bindFlags(testRoot)
-	
-	// Build fresh service command with all subcommands for testing
-	testServiceCmd := buildServiceCmd()
-	
-	// Add the service command to our test root
-	testRoot.AddCommand(testServiceCmd)
+	// Use buildRootCmd() to get a complete root command with all flags and subcommands
+	testRoot := buildRootCmd()
 	
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
