@@ -497,6 +497,8 @@ Examples:
 		// Handle API response
 		switch resp.StatusCode() {
 		case 200:
+				fallthrough
+		case 204:
 			fmt.Fprintf(cmd.OutOrStdout(), "✅ Master password for 'tsdbadmin' user updated successfully\n")
 			
 			// Handle .pgpass file update - save by default unless --no-save-password was specified
@@ -517,7 +519,7 @@ Examples:
 		case 404:
 			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
 		case 400:
-			return fmt.Errorf("invalid password. Please ensure the password meets security requirements")
+			return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
 		default:
 			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 		}
@@ -533,7 +535,6 @@ Examples:
 	
 	return cmd
 }
-
 
 // outputService formats and outputs a single service based on the specified format
 func outputService(cmd *cobra.Command, service api.Service, format string) error {
