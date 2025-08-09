@@ -212,7 +212,6 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-
 // buildConnectionString creates a PostgreSQL connection string from service details
 func buildConnectionString(service api.Service, pooled bool, role string, cmd *cobra.Command) (string, error) {
 	if service.Endpoint == nil {
@@ -384,7 +383,7 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 	// Create context with timeout if specified
 	var ctx context.Context
 	var cancel context.CancelFunc
-	
+
 	if timeoutSeconds > 0 {
 		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 		defer cancel()
@@ -407,13 +406,13 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
-		
+
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
 			return exitWithCode(1, err) // Server is rejecting connections
 		}
-		
+
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
 		return exitWithCode(2, err) // No response to connection attempt
 	}
@@ -427,13 +426,13 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
-		
+
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
 			return exitWithCode(1, err) // Server is rejecting connections
 		}
-		
+
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
 		return exitWithCode(2, err) // No response to connection attempt
 	}
@@ -454,15 +453,14 @@ func isConnectionRejected(err error) bool {
 	// should be considered as "server rejecting connections" (exit code 1).
 	// This occurs when the server is running but cannot accept new connections
 	// (e.g., during startup, shutdown, or when max_connections is reached).
-	
+
 	// Check if this is a PostgreSQL error with the specific error code
 	if pgxErr, ok := err.(*pgconn.PgError); ok {
 		// ERRCODE_CANNOT_CONNECT_NOW is 57P03
 		return pgxErr.Code == "57P03"
 	}
-	
-	// All other errors (authentication, authorization, network issues, etc.) 
+
+	// All other errors (authentication, authorization, network issues, etc.)
 	// should be treated as "unreachable" (exit code 2)
 	return false
 }
-

@@ -19,12 +19,12 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	originalValidator := validateAPIKeyForLogin
-	
+
 	// Mock the validator to return an error
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		return errors.New("invalid API key: authentication failed")
 	}
-	
+
 	defer func() {
 		validateAPIKeyForLogin = originalValidator
 	}()
@@ -75,12 +75,12 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	originalValidator := validateAPIKeyForLogin
-	
+
 	// Mock the validator to return success
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
 		return nil // Success
 	}
-	
+
 	defer func() {
 		validateAPIKeyForLogin = originalValidator
 	}()

@@ -19,7 +19,7 @@ func buildConfigShowCmd() *cobra.Command {
 		Long:  `Display the current CLI configuration settings`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			
+
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -45,7 +45,7 @@ func buildConfigSetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
-			
+
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
@@ -72,7 +72,7 @@ func buildConfigUnsetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
-			
+
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
@@ -98,7 +98,7 @@ func buildConfigResetCmd() *cobra.Command {
 		Long:  `Reset all configuration settings to their default values`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			
+
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -181,4 +181,3 @@ func valueOrEmpty(s string) string {
 	}
 	return s
 }
-

@@ -11,7 +11,7 @@ var logger *zap.Logger
 
 func Init(debug bool) error {
 	var config zap.Config
-	
+
 	if debug {
 		config = zap.NewDevelopmentConfig()
 		config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)

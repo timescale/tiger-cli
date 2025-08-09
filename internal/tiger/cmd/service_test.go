@@ -20,24 +20,24 @@ import (
 
 func setupServiceTest(t *testing.T) string {
 	t.Helper()
-	
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-service-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	
+
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
 	viper.Reset()
-	
+
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
-	
+
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
@@ -47,41 +47,41 @@ func setupServiceTest(t *testing.T) string {
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
-	
+
 	return tmpDir
 }
 
 func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
 	// No need to reset any flags - we build fresh commands with local variables
-	
+
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot := buildRootCmd()
-	
+
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
-	
+
 	err := testRoot.Execute()
 	return buf.String(), err, testRoot
 }
 
 func TestServiceList_NoProjectID(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service list command without project ID
 	_, err, _ := executeServiceCommand("service", "list")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestServiceList_NoProjectID(t *testing.T) {
 
 func TestServiceList_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and API URL
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -100,20 +100,20 @@ func TestServiceList_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service list command
 	_, err, _ = executeServiceCommand("service", "list")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -121,27 +121,27 @@ func TestServiceList_NoAuth(t *testing.T) {
 
 func TestOutputServices_JSON(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Create test services
 	services := createTestServices()
-	
+
 	// Create test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test JSON output
 	err := outputServices(cmd, services, "json")
 	if err != nil {
 		t.Fatalf("Failed to output JSON: %v", err)
 	}
-	
+
 	// Verify JSON is valid
 	var result []api.Service
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("Invalid JSON output: %v", err)
 	}
-	
+
 	if len(result) != len(services) {
 		t.Errorf("Expected %d services in JSON, got %d", len(services), len(result))
 	}
@@ -149,27 +149,27 @@ func TestOutputServices_JSON(t *testing.T) {
 
 func TestOutputServices_YAML(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Create test services
 	services := createTestServices()
-	
+
 	// Create test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test YAML output
 	err := outputServices(cmd, services, "yaml")
 	if err != nil {
 		t.Fatalf("Failed to output YAML: %v", err)
 	}
-	
+
 	// Verify YAML is valid
 	var result []api.Service
 	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("Invalid YAML output: %v", err)
 	}
-	
+
 	if len(result) != len(services) {
 		t.Errorf("Expected %d services in YAML, got %d", len(services), len(result))
 	}
@@ -177,23 +177,23 @@ func TestOutputServices_YAML(t *testing.T) {
 
 func TestOutputServices_Table(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Create test services
 	services := createTestServices()
-	
+
 	// Create test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test table output
 	err := outputServices(cmd, services, "table")
 	if err != nil {
 		t.Fatalf("Failed to output table: %v", err)
 	}
-	
+
 	output := buf.String()
-	
+
 	// Verify table contains headers
 	if !strings.Contains(output, "SERVICE ID") {
 		t.Error("Table output should contain SERVICE ID header")
@@ -204,7 +204,7 @@ func TestOutputServices_Table(t *testing.T) {
 	if !strings.Contains(output, "STATUS") {
 		t.Error("Table output should contain STATUS header")
 	}
-	
+
 	// Verify table contains service data
 	if !strings.Contains(output, "test-service-1") {
 		t.Error("Table output should contain test service name")
@@ -220,7 +220,7 @@ func TestFormatHelpers(t *testing.T) {
 	if derefString(nil) != "" {
 		t.Error("derefString should return empty string for nil")
 	}
-	
+
 	// Test derefString
 	testStr := "test"
 	if derefString(&testStr) != "test" {
@@ -229,7 +229,7 @@ func TestFormatHelpers(t *testing.T) {
 	if derefString(nil) != "" {
 		t.Error("derefString should return empty string for nil")
 	}
-	
+
 	// Test formatDeployStatus
 	status := api.DeployStatus("running")
 	if formatDeployStatus(&status) != "running" {
@@ -238,7 +238,7 @@ func TestFormatHelpers(t *testing.T) {
 	if formatDeployStatus(nil) != "" {
 		t.Error("formatDeployStatus should return empty string for nil")
 	}
-	
+
 	// Test formatServiceType
 	serviceType := api.ServiceType("POSTGRES")
 	if formatServiceType(&serviceType) != "POSTGRES" {
@@ -247,7 +247,7 @@ func TestFormatHelpers(t *testing.T) {
 	if formatServiceType(nil) != "" {
 		t.Error("formatServiceType should return empty string for nil")
 	}
-	
+
 	// Test formatTimePtr
 	testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	if formatTimePtr(&testTime) == "" {
@@ -260,7 +260,7 @@ func TestFormatHelpers(t *testing.T) {
 
 func TestServiceCreate_ValidationErrors(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and a mock API URL to prevent network calls
 	cfg := &config.Config{
 		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
@@ -271,14 +271,14 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Test with no name (should auto-generate) - this should now work without error
 	// Just test that it doesn't fail due to missing name
 	_, err, _ = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
@@ -286,7 +286,7 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	if err != nil && (strings.Contains(err.Error(), "name") && strings.Contains(err.Error(), "required")) {
 		t.Errorf("Should not fail due to missing name anymore (should auto-generate), got: %v", err)
 	}
-	
+
 	// Test with explicit empty region (should still fail validation)
 	_, err, _ = executeServiceCommand("service", "create", "--name", "test", "--type", "postgres", "--region", "")
 	if err == nil {
@@ -295,7 +295,7 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	if !strings.Contains(err.Error(), "region") && !strings.Contains(err.Error(), "empty") {
 		t.Errorf("Expected error about empty region, got: %v", err)
 	}
-	
+
 	// Test invalid service type - this should fail validation before making API call
 	_, err, _ = executeServiceCommand("service", "create", "--type", "invalid-type", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
@@ -308,20 +308,20 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 
 func TestServiceCreate_NoProjectID(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service create command without project ID (name will be auto-generated)
 	_, err, _ := executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestServiceCreate_NoProjectID(t *testing.T) {
 
 func TestServiceCreate_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and API URL
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -340,20 +340,20 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service create command with valid parameters (name will be auto-generated)
 	_, err, _ = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -361,31 +361,31 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 
 func TestSavePgPassEntry(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Set HOME environment variable for testing
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", testHomeDir)
-	defer func() { 
+	defer func() {
 		if originalHome != "" {
 			os.Setenv("HOME", originalHome)
 		} else {
 			os.Unsetenv("HOME")
 		}
 	}()
-	
+
 	// Create test service data
 	host := "test-host.tigerdata.com"
 	port := 5432
 	password := "test-password-123"
 	serviceID := "12345678-9abc-def0-1234-56789abcdef0"
-	
+
 	service := api.Service{
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
@@ -394,19 +394,19 @@ func TestSavePgPassEntry(t *testing.T) {
 		},
 		InitialPassword: &password,
 	}
-	
+
 	// Test saving entry
 	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
-	
+
 	// Verify the .pgpass file was created
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	if _, err := os.Stat(pgpassPath); os.IsNotExist(err) {
 		t.Fatal("Expected .pgpass file to be created")
 	}
-	
+
 	// Check file permissions
 	fileInfo, err := os.Stat(pgpassPath)
 	if err != nil {
@@ -416,13 +416,13 @@ func TestSavePgPassEntry(t *testing.T) {
 	if fileInfo.Mode().Perm() != expectedPerms {
 		t.Errorf("Expected file permissions %v, got %v", expectedPerms, fileInfo.Mode().Perm())
 	}
-	
+
 	// Read and verify file contents
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	expectedEntry := "test-host.tigerdata.com:5432:tsdb:tsdbadmin:test-password-123\n"
 	if string(content) != expectedEntry {
 		t.Errorf("Expected pgpass entry %q, got %q", expectedEntry, string(content))
@@ -431,30 +431,30 @@ func TestSavePgPassEntry(t *testing.T) {
 
 func TestSavePgPassEntry_DefaultPort(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Set HOME environment variable for testing
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", testHomeDir)
-	defer func() { 
+	defer func() {
 		if originalHome != "" {
 			os.Setenv("HOME", originalHome)
 		} else {
 			os.Unsetenv("HOME")
 		}
 	}()
-	
+
 	// Create test service data without explicit port (should use default 5432)
 	host := "test-host.tigerdata.com"
 	password := "test-password-123"
 	serviceID := "12345678-9abc-def0-1234-56789abcdef0"
-	
+
 	service := api.Service{
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
@@ -463,20 +463,20 @@ func TestSavePgPassEntry_DefaultPort(t *testing.T) {
 		},
 		InitialPassword: &password,
 	}
-	
+
 	// Test saving entry
 	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
-	
+
 	// Read and verify file contents use default port
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	expectedEntry := "test-host.tigerdata.com:5432:tsdb:tsdbadmin:test-password-123\n"
 	if string(content) != expectedEntry {
 		t.Errorf("Expected pgpass entry %q, got %q", expectedEntry, string(content))
@@ -485,25 +485,25 @@ func TestSavePgPassEntry_DefaultPort(t *testing.T) {
 
 func TestSavePgPassEntry_AppendToExisting(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Set HOME environment variable for testing
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", testHomeDir)
-	defer func() { 
+	defer func() {
 		if originalHome != "" {
 			os.Setenv("HOME", originalHome)
 		} else {
 			os.Unsetenv("HOME")
 		}
 	}()
-	
+
 	// Create existing .pgpass file with some content
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	existingContent := "existing-host:5432:existing-db:existing-user:existing-pass\n"
@@ -511,13 +511,13 @@ func TestSavePgPassEntry_AppendToExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create existing .pgpass file: %v", err)
 	}
-	
+
 	// Create test service data
 	host := "new-host.tigerdata.com"
 	port := 5432
 	password := "new-password-123"
 	serviceID := "12345678-9abc-def0-1234-56789abcdef0"
-	
+
 	service := api.Service{
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
@@ -526,19 +526,19 @@ func TestSavePgPassEntry_AppendToExisting(t *testing.T) {
 		},
 		InitialPassword: &password,
 	}
-	
+
 	// Test saving entry
 	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
-	
+
 	// Read and verify file contents include both entries
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	expectedContent := existingContent + "new-host.tigerdata.com:5432:tsdb:tsdbadmin:new-password-123\n"
 	if string(content) != expectedContent {
 		t.Errorf("Expected pgpass content %q, got %q", expectedContent, string(content))
@@ -547,16 +547,16 @@ func TestSavePgPassEntry_AppendToExisting(t *testing.T) {
 
 func TestPgpassEntryExists(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
-	
+
 	// Test with non-existent file
 	exists, err := pgpassEntryExists(pgpassPath, "test-host", "5432", "tsdbadmin")
 	if err != nil {
@@ -565,7 +565,7 @@ func TestPgpassEntryExists(t *testing.T) {
 	if exists {
 		t.Error("Expected entry to not exist in non-existent file")
 	}
-	
+
 	// Create .pgpass file with test entries
 	content := `host1:5432:db1:user1:pass1
 test-host.tigerdata.com:5432:tsdb:tsdbadmin:existing-pass
@@ -576,7 +576,7 @@ test-host.tigerdata.com:5433:tsdb:tsdbadmin:different-port
 	if err != nil {
 		t.Fatalf("Failed to create test .pgpass file: %v", err)
 	}
-	
+
 	// Test existing entry
 	exists, err = pgpassEntryExists(pgpassPath, "test-host.tigerdata.com", "5432", "tsdbadmin")
 	if err != nil {
@@ -585,7 +585,7 @@ test-host.tigerdata.com:5433:tsdb:tsdbadmin:different-port
 	if !exists {
 		t.Error("Expected entry to exist")
 	}
-	
+
 	// Test non-existing entry (different host)
 	exists, err = pgpassEntryExists(pgpassPath, "different-host", "5432", "tsdbadmin")
 	if err != nil {
@@ -594,7 +594,7 @@ test-host.tigerdata.com:5433:tsdb:tsdbadmin:different-port
 	if exists {
 		t.Error("Expected entry to not exist for different host")
 	}
-	
+
 	// Test non-existing entry (different port)
 	exists, err = pgpassEntryExists(pgpassPath, "test-host.tigerdata.com", "5431", "tsdbadmin")
 	if err != nil {
@@ -603,7 +603,7 @@ test-host.tigerdata.com:5433:tsdb:tsdbadmin:different-port
 	if exists {
 		t.Error("Expected entry to not exist for different port")
 	}
-	
+
 	// Test non-existing entry (different user)
 	exists, err = pgpassEntryExists(pgpassPath, "test-host.tigerdata.com", "5432", "different-user")
 	if err != nil {
@@ -616,25 +616,25 @@ test-host.tigerdata.com:5433:tsdb:tsdbadmin:different-port
 
 func TestSavePgPassEntry_SkipDuplicate(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Set HOME environment variable for testing
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", testHomeDir)
-	defer func() { 
+	defer func() {
 		if originalHome != "" {
 			os.Setenv("HOME", originalHome)
 		} else {
 			os.Unsetenv("HOME")
 		}
 	}()
-	
+
 	// Create existing .pgpass file with the entry we're about to add
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	existingContent := "test-host.tigerdata.com:5432:tsdb:tsdbadmin:existing-pass\n"
@@ -642,13 +642,13 @@ func TestSavePgPassEntry_SkipDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create existing .pgpass file: %v", err)
 	}
-	
+
 	// Create test service data with same host/port/user
 	host := "test-host.tigerdata.com"
 	port := 5432
 	password := "new-password-123"
 	serviceID := "12345678-9abc-def0-1234-56789abcdef0"
-	
+
 	service := api.Service{
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
@@ -657,19 +657,19 @@ func TestSavePgPassEntry_SkipDuplicate(t *testing.T) {
 		},
 		InitialPassword: &password,
 	}
-	
+
 	// Test saving entry (should not add duplicate)
 	err = savePgPassEntry(service, password, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry: %v", err)
 	}
-	
+
 	// Read and verify file contents are unchanged (no duplicate)
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	if string(content) != existingContent {
 		t.Errorf("Expected pgpass content to remain unchanged %q, got %q", existingContent, string(content))
 	}
@@ -687,7 +687,7 @@ func TestSavePgPassEntry_ErrorCases(t *testing.T) {
 	if !strings.Contains(err.Error(), "service endpoint not available") {
 		t.Errorf("Expected endpoint error, got: %v", err)
 	}
-	
+
 	// Test with nil host
 	service = api.Service{
 		Endpoint: &api.Endpoint{
@@ -744,13 +744,13 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			expectError:   true,
 		},
 		{
-			name:         "CPU only auto-configure memory (2 CPU -> 8GB)",
-			cpuMillis:    2000,
-			cpuFlagSet:   true,
+			name:          "CPU only auto-configure memory (2 CPU -> 8GB)",
+			cpuMillis:     2000,
+			cpuFlagSet:    true,
 			memoryFlagSet: false,
-			expectCPU:    2000,
-			expectMemory: 8,
-			expectError:  false,
+			expectCPU:     2000,
+			expectMemory:  8,
+			expectError:   false,
 		},
 		{
 			name:          "Memory only auto-configure CPU (16GB -> 4 CPU)",
@@ -762,11 +762,11 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:         "Invalid CPU only",
-			cpuMillis:    1500,
-			cpuFlagSet:   true,
+			name:          "Invalid CPU only",
+			cpuMillis:     1500,
+			cpuFlagSet:    true,
 			memoryFlagSet: false,
-			expectError:  true,
+			expectError:   true,
 		},
 		{
 			name:          "Invalid memory only",
@@ -788,23 +788,23 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cpu, memory, err := validateAndNormalizeCPUMemory(tc.cpuMillis, tc.memoryGbs, tc.cpuFlagSet, tc.memoryFlagSet)
-			
+
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if cpu != tc.expectCPU {
 				t.Errorf("Expected CPU %d, got %d", tc.expectCPU, cpu)
 			}
-			
+
 			if memory != tc.expectMemory {
 				t.Errorf("Expected memory %.0f, got %.1f", tc.expectMemory, memory)
 			}
@@ -814,13 +814,13 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 
 func TestGetAllowedCPUMemoryConfigs(t *testing.T) {
 	configs := getAllowedCPUMemoryConfigs()
-	
+
 	// Verify we have the expected number of configurations
 	expectedCount := 7
 	if len(configs) != expectedCount {
 		t.Errorf("Expected %d configurations, got %d", expectedCount, len(configs))
 	}
-	
+
 	// Verify specific configurations from the spec
 	expectedConfigs := []CPUMemoryConfig{
 		{CPUMillis: 500, MemoryGbs: 2},
@@ -831,7 +831,7 @@ func TestGetAllowedCPUMemoryConfigs(t *testing.T) {
 		{CPUMillis: 16000, MemoryGbs: 64},
 		{CPUMillis: 32000, MemoryGbs: 128},
 	}
-	
+
 	for i, expected := range expectedConfigs {
 		if i < len(configs) {
 			if configs[i].CPUMillis != expected.CPUMillis || configs[i].MemoryGbs != expected.MemoryGbs {
@@ -847,10 +847,10 @@ func TestFormatAllowedCombinations(t *testing.T) {
 		{CPUMillis: 1000, MemoryGbs: 4},
 		{CPUMillis: 2000, MemoryGbs: 8},
 	}
-	
+
 	result := formatAllowedCombinations(configs)
 	expected := "0.5 CPU/2GB, 1 CPU/4GB, 2 CPU/8GB"
-	
+
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}
@@ -862,10 +862,10 @@ func TestFormatAllowedCPUValues(t *testing.T) {
 		{CPUMillis: 1000, MemoryGbs: 4},
 		{CPUMillis: 2000, MemoryGbs: 8},
 	}
-	
+
 	result := formatAllowedCPUValues(configs)
 	expected := "0.5 (500m), 1 (1000m), 2 (2000m)"
-	
+
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}
@@ -877,10 +877,10 @@ func TestFormatAllowedMemoryValues(t *testing.T) {
 		{CPUMillis: 1000, MemoryGbs: 4},
 		{CPUMillis: 2000, MemoryGbs: 8},
 	}
-	
+
 	result := formatAllowedMemoryValues(configs)
 	expected := "2GB, 4GB, 8GB"
-	
+
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}
@@ -890,7 +890,7 @@ func TestFormatAllowedMemoryValues(t *testing.T) {
 func createTestServices() []api.Service {
 	testServiceID1 := "12345678-9abc-def0-1234-56789abcdef0"
 	testServiceID2 := "98765432-10fe-dcba-9876-543210fedcba"
-	
+
 	name1 := "test-service-1"
 	name2 := "test-service-2"
 	region1 := "us-east-1"
@@ -901,7 +901,7 @@ func createTestServices() []api.Service {
 	serviceType2 := api.ServiceType("TIMESCALEDB")
 	created1 := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	created2 := time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC)
-	
+
 	return []api.Service{
 		{
 			ServiceId:   &testServiceID1,
@@ -947,39 +947,39 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 	// We expect this to fail at the API call stage, not at validation
 	var rootCmd *cobra.Command
 	_, err, rootCmd = executeServiceCommand("service", "create", "--type", "postgres", "--region", "us-east-1")
-	
+
 	// The command should not fail due to missing service name
 	if err != nil && strings.Contains(err.Error(), "service name is required") {
 		t.Error("Service name should be auto-generated, not required")
 	}
-	
+
 	// Navigate to the create command that was actually used
 	if rootCmd == nil {
 		t.Fatal("rootCmd should not be nil")
 	}
-	
+
 	// Find service command
 	serviceCmd, _, err := rootCmd.Find([]string{"service"})
 	if err != nil {
 		t.Fatalf("Failed to find service command: %v", err)
 	}
-	
+
 	// Find create subcommand
 	createCmd, _, err := serviceCmd.Find([]string{"create"})
 	if err != nil {
 		t.Fatalf("Failed to find create command: %v", err)
 	}
-	
+
 	nameFlag := createCmd.Flags().Lookup("name")
 	if nameFlag == nil {
 		t.Fatal("name flag should exist on create command")
 	}
-	
+
 	serviceName := nameFlag.Value.String()
 	if serviceName == "" {
 		t.Error("Service name should have been auto-generated")
 	}
-	
+
 	// Check pattern (should start with "db-" followed by numbers)
 	if !strings.HasPrefix(serviceName, "db-") {
 		t.Errorf("Auto-generated name should start with 'db-', got: %s", serviceName)
@@ -988,20 +988,20 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 
 func TestServiceDescribe_NoProjectID(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service describe command without project ID
 	_, err, _ := executeServiceCommand("service", "describe", "svc-12345")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -1009,7 +1009,7 @@ func TestServiceDescribe_NoProjectID(t *testing.T) {
 
 func TestServiceDescribe_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID but no default service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -1020,20 +1020,20 @@ func TestServiceDescribe_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service describe command without service ID
 	_, err, _ = executeServiceCommand("service", "describe")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
@@ -1041,7 +1041,7 @@ func TestServiceDescribe_NoServiceID(t *testing.T) {
 
 func TestServiceDescribe_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -1053,20 +1053,20 @@ func TestServiceDescribe_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service describe command
 	_, err, _ = executeServiceCommand("service", "describe")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -1081,7 +1081,7 @@ func TestOutputService_JSON(t *testing.T) {
 	status := api.READY
 	created := time.Now()
 	initialPassword := "secret-password-123"
-	
+
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
@@ -1091,36 +1091,36 @@ func TestOutputService_JSON(t *testing.T) {
 		Created:         &created,
 		InitialPassword: &initialPassword,
 	}
-	
+
 	// Create a test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test JSON output
 	err := outputService(cmd, service, "json")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	// Verify JSON output
 	output := buf.String()
 	if !strings.Contains(output, `"service_id": "svc-12345"`) {
 		t.Errorf("Expected JSON to contain service ID, got: %s", output)
 	}
-	
+
 	// Verify that initialpassword is NOT in the output
 	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") || strings.Contains(output, "initial_password") {
 		t.Errorf("JSON output should not contain initialpassword field, got: %s", output)
 	}
-	
+
 	// Verify it's valid JSON
 	var jsonResult api.Service
 	err = json.Unmarshal([]byte(output), &jsonResult)
 	if err != nil {
 		t.Errorf("Output should be valid JSON: %v", err)
 	}
-	
+
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
 	var jsonMap map[string]interface{}
@@ -1128,7 +1128,7 @@ func TestOutputService_JSON(t *testing.T) {
 	if err2 != nil {
 		t.Errorf("Output should be valid JSON map: %v", err2)
 	}
-	
+
 	// Check that initialpassword fields are not present in the map
 	if _, exists := jsonMap["initial_password"]; exists {
 		t.Error("JSON should not contain initial_password field")
@@ -1147,7 +1147,7 @@ func TestOutputService_YAML(t *testing.T) {
 	status := api.READY
 	created := time.Now()
 	initialPassword := "secret-password-123"
-	
+
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
@@ -1157,36 +1157,36 @@ func TestOutputService_YAML(t *testing.T) {
 		Created:         &created,
 		InitialPassword: &initialPassword,
 	}
-	
+
 	// Create a test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test YAML output
 	err := outputService(cmd, service, "yaml")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	// Verify YAML output
 	output := buf.String()
 	if !strings.Contains(output, "service_id: svc-12345") {
 		t.Errorf("Expected YAML to contain service ID, got: %s", output)
 	}
-	
+
 	// Verify that initialpassword is NOT in the output
 	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") {
 		t.Errorf("YAML output should not contain initialpassword field, got: %s", output)
 	}
-	
+
 	// Verify it's valid YAML
 	var yamlResult api.Service
 	err = yaml.Unmarshal([]byte(output), &yamlResult)
 	if err != nil {
 		t.Errorf("Output should be valid YAML: %v", err)
 	}
-	
+
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
 	var yamlMap map[string]interface{}
@@ -1194,7 +1194,7 @@ func TestOutputService_YAML(t *testing.T) {
 	if err2 != nil {
 		t.Errorf("Output should be valid YAML map: %v", err2)
 	}
-	
+
 	// Check that initialpassword fields are not present in the map
 	if _, exists := yamlMap["initial_password"]; exists {
 		t.Error("YAML should not contain initial_password field")
@@ -1218,7 +1218,7 @@ func TestOutputService_Table(t *testing.T) {
 	host := "test.tigerdata.com"
 	port := 5432
 	initialPassword := "secret-password-123"
-	
+
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
@@ -1230,9 +1230,9 @@ func TestOutputService_Table(t *testing.T) {
 		Resources: &[]struct {
 			Id   *string `json:"id,omitempty"`
 			Spec *struct {
-				CpuMillis   *int    `json:"cpu_millis,omitempty"`
-				MemoryGbs   *int    `json:"memory_gbs,omitempty"`
-				VolumeType  *string `json:"volume_type,omitempty"`
+				CpuMillis  *int    `json:"cpu_millis,omitempty"`
+				MemoryGbs  *int    `json:"memory_gbs,omitempty"`
+				VolumeType *string `json:"volume_type,omitempty"`
 			} `json:"spec,omitempty"`
 		}{
 			{
@@ -1254,18 +1254,18 @@ func TestOutputService_Table(t *testing.T) {
 			Port: &port,
 		},
 	}
-	
+
 	// Create a test command
 	cmd := &cobra.Command{}
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
-	
+
 	// Test table output
 	err := outputService(cmd, service, "table")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	// Verify table output contains expected information
 	output := buf.String()
 	expectedContents := []string{
@@ -1279,13 +1279,13 @@ func TestOutputService_Table(t *testing.T) {
 		"2",
 		"test.tigerdata.com:5432",
 	}
-	
+
 	for _, content := range expectedContents {
 		if !strings.Contains(output, content) {
 			t.Errorf("Expected table to contain %q, got: %s", content, output)
 		}
 	}
-	
+
 	// Verify that initialpassword is NOT in the table output
 	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "password") {
 		t.Errorf("Table output should not contain password information, got: %s", output)
@@ -1297,16 +1297,16 @@ func TestSanitizeServiceForOutput(t *testing.T) {
 	serviceID := "svc-12345"
 	serviceName := "test-service"
 	initialPassword := "secret-password-123"
-	
+
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
 		InitialPassword: &initialPassword,
 	}
-	
+
 	// Sanitize the service
 	sanitized := sanitizeServiceForOutput(service)
-	
+
 	// Verify that sensitive fields are removed
 	if _, exists := sanitized["initial_password"]; exists {
 		t.Error("Expected initial_password to be removed from sanitized service")
@@ -1314,7 +1314,7 @@ func TestSanitizeServiceForOutput(t *testing.T) {
 	if _, exists := sanitized["initialpassword"]; exists {
 		t.Error("Expected initialpassword to be removed from sanitized service")
 	}
-	
+
 	// Verify that other fields are preserved
 	if serviceIDVal, exists := sanitized["service_id"]; !exists || serviceIDVal != serviceID {
 		t.Error("Expected service_id to be preserved in sanitized service")
@@ -1329,11 +1329,11 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 	serviceID1 := "svc-12345"
 	serviceName1 := "test-service-1"
 	initialPassword1 := "secret-password-123"
-	
+
 	serviceID2 := "svc-67890"
 	serviceName2 := "test-service-2"
 	initialPassword2 := "another-secret-456"
-	
+
 	services := []api.Service{
 		{
 			ServiceId:       &serviceID1,
@@ -1346,15 +1346,15 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 			InitialPassword: &initialPassword2,
 		},
 	}
-	
+
 	// Sanitize the services
 	sanitized := sanitizeServicesForOutput(services)
-	
+
 	// Verify that we have the same number of services
 	if len(sanitized) != len(services) {
 		t.Errorf("Expected %d sanitized services, got %d", len(services), len(sanitized))
 	}
-	
+
 	// Verify that sensitive fields are removed from all services
 	for i, service := range sanitized {
 		if _, exists := service["initial_password"]; exists {
@@ -1363,7 +1363,7 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 		if _, exists := service["initialpassword"]; exists {
 			t.Errorf("Expected initialpassword to be removed from sanitized service %d", i)
 		}
-		
+
 		// Verify that other fields are preserved
 		if _, exists := service["service_id"]; !exists {
 			t.Errorf("Expected service_id to be preserved in sanitized service %d", i)
@@ -1376,20 +1376,20 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 
 func TestServiceUpdatePassword_NoProjectID(t *testing.T) {
 	setupServiceTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service update-password command without project ID
 	_, err, _ := executeServiceCommand("service", "update-password", "svc-12345", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -1397,7 +1397,7 @@ func TestServiceUpdatePassword_NoProjectID(t *testing.T) {
 
 func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID but no default service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -1408,20 +1408,20 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service update-password command without service ID
 	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
@@ -1429,7 +1429,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 
 func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -1441,20 +1441,20 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service update-password command without password
 	_, err, _ = executeServiceCommand("service", "update-password")
 	if err == nil {
 		t.Fatal("Expected error when no password is provided")
 	}
-	
+
 	if !strings.Contains(err.Error(), "password is required") {
 		t.Errorf("Expected error about missing password, got: %v", err)
 	}
@@ -1462,7 +1462,7 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 
 func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -1474,20 +1474,20 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Execute service update-password command
 	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -1495,7 +1495,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 
 func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Set up config with project ID
 	cfg := &config.Config{
 		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
@@ -1507,14 +1507,14 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForService
 	getAPIKeyForService = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
-	
+
 	// Set environment variable BEFORE creating command (like root test does)
 	originalEnv := os.Getenv("TIGER_PASSWORD")
 	os.Setenv("TIGER_PASSWORD", "env-password-123")
@@ -1525,20 +1525,20 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 			os.Unsetenv("TIGER_PASSWORD")
 		}
 	}()
-	
+
 	// Execute command without --password flag (should use environment variable)
 	_, err, _ = executeServiceCommand("service", "update-password", "test-service-456")
-	
+
 	// Should fail with network error (not password missing error) since we have password from env
 	if err == nil {
 		t.Fatal("Expected network error since we're using a mock URL")
 	}
-	
+
 	// Should not be a password validation error - if it gets to network call, env var worked
 	if strings.Contains(err.Error(), "password is required") {
 		t.Errorf("Environment variable was not picked up, got password required error: %v", err)
 	}
-	
+
 	// Should be network/API error showing the password was found
 	if !strings.Contains(err.Error(), "API request failed") && !strings.Contains(err.Error(), "failed to update service password") {
 		t.Errorf("Expected network/API error indicating password was found, got: %v", err)
@@ -1547,25 +1547,25 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 
 func TestSavePgPassEntryForceOverride(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Set HOME environment variable for testing
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", testHomeDir)
-	defer func() { 
+	defer func() {
 		if originalHome != "" {
 			os.Setenv("HOME", originalHome)
 		} else {
 			os.Unsetenv("HOME")
 		}
 	}()
-	
+
 	// Create existing .pgpass file with initial entry
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	initialContent := "test-host.tigerdata.com:5432:tsdb:tsdbadmin:old-password\nother-host:5432:db:user:pass\n"
@@ -1573,13 +1573,13 @@ func TestSavePgPassEntryForceOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create initial .pgpass file: %v", err)
 	}
-	
+
 	// Create test service data
 	host := "test-host.tigerdata.com"
 	port := 5432
 	newPassword := "new-password-123"
 	serviceID := "svc-12345"
-	
+
 	service := api.Service{
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
@@ -1587,47 +1587,47 @@ func TestSavePgPassEntryForceOverride(t *testing.T) {
 			Port: &port,
 		},
 	}
-	
+
 	// Test saving entry with force override = false (should not override)
 	err = savePgPassEntry(service, newPassword, false)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry without override: %v", err)
 	}
-	
+
 	// Verify original password is still there
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	if strings.Contains(string(content), newPassword) {
 		t.Error("New password should not be present when forceOverride=false")
 	}
-	
+
 	if !strings.Contains(string(content), "old-password") {
 		t.Error("Original password should still be present when forceOverride=false")
 	}
-	
+
 	// Test saving entry with force override = true (should override)
 	err = savePgPassEntry(service, newPassword, true)
 	if err != nil {
 		t.Fatalf("Failed to save pgpass entry with override: %v", err)
 	}
-	
+
 	// Verify new password replaced old one
 	content, err = os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	if !strings.Contains(string(content), newPassword) {
 		t.Error("New password should be present when forceOverride=true")
 	}
-	
+
 	if strings.Contains(string(content), "old-password") {
 		t.Error("Original password should be replaced when forceOverride=true")
 	}
-	
+
 	// Verify other entries are preserved
 	if !strings.Contains(string(content), "other-host:5432:db:user:pass") {
 		t.Error("Other .pgpass entries should be preserved")
@@ -1636,14 +1636,14 @@ func TestSavePgPassEntryForceOverride(t *testing.T) {
 
 func TestRemovePgPassEntry(t *testing.T) {
 	tmpDir := setupServiceTest(t)
-	
+
 	// Create a temporary home directory for testing
 	testHomeDir := filepath.Join(tmpDir, "home")
 	err := os.MkdirAll(testHomeDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create test home directory: %v", err)
 	}
-	
+
 	// Create test .pgpass file with multiple entries
 	pgpassPath := filepath.Join(testHomeDir, ".pgpass")
 	initialContent := `test-host.tigerdata.com:5432:tsdb:tsdbadmin:password1
@@ -1655,26 +1655,26 @@ another-host:3306:mysql:root:password4
 	if err != nil {
 		t.Fatalf("Failed to create test .pgpass file: %v", err)
 	}
-	
+
 	// Remove specific entry
 	err = removePgPassEntry(pgpassPath, "test-host.tigerdata.com", "5432", "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to remove pgpass entry: %v", err)
 	}
-	
+
 	// Verify entry was removed
 	content, err := os.ReadFile(pgpassPath)
 	if err != nil {
 		t.Fatalf("Failed to read .pgpass file: %v", err)
 	}
-	
+
 	contentStr := string(content)
-	
+
 	// Target entry should be removed
 	if strings.Contains(contentStr, "test-host.tigerdata.com:5432:tsdb:tsdbadmin:password1") {
 		t.Error("Target entry should be removed")
 	}
-	
+
 	// Other entries should remain
 	if !strings.Contains(contentStr, "other-host.example.com:5432:db:user:password2") {
 		t.Error("Other entries should remain")

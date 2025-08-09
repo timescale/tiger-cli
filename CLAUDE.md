@@ -43,6 +43,10 @@ go generate ./internal/tiger/api
 # - mocks/mock_client.go: Mock implementations for testing
 ```
 
+## Development Best Practices
+
+- Always use go fmt after making file changes and before committing
+
 ## Architecture Overview
 
 Tiger CLI is a Go-based command-line interface for managing TigerData Cloud Platform resources. The architecture follows standard Go CLI patterns using Cobra and Viper.
@@ -424,3 +428,4 @@ This architecture ensures Tiger CLI remains maintainable and testable as it grow
 The project specifications are located in the `specs/` directory:
 - `spec.md` - Basic project specification and CLI requirements
 - `spec_mcp.md` - MCP (Model Context Protocol) specification for integration
+```

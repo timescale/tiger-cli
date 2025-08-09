@@ -59,7 +59,7 @@ VPCs, replicas, and related infrastructure components.`,
 			fmt.Fprintf(os.Stderr, "Error setting up config: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		if debug {
 			if configFile := viper.ConfigFileUsed(); configFile != "" {
 				fmt.Fprintln(os.Stderr, "Using config file:", configFile)
@@ -108,4 +108,3 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-

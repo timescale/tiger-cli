@@ -25,4 +25,3 @@ func buildVersionCmd() *cobra.Command {
 		},
 	}
 }
-

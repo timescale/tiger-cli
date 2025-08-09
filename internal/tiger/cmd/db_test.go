@@ -18,20 +18,20 @@ import (
 
 func setupDBTest(t *testing.T) string {
 	t.Helper()
-	
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-db-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	
+
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
 	viper.Reset()
-	
+
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
@@ -41,39 +41,39 @@ func setupDBTest(t *testing.T) string {
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
-	
+
 	return tmpDir
 }
 
 func executeDBCommand(args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot := buildRootCmd()
-	
+
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
-	
+
 	err := testRoot.Execute()
 	return buf.String(), err
 }
 
 func TestDBConnectionString_NoProjectID(t *testing.T) {
 	setupDBTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connection-string command without project ID
 	_, err := executeDBCommand("db", "connection-string", "svc-12345")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestDBConnectionString_NoProjectID(t *testing.T) {
 
 func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID but no default service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -92,20 +92,20 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connection-string command without service ID
 	_, err = executeDBCommand("db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 
 func TestDBConnectionString_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -125,20 +125,20 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connection-string command
 	_, err = executeDBCommand("db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// This test demonstrates that the warning functionality works
 	// by directly testing the buildConnectionString function
-	
+
 	// Service without connection pooler
 	service := api.Service{
 		Endpoint: &api.Endpoint{
@@ -156,31 +156,31 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 		},
 		ConnectionPooler: nil, // No pooler available
 	}
-	
+
 	// Create a test command to capture stderr
 	cmd := &cobra.Command{}
 	errBuf := new(bytes.Buffer)
 	cmd.SetErr(errBuf)
-	
+
 	// Request pooled connection when pooler is not available
 	connectionString, err := buildConnectionString(service, true, "tsdbadmin", cmd)
-	
+
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	
+
 	// Should return direct connection string
 	expectedString := "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require"
 	if connectionString != expectedString {
 		t.Errorf("Expected connection string %q, got %q", expectedString, connectionString)
 	}
-	
+
 	// Should have warning message on stderr
 	stderrOutput := errBuf.String()
 	if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
 		t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
 	}
-	
+
 	// Verify the warning mentions using direct connection
 	if !strings.Contains(stderrOutput, "using direct connection") {
 		t.Errorf("Expected warning to mention direct connection fallback, but got: %q", stderrOutput)
@@ -189,20 +189,20 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 
 func TestDBConnect_NoProjectID(t *testing.T) {
 	setupDBTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connect command without project ID
 	_, err := executeDBCommand("db", "connect", "svc-12345")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestDBConnect_NoProjectID(t *testing.T) {
 
 func TestDBConnect_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID but no default service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -221,20 +221,20 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connect command without service ID
 	_, err = executeDBCommand("db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 
 func TestDBConnect_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -254,20 +254,20 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db connect command
 	_, err = executeDBCommand("db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestDBConnect_NoAuth(t *testing.T) {
 
 func TestDBConnect_PsqlNotFound(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config
 	cfg := &config.Config{
 		APIURL:    "http://localhost:9999",
@@ -287,27 +287,27 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Test that psql alias works the same as connect
 	_, err1 := executeDBCommand("db", "connect")
 	_, err2 := executeDBCommand("db", "psql")
-	
+
 	// Both should behave identically (both will fail due to network/psql not found, but with same error pattern)
 	if err1 == nil || err2 == nil {
 		t.Fatal("Expected both connect and psql to fail in test environment")
 	}
-	
+
 	// Both should have similar error patterns (either network error or psql not found)
 	connectErrStr := err1.Error()
 	psqlErrStr := err2.Error()
-	
+
 	// They should both fail for the same fundamental reason
 	if strings.Contains(connectErrStr, "authentication") != strings.Contains(psqlErrStr, "authentication") ||
 		strings.Contains(connectErrStr, "psql client not found") != strings.Contains(psqlErrStr, "psql client not found") ||
@@ -318,23 +318,23 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 
 func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	// This test verifies the psql launching logic without actually running psql
-	
+
 	// Create a test command to capture output
 	cmd := &cobra.Command{}
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
-	
+
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
-	
+
 	// This will fail because psql path doesn't exist, but we can verify the error
 	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, cmd)
-	
+
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
 		t.Error("Expected error when using fake psql path")
 	}
-	
+
 	// No output expected since we removed the connecting message
 	output := outBuf.String()
 	if output != "" {
@@ -344,24 +344,24 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 
 func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	// This test verifies that additional flags are passed correctly to psql
-	
+
 	// Create a test command to capture output
 	cmd := &cobra.Command{}
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
-	
+
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
-	
+
 	// This will fail because psql path doesn't exist, but we can verify the error
 	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, cmd)
-	
+
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
 		t.Error("Expected error when using fake psql path")
 	}
-	
+
 	// No output expected since we removed the connecting message
 	output := outBuf.String()
 	if output != "" {
@@ -373,7 +373,7 @@ func TestSeparateServiceAndPsqlArgs(t *testing.T) {
 	testCases := []struct {
 		name                string
 		args                []string
-		argsLenAtDash       int  // What ArgsLenAtDash should return
+		argsLenAtDash       int // What ArgsLenAtDash should return
 		expectedServiceArgs []string
 		expectedPsqlFlags   []string
 	}{
@@ -421,13 +421,13 @@ func TestSeparateServiceAndPsqlArgs(t *testing.T) {
 				args:          tc.args,
 				argsLenAtDash: tc.argsLenAtDash,
 			}
-			
+
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(mockCmd, tc.args)
-			
+
 			if !equalStringSlices(serviceArgs, tc.expectedServiceArgs) {
 				t.Errorf("Expected serviceArgs %v, got %v", tc.expectedServiceArgs, serviceArgs)
 			}
-			
+
 			if !equalStringSlices(psqlFlags, tc.expectedPsqlFlags) {
 				t.Errorf("Expected psqlFlags %v, got %v", tc.expectedPsqlFlags, psqlFlags)
 			}
@@ -460,20 +460,20 @@ func equalStringSlices(a, b []string) bool {
 
 func TestDBTestConnection_NoProjectID(t *testing.T) {
 	setupDBTest(t)
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db test-connection command without project ID
 	_, err := executeDBCommand("db", "test-connection", "svc-12345")
 	if err == nil {
 		t.Fatal("Expected error when no project ID is configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestDBTestConnection_NoProjectID(t *testing.T) {
 
 func TestDBTestConnection_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID but no default service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -492,20 +492,20 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "test-api-key", nil
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db test-connection command without service ID
 	_, err = executeDBCommand("db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
-	
+
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
@@ -513,7 +513,7 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 
 func TestDBTestConnection_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
-	
+
 	// Set up config with project ID and service ID
 	cfg := &config.Config{
 		APIURL:    "https://api.tigerdata.com/public/v1",
@@ -525,20 +525,20 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	
+
 	// Mock authentication failure
 	originalGetAPIKey := getAPIKeyForDB
 	getAPIKeyForDB = func() (string, error) {
 		return "", fmt.Errorf("not logged in")
 	}
 	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-	
+
 	// Execute db test-connection command
 	_, err = executeDBCommand("db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
-	
+
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
 	}
@@ -546,21 +546,21 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 
 func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	// Test with truly invalid connection string that should fail at sql.Open
-	
+
 	cmd := &cobra.Command{}
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
-	
+
 	// Test with malformed connection string (should return exit code 3)
 	invalidConnectionString := "this is not a valid connection string at all"
 	err := testDatabaseConnection(invalidConnectionString, 1, cmd)
-	
+
 	if err == nil {
 		t.Error("Expected error for invalid connection string")
 	}
-	
+
 	// Should be an exitCodeError
 	if exitErr, ok := err.(exitCodeError); ok {
 		// The exact code depends on where it fails - could be 2 or 3
@@ -579,23 +579,23 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
-	
+
 	// Use a connection string to a non-routable IP to test timeout
 	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
-	
+
 	start := time.Now()
 	err := testDatabaseConnection(timeoutConnectionString, 1, cmd) // 1 second timeout
 	duration := time.Since(start)
-	
+
 	if err == nil {
 		t.Error("Expected error for timeout connection")
 	}
-	
+
 	// Should complete within reasonable time (not hang)
 	if duration > 3*time.Second {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
-	
+
 	// Check exit code (should be 2 for unreachable)
 	if exitErr, ok := err.(exitCodeError); ok {
 		if exitErr.ExitCode() != 2 {
@@ -610,11 +610,11 @@ func TestExitCodeError(t *testing.T) {
 	// Test the exitCodeError type
 	originalErr := fmt.Errorf("test error")
 	exitErr := exitWithCode(42, originalErr)
-	
+
 	if exitErr.Error() != "test error" {
 		t.Errorf("Expected error message 'test error', got '%s'", exitErr.Error())
 	}
-	
+
 	if exitCodeErr, ok := exitErr.(exitCodeError); ok {
 		if exitCodeErr.ExitCode() != 42 {
 			t.Errorf("Expected exit code 42, got %d", exitCodeErr.ExitCode())
@@ -673,13 +673,13 @@ func TestIsConnectionRejected(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := isConnectionRejected(tc.err)
-			
+
 			if result != tc.expected {
-				t.Errorf("Expected isConnectionRejected to return %v for error %v, got %v", 
+				t.Errorf("Expected isConnectionRejected to return %v for error %v, got %v",
 					tc.expected, tc.err, result)
 			}
 		})
@@ -688,13 +688,13 @@ func TestIsConnectionRejected(t *testing.T) {
 
 func TestBuildConnectionString(t *testing.T) {
 	testCases := []struct {
-		name            string
-		service         api.Service
-		pooled          bool
-		role            string
-		expectedString  string
-		expectError     bool
-		expectWarning   bool
+		name           string
+		service        api.Service
+		pooled         bool
+		role           string
+		expectedString string
+		expectError    bool
+		expectWarning  bool
 	}{
 		{
 			name: "Basic connection string",
@@ -798,25 +798,25 @@ func TestBuildConnectionString(t *testing.T) {
 			cmd := &cobra.Command{}
 			errBuf := new(bytes.Buffer)
 			cmd.SetErr(errBuf)
-			
+
 			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, cmd)
-			
+
 			if tc.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if result != tc.expectedString {
 				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result)
 			}
-			
+
 			// Check for warning message
 			stderrOutput := errBuf.String()
 			if tc.expectWarning {

@@ -45,9 +45,9 @@ func buildServiceCmd() *cobra.Command {
 // serviceDescribeCmd represents the describe command under service
 func buildServiceDescribeCmd() *cobra.Command {
 	cmd := &cobra.Command{
-	Use:   "describe [service-id]",
-	Short: "Show detailed information about a service",
-	Long: `Show detailed information about a specific database service.
+		Use:   "describe [service-id]",
+		Short: "Show detailed information about a service",
+		Long: `Show detailed information about a specific database service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command displays comprehensive information about
@@ -65,73 +65,73 @@ Examples:
 
   # Get service details in YAML format
   tiger service describe svc-12345 --output yaml`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		projectID := cfg.ProjectID
-		if projectID == "" {
-			return fmt.Errorf("project ID is required. Set it using login with --project-id")
-		}
-
-		// Determine service ID
-		var serviceID string
-		if len(args) > 0 {
-			serviceID = args[0]
-		} else {
-			serviceID = cfg.ServiceID
-		}
-
-		if serviceID == "" {
-			return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-		}
-
-		cmd.SilenceUsage = true
-
-		// Get API key for authentication
-		apiKey, err := getAPIKeyForService()
-		if err != nil {
-			return fmt.Errorf("authentication required: %w", err)
-		}
-
-		// Create API client
-		client, err := api.NewTigerClient(apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to create API client: %w", err)
-		}
-
-		// Make API call to get service details
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-		if err != nil {
-			return fmt.Errorf("failed to get service details: %w", err)
-		}
-
-		// Handle API response
-		switch resp.StatusCode() {
-		case 200:
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			service := *resp.JSON200
-			
-			// Output service in requested format
-			return outputService(cmd, service, cfg.Output)
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
 
-		case 401, 403:
-			return fmt.Errorf("authentication failed: invalid API key")
-		case 404:
-			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
-		default:
-			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
-		}
-	},
+			// Determine service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return fmt.Errorf("authentication required: %w", err)
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make API call to get service details
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err != nil {
+				return fmt.Errorf("failed to get service details: %w", err)
+			}
+
+			// Handle API response
+			switch resp.StatusCode() {
+			case 200:
+				if resp.JSON200 == nil {
+					return fmt.Errorf("empty response from API")
+				}
+
+				service := *resp.JSON200
+
+				// Output service in requested format
+				return outputService(cmd, service, cfg.Output)
+
+			case 401, 403:
+				return fmt.Errorf("authentication failed: invalid API key")
+			case 404:
+				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+			default:
+				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			}
+		},
 	}
 
 	return cmd
@@ -140,72 +140,72 @@ Examples:
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
 	cmd := &cobra.Command{
-	Use:   "list",
-	Short: "List all services",
-	Long:  `List all database services in the current project.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		projectID := cfg.ProjectID
-		if projectID == "" {
-			return fmt.Errorf("project ID is required. Set it using login with --project-id")
-		}
-
-		cmd.SilenceUsage = true
-
-		// Get API key for authentication
-		apiKey, err := getAPIKeyForService()
-		if err != nil {
-			return fmt.Errorf("authentication required: %w", err)
-		}
-
-		// Create API client
-		client, err := api.NewTigerClient(apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to create API client: %w", err)
-		}
-
-		// Make API call to list services
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
-		if err != nil {
-			return fmt.Errorf("failed to list services: %w", err)
-		}
-
-		// Handle API response
-		switch resp.StatusCode() {
-		case 200:
-			// Success - process services
-			if resp.JSON200 == nil {
-				fmt.Fprintln(cmd.OutOrStdout(), "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(cmd.OutOrStdout(), "🚀 Ready to get started? Create your first service with: tiger service create")
-				return nil
+		Use:   "list",
+		Short: "List all services",
+		Long:  `List all database services in the current project.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			services := *resp.JSON200
-			if len(services) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(cmd.OutOrStdout(), "🚀 Ready to get started? Create your first service with: tiger service create")
-				return nil
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
 			}
 
-			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output)
+			cmd.SilenceUsage = true
 
-		case 401, 403:
-			return fmt.Errorf("authentication failed: invalid API key")
-		case 404:
-			return fmt.Errorf("project not found")
-		default:
-			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
-		}
-	},
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return fmt.Errorf("authentication required: %w", err)
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make API call to list services
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+			if err != nil {
+				return fmt.Errorf("failed to list services: %w", err)
+			}
+
+			// Handle API response
+			switch resp.StatusCode() {
+			case 200:
+				// Success - process services
+				if resp.JSON200 == nil {
+					fmt.Fprintln(cmd.OutOrStdout(), "🏜️  No services found! Your project is looking a bit empty.")
+					fmt.Fprintln(cmd.OutOrStdout(), "🚀 Ready to get started? Create your first service with: tiger service create")
+					return nil
+				}
+
+				services := *resp.JSON200
+				if len(services) == 0 {
+					fmt.Fprintln(cmd.OutOrStdout(), "🏜️  No services found! Your project is looking a bit empty.")
+					fmt.Fprintln(cmd.OutOrStdout(), "🚀 Ready to get started? Create your first service with: tiger service create")
+					return nil
+				}
+
+				// Output services in requested format
+				return outputServices(cmd, services, cfg.Output)
+
+			case 401, 403:
+				return fmt.Errorf("authentication failed: invalid API key")
+			case 404:
+				return fmt.Errorf("project not found")
+			default:
+				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			}
+		},
 	}
 
 	return cmd
@@ -223,9 +223,9 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createTimeoutMinutes int
 
 	cmd := &cobra.Command{
-	Use:   "create",
-	Short: "Create a new database service",
-	Long: `Create a new database service in the current project.
+		Use:   "create",
+		Short: "Create a new database service",
+		Long: `Create a new database service in the current project.
 
 Examples:
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
@@ -257,140 +257,140 @@ Allowed CPU/Memory Configurations:
   8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		projectID := cfg.ProjectID
-		if projectID == "" {
-			return fmt.Errorf("project ID is required. Set it using login with --project-id")
-		}
-
-		// Auto-generate service name if not provided
-		if createServiceName == "" {
-			createServiceName = fmt.Sprintf("db-%d", rand.Intn(10000))
-		}
-		if createServiceType == "" {
-			return fmt.Errorf("service type is required (--type)")
-		}
-		if createRegionCode == "" {
-			return fmt.Errorf("region code cannot be empty (--region)")
-		}
-		if createReplicaCount <= 0 {
-			return fmt.Errorf("replica count must be positive (--replicas)")
-		}
-
-		// Check which flags were explicitly set
-		cpuFlagSet := cmd.Flags().Changed("cpu")
-		memoryFlagSet := cmd.Flags().Changed("memory")
-
-		// Validate and normalize CPU/Memory configuration
-		cpuMillis, memoryGbs, err := validateAndNormalizeCPUMemory(createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet)
-		if err != nil {
-			return err
-		}
-		createCpuMillis = cpuMillis
-		createMemoryGbs = memoryGbs
-
-		cmd.SilenceUsage = true
-
-		// Validate service type
-		validTypes := []string{"timescaledb", "postgres", "vector"}
-		serviceTypeUpper := strings.ToUpper(createServiceType)
-		isValidType := false
-		for _, validType := range validTypes {
-			if serviceTypeUpper == strings.ToUpper(validType) {
-				isValidType = true
-				break
-			}
-		}
-		if !isValidType {
-			return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(validTypes, ", "))
-		}
-
-		// Get API key for authentication
-		apiKey, err := getAPIKeyForService()
-		if err != nil {
-			return fmt.Errorf("authentication required: %w", err)
-		}
-
-		// Create API client
-		client, err := api.NewTigerClient(apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to create API client: %w", err)
-		}
-
-		// Prepare service creation request
-		serviceCreateReq := api.ServiceCreate{
-			Name:         createServiceName,
-			ServiceType:  api.ServiceType(serviceTypeUpper),
-			RegionCode:   createRegionCode,
-			ReplicaCount: createReplicaCount,
-			CpuMillis:    createCpuMillis,
-			MemoryGbs:    float32(createMemoryGbs),
-		}
-
-		// Make API call to create service
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if cmd.Flags().Changed("name") {
-			fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s'...\n", createServiceName)
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
-		}
-		resp, err := client.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
-		if err != nil {
-			return fmt.Errorf("failed to create service: %w", err)
-		}
-
-		// Handle API response
-		switch resp.StatusCode() {
-		case 202:
-			// Success - service creation accepted
-			if resp.JSON202 == nil {
-				fmt.Fprintln(cmd.OutOrStdout(), "✅ Service creation request accepted!")
-				return nil
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			service := *resp.JSON202
-			serviceID := derefString(service.ServiceId)
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Service creation request accepted!\n")
-			fmt.Fprintf(cmd.OutOrStdout(), "📋 Service ID: %s\n", serviceID)
-
-			// Capture initial password from creation response and save it immediately
-			var initialPassword string
-			if service.InitialPassword != nil {
-				initialPassword = *service.InitialPassword
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
 			}
 
-			// Save password immediately after service creation, before any waiting
-			// This ensures users have access even if they interrupt the wait or it fails
-			handlePasswordSaving(service, initialPassword, cmd)
-
-			// Handle wait behavior
-			if createNoWait {
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
-				return nil
+			// Auto-generate service name if not provided
+			if createServiceName == "" {
+				createServiceName = fmt.Sprintf("db-%d", rand.Intn(10000))
+			}
+			if createServiceType == "" {
+				return fmt.Errorf("service type is required (--type)")
+			}
+			if createRegionCode == "" {
+				return fmt.Errorf("region code cannot be empty (--region)")
+			}
+			if createReplicaCount <= 0 {
+				return fmt.Errorf("replica count must be positive (--replicas)")
 			}
 
-			// Wait for service to be ready
-			fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (timeout: %d minutes)...\n", createTimeoutMinutes)
-			return waitForServiceReady(client, projectID, serviceID, createTimeoutMinutes, cmd)
+			// Check which flags were explicitly set
+			cpuFlagSet := cmd.Flags().Changed("cpu")
+			memoryFlagSet := cmd.Flags().Changed("memory")
 
-		case 400:
-			return fmt.Errorf("invalid request parameters")
-		case 401, 403:
-			return fmt.Errorf("authentication failed: invalid API key")
-		case 404:
-			return fmt.Errorf("project not found")
-		default:
-			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
-		}
-	},
+			// Validate and normalize CPU/Memory configuration
+			cpuMillis, memoryGbs, err := validateAndNormalizeCPUMemory(createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet)
+			if err != nil {
+				return err
+			}
+			createCpuMillis = cpuMillis
+			createMemoryGbs = memoryGbs
+
+			cmd.SilenceUsage = true
+
+			// Validate service type
+			validTypes := []string{"timescaledb", "postgres", "vector"}
+			serviceTypeUpper := strings.ToUpper(createServiceType)
+			isValidType := false
+			for _, validType := range validTypes {
+				if serviceTypeUpper == strings.ToUpper(validType) {
+					isValidType = true
+					break
+				}
+			}
+			if !isValidType {
+				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(validTypes, ", "))
+			}
+
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return fmt.Errorf("authentication required: %w", err)
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Prepare service creation request
+			serviceCreateReq := api.ServiceCreate{
+				Name:         createServiceName,
+				ServiceType:  api.ServiceType(serviceTypeUpper),
+				RegionCode:   createRegionCode,
+				ReplicaCount: createReplicaCount,
+				CpuMillis:    createCpuMillis,
+				MemoryGbs:    float32(createMemoryGbs),
+			}
+
+			// Make API call to create service
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			if cmd.Flags().Changed("name") {
+				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s'...\n", createServiceName)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
+			}
+			resp, err := client.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
+			if err != nil {
+				return fmt.Errorf("failed to create service: %w", err)
+			}
+
+			// Handle API response
+			switch resp.StatusCode() {
+			case 202:
+				// Success - service creation accepted
+				if resp.JSON202 == nil {
+					fmt.Fprintln(cmd.OutOrStdout(), "✅ Service creation request accepted!")
+					return nil
+				}
+
+				service := *resp.JSON202
+				serviceID := derefString(service.ServiceId)
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Service creation request accepted!\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "📋 Service ID: %s\n", serviceID)
+
+				// Capture initial password from creation response and save it immediately
+				var initialPassword string
+				if service.InitialPassword != nil {
+					initialPassword = *service.InitialPassword
+				}
+
+				// Save password immediately after service creation, before any waiting
+				// This ensures users have access even if they interrupt the wait or it fails
+				handlePasswordSaving(service, initialPassword, cmd)
+
+				// Handle wait behavior
+				if createNoWait {
+					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
+					return nil
+				}
+
+				// Wait for service to be ready
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (timeout: %d minutes)...\n", createTimeoutMinutes)
+				return waitForServiceReady(client, projectID, serviceID, createTimeoutMinutes, cmd)
+
+			case 400:
+				return fmt.Errorf("invalid request parameters")
+			case 401, 403:
+				return fmt.Errorf("authentication failed: invalid API key")
+			case 404:
+				return fmt.Errorf("project not found")
+			default:
+				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			}
+		},
 	}
 
 	// Add flags
@@ -412,9 +412,9 @@ func buildServiceUpdatePasswordCmd() *cobra.Command {
 	var updatePasswordSaveToFile bool
 
 	cmd := &cobra.Command{
-	Use:   "update-password [service-id]",
-	Short: "Update the master password for a service",
-	Long: `Update the master password for a specific database service.
+		Use:   "update-password [service-id]",
+		Short: "Update the master password for a service",
+		Long: `Update the master password for a specific database service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command updates the master password for the
@@ -436,103 +436,103 @@ Examples:
 
   # Update password without saving to .pgpass
   tiger service update-password svc-12345 --password new-secure-password --no-save-password`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		projectID := cfg.ProjectID
-		if projectID == "" {
-			return fmt.Errorf("project ID is required. Set it using login with --project-id")
-		}
-
-		// Determine service ID
-		var serviceID string
-		if len(args) > 0 {
-			serviceID = args[0]
-		} else {
-			serviceID = cfg.ServiceID
-		}
-
-		if serviceID == "" {
-			return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-		}
-
-		// Get password from flag or environment variable via viper
-		password := viper.GetString("password")
-		if password == "" {
-			return fmt.Errorf("password is required. Use --password flag or set TIGER_PASSWORD environment variable")
-		}
-
-		cmd.SilenceUsage = true
-
-		// Get API key for authentication
-		apiKey, err := getAPIKeyForService()
-		if err != nil {
-			return fmt.Errorf("authentication required: %w", err)
-		}
-
-		// Create API client
-		client, err := api.NewTigerClient(apiKey)
-		if err != nil {
-			return fmt.Errorf("failed to create API client: %w", err)
-		}
-
-		// Prepare password update request
-		updateReq := api.UpdatePasswordInput{
-			Password: password,
-		}
-
-		// Make API call to update password
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
-		if err != nil {
-			return fmt.Errorf("failed to update service password: %w", err)
-		}
-
-		// Handle API response
-		switch resp.StatusCode() {
-		case 200:
-				fallthrough
-		case 204:
-			fmt.Fprintf(cmd.OutOrStdout(), "✅ Master password for 'tsdbadmin' user updated successfully\n")
-			
-			// Handle .pgpass file update - save by default unless --no-save-password was specified
-			if !updatePasswordSaveToFile {
-				err := updatePgPassFile(projectID, serviceID, password, client, ctx)
-				if err != nil {
-					fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to update ~/.pgpass: %v\n", err)
-					fmt.Fprintf(cmd.OutOrStdout(), "💡 You may need to manually update your ~/.pgpass file with the new password\n")
-				} else {
-					fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password updated in ~/.pgpass for automatic authentication\n")
-				}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
-			
-			return nil
 
-		case 401, 403:
-			return fmt.Errorf("authentication failed: invalid API key")
-		case 404:
-			return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
-		case 400:
-			return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
-		default:
-			return fmt.Errorf("API request failed with status %d", resp.StatusCode())
-		}
-	},
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Determine service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			// Get password from flag or environment variable via viper
+			password := viper.GetString("password")
+			if password == "" {
+				return fmt.Errorf("password is required. Use --password flag or set TIGER_PASSWORD environment variable")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return fmt.Errorf("authentication required: %w", err)
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Prepare password update request
+			updateReq := api.UpdatePasswordInput{
+				Password: password,
+			}
+
+			// Make API call to update password
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
+			if err != nil {
+				return fmt.Errorf("failed to update service password: %w", err)
+			}
+
+			// Handle API response
+			switch resp.StatusCode() {
+			case 200:
+				fallthrough
+			case 204:
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Master password for 'tsdbadmin' user updated successfully\n")
+
+				// Handle .pgpass file update - save by default unless --no-save-password was specified
+				if !updatePasswordSaveToFile {
+					err := updatePgPassFile(projectID, serviceID, password, client, ctx)
+					if err != nil {
+						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to update ~/.pgpass: %v\n", err)
+						fmt.Fprintf(cmd.OutOrStdout(), "💡 You may need to manually update your ~/.pgpass file with the new password\n")
+					} else {
+						fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password updated in ~/.pgpass for automatic authentication\n")
+					}
+				}
+
+				return nil
+
+			case 401, 403:
+				return fmt.Errorf("authentication failed: invalid API key")
+			case 404:
+				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+			case 400:
+				return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
+			default:
+				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			}
+		},
 	}
-	
+
 	// Add flags
 	cmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
 	cmd.Flags().BoolVar(&updatePasswordSaveToFile, "no-save-password", false, "Don't save the new password to ~/.pgpass file")
-	
+
 	// Bind flags to viper
 	viper.BindPFlag("password", cmd.Flags().Lookup("password"))
-	
+
 	return cmd
 }
 
@@ -579,7 +579,7 @@ func outputServiceTable(cmd *cobra.Command, service api.Service) error {
 	table.Append("Status", formatDeployStatus(service.Status))
 	table.Append("Type", formatServiceType(service.ServiceType))
 	table.Append("Region", derefString(service.RegionCode))
-	
+
 	// Resource information from Resources slice
 	if service.Resources != nil && len(*service.Resources) > 0 {
 		resource := (*service.Resources)[0] // Get first resource
@@ -592,13 +592,13 @@ func outputServiceTable(cmd *cobra.Command, service api.Service) error {
 					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
 				}
 			}
-			
+
 			if resource.Spec.MemoryGbs != nil {
 				table.Append("Memory", fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs))
 			}
 		}
 	}
-	
+
 	// High availability replicas
 	if service.HaReplicas != nil {
 		if service.HaReplicas.ReplicaCount != nil {
@@ -666,11 +666,11 @@ func sanitizeServiceForOutput(service api.Service) map[string]interface{} {
 	serviceBytes, _ := json.Marshal(service)
 	var serviceMap map[string]interface{}
 	json.Unmarshal(serviceBytes, &serviceMap)
-	
+
 	// Remove sensitive fields
 	delete(serviceMap, "initial_password")
 	delete(serviceMap, "initialpassword")
-	
+
 	return serviceMap
 }
 

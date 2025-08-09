@@ -9,22 +9,22 @@ import (
 )
 
 type Config struct {
-	APIURL     string `mapstructure:"api_url" yaml:"api_url"`
-	ProjectID  string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID  string `mapstructure:"service_id" yaml:"service_id"`
-	Output     string `mapstructure:"output" yaml:"output"`
-	Analytics  bool   `mapstructure:"analytics" yaml:"analytics"`
-	ConfigDir  string `mapstructure:"config_dir" yaml:"-"`
-	Debug      bool   `mapstructure:"debug" yaml:"debug"`
+	APIURL    string `mapstructure:"api_url" yaml:"api_url"`
+	ProjectID string `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID string `mapstructure:"service_id" yaml:"service_id"`
+	Output    string `mapstructure:"output" yaml:"output"`
+	Analytics bool   `mapstructure:"analytics" yaml:"analytics"`
+	ConfigDir string `mapstructure:"config_dir" yaml:"-"`
+	Debug     bool   `mapstructure:"debug" yaml:"debug"`
 }
 
 const (
-	DefaultAPIURL     = "https://api.tigerdata.com/public/v1"
-	DefaultOutput     = "table"
-	DefaultAnalytics  = true
-	DefaultDebug      = false
-	DefaultConfigDir  = "~/.config/tiger"
-	ConfigFileName    = "config.yaml"
+	DefaultAPIURL    = "https://api.tigerdata.com/public/v1"
+	DefaultOutput    = "table"
+	DefaultAnalytics = true
+	DefaultDebug     = false
+	DefaultConfigDir = "~/.config/tiger"
+	ConfigFileName   = "config.yaml"
 )
 
 var globalConfig *Config
@@ -34,7 +34,7 @@ func SetupViper(configFile string) error {
 	viper.SetConfigFile(configFile)
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
-	
+
 	// Set defaults for all config values
 	viper.SetDefault("api_url", DefaultAPIURL)
 	viper.SetDefault("project_id", "")
@@ -42,7 +42,7 @@ func SetupViper(configFile string) error {
 	viper.SetDefault("output", DefaultOutput)
 	viper.SetDefault("analytics", DefaultAnalytics)
 	viper.SetDefault("debug", DefaultDebug)
-	
+
 	// Try to read config file if it exists
 	if _, err := os.Stat(configFile); err == nil {
 		// File exists, try to read it
@@ -51,7 +51,7 @@ func SetupViper(configFile string) error {
 		}
 	}
 	// If file doesn't exist, that's okay - we'll use defaults and env vars
-	
+
 	return nil
 }
 
@@ -81,7 +81,7 @@ func (c *Config) Save() error {
 	}
 
 	configFile := filepath.Join(configDir, ConfigFileName)
-	
+
 	viper.Set("api_url", c.APIURL)
 	viper.Set("project_id", c.ProjectID)
 	viper.Set("service_id", c.ServiceID)
@@ -168,12 +168,12 @@ func GetConfigDir() string {
 	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
 		return expandPath(dir)
 	}
-	
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "./.config/tiger"
 	}
-	
+
 	return filepath.Join(homeDir, ".config", "tiger")
 }
 
@@ -182,15 +182,14 @@ func expandPath(path string) string {
 		homeDir, _ := os.UserHomeDir()
 		return homeDir
 	}
-	
+
 	if len(path) > 1 && path[:2] == "~/" {
 		homeDir, _ := os.UserHomeDir()
 		return filepath.Join(homeDir, path[2:])
 	}
-	
+
 	return path
 }
-
 
 // ResetGlobalConfig clears the global config singleton for testing
 func ResetGlobalConfig() {

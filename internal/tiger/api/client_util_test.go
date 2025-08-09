@@ -13,9 +13,9 @@ import (
 
 func TestValidateAPIKeyWithClient(t *testing.T) {
 	tests := []struct {
-		name           string
-		setupMock      func(*mocks.MockClientWithResponsesInterface)
-		expectedError  string
+		name          string
+		setupMock     func(*mocks.MockClientWithResponsesInterface)
+		expectedError string
 	}{
 		{
 			name: "valid API key - 200 response",
@@ -114,7 +114,7 @@ func TestValidateAPIKey_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-	
+
 	// This test would require a real API key and network connectivity
 	t.Skip("Integration test requires real API key - implement when needed")
 }

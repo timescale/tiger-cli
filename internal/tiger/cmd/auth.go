@@ -100,7 +100,7 @@ func buildLogoutCmd() *cobra.Command {
 		Long:  `Remove stored API key and clear authentication credentials.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			
+
 			if err := removeAPIKey(); err != nil {
 				return fmt.Errorf("failed to remove API key: %w", err)
 			}
@@ -118,7 +118,7 @@ func buildWhoamiCmd() *cobra.Command {
 		Long:  `Show information about the currently authenticated user.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			
+
 			apiKey, err := getAPIKey()
 			if err != nil {
 				return fmt.Errorf("not logged in: %w", err)
@@ -150,7 +150,6 @@ func buildAuthCmd() *cobra.Command {
 
 	return cmd
 }
-
 
 // storeAPIKey stores the API key using keyring with file fallback
 func storeAPIKey(apiKey string) error {

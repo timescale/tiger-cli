@@ -16,55 +16,55 @@ import (
 
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
-	
+
 	// Reset viper state to ensure clean test environment
 	viper.Reset()
-	
+
 	// Reset global config in the config package
 	config.ResetGlobalConfig()
-	
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	
+
 	// Set environment variable to use test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		viper.Reset()
-		
+
 		// Reset global config in the config package
 		// This is important for test isolation
 		// We need to clear the singleton
 		config.ResetGlobalConfig()
 	}
-	
+
 	t.Cleanup(cleanup)
-	
+
 	return tmpDir, cleanup
 }
 
 func executeConfigCommand(args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot := buildRootCmd()
-	
+
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
-	
+
 	err := testRoot.Execute()
 	return buf.String(), err
 }
 
 func TestConfigShow_TableOutput(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
-	
+
 	// Create config file with test data
 	configContent := `api_url: https://test.api.com/v1
 project_id: test-project
@@ -76,12 +76,12 @@ analytics: false
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	
+
 	output, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
-	
+
 	// Check table output contains expected values
 	if !strings.Contains(output, "https://test.api.com/v1") {
 		t.Errorf("Output should contain API URL, got: %s", output)
@@ -102,7 +102,7 @@ analytics: false
 
 func TestConfigShow_JSONOutput(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
-	
+
 	// Create config file with JSON output format
 	configContent := `api_url: https://json.api.com/v1
 project_id: json-project
@@ -113,18 +113,18 @@ analytics: true
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	
+
 	output, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
-	
+
 	// Parse JSON output
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
-	
+
 	// Verify JSON content
 	if result["api_url"] != "https://json.api.com/v1" {
 		t.Errorf("Expected api_url 'https://json.api.com/v1', got %v", result["api_url"])
@@ -142,7 +142,7 @@ analytics: true
 
 func TestConfigShow_YAMLOutput(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
-	
+
 	// Create config file with YAML output format
 	configContent := `api_url: https://yaml.api.com/v1
 project_id: yaml-project
@@ -153,18 +153,18 @@ analytics: false
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	
+
 	output, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
-	
+
 	// Parse YAML output
 	var result map[string]interface{}
 	if err := yaml.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse YAML output: %v", err)
 	}
-	
+
 	// Verify YAML content
 	if result["api_url"] != "https://yaml.api.com/v1" {
 		t.Errorf("Expected api_url 'https://yaml.api.com/v1', got %v", result["api_url"])
@@ -182,7 +182,7 @@ analytics: false
 
 func TestConfigShow_EmptyValues(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
-	
+
 	// Create minimal config (only defaults)
 	configContent := `output: table
 analytics: true
@@ -191,12 +191,12 @@ analytics: true
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	
+
 	output, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
-	
+
 	// Check that empty values show "(not set)"
 	if !strings.Contains(output, "(not set)") {
 		t.Error("Output should contain '(not set)' for empty values")
@@ -205,10 +205,10 @@ analytics: true
 
 func TestConfigSet_ValidValues(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	tests := []struct {
-		key           string
-		value         string
+		key            string
+		value          string
 		expectedOutput string
 	}{
 		{"api_url", "https://new.api.com/v1", "Set api_url = https://new.api.com/v1"},
@@ -217,24 +217,24 @@ func TestConfigSet_ValidValues(t *testing.T) {
 		{"output", "json", "Set output = json"},
 		{"analytics", "false", "Set analytics = false"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
 			output, err := executeConfigCommand("config", "set", tt.key, tt.value)
 			if err != nil {
 				t.Fatalf("Command failed: %v", err)
 			}
-			
+
 			if !strings.Contains(output, tt.expectedOutput) {
 				t.Errorf("Expected output to contain '%s', got '%s'", tt.expectedOutput, strings.TrimSpace(output))
 			}
-			
+
 			// Verify the value was actually set
 			cfg, err := config.Load()
 			if err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
-			
+
 			// Check the value was set correctly
 			switch tt.key {
 			case "api_url":
@@ -265,7 +265,7 @@ func TestConfigSet_ValidValues(t *testing.T) {
 
 func TestConfigSet_InvalidValues(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	tests := []struct {
 		key   string
 		value string
@@ -275,14 +275,14 @@ func TestConfigSet_InvalidValues(t *testing.T) {
 		{"analytics", "maybe", "invalid analytics value"},
 		{"unknown", "value", "unknown configuration key"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
 			_, err := executeConfigCommand("config", "set", tt.key, tt.value)
 			if err == nil {
 				t.Error("Expected command to fail, but it succeeded")
 			}
-			
+
 			if !strings.Contains(err.Error(), tt.error) {
 				t.Errorf("Expected error to contain '%s', got '%s'", tt.error, err.Error())
 			}
@@ -292,19 +292,19 @@ func TestConfigSet_InvalidValues(t *testing.T) {
 
 func TestConfigSet_WrongArgs(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	// Test with no arguments
 	_, err := executeConfigCommand("config", "set")
 	if err == nil {
 		t.Error("Expected command to fail with no arguments")
 	}
-	
+
 	// Test with one argument
 	_, err = executeConfigCommand("config", "set", "key")
 	if err == nil {
 		t.Error("Expected command to fail with only one argument")
 	}
-	
+
 	// Test with too many arguments
 	_, err = executeConfigCommand("config", "set", "key", "value", "extra")
 	if err == nil {
@@ -314,17 +314,17 @@ func TestConfigSet_WrongArgs(t *testing.T) {
 
 func TestConfigUnset_ValidKeys(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	// First set some values
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	cfg.Set("project_id", "test-project")
 	cfg.Set("service_id", "test-service")
 	cfg.Set("output", "json")
-	
+
 	tests := []struct {
 		key            string
 		expectedOutput string
@@ -333,24 +333,24 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 		{"service_id", "Unset service_id"},
 		{"output", "Unset output"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
 			output, err := executeConfigCommand("config", "unset", tt.key)
 			if err != nil {
 				t.Fatalf("Command failed: %v", err)
 			}
-			
+
 			if !strings.Contains(output, tt.expectedOutput) {
 				t.Errorf("Expected output to contain '%s', got '%s'", tt.expectedOutput, strings.TrimSpace(output))
 			}
-			
+
 			// Verify the value was actually unset
 			cfg, err := config.Load()
 			if err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
-			
+
 			// Check the value was unset correctly
 			switch tt.key {
 			case "project_id":
@@ -372,12 +372,12 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 
 func TestConfigUnset_InvalidKey(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	_, err := executeConfigCommand("config", "unset", "unknown_key")
 	if err == nil {
 		t.Error("Expected command to fail with unknown key")
 	}
-	
+
 	if !strings.Contains(err.Error(), "unknown configuration key") {
 		t.Errorf("Expected error about unknown key, got: %s", err.Error())
 	}
@@ -385,13 +385,13 @@ func TestConfigUnset_InvalidKey(t *testing.T) {
 
 func TestConfigUnset_WrongArgs(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	// Test with no arguments
 	_, err := executeConfigCommand("config", "unset")
 	if err == nil {
 		t.Error("Expected command to fail with no arguments")
 	}
-	
+
 	// Test with too many arguments
 	_, err = executeConfigCommand("config", "unset", "key", "extra")
 	if err == nil {
@@ -401,34 +401,34 @@ func TestConfigUnset_WrongArgs(t *testing.T) {
 
 func TestConfigReset(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	// First set some custom values
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	cfg.Set("project_id", "custom-project")
 	cfg.Set("service_id", "custom-service")
 	cfg.Set("output", "json")
 	cfg.Set("analytics", "false")
-	
+
 	// Execute reset command
 	output, err := executeConfigCommand("config", "reset")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
-	
+
 	if !strings.Contains(output, "Configuration reset to defaults") {
 		t.Errorf("Expected output to contain reset message, got '%s'", strings.TrimSpace(output))
 	}
-	
+
 	// Verify all values were reset to defaults
 	cfg, err = config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	if cfg.APIURL != config.DefaultAPIURL {
 		t.Errorf("Expected default APIURL %s, got %s", config.DefaultAPIURL, cfg.APIURL)
 	}
@@ -455,7 +455,7 @@ func TestValueOrEmpty(t *testing.T) {
 		{"value", "value"},
 		{"test-string", "test-string"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result := valueOrEmpty(tt.input)
@@ -468,65 +468,65 @@ func TestValueOrEmpty(t *testing.T) {
 
 func TestConfigCommands_Integration(t *testing.T) {
 	_, _ = setupConfigTest(t)
-	
+
 	// Test full workflow: set -> show -> unset -> reset
-	
+
 	// 1. Set some values
 	_, err := executeConfigCommand("config", "set", "project_id", "integration-test")
 	if err != nil {
 		t.Fatalf("Failed to set project_id: %v", err)
 	}
-	
+
 	_, err = executeConfigCommand("config", "set", "output", "json")
 	if err != nil {
 		t.Fatalf("Failed to set output: %v", err)
 	}
-	
+
 	// 2. Show config in JSON format (should use the output format we just set)
 	showOutput, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Failed to show config: %v", err)
 	}
-	
+
 	// Should be JSON output
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(showOutput), &result); err != nil {
 		t.Fatalf("Expected JSON output, got: %s", showOutput)
 	}
-	
+
 	if result["project_id"] != "integration-test" {
 		t.Errorf("Expected project_id 'integration-test', got %v", result["project_id"])
 	}
-	
+
 	// 3. Unset project_id
 	_, err = executeConfigCommand("config", "unset", "project_id")
 	if err != nil {
 		t.Fatalf("Failed to unset project_id: %v", err)
 	}
-	
+
 	// 4. Verify project_id was unset
 	showOutput, err = executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Failed to show config after unset: %v", err)
 	}
-	
+
 	json.Unmarshal([]byte(showOutput), &result)
 	if result["project_id"] != "" {
 		t.Errorf("Expected empty project_id after unset, got %v", result["project_id"])
 	}
-	
+
 	// 5. Reset all config
 	_, err = executeConfigCommand("config", "reset")
 	if err != nil {
 		t.Fatalf("Failed to reset config: %v", err)
 	}
-	
+
 	// 6. Verify everything is back to defaults
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config after reset: %v", err)
 	}
-	
+
 	if cfg.Output != config.DefaultOutput {
 		t.Errorf("Expected output reset to default %s, got %s", config.DefaultOutput, cfg.Output)
 	}
