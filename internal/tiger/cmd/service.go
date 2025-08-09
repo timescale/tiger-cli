@@ -220,7 +220,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createMemoryGbs float64
 	var createReplicaCount int
 	var createNoWait bool
-	var createTimeoutMinutes int
+	var createWaitTimeout string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -250,7 +250,7 @@ Examples:
   tiger service create --name quick-db --type postgres --cpu 1000 --memory 4 --replicas 1 --no-wait
 
   # Create service with custom wait timeout
-  tiger service create --name patient-db --type timescaledb --cpu 2000 --memory 8 --replicas 2 --wait-timeout 60
+  tiger service create --name patient-db --type timescaledb --cpu 2000 --memory 8 --replicas 2 --wait-timeout 1h
 
 Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB    |  2 CPU (2000m) / 8GB    |  4 CPU (4000m) / 16GB
@@ -294,6 +294,15 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			createCpuMillis = cpuMillis
 			createMemoryGbs = memoryGbs
+
+			// Parse wait timeout duration
+			waitTimeout, err := time.ParseDuration(createWaitTimeout)
+			if err != nil {
+				return fmt.Errorf("invalid wait timeout format '%s': %w\nExpected format: 30m, 1h30m, 90s, etc.", createWaitTimeout, err)
+			}
+			if waitTimeout <= 0 {
+				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			}
 
 			cmd.SilenceUsage = true
 
@@ -378,8 +387,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Wait for service to be ready
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %d minutes)...\n", createTimeoutMinutes)
-				return waitForServiceReady(client, projectID, serviceID, createTimeoutMinutes, cmd)
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", waitTimeout)
+				return waitForServiceReady(client, projectID, serviceID, waitTimeout, cmd)
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
@@ -401,7 +410,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
-	cmd.Flags().IntVar(&createTimeoutMinutes, "wait-timeout", 30, "Wait timeout in minutes")
+	cmd.Flags().StringVar(&createWaitTimeout, "wait-timeout", "30m", "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }
@@ -737,8 +746,8 @@ func formatServiceType(serviceType *api.ServiceType) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, timeoutMinutes int, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMinutes)*time.Minute)
+func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, cmd *cobra.Command) error {
+	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
 	ticker := time.NewTicker(10 * time.Second)
@@ -747,7 +756,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("❌ wait timeout reached after %d minutes - service may still be provisioning", timeoutMinutes)
+			return fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout)
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {

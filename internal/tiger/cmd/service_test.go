@@ -1686,3 +1686,105 @@ another-host:3306:mysql:root:password4
 		t.Error("Unrelated entries should remain")
 	}
 }
+
+func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID to get past initial validation
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Use local URL that will fail fast
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	testCases := []struct {
+		name          string
+		waitTimeout   string
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:        "Valid duration - minutes",
+			waitTimeout: "30m",
+			expectError: false,
+		},
+		{
+			name:        "Valid duration - hours and minutes",
+			waitTimeout: "1h30m",
+			expectError: false,
+		},
+		{
+			name:        "Valid duration - seconds",
+			waitTimeout: "90s",
+			expectError: false,
+		},
+		{
+			name:        "Valid duration - hours",
+			waitTimeout: "2h",
+			expectError: false,
+		},
+		{
+			name:          "Invalid duration format",
+			waitTimeout:   "invalid",
+			expectError:   true,
+			errorContains: "invalid wait timeout format",
+		},
+		{
+			name:          "Negative duration",
+			waitTimeout:   "-30m",
+			expectError:   true,
+			errorContains: "wait timeout must be positive",
+		},
+		{
+			name:          "Zero duration",
+			waitTimeout:   "0s",
+			expectError:   true,
+			errorContains: "wait timeout must be positive",
+		},
+		{
+			name:          "Empty duration",
+			waitTimeout:   "",
+			expectError:   true,
+			errorContains: "invalid wait timeout format",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Execute service create with specific wait-timeout
+			_, err, _ := executeServiceCommand("service", "create",
+				"--name", "test-service",
+				"--type", "postgres",
+				"--region", "us-east-1",
+				"--wait-timeout", tc.waitTimeout,
+				"--no-wait") // Use no-wait to avoid actual API calls
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error for wait-timeout '%s', but got none", tc.waitTimeout)
+					return
+				}
+				if !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("Expected error to contain '%s', got: %v", tc.errorContains, err)
+				}
+			} else {
+				// For valid durations, we expect authentication error since we're using mock API
+				// The duration parsing should succeed and we should get to the API call stage
+				if err != nil && strings.Contains(err.Error(), "invalid wait timeout format") {
+					t.Errorf("Unexpected duration parsing error for '%s': %v", tc.waitTimeout, err)
+				}
+			}
+		})
+	}
+}
