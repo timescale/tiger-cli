@@ -7,7 +7,7 @@ TODO items:
 spec updates needed:
  - ✅ change service operations to use --wait-timeout instead of --timeout
  - ✅ implement --wait-timeout flag to accept time.ParseDuration format (e.g., "30m", "1h30m", "90s")
- - update --timeout flag for db test-connection to accept time.ParseDuration format 
+ - ✅ update --timeout flag for db test-connection to accept time.ParseDuration format 
  - implement exit code 2 for wait-timeout scenarios (operation continues on server)
  - update global exit code mapping per new spec (authentication moved to code 3, etc.)
  - ensure wait-timeout operations display status updates every 10 seconds while waiting

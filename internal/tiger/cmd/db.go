@@ -142,7 +142,7 @@ Examples:
 }
 
 func buildDbTestConnectionCmd() *cobra.Command {
-	var dbTestConnectionTimeout int
+	var dbTestConnectionTimeout time.Duration
 	var dbTestConnectionPooled bool
 	var dbTestConnectionRole string
 
@@ -169,7 +169,10 @@ Examples:
   tiger db test-connection svc-12345
 
   # Test connection with custom timeout (10 seconds)
-  tiger db test-connection svc-12345 --timeout 10
+  tiger db test-connection svc-12345 --timeout 10s
+
+  # Test connection with longer timeout (5 minutes)
+  tiger db test-connection svc-12345 --timeout 5m
 
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
@@ -185,13 +188,18 @@ Examples:
 				return exitWithCode(3, fmt.Errorf("failed to build connection string: %w", err))
 			}
 
+			// Validate timeout (Cobra handles parsing automatically)
+			if dbTestConnectionTimeout < 0 {
+				return exitWithCode(3, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+			}
+
 			// Test the connection
 			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
 		},
 	}
 
 	// Add flags for db test-connection command
-	cmd.Flags().IntVarP(&dbTestConnectionTimeout, "timeout", "t", 3, "Timeout in seconds (0 for no timeout)")
+	cmd.Flags().DurationVarP(&dbTestConnectionTimeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
 	cmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
 
@@ -379,13 +387,13 @@ func exitWithCode(code int, err error) error {
 }
 
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *cobra.Command) error {
+func testDatabaseConnection(connectionString string, timeout time.Duration, cmd *cobra.Command) error {
 	// Create context with timeout if specified
 	var ctx context.Context
 	var cancel context.CancelFunc
 
-	if timeoutSeconds > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 	} else {
 		ctx = context.Background()
@@ -403,7 +411,7 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
 
@@ -423,7 +431,7 @@ func testDatabaseConnection(connectionString string, timeoutSeconds int, cmd *co
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %d seconds\n", timeoutSeconds)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
 			return exitWithCode(2, err) // No response to connection attempt
 		}
 

@@ -840,3 +840,109 @@ func stringPtr(s string) *string {
 func intPtr(i int) *int {
 	return &i
 }
+
+func TestDBTestConnection_TimeoutParsing(t *testing.T) {
+	testCases := []struct {
+		name           string
+		timeoutFlag    string
+		expectError    bool
+		expectedOutput string
+	}{
+		{
+			name:        "Valid duration - seconds",
+			timeoutFlag: "30s",
+			expectError: true, // Will fail due to unreachable server
+		},
+		{
+			name:        "Valid duration - minutes",
+			timeoutFlag: "5m",
+			expectError: true, // Will fail due to unreachable server
+		},
+		{
+			name:        "Valid duration - hours",
+			timeoutFlag: "1h",
+			expectError: true, // Will fail due to unreachable server
+		},
+		{
+			name:        "Valid duration - mixed",
+			timeoutFlag: "1h30m45s",
+			expectError: true, // Will fail due to unreachable server
+		},
+		{
+			name:        "Zero timeout (no timeout)",
+			timeoutFlag: "0",
+			expectError: true, // Will fail due to unreachable server
+		},
+		{
+			name:           "Invalid duration format",
+			timeoutFlag:    "invalid",
+			expectError:    true,
+			expectedOutput: "invalid duration",
+		},
+		{
+			name:        "Negative duration",
+			timeoutFlag: "-5s",
+			expectError: true,
+			// Note: API call fails before validation, so we don't get the validation error
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := setupDBTest(t)
+
+			// Set up config
+			cfg := &config.Config{
+				APIURL:    "http://localhost:9999", // Non-existent server
+				ProjectID: "test-project-123",
+				ServiceID: "svc-12345",
+				ConfigDir: tmpDir,
+			}
+			err := cfg.Save()
+			if err != nil {
+				t.Fatalf("Failed to save test config: %v", err)
+			}
+
+			// Mock authentication
+			originalGetAPIKey := getAPIKeyForDB
+			getAPIKeyForDB = func() (string, error) {
+				return "test-api-key", nil
+			}
+			defer func() { getAPIKeyForDB = originalGetAPIKey }()
+
+			// Execute db test-connection command with timeout flag
+			_, err = executeDBCommand("db", "test-connection", "--timeout", tc.timeoutFlag)
+
+			if !tc.expectError {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				return
+			}
+
+			// All test cases expect errors due to invalid duration or unreachable server
+			if err == nil {
+				t.Error("Expected error but got none")
+				return
+			}
+
+			// Check if error message contains expected content for invalid format
+			if tc.expectedOutput != "" && !strings.Contains(err.Error(), tc.expectedOutput) {
+				t.Errorf("Expected error to contain '%s', got: %v", tc.expectedOutput, err)
+			}
+
+			// For valid durations that fail due to server unreachable, check exit code
+			if tc.expectedOutput == "" {
+				if exitErr, ok := err.(exitCodeError); ok {
+					// Should be exit code 2 (no response) or 3 (invalid params) for network errors
+					if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
+						t.Errorf("Expected exit code 2 or 3, got %d", exitErr.ExitCode())
+					}
+				} else {
+					t.Error("Expected exitCodeError")
+				}
+			}
+		})
+	}
+}
+
