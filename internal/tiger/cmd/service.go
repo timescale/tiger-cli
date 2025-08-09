@@ -220,7 +220,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createMemoryGbs float64
 	var createReplicaCount int
 	var createNoWait bool
-	var createWaitTimeout string
+	var createWaitTimeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -295,13 +295,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			createCpuMillis = cpuMillis
 			createMemoryGbs = memoryGbs
 
-			// Parse wait timeout duration
-			waitTimeout, err := time.ParseDuration(createWaitTimeout)
-			if err != nil {
-				return fmt.Errorf("invalid wait timeout format '%s': %w\nExpected format: 30m, 1h30m, 90s, etc.", createWaitTimeout, err)
-			}
-			if waitTimeout <= 0 {
-				return fmt.Errorf("wait timeout must be positive, got %v", waitTimeout)
+			// Validate wait timeout (Cobra handles parsing automatically)
+			if createWaitTimeout <= 0 {
+				return fmt.Errorf("wait timeout must be positive, got %v", createWaitTimeout)
 			}
 
 			cmd.SilenceUsage = true
@@ -387,8 +383,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Wait for service to be ready
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", waitTimeout)
-				return waitForServiceReady(client, projectID, serviceID, waitTimeout, cmd)
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
+				return waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd)
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
@@ -410,7 +406,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
-	cmd.Flags().StringVar(&createWaitTimeout, "wait-timeout", "30m", "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }

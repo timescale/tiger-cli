@@ -1738,7 +1738,7 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 			name:          "Invalid duration format",
 			waitTimeout:   "invalid",
 			expectError:   true,
-			errorContains: "invalid wait timeout format",
+			errorContains: "invalid duration", // Cobra's parsing error
 		},
 		{
 			name:          "Negative duration",
@@ -1756,7 +1756,7 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 			name:          "Empty duration",
 			waitTimeout:   "",
 			expectError:   true,
-			errorContains: "invalid wait timeout format",
+			errorContains: "invalid duration", // Cobra's parsing error
 		},
 	}
 
@@ -1781,7 +1781,7 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 			} else {
 				// For valid durations, we expect authentication error since we're using mock API
 				// The duration parsing should succeed and we should get to the API call stage
-				if err != nil && strings.Contains(err.Error(), "invalid wait timeout format") {
+				if err != nil && strings.Contains(err.Error(), "invalid duration") {
 					t.Errorf("Unexpected duration parsing error for '%s': %v", tc.waitTimeout, err)
 				}
 			}
