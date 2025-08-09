@@ -752,7 +752,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout)
+			return exitWithCode(2, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {

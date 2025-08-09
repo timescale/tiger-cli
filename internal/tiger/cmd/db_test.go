@@ -606,23 +606,6 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	}
 }
 
-func TestExitCodeError(t *testing.T) {
-	// Test the exitCodeError type
-	originalErr := fmt.Errorf("test error")
-	exitErr := exitWithCode(42, originalErr)
-
-	if exitErr.Error() != "test error" {
-		t.Errorf("Expected error message 'test error', got '%s'", exitErr.Error())
-	}
-
-	if exitCodeErr, ok := exitErr.(exitCodeError); ok {
-		if exitCodeErr.ExitCode() != 42 {
-			t.Errorf("Expected exit code 42, got %d", exitCodeErr.ExitCode())
-		}
-	} else {
-		t.Error("exitWithCode should return exitCodeError")
-	}
-}
 
 func TestIsConnectionRejected(t *testing.T) {
 	testCases := []struct {

@@ -1788,3 +1788,65 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestWaitForServiceReady_Timeout(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Non-existent server to force timeout
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Create API client
+	client, err := api.NewTigerClient("test-api-key")
+	if err != nil {
+		t.Fatalf("Failed to create API client: %v", err)
+	}
+
+	// Create a test command
+	cmd := &cobra.Command{}
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	cmd.SetErr(errBuf)
+
+	// Test waitForServiceReady with very short timeout to trigger timeout quickly
+	err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd)
+
+	// Should return an error with exit code 2
+	if err == nil {
+		t.Error("Expected error for timeout, but got none")
+		return
+	}
+
+	// Check that it's an exitCodeError with code 2
+	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+		if exitErr.ExitCode() != 2 {
+			t.Errorf("Expected exit code 2 for wait timeout, got %d", exitErr.ExitCode())
+		}
+	} else {
+		t.Error("Expected exitCodeError for wait timeout")
+	}
+
+	// Check error message mentions timeout and continuing provisioning
+	errorMsg := err.Error()
+	if !strings.Contains(errorMsg, "wait timeout reached") {
+		t.Errorf("Expected error message to mention timeout, got: %v", errorMsg)
+	}
+	if !strings.Contains(errorMsg, "service may still be provisioning") {
+		t.Errorf("Expected error message to mention service may still be provisioning, got: %v", errorMsg)
+	}
+}
