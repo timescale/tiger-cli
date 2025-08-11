@@ -49,7 +49,7 @@ analytics: true
 - `--config-dir`: Path to configuration directory
 - `--api-key`: Specify TigerData API key
 - `--project-id`: Specify project ID
-- `--service-id`: Specify service ID
+- `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
 - `--analytics`: Toggle analytics collection
 - `-v, --version`: Show CLI version
 - `-h, --help`: Show help information
@@ -764,3 +764,16 @@ tiger service update-password svc-12345 --password new-secure-password
 # Show current configuration
 tiger config show
 ```
+
+### Service ID Parameter Patterns
+
+Commands follow consistent patterns for specifying service IDs:
+
+**Single-service commands** (verbs acting on one service):
+- Use positional `<service-id>` as the canonical parameter
+- Support `--service-id` flag as an alias/override
+- Examples: `tiger service describe <service-id>`, `tiger db connect <service-id>`
+
+**Global context commands** (acting on other resources with service as secondary):
+- Use `--service-id` flag as the canonical parameter  
+- Examples: `tiger vpc attach-service <vpc-id> --service-id <service-id>`
