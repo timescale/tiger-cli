@@ -614,11 +614,9 @@ tiger config reset
 - `0`: Success
 - `1`: General error
 - `2`: Operation timeout (wait-timeout exceeded for service operations) or connection timeout (for db test-connection)
-- `3`: Authentication error
-- `4`: Resource not found
+- `3`: Invalid parameters
+- `4`: Authentication error
 - `5`: Permission denied
-- `6`: Service unavailable
-- `7`: Invalid configuration
 
 ## Output Formats
 
