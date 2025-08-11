@@ -14,5 +14,6 @@ spec updates needed:
  - change from "tiger services" to "tiger service" with aliases for "services" and "svc"
 
 small things:
- - implement flag not to save password to ~/.pgpass
+ - ✅ implement flag not to save password to ~/.pgpass (replaced with --password-storage flag)
  - make sure create makes the service the default service (with option to not do this)
+ - update create-service and update-password commands to respect global --password-storage flag (keyring|pgpass|none)

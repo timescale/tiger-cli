@@ -51,6 +51,7 @@ analytics: true
 - `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
 - `--analytics`: Toggle analytics collection
+- `--password-storage`: Password storage method (keyring, pgpass, none) (default: keyring)
 - `-v, --version`: Show CLI version
 - `-h, --help`: Show help information
 - `--debug`: Enable debug logging
@@ -269,8 +270,6 @@ tiger service set-default svc-12345
 - `--memory`: Memory allocation - must be from allowed configurations (see below)
 - `--replicas`: Number of high-availability replicas (default: 1)
 - `--vpc-id`: VPC ID for attach/detach operations
-- `--save-password`: Save password to ~/.pgpass file (default: true)
-- `--no-save-password`: Don't save password to ~/.pgpass file
 - `--set-default`: Set this service as the default service (default: true)
 - `--no-set-default`: Don't set this service as the default service
 - `--wait`: Wait for operation to complete (default: true for commands listed above)
@@ -279,7 +278,7 @@ tiger service set-default svc-12345
 - `--password`: New password (for update-password command)
 
 **Default Behavior:**
-- **Password Management**: By default, service creation will save the generated password to `~/.pgpass` for automatic authentication. Use `--no-save-password` to disable this behavior and manage passwords manually.
+- **Password Management**: Password storage is controlled by the global `--password-storage` flag (keyring by default). When `--password-storage=keyring`, passwords are stored in the system keyring. When `--password-storage=pgpass`, passwords are saved to `~/.pgpass` for automatic authentication. When `--password-storage=none`, passwords are not saved automatically and must be managed manually.
 - **Default Service**: By default, newly created services will be set as the default service in your configuration. Use `--no-set-default` to disable this behavior and keep your current default service unchanged.
 - **Wait for Completion**: By default, asynchronous service commands (see list above) will wait for the operation to complete before returning, displaying status updates every 10 seconds. Use `--no-wait` to return immediately after the request is accepted, or `--wait-timeout` to specify a custom timeout period. If the wait timeout is exceeded, the command will exit with code 2, but the operation will continue running on the server.
 
@@ -329,8 +328,8 @@ Database-specific operations and management.
 - `psql`: Connect to a database (alias for connect)
 - `connection-string`: Get connection string for a service
 - `test-connection`: Test database connectivity
-- `save-password`: Save password to ~/.pgpass file
-- `remove-password`: Remove password from ~/.pgpass file
+- `save-password`: Save password according to --password-storage setting
+- `remove-password`: Remove password from configured storage location
 
 **Examples:**
 ```bash
@@ -365,11 +364,15 @@ tiger db test-connection svc-12345
 # Test with custom timeout
 tiger db test-connection svc-12345 --timeout 10s
 
-# Save password to .pgpass
+# Save password (storage location depends on --password-storage flag)
 tiger db save-password svc-12345 --password your-password
 tiger db save-password svc-12345 --password your-password --role readonly
 
-# Remove password from .pgpass
+# Save to specific storage location
+tiger db save-password svc-12345 --password your-password --password-storage pgpass
+tiger db save-password svc-12345 --password your-password --password-storage keyring
+
+# Remove password from configured storage
 tiger db remove-password svc-12345
 tiger db remove-password svc-12345 --role readonly
 ```
@@ -383,7 +386,7 @@ The `test-connection` command follows `pg_isready` conventions:
 
 **Authentication:**
 The `connect` and `psql` commands automatically handle authentication using:
-1. `~/.pgpass` file (if password was saved during service creation)
+1. Stored password from configured storage method (keyring, ~/.pgpass file, or none based on --password-storage setting)
 2. `PGPASSWORD` environment variable
 3. Interactive password prompt (if neither above is available)
 
