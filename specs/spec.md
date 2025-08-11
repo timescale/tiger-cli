@@ -193,7 +193,7 @@ tiger svc describe svc-12345
 tiger service create \
   --name "production-db" \
   --type timescaledb \
-  --region google-us-central1 \
+  --region us-east-1 \
   --cpu 2000m \
   --memory 8GB \
   --replicas 2
@@ -202,7 +202,7 @@ tiger service create \
 tiger service create \
   --name "postgres-db" \
   --type postgres \
-  --region google-europe-west1 \
+  --region us-east-1 \
   --cpu 1 \
   --memory 4GB \
   --replicas 1
@@ -211,7 +211,7 @@ tiger service create \
 tiger service create \
   --name "quick-service" \
   --type timescaledb \
-  --region google-us-central1 \
+  --region us-east-1 \
   --cpu 1000m \
   --memory 2GB \
   --replicas 1 \
@@ -221,7 +221,7 @@ tiger service create \
 tiger service create \
   --name "patient-service" \
   --type postgres \
-  --region google-europe-west1 \
+  --region us-east-1 \
   --cpu 2000m \
   --memory 8GB \
   --replicas 2 \
@@ -428,7 +428,7 @@ tiger ha set svc-12345 --level highest-dataintegrity
 
 ### Read Replica Sets Management
 
-#### `tiger read-replicas`
+#### `tiger read-replica`
 Manage read replica sets for scaling read workloads.
 
 **Subcommands:**
@@ -446,32 +446,32 @@ Manage read replica sets for scaling read workloads.
 **Examples:**
 ```bash
 # List read replica sets
-tiger read-replicas list svc-12345
+tiger read-replica list svc-12345
 
 # Create read replica set
-tiger read-replicas create svc-12345 \
+tiger read-replica create svc-12345 \
   --name "reporting-replica" \
   --nodes 2 \
   --cpu 500m \
   --memory 2GB
 
 # Create read replica set in specific VPC
-tiger read-replicas create svc-12345 \
+tiger read-replica create svc-12345 \
   --name "vpc-replica" \
   --nodes 1 \
-  --cpu 250m \
-  --memory 1GB \
+  --cpu 500m \
+  --memory 2GB \
   --vpc-id vpc-67890
 
 # Resize replica set
-tiger read-replicas resize replica-67890 --nodes 3 --cpu 1000m
+tiger read-replica resize replica-67890 --nodes 3 --cpu 1000m
 
 # Enable connection pooler
-tiger read-replicas enable-pooler replica-67890
+tiger read-replica enable-pooler replica-67890
 
 # Attach/detach VPC
-tiger read-replicas attach-vpc replica-67890 --vpc-id vpc-12345
-tiger read-replicas detach-vpc replica-67890 --vpc-id vpc-12345
+tiger read-replica attach-vpc replica-67890 --vpc-id vpc-12345
+tiger read-replica detach-vpc replica-67890 --vpc-id vpc-12345
 ```
 
 **Options:**
@@ -483,7 +483,7 @@ tiger read-replicas detach-vpc replica-67890 --vpc-id vpc-12345
 
 ### VPC Management
 
-#### `tiger vpcs`
+#### `tiger vpc`
 Manage Virtual Private Clouds.
 
 **Subcommands:**
@@ -500,26 +500,26 @@ Manage Virtual Private Clouds.
 **Examples:**
 ```bash
 # List VPCs
-tiger vpcs list
+tiger vpc list
 
 # Create VPC
-tiger vpcs create \
+tiger vpc create \
   --name "production-vpc" \
   --cidr "10.0.0.0/16" \
-  --region google-us-central1
+  --region us-east-1
 
 # Show VPC details
-tiger vpcs describe vpc-12345
+tiger vpc describe vpc-12345
 
 # Attach/detach services
-tiger vpcs attach-service vpc-12345 --service-id svc-67890
-tiger vpcs detach-service vpc-12345 --service-id svc-67890
+tiger vpc attach-service vpc-12345 --service-id svc-67890
+tiger vpc detach-service vpc-12345 --service-id svc-67890
 
 # List services in VPC
-tiger vpcs list-services vpc-12345
+tiger vpc list-services vpc-12345
 
 # Manage VPC peering (see VPC Peering Management section for details)
-tiger vpcs peering list vpc-12345
+tiger vpc peering list vpc-12345
 ```
 
 **Options:**
@@ -530,7 +530,7 @@ tiger vpcs peering list vpc-12345
 
 ### VPC Peering Management
 
-#### `tiger vpcs peering`
+#### `tiger vpc peering`
 Manage VPC peering connections for a specific VPC.
 
 **Subcommands:**
@@ -542,19 +542,19 @@ Manage VPC peering connections for a specific VPC.
 **Examples:**
 ```bash
 # List all peering connections for a VPC
-tiger vpcs peering list vpc-12345
+tiger vpc peering list vpc-12345
 
 # Show details of a specific peering connection
-tiger vpcs peering describe vpc-12345 peer-67890
+tiger vpc peering describe vpc-12345 peer-67890
 
 # Create a new peering connection
-tiger vpcs peering create vpc-12345 \
+tiger vpc peering create vpc-12345 \
   --peer-account-id acc-54321 \
   --peer-vpc-id vpc-abcdef \
-  --peer-region aws-us-east-1
+  --peer-region us-east-1
 
 # Delete a peering connection
-tiger vpcs peering delete vpc-12345 peer-67890
+tiger vpc peering delete vpc-12345 peer-67890
 ```
 
 **Options:**
@@ -722,31 +722,23 @@ Use 'tiger service list' to see available services.
 # Authenticate
 tiger auth login
 
-# Set default project
-tiger projects set-default proj-12345
-
 # List available resources
 tiger service list
-tiger vpcs list
 ```
 
 ### Creating a Production Environment
 ```bash
 # Create VPC
-tiger vpcs create --name "prod-vpc" --cidr "10.0.0.0/16" --region google-us-central1
+tiger vpc create --name "prod-vpc" --cidr "10.0.0.0/16" --region us-east-1
 
 # Create production service
 tiger service create \
   --name "production-db" \
-  --tier "production" \
-  --vpc-id vpc-12345 \
-  --region google-us-central1 \
-  --postgres-version 15
-
-# Create read replica
-tiger replicas create svc-67890 \
-  --name "read-replica-east" \
-  --region google-us-east1
+  --type timescaledb \
+  --region us-east-1 \
+  --cpu 2 \
+  --memory 8GB \
+  --replicas 2
 ```
 
 ### Database Operations
@@ -754,10 +746,11 @@ tiger replicas create svc-67890 \
 # Connect to database
 tiger db connect svc-12345
 
-# Create and apply migration
-tiger migrations new --name "add_index_on_users"
-# Edit the migration file
-tiger migrations up svc-12345
+# Test database connectivity
+tiger db test-connection svc-12345
+
+# Get connection string
+tiger db connection-string svc-12345
 ```
 
 ### Monitoring and Maintenance
@@ -765,10 +758,9 @@ tiger migrations up svc-12345
 # Check service status
 tiger service describe svc-12345
 
-# Inspect performance
-tiger inspect slow-queries svc-12345
-tiger inspect bloat svc-12345
+# Update service password
+tiger service update-password svc-12345 --password new-secure-password
 
-# View recent operations
-tiger operations list --limit 10
+# Show current configuration
+tiger config show
 ```
