@@ -2,7 +2,7 @@ module github.com/tigerdata/tiger-cli
 
 go 1.23.0
 
-toolchain go1.23.1
+toolchain go1.24.6
 
 require (
 	github.com/jackc/pgx/v5 v5.7.5

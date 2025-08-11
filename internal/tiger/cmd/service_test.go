@@ -1850,3 +1850,46 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 		t.Errorf("Expected error message to mention service may still be provisioning, got: %v", errorMsg)
 	}
 }
+
+func TestServiceCommandAliases(t *testing.T) {
+	// Build a fresh root command to test aliases
+	rootCmd := buildRootCmd()
+
+	// Test that 'service' command exists
+	serviceCmd, _, err := rootCmd.Find([]string{"service"})
+	if err != nil {
+		t.Fatalf("Failed to find 'service' command: %v", err)
+	}
+	if serviceCmd.Use != "service" {
+		t.Errorf("Expected service command Use to be 'service', got: %s", serviceCmd.Use)
+	}
+
+	// Test that 'services' alias works
+	servicesCmd, _, err := rootCmd.Find([]string{"services"})
+	if err != nil {
+		t.Fatalf("Failed to find 'services' alias: %v", err)
+	}
+	if servicesCmd != serviceCmd {
+		t.Errorf("Expected 'services' alias to resolve to same command as 'service'")
+	}
+
+	// Test that 'svc' alias works
+	svcCmd, _, err := rootCmd.Find([]string{"svc"})
+	if err != nil {
+		t.Fatalf("Failed to find 'svc' alias: %v", err)
+	}
+	if svcCmd != serviceCmd {
+		t.Errorf("Expected 'svc' alias to resolve to same command as 'service'")
+	}
+
+	// Verify aliases are properly set in the command definition
+	expectedAliases := []string{"services", "svc"}
+	if len(serviceCmd.Aliases) != len(expectedAliases) {
+		t.Errorf("Expected %d aliases, got %d", len(expectedAliases), len(serviceCmd.Aliases))
+	}
+	for i, expected := range expectedAliases {
+		if i >= len(serviceCmd.Aliases) || serviceCmd.Aliases[i] != expected {
+			t.Errorf("Expected alias %d to be '%s', got '%s'", i, expected, serviceCmd.Aliases[i])
+		}
+	}
+}

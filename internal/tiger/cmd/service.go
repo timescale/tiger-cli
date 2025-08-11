@@ -28,9 +28,10 @@ var (
 // buildServiceCmd creates the main service command with all subcommands
 func buildServiceCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "service",
-		Short: "Manage database services",
-		Long:  `Manage database services within TigerData Cloud Platform.`,
+		Use:     "service",
+		Aliases: []string{"services", "svc"},
+		Short:   "Manage database services",
+		Long:    `Manage database services within TigerData Cloud Platform.`,
 	}
 
 	// Add all subcommands
