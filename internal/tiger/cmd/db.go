@@ -364,7 +364,6 @@ func launchPsqlWithConnectionString(connectionString, psqlPath string, additiona
 	return psqlCmd.Run()
 }
 
-
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
 func testDatabaseConnection(connectionString string, timeout time.Duration, cmd *cobra.Command) error {
 	// Create context with timeout if specified

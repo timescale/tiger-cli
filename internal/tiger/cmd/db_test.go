@@ -606,7 +606,6 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	}
 }
 
-
 func TestIsConnectionRejected(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -928,4 +927,3 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 		})
 	}
 }
-

@@ -12,8 +12,8 @@ spec updates needed:
  - ✅ update global exit code mapping per new spec (authentication moved to code 3, etc.)
  - ✅ ensure wait-timeout operations display status updates every 10 seconds while waiting
  - ✅ change from "tiger services" to "tiger service" with aliases for "services" and "svc"
- - add --password-storage flag to all commands that save passwords (keyring|pgpass|none)
- - update create-service and update-password commands to respect global --password-storage flag (keyring|pgpass|none)
+ - ✅ add --password-storage flag to all commands that save passwords (keyring|pgpass|none)
+ - ✅ update create-service and update-password commands to respect global --password-storage flag (keyring|pgpass|none)
  - update exit codes for authentication and permission errors
 
 small things:

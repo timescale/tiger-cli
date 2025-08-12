@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -415,7 +412,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 // buildServiceUpdatePasswordCmd creates a new update-password command
 func buildServiceUpdatePasswordCmd() *cobra.Command {
 	var updatePasswordValue string
-	var updatePasswordSaveToFile bool
 
 	cmd := &cobra.Command{
 		Use:   "update-password [service-id]",
@@ -440,8 +436,8 @@ Examples:
   # Update password and save to .pgpass (default behavior)
   tiger service update-password svc-12345 --password new-secure-password
 
-  # Update password without saving to .pgpass
-  tiger service update-password svc-12345 --password new-secure-password --no-save-password`,
+  # Update password without saving (using global flag)
+  tiger service update-password svc-12345 --password new-secure-password --password-storage none`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -507,14 +503,14 @@ Examples:
 			case 204:
 				fmt.Fprintf(cmd.OutOrStdout(), "✅ Master password for 'tsdbadmin' user updated successfully\n")
 
-				// Handle .pgpass file update - save by default unless --no-save-password was specified
-				if !updatePasswordSaveToFile {
-					err := updatePgPassFile(projectID, serviceID, password, client, ctx)
-					if err != nil {
-						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to update ~/.pgpass: %v\n", err)
-						fmt.Fprintf(cmd.OutOrStdout(), "💡 You may need to manually update your ~/.pgpass file with the new password\n")
-					} else {
-						fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password updated in ~/.pgpass for automatic authentication\n")
+				// Handle password storage using the configured method
+				// Get the service details for password storage
+				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+					if err := SavePasswordWithMessages(*serviceResp.JSON200, password, cmd.OutOrStdout()); err != nil {
+						// Password saving failed, but password update succeeded
+						// The error message was already displayed by SavePasswordWithMessages
+						// We don't want to fail the entire password update for this
 					}
 				}
 
@@ -534,7 +530,6 @@ Examples:
 
 	// Add flags
 	cmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
-	cmd.Flags().BoolVar(&updatePasswordSaveToFile, "no-save-password", false, "Don't save the new password to ~/.pgpass file")
 
 	// Bind flags to viper
 	viper.BindPFlag("password", cmd.Flags().Lookup("password"))
@@ -689,27 +684,6 @@ func sanitizeServicesForOutput(services []api.Service) []map[string]interface{} 
 	return sanitized
 }
 
-// updatePgPassFile updates the ~/.pgpass file with the new password for a service
-func updatePgPassFile(projectID, serviceID, newPassword string, client *api.ClientWithResponses, ctx context.Context) error {
-	// Get the service details to find the endpoint
-	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-	if err != nil {
-		return fmt.Errorf("failed to get service details: %w", err)
-	}
-
-	if resp.StatusCode() != 200 || resp.JSON200 == nil {
-		return fmt.Errorf("failed to get service details: status %d", resp.StatusCode())
-	}
-
-	service := *resp.JSON200
-	if service.Endpoint == nil || service.Endpoint.Host == nil {
-		return fmt.Errorf("service endpoint not available")
-	}
-
-	// Update the .pgpass entry with the new password (force override existing)
-	return savePgPassEntry(service, newPassword, true)
-}
-
 // derefString safely dereferences a string pointer, returning empty string if nil
 func derefString(s *string) string {
 	if s == nil {
@@ -782,147 +756,13 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	}
 }
 
-// handlePasswordSaving handles saving password to ~/.pgpass and displaying appropriate messages
+// handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
-	if initialPassword != "" && service.Endpoint != nil {
-		err := savePgPassEntry(service, initialPassword, false)
-		if err != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Failed to save password to ~/.pgpass: %v\n", err)
-			fmt.Fprintf(cmd.OutOrStdout(), "🔐 Initial password: %s\n", initialPassword)
-			fmt.Fprintf(cmd.OutOrStdout(), "💡 Save this password - it won't be shown again!\n")
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "🔐 Password saved to ~/.pgpass for automatic authentication\n")
-		}
+	if err := SavePasswordWithMessages(service, initialPassword, cmd.OutOrStdout()); err != nil {
+		// Password saving failed, but service creation succeeded
+		// The error message was already displayed by SavePasswordWithMessages
+		// We don't want to fail the entire service creation for this
 	}
-}
-
-// savePgPassEntry saves the service credentials to ~/.pgpass file
-func savePgPassEntry(service api.Service, password string, forceOverride bool) error {
-	if service.Endpoint == nil || service.Endpoint.Host == nil {
-		return fmt.Errorf("service endpoint not available")
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
-	}
-
-	pgpassPath := filepath.Join(homeDir, ".pgpass")
-
-	// Create entry: hostname:port:database:username:password
-	host := *service.Endpoint.Host
-	port := "5432" // default PostgreSQL port
-	if service.Endpoint.Port != nil {
-		port = fmt.Sprintf("%d", *service.Endpoint.Port)
-	}
-	database := "tsdb"      // TimescaleDB database name
-	username := "tsdbadmin" // default admin user
-
-	entry := fmt.Sprintf("%s:%s:%s:%s:%s\n", host, port, database, username, password)
-
-	// Check if entry already exists and handle accordingly
-	if exists, err := pgpassEntryExists(pgpassPath, host, port, username); err == nil && exists {
-		if !forceOverride {
-			// Entry already exists and we're not forcing override, don't add duplicate
-			return nil
-		}
-		// Remove existing entry before adding new one
-		if err := removePgPassEntry(pgpassPath, host, port, username); err != nil {
-			return fmt.Errorf("failed to remove existing .pgpass entry: %w", err)
-		}
-	}
-
-	// Append to .pgpass file with restricted permissions
-	file, err := os.OpenFile(pgpassPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open .pgpass file: %w", err)
-	}
-	defer file.Close()
-
-	if _, err := file.WriteString(entry); err != nil {
-		return fmt.Errorf("failed to write to .pgpass file: %w", err)
-	}
-
-	return nil
-}
-
-// pgpassEntryExists checks if a .pgpass entry already exists for the given host/port/username
-func pgpassEntryExists(pgpassPath, host, port, username string) (bool, error) {
-	file, err := os.Open(pgpassPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	targetPrefix := fmt.Sprintf("%s:%s:", host, port)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, targetPrefix) && strings.Contains(line, username) {
-			return true, nil
-		}
-	}
-
-	return false, scanner.Err()
-}
-
-// removePgPassEntry removes an existing entry from the .pgpass file
-func removePgPassEntry(pgpassPath, host, port, username string) error {
-	// Read all lines from the file
-	file, err := os.Open(pgpassPath)
-	if err != nil {
-		return fmt.Errorf("failed to open .pgpass file: %w", err)
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	targetPrefix := fmt.Sprintf("%s:%s:", host, port)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Keep lines that don't match our target entry
-		if !(strings.HasPrefix(line, targetPrefix) && strings.Contains(line, username)) {
-			lines = append(lines, line)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading .pgpass file: %w", err)
-	}
-
-	// Write back all lines except the one we want to remove
-	tmpFile, err := os.CreateTemp(filepath.Dir(pgpassPath), ".pgpass.tmp")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	for _, line := range lines {
-		if _, err := tmpFile.WriteString(line + "\n"); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("failed to write to temporary file: %w", err)
-		}
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temporary file: %w", err)
-	}
-
-	// Set proper permissions and replace the original file
-	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
-		return fmt.Errorf("failed to set permissions on temporary file: %w", err)
-	}
-
-	if err := os.Rename(tmpFile.Name(), pgpassPath); err != nil {
-		return fmt.Errorf("failed to replace .pgpass file: %w", err)
-	}
-
-	return nil
 }
 
 // CPUMemoryConfig represents an allowed CPU/Memory configuration

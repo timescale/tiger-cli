@@ -21,6 +21,7 @@ func buildRootCmd() *cobra.Command {
 	var projectID string
 	var serviceID string
 	var analytics bool
+	var passwordStorage string
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -78,6 +79,7 @@ VPCs, replicas, and related infrastructure components.`,
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
+	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", "keyring", "password storage method (keyring, pgpass, none)")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
@@ -86,6 +88,7 @@ VPCs, replicas, and related infrastructure components.`,
 	viper.BindPFlag("project_id", cmd.PersistentFlags().Lookup("project-id"))
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
+	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())
