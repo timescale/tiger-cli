@@ -23,9 +23,10 @@ mv tiger /usr/local/bin/
 
 ### Environment Variables
 
-- `TIGER_API_KEY`: TigerData API key for authentication
-- `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
+- `TIGER_PUBLIC_KEY`: TigerData public key for authentication
+- `TIGER_SECRET_KEY`: TigerData secret key for authentication
 - `TIGER_PROJECT_ID`: Default project ID to use
+- `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
 - `TIGER_SERVICE_ID`: Default service ID to use
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
 - `TIGER_OUTPUT`: Default output format (json, yaml, table)
@@ -47,7 +48,8 @@ analytics: true
 
 - `-o, --output`: Set output format (json, yaml, table)
 - `--config-dir`: Path to configuration directory
-- `--api-key`: Specify TigerData API key
+- `--public-key`: Specify TigerData public key for authentication
+- `--secret-key`: Specify TigerData secret key for authentication
 - `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
 - `--analytics`: Toggle analytics collection
@@ -110,10 +112,19 @@ Manage authentication and credentials (token-based only).
 
 **Examples:**
 ```bash
-# Login with API key
-tiger auth login --api-key YOUR_API_KEY
+# Login with all credentials via flags
+tiger auth login --public-key YOUR_PUBLIC_KEY --secret-key YOUR_SECRET_KEY --project-id proj-123
 
-# Login with token from environment
+# Login with project ID flag (will prompt for keys if not in environment)
+tiger auth login --project-id proj-123
+
+# Login with credentials from environment variables
+export TIGER_PUBLIC_KEY="your-public-key"
+export TIGER_SECRET_KEY="your-secret-key"  
+export TIGER_PROJECT_ID="proj-123"
+tiger auth login
+
+# Interactive login (will prompt for any missing credentials)
 tiger auth login
 
 # Show current user
@@ -124,23 +135,35 @@ tiger auth logout
 ```
 
 **Authentication Methods:**
-1. `--api-key` flag: Provide API key directly
-2. `TIGER_API_KEY` environment variable
-3. Interactive prompt for API key
+1. `--public-key` and `--secret-key` flags: Provide public and secret keys directly
+2. `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` environment variables
+3. `TIGER_PROJECT_ID` environment variable for project ID
+4. Interactive prompt for any missing credentials (requires TTY)
 
 **Login Process:**
 When using `tiger auth login`, the CLI will:
-1. Store the API key securely using system keyring or file fallback
-2. Retrieve the project ID associated with the token from the API
-3. Store the project ID in `~/.config/tiger/config.yaml` as the default project
+1. Prompt for any missing credentials (public key, secret key, project ID) if not provided via flags or environment variables
+2. Combine the public and secret keys into format `<public key>:<secret key>` for internal storage
+3. Validate the combined API key by making a test API call
+4. Store the combined API key securely using system keyring or file fallback
+5. Store the project ID in `~/.config/tiger/config.yaml` as the default project
+
+**Project ID Requirement:**
+Project ID is required during login. The CLI will:
+- Use `--project-id` flag if provided
+- Use `TIGER_PROJECT_ID` environment variable if flag not provided  
+- Prompt interactively for project ID if neither flag nor environment variable is set
+- Fail with an error in non-interactive environments (no TTY) if project ID is missing
 
 **API Key Storage:**
-The API key is stored securely using:
+The combined API key (`<public key>:<secret key>`) is stored securely using:
 1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)  
 2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/api-key` with restricted file permissions (600)
 
 **Options:**
-- `--api-key`: API key for authentication
+- `--public-key`: Public key for authentication
+- `--secret-key`: Secret key for authentication
+- `--project-id`: Project ID to set as default in configuration
 
 ### Service Management
 

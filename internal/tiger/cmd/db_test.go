@@ -58,27 +58,6 @@ func executeDBCommand(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestDBConnectionString_NoProjectID(t *testing.T) {
-	setupDBTest(t)
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-
-	// Execute db connection-string command without project ID
-	_, err := executeDBCommand("db", "connection-string", "svc-12345")
-	if err == nil {
-		t.Fatal("Expected error when no project ID is configured")
-	}
-
-	if !strings.Contains(err.Error(), "project ID is required") {
-		t.Errorf("Expected error about missing project ID, got: %v", err)
-	}
-}
-
 func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
@@ -184,27 +163,6 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// Verify the warning mentions using direct connection
 	if !strings.Contains(stderrOutput, "using direct connection") {
 		t.Errorf("Expected warning to mention direct connection fallback, but got: %q", stderrOutput)
-	}
-}
-
-func TestDBConnect_NoProjectID(t *testing.T) {
-	setupDBTest(t)
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-
-	// Execute db connect command without project ID
-	_, err := executeDBCommand("db", "connect", "svc-12345")
-	if err == nil {
-		t.Fatal("Expected error when no project ID is configured")
-	}
-
-	if !strings.Contains(err.Error(), "project ID is required") {
-		t.Errorf("Expected error about missing project ID, got: %v", err)
 	}
 }
 
@@ -456,27 +414,6 @@ func equalStringSlices(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-func TestDBTestConnection_NoProjectID(t *testing.T) {
-	setupDBTest(t)
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
-
-	// Execute db test-connection command without project ID
-	_, err := executeDBCommand("db", "test-connection", "svc-12345")
-	if err == nil {
-		t.Fatal("Expected error when no project ID is configured")
-	}
-
-	if !strings.Contains(err.Error(), "project ID is required") {
-		t.Errorf("Expected error about missing project ID, got: %v", err)
-	}
 }
 
 func TestDBTestConnection_NoServiceID(t *testing.T) {

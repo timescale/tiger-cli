@@ -37,10 +37,10 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	keyring.Delete(serviceName, username)
 	defer keyring.Delete(serviceName, username)
 
-	// Execute login command with API key flag - should fail validation
-	output, err := executeAuthCommand("auth", "login", "--api-key", "invalid-api-key")
+	// Execute login command with public and secret key flags - should fail validation
+	output, err := executeAuthCommand("auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret", "--project-id", "test-project-invalid")
 	if err == nil {
-		t.Fatal("Expected login to fail with invalid API key, but it succeeded")
+		t.Fatal("Expected login to fail with invalid keys, but it succeeded")
 	}
 
 	expectedErrorMsg := "API key validation failed: invalid API key: authentication failed"
@@ -93,13 +93,13 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	keyring.Delete(serviceName, username)
 	defer keyring.Delete(serviceName, username)
 
-	// Execute login command with API key flag - should succeed
-	output, err := executeAuthCommand("auth", "login", "--api-key", "valid-api-key")
+	// Execute login command with public and secret key flags - should succeed
+	output, err := executeAuthCommand("auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret", "--project-id", "test-project-valid")
 	if err != nil {
-		t.Fatalf("Expected login to succeed with valid API key, got error: %v", err)
+		t.Fatalf("Expected login to succeed with valid keys, got error: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-valid\n"
 	if output != expectedOutput {
 		t.Errorf("Expected output %q, got %q", expectedOutput, output)
 	}
@@ -113,12 +113,14 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("API key not stored in keyring or file: %v", err)
 		}
-		if string(data) != "valid-api-key" {
-			t.Errorf("Expected API key 'valid-api-key', got '%s'", string(data))
+		expectedAPIKey := "valid-public:valid-secret"
+		if string(data) != expectedAPIKey {
+			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, string(data))
 		}
 	} else {
-		if apiKey != "valid-api-key" {
-			t.Errorf("Expected API key 'valid-api-key', got '%s'", apiKey)
+		expectedAPIKey := "valid-public:valid-secret"
+		if apiKey != expectedAPIKey {
+			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 		}
 	}
 }

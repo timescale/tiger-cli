@@ -429,3 +429,4 @@ The project specifications are located in the `specs/` directory:
 - `spec.md` - Basic project specification and CLI requirements
 - `spec_mcp.md` - MCP (Model Context Protocol) specification for integration
 ```
+- Never acceept a state where tests are failing

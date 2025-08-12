@@ -28,36 +28,73 @@ var (
 )
 
 func buildLoginCmd() *cobra.Command {
-	var apiKeyFlag string
+	var publicKeyFlag string
+	var secretKeyFlag string
 	var projectIDFlag string
 
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authenticate with API token and optional project ID",
-		Long: `Authenticate with TigerData API using an API token and optionally set a default project ID.
-The API key will be stored securely in the system keyring or as a fallback file.
-The project ID will be stored in the configuration file.`,
+		Short: "Authenticate with public and secret keys and project ID",
+		Long: `Authenticate with TigerData API using public and secret keys and a project ID.
+The keys will be combined and stored securely in the system keyring or as a fallback file.
+The project ID will be stored in the configuration file.
+
+You can find your API credentials and project ID at: https://console.timescale.com/dashboard/settings
+
+Examples:
+  # Interactive login (will prompt for keys and project ID if not provided)
+  tiger login
+
+  # Login with project ID (will prompt for keys if not provided)
+  tiger login --project-id proj-123
+
+  # Login with all flags
+  tiger login --public-key your-public-key --secret-key your-secret-key --project-id proj-123
+
+  # Login using environment variables
+  export TIGER_PUBLIC_KEY="your-public-key"
+  export TIGER_SECRET_KEY="your-secret-key"
+  export TIGER_PROJECT_ID="proj-123"
+  tiger login`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			apiKey := apiKeyFlag
+			publicKey := publicKeyFlag
+			secretKey := secretKeyFlag
 			projectID := projectIDFlag
 
-			// If no API key provided via flag, check environment variable
-			if apiKey == "" {
-				apiKey = os.Getenv("TIGER_API_KEY")
+			// If no keys provided via flags, check environment variables
+			if publicKey == "" {
+				publicKey = os.Getenv("TIGER_PUBLIC_KEY")
+			}
+			if secretKey == "" {
+				secretKey = os.Getenv("TIGER_SECRET_KEY")
+			}
+			if projectID == "" {
+				projectID = os.Getenv("TIGER_PROJECT_ID")
 			}
 
-			// If still no API key, prompt for it interactively
-			if apiKey == "" {
+			// If any credentials are missing, prompt for them all at once
+			if publicKey == "" || secretKey == "" || projectID == "" {
+				// Set SilenceUsage before attempting interactive prompts
+				// This prevents showing usage help for TTY/environmental errors
+				cmd.SilenceUsage = true
+
 				var err error
-				apiKey, err = promptForAPIKey()
+				publicKey, secretKey, projectID, err = promptForCredentials(publicKey, secretKey, projectID)
 				if err != nil {
-					return fmt.Errorf("failed to get API key: %w", err)
+					return fmt.Errorf("failed to get credentials: %w", err)
 				}
 			}
 
-			if apiKey == "" {
-				return fmt.Errorf("API key is required")
+			if publicKey == "" || secretKey == "" {
+				return fmt.Errorf("both public key and secret key are required")
 			}
+
+			if projectID == "" {
+				return fmt.Errorf("project ID is required")
+			}
+
+			// Combine the keys in the format "public:secret" for storage
+			apiKey := fmt.Sprintf("%s:%s", publicKey, secretKey)
 
 			cmd.SilenceUsage = true
 
@@ -87,7 +124,8 @@ The project ID will be stored in the configuration file.`,
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&apiKeyFlag, "api-key", "", "API key for authentication")
+	cmd.Flags().StringVar(&publicKeyFlag, "public-key", "", "Public key for authentication")
+	cmd.Flags().StringVar(&secretKeyFlag, "secret-key", "", "Secret key for authentication")
 	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Default project ID to set in configuration")
 
 	return cmd
@@ -234,28 +272,52 @@ func removeAPIKeyFromFile() error {
 	return nil
 }
 
-// promptForAPIKey prompts the user to enter their API key securely
-func promptForAPIKey() (string, error) {
-	fmt.Print("Enter your API key: ")
+// promptForCredentials prompts the user to enter any missing credentials
+func promptForCredentials(publicKey, secretKey, projectID string) (string, string, string, error) {
+	// Check if we're in a terminal for interactive input
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		return "", "", "", fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
+	}
 
-	// Check if we're in a terminal for secure input
-	if term.IsTerminal(int(syscall.Stdin)) {
-		// Use terminal to hide input
+	fmt.Println("You can find your API credentials and project ID at: https://console.timescale.com/dashboard/settings")
+	fmt.Println()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	// Prompt for public key if missing
+	if publicKey == "" {
+		fmt.Print("Enter your public key: ")
+		var err error
+		publicKey, err = reader.ReadString('\n')
+		if err != nil {
+			return "", "", "", err
+		}
+		publicKey = strings.TrimSpace(publicKey)
+	}
+
+	// Prompt for secret key if missing
+	if secretKey == "" {
+		fmt.Print("Enter your secret key: ")
 		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		if err != nil {
-			return "", err
+			return "", "", "", err
 		}
 		fmt.Println() // Print newline after hidden input
-		return strings.TrimSpace(string(bytePassword)), nil
-	} else {
-		// Fallback to regular input if not in terminal
-		reader := bufio.NewReader(os.Stdin)
-		apiKey, err := reader.ReadString('\n')
-		if err != nil {
-			return "", err
-		}
-		return strings.TrimSpace(apiKey), nil
+		secretKey = strings.TrimSpace(string(bytePassword))
 	}
+
+	// Prompt for project ID if missing
+	if projectID == "" {
+		fmt.Print("Enter your project ID: ")
+		var err error
+		projectID, err = reader.ReadString('\n')
+		if err != nil {
+			return "", "", "", err
+		}
+		projectID = strings.TrimSpace(projectID)
+	}
+
+	return publicKey, secretKey, projectID, nil
 }
 
 // storeProjectID stores the project ID in the configuration file

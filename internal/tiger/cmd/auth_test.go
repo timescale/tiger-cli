@@ -77,18 +77,20 @@ func executeAuthCommand(args ...string) (string, error) {
 func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
-	// Execute login command with API key flag
-	output, err := executeAuthCommand("auth", "login", "--api-key", "test-api-key-123")
+	// Execute login command with public and secret key flags and project ID
+	output, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-123\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
 	// Verify API key was stored (try keyring first, then file fallback)
+	// The combined key should be in format "public:secret"
+	expectedAPIKey := "test-public-key:test-secret-key"
 	apiKey, err := keyring.Get(serviceName, username)
 	if err != nil {
 		// Keyring failed, check file fallback
@@ -97,12 +99,12 @@ func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 		if err != nil {
 			t.Fatalf("API key not stored in keyring or file: %v", err)
 		}
-		if string(data) != "test-api-key-123" {
-			t.Errorf("Expected API key 'test-api-key-123', got '%s'", string(data))
+		if string(data) != expectedAPIKey {
+			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, string(data))
 		}
 	} else {
-		if apiKey != "test-api-key-123" {
-			t.Errorf("Expected API key 'test-api-key-123', got '%s'", apiKey)
+		if apiKey != expectedAPIKey {
+			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 		}
 	}
 }
@@ -110,46 +112,50 @@ func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 func TestAuthLogin_WithEnvironmentVariable(t *testing.T) {
 	setupAuthTest(t)
 
-	// Set environment variable
-	os.Setenv("TIGER_API_KEY", "env-api-key-456")
-	defer os.Unsetenv("TIGER_API_KEY")
+	// Set environment variables for public and secret keys
+	os.Setenv("TIGER_PUBLIC_KEY", "env-public-key")
+	os.Setenv("TIGER_SECRET_KEY", "env-secret-key")
+	defer os.Unsetenv("TIGER_PUBLIC_KEY")
+	defer os.Unsetenv("TIGER_SECRET_KEY")
 
-	// Execute login command without API key flag
-	output, err := executeAuthCommand("auth", "login")
+	// Execute login command with project ID flag but using env vars for keys
+	output, err := executeAuthCommand("auth", "login", "--project-id", "test-project-456")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-456\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Verify API key was stored
+	// Verify API key was stored (should be combined format)
+	expectedAPIKey := "env-public-key:env-secret-key"
 	storedKey, err := getAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
-	if storedKey != "env-api-key-456" {
-		t.Errorf("Expected API key 'env-api-key-456', got '%s'", storedKey)
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
 }
 
 func TestAuthLogin_NoAPIKey(t *testing.T) {
 	setupAuthTest(t)
 
-	// Ensure no API key in environment
-	os.Unsetenv("TIGER_API_KEY")
+	// Ensure no keys in environment
+	os.Unsetenv("TIGER_PUBLIC_KEY")
+	os.Unsetenv("TIGER_SECRET_KEY")
 
-	// Execute login command without API key (this should fail in non-interactive mode)
+	// Execute login command without keys (this should fail in non-interactive mode)
 	_, err := executeAuthCommand("auth", "login")
 	if err == nil {
-		t.Fatal("Expected login to fail without API key")
+		t.Fatal("Expected login to fail without keys")
 	}
 
-	// Error should indicate API key is required (or failed to get API key in test environment)
-	if !strings.Contains(err.Error(), "API key") {
-		t.Errorf("Expected error to mention API key, got: %v", err)
+	// Error should indicate TTY not detected and credentials are required
+	if !strings.Contains(err.Error(), "TTY not detected - credentials required") {
+		t.Errorf("Expected error to mention TTY not detected, got: %v", err)
 	}
 }
 
@@ -160,13 +166,13 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	// We can't easily mock keyring failure, but we can test file storage directly
 	// by ensuring the API key gets stored to file when keyring might not be available
 
-	// Execute login command with API key flag
-	output, err := executeAuthCommand("auth", "login", "--api-key", "fallback-test-key")
+	// Execute login command with public and secret key flags and project ID
+	output, err := executeAuthCommand("auth", "login", "--public-key", "fallback-public", "--secret-key", "fallback-secret", "--project-id", "test-project-fallback")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-fallback\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -177,8 +183,9 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	// If keyring worked, manually create file scenario by removing keyring and adding file
 	keyring.Delete(serviceName, username) // Remove from keyring
 
-	// Store to file manually to simulate fallback
-	err = storeAPIKeyToFile("fallback-test-key")
+	// Store to file manually to simulate fallback (combined format)
+	expectedAPIKey := "fallback-public:fallback-secret"
+	err = storeAPIKeyToFile(expectedAPIKey)
 	if err != nil {
 		t.Fatalf("Failed to store API key to file: %v", err)
 	}
@@ -188,8 +195,8 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get API key from file fallback: %v", err)
 	}
-	if storedKey != "fallback-test-key" {
-		t.Errorf("Expected API key 'fallback-test-key', got '%s'", storedKey)
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
 
 	// Test whoami with file-only storage
@@ -223,17 +230,21 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	// Clear any keyring entries to force file-only storage
 	keyring.Delete(serviceName, username)
 
-	// Set environment variable
-	os.Setenv("TIGER_API_KEY", "env-file-only-789")
-	defer os.Unsetenv("TIGER_API_KEY")
+	// Set environment variables for public key, secret key, and project ID
+	os.Setenv("TIGER_PUBLIC_KEY", "env-file-public")
+	os.Setenv("TIGER_SECRET_KEY", "env-file-secret")
+	os.Setenv("TIGER_PROJECT_ID", "test-project-env-file")
+	defer os.Unsetenv("TIGER_PUBLIC_KEY")
+	defer os.Unsetenv("TIGER_SECRET_KEY")
+	defer os.Unsetenv("TIGER_PROJECT_ID")
 
-	// Execute login command without API key flag
+	// Execute login command without any flags (all from env vars)
 	output, err := executeAuthCommand("auth", "login")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-env-file\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -242,11 +253,12 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	keyring.Delete(serviceName, username)
 
 	// Verify API key was stored in file (since keyring is cleared)
+	expectedAPIKey := "env-file-public:env-file-secret"
 	apiKeyFile := filepath.Join(tmpDir, "api-key")
 	data, err := os.ReadFile(apiKeyFile)
 	if err != nil {
 		// If file doesn't exist, the keyring might have worked, so manually ensure file storage
-		err = storeAPIKeyToFile("env-file-only-789")
+		err = storeAPIKeyToFile(expectedAPIKey)
 		if err != nil {
 			t.Fatalf("Failed to store API key to file: %v", err)
 		}
@@ -256,8 +268,8 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		}
 	}
 
-	if string(data) != "env-file-only-789" {
-		t.Errorf("Expected API key 'env-file-only-789' in file, got '%s'", string(data))
+	if string(data) != expectedAPIKey {
+		t.Errorf("Expected API key '%s' in file, got '%s'", expectedAPIKey, string(data))
 	}
 
 	// Verify getAPIKey works with file-only storage
@@ -265,8 +277,8 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get API key from file: %v", err)
 	}
-	if storedKey != "env-file-only-789" {
-		t.Errorf("Expected API key 'env-file-only-789', got '%s'", storedKey)
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
 }
 
@@ -438,8 +450,8 @@ func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
 func TestAuthLogin_WithProjectID(t *testing.T) {
 	setupAuthTest(t)
 
-	// Execute login command with API key and project ID flags
-	output, err := executeAuthCommand("auth", "login", "--api-key", "test-api-key-123", "--project-id", "test-project-456")
+	// Execute login command with public key, secret key, and project ID flags
+	output, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-456")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -449,13 +461,14 @@ func TestAuthLogin_WithProjectID(t *testing.T) {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Verify API key was stored (try keyring first, then file fallback)
+	// Verify API key was stored (should be combined format)
+	expectedAPIKey := "test-public-key:test-secret-key"
 	apiKey, err := getAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
-	if apiKey != "test-api-key-123" {
-		t.Errorf("Expected API key 'test-api-key-123', got '%s'", apiKey)
+	if apiKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 	}
 
 	// Verify project ID was stored in config
@@ -471,32 +484,22 @@ func TestAuthLogin_WithProjectID(t *testing.T) {
 func TestAuthLogin_WithoutProjectID(t *testing.T) {
 	setupAuthTest(t)
 
-	// Execute login command with only API key flag (no project ID)
-	output, err := executeAuthCommand("auth", "login", "--api-key", "test-api-key-789")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+	// Execute login command with only public and secret key flags (no project ID)
+	// This should fail since project ID is now required
+	_, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
+	if err == nil {
+		t.Fatal("Expected login to fail without project ID, but it succeeded")
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
+	// Verify the error message mentions TTY not detected
+	expectedErrorMsg := "TTY not detected - credentials required"
+	if !strings.Contains(err.Error(), expectedErrorMsg) {
+		t.Errorf("Expected error to contain %q, got: %v", expectedErrorMsg, err)
 	}
 
-	// Verify API key was stored
-	apiKey, err := getAPIKey()
-	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
-	}
-	if apiKey != "test-api-key-789" {
-		t.Errorf("Expected API key 'test-api-key-789', got '%s'", apiKey)
-	}
-
-	// Verify project ID was not set in config (should be empty)
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	if cfg.ProjectID != "" {
-		t.Errorf("Expected empty project ID, got '%s'", cfg.ProjectID)
+	// Verify no API key was stored since login failed
+	_, err = getAPIKey()
+	if err == nil {
+		t.Error("API key should not be stored when login fails")
 	}
 }
