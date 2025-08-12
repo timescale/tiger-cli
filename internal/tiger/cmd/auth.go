@@ -20,6 +20,22 @@ const (
 	username    = "api-key"
 )
 
+// getServiceName returns the appropriate service name for keyring operations
+// Uses a test-specific service name when running in test mode to avoid polluting the real keyring
+func getServiceName() string {
+	// Check if we're running in a test - look for .test suffix in the binary name
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return "tiger-cli-test"
+	}
+	// Also check for test-specific arguments
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, "-test.") {
+			return "tiger-cli-test"
+		}
+	}
+	return serviceName
+}
+
 var (
 	// validateAPIKeyForLogin can be overridden for testing
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
@@ -192,7 +208,7 @@ func buildAuthCmd() *cobra.Command {
 // storeAPIKey stores the API key using keyring with file fallback
 func storeAPIKey(apiKey string) error {
 	// Try keyring first
-	err := keyring.Set(serviceName, username, apiKey)
+	err := keyring.Set(getServiceName(), username, apiKey)
 	if err == nil {
 		return nil
 	}
@@ -204,7 +220,7 @@ func storeAPIKey(apiKey string) error {
 // getAPIKey retrieves the API key from keyring or file fallback
 func getAPIKey() (string, error) {
 	// Try keyring first
-	apiKey, err := keyring.Get(serviceName, username)
+	apiKey, err := keyring.Get(getServiceName(), username)
 	if err == nil {
 		return apiKey, nil
 	}
@@ -216,7 +232,7 @@ func getAPIKey() (string, error) {
 // removeAPIKey removes the API key from keyring and file fallback
 func removeAPIKey() error {
 	// Try to remove from keyring (ignore errors as it might not exist)
-	keyring.Delete(serviceName, username)
+	keyring.Delete(getServiceName(), username)
 
 	// Remove from file fallback
 	return removeAPIKeyFromFile()
