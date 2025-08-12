@@ -77,6 +77,7 @@ For the initial v0 release, implement these essential commands first:
 - `tiger service list` - List all services
 - `tiger service describe` - Show service details
 - `tiger service create` - Create new services
+- `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
 
 **Database Operations:**
@@ -90,7 +91,6 @@ For the initial v0 release, implement these essential commands first:
 
 **Future v1+ Commands:**
 - Service lifecycle (start/stop/restart) - pending API endpoints
-- Service deletion with confirmation
 - HA management commands
 - Read replica management
 - VPC management and peering
@@ -251,6 +251,18 @@ tiger service create \
   --replicas 2 \
   --wait-timeout 60m
 
+# Delete service (with confirmation prompt - will prompt to type service ID)
+tiger service delete svc-12345
+
+# Delete service without confirmation prompt (for automation)
+tiger service delete svc-12345 --confirm
+
+# Delete service without waiting for completion  
+tiger service delete svc-12345 --confirm --no-wait
+
+# Delete service with custom wait timeout
+tiger service delete svc-12345 --confirm --wait-timeout 15m
+
 # Resize service
 tiger service resize svc-12345 --cpu 4 --memory 16GB
 
@@ -299,11 +311,13 @@ tiger service set-default svc-12345
 - `--no-wait`: Don't wait for operation to complete, return immediately
 - `--wait-timeout`: Timeout for waiting (accepts any duration format from Go's time.ParseDuration: "30m", "1h30m", "90s", etc.) (default: 30m)
 - `--password`: New password (for update-password command)
+- `--confirm`: Skip confirmation prompt for destructive operations (AI agents must confirm with user first)
 
 **Default Behavior:**
 - **Password Management**: Password storage is controlled by the global `--password-storage` flag (keyring by default). When `--password-storage=keyring`, passwords are stored in the system keyring. When `--password-storage=pgpass`, passwords are saved to `~/.pgpass` for automatic authentication. When `--password-storage=none`, passwords are not saved automatically and must be managed manually.
 - **Default Service**: By default, newly created services will be set as the default service in your configuration. Use `--no-set-default` to disable this behavior and keep your current default service unchanged.
 - **Wait for Completion**: By default, asynchronous service commands (see list above) will wait for the operation to complete before returning, displaying status updates every 10 seconds. Use `--no-wait` to return immediately after the request is accepted, or `--wait-timeout` to specify a custom timeout period. If the wait timeout is exceeded, the command will exit with code 2, but the operation will continue running on the server.
+- **Delete Safety**: The `delete` command requires an explicit service ID (no default fallback) and prompts users to type the exact service ID to confirm deletion. The `--confirm` flag skips this prompt for automation use cases. **Important for AI agents**: Always confirm with users before performing any delete operation, whether using interactive prompts or the `--confirm` flag.
 
 **Allowed CPU/Memory Configurations:**
 Service creation and resizing support the following CPU and memory combinations. You can specify both CPU and memory together, or specify only one (the other will be automatically set to the corresponding value):

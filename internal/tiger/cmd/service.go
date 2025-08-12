@@ -35,6 +35,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceDescribeCmd())
 	cmd.AddCommand(buildServiceListCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
+	cmd.AddCommand(buildServiceDeleteCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 
 	return cmd
@@ -838,6 +839,164 @@ func formatAllowedCombinations(configs []CPUMemoryConfig) string {
 		}
 	}
 	return strings.Join(combinations, ", ")
+}
+
+// buildServiceDeleteCmd creates the delete subcommand
+func buildServiceDeleteCmd() *cobra.Command {
+	var deleteNoWait bool
+	var deleteWaitTimeout time.Duration
+	var deleteConfirm bool
+
+	cmd := &cobra.Command{
+		Use:   "delete [service-id]",
+		Short: "Delete a database service",
+		Long: `Delete a database service permanently.
+
+This operation is irreversible. By default, you will be prompted to type the service ID
+to confirm deletion, unless you use the --confirm flag.
+
+Note for AI agents: Always confirm with the user before performing this destructive operation.
+
+Examples:
+  # Delete a service (with confirmation prompt)
+  tiger service delete svc-12345
+
+  # Delete service without confirmation prompt
+  tiger service delete svc-12345 --confirm
+
+  # Delete service without waiting for completion
+  tiger service delete svc-12345 --no-wait
+
+  # Delete service with custom wait timeout
+  tiger service delete svc-12345 --wait-timeout 15m`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Require explicit service ID for safety
+			if len(args) < 1 {
+				return fmt.Errorf("service ID is required")
+			}
+			serviceID := args[0]
+
+			cmd.SilenceUsage = true
+
+			// Get project ID from config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			if cfg.ProjectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Get API key
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return fmt.Errorf("authentication required: %w", err)
+			}
+
+			// Prompt for confirmation unless --confirm is used
+			if !deleteConfirm {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Type the service ID '%s' to confirm: ", serviceID)
+				var confirmation string
+				fmt.Scanln(&confirmation)
+				if confirmation != serviceID {
+					fmt.Fprintln(cmd.OutOrStdout(), "❌ Delete operation cancelled.")
+					return nil
+				}
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make the delete request
+			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
+				context.Background(),
+				api.ProjectId(cfg.ProjectID),
+				api.ServiceId(serviceID),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to delete service: %w", err)
+			}
+
+			// Handle response
+			switch resp.StatusCode() {
+			case 202:
+				fmt.Fprintf(cmd.OutOrStdout(), "🗑️  Delete request accepted for service '%s'.\n", serviceID)
+				
+				// If not waiting, return early
+				if deleteNoWait {
+					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service list' to check deletion status.")
+					return nil
+				}
+
+				// Wait for deletion to complete
+				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
+			case 404:
+				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID)
+			case 401, 403:
+				return fmt.Errorf("authentication failed: invalid API key")
+			default:
+				return fmt.Errorf("failed to delete service: API request failed with status %d", resp.StatusCode())
+			}
+		},
+	}
+
+	cmd.Flags().BoolVar(&deleteNoWait, "no-wait", false, "Don't wait for deletion to complete, return immediately")
+	cmd.Flags().DurationVar(&deleteWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&deleteConfirm, "confirm", false, "Skip confirmation prompt (AI agents must confirm with user first)")
+
+	return cmd
+}
+
+// waitForServiceDeletion waits for a service to be fully deleted
+func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service '%s' to be deleted", serviceID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
+			return exitWithCode(2, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+		case <-ticker.C:
+			// Check if service still exists
+			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
+				ctx,
+				api.ProjectId(projectID),
+				api.ServiceId(serviceID),
+			)
+			if err != nil {
+				fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
+				return fmt.Errorf("failed to check service status: %w", err)
+			}
+
+			if resp.StatusCode() == 404 {
+				// Service is deleted
+				fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Service '%s' has been successfully deleted.\n", serviceID)
+				return nil
+			}
+
+			if resp.StatusCode() == 200 {
+				// Service still exists, continue waiting
+				fmt.Fprint(cmd.OutOrStdout(), ".")
+				continue
+			}
+
+			// Other error
+			fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
+			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
+		}
+	}
 }
 
 // formatAllowedCPUValues returns a user-friendly string of allowed CPU values

@@ -1322,3 +1322,229 @@ func TestServiceCommandAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestServiceDelete_NoServiceID(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Execute service delete command without service ID
+	_, err, _ = executeServiceCommand("service", "delete")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided")
+	}
+
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestServiceDelete_NoAuth(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service delete command
+	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestServiceDelete_NoProjectID(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config without project ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service delete command
+	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
+	if err == nil {
+		t.Fatal("Expected error when no project ID is configured")
+	}
+
+	if !strings.Contains(err.Error(), "project ID is required") {
+		t.Errorf("Expected project ID error, got: %v", err)
+	}
+}
+
+func TestServiceDelete_WithConfirmFlag(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Non-existent server for testing
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service delete command with --confirm flag
+	// This should fail due to network error (which is expected in tests)
+	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
+	if err == nil {
+		t.Fatal("Expected error due to network failure, but got none")
+	}
+
+	// Should fail with network error, not confirmation error
+	if strings.Contains(err.Error(), "confirmation") {
+		t.Errorf("Should not prompt for confirmation with --confirm flag, got: %v", err)
+	}
+}
+
+func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
+	// This test verifies that without --confirm flag, the command would prompt for confirmation
+	// Since we can't easily test interactive input, we test that it tries to prompt
+
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service delete command without --confirm flag
+	// This should try to read from stdin for confirmation, which will fail in test environment
+	output, err, _ := executeServiceCommand("service", "delete", "svc-12345")
+	
+	// Should either fail due to stdin read error or show cancellation message
+	// The exact behavior depends on the test environment
+	if err == nil && !strings.Contains(output, "Delete operation cancelled") {
+		t.Error("Expected either error or cancellation message when no confirmation provided")
+	}
+}
+
+func TestServiceDelete_HelpOutput(t *testing.T) {
+	// Test that the help output contains expected information
+	output, err, _ := executeServiceCommand("service", "delete", "--help")
+	if err != nil {
+		t.Fatalf("Help command should not fail: %v", err)
+	}
+
+	expectedStrings := []string{
+		"Delete a database service permanently",
+		"irreversible",
+		"--confirm",
+		"--no-wait",
+		"--wait-timeout",
+		"tiger service delete svc-12345",
+	}
+
+	for _, expected := range expectedStrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected help output to contain '%s', but it didn't. Output: %s", expected, output)
+		}
+	}
+}
+
+func TestServiceDelete_FlagsValidation(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1", 
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Test various flag combinations
+	testCases := []struct {
+		name string
+		args []string
+	}{
+		{"with confirm flag", []string{"service", "delete", "svc-12345", "--confirm"}},
+		{"with no-wait flag", []string{"service", "delete", "svc-12345", "--confirm", "--no-wait"}},
+		{"with wait-timeout", []string{"service", "delete", "svc-12345", "--confirm", "--wait-timeout", "15m"}},
+		{"with all flags", []string{"service", "delete", "svc-12345", "--confirm", "--no-wait", "--wait-timeout", "10m"}},
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// All these should fail due to network (which is expected)
+			// but they should NOT fail due to flag parsing errors
+			_, err, _ := executeServiceCommand(tc.args...)
+			
+			// Should fail with network error, not flag parsing error
+			if err != nil && strings.Contains(err.Error(), "flag") {
+				t.Errorf("Should not have flag parsing error, got: %v", err)
+			}
+		})
+	}
+}
