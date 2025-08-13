@@ -423,6 +423,129 @@ When adding new commands to this architecture:
 
 This architecture ensures Tiger CLI remains maintainable and testable as it grows.
 
+## CLI Design Patterns and Conventions
+
+Tiger CLI follows established command-line interface patterns, particularly inspired by the GitHub CLI (`gh`) for consistency with modern CLI tools.
+
+### Boolean Flag Patterns
+
+When implementing boolean flags that can be enabled or disabled, follow the GitHub CLI pattern:
+
+1. **Default Positive Behavior** - The positive behavior is the default (no flag needed)
+2. **Explicit Negative Override** - Use `--no-<feature>` to disable the default behavior
+3. **Avoid Mutually Exclusive Pairs** - Don't create both `--enable-X` and `--disable-X` flags
+
+**Example:**
+```go
+// ✅ Good: GitHub CLI pattern
+var createNoSetDefault bool
+cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
+
+// Default behavior: set as default
+if !createNoSetDefault {
+    setAsDefault()
+}
+
+// ❌ Avoid: Mutually exclusive flags
+var setDefault bool
+var noSetDefault bool
+cmd.Flags().BoolVar(&setDefault, "set-default", true, "Set service as default")
+cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set as default")
+cmd.MarkFlagsMutuallyExclusive("set-default", "no-set-default")
+```
+
+**Real GitHub CLI Examples:**
+- `gh pr create` has `--no-maintainer-edit` to disable the default maintainer edit behavior
+- Default behavior is implicit, override is explicit with `--no-` prefix
+
+### Destructive Operation Patterns
+
+For destructive operations (delete, remove, etc.), follow these safety patterns:
+
+1. **Explicit Resource ID Required** - No default fallback for destructive operations
+2. **Interactive Confirmation** - Require typing the resource ID to confirm
+3. **Automation Override** - `--confirm` flag to skip prompts for scripts
+4. **AI Agent Warnings** - Include warnings in help text for AI agents
+
+**Example:**
+```go
+// Require explicit service ID (no default)
+if len(args) < 1 {
+    return fmt.Errorf("service ID is required")
+}
+
+// Interactive confirmation unless --confirm
+if !confirmFlag {
+    fmt.Fprintf(cmd.ErrOrStderr(), "Type the service ID '%s' to confirm: ", serviceID)
+    var confirmation string
+    fmt.Scanln(&confirmation)
+    if confirmation != serviceID {
+        return fmt.Errorf("confirmation did not match")
+    }
+}
+```
+
+### Wait/Timeout Patterns
+
+For asynchronous operations, provide consistent wait behavior:
+
+1. **Default Wait** - Wait for completion by default
+2. **No-Wait Override** - `--no-wait` to return immediately  
+3. **Timeout Control** - `--wait-timeout` with duration parsing
+4. **Exit Code 2** - Use exit code 2 for timeout scenarios
+
+**Example:**
+```go
+var noWait bool
+var waitTimeout time.Duration
+
+cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
+cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration")
+
+// Default: wait for completion
+if !noWait {
+    if err := waitForCompletion(waitTimeout); err != nil {
+        if isTimeout(err) {
+            return exitWithCode(2, err) // Exit code 2 for timeouts
+        }
+        return err
+    }
+}
+```
+
+### Help Text and Documentation
+
+1. **Explain Default Behavior** - Always document what happens by default
+2. **Show Override Options** - Explain how to change default behavior  
+3. **Include Examples** - Show common usage patterns
+4. **AI Agent Notes** - Add warnings for destructive operations
+
+**Example:**
+```go
+Long: `Create a new database service in the current project.
+
+By default, the newly created service will be set as your default service for future 
+commands. Use --no-set-default to prevent this behavior.
+
+Note for AI agents: Always confirm with the user before performing this destructive operation.
+
+Examples:
+  # Create service (sets as default by default)
+  tiger service create --name my-db
+  
+  # Create service without setting as default
+  tiger service create --name temp-db --no-set-default`,
+```
+
+### Flag Naming Conventions
+
+1. **Kebab Case** - Use `--kebab-case` for multi-word flags
+2. **Descriptive Names** - Prefer clarity over brevity
+3. **Consistent Prefixes** - Use `--no-` for negative overrides
+4. **Avoid Abbreviations** - Prefer `--no-wait` over `--nowait`
+
+These patterns ensure Tiger CLI maintains consistency with modern CLI tools while providing a predictable user experience.
+
 ## Specifications
 
 The project specifications are located in the `specs/` directory:

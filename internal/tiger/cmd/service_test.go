@@ -1548,3 +1548,26 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceCreate_NoSetDefaultFlag(t *testing.T) {
+	// Test that the --no-set-default flag is recognized and doesn't cause parsing errors
+	output, err, _ := executeServiceCommand("service", "create", "--help")
+	if err != nil {
+		t.Fatalf("Help command should not fail: %v", err)
+	}
+
+	// Verify the flag appears in help output
+	if !strings.Contains(output, "--no-set-default") {
+		t.Error("Expected --no-set-default flag to appear in help output")
+	}
+
+	// Verify the flag description
+	if !strings.Contains(output, "Don't set this service as the default service") {
+		t.Error("Expected --no-set-default flag description to appear in help output")
+	}
+
+	// Verify the help text mentions the default behavior
+	if !strings.Contains(output, "newly created service will be set as your default service") {
+		t.Error("Expected help text to mention default service behavior")
+	}
+}

@@ -220,11 +220,15 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createReplicaCount int
 	var createNoWait bool
 	var createWaitTimeout time.Duration
+	var createNoSetDefault bool
 
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new database service",
 		Long: `Create a new database service in the current project.
+
+By default, the newly created service will be set as your default service for future 
+commands. Use --no-set-default to prevent this behavior.
 
 Examples:
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
@@ -238,6 +242,9 @@ Examples:
 
   # Create service in a different region
   tiger service create --name eu-db --region google-europe-west1
+
+  # Create service without setting it as default
+  tiger service create --name temp-db --no-set-default
 
   # Create service specifying only CPU (memory will be auto-configured to 8GB)
   tiger service create --name auto-memory --type postgres --cpu 2000
@@ -375,6 +382,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				// This ensures users have access even if they interrupt the wait or it fails
 				handlePasswordSaving(service, initialPassword, cmd)
 
+				// Set as default service unless --no-set-default is specified
+				if !createNoSetDefault {
+					if err := setDefaultService(serviceID, cmd); err != nil {
+						// Log warning but don't fail the command
+						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to set service as default: %v\n", err)
+					}
+				}
+
 				// Handle wait behavior
 				if createNoWait {
 					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
@@ -406,6 +421,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 
 	return cmd
 }
@@ -764,6 +780,22 @@ func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobr
 		// The error message was already displayed by SavePasswordWithMessages
 		// We don't want to fail the entire service creation for this
 	}
+}
+
+// setDefaultService sets the given service as the default service in the configuration
+func setDefaultService(serviceID string, cmd *cobra.Command) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	cfg.ServiceID = serviceID
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "🎯 Set service '%s' as default service.\n", serviceID)
+	return nil
 }
 
 // CPUMemoryConfig represents an allowed CPU/Memory configuration
