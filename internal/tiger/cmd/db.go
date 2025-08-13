@@ -84,7 +84,7 @@ from your configuration. This command will launch an interactive psql session
 with the appropriate connection parameters.
 
 Authentication is handled automatically using:
-1. ~/.pgpass file (if password was saved during service creation)  
+1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
 2. PGPASSWORD environment variable
 3. Interactive password prompt (if neither above is available)
 
@@ -130,7 +130,7 @@ Examples:
 			}
 
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, cmd)
+			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, service, cmd)
 		},
 	}
 
@@ -351,7 +351,13 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, _ *cobra.Command) error {
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service)
+	return psqlCmd.Run()
+}
+
+// buildPsqlCommand creates the psql command with proper environment setup
+func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
@@ -361,7 +367,19 @@ func launchPsqlWithConnectionString(connectionString, psqlPath string, additiona
 	psqlCmd.Stdout = os.Stdout
 	psqlCmd.Stderr = os.Stderr
 
-	return psqlCmd.Run()
+	// Only set PGPASSWORD for keyring storage method
+	// pgpass storage relies on psql automatically reading ~/.pgpass file
+	storage := GetPasswordStorage()
+	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+		if password, err := storage.Get(service); err == nil && password != "" {
+			// Set PGPASSWORD environment variable for psql when using keyring
+			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+		}
+		// Note: If keyring password retrieval fails, we let psql try without it
+		// This allows fallback to other authentication methods
+	}
+
+	return psqlCmd
 }
 
 // testDatabaseConnection tests the database connection and returns appropriate exit codes

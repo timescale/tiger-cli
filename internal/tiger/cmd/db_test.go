@@ -285,8 +285,11 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 
+	// Create a dummy service for the test
+	service := api.Service{}
+	
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -312,8 +315,11 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
 
+	// Create a dummy service for the test
+	service := api.Service{}
+
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -324,6 +330,90 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	output := outBuf.String()
 	if output != "" {
 		t.Errorf("Expected no output, got: %q", output)
+	}
+}
+
+
+func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+	
+	// Create a test service
+	serviceID := "test-psql-service"
+	projectID := "test-psql-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Store a test password in keyring
+	testPassword := "test-password-12345"
+	storage := GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/usr/bin/psql"
+	additionalFlags := []string{"--quiet"}
+	
+	// Call the actual production function that builds the command
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service)
+	
+	if psqlCmd == nil {
+		t.Fatal("buildPsqlCommand returned nil")
+	}
+	
+	// Verify that PGPASSWORD is set in the environment with the correct value
+	found := false
+	expectedEnvVar := "PGPASSWORD=" + testPassword
+	for _, envVar := range psqlCmd.Env {
+		if envVar == expectedEnvVar {
+			found = true
+			break
+		}
+	}
+	
+	if !found {
+		t.Errorf("Expected PGPASSWORD=%s to be set in environment, but it wasn't. Env vars: %v", testPassword, psqlCmd.Env)
+	}
+}
+
+func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+	
+	// Create a test service
+	serviceID := "test-service-id"
+	projectID := "test-project-id"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/usr/bin/psql"
+	
+	// Call the actual production function that builds the command
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service)
+	
+	if psqlCmd == nil {
+		t.Fatal("buildPsqlCommand returned nil")
+	}
+	
+	// Verify that PGPASSWORD is NOT set in the environment for pgpass storage
+	if psqlCmd.Env != nil {
+		for _, envVar := range psqlCmd.Env {
+			if strings.HasPrefix(envVar, "PGPASSWORD=") {
+				t.Errorf("PGPASSWORD should not be set when using pgpass storage, but found: %s", envVar)
+			}
+		}
 	}
 }
 
