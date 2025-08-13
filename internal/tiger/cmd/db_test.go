@@ -417,6 +417,85 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	}
 }
 
+func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
+	// This test verifies that buildConnectionConfig properly sets password from keyring
+	
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+	
+	// Create a test service
+	serviceID := "test-connection-config-service"
+	projectID := "test-connection-config-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Store a test password in keyring
+	testPassword := "test-connection-config-password-789"
+	storage := GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	
+	// Call the actual production function that builds the config
+	config, err := buildConnectionConfig(connectionString, service)
+	
+	if err != nil {
+		t.Fatalf("buildConnectionConfig failed: %v", err)
+	}
+	
+	if config == nil {
+		t.Fatal("buildConnectionConfig returned nil config")
+	}
+	
+	// Verify that the password was set in the config
+	if config.Password != testPassword {
+		t.Errorf("Expected password '%s' to be set in config, but got '%s'", testPassword, config.Password)
+	}
+}
+
+func TestBuildConnectionConfig_PgpassStorage_NoPasswordSet(t *testing.T) {
+	// This test verifies that buildConnectionConfig doesn't set password for pgpass storage
+	
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+	
+	// Create a test service
+	serviceID := "test-connection-config-pgpass"
+	projectID := "test-connection-config-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	
+	// Call the actual production function that builds the config
+	config, err := buildConnectionConfig(connectionString, service)
+	
+	if err != nil {
+		t.Fatalf("buildConnectionConfig failed: %v", err)
+	}
+	
+	if config == nil {
+		t.Fatal("buildConnectionConfig returned nil config")
+	}
+	
+	// Verify that no password was set in the config (pgx will check ~/.pgpass automatically)
+	if config.Password != "" {
+		t.Errorf("Expected no password to be set in config for pgpass storage, but got '%s'", config.Password)
+	}
+}
+
 func TestSeparateServiceAndPsqlArgs(t *testing.T) {
 	testCases := []struct {
 		name                string
@@ -582,7 +661,8 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 
 	// Test with malformed connection string (should return exit code 3)
 	invalidConnectionString := "this is not a valid connection string at all"
-	err := testDatabaseConnection(invalidConnectionString, 1, cmd)
+	service := api.Service{} // Dummy service for test
+	err := testDatabaseConnection(invalidConnectionString, 1, service, cmd)
 
 	if err == nil {
 		t.Error("Expected error for invalid connection string")
@@ -610,8 +690,9 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	// Use a connection string to a non-routable IP to test timeout
 	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
 
+	service := api.Service{} // Dummy service for test
 	start := time.Now()
-	err := testDatabaseConnection(timeoutConnectionString, 1, cmd) // 1 second timeout
+	err := testDatabaseConnection(timeoutConnectionString, 1, service, cmd) // 1 second timeout
 	duration := time.Since(start)
 
 	if err == nil {

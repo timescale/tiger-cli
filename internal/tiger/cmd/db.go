@@ -194,7 +194,7 @@ Examples:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, service, cmd)
 		},
 	}
 
@@ -382,8 +382,30 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	return psqlCmd
 }
 
+// buildConnectionConfig creates a pgx connection config with proper password handling
+func buildConnectionConfig(connectionString string, service api.Service) (*pgx.ConnConfig, error) {
+	// Parse the connection string first to validate it
+	config, err := pgx.ParseConfig(connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set password from keyring storage if available
+	// pgpass storage works automatically since pgx checks ~/.pgpass file
+	storage := GetPasswordStorage()
+	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+		if password, err := storage.Get(service); err == nil && password != "" {
+			config.Password = password
+		}
+		// Note: If keyring password retrieval fails, we let pgx try without it
+		// This allows fallback to other authentication methods
+	}
+
+	return config, nil
+}
+
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(connectionString string, timeout time.Duration, cmd *cobra.Command) error {
+func testDatabaseConnection(connectionString string, timeout time.Duration, service api.Service, cmd *cobra.Command) error {
 	// Create context with timeout if specified
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -395,10 +417,10 @@ func testDatabaseConnection(connectionString string, timeout time.Duration, cmd 
 		ctx = context.Background()
 	}
 
-	// Parse the connection string first to validate it
-	config, err := pgx.ParseConfig(connectionString)
+	// Build connection config with proper password handling
+	config, err := buildConnectionConfig(connectionString, service)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to parse connection string: %v\n", err)
+		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to build connection config: %v\n", err)
 		return exitWithCode(3, err) // Invalid parameters
 	}
 
