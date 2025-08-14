@@ -74,8 +74,55 @@ go build -o bin/tiger ./cmd/tiger
 ### Running Tests
 
 ```bash
+# Run unit tests
 go test ./...
+
+# Run tests with verbose output
+go test -v ./...
 ```
+
+### Integration Testing
+
+Integration tests execute real API calls against a TigerData environment to validate end-to-end functionality. These tests require valid credentials and will create/delete actual resources.
+
+#### Setup
+
+1. Copy the sample environment file:
+   ```bash
+   cp .env.sample .env
+   ```
+
+2. Edit `.env` with your actual credentials:
+   ```bash
+   TIGER_PUBLIC_KEY_INTEGRATION=your-public-key-here
+   TIGER_SECRET_KEY_INTEGRATION=your-secret-key-here
+   TIGER_PROJECT_ID_INTEGRATION=your-project-id-here
+   TIGER_API_URL=http://localhost:8080/public/api/v1  # or production URL
+   ```
+
+#### Running Integration Tests
+
+```bash
+# Load environment variables and run all integration tests
+export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run Integration
+
+# Run specific integration test
+export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run TestServiceLifecycleIntegration
+
+# Integration tests will skip automatically if credentials are not set
+go test ./internal/tiger/cmd -v -run Integration
+```
+
+#### What Integration Tests Cover
+
+- **Authentication lifecycle**: Login with credentials, verify authentication, logout
+- **Service management**: Create, list, describe, and delete database services  
+- **Password management**: Update service passwords with keychain storage
+- **Database connectivity**: Generate connection strings and execute psql commands
+- **Output formats**: Validate JSON, YAML, and table output formats
+- **Error handling**: Test authentication failures and resource cleanup
+
+**Note**: Integration tests create and delete real services, which may incur costs. Use a development environment when possible.
 
 ## Project Structure
 
