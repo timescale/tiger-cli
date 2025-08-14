@@ -361,8 +361,11 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	psqlPath := "/usr/bin/psql"
 	additionalFlags := []string{"--quiet"}
 	
+	// Create a mock command for testing
+	testCmd := &cobra.Command{}
+	
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
 	
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -400,8 +403,11 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
 	
+	// Create a mock command for testing
+	testCmd := &cobra.Command{}
+	
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
 	
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")

@@ -20,6 +20,12 @@ go test ./...
 
 # Run tests with verbose output
 go test -v ./...
+
+# Load environment variables from .env file (note: source .env doesn't work)
+export $(cat .env | xargs)
+
+# Run integration tests with environment variables from .env file
+export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run TestServiceLifecycleIntegration
 ```
 
 ### Running Locally
@@ -29,6 +35,26 @@ go test -v ./...
 
 # Or run directly with go
 go run ./cmd/tiger --help
+```
+
+### Integration Testing
+```bash
+# Run all tests (integration tests will skip without credentials)
+go test ./...
+
+# Run only integration tests
+go test ./internal/tiger/cmd -run Integration
+
+# To run integration tests with real API calls, set environment variables:
+export TIGER_PUBLIC_KEY_INTEGRATION=your-public-key
+export TIGER_SECRET_KEY_INTEGRATION=your-secret-key
+export TIGER_PROJECT_ID_INTEGRATION=your-project-id
+
+# Optional: Set this to test database commands with existing service
+export TIGER_EXISTING_SERVICE_ID_INTEGRATION=existing-service-id
+
+# Then run tests normally
+go test ./internal/tiger/cmd -v -run Integration
 ```
 
 ### Code Generation

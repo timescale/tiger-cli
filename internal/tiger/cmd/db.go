@@ -352,20 +352,22 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
 func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service) *exec.Cmd {
+func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
 	psqlCmd := exec.Command(psqlPath, args...)
-	psqlCmd.Stdin = os.Stdin
-	psqlCmd.Stdout = os.Stdout
-	psqlCmd.Stderr = os.Stderr
+	
+	// Use cmd's input/output streams for testability while maintaining CLI behavior
+	psqlCmd.Stdin = cmd.InOrStdin()
+	psqlCmd.Stdout = cmd.OutOrStdout()
+	psqlCmd.Stderr = cmd.ErrOrStderr()
 
 	// Only set PGPASSWORD for keyring storage method
 	// pgpass storage relies on psql automatically reading ~/.pgpass file

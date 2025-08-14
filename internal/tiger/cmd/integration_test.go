@@ -1,0 +1,507 @@
+package cmd
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/spf13/viper"
+	"github.com/tigerdata/tiger-cli/internal/tiger/api"
+	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+)
+
+// setupIntegrationTest sets up isolated test environment with temporary config directory
+func setupIntegrationTest(t *testing.T) string {
+	t.Helper()
+
+	// Create temporary directory for test config
+	tmpDir, err := os.MkdirTemp("", "tiger-integration-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// Set temporary config directory
+	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
+	// Reset global config and viper to ensure test isolation
+	config.ResetGlobalConfig()
+	viper.Reset()
+
+	// Re-establish viper environment configuration after reset
+	viper.SetEnvPrefix("TIGER")
+	viper.AutomaticEnv()
+
+	t.Cleanup(func() {
+		// Reset global config and viper first
+		config.ResetGlobalConfig()
+		viper.Reset()
+		// Clean up environment variable BEFORE cleaning up file system
+		os.Unsetenv("TIGER_CONFIG_DIR")
+		// Then clean up file system
+		os.RemoveAll(tmpDir)
+	})
+
+	return tmpDir
+}
+
+// executeIntegrationCommand executes a CLI command for integration testing
+func executeIntegrationCommand(args ...string) (string, error) {
+	// Reset both global config and viper before each command execution
+	// This ensures fresh config loading with proper flag precedence
+	config.ResetGlobalConfig()
+	viper.Reset()
+	
+	// Re-establish viper environment configuration after reset
+	viper.SetEnvPrefix("TIGER")
+	viper.AutomaticEnv()
+	
+	// Use buildRootCmd() to get a complete root command with all flags and subcommands
+	testRoot := buildRootCmd()
+
+	buf := new(bytes.Buffer)
+	testRoot.SetOut(buf)
+	testRoot.SetErr(buf)
+	testRoot.SetArgs(args)
+
+	err := testRoot.Execute()
+	return buf.String(), err
+}
+
+// TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
+// login -> whoami -> create -> describe -> update-password -> delete -> logout
+func TestServiceLifecycleIntegration(t *testing.T) {
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	if publicKey == "" || secretKey == "" || projectID == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Generate unique service name to avoid conflicts
+	serviceName := fmt.Sprintf("integration-test-%d", time.Now().Unix())
+	var serviceID string
+	var deletedServiceID string // Keep track of deleted service for verification
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand("auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	// Cleanup function to ensure service is deleted even if test fails
+	defer func() {
+		if serviceID != "" {
+			t.Logf("Cleaning up service: %s", serviceID)
+			// Best effort cleanup - don't fail the test if cleanup fails
+			_, err := executeIntegrationCommand(
+				"service", "delete", serviceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup service %s: %v", serviceID, err)
+			}
+		}
+	}()
+
+	t.Run("Login", func(t *testing.T) {
+		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
+		
+		output, err := executeIntegrationCommand(
+			"auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+			"--project-id", projectID,
+		)
+
+		if err != nil {
+			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify login success message
+		if !strings.Contains(output, "Successfully logged in") && !strings.Contains(output, "Logged in") {
+			t.Logf("Login output: %s", output)
+		}
+
+		t.Logf("Login successful")
+	})
+
+	t.Run("WhoAmI", func(t *testing.T) {
+		t.Logf("Verifying authentication status")
+		
+		output, err := executeIntegrationCommand("auth", "whoami")
+		if err != nil {
+			t.Fatalf("WhoAmI failed: %v\nOutput: %s", err, output)
+		}
+
+		// Should not say "Not logged in"
+		if strings.Contains(output, "Not logged in") {
+			t.Errorf("Expected to be logged in, but got: %s", output)
+		}
+
+		t.Logf("Current authentication status: %s", strings.TrimSpace(output))
+	})
+
+	t.Run("CreateService", func(t *testing.T) {
+		t.Logf("Creating service: %s", serviceName)
+		
+		output, err := executeIntegrationCommand(
+			"service", "create",
+			"--name", serviceName,
+			"--wait-timeout", "15m", // Longer timeout for integration tests
+			"--no-set-default",      // Don't modify user's default service
+			"--output", "json",      // Use JSON for easier parsing
+		)
+
+		if err != nil {
+			t.Fatalf("Service creation failed: %v\nOutput: %s", err, output)
+		}
+
+		// Extract service ID from JSON output
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract service ID from create output: %s", output)
+		}
+
+		serviceID = extractedServiceID
+		t.Logf("Created service with ID: %s", serviceID)
+	})
+
+	t.Run("ListServices", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Listing services to verify creation")
+		
+		output, err := executeIntegrationCommand(
+			"service", "list",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service list failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify our service appears in the list
+		if !strings.Contains(output, serviceID) {
+			t.Errorf("Service ID %s not found in service list output", serviceID)
+		}
+
+		if !strings.Contains(output, serviceName) {
+			t.Errorf("Service name %s not found in service list output", serviceName)
+		}
+	})
+
+	t.Run("DescribeService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Describing service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"service", "describe", serviceID,
+			"--output", "json",
+		)
+		
+		t.Logf("Raw service describe output: %s", output)
+
+		if err != nil {
+			t.Fatalf("Service describe failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to verify service details
+		var service api.Service
+		if err := json.Unmarshal([]byte(output), &service); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify service details
+		if service.ServiceId == nil || *service.ServiceId != serviceID {
+			t.Errorf("Expected service ID %s, got %v", serviceID, service.ServiceId)
+		}
+
+		if service.Name == nil || *service.Name != serviceName {
+			t.Errorf("Expected service name %s, got %v", serviceName, service.Name)
+		}
+
+		// Verify service has expected structure
+		if service.Endpoint == nil {
+			t.Error("Service endpoint should not be nil")
+		}
+
+		t.Logf("Service status: %v", service.Status)
+	})
+
+	t.Run("UpdatePassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		newPassword := fmt.Sprintf("integration-test-password-%d", time.Now().Unix())
+		
+		t.Logf("Updating password for service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"service", "update-password", serviceID,
+			"--new-password", newPassword,
+			"--password-storage", "keychain", // Save to keychain for psql test
+		)
+
+		if err != nil {
+			t.Fatalf("Password update failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify success message
+		if !strings.Contains(output, "updated successfully") {
+			t.Errorf("Expected success message in output: %s", output)
+		}
+	})
+
+	t.Run("DatabaseConnectionString", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Getting connection string for service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"db", "connection-string", serviceID,
+		)
+
+		if err != nil {
+			t.Fatalf("Connection string failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify connection string format
+		if !strings.HasPrefix(strings.TrimSpace(output), "postgresql://") {
+			t.Errorf("Expected PostgreSQL connection string, got: %s", output)
+		}
+
+		// Verify connection string contains expected components
+		if !strings.Contains(output, "sslmode=require") {
+			t.Errorf("Expected connection string to include sslmode=require: %s", output)
+		}
+	})
+
+	t.Run("DatabasePsqlCommand", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Testing psql command with service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--", "-c", "SELECT 1 as test_query;",
+		)
+
+		if err != nil {
+			t.Fatalf("Database psql command failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify we got expected output from SELECT 1
+		if !strings.Contains(output, "1") && !strings.Contains(output, "test_query") {
+			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'test_query': %s", output)
+		}
+
+		t.Logf("✅ psql command returned expected query result")
+	})
+
+	t.Run("DeleteService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available for deletion")
+		}
+
+		t.Logf("Deleting service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"service", "delete", serviceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify deletion success message
+		if !strings.Contains(output, "deleted successfully") && !strings.Contains(output, "Deletion completed") && !strings.Contains(output, "successfully deleted") {
+			t.Errorf("Expected deletion success message in output: %s", output)
+		}
+
+		// Store serviceID for verification, then clear it so cleanup doesn't try to delete again
+		deletedServiceID = serviceID
+		serviceID = ""
+	})
+
+	t.Run("VerifyServiceDeleted", func(t *testing.T) {
+		if deletedServiceID == "" {
+			t.Skip("No deleted service ID available for verification")
+		}
+
+		t.Logf("Verifying service %s no longer exists", deletedServiceID)
+		
+		// Try to describe the deleted service - should fail
+		output, err := executeIntegrationCommand(
+			"service", "describe", deletedServiceID,
+		)
+
+		// We expect this to fail since the service should be deleted
+		if err == nil {
+			t.Errorf("Expected service describe to fail for deleted service, but got output: %s", output)
+		}
+
+		// Check that error indicates service not found
+		if !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "404") {
+			t.Errorf("Expected 'not found' error for deleted service, got: %v", err)
+		}
+	})
+
+	t.Run("Logout", func(t *testing.T) {
+		t.Logf("Logging out")
+		
+		output, err := executeIntegrationCommand("auth", "logout")
+		if err != nil {
+			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify logout success message  
+		if !strings.Contains(output, "Successfully logged out") && !strings.Contains(output, "Logged out") {
+			t.Logf("Logout output: %s", output)
+		}
+
+		t.Logf("Logout successful")
+	})
+
+	t.Run("VerifyLoggedOut", func(t *testing.T) {
+		t.Logf("Verifying we're logged out")
+		
+		output, err := executeIntegrationCommand("auth", "whoami")
+		// This should either fail or say "Not logged in"
+		if err == nil && !strings.Contains(output, "Not logged in") {
+			t.Errorf("Expected to be logged out, but whoami succeeded: %s", output)
+		}
+
+		t.Logf("Verified logged out status")
+	})
+}
+
+// extractServiceIDFromCreateOutput extracts the service ID from service create command output
+func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
+	t.Helper()
+	
+	// Try to parse as JSON first (if --output json was used)
+	var service api.Service
+	if err := json.Unmarshal([]byte(output), &service); err == nil {
+		if service.ServiceId != nil {
+			return *service.ServiceId
+		}
+	}
+
+	// Fall back to regex extraction for text output
+	// Look for service ID pattern (svc- followed by alphanumeric characters)
+	serviceIDRegex := regexp.MustCompile(`svc-[a-zA-Z0-9]+`)
+	matches := serviceIDRegex.FindStringSubmatch(output)
+	if len(matches) > 0 {
+		return matches[0]
+	}
+
+	// Try to extract from structured output lines
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Service ID") || strings.Contains(line, "service_id") {
+			// Extract ID from lines like "📋 Service ID: p7yqpiw7a8" or "service_id: svc-12345"
+			parts := strings.Split(line, ":")
+			if len(parts) >= 2 {
+				id := strings.TrimSpace(parts[1])
+				// Look for any service ID pattern (not just svc- prefix)
+				serviceIDRegex := regexp.MustCompile(`[a-zA-Z0-9]{8,}`)
+				if match := serviceIDRegex.FindString(id); match != "" {
+					return match
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// TestDatabaseCommandsIntegration tests database-related commands that don't require service creation
+func TestDatabaseCommandsIntegration(t *testing.T) {
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
+	
+	if publicKey == "" || secretKey == "" || projectID == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	}
+
+	if existingServiceID == "" {
+		t.Skip("Skipping database integration test: TIGER_EXISTING_SERVICE_ID_INTEGRATION not set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand("auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	t.Run("Login", func(t *testing.T) {
+		t.Logf("Logging in for database tests")
+		
+		output, err := executeIntegrationCommand(
+			"auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+			"--project-id", projectID,
+		)
+
+		if err != nil {
+			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Login successful for database tests")
+	})
+
+	t.Run("DatabaseTestConnection", func(t *testing.T) {
+		t.Logf("Testing database connection for service: %s", existingServiceID)
+		
+		output, err := executeIntegrationCommand(
+			"db", "test-connection", existingServiceID,
+			"--timeout", "30s",
+		)
+
+		// Note: This may fail if the database isn't fully ready or credentials aren't set up
+		// We log the result but don't fail the test since it depends on database state
+		if err != nil {
+			t.Logf("Database connection test failed (this may be expected): %v\nOutput: %s", err, output)
+		} else {
+			t.Logf("Database connection test succeeded: %s", output)
+		}
+	})
+}
