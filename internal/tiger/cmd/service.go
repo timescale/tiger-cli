@@ -441,20 +441,20 @@ from your configuration. This command updates the master password for the
 
 Examples:
   # Update password for default service
-  tiger service update-password --password new-secure-password
+  tiger service update-password --new-password new-secure-password
 
   # Update password for specific service
-  tiger service update-password svc-12345 --password new-secure-password
+  tiger service update-password svc-12345 --new-password new-secure-password
 
-  # Update password using environment variable (TIGER_PASSWORD)
-  export TIGER_PASSWORD="new-secure-password"
+  # Update password using environment variable (TIGER_NEW_PASSWORD)
+  export TIGER_NEW_PASSWORD="new-secure-password"
   tiger service update-password svc-12345
 
   # Update password and save to .pgpass (default behavior)
-  tiger service update-password svc-12345 --password new-secure-password
+  tiger service update-password svc-12345 --new-password new-secure-password
 
   # Update password without saving (using global flag)
-  tiger service update-password svc-12345 --password new-secure-password --password-storage none`,
+  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -480,9 +480,9 @@ Examples:
 			}
 
 			// Get password from flag or environment variable via viper
-			password := viper.GetString("password")
+			password := viper.GetString("new_password")
 			if password == "" {
-				return fmt.Errorf("password is required. Use --password flag or set TIGER_PASSWORD environment variable")
+				return fmt.Errorf("new password is required. Use --new-password flag or set TIGER_NEW_PASSWORD environment variable")
 			}
 
 			cmd.SilenceUsage = true
@@ -546,10 +546,10 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
+	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
 
 	// Bind flags to viper
-	viper.BindPFlag("password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("new_password", cmd.Flags().Lookup("new-password"))
 
 	return cmd
 }

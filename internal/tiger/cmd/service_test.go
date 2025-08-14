@@ -988,7 +988,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Execute service update-password command without service ID
-	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1054,7 +1054,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Execute service update-password command
-	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1087,13 +1087,13 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Set environment variable BEFORE creating command (like root test does)
-	originalEnv := os.Getenv("TIGER_PASSWORD")
-	os.Setenv("TIGER_PASSWORD", "env-password-123")
+	originalEnv := os.Getenv("TIGER_NEW_PASSWORD")
+	os.Setenv("TIGER_NEW_PASSWORD", "env-password-123")
 	defer func() {
 		if originalEnv != "" {
-			os.Setenv("TIGER_PASSWORD", originalEnv)
+			os.Setenv("TIGER_NEW_PASSWORD", originalEnv)
 		} else {
-			os.Unsetenv("TIGER_PASSWORD")
+			os.Unsetenv("TIGER_NEW_PASSWORD")
 		}
 	}()
 
