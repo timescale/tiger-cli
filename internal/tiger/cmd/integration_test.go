@@ -133,7 +133,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Verify login success message
 		if !strings.Contains(output, "Successfully logged in") && !strings.Contains(output, "Logged in") {
-			t.Logf("Login output: %s", output)
+			t.Errorf("Login output: %s", output)
 		}
 
 		t.Logf("Login successful")
@@ -247,6 +247,30 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Service status: %v", service.Status)
 	})
 
+	t.Run("DatabasePsqlCommand_OriginalPassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Testing psql command with original password for service: %s", serviceID)
+		
+		output, err := executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--", "-c", "SELECT 1 as original_password_test;",
+		)
+
+		if err != nil {
+			t.Fatalf("Database psql command with original password failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify we got expected output from SELECT 1
+		if !strings.Contains(output, "1") && !strings.Contains(output, "original_password_test") {
+			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'original_password_test': %s", output)
+		}
+
+		t.Logf("✅ psql command with original password succeeded")
+	})
+
 	t.Run("UpdatePassword", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
@@ -298,28 +322,28 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("DatabasePsqlCommand", func(t *testing.T) {
+	t.Run("DatabasePsqlCommand_UpdatedPassword", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
 		}
 
-		t.Logf("Testing psql command with service: %s", serviceID)
+		t.Logf("Testing psql command with updated password for service: %s", serviceID)
 		
 		output, err := executeIntegrationCommand(
 			"db", "psql", serviceID,
-			"--", "-c", "SELECT 1 as test_query;",
+			"--", "-c", "SELECT 1 as updated_password_test;",
 		)
 
 		if err != nil {
-			t.Fatalf("Database psql command failed: %v\nOutput: %s", err, output)
+			t.Fatalf("Database psql command with updated password failed: %v\nOutput: %s", err, output)
 		}
 
 		// Verify we got expected output from SELECT 1
-		if !strings.Contains(output, "1") && !strings.Contains(output, "test_query") {
-			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'test_query': %s", output)
+		if !strings.Contains(output, "1") && !strings.Contains(output, "updated_password_test") {
+			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'updated_password_test': %s", output)
 		}
 
-		t.Logf("✅ psql command returned expected query result")
+		t.Logf("✅ psql command with updated password succeeded")
 	})
 
 	t.Run("DeleteService", func(t *testing.T) {
@@ -382,7 +406,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Verify logout success message  
 		if !strings.Contains(output, "Successfully logged out") && !strings.Contains(output, "Logged out") {
-			t.Logf("Logout output: %s", output)
+			t.Errorf("Logout output: %s", output)
 		}
 
 		t.Logf("Logout successful")
