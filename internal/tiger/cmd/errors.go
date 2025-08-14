@@ -8,6 +8,7 @@ const (
 	ExitInvalidParameters  = 3 // Invalid parameters
 	ExitAuthenticationError = 4 // Authentication error
 	ExitPermissionDenied   = 5 // Permission denied
+	ExitServiceNotFound    = 6 // Service not found
 )
 
 // exitCodeError creates an error that will cause the program to exit with the specified code

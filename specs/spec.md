@@ -654,6 +654,7 @@ tiger config reset
 - `3`: Invalid parameters
 - `4`: Authentication error
 - `5`: Permission denied
+- `6`: Service not found
 
 ## Output Formats
 

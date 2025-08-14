@@ -126,7 +126,7 @@ Examples:
 			case 401, 403:
 				return fmt.Errorf("authentication failed: invalid API key")
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			default:
 				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 			}
@@ -536,7 +536,7 @@ Examples:
 			case 401, 403:
 				return fmt.Errorf("authentication failed: invalid API key")
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			case 400:
 				return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
 			default:
@@ -968,7 +968,7 @@ Examples:
 				// Wait for deletion to complete
 				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID)
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
 			case 401, 403:
 				return fmt.Errorf("authentication failed: invalid API key")
 			default:

@@ -394,6 +394,15 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "404") {
 			t.Errorf("Expected 'not found' error for deleted service, got: %v", err)
 		}
+
+		// Check that it returns the correct exit code (this should be required)
+		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+			if exitErr.ExitCode() != ExitServiceNotFound {
+				t.Errorf("Expected exit code %d for service not found, got %d", ExitServiceNotFound, exitErr.ExitCode())
+			}
+		} else {
+			t.Error("Expected exitCodeError with ExitServiceNotFound exit code for deleted service")
+		}
 	})
 
 	t.Run("Logout", func(t *testing.T) {
@@ -464,6 +473,118 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	}
 
 	return ""
+}
+
+// TestServiceNotFound tests that commands requiring service ID fail with correct exit code for non-existent services
+func TestServiceNotFound(t *testing.T) {
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	
+	if publicKey == "" || secretKey == "" || projectID == "" {
+		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand("auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	// Login first
+	output, err := executeIntegrationCommand(
+		"auth", "login",
+		"--public-key", publicKey,
+		"--secret-key", secretKey,
+		"--project-id", projectID,
+	)
+
+	if err != nil {
+		t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+	}
+	t.Logf("Login successful for service not found tests")
+
+	// Use a definitely non-existent service ID
+	nonExistentServiceID := "nonexistent-service-12345"
+
+	// Table of commands that should fail with specific exit codes for non-existent services
+	testCases := []struct {
+		name         string
+		args         []string
+		expectedExitCode int
+		reason       string
+	}{
+		{
+			name: "service describe",
+			args: []string{"service", "describe", nonExistentServiceID},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
+			name: "service update-password",
+			args: []string{"service", "update-password", nonExistentServiceID, "--new-password", "test-password"},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
+			name: "service delete",
+			args: []string{"service", "delete", nonExistentServiceID, "--confirm"},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
+			name: "db connection-string",
+			args: []string{"db", "connection-string", nonExistentServiceID},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
+			name: "db test-connection",
+			args: []string{"db", "test-connection", nonExistentServiceID},
+			expectedExitCode: ExitInvalidParameters,
+			reason: "maintains compatibility with PostgreSQL tooling conventions",
+		},
+		{
+			name: "db psql",
+			args: []string{"db", "psql", nonExistentServiceID, "--", "-c", "SELECT 1;"},
+			expectedExitCode: ExitServiceNotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := executeIntegrationCommand(tc.args...)
+			
+			if err == nil {
+				t.Errorf("Expected %s to fail for non-existent service, but got output: %s", tc.name, output)
+				return
+			}
+
+			// Verify error message contains "not found"
+			if !strings.Contains(err.Error(), "not found") {
+				t.Errorf("Expected 'not found' error message for %s, got: %v", tc.name, err)
+			}
+
+			// Verify correct exit code
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != tc.expectedExitCode {
+					t.Errorf("Expected exit code %d for %s, got %d", tc.expectedExitCode, tc.name, exitErr.ExitCode())
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with exit code %d for %s", tc.expectedExitCode, tc.name)
+			}
+
+			reasonMsg := ""
+			if tc.reason != "" {
+				reasonMsg = fmt.Sprintf(" (%s)", tc.reason)
+			}
+			t.Logf("✅ %s correctly failed with exit code %d%s", tc.name, tc.expectedExitCode, reasonMsg)
+		})
+	}
 }
 
 // TestDatabaseCommandsIntegration tests database-related commands that don't require service creation

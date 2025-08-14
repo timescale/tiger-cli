@@ -321,7 +321,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	case 401, 403:
 		return api.Service{}, fmt.Errorf("authentication failed: invalid API key")
 	case 404:
-		return api.Service{}, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+		return api.Service{}, exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 	default:
 		return api.Service{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
