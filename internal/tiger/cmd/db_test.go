@@ -665,7 +665,7 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test with malformed connection string (should return exit code 3)
+	// Test with malformed connection string (should return ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
 	service := api.Service{} // Dummy service for test
 	err := testDatabaseConnection(invalidConnectionString, 1, service, cmd)
@@ -676,9 +676,9 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 
 	// Should be an exitCodeError
 	if exitErr, ok := err.(exitCodeError); ok {
-		// The exact code depends on where it fails - could be 2 or 3
-		if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
-			t.Errorf("Expected exit code 2 or 3 for invalid connection string, got %d", exitErr.ExitCode())
+		// The exact code depends on where it fails - could be ExitTimeout or ExitInvalidParameters
+		if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
+			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for invalid connection string")
@@ -710,10 +710,10 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
 
-	// Check exit code (should be 2 for unreachable)
+	// Check exit code (should be ExitTimeout for unreachable)
 	if exitErr, ok := err.(exitCodeError); ok {
-		if exitErr.ExitCode() != 2 {
-			t.Errorf("Expected exit code 2 for timeout, got %d", exitErr.ExitCode())
+		if exitErr.ExitCode() != ExitTimeout {
+			t.Errorf("Expected exit code %d for timeout, got %d", ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for timeout")
@@ -1030,9 +1030,9 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			// For valid durations that fail due to server unreachable, check exit code
 			if tc.expectedOutput == "" {
 				if exitErr, ok := err.(exitCodeError); ok {
-					// Should be exit code 2 (no response) or 3 (invalid params) for network errors
-					if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
-						t.Errorf("Expected exit code 2 or 3, got %d", exitErr.ExitCode())
+					// Should be ExitTimeout (no response) or ExitInvalidParameters (invalid params) for network errors
+					if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
+						t.Errorf("Expected exit code %d or %d, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
 					}
 				} else {
 					t.Error("Expected exitCodeError")

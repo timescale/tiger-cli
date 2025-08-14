@@ -1255,16 +1255,16 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	// Test waitForServiceReady with very short timeout to trigger timeout quickly
 	err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd)
 
-	// Should return an error with exit code 2
+	// Should return an error with ExitTimeout
 	if err == nil {
 		t.Error("Expected error for timeout, but got none")
 		return
 	}
 
-	// Check that it's an exitCodeError with code 2
+	// Check that it's an exitCodeError with ExitTimeout
 	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != 2 {
-			t.Errorf("Expected exit code 2 for wait timeout, got %d", exitErr.ExitCode())
+		if exitErr.ExitCode() != ExitTimeout {
+			t.Errorf("Expected exit code %d for wait timeout, got %d", ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for wait timeout")

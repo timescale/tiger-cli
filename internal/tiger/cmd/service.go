@@ -744,7 +744,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(2, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -998,7 +998,7 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 		select {
 		case <-ctx.Done():
 			fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
-			return exitWithCode(2, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
 		case <-ticker.C:
 			// Check if service still exists
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
