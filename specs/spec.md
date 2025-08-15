@@ -699,6 +699,8 @@ Use 'tiger service list' to see available services.
 3. Configuration file
 4. Default values
 
+**Note:** The `api_url` configuration is intentionally not exposed as a CLI flag (`--api-url`). It can only be configured via environment variable (`TIGER_API_URL`), configuration file, or the config command (`tiger config set api_url <url>`). This is primarily intended for internal debugging and development use.
+
 ## Go Library Dependencies
 
 ### Core Libraries

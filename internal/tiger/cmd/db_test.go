@@ -287,7 +287,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 
 	// Create a dummy service for the test
 	service := api.Service{}
-	
+
 	// This will fail because psql path doesn't exist, but we can verify the error
 	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
 
@@ -333,13 +333,12 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	}
 }
 
-
 func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
 	defer viper.Set("password_storage", originalStorage)
-	
+
 	// Create a test service
 	serviceID := "test-psql-service"
 	projectID := "test-psql-project"
@@ -360,17 +359,17 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
 	additionalFlags := []string{"--quiet"}
-	
+
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
-	
+
 	// Call the actual production function that builds the command
 	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
-	
+
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
 	}
-	
+
 	// Verify that PGPASSWORD is set in the environment with the correct value
 	found := false
 	expectedEnvVar := "PGPASSWORD=" + testPassword
@@ -380,7 +379,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Errorf("Expected PGPASSWORD=%s to be set in environment, but it wasn't. Env vars: %v", testPassword, psqlCmd.Env)
 	}
@@ -391,7 +390,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "pgpass")
 	defer viper.Set("password_storage", originalStorage)
-	
+
 	// Create a test service
 	serviceID := "test-service-id"
 	projectID := "test-project-id"
@@ -402,17 +401,17 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
-	
+
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
-	
+
 	// Call the actual production function that builds the command
 	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
-	
+
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
 	}
-	
+
 	// Verify that PGPASSWORD is NOT set in the environment for pgpass storage
 	if psqlCmd.Env != nil {
 		for _, envVar := range psqlCmd.Env {
@@ -425,12 +424,12 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 
 func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
 	// This test verifies that buildConnectionConfig properly sets password from keyring
-	
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
 	defer viper.Set("password_storage", originalStorage)
-	
+
 	// Create a test service
 	serviceID := "test-connection-config-service"
 	projectID := "test-connection-config-project"
@@ -449,18 +448,18 @@ func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
 	defer storage.Remove(service) // Clean up after test
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
-	
+
 	// Call the actual production function that builds the config
 	config, err := buildConnectionConfig(connectionString, service)
-	
+
 	if err != nil {
 		t.Fatalf("buildConnectionConfig failed: %v", err)
 	}
-	
+
 	if config == nil {
 		t.Fatal("buildConnectionConfig returned nil config")
 	}
-	
+
 	// Verify that the password was set in the config
 	if config.Password != testPassword {
 		t.Errorf("Expected password '%s' to be set in config, but got '%s'", testPassword, config.Password)
@@ -469,12 +468,12 @@ func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
 
 func TestBuildConnectionConfig_PgpassStorage_NoPasswordSet(t *testing.T) {
 	// This test verifies that buildConnectionConfig doesn't set password for pgpass storage
-	
+
 	// Set pgpass as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "pgpass")
 	defer viper.Set("password_storage", originalStorage)
-	
+
 	// Create a test service
 	serviceID := "test-connection-config-pgpass"
 	projectID := "test-connection-config-project"
@@ -484,18 +483,18 @@ func TestBuildConnectionConfig_PgpassStorage_NoPasswordSet(t *testing.T) {
 	}
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
-	
+
 	// Call the actual production function that builds the config
 	config, err := buildConnectionConfig(connectionString, service)
-	
+
 	if err != nil {
 		t.Fatalf("buildConnectionConfig failed: %v", err)
 	}
-	
+
 	if config == nil {
 		t.Fatal("buildConnectionConfig returned nil config")
 	}
-	
+
 	// Verify that no password was set in the config (pgx will check ~/.pgpass automatically)
 	if config.Password != "" {
 		t.Errorf("Expected no password to be set in config for pgpass storage, but got '%s'", config.Password)

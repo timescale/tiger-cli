@@ -90,6 +90,13 @@ VPCs, replicas, and related infrastructure components.`,
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
 
+	// Note: api_url is intentionally not exposed as a CLI flag.
+	// It can be configured via:
+	// - Environment variable: TIGER_API_URL
+	// - Config file: ~/.config/tiger/config.yaml
+	// - Config command: tiger config set api_url <url>
+	// This is primarily used for internal debugging and development.
+
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())
 	cmd.AddCommand(buildConfigCmd())

@@ -21,7 +21,7 @@ type Config struct {
 }
 
 const (
-	DefaultAPIURL     = "https://api.tigerdata.com/public/v1"
+	DefaultAPIURL     = "https://console.cloud.timescale.com/public/api/v1"
 	DefaultConsoleURL = "https://console.cloud.timescale.com"
 	DefaultGatewayURL = "https://console.cloud.timescale.com/api"
 	DefaultOutput     = "table"

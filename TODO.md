@@ -5,6 +5,7 @@ Blocked:
 - need to add JWT/OATH2 support so that users don't handle API keys
 
 Active List:
+- should we alias the auth login command to login?
 - add release tooling
    - goreleaser?
    - platforms:

@@ -1472,7 +1472,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
 	output, err, _ := executeServiceCommand("service", "delete", "svc-12345")
-	
+
 	// Should either fail due to stdin read error or show cancellation message
 	// The exact behavior depends on the test environment
 	if err == nil && !strings.Contains(output, "Delete operation cancelled") {
@@ -1508,7 +1508,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 
 	// Set up config
 	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1", 
+		APIURL:    "https://api.tigerdata.com/public/v1",
 		ProjectID: "test-project-123",
 		ConfigDir: tmpDir,
 	}
@@ -1540,7 +1540,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 			// All these should fail due to network (which is expected)
 			// but they should NOT fail due to flag parsing errors
 			_, err, _ := executeServiceCommand(tc.args...)
-			
+
 			// Should fail with network error, not flag parsing error
 			if err != nil && strings.Contains(err.Error(), "flag") {
 				t.Errorf("Should not have flag parsing error, got: %v", err)

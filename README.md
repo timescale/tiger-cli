@@ -2,6 +2,32 @@
 
 Tiger CLI is a command-line interface for managing TigerData Cloud Platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
 
+## Quick Start During Development
+```bash
+# Clone the repository
+git clone https://github.com/tigerdata/tiger-cli.git
+cd tiger-cli
+git checkout <branch>
+
+# Install the CLI
+go install ./cmd/tiger
+
+# (Optional) Set up the savannah-public endpoint
+# for prod (default)
+./tiger config set api-url https://console.cloud.timescale.com/public/api/v1
+# for dev
+./tiger config set api-url https://console.dev.timescale.com/public/api/v1
+# for local
+./tiger config set api-url http://localhost:8080/public/api/v1
+
+# Login to your account
+tiger auth login
+
+# explore the CLI
+tiger --help
+```
+
+
 ## Installation
 
 ### Homebrew (macOS/Linux)
