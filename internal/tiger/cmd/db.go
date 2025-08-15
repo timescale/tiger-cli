@@ -291,7 +291,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	// Get API key for authentication
 	apiKey, err := getAPIKeyForDB()
 	if err != nil {
-		return api.Service{}, fmt.Errorf("authentication required: %w", err)
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 	}
 
 	// Create API client
@@ -318,8 +318,10 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 
 		return *resp.JSON200, nil
 
-	case 401, 403:
-		return api.Service{}, fmt.Errorf("authentication failed: invalid API key")
+	case 401:
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+	case 403:
+		return api.Service{}, exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
 	case 404:
 		return api.Service{}, exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 	default:
@@ -363,7 +365,7 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	args = append(args, additionalFlags...)
 
 	psqlCmd := exec.Command(psqlPath, args...)
-	
+
 	// Use cmd's input/output streams for testability while maintaining CLI behavior
 	psqlCmd.Stdin = cmd.InOrStdin()
 	psqlCmd.Stdout = cmd.OutOrStdout()

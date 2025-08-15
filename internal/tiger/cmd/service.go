@@ -93,7 +93,7 @@ Examples:
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -123,8 +123,10 @@ Examples:
 				// Output service in requested format
 				return outputService(cmd, service, cfg.Output)
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
 			case 404:
 				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			default:
@@ -159,7 +161,7 @@ func buildServiceListCmd() *cobra.Command {
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -197,8 +199,10 @@ func buildServiceListCmd() *cobra.Command {
 				// Output services in requested format
 				return outputServices(cmd, services, cfg.Output)
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to project"))
 			case 404:
 				return fmt.Errorf("project not found")
 			default:
@@ -325,7 +329,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -402,8 +406,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to create services"))
 			case 404:
 				return fmt.Errorf("project not found")
 			default:
@@ -490,7 +496,7 @@ Examples:
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -533,8 +539,10 @@ Examples:
 
 				return nil
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to update service password"))
 			case 404:
 				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			case 400:
@@ -923,7 +931,7 @@ Examples:
 			// Get API key
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Prompt for confirmation unless --confirm is used
@@ -958,7 +966,7 @@ Examples:
 			switch resp.StatusCode() {
 			case 202:
 				fmt.Fprintf(cmd.OutOrStdout(), "🗑️  Delete request accepted for service '%s'.\n", serviceID)
-				
+
 				// If not waiting, return early
 				if deleteNoWait {
 					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service list' to check deletion status.")
@@ -969,8 +977,10 @@ Examples:
 				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 			case 404:
 				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to delete service"))
 			default:
 				return fmt.Errorf("failed to delete service: API request failed with status %d", resp.StatusCode())
 			}

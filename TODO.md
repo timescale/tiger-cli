@@ -5,9 +5,6 @@ Blocked:
 - need to add JWT/OATH2 support so that users don't handle API keys
 
 Active List:
-- update exit codes for authentication and permission errors
-- test the --password-storage flag with none option and PGPASSWORD env var
-- add integration test for service 404s
 - add release tooling
    - goreleaser?
    - platforms:
@@ -16,6 +13,9 @@ Active List:
         - curl .sh script
 
 Done:
+ - ✅ update exit codes for authentication and permission errors
+ - ✅ test the --password-storage flag with none option and PGPASSWORD env var
+ - ✅ add integration test for service 404s
  - ✅ api key stuff right now is messy. we require setting the api key from the public key and private key as public_key:private_key. should be a single string instead.
  - ✅ change service operations to use --wait-timeout instead of --timeout
  - ✅ implement --wait-timeout flag to accept time.ParseDuration format (e.g., "30m", "1h30m", "90s")

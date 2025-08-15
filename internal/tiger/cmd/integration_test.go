@@ -55,11 +55,11 @@ func executeIntegrationCommand(args ...string) (string, error) {
 	// This ensures fresh config loading with proper flag precedence
 	config.ResetGlobalConfig()
 	viper.Reset()
-	
+
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
-	
+
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot := buildRootCmd()
 
@@ -119,7 +119,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 	t.Run("Login", func(t *testing.T) {
 		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
-		
+
 		output, err := executeIntegrationCommand(
 			"auth", "login",
 			"--public-key", publicKey,
@@ -141,7 +141,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 	t.Run("WhoAmI", func(t *testing.T) {
 		t.Logf("Verifying authentication status")
-		
+
 		output, err := executeIntegrationCommand("auth", "whoami")
 		if err != nil {
 			t.Fatalf("WhoAmI failed: %v\nOutput: %s", err, output)
@@ -157,13 +157,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 	t.Run("CreateService", func(t *testing.T) {
 		t.Logf("Creating service: %s", serviceName)
-		
+
 		output, err := executeIntegrationCommand(
 			"service", "create",
 			"--name", serviceName,
 			"--wait-timeout", "15m", // Longer timeout for integration tests
-			"--no-set-default",      // Don't modify user's default service
-			"--output", "json",      // Use JSON for easier parsing
+			"--no-set-default", // Don't modify user's default service
+			"--output", "json", // Use JSON for easier parsing
 		)
 
 		if err != nil {
@@ -186,7 +186,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Listing services to verify creation")
-		
+
 		output, err := executeIntegrationCommand(
 			"service", "list",
 			"--output", "json",
@@ -212,12 +212,12 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Describing service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"service", "describe", serviceID,
 			"--output", "json",
 		)
-		
+
 		t.Logf("Raw service describe output: %s", output)
 
 		if err != nil {
@@ -253,7 +253,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Testing psql command with original password for service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as original_password_test;",
@@ -277,9 +277,9 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		newPassword := fmt.Sprintf("integration-test-password-%d", time.Now().Unix())
-		
+
 		t.Logf("Updating password for service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"service", "update-password", serviceID,
 			"--new-password", newPassword,
@@ -302,7 +302,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Getting connection string for service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"db", "connection-string", serviceID,
 		)
@@ -328,7 +328,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Testing psql command with updated password for service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as updated_password_test;",
@@ -352,7 +352,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Deleting service: %s", serviceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"service", "delete", serviceID,
 			"--confirm",
@@ -379,7 +379,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("Verifying service %s no longer exists", deletedServiceID)
-		
+
 		// Try to describe the deleted service - should fail
 		output, err := executeIntegrationCommand(
 			"service", "describe", deletedServiceID,
@@ -407,13 +407,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 	t.Run("Logout", func(t *testing.T) {
 		t.Logf("Logging out")
-		
+
 		output, err := executeIntegrationCommand("auth", "logout")
 		if err != nil {
 			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
 		}
 
-		// Verify logout success message  
+		// Verify logout success message
 		if !strings.Contains(output, "Successfully logged out") && !strings.Contains(output, "Logged out") {
 			t.Errorf("Logout output: %s", output)
 		}
@@ -423,7 +423,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 	t.Run("VerifyLoggedOut", func(t *testing.T) {
 		t.Logf("Verifying we're logged out")
-		
+
 		output, err := executeIntegrationCommand("auth", "whoami")
 		// This should either fail or say "Not logged in"
 		if err == nil && !strings.Contains(output, "Not logged in") {
@@ -437,7 +437,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 // extractServiceIDFromCreateOutput extracts the service ID from service create command output
 func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	t.Helper()
-	
+
 	// Try to parse as JSON first (if --output json was used)
 	var service api.Service
 	if err := json.Unmarshal([]byte(output), &service); err == nil {
@@ -481,7 +481,7 @@ func TestServiceNotFound(t *testing.T) {
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
-	
+
 	if publicKey == "" || secretKey == "" || projectID == "" {
 		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
 	}
@@ -517,40 +517,40 @@ func TestServiceNotFound(t *testing.T) {
 
 	// Table of commands that should fail with specific exit codes for non-existent services
 	testCases := []struct {
-		name         string
-		args         []string
+		name             string
+		args             []string
 		expectedExitCode int
-		reason       string
+		reason           string
 	}{
 		{
-			name: "service describe",
-			args: []string{"service", "describe", nonExistentServiceID},
+			name:             "service describe",
+			args:             []string{"service", "describe", nonExistentServiceID},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
-			name: "service update-password",
-			args: []string{"service", "update-password", nonExistentServiceID, "--new-password", "test-password"},
+			name:             "service update-password",
+			args:             []string{"service", "update-password", nonExistentServiceID, "--new-password", "test-password"},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
-			name: "service delete",
-			args: []string{"service", "delete", nonExistentServiceID, "--confirm"},
+			name:             "service delete",
+			args:             []string{"service", "delete", nonExistentServiceID, "--confirm"},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
-			name: "db connection-string",
-			args: []string{"db", "connection-string", nonExistentServiceID},
+			name:             "db connection-string",
+			args:             []string{"db", "connection-string", nonExistentServiceID},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
-			name: "db test-connection",
-			args: []string{"db", "test-connection", nonExistentServiceID},
+			name:             "db test-connection",
+			args:             []string{"db", "test-connection", nonExistentServiceID},
 			expectedExitCode: ExitInvalidParameters,
-			reason: "maintains compatibility with PostgreSQL tooling conventions",
+			reason:           "maintains compatibility with PostgreSQL tooling conventions",
 		},
 		{
-			name: "db psql",
-			args: []string{"db", "psql", nonExistentServiceID, "--", "-c", "SELECT 1;"},
+			name:             "db psql",
+			args:             []string{"db", "psql", nonExistentServiceID, "--", "-c", "SELECT 1;"},
 			expectedExitCode: ExitServiceNotFound,
 		},
 	}
@@ -558,7 +558,7 @@ func TestServiceNotFound(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			output, err := executeIntegrationCommand(tc.args...)
-			
+
 			if err == nil {
 				t.Errorf("Expected %s to fail for non-existent service, but got output: %s", tc.name, output)
 				return
@@ -594,7 +594,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
-	
+
 	if publicKey == "" || secretKey == "" || projectID == "" {
 		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
 	}
@@ -618,7 +618,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 
 	t.Run("Login", func(t *testing.T) {
 		t.Logf("Logging in for database tests")
-		
+
 		output, err := executeIntegrationCommand(
 			"auth", "login",
 			"--public-key", publicKey,
@@ -635,7 +635,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 
 	t.Run("DatabaseTestConnection", func(t *testing.T) {
 		t.Logf("Testing database connection for service: %s", existingServiceID)
-		
+
 		output, err := executeIntegrationCommand(
 			"db", "test-connection", existingServiceID,
 			"--timeout", "30s",
@@ -649,4 +649,142 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			t.Logf("Database connection test succeeded: %s", output)
 		}
 	})
+}
+
+// TestAuthenticationErrorsIntegration tests that all commands requiring authentication
+// properly handle authentication failures and return appropriate exit codes
+func TestAuthenticationErrorsIntegration(t *testing.T) {
+	// Check if we have valid integration test credentials
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+
+	if publicKey == "" || secretKey == "" || projectID == "" {
+		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Make sure we're logged out (this should always succeed or be a no-op)
+	_, _ = executeIntegrationCommand("auth", "logout")
+
+	// Test with invalid API key to trigger authentication errors (401 response from server)
+	invalidAPIKey := "invalid-public-key:invalid-secret-key"
+
+	// Test service commands that should return authentication errors
+	serviceCommands := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "service list",
+			args: []string{"service", "list", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+		{
+			name: "service describe",
+			args: []string{"service", "describe", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+		{
+			name: "service create",
+			args: []string{"service", "create", "--name", "test-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+		},
+		{
+			name: "service update-password",
+			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+		{
+			name: "service delete",
+			args: []string{"service", "delete", "non-existent-service", "--confirm", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+		},
+	}
+
+	// Test db commands that should return authentication errors
+	dbCommands := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "db connection-string",
+			args: []string{"db", "connection-string", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+		{
+			name: "db connect",
+			args: []string{"db", "connect", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
+		// for authentication issues, not ExitAuthenticationError like other commands
+		{
+			name: "db test-connection",
+			args: []string{"db", "test-connection", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+		},
+	}
+
+	// Test all service commands
+	for _, tc := range serviceCommands {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := executeIntegrationCommand(tc.args...)
+
+			// Should fail with authentication error
+			if err == nil {
+				t.Errorf("Expected %s to fail with authentication error when using invalid API key, but got output: %s", tc.name, output)
+				return
+			}
+
+			// Check that it's an exitCodeError with ExitAuthenticationError
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != ExitAuthenticationError {
+					t.Errorf("Expected exit code %d (ExitAuthenticationError) for %s, got %d. Error: %s", ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, ExitAuthenticationError)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
+			}
+
+			// Check error message contains authentication-related text
+			if !strings.Contains(err.Error(), "authentication") && !strings.Contains(err.Error(), "API key") {
+				t.Logf("Note: %s error message may be acceptable: %s", tc.name, err.Error())
+			}
+		})
+	}
+
+	// Test all db commands
+	for _, tc := range dbCommands {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := executeIntegrationCommand(tc.args...)
+
+			// Should fail with authentication error
+			if err == nil {
+				t.Errorf("Expected %s to fail with authentication error when using invalid API key, but got output: %s", tc.name, output)
+				return
+			}
+
+			// Check that it's an exitCodeError with the expected exit code
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				expectedExitCode := ExitAuthenticationError
+				expectedDescription := "authentication error"
+
+				// db test-connection follows pg_isready conventions and uses exit code 3
+				if tc.name == "db test-connection" {
+					expectedExitCode = ExitInvalidParameters
+					expectedDescription = "invalid parameters (pg_isready convention)"
+				}
+
+				if exitErr.ExitCode() != expectedExitCode {
+					t.Errorf("Expected exit code %d (%s) for %s, got %d. Error: %s", expectedExitCode, expectedDescription, tc.name, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ %s correctly failed with %s (exit code %d)", tc.name, expectedDescription, expectedExitCode)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError for %s, got: %v", tc.name, err)
+			}
+
+			// Check error message contains authentication-related text
+			if !strings.Contains(err.Error(), "authentication") && !strings.Contains(err.Error(), "API key") {
+				t.Logf("Note: %s error message may be acceptable: %s", tc.name, err.Error())
+			}
+		})
+	}
 }
