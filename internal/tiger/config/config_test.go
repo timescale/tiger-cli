@@ -10,8 +10,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// Reset global config before each test run
-	globalConfig = nil
+	// Reset viper state before each test run
+	viper.Reset()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -27,12 +27,10 @@ func setupTestConfig(t *testing.T) string {
 
 	// Clean up Viper state
 	viper.Reset()
-	globalConfig = nil
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
 		viper.Reset()
-		globalConfig = nil
 	})
 
 	return tmpDir
@@ -214,7 +212,7 @@ analytics: true
 	}
 }
 
-func TestLoad_GlobalConfigSingleton(t *testing.T) {
+func TestLoad_IndependentInstances(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	setupViper(t, tmpDir)
 
@@ -227,14 +225,20 @@ func TestLoad_GlobalConfigSingleton(t *testing.T) {
 		t.Fatalf("First Load() failed: %v", err)
 	}
 
-	// Second load should return same instance
+	// Second load should return new independent instance
 	cfg2, err := Load()
 	if err != nil {
 		t.Fatalf("Second Load() failed: %v", err)
 	}
 
-	if cfg1 != cfg2 {
-		t.Error("Expected same config instance, got different instances")
+	// Should be different instances but same values
+	if cfg1 == cfg2 {
+		t.Error("Expected different config instances, got same instance")
+	}
+
+	// But should have same configuration values
+	if cfg1.APIURL != cfg2.APIURL || cfg1.Output != cfg2.Output {
+		t.Error("Config instances should have same values even if different objects")
 	}
 }
 
@@ -267,7 +271,6 @@ func TestSave(t *testing.T) {
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	viper.Reset()
-	globalConfig = nil
 
 	// Setup Viper again to read the saved config file
 	setupViper(t, tmpDir)
@@ -520,12 +523,11 @@ func TestReset(t *testing.T) {
 	}
 }
 
-func TestLoad_Singleton(t *testing.T) {
+func TestLoad_WithMissingConfigFile(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	setupViper(t, tmpDir)
 
-	// Test when globalConfig is nil (Load succeeds with missing file)
-	globalConfig = nil
+	// Test Load succeeds with missing file
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
@@ -548,13 +550,16 @@ func TestLoad_Singleton(t *testing.T) {
 		t.Errorf("Expected default Analytics %t, got %t", DefaultAnalytics, cfg.Analytics)
 	}
 
-	// Test when globalConfig is already set (singleton behavior)
+	// Second load should create new instance with same values
 	cfg2, err := Load()
 	if err != nil {
 		t.Fatalf("Second Load() failed: %v", err)
 	}
-	if cfg != cfg2 {
-		t.Error("Expected Load() to return same instance when globalConfig is already set")
+	if cfg == cfg2 {
+		t.Error("Expected Load() to create new instances, got same instance")
+	}
+	if cfg.APIURL != cfg2.APIURL {
+		t.Error("Expected same configuration values across different instances")
 	}
 }
 
@@ -574,8 +579,6 @@ invalid yaml content [
 
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
-
-	globalConfig = nil
 
 	// SetupViper should fail with invalid config file
 	err := SetupViper(configFile)
@@ -671,35 +674,45 @@ func TestResetGlobalConfig(t *testing.T) {
 
 	// Set environment variable for test
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	defer os.Unsetenv("TIGER_CONFIG_DIR")
+	os.Setenv("TIGER_PROJECT_ID", "test-project-before-reset")
+	defer func() {
+		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_PROJECT_ID")
+	}()
 
-	// Load config to populate globalConfig
+	// Load config first
 	cfg1, err := Load()
 	if err != nil {
 		t.Fatalf("Load() failed: %v", err)
 	}
 
-	// Verify globalConfig is set
-	if globalConfig == nil {
-		t.Error("Expected globalConfig to be set after Load()")
+	// Verify environment was used
+	if cfg1.ProjectID != "test-project-before-reset" {
+		t.Errorf("Expected project ID from env, got %s", cfg1.ProjectID)
 	}
 
-	// Reset global config
+	// Reset global viper state
 	ResetGlobalConfig()
 
-	// Verify globalConfig is nil
-	if globalConfig != nil {
-		t.Error("Expected globalConfig to be nil after ResetGlobalConfig()")
-	}
+	// Re-setup viper after reset
+	setupViper(t, tmpDir)
 
-	// Load again should create new instance
+	// Change env var
+	os.Setenv("TIGER_PROJECT_ID", "test-project-after-reset")
+
+	// Load again should pick up new env value
 	cfg2, err := Load()
 	if err != nil {
 		t.Fatalf("Second Load() failed: %v", err)
 	}
 
-	// Should be different instances since we reset
+	// Should be different instances
 	if cfg1 == cfg2 {
 		t.Error("Expected different config instances after reset, got same instance")
+	}
+
+	// Should have new env value
+	if cfg2.ProjectID != "test-project-after-reset" {
+		t.Errorf("Expected new project ID after reset, got %s", cfg2.ProjectID)
 	}
 }

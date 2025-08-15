@@ -10,7 +10,7 @@ This comprehensive code review identified **12 significant issues** across secur
 
 **Risk Distribution:**
 - **Critical:** 0 issues 
-- **High:** 3 issues (architecture, performance) ⬅️ **1 RESOLVED**
+- **High:** 2 issues (error handling, performance) ⬅️ **2 RESOLVED**
 - **Medium:** 6 issues (security, concurrency, error handling, API design)
 - **Low:** 2 issues (testing, code quality)
 
@@ -48,17 +48,38 @@ func getServiceName() string {
 
 **Impact:** ✅ **Eliminated** keyring pollution risk during testing and security bypass potential.
 
-### 2. **Architecture - Global Singleton State**
-**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/config/config.go:30`  
-**Severity:** High  
-**Problem:** Global config singleton creates hidden dependencies and makes testing difficult.
+### 2. **Architecture - Global Singleton State** ✅ **FIXED**
+**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/config/config.go` (previously line 30)  
+**Severity:** High → **RESOLVED**  
+**Problem:** Global config singleton previously created hidden dependencies and made testing difficult.
+
+**Solution Implemented:** Removed global singleton pattern and implemented proper instantiation:
 
 ```go
+// Before: Global singleton with caching
 var globalConfig *Config
+
+func Load() (*Config, error) {
+    if globalConfig != nil {
+        return globalConfig, nil  // Return cached instance
+    }
+    // ... cache new instance in globalConfig
+}
+
+// After: Fresh instance creation every time
+func Load() (*Config, error) {
+    cfg := &Config{
+        ConfigDir: GetConfigDir(),
+    }
+    // Use viper to unmarshal fresh config each time
+    if err := viper.Unmarshal(cfg); err != nil {
+        return nil, fmt.Errorf("error unmarshaling config: %w", err)
+    }
+    return cfg, nil  // Return new instance
+}
 ```
 
-**Impact:** Race conditions in concurrent use, difficult testing, hidden dependencies.  
-**Solution:** Remove global state, pass configuration explicitly through dependency injection.
+**Impact:** ✅ **Eliminated** race conditions, improved testability, removed hidden dependencies. Each `config.Load()` call now returns a fresh instance based on current viper state.
 
 ### 3. **Error Handling - Insufficient Input Validation**
 **File:** `/Users/cevian/Development/tiger-cli/internal/tiger/cmd/db.go:338-353`  
@@ -206,7 +227,7 @@ The codebase demonstrates several **strong architectural patterns**:
 
 ### ⚠️ **High Priority (Next Sprint)**
 1. **Implement input validation for user-provided arguments** - Prevent command injection
-2. **Remove global config singleton** - Implement dependency injection
+2. ~~**Remove global config singleton**~~ ✅ **COMPLETED** - Removed singleton pattern, implemented fresh instance creation
 3. **Configure HTTP client resource limits** - Prevent resource exhaustion
 4. ~~**Improve keyring service name detection**~~ ✅ **COMPLETED** - Fixed using `testing.Testing()`
 
