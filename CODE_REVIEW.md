@@ -10,7 +10,7 @@ This comprehensive code review identified **12 significant issues** across secur
 
 **Risk Distribution:**
 - **Critical:** 0 issues 
-- **High:** 1 issue (error handling) ⬅️ **3 RESOLVED**
+- **High:** 1 issue (under review) ⬅️ **3 RESOLVED** 
 - **Medium:** 6 issues (security, concurrency, error handling, API design)
 - **Low:** 2 issues (testing, code quality)
 
@@ -81,9 +81,9 @@ func Load() (*Config, error) {
 
 **Impact:** ✅ **Eliminated** race conditions, improved testability, removed hidden dependencies. Each `config.Load()` call now returns a fresh instance based on current viper state.
 
-### 3. **Error Handling - Insufficient Input Validation**
+### 3. **Error Handling - Insufficient Input Validation** ❓ **NEEDS REVIEW**
 **File:** `/Users/cevian/Development/tiger-cli/internal/tiger/cmd/db.go:338-353`  
-**Severity:** High  
+**Severity:** High → **UNDER REVIEW**  
 **Problem:** User-provided psql arguments are passed directly without validation or sanitization.
 
 ```go
@@ -95,8 +95,19 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 ```
 
-**Impact:** Command injection vulnerabilities if malicious arguments are crafted.  
-**Solution:** Implement argument validation and sanitization for psql flags.
+**Initial Assessment:** Command injection vulnerabilities if malicious arguments are crafted.
+
+**⚠️ REVIEWER NOTE:** This issue requires further evaluation. The security impact may be limited since:
+- CLI runs with user privileges (no privilege escalation)
+- Users who can inject malicious args can run malicious commands directly
+- Main risk may be in scripted/automated usage or web service integrations
+
+**Potential Solutions:**
+- Whitelist allowed psql flags for defensive programming
+- Add basic input sanitization to prevent accidents in automation
+- Document safe usage patterns for integrations
+
+**Action Required:** Please review whether this constitutes a genuine security vulnerability or should be downgraded to a code quality/defensive programming issue.
 
 ### 4. **Performance - Resource Leaks in API Client** ✅ **FIXED**
 **File:** `/Users/cevian/Development/tiger-cli/internal/tiger/api/client_util.go:22-48`  
