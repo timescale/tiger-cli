@@ -5,10 +5,37 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/tigerdata/tiger-cli/internal/tiger/config"
 )
+
+// Shared HTTP client with resource limits to prevent resource exhaustion under load
+var (
+	httpClientOnce   sync.Once
+	sharedHTTPClient *http.Client
+)
+
+// getHTTPClient returns a singleton HTTP client with essential resource limits
+// Focuses on preventing resource leaks while using reasonable Go defaults elsewhere
+func getHTTPClient() *http.Client {
+	httpClientOnce.Do(func() {
+		// Clone default transport to inherit sensible defaults, then customize key settings
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+
+		// Essential resource limits to prevent exhaustion
+		transport.MaxIdleConns = 100                 // Limit total idle connections
+		transport.MaxIdleConnsPerHost = 10           // Limit per-host idle connections
+		transport.IdleConnTimeout = 90 * time.Second // Clean up idle connections
+
+		sharedHTTPClient = &http.Client{
+			Transport: transport,
+			Timeout:   30 * time.Second, // Overall request timeout
+		}
+	})
+	return sharedHTTPClient
+}
 
 // NewTigerClient creates a new API client with the given API key
 func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
@@ -17,10 +44,8 @@ func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Create HTTP client with reasonable timeout
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-	}
+	// Use shared HTTP client with resource limits
+	httpClient := getHTTPClient()
 
 	// Create the API client
 	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient), WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {

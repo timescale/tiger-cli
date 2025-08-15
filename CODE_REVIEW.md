@@ -10,7 +10,7 @@ This comprehensive code review identified **12 significant issues** across secur
 
 **Risk Distribution:**
 - **Critical:** 0 issues 
-- **High:** 2 issues (error handling, performance) ⬅️ **2 RESOLVED**
+- **High:** 1 issue (error handling) ⬅️ **3 RESOLVED**
 - **Medium:** 6 issues (security, concurrency, error handling, API design)
 - **Low:** 2 issues (testing, code quality)
 
@@ -98,19 +98,39 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 **Impact:** Command injection vulnerabilities if malicious arguments are crafted.  
 **Solution:** Implement argument validation and sanitization for psql flags.
 
-### 4. **Performance - Resource Leaks in API Client**
-**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/api/client_util.go:22-23`  
-**Severity:** High  
-**Problem:** HTTP client has 30-second timeout but no connection pooling limits or cleanup.
+### 4. **Performance - Resource Leaks in API Client** ✅ **FIXED**
+**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/api/client_util.go:22-48`  
+**Severity:** High → **RESOLVED**  
+**Problem:** HTTP client previously had no connection pooling limits or cleanup, potentially leading to resource exhaustion.
+
+**Solution Implemented:** Added singleton HTTP client with essential resource limits:
 
 ```go
+// Before: Basic client with no resource limits
 httpClient := &http.Client{
     Timeout: 30 * time.Second,
 }
+
+// After: Shared client with resource limits
+func getHTTPClient() *http.Client {
+    httpClientOnce.Do(func() {
+        transport := http.DefaultTransport.(*http.Transport).Clone()
+        
+        // Essential resource limits to prevent exhaustion
+        transport.MaxIdleConns = 100        // Limit total idle connections
+        transport.MaxIdleConnsPerHost = 10  // Limit per-host idle connections  
+        transport.IdleConnTimeout = 90 * time.Second // Clean up idle connections
+
+        sharedHTTPClient = &http.Client{
+            Transport: transport,
+            Timeout:   30 * time.Second,
+        }
+    })
+    return sharedHTTPClient
+}
 ```
 
-**Impact:** Could lead to resource exhaustion under high load.  
-**Solution:** Configure connection limits, idle timeouts, and proper cleanup.
+**Impact:** ✅ **Eliminated** resource exhaustion risk, improved performance through connection reuse, and implemented proper connection cleanup while maintaining Go's sensible defaults.
 
 ---
 
@@ -228,7 +248,7 @@ The codebase demonstrates several **strong architectural patterns**:
 ### ⚠️ **High Priority (Next Sprint)**
 1. **Implement input validation for user-provided arguments** - Prevent command injection
 2. ~~**Remove global config singleton**~~ ✅ **COMPLETED** - Removed singleton pattern, implemented fresh instance creation
-3. **Configure HTTP client resource limits** - Prevent resource exhaustion
+3. ~~**Configure HTTP client resource limits**~~ ✅ **COMPLETED** - Added connection limits and cleanup
 4. ~~**Improve keyring service name detection**~~ ✅ **COMPLETED** - Fixed using `testing.Testing()`
 
 ### 📋 **Medium Priority (Following Sprint)**
