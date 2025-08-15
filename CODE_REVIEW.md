@@ -10,7 +10,7 @@ This comprehensive code review identified **12 significant issues** across secur
 
 **Risk Distribution:**
 - **Critical:** 0 issues 
-- **High:** 4 issues (architecture, performance)  
+- **High:** 3 issues (architecture, performance) ⬅️ **1 RESOLVED**
 - **Medium:** 6 issues (security, concurrency, error handling, API design)
 - **Low:** 2 issues (testing, code quality)
 
@@ -29,19 +29,24 @@ This comprehensive code review identified **12 significant issues** across secur
 
 ## High Severity Issues
 
-### 1. **Security - Weak Keyring Service Name Detection**
-**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/cmd/auth.go:27-37`  
-**Severity:** High  
-**Problem:** Test detection logic relies on binary name suffix and command line arguments, which can be easily bypassed.
+### 1. **Security - Weak Keyring Service Name Detection** ✅ **FIXED**
+**File:** `/Users/cevian/Development/tiger-cli/internal/tiger/cmd/auth.go:27-33`  
+**Severity:** High → **RESOLVED**  
+**Problem:** Test detection logic previously relied on binary name suffix and command line arguments, which could be easily bypassed.
+
+**Solution Implemented:** Replaced complex detection logic with Go's built-in `testing.Testing()` function:
 
 ```go
-if strings.HasSuffix(os.Args[0], ".test") {
-    return "tiger-cli-test"
+func getServiceName() string {
+    // Use Go's built-in testing detection
+    if testing.Testing() {
+        return "tiger-cli-test"
+    }
+    return serviceName
 }
 ```
 
-**Impact:** Could lead to production keyring pollution during testing or security bypasses.  
-**Solution:** Use explicit environment variable or build tags for test mode detection.
+**Impact:** ✅ **Eliminated** keyring pollution risk during testing and security bypass potential.
 
 ### 2. **Architecture - Global Singleton State**
 **File:** `/Users/cevian/Development/tiger-cli/internal/tiger/config/config.go:30`  
@@ -203,7 +208,7 @@ The codebase demonstrates several **strong architectural patterns**:
 1. **Implement input validation for user-provided arguments** - Prevent command injection
 2. **Remove global config singleton** - Implement dependency injection
 3. **Configure HTTP client resource limits** - Prevent resource exhaustion
-4. **Improve keyring service name detection** - Use build tags or explicit env vars
+4. ~~**Improve keyring service name detection**~~ ✅ **COMPLETED** - Fixed using `testing.Testing()`
 
 ### 📋 **Medium Priority (Following Sprint)**
 5. **Address silent password save failures** - Make errors visible to users
@@ -228,11 +233,11 @@ The codebase demonstrates several **strong architectural patterns**:
 
 **Remaining security concerns:**
 - ⚠️ Potential command injection via psql arguments
-- ⚠️ Weak test environment detection (keyring pollution risk)
+- ~~Weak test environment detection~~ ✅ **RESOLVED** - Now using `testing.Testing()`
 
 **Recommended Actions:**
 1. Add comprehensive input validation for user arguments
-2. Improve test environment detection
+2. ~~Improve test environment detection~~ ✅ **COMPLETED**
 3. Consider additional security testing
 
 ---
