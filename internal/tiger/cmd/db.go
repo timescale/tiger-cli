@@ -255,7 +255,9 @@ func buildConnectionString(service api.Service, pooled bool, role string, cmd *c
 	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
 	database := "tsdb"
 
-	// Build connection string in PostgreSQL URI format
+	// Build connection string in PostgreSQL URI format (username only, no password)
+	// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
+	// This ensures credentials are never visible in process arguments
 	connectionString := fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
 
 	return connectionString, nil
@@ -361,6 +363,8 @@ func launchPsqlWithConnectionString(connectionString, psqlPath string, additiona
 // buildPsqlCommand creates the psql command with proper environment setup
 func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
+	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
+	// Passwords are passed via PGPASSWORD environment variable (see below)
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
