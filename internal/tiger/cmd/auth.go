@@ -316,8 +316,8 @@ func (c *loginCmd) oauthFlow() (string, error) {
 	select {
 	case result := <-server.resultChan:
 		return result.accessToken, result.err
-	case <-time.After(2 * time.Minute):
-		return "", fmt.Errorf("authentication timeout - no callback received within 2 minutes")
+	case <-time.After(5 * time.Minute):
+		return "", fmt.Errorf("authorization timeout - no callback received within 5 minutes")
 	}
 }
 
