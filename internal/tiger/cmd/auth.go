@@ -586,8 +586,11 @@ func (c *loginCmd) createAPIKey(accessToken, projectID string) (string, error) {
 	return fmt.Sprintf("%s:%s", patRecord.ClientCredentials.AccessKey, patRecord.ClientCredentials.SecretKey), nil
 }
 
-// Use user name, fallback to email if name is empty, fallback to hostname as last resort
+// Build the PAT/Client Credentials name. This is displayed under "Project settings"
+// in the console and helps identify what the credentials are for.
 func (c *loginCmd) buildPATName(user *User) string {
+	// Use user name, fallback to email if name is empty,
+	// fallback to hostname as last resort.
 	if user.Name != "" {
 		return "TigerCLI - " + user.Name
 	} else if user.Email != "" {
