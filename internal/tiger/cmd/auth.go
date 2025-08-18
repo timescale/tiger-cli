@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,7 +11,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -22,6 +21,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
+	"golang.org/x/oauth2"
 	"golang.org/x/term"
 
 	"github.com/tigerdata/tiger-cli/internal/tiger/api"
@@ -272,11 +272,8 @@ func (c *loginCmd) loginWithOAuth() (string, string, error) {
 
 func (c *loginCmd) oauthFlow() (string, error) {
 	// Generate PKCE parameters
-	codeVerifier, err := generateCodeVerifier()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate PKCE code verifier: %w", err)
-	}
-	codeChallenge := generateCodeChallenge(codeVerifier)
+	codeVerifier := oauth2.GenerateVerifier()
+	codeChallenge := oauth2.S256ChallengeFromVerifier(codeVerifier)
 
 	// Generate random state string (to guard against CRSF attacks)
 	state, err := generateRandomState(32)
@@ -295,16 +292,7 @@ func (c *loginCmd) oauthFlow() (string, error) {
 		}
 	}()
 
-	// Construct authorization URL
-	authParams := url.Values{}
-	authParams.Set("clientId", clientID)
-	authParams.Set("redirectUri", server.redirectURI)
-	authParams.Set("responseType", "code")
-	authParams.Set("codeChallenge", codeChallenge)
-	authParams.Set("codeChallengeMethod", "S256")
-	authParams.Set("state", state)
-
-	authURL := c.cfg.ConsoleURL + "/oauth/authorize" + "?" + authParams.Encode()
+	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeChallenge))
 
 	// Open browser
 	fmt.Fprintln(c.out, "Opening browser for authentication...")
@@ -321,19 +309,6 @@ func (c *loginCmd) oauthFlow() (string, error) {
 	}
 }
 
-func generateCodeVerifier() (string, error) {
-	data := make([]byte, 32)
-	if _, err := rand.Read(data); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(data), nil
-}
-
-func generateCodeChallenge(verifier string) string {
-	hash := sha256.Sum256([]byte(verifier))
-	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(hash[:])
-}
-
 func generateRandomState(length int) (string, error) {
 	data := make([]byte, length)
 	if _, err := rand.Read(data); err != nil {
@@ -343,10 +318,10 @@ func generateRandomState(length int) (string, error) {
 }
 
 type oauthServer struct {
-	listener    net.Listener
-	server      *http.Server
-	redirectURI string
-	resultChan  <-chan oauthResult
+	listener   net.Listener
+	server     *http.Server
+	oauthCfg   oauth2.Config
+	resultChan <-chan oauthResult
 }
 
 type oauthResult struct {
@@ -375,14 +350,22 @@ func (c *loginCmd) startOAuthServer(state, codeVerifier string) (*oauthServer, e
 		return nil, fmt.Errorf("failed to listen on local port: %w", err)
 	}
 
-	// Build redirect URI
+	// Build OAuth config with localhost redirect URI
 	port := listener.Addr().(*net.TCPAddr).Port
-	redirectUri := fmt.Sprintf("http://localhost:%d/callback", port)
+	oauthCfg := oauth2.Config{
+		ClientID: clientID,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:   c.cfg.ConsoleURL + "/oauth/authorize",
+			TokenURL:  c.cfg.GatewayURL + "/idp/external/cli/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		},
+		RedirectURL: fmt.Sprintf("http://localhost:%d/callback", port),
+	}
 
 	// Start local HTTP server for callback
 	resultChan := make(chan oauthResult, 1)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /callback", c.createOAuthCallbackHandler(state, codeVerifier, resultChan))
+	mux.HandleFunc("GET /callback", c.createOAuthCallbackHandler(oauthCfg, state, codeVerifier, resultChan))
 
 	server := &http.Server{Handler: mux}
 	go func() {
@@ -394,14 +377,14 @@ func (c *loginCmd) startOAuthServer(state, codeVerifier string) (*oauthServer, e
 	}()
 
 	return &oauthServer{
-		server:      server,
-		listener:    listener,
-		redirectURI: redirectUri,
-		resultChan:  resultChan,
+		server:     server,
+		listener:   listener,
+		oauthCfg:   oauthCfg,
+		resultChan: resultChan,
 	}, nil
 }
 
-func (c *loginCmd) createOAuthCallbackHandler(expectedState, codeVerifier string, resultChan chan<- oauthResult) http.HandlerFunc {
+func (c *loginCmd) createOAuthCallbackHandler(oauthCfg oauth2.Config, expectedState, codeVerifier string, resultChan chan<- oauthResult) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 
@@ -424,7 +407,7 @@ func (c *loginCmd) createOAuthCallbackHandler(expectedState, codeVerifier string
 		}
 
 		// Exchange authorization code for tokens
-		accessToken, err := c.exchangeCodeForAccessToken(code, codeVerifier, clientID)
+		token, err := oauthCfg.Exchange(context.Background(), code, oauth2.VerifierOption(codeVerifier))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Failed to exchange authorization code for tokens")
@@ -437,48 +420,9 @@ func (c *loginCmd) createOAuthCallbackHandler(expectedState, codeVerifier string
 		http.Redirect(w, r, successURL, http.StatusTemporaryRedirect)
 
 		resultChan <- oauthResult{
-			accessToken: accessToken,
+			accessToken: token.AccessToken,
 		}
 	}
-}
-
-func (c *loginCmd) exchangeCodeForAccessToken(code, codeVerifier, clientID string) (string, error) {
-	data := url.Values{}
-	data.Set("client_id", clientID)
-	data.Set("code", code)
-	data.Set("code_verifier", codeVerifier)
-
-	tokenURL := c.cfg.GatewayURL + "/idp/external/cli/token"
-	resp, err := http.PostForm(tokenURL, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to make token exchange request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token exchange failed with status %d", resp.StatusCode)
-	}
-
-	var tokenResponse struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresAt    int    `json:"expires_at"`
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read token response body: %w", err)
-	}
-
-	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return "", fmt.Errorf("failed to decode token response: %w", err)
-	}
-
-	if tokenResponse.AccessToken == "" {
-		return "", fmt.Errorf("no access token received")
-	}
-
-	return tokenResponse.AccessToken, nil
 }
 
 // selectProjectID prompts the user to select a project if multiple are available
