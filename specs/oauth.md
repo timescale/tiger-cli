@@ -7,9 +7,55 @@ authentication with the TigerData Cloud Platform API. The implementation
 supports both interactive user authentication and programmatic authentication
 for CI/CD environments.
 
+## Design Decisions
+
+### OAuth flow uses new `web-cloud` authorization page
+
+- Not the built-in FusionAuth login page
+- Ensures user does not have to log in again if they're already logged into the console
+- Page styling and functionality are fully in our control
+- No need to deal with creating different FusionAuth applications, etc.
+  (FusionAuth is not really well-suited to this use case).
+
+### Client secret is not verified
+
+- The client secret (per the OAuth standard) is not used or verified by the back-end
+- There would be no way to truly secure it in a CLI tool distributed to end users
+- State parameter and PKCE at least ensure that our CLI tool is both kicking off
+  the OAuth flow and completing it
+- Risk: malicious code running on the user's machine could perform the OAuth
+  flow just like our CLI tool does
+  - Could potentially steal credentials
+  - User would still have to click "Authorize" to complete the flow
+  - If user machine is compromised to that extent (running untrusted code),
+    probably have bigger problems (e.g. could likely steal many other
+    credentials directly from the filesystem)
+
+### Client Credentials (PAT tokens) used for API authentication
+
+- The OAuth access token is only used temporarily to create new client credentials (PAT token)
+- The OAuth access token is not stored on the user's machine
+- Public key and secret key (from client credentials) are concatenated, stored, and used as the API key
+- Benefits:
+  - Client credentials can be viewed in the UI and revoked (whereas OAuth access/refresh tokens cannot be)
+  - No need to acquire a long-lived OAuth refresh token
+  - No need to deal with refreshing access tokens (which expire often)
+  - API keys are limited to just a single project (also potentially a downside)
+
+### Existing GraphQL endpoints are used in OAuth flow
+
+- GraphQL endpoints are used to:
+  - Fetch user profile info
+  - Fetch list of user's projects
+  - Create new client credentials (PAT token)
+- Endpoints already exist for the sake of the `web-cloud` front-end
+- Endpoints already accept the OAuth access token for authentication
+- No need to add corresponding endpoints to `savannah-public` that accept OAuth
+  access tokens (unlike the other endpoints)
+
 ## Authentication Flows
 
-### 1. Interactive Login Flow (`tiger auth login`)
+### 1. Interactive OAuth Login Flow (`tiger auth login`)
 
 The interactive flow uses OAuth 2.0 Authorization Code flow with PKCE (Proof Key
 for Code Exchange) for secure browser-based authentication.
@@ -19,180 +65,88 @@ for Code Exchange) for secure browser-based authentication.
 1. **CLI Initiation**
    - User runs `tiger auth login`
    - CLI generates PKCE code verifier and challenge
-   - CLI starts local HTTP server on random available port (e.g.,
-     `http://localhost:8080/callback`)
+   - CLI starts local HTTP server on random available port (e.g. `http://localhost:8080/callback`)
    - CLI constructs authorization URL with:
-     - `client_id`: Tiger CLI application ID registered in FusionAuth
+     - `client_id`: Tiger CLI application ID
      - `redirect_uri`: Local callback URL
      - `response_type=code`
-     - `scope`: Required API scopes (e.g., `api:read api:write`)
+     - `scope`: Required API scopes (NOTE: not currently implemented)
      - `code_challenge`: PKCE challenge
      - `code_challenge_method=S256`
      - `state`: Random state parameter for CSRF protection
 
 2. **Browser Redirect**
-   - CLI opens user's default browser to authorization URL (new page in web-cloud)
+   - CLI opens user's default browser to authorization URL (e.g. https://console.cloud.timescale.com/oauth/authorize)
    - User completes authentication flow in browser
      - Must log in if not already logged in
-     - Click a button to authorize the CLI app
-   - On success: Browser redirects to local callback with authorization code
-   - On decline: Browser redirects to local callback with error parameters
-   - On error: Browser redirects to local callback with error parameters
+     - Click "Authorize" button to authorize the CLI app
+   - On success: Browser redirects to local callback with authorization code and state parameter
+   - On error: Browser displays error message on authorization page
 
 3. **Authorization Code Exchange**
    - CLI receives callback request with authorization code
-   - CLI displays success page in browser: "Authentication successful! You can
-     now return to your terminal."
-   - CLI exchanges authorization code for tokens via POST to token endpoint:
+   - CLI verifies state parameter is correct
+   - CLI exchanges authorization code for access token via POST to token endpoint (e.g. https://console.cloud.timescale.com/api/idp/external/cli/token):
      - `grant_type=authorization_code`
      - `client_id`: Tiger CLI application ID
      - `code`: Authorization code from callback
      - `redirect_uri`: Same URI used in authorization request
      - `code_verifier`: PKCE code verifier
-
-4. **Token Storage**
-   - CLI receives access token, refresh token, and token metadata
-   - Tokens stored securely in system keychain (macOS Keychain, Windows
-     Credential Manager, Linux Secret Service)
-   - Fallback to encrypted file storage if keychain unavailable
+   - CLI redirects browser from local callback URL to success page (e.g. https://console.cloud.timescale.com/oauth/code/success)
    - CLI shuts down local HTTP server
 
+4. **API Key Generation**
+   - CLI uses access token to fetch list of user projects via GraphQL endpoint
+   - User is prompted to choose a project (if more than one)
+   - CLI uses access token to fetch user profile info
+   - CLI uses access token to create new client credentials (PAT token)
+     - Token is named `Tiger CLI - ${username}`
+
+5. **Credential Storage**
+   - Public key and secret key (client credentials) are concatenated with a
+     colon to form the API key (e.g. `publicKey:secretKey`)
+   - API key is stored securely in system keychain (macOS Keychain, Windows
+     Credential Manager, Linux Secret Service)
+   - Fallback to encrypted file storage if keychain unavailable
+   - Project ID stored in config file
+
 #### Error Handling:
-- Network errors: Retry with exponential backoff
+
 - User cancellation: Clean exit with helpful message
 - Invalid credentials: Clear error message with retry option
 - PKCE validation failures: Security error, force re-authentication
 
-### 2. Client Credentials Flow (CI/CD)
+### 2. Programmatic Login Flow (CI/CD)
 
-For non-interactive environments, Tiger CLI supports OAuth 2.0 Client
-Credentials flow using pre-configured client credentials.
+For non-interactive environments, Tiger CLI supports providing credentials
+manually via flags or environment variables. The CLI will prompt for credentials
+that are missing.
 
 #### Flow Steps:
 
 1. **Credential Configuration**
-   - User provides `CLIENT_ID` and `CLIENT_SECRET` via:
-     - Environment variables: `TIGER_CLIENT_ID`, `TIGER_CLIENT_SECRET`
-     - CLI flags: `--client-id`, `--client-secret`
-     - Configuration file (not recommended for secrets)
+   - User provides one or more of the following:
+     - `--public-key` flag or `TIGER_PUBLIC_KEY` env var
+     - `--secret-key` flag or `TIGER_SECRET_KEY` env var
+     - `--project-id` flag or `TIGER_PROJECT_ID` env var
+   - Flags take precedence over environment variables
 
-2. **Token Exchange**
-   - CLI directly exchanges credentials for access token via POST to token
-     endpoint:
-     - `grant_type=client_credentials`
-     - `client_id`: Provided client ID
-     - `client_secret`: Provided client secret
-     - `scope`: Required API scopes
+2. **Prompt for missing credentials**
+   - CLI prompts user for any values (public key, secret key, or project ID) that weren't provided
+   - TODO: Should be possible to determine the project ID programmatically from
+     the public key/secret key via an API call, which would render the project
+     ID flag/env var unnecessary
 
-3. **Token Usage**
-   - Tokens used immediately, not persisted to keychain or filesystem
-   - Fresh tokens obtained for each CLI invocation
-   - No refresh token issued (client credentials flow doesn't use refresh
-     tokens)
+3. **Credential Storage**
+   - Public key and secret key (client credentials) are concatenated with a
+     colon to form the API key (e.g. `publicKey:secretKey`)
+   - API key is stored securely in system keychain (macOS Keychain, Windows
+     Credential Manager, Linux Secret Service)
+   - Fallback to encrypted file storage if keychain unavailable
+   - Project ID stored in config file
 
-#### Security Considerations:
-- Client secrets should be managed as secure environment variables
-- Tokens have shorter expiration times compared to interactive flow
-- No persistent token storage reduces security risk
+#### Error Handling:
 
-## Token Management
-
-### Token Storage
-
-#### Secure Keychain (Preferred)
-- **macOS**: Keychain Services API
-- **Windows**: Windows Credential Manager
-- **Linux**: Secret Service (libsecret/gnome-keyring)
-
-Storage keys:
-- `tiger-cli-access-token`: Current access token
-- `tiger-cli-refresh-token`: Current refresh token
-- `tiger-cli-token-metadata`: Token expiration and scope information
-
-#### File-based Fallback If keychain is unavailable, tokens stored in local
-file:
-- Location: `~/.config/tiger/credentials.json`
-- Permissions: 0600 (owner read/write only)
-
-### Token Usage
-
-All API requests include bearer token in Authorization header: ```
-Authorization: Bearer <access_token> ```
-
-### Token Refresh Flow
-
-1. **Automatic Refresh**
-   - CLI checks token expiration before each API request
-   - If token expires within 5 minutes, trigger refresh
-   - Use refresh token to obtain new access token
-
-2. **Refresh Request**
-   - POST to token endpoint:
-     - `grant_type=refresh_token`
-     - `client_id`: Tiger CLI application ID
-     - `refresh_token`: Current refresh token
-
-3. **Refresh Response**
-   - New access token and optionally new refresh token
-   - Update stored tokens with new values
-   - Retry original API request with new access token
-
-4. **Refresh Failure**
-   - If refresh token expired/invalid: Clear stored tokens
-   - Prompt user to re-authenticate: "Your session has expired. Please run
-     'tiger auth login' to re-authenticate."
-   - For client credentials flow: Obtain fresh token using credentials
-
-## FusionAuth Integration
-
-### Endpoints
-
-#### Authorization Endpoint ``` GET
-https://auth.console.cloud.timescale.com/oauth2/authorize ```
-
-Parameters:
-- `client_id`: Tiger CLI application ID
-- `redirect_uri`: Callback URL
-- `response_type=code`: Authorization code flow
-- `scope`: Space-separated scopes
-- `code_challenge`: PKCE challenge
-- `code_challenge_method=S256`: PKCE method
-- `state`: CSRF protection token
-
-#### Token Endpoint ``` POST
-https://auth.console.cloud.timescale.com/oauth2/token Content-Type:
-application/x-www-form-urlencoded ```
-
-**Authorization Code Exchange:** ``` grant_type=authorization_code
-&client_id={client_id} &code={authorization_code} &redirect_uri={redirect_uri}
-&code_verifier={pkce_verifier} ```
-
-**Client Credentials:** ``` grant_type=client_credentials &client_id={client_id}
-&client_secret={client_secret} &scope={scopes} ```
-
-**Refresh Token:** ``` grant_type=refresh_token &client_id={client_id}
-&refresh_token={refresh_token} ```
-
-#### Token Response Format ```json { "access_token":
-"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...", "refresh_token":
-"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...", "token_type": "Bearer", "expires_in":
-3600, "scope": "api:read api:write" } ```
-
-#### Signature RSA-256 signature using FusionAuth's private key, verifiable with
-public key from JWKS endpoint: ``` GET
-https://auth.console.cloud.timescale.com/.well-known/jwks.json ```
-
-## CLI Command Structure
-
-### Auth Commands
-
-```bash # Interactive login tiger auth login
-
-# Logout (clear stored tokens) tiger auth logout ```
-
-### Global Authentication Flags
-
-Available on all commands:
-- `--client-id <id>`: Override default client ID
-- `--client-secret <secret>`: Provide client secret for CI/CD flow
-- `--no-keychain`: Force file-based token storage
+- User cancellation: Clean exit with helpful message
+- Invalid credentials: Clear error message
+- Failure to provide credentials when prompted: clear error message
