@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/viper"
 	"github.com/tigerdata/tiger-cli/internal/tiger/config"
@@ -374,32 +374,56 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 			return err
 		}
 
-		redirectURI := parsedURL.Query().Get("redirectUri")
+		clientID := parsedURL.Query().Get("client_id")
+		responseType := parsedURL.Query().Get("response_type")
+		codeChallengeMethod := parsedURL.Query().Get("code_challenge_method")
+		codeChallenge := parsedURL.Query().Get("code_challenge")
+		redirectURI := parsedURL.Query().Get("redirect_uri")
 		state := parsedURL.Query().Get("state")
 
+		if clientID == "" {
+			t.Fatal("no client_id found in OAuth URL")
+			return errors.New("no client_id found in OAuth URL")
+		}
+
+		if responseType != "code" {
+			t.Fatal("invalid response_type found in OAuth URL")
+			return errors.New("no response_type found in OAuth URL")
+		}
+
+		if codeChallengeMethod != "S256" {
+			t.Fatal("invalid code_challenge_method found in OAuth URL")
+			return errors.New("no code_challenge_method found in OAuth URL")
+		}
+
+		if codeChallenge == "" {
+			t.Fatal("no code_challenge found in OAuth URL")
+			return errors.New("no code_challenge found in OAuth URL")
+		}
+
 		if redirectURI == "" {
-			return fmt.Errorf("no redirectUri found in OAuth URL")
+			t.Fatal("no redirect_uri found in OAuth URL")
+			return errors.New("no redirect_uri found in OAuth URL")
 		}
 
 		if state == "" {
-			return fmt.Errorf("no state found in OAuth URL")
+			t.Fatal("no state found in OAuth URL")
+			return errors.New("no state found in OAuth URL")
 		}
 
 		// Give the OAuth server a moment to start
 		go func() {
-			time.Sleep(50 * time.Millisecond)
-
 			// Make the OAuth callback request directly
 			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
 			t.Logf("Mock browser making callback request to: %s", callbackURL)
 
 			resp, err := http.Get(callbackURL)
 			if err != nil {
-				t.Logf("Mock callback request failed: %v", err)
+				t.Errorf("Mock callback request failed: %v", err)
 				return
 			}
 			if err := resp.Body.Close(); err != nil {
-				t.Logf("Error closing callback request body: %v", err)
+				t.Errorf("Error closing callback request body: %v", err)
 			}
 		}()
 
