@@ -2,25 +2,14 @@ package cmd
 
 import (
 	"bufio"
-	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
-	"golang.org/x/oauth2"
 	"golang.org/x/term"
 
 	"github.com/tigerdata/tiger-cli/internal/tiger/api"
@@ -29,8 +18,9 @@ import (
 
 // Keyring parameters
 const (
-	serviceName = "tiger-cli"
-	username    = "api-key"
+	serviceName     = "tiger-cli"
+	testServiceName = "tiger-cli-test"
+	username        = "api-key"
 )
 
 // getServiceName returns the appropriate service name for keyring operations
@@ -38,36 +28,28 @@ const (
 func getServiceName() string {
 	// Check if we're running in a test - look for .test suffix in the binary name
 	if strings.HasSuffix(os.Args[0], ".test") {
-		return "tiger-cli-test"
+		return testServiceName
 	}
 	// Also check for test-specific arguments
 	for _, arg := range os.Args {
 		if strings.HasPrefix(arg, "-test.") {
-			return "tiger-cli-test"
+			return testServiceName
 		}
 	}
 	return serviceName
 }
 
-// OAuth parameters
-// TODO: Currently unused, but should probably support
-const clientID = "65183398-ece9-40c4-84e7-84974c51255b"
+// validateAPIKeyForLogin can be overridden for testing
+var validateAPIKeyForLogin = api.ValidateAPIKey
 
-var (
-	// validateAPIKeyForLogin can be overridden for testing
-	validateAPIKeyForLogin = api.ValidateAPIKey
-
-	// openBrowser can be overridden for testing
-	openBrowser = openBrowserImpl
-
-	// selectProjectInteractively can be overridden for testing
-	selectProjectInteractively = selectProjectInteractivelyImpl
-)
+type credentials struct {
+	publicKey string
+	secretKey string
+	projectID string
+}
 
 func buildLoginCmd() *cobra.Command {
-	var publicKeyFlag string
-	var secretKeyFlag string
-	var projectIDFlag string
+	var flags credentials
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -112,59 +94,52 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			c := &loginCmd{
-				cfg: cfg,
-				graphql: &GraphQLClient{
-					URL: cfg.GatewayURL,
-				},
-				out: cmd.OutOrStdout(),
-			}
-
-			publicKey := publicKeyFlag
-			if publicKey == "" {
-				publicKey = os.Getenv("TIGER_PUBLIC_KEY")
-			}
-
-			secretKey := secretKeyFlag
-			if secretKey == "" {
-				secretKey = os.Getenv("TIGER_SECRET_KEY")
-			}
-
 			// TODO: It should be possible to get the projectID corresponding to the
-			// API keys programmatically, making the project-id flag unnecessary
-			projectID := projectIDFlag
-			if projectID == "" {
-				projectID = os.Getenv("TIGER_PROJECT_ID")
+			// API keys programmatically, making the project-id flag/env var unnecessary
+			creds := credentials{
+				publicKey: flagOrEnvVar(flags.publicKey, "TIGER_PUBLIC_KEY"),
+				secretKey: flagOrEnvVar(flags.secretKey, "TIGER_SECRET_KEY"),
+				projectID: flagOrEnvVar(flags.projectID, "TIGER_PROJECT_ID"),
 			}
 
-			apiKey := fmt.Sprintf("%s:%s", publicKey, secretKey)
-			if publicKey == "" && secretKey == "" && projectID == "" {
-				apiKey, projectID, err = c.loginWithOAuth()
+			if creds.publicKey == "" && creds.secretKey == "" && creds.projectID == "" {
+				// If no credentials were provided, start interactive OAuth login flow
+				l := &oauthLogin{
+					authURL:    cfg.ConsoleURL + "/oauth/authorize",
+					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
+					successURL: cfg.ConsoleURL + "/oauth/code/success",
+					graphql: &GraphQLClient{
+						URL: cfg.GatewayURL + "/query",
+					},
+					out: cmd.OutOrStdout(),
+				}
+
+				creds, err = l.loginWithOAuth()
 				if err != nil {
 					return err
 				}
-			} else if publicKey == "" || secretKey == "" || projectID == "" {
-				// If any credentials are missing, prompt for them all at once
-				publicKey, secretKey, projectID, err = promptForCredentials(publicKey, secretKey, projectID)
+			} else if creds.publicKey == "" || creds.secretKey == "" || creds.projectID == "" {
+				// If some credentials were provided, prompt for missing ones
+				creds, err = promptForCredentials(creds)
 				if err != nil {
 					return fmt.Errorf("failed to get credentials: %w", err)
 				}
 
-				if publicKey == "" || secretKey == "" {
+				if creds.publicKey == "" || creds.secretKey == "" {
 					return fmt.Errorf("both public key and secret key are required")
 				}
 
-				if projectID == "" {
+				if creds.projectID == "" {
 					return fmt.Errorf("project ID is required")
 				}
-
-				// Combine the keys in the format "public:secret" for storage
-				apiKey = fmt.Sprintf("%s:%s", publicKey, secretKey)
 			}
 
+			// Combine the keys in the format "public:secret" for storage
+			apiKey := fmt.Sprintf("%s:%s", creds.publicKey, creds.secretKey)
+
 			// Validate the API key by making a test API call
-			fmt.Fprintln(c.out, "Validating API key...")
-			if err := validateAPIKeyForLogin(apiKey, projectID); err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
+			if err := validateAPIKeyForLogin(apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
 
@@ -172,22 +147,22 @@ Examples:
 			if err := storeAPIKey(apiKey); err != nil {
 				return fmt.Errorf("failed to store API key: %w", err)
 			}
-			fmt.Fprintln(c.out, "Successfully logged in and stored API key")
+			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key")
 
 			// Store project ID in config if provided
-			if err := storeProjectID(projectID); err != nil {
+			if err := storeProjectID(creds.projectID); err != nil {
 				return fmt.Errorf("failed to store project ID: %w", err)
 			}
-			fmt.Fprintf(c.out, "Set default project ID to: %s\n", projectID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Set default project ID to: %s\n", creds.projectID)
 
 			return nil
 		},
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&publicKeyFlag, "public-key", "", "Public key for authentication")
-	cmd.Flags().StringVar(&secretKeyFlag, "secret-key", "", "Secret key for authentication")
-	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Default project ID to set in configuration")
+	cmd.Flags().StringVar(&flags.publicKey, "public-key", "", "Public key for authentication")
+	cmd.Flags().StringVar(&flags.secretKey, "secret-key", "", "Secret key for authentication")
+	cmd.Flags().StringVar(&flags.projectID, "project-id", "", "Default project ID to set in configuration")
 
 	return cmd
 }
@@ -244,327 +219,11 @@ func buildAuthCmd() *cobra.Command {
 	return cmd
 }
 
-type loginCmd struct {
-	cfg     *config.Config
-	graphql *GraphQLClient
-	out     io.Writer
-}
-
-func (c *loginCmd) loginWithOAuth() (string, string, error) {
-	// Get a user access token via OAuth
-	accessToken, err := c.oauthFlow()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to authenticate via OAuth: %w", err)
+func flagOrEnvVar(flagVal, envVarName string) string {
+	if flagVal != "" {
+		return flagVal
 	}
-
-	// Get the user's project ID (with interactive selection if needed)
-	projectID, err := c.selectProjectID(accessToken)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to select project: %w", err)
-	}
-
-	// Create API key for the selected project
-	apiKey, err := c.createAPIKey(accessToken, projectID)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create API key: %w", err)
-	}
-
-	return apiKey, projectID, nil
-
-}
-
-func (c *loginCmd) oauthFlow() (string, error) {
-	// Generate PKCE parameters
-	codeVerifier := oauth2.GenerateVerifier()
-	codeChallenge := oauth2.S256ChallengeFromVerifier(codeVerifier)
-
-	// Generate random state string (to guard against CRSF attacks)
-	state, err := generateRandomState(32)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random state: %w", err)
-	}
-
-	// Start local HTTP server for handling the OAuth callback
-	server, err := c.startOAuthServer(state, codeVerifier)
-	if err != nil {
-		return "", fmt.Errorf("failed to create local server: %w", err)
-	}
-	defer func() {
-		if err := server.Close(); err != nil {
-			fmt.Fprintf(c.out, "Failed to close local server: %s\n", err)
-		}
-	}()
-
-	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeChallenge))
-
-	// Open browser
-	fmt.Fprintln(c.out, "Opening browser for authentication...")
-	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(c.out, "Failed to open browser: %s\nPlease manually navigate to: %s\n", err, authURL)
-	}
-
-	// Wait for callback with timeout
-	select {
-	case result := <-server.resultChan:
-		return result.accessToken, result.err
-	case <-time.After(5 * time.Minute):
-		return "", fmt.Errorf("authorization timeout - no callback received within 5 minutes")
-	}
-}
-
-func generateRandomState(length int) (string, error) {
-	data := make([]byte, length)
-	if _, err := rand.Read(data); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(data)[:length], nil
-}
-
-type oauthServer struct {
-	listener   net.Listener
-	server     *http.Server
-	oauthCfg   oauth2.Config
-	resultChan <-chan oauthResult
-}
-
-type oauthResult struct {
-	accessToken string
-	err         error
-}
-
-func (s *oauthServer) Close() error {
-	doClose := func(closer io.Closer) error {
-		if err := closer.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			return err
-		}
-		return nil
-	}
-
-	return errors.Join(
-		doClose(s.server),
-		doClose(s.listener),
-	)
-}
-
-func (c *loginCmd) startOAuthServer(state, codeVerifier string) (*oauthServer, error) {
-	// Start listening on an available port
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to listen on local port: %w", err)
-	}
-
-	// Build OAuth config with localhost redirect URI
-	port := listener.Addr().(*net.TCPAddr).Port
-	oauthCfg := oauth2.Config{
-		ClientID: clientID,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:   c.cfg.ConsoleURL + "/oauth/authorize",
-			TokenURL:  c.cfg.GatewayURL + "/idp/external/cli/token",
-			AuthStyle: oauth2.AuthStyleInParams,
-		},
-		RedirectURL: fmt.Sprintf("http://localhost:%d/callback", port),
-	}
-
-	// Start local HTTP server for callback
-	resultChan := make(chan oauthResult, 1)
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /callback", c.createOAuthCallbackHandler(oauthCfg, state, codeVerifier, resultChan))
-
-	server := &http.Server{Handler: mux}
-	go func() {
-		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			resultChan <- oauthResult{
-				err: fmt.Errorf("failed to serve requests: %w", err),
-			}
-		}
-	}()
-
-	return &oauthServer{
-		server:     server,
-		listener:   listener,
-		oauthCfg:   oauthCfg,
-		resultChan: resultChan,
-	}, nil
-}
-
-func (c *loginCmd) createOAuthCallbackHandler(oauthCfg oauth2.Config, expectedState, codeVerifier string, resultChan chan<- oauthResult) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		query := r.URL.Query()
-
-		// Validate state parameter
-		state := query.Get("state")
-		if state != expectedState {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "Invalid state parameter")
-			resultChan <- oauthResult{err: fmt.Errorf("invalid state parameter")}
-			return
-		}
-
-		// Get authorization code
-		code := query.Get("code")
-		if code == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "Missing authorization code")
-			resultChan <- oauthResult{err: fmt.Errorf("missing authorization code in callback")}
-			return
-		}
-
-		// Exchange authorization code for tokens
-		token, err := oauthCfg.Exchange(context.Background(), code, oauth2.VerifierOption(codeVerifier))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Failed to exchange authorization code for tokens")
-			resultChan <- oauthResult{err: fmt.Errorf("failed to exchange code for tokens: %w", err)}
-			return
-		}
-
-		// Redirect to success page
-		successURL := c.cfg.ConsoleURL + "/oauth/code/success"
-		http.Redirect(w, r, successURL, http.StatusTemporaryRedirect)
-
-		resultChan <- oauthResult{
-			accessToken: token.AccessToken,
-		}
-	}
-}
-
-// selectProjectID prompts the user to select a project if multiple are available
-func (c *loginCmd) selectProjectID(accessToken string) (string, error) {
-	// First, get the list of projects the user has access to
-	projects, err := c.graphql.getUserProjects(accessToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to get user projects: %w", err)
-	}
-
-	switch len(projects) {
-	case 0:
-		return "", fmt.Errorf("user has no accessible projects")
-	case 1:
-		return projects[0].ID, nil
-	default:
-		return selectProjectInteractively(projects, c.out)
-	}
-}
-
-// selectProjectInteractivelyImpl is the default implementation for project selection using Bubble Tea
-func selectProjectInteractivelyImpl(projects []Project, out io.Writer) (string, error) {
-	model := projectSelectModel{
-		projects: projects,
-		cursor:   0,
-	}
-
-	program := tea.NewProgram(model, tea.WithOutput(out))
-	finalModel, err := program.Run()
-	if err != nil {
-		return "", fmt.Errorf("failed to run project selection: %w", err)
-	}
-
-	result := finalModel.(projectSelectModel)
-	if result.selected == "" {
-		return "", fmt.Errorf("no project selected")
-	}
-
-	return result.selected, nil
-}
-
-// projectSelectModel represents the Bubble Tea model for project selection
-type projectSelectModel struct {
-	projects []Project
-	cursor   int
-	selected string
-}
-
-func (m projectSelectModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			if m.cursor < len(m.projects)-1 {
-				m.cursor++
-			}
-		case "enter", " ":
-			m.selected = m.projects[m.cursor].ID
-			return m, tea.Quit
-		}
-	}
-	return m, nil
-}
-
-func (m projectSelectModel) View() string {
-	s := "Select a project:\n\n"
-
-	for i, project := range m.projects {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-		s += fmt.Sprintf("%s %s (%s)\n", cursor, project.Name, project.ID)
-	}
-
-	s += "\nUse ↑/↓ arrows to navigate, Enter to select, q to quit"
-	return s
-}
-
-// createAPIKey creates an API key for the selected project
-func (c *loginCmd) createAPIKey(accessToken, projectID string) (string, error) {
-	// Get user information for PAT name
-	user, err := c.graphql.getUser(accessToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to get user info: %w", err)
-	}
-
-	// Create a PAT record for this project
-	patRecord, err := c.graphql.createPATRecord(accessToken, projectID, c.buildPATName(user))
-	if err != nil {
-		return "", fmt.Errorf("failed to create PAT record: %w", err)
-	}
-
-	// Combine access key and secret key with colon
-	return fmt.Sprintf("%s:%s", patRecord.ClientCredentials.AccessKey, patRecord.ClientCredentials.SecretKey), nil
-}
-
-// Build the PAT/Client Credentials name. This is displayed under "Project settings"
-// in the console and helps identify what the credentials are for.
-func (c *loginCmd) buildPATName(user *User) string {
-	// Use user name, fallback to email if name is empty,
-	// fallback to hostname as last resort.
-	if user.Name != "" {
-		return "TigerCLI - " + user.Name
-	} else if user.Email != "" {
-		return "TigerCLI - " + user.Email
-	} else if hostname, _ := os.Hostname(); hostname != "" {
-		return "TigerCLI - " + hostname
-	} else {
-		return "TigerCLI"
-	}
-}
-
-func openBrowserImpl(url string) error {
-	var cmd string
-	var args []string
-
-	// TODO: Do all of these work correctly?
-	switch runtime.GOOS {
-	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
-	case "darwin":
-		cmd = "open"
-	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
-	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
+	return os.Getenv(envVarName)
 }
 
 // storeAPIKey stores the API key using keyring with file fallback
@@ -665,10 +324,10 @@ func removeAPIKeyFromFile() error {
 }
 
 // promptForCredentials prompts the user to enter any missing credentials
-func promptForCredentials(publicKey, secretKey, projectID string) (string, string, string, error) {
+func promptForCredentials(creds credentials) (credentials, error) {
 	// Check if we're in a terminal for interactive input
 	if !term.IsTerminal(int(syscall.Stdin)) {
-		return "", "", "", fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
+		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
 	}
 
 	fmt.Println("You can find your API credentials and project ID at: https://console.timescale.com/dashboard/settings")
@@ -677,39 +336,37 @@ func promptForCredentials(publicKey, secretKey, projectID string) (string, strin
 	reader := bufio.NewReader(os.Stdin)
 
 	// Prompt for public key if missing
-	if publicKey == "" {
+	if creds.publicKey == "" {
 		fmt.Print("Enter your public key: ")
-		var err error
-		publicKey, err = reader.ReadString('\n')
+		publicKey, err := reader.ReadString('\n')
 		if err != nil {
-			return "", "", "", err
+			return credentials{}, err
 		}
-		publicKey = strings.TrimSpace(publicKey)
+		creds.publicKey = strings.TrimSpace(publicKey)
 	}
 
 	// Prompt for secret key if missing
-	if secretKey == "" {
+	if creds.secretKey == "" {
 		fmt.Print("Enter your secret key: ")
 		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		if err != nil {
-			return "", "", "", err
+			return credentials{}, err
 		}
 		fmt.Println() // Print newline after hidden input
-		secretKey = strings.TrimSpace(string(bytePassword))
+		creds.secretKey = strings.TrimSpace(string(bytePassword))
 	}
 
 	// Prompt for project ID if missing
-	if projectID == "" {
+	if creds.projectID == "" {
 		fmt.Print("Enter your project ID: ")
-		var err error
-		projectID, err = reader.ReadString('\n')
+		projectID, err := reader.ReadString('\n')
 		if err != nil {
-			return "", "", "", err
+			return credentials{}, err
 		}
-		projectID = strings.TrimSpace(projectID)
+		creds.projectID = strings.TrimSpace(projectID)
 	}
 
-	return publicKey, secretKey, projectID, nil
+	return creds, nil
 }
 
 // storeProjectID stores the project ID in the configuration file

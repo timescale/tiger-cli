@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// We currently use a few GraphQL endpoints as part of the OAuth login flow
+// We currently use a few GraphQL endpoints as part of the OAuth login flow,
 // because they were already available and they accept the OAuth access token
 // for authentication (whereas savannah-public only accepts the client
 // credentials/API Key).
@@ -125,8 +125,8 @@ func (c *GraphQLClient) createPATRecord(accessToken, projectID, patName string) 
 	return &response.Data.CreatePATRecord, nil
 }
 
-// makeGraphQLRequest makes a GraphQL request to the API using generics
-func makeGraphQLRequest[T any](gatewayURL, accessToken, query string, variables map[string]any) (*T, error) {
+// makeGraphQLRequest makes a GraphQL request to the API
+func makeGraphQLRequest[T any](queryURL, accessToken, query string, variables map[string]any) (*T, error) {
 	requestBody := map[string]any{
 		"query": query,
 	}
@@ -139,7 +139,6 @@ func makeGraphQLRequest[T any](gatewayURL, accessToken, query string, variables 
 		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
 	}
 
-	queryURL := gatewayURL + "/query"
 	req, err := http.NewRequest("POST", queryURL, strings.NewReader(string(jsonBody)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
@@ -148,8 +147,7 @@ func makeGraphQLRequest[T any](gatewayURL, accessToken, query string, variables 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make GraphQL request: %w", err)
 	}
