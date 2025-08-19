@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -287,9 +288,10 @@ func selectProjectInteractivelyImpl(projects []Project, out io.Writer) (string, 
 
 // projectSelectModel represents the Bubble Tea model for project selection
 type projectSelectModel struct {
-	projects []Project
-	cursor   int
-	selected string
+	projects     []Project
+	cursor       int
+	selected     string
+	numberBuffer string
 }
 
 func (m projectSelectModel) Init() tea.Cmd {
@@ -303,19 +305,55 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
 			if m.cursor > 0 {
 				m.cursor--
 			}
 		case "down", "j":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
 			if m.cursor < len(m.projects)-1 {
 				m.cursor++
 			}
 		case "enter", " ":
 			m.selected = m.projects[m.cursor].ID
 			return m, tea.Quit
+		case "backspace":
+			// Handle backspace to remove last character from buffer
+			if len(m.numberBuffer) > 0 {
+				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
+			}
+		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			// Add digit to buffer and update cursor position
+			m.updateNumberBuffer(m.numberBuffer + msg.String())
+		case "ctrl+w", "esc":
+			// Clear buffer on escape
+			m.numberBuffer = ""
 		}
 	}
 	return m, nil
+}
+
+// updateNumberBuffer moves the cursor to the project matching the number buffer
+func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
+	if newBuffer == "" {
+		m.numberBuffer = newBuffer
+		return
+	}
+
+	// Parse the buffer as a number
+	num, err := strconv.Atoi(newBuffer)
+	if err != nil {
+		return
+	}
+
+	// Convert from 1-based to 0-based index and validate bounds
+	index := num - 1
+	if index >= 0 && index < len(m.projects) {
+		m.numberBuffer = newBuffer
+		m.cursor = index
+	}
 }
 
 func (m projectSelectModel) View() string {
@@ -326,10 +364,15 @@ func (m projectSelectModel) View() string {
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %s (%s)\n", cursor, project.Name, project.ID)
+		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
 	}
 
-	s += "\nUse ↑/↓ arrows to navigate, Enter to select, q to quit"
+	// Show the current number buffer if user is typing
+	if m.numberBuffer != "" {
+		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
+	}
+
+	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
 	return s
 }
 
