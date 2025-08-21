@@ -9,22 +9,26 @@ import (
 )
 
 type Config struct {
-	APIURL    string `mapstructure:"api_url" yaml:"api_url"`
-	ProjectID string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID string `mapstructure:"service_id" yaml:"service_id"`
-	Output    string `mapstructure:"output" yaml:"output"`
-	Analytics bool   `mapstructure:"analytics" yaml:"analytics"`
-	ConfigDir string `mapstructure:"config_dir" yaml:"-"`
-	Debug     bool   `mapstructure:"debug" yaml:"debug"`
+	APIURL     string `mapstructure:"api_url" yaml:"api_url"`
+	ConsoleURL string `mapstructure:"console_url" yaml:"console_url"`
+	GatewayURL string `mapstructure:"gateway_url" yaml:"gateway_url"`
+	ProjectID  string `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID  string `mapstructure:"service_id" yaml:"service_id"`
+	Output     string `mapstructure:"output" yaml:"output"`
+	Analytics  bool   `mapstructure:"analytics" yaml:"analytics"`
+	ConfigDir  string `mapstructure:"config_dir" yaml:"-"`
+	Debug      bool   `mapstructure:"debug" yaml:"debug"`
 }
 
 const (
-	DefaultAPIURL    = "https://api.tigerdata.com/public/v1"
-	DefaultOutput    = "table"
-	DefaultAnalytics = true
-	DefaultDebug     = false
-	DefaultConfigDir = "~/.config/tiger"
-	ConfigFileName   = "config.yaml"
+	DefaultAPIURL     = "https://api.tigerdata.com/public/v1"
+	DefaultConsoleURL = "https://console.cloud.timescale.com"
+	DefaultGatewayURL = "https://console.cloud.timescale.com/api"
+	DefaultOutput     = "table"
+	DefaultAnalytics  = true
+	DefaultDebug      = false
+	DefaultConfigDir  = "~/.config/tiger"
+	ConfigFileName    = "config.yaml"
 )
 
 var globalConfig *Config
@@ -37,6 +41,8 @@ func SetupViper(configFile string) error {
 
 	// Set defaults for all config values
 	viper.SetDefault("api_url", DefaultAPIURL)
+	viper.SetDefault("console_url", DefaultConsoleURL)
+	viper.SetDefault("gateway_url", DefaultGatewayURL)
 	viper.SetDefault("project_id", "")
 	viper.SetDefault("service_id", "")
 	viper.SetDefault("output", DefaultOutput)
@@ -83,6 +89,8 @@ func (c *Config) Save() error {
 	configFile := filepath.Join(configDir, ConfigFileName)
 
 	viper.Set("api_url", c.APIURL)
+	viper.Set("console_url", c.ConsoleURL)
+	viper.Set("gateway_url", c.GatewayURL)
 	viper.Set("project_id", c.ProjectID)
 	viper.Set("service_id", c.ServiceID)
 	viper.Set("output", c.Output)
@@ -100,6 +108,10 @@ func (c *Config) Set(key, value string) error {
 	switch key {
 	case "api_url":
 		c.APIURL = value
+	case "console_url":
+		c.ConsoleURL = value
+	case "gateway_url":
+		c.GatewayURL = value
 	case "project_id":
 		c.ProjectID = value
 	case "service_id":
@@ -136,6 +148,10 @@ func (c *Config) Unset(key string) error {
 	switch key {
 	case "api_url":
 		c.APIURL = DefaultAPIURL
+	case "console_url":
+		c.ConsoleURL = DefaultConsoleURL
+	case "gateway_url":
+		c.GatewayURL = DefaultGatewayURL
 	case "project_id":
 		c.ProjectID = ""
 	case "service_id":
@@ -155,6 +171,8 @@ func (c *Config) Unset(key string) error {
 
 func (c *Config) Reset() error {
 	c.APIURL = DefaultAPIURL
+	c.ConsoleURL = DefaultConsoleURL
+	c.GatewayURL = DefaultGatewayURL
 	c.ProjectID = ""
 	c.ServiceID = ""
 	c.Output = DefaultOutput

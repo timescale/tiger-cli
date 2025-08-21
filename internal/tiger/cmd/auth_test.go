@@ -2,6 +2,13 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +82,7 @@ func executeAuthCommand(args ...string) (string, error) {
 	return buf.String(), err
 }
 
-func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
+func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
 	// Execute login command with public and secret key flags and project ID
@@ -84,7 +91,7 @@ func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-123\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -108,24 +115,57 @@ func TestAuthLogin_WithAPIKeyFlag(t *testing.T) {
 			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 		}
 	}
+
+	// Verify project ID was stored in config
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ProjectID != "test-project-123" {
+		t.Errorf("Expected project ID 'test-project-123', got '%s'", cfg.ProjectID)
+	}
 }
 
-func TestAuthLogin_WithEnvironmentVariable(t *testing.T) {
+func TestAuthLogin_KeyFlags_NoProjectID(t *testing.T) {
+	setupAuthTest(t)
+
+	// Execute login command with only public and secret key flags (no project ID)
+	// This should fail since project ID is now required
+	_, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
+	if err == nil {
+		t.Fatal("Expected login to fail without project ID, but it succeeded")
+	}
+
+	// Verify the error message mentions TTY not detected
+	expectedErrorMsg := "TTY not detected - credentials required"
+	if !strings.Contains(err.Error(), expectedErrorMsg) {
+		t.Errorf("Expected error to contain %q, got: %v", expectedErrorMsg, err)
+	}
+
+	// Verify no API key was stored since login failed
+	if _, err = getAPIKey(); err == nil {
+		t.Error("API key should not be stored when login fails")
+	}
+}
+
+func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 	setupAuthTest(t)
 
 	// Set environment variables for public and secret keys
 	os.Setenv("TIGER_PUBLIC_KEY", "env-public-key")
 	os.Setenv("TIGER_SECRET_KEY", "env-secret-key")
+	os.Setenv("TIGER_PROJECT_ID", "env-project-id")
 	defer os.Unsetenv("TIGER_PUBLIC_KEY")
 	defer os.Unsetenv("TIGER_SECRET_KEY")
+	defer os.Unsetenv("TIGER_PROJECT_ID")
 
 	// Execute login command with project ID flag but using env vars for keys
-	output, err := executeAuthCommand("auth", "login", "--project-id", "test-project-456")
+	output, err := executeAuthCommand("auth", "login")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-456\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -141,22 +181,339 @@ func TestAuthLogin_WithEnvironmentVariable(t *testing.T) {
 	}
 }
 
-func TestAuthLogin_NoAPIKey(t *testing.T) {
+func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 	setupAuthTest(t)
+
+	// Set environment variables for public and secret keys
+	os.Setenv("TIGER_PUBLIC_KEY", "env-public-key")
+	os.Setenv("TIGER_SECRET_KEY", "env-secret-key")
+	defer os.Unsetenv("TIGER_PUBLIC_KEY")
+	defer os.Unsetenv("TIGER_SECRET_KEY")
+
+	// Execute login command with project ID flag but using env vars for keys
+	output, err := executeAuthCommand("auth", "login", "--project-id", "test-project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n"
+	if output != expectedOutput {
+		t.Errorf("Unexpected output: '%s'", output)
+	}
+
+	// Verify API key was stored (should be combined format)
+	expectedAPIKey := "env-public-key:env-secret-key"
+	storedKey, err := getAPIKey()
+	if err != nil {
+		t.Fatalf("Failed to get stored API key: %v", err)
+	}
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+}
+
+// setupOAuthTest creates a complete OAuth test environment with mock server and browser
+func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) {
+	t.Helper()
+	tmpDir := setupAuthTest(t)
 
 	// Ensure no keys in environment
 	os.Unsetenv("TIGER_PUBLIC_KEY")
 	os.Unsetenv("TIGER_SECRET_KEY")
+	os.Unsetenv("TIGER_PROJECT_ID")
 
-	// Execute login command without keys (this should fail in non-interactive mode)
-	_, err := executeAuthCommand("auth", "login")
-	if err == nil {
-		t.Fatal("Expected login to fail without keys")
+	// Start mock server for OAuth endpoints
+	mockServer := startMockOAuthServer(t, projects)
+
+	// Set up mock browser function
+	originalOpenBrowser := openBrowser
+	openBrowser = mockOpenBrowser(t)
+
+	// Set config URLs to point to mock server
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	configContent := fmt.Sprintf(`
+console_url: "%s"
+gateway_url: "%s"
+`, mockServer.URL, mockServer.URL)
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Error should indicate TTY not detected and credentials are required
-	if !strings.Contains(err.Error(), "TTY not detected - credentials required") {
-		t.Errorf("Expected error to mention TTY not detected, got: %v", err)
+	// Return cleanup function
+	t.Cleanup(func() {
+		mockServer.Close()
+		openBrowser = originalOpenBrowser
+	})
+}
+
+// startMockOAuthServer starts a mock server that handles all OAuth endpoints
+func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
+	t.Helper()
+
+	mux := http.NewServeMux()
+
+	// Token exchange endpoint
+	mux.HandleFunc("POST /idp/external/cli/token", func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("Mock server received token exchange request")
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+
+		clientID := r.FormValue("client_id")
+		code := r.FormValue("code")
+		codeVerifier := r.FormValue("code_verifier")
+
+		if clientID == "" || code == "" || codeVerifier == "" {
+			http.Error(w, "Missing required parameters", http.StatusBadRequest)
+			return
+		}
+
+		tokenResponse := map[string]interface{}{
+			"access_token":  "mock-access-token-12345",
+			"refresh_token": "mock-refresh-token-67890",
+			"expires_at":    1234567890,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(tokenResponse); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	})
+
+	// GraphQL endpoint for getUserProjects and other queries
+	mux.HandleFunc("POST /query", func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("Mock server received GraphQL request")
+
+		var requestBody map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			http.Error(w, "Failed to decode request body", http.StatusBadRequest)
+			return
+		}
+
+		query, ok := requestBody["query"].(string)
+		if !ok {
+			http.Error(w, "Missing query in request", http.StatusBadRequest)
+			return
+		}
+
+		// Handle different GraphQL queries
+		if strings.Contains(query, "getAllProjects") {
+			response := GraphQLResponse[GetAllProjectsData]{
+				Data: &GetAllProjectsData{
+					GetAllProjects: projects,
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
+		} else if strings.Contains(query, "getUser") {
+			response := GraphQLResponse[GetUserData]{
+				Data: &GetUserData{
+					GetUser: User{
+						ID:    "user-456",
+						Name:  "Test User",
+						Email: "test@example.com",
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
+		} else if strings.Contains(query, "createPATRecord") {
+			response := GraphQLResponse[CreatePATRecordData]{
+				Data: &CreatePATRecordData{
+					CreatePATRecord: PATRecordResponse{
+						ClientCredentials: struct {
+							AccessKey string `json:"accessKey"`
+							SecretKey string `json:"secretKey"`
+						}{
+							AccessKey: "test-access-key",
+							SecretKey: "test-secret-key",
+						},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
+		} else {
+			http.Error(w, "Unknown GraphQL query", http.StatusBadRequest)
+		}
+	})
+
+	// OAuth success endpoint (just returns 200 OK)
+	mux.HandleFunc("GET /oauth/code/success", func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("Mock server received OAuth success request")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Create test server
+	return httptest.NewServer(mux)
+}
+
+// mockOpenBrowser returns a mock openBrowser function that simulates OAuth callback
+func mockOpenBrowser(t *testing.T) func(string) error {
+	return func(authURL string) error {
+		t.Logf("Mock browser opening URL: %s", authURL)
+
+		// Extract redirect_uri and state from the URL parameters
+		parsedURL, err := url.Parse(authURL)
+		if err != nil {
+			return err
+		}
+
+		clientID := parsedURL.Query().Get("client_id")
+		responseType := parsedURL.Query().Get("response_type")
+		codeChallengeMethod := parsedURL.Query().Get("code_challenge_method")
+		codeChallenge := parsedURL.Query().Get("code_challenge")
+		redirectURI := parsedURL.Query().Get("redirect_uri")
+		state := parsedURL.Query().Get("state")
+
+		if clientID == "" {
+			t.Fatal("no client_id found in OAuth URL")
+			return errors.New("no client_id found in OAuth URL")
+		}
+
+		if responseType != "code" {
+			t.Fatal("invalid response_type found in OAuth URL")
+			return errors.New("no response_type found in OAuth URL")
+		}
+
+		if codeChallengeMethod != "S256" {
+			t.Fatal("invalid code_challenge_method found in OAuth URL")
+			return errors.New("no code_challenge_method found in OAuth URL")
+		}
+
+		if codeChallenge == "" {
+			t.Fatal("no code_challenge found in OAuth URL")
+			return errors.New("no code_challenge found in OAuth URL")
+		}
+
+		if redirectURI == "" {
+			t.Fatal("no redirect_uri found in OAuth URL")
+			return errors.New("no redirect_uri found in OAuth URL")
+		}
+
+		if state == "" {
+			t.Fatal("no state found in OAuth URL")
+			return errors.New("no state found in OAuth URL")
+		}
+
+		// Give the OAuth server a moment to start
+		go func() {
+			// Make the OAuth callback request directly
+			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
+			t.Logf("Mock browser making callback request to: %s", callbackURL)
+
+			resp, err := http.Get(callbackURL)
+			if err != nil {
+				t.Errorf("Mock callback request failed: %v", err)
+				return
+			}
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("Error closing callback request body: %v", err)
+			}
+		}()
+
+		return nil
+	}
+}
+
+func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
+	setupOAuthTest(t, []Project{
+		{ID: "project-123", Name: "Test Project"},
+	}, "project-123")
+
+	// Execute login command - the mocked openBrowser will handle the callback automatically
+	output, err := executeAuthCommand("auth", "login")
+
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-123\n"
+	if output != expectedOutput {
+		t.Errorf("Unexpected output: '%s'", output)
+	}
+
+	// Verify API key was stored
+	storedKey, err := getAPIKey()
+	if err != nil {
+		t.Fatalf("Failed to get stored API key: %v", err)
+	}
+
+	// Expected API key is "test-access-key:test-secret-key"
+	expectedAPIKey := "test-access-key:test-secret-key"
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+
+	// Verify project ID was stored in config
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ProjectID != "project-123" {
+		t.Errorf("Expected project ID 'project-123', got '%s'", cfg.ProjectID)
+	}
+}
+
+func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
+	setupOAuthTest(t, []Project{
+		{ID: "project-123", Name: "Test Project 1"},
+		{ID: "project-456", Name: "Test Project 2"},
+		{ID: "project-789", Name: "Test Project 3"},
+	}, "project-789")
+
+	// Mock the project selection to simulate user selecting the third project (index 2)
+	originalSelectProjectInteractively := selectProjectInteractively
+	defer func() {
+		selectProjectInteractively = originalSelectProjectInteractively
+	}()
+
+	selectProjectInteractively = func(projects []Project, out io.Writer) (string, error) {
+		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].ID)
+		// Simulate user pressing down arrow twice and then enter (selects third project)
+		return projects[2].ID, nil
+	}
+
+	// Execute login command - both mocked functions will handle OAuth flow and project selection
+	output, err := executeAuthCommand("auth", "login")
+
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-789\n"
+	if output != expectedOutput {
+		t.Errorf("Unexpected output: '%s'", output)
+	}
+
+	// Verify API key was stored
+	storedKey, err := getAPIKey()
+	if err != nil {
+		t.Fatalf("Failed to get stored API key: %v", err)
+	}
+
+	// Expected API key is "test-access-key:test-secret-key"
+	expectedAPIKey := "test-access-key:test-secret-key"
+	if storedKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+
+	// Verify project ID was stored in config (should be the third project - project-789)
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ProjectID != "project-789" {
+		t.Errorf("Expected project ID 'project-789', got '%s'", cfg.ProjectID)
 	}
 }
 
@@ -173,7 +530,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-fallback\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -245,7 +602,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-env-file\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n"
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -313,7 +670,7 @@ func TestAuthWhoami_NotLoggedIn(t *testing.T) {
 	}
 
 	// Error should indicate not logged in
-	if err.Error() != "not logged in: not logged in" {
+	if err.Error() != errNotLoggedIn.Error() {
 		t.Errorf("Expected 'not logged in' error, got: %v", err)
 	}
 }
@@ -445,62 +802,5 @@ func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
 	err := removeAPIKeyFromFile()
 	if err != nil {
 		t.Fatalf("Should not error when removing non-existent file: %v", err)
-	}
-}
-
-func TestAuthLogin_WithProjectID(t *testing.T) {
-	setupAuthTest(t)
-
-	// Execute login command with public key, secret key, and project ID flags
-	output, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-456")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key securely. Set default project ID to: test-project-456\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
-	}
-
-	// Verify API key was stored (should be combined format)
-	expectedAPIKey := "test-public-key:test-secret-key"
-	apiKey, err := getAPIKey()
-	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
-	}
-	if apiKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
-	}
-
-	// Verify project ID was stored in config
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	if cfg.ProjectID != "test-project-456" {
-		t.Errorf("Expected project ID 'test-project-456', got '%s'", cfg.ProjectID)
-	}
-}
-
-func TestAuthLogin_WithoutProjectID(t *testing.T) {
-	setupAuthTest(t)
-
-	// Execute login command with only public and secret key flags (no project ID)
-	// This should fail since project ID is now required
-	_, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
-	if err == nil {
-		t.Fatal("Expected login to fail without project ID, but it succeeded")
-	}
-
-	// Verify the error message mentions TTY not detected
-	expectedErrorMsg := "TTY not detected - credentials required"
-	if !strings.Contains(err.Error(), expectedErrorMsg) {
-		t.Errorf("Expected error to contain %q, got: %v", expectedErrorMsg, err)
-	}
-
-	// Verify no API key was stored since login failed
-	_, err = getAPIKey()
-	if err == nil {
-		t.Error("API key should not be stored when login fails")
 	}
 }
