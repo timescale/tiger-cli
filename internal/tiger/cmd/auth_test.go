@@ -301,10 +301,8 @@ func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
 
 		// Handle different GraphQL queries
 		if strings.Contains(query, "getAllProjects") {
-			response := GetAllProjectsResponse{
-				Data: struct {
-					GetAllProjects []Project `json:"getAllProjects"`
-				}{
+			response := GraphQLResponse[GetAllProjectsData]{
+				Data: &GetAllProjectsData{
 					GetAllProjects: projects,
 				},
 			}
@@ -313,10 +311,8 @@ func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
 				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			}
 		} else if strings.Contains(query, "getUser") {
-			response := GetUserResponse{
-				Data: struct {
-					GetUser User `json:"getUser"`
-				}{
+			response := GraphQLResponse[GetUserData]{
+				Data: &GetUserData{
 					GetUser: User{
 						ID:    "user-456",
 						Name:  "Test User",
@@ -329,10 +325,8 @@ func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
 				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 			}
 		} else if strings.Contains(query, "createPATRecord") {
-			response := CreatePATRecordResponse{
-				Data: struct {
-					CreatePATRecord PATRecordResponse `json:"createPATRecord"`
-				}{
+			response := GraphQLResponse[CreatePATRecordData]{
+				Data: &CreatePATRecordData{
 					CreatePATRecord: PATRecordResponse{
 						ClientCredentials: struct {
 							AccessKey string `json:"accessKey"`

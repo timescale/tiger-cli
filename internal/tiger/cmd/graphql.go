@@ -16,11 +16,20 @@ type GraphQLClient struct {
 	URL string
 }
 
-// GetAllProjectsResponse represents the response from the getAllProjects query
-type GetAllProjectsResponse struct {
-	Data struct {
-		GetAllProjects []Project `json:"getAllProjects"`
-	} `json:"data"`
+// GraphQLResponse represents a generic GraphQL response wrapper
+type GraphQLResponse[T any] struct {
+	Data   *T             `json:"data"`
+	Errors []GraphQLError `json:"errors,omitempty"`
+}
+
+// GraphQLError represents an error returned in a GraphQL response
+type GraphQLError struct {
+	Message string `json:"message"`
+}
+
+// GetAllProjectsData represents the data from the getAllProjects query
+type GetAllProjectsData struct {
+	GetAllProjects []Project `json:"getAllProjects"`
 }
 
 // Project represents a project from the GraphQL API
@@ -40,19 +49,17 @@ func (c *GraphQLClient) getUserProjects(accessToken string) ([]Project, error) {
 		}
 	`
 
-	response, err := makeGraphQLRequest[GetAllProjectsResponse](c.URL, accessToken, query, nil)
+	response, err := makeGraphQLRequest[GetAllProjectsData](c.URL, accessToken, query, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return response.Data.GetAllProjects, nil
+	return response.GetAllProjects, nil
 }
 
-// GetUserResponse represents the response from the getUser query
-type GetUserResponse struct {
-	Data struct {
-		GetUser User `json:"getUser"`
-	} `json:"data"`
+// GetUserData represents the data from the getUser query
+type GetUserData struct {
+	GetUser User `json:"getUser"`
 }
 
 // User represents a user from the GraphQL API
@@ -74,19 +81,17 @@ func (c *GraphQLClient) getUser(accessToken string) (*User, error) {
 		}
 	`
 
-	response, err := makeGraphQLRequest[GetUserResponse](c.URL, accessToken, query, nil)
+	response, err := makeGraphQLRequest[GetUserData](c.URL, accessToken, query, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return &response.Data.GetUser, nil
+	return &response.GetUser, nil
 }
 
-// CreatePATRecordResponse represents the response from the createPATRecord mutation
-type CreatePATRecordResponse struct {
-	Data struct {
-		CreatePATRecord PATRecordResponse `json:"createPATRecord"`
-	} `json:"data"`
+// CreatePATRecordData represents the data from the createPATRecord mutation
+type CreatePATRecordData struct {
+	CreatePATRecord PATRecordResponse `json:"createPATRecord"`
 }
 
 // PATRecordResponse represents the response from creating a PAT record
@@ -117,12 +122,12 @@ func (c *GraphQLClient) createPATRecord(accessToken, projectID, patName string) 
 		},
 	}
 
-	response, err := makeGraphQLRequest[CreatePATRecordResponse](c.URL, accessToken, query, variables)
+	response, err := makeGraphQLRequest[CreatePATRecordData](c.URL, accessToken, query, variables)
 	if err != nil {
 		return nil, err
 	}
 
-	return &response.Data.CreatePATRecord, nil
+	return &response.CreatePATRecord, nil
 }
 
 // makeGraphQLRequest makes a GraphQL request to the API
@@ -162,10 +167,23 @@ func makeGraphQLRequest[T any](queryURL, accessToken, query string, variables ma
 		return nil, fmt.Errorf("failed to read GraphQL response: %w", err)
 	}
 
-	var response T
+	var response GraphQLResponse[T]
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal GraphQL response: %w", err)
 	}
 
-	return &response, nil
+	// Check for GraphQL errors
+	if len(response.Errors) > 0 {
+		var errorMessages []string
+		for _, gqlErr := range response.Errors {
+			errorMessages = append(errorMessages, gqlErr.Message)
+		}
+		return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(errorMessages, "; "))
+	}
+
+	if response.Data == nil {
+		return nil, fmt.Errorf("GraphQL response contains no data")
+	}
+
+	return response.Data, nil
 }
