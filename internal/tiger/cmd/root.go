@@ -28,7 +28,13 @@ func buildRootCmd() *cobra.Command {
 		Short: "Tiger CLI - TigerData Cloud Platform command-line interface",
 		Long: `Tiger CLI is a command-line interface for managing TigerData Cloud Platform resources.
 Built as a single Go binary, it provides comprehensive tools for managing database services,
-VPCs, replicas, and related infrastructure components.`,
+VPCs, replicas, and related infrastructure components.
+
+To get started, run:
+
+tiger auth login
+
+`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := logging.Init(debug); err != nil {
 				return fmt.Errorf("failed to initialize logging: %w", err)
@@ -89,6 +95,13 @@ VPCs, replicas, and related infrastructure components.`,
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
+
+	// Note: api_url is intentionally not exposed as a CLI flag.
+	// It can be configured via:
+	// - Environment variable: TIGER_API_URL
+	// - Config file: ~/.config/tiger/config.yaml
+	// - Config command: tiger config set api_url <url>
+	// This is primarily used for internal debugging and development.
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())

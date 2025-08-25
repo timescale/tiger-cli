@@ -988,7 +988,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Execute service update-password command without service ID
-	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1054,7 +1054,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Execute service update-password command
-	_, err, _ = executeServiceCommand("service", "update-password", "--password", "new-password")
+	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1087,13 +1087,13 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	defer func() { getAPIKeyForService = originalGetAPIKey }()
 
 	// Set environment variable BEFORE creating command (like root test does)
-	originalEnv := os.Getenv("TIGER_PASSWORD")
-	os.Setenv("TIGER_PASSWORD", "env-password-123")
+	originalEnv := os.Getenv("TIGER_NEW_PASSWORD")
+	os.Setenv("TIGER_NEW_PASSWORD", "env-password-123")
 	defer func() {
 		if originalEnv != "" {
-			os.Setenv("TIGER_PASSWORD", originalEnv)
+			os.Setenv("TIGER_NEW_PASSWORD", originalEnv)
 		} else {
-			os.Unsetenv("TIGER_PASSWORD")
+			os.Unsetenv("TIGER_NEW_PASSWORD")
 		}
 	}()
 
@@ -1255,16 +1255,16 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	// Test waitForServiceReady with very short timeout to trigger timeout quickly
 	err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd)
 
-	// Should return an error with exit code 2
+	// Should return an error with ExitTimeout
 	if err == nil {
 		t.Error("Expected error for timeout, but got none")
 		return
 	}
 
-	// Check that it's an exitCodeError with code 2
+	// Check that it's an exitCodeError with ExitTimeout
 	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != 2 {
-			t.Errorf("Expected exit code 2 for wait timeout, got %d", exitErr.ExitCode())
+		if exitErr.ExitCode() != ExitTimeout {
+			t.Errorf("Expected exit code %d for wait timeout, got %d", ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for wait timeout")
@@ -1472,7 +1472,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
 	output, err, _ := executeServiceCommand("service", "delete", "svc-12345")
-	
+
 	// Should either fail due to stdin read error or show cancellation message
 	// The exact behavior depends on the test environment
 	if err == nil && !strings.Contains(output, "Delete operation cancelled") {
@@ -1508,7 +1508,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 
 	// Set up config
 	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1", 
+		APIURL:    "https://api.tigerdata.com/public/v1",
 		ProjectID: "test-project-123",
 		ConfigDir: tmpDir,
 	}
@@ -1540,7 +1540,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 			// All these should fail due to network (which is expected)
 			// but they should NOT fail due to flag parsing errors
 			_, err, _ := executeServiceCommand(tc.args...)
-			
+
 			// Should fail with network error, not flag parsing error
 			if err != nil && strings.Contains(err.Error(), "flag") {
 				t.Errorf("Should not have flag parsing error, got: %v", err)

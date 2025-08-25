@@ -21,7 +21,7 @@ type Config struct {
 }
 
 const (
-	DefaultAPIURL     = "https://api.tigerdata.com/public/v1"
+	DefaultAPIURL     = "https://console.cloud.timescale.com/public/api/v1"
 	DefaultConsoleURL = "https://console.cloud.timescale.com"
 	DefaultGatewayURL = "https://console.cloud.timescale.com/api"
 	DefaultOutput     = "table"
@@ -30,8 +30,6 @@ const (
 	DefaultConfigDir  = "~/.config/tiger"
 	ConfigFileName    = "config.yaml"
 )
-
-var globalConfig *Config
 
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
 func SetupViper(configFile string) error {
@@ -61,11 +59,9 @@ func SetupViper(configFile string) error {
 	return nil
 }
 
+// Load creates a new Config instance from the current viper state
+// This function should be called after SetupViper has been called to initialize viper
 func Load() (*Config, error) {
-	if globalConfig != nil {
-		return globalConfig, nil
-	}
-
 	cfg := &Config{
 		ConfigDir: GetConfigDir(),
 	}
@@ -76,7 +72,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
 
-	globalConfig = cfg
 	return cfg, nil
 }
 
@@ -209,7 +204,8 @@ func expandPath(path string) string {
 	return path
 }
 
-// ResetGlobalConfig clears the global config singleton for testing
+// ResetGlobalConfig clears the global viper state for testing
+// This is mainly used to reset viper configuration between test runs
 func ResetGlobalConfig() {
-	globalConfig = nil
+	viper.Reset()
 }

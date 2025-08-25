@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
@@ -26,16 +27,11 @@ const (
 // getServiceName returns the appropriate service name for keyring operations
 // Uses a test-specific service name when running in test mode to avoid polluting the real keyring
 func getServiceName() string {
-	// Check if we're running in a test - look for .test suffix in the binary name
-	if strings.HasSuffix(os.Args[0], ".test") {
+	// Use Go's built-in testing detection
+	if testing.Testing() {
 		return testServiceName
 	}
-	// Also check for test-specific arguments
-	for _, arg := range os.Args {
-		if strings.HasPrefix(arg, "-test.") {
-			return testServiceName
-		}
-	}
+
 	return serviceName
 }
 

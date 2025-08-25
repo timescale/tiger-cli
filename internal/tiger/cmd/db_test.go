@@ -285,8 +285,11 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 
+	// Create a dummy service for the test
+	service := api.Service{}
+
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -312,8 +315,11 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
 
+	// Create a dummy service for the test
+	service := api.Service{}
+
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -324,6 +330,174 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	output := outBuf.String()
 	if output != "" {
 		t.Errorf("Expected no output, got: %q", output)
+	}
+}
+
+func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-psql-service"
+	projectID := "test-psql-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Store a test password in keyring
+	testPassword := "test-password-12345"
+	storage := GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/usr/bin/psql"
+	additionalFlags := []string{"--quiet"}
+
+	// Create a mock command for testing
+	testCmd := &cobra.Command{}
+
+	// Call the actual production function that builds the command
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
+
+	if psqlCmd == nil {
+		t.Fatal("buildPsqlCommand returned nil")
+	}
+
+	// Verify that PGPASSWORD is set in the environment with the correct value
+	found := false
+	expectedEnvVar := "PGPASSWORD=" + testPassword
+	for _, envVar := range psqlCmd.Env {
+		if envVar == expectedEnvVar {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Expected PGPASSWORD=%s to be set in environment, but it wasn't. Env vars: %v", testPassword, psqlCmd.Env)
+	}
+}
+
+func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-service-id"
+	projectID := "test-project-id"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+	psqlPath := "/usr/bin/psql"
+
+	// Create a mock command for testing
+	testCmd := &cobra.Command{}
+
+	// Call the actual production function that builds the command
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
+
+	if psqlCmd == nil {
+		t.Fatal("buildPsqlCommand returned nil")
+	}
+
+	// Verify that PGPASSWORD is NOT set in the environment for pgpass storage
+	if psqlCmd.Env != nil {
+		for _, envVar := range psqlCmd.Env {
+			if strings.HasPrefix(envVar, "PGPASSWORD=") {
+				t.Errorf("PGPASSWORD should not be set when using pgpass storage, but found: %s", envVar)
+			}
+		}
+	}
+}
+
+func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
+	// This test verifies that buildConnectionConfig properly sets password from keyring
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-connection-config-service"
+	projectID := "test-connection-config-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Store a test password in keyring
+	testPassword := "test-connection-config-password-789"
+	storage := GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+
+	// Call the actual production function that builds the config
+	config, err := buildConnectionConfig(connectionString, service)
+
+	if err != nil {
+		t.Fatalf("buildConnectionConfig failed: %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("buildConnectionConfig returned nil config")
+	}
+
+	// Verify that the password was set in the config
+	if config.Password != testPassword {
+		t.Errorf("Expected password '%s' to be set in config, but got '%s'", testPassword, config.Password)
+	}
+}
+
+func TestBuildConnectionConfig_PgpassStorage_NoPasswordSet(t *testing.T) {
+	// This test verifies that buildConnectionConfig doesn't set password for pgpass storage
+
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-connection-config-pgpass"
+	projectID := "test-connection-config-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+
+	// Call the actual production function that builds the config
+	config, err := buildConnectionConfig(connectionString, service)
+
+	if err != nil {
+		t.Fatalf("buildConnectionConfig failed: %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("buildConnectionConfig returned nil config")
+	}
+
+	// Verify that no password was set in the config (pgx will check ~/.pgpass automatically)
+	if config.Password != "" {
+		t.Errorf("Expected no password to be set in config for pgpass storage, but got '%s'", config.Password)
 	}
 }
 
@@ -490,9 +664,10 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test with malformed connection string (should return exit code 3)
+	// Test with malformed connection string (should return ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
-	err := testDatabaseConnection(invalidConnectionString, 1, cmd)
+	service := api.Service{} // Dummy service for test
+	err := testDatabaseConnection(invalidConnectionString, 1, service, cmd)
 
 	if err == nil {
 		t.Error("Expected error for invalid connection string")
@@ -500,9 +675,9 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 
 	// Should be an exitCodeError
 	if exitErr, ok := err.(exitCodeError); ok {
-		// The exact code depends on where it fails - could be 2 or 3
-		if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
-			t.Errorf("Expected exit code 2 or 3 for invalid connection string, got %d", exitErr.ExitCode())
+		// The exact code depends on where it fails - could be ExitTimeout or ExitInvalidParameters
+		if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
+			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for invalid connection string")
@@ -520,8 +695,9 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	// Use a connection string to a non-routable IP to test timeout
 	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
 
+	service := api.Service{} // Dummy service for test
 	start := time.Now()
-	err := testDatabaseConnection(timeoutConnectionString, 1, cmd) // 1 second timeout
+	err := testDatabaseConnection(timeoutConnectionString, 1, service, cmd) // 1 second timeout
 	duration := time.Since(start)
 
 	if err == nil {
@@ -533,10 +709,10 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
 
-	// Check exit code (should be 2 for unreachable)
+	// Check exit code (should be ExitTimeout for unreachable)
 	if exitErr, ok := err.(exitCodeError); ok {
-		if exitErr.ExitCode() != 2 {
-			t.Errorf("Expected exit code 2 for timeout, got %d", exitErr.ExitCode())
+		if exitErr.ExitCode() != ExitTimeout {
+			t.Errorf("Expected exit code %d for timeout, got %d", ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for timeout")
@@ -853,9 +1029,9 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			// For valid durations that fail due to server unreachable, check exit code
 			if tc.expectedOutput == "" {
 				if exitErr, ok := err.(exitCodeError); ok {
-					// Should be exit code 2 (no response) or 3 (invalid params) for network errors
-					if exitErr.ExitCode() != 2 && exitErr.ExitCode() != 3 {
-						t.Errorf("Expected exit code 2 or 3, got %d", exitErr.ExitCode())
+					// Should be ExitTimeout (no response) or ExitInvalidParameters (invalid params) for network errors
+					if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
+						t.Errorf("Expected exit code %d or %d, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
 					}
 				} else {
 					t.Error("Expected exitCodeError")

@@ -84,7 +84,7 @@ from your configuration. This command will launch an interactive psql session
 with the appropriate connection parameters.
 
 Authentication is handled automatically using:
-1. ~/.pgpass file (if password was saved during service creation)  
+1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
 2. PGPASSWORD environment variable
 3. Interactive password prompt (if neither above is available)
 
@@ -130,7 +130,7 @@ Examples:
 			}
 
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, cmd)
+			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, service, cmd)
 		},
 	}
 
@@ -179,22 +179,22 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			service, err := getServiceDetails(cmd, args)
 			if err != nil {
-				return exitWithCode(3, err) // Invalid parameters
+				return exitWithCode(ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing
 			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, cmd)
 			if err != nil {
-				return exitWithCode(3, fmt.Errorf("failed to build connection string: %w", err))
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
 			if dbTestConnectionTimeout < 0 {
-				return exitWithCode(3, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
 			}
 
 			// Test the connection
-			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, service, cmd)
 		},
 	}
 
@@ -255,7 +255,9 @@ func buildConnectionString(service api.Service, pooled bool, role string, cmd *c
 	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
 	database := "tsdb"
 
-	// Build connection string in PostgreSQL URI format
+	// Build connection string in PostgreSQL URI format (username only, no password)
+	// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
+	// This ensures credentials are never visible in process arguments
 	connectionString := fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
 
 	return connectionString, nil
@@ -291,7 +293,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	// Get API key for authentication
 	apiKey, err := getAPIKeyForDB()
 	if err != nil {
-		return api.Service{}, fmt.Errorf("authentication required: %w", err)
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 	}
 
 	// Create API client
@@ -318,10 +320,12 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 
 		return *resp.JSON200, nil
 
-	case 401, 403:
-		return api.Service{}, fmt.Errorf("authentication failed: invalid API key")
+	case 401:
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+	case 403:
+		return api.Service{}, exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
 	case 404:
-		return api.Service{}, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+		return api.Service{}, exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 	default:
 		return api.Service{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
@@ -351,21 +355,65 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, _ *cobra.Command) error {
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, cmd)
+	return psqlCmd.Run()
+}
+
+// buildPsqlCommand creates the psql command with proper environment setup
+func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
+	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
+	// Passwords are passed via PGPASSWORD environment variable (see below)
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
 	psqlCmd := exec.Command(psqlPath, args...)
-	psqlCmd.Stdin = os.Stdin
-	psqlCmd.Stdout = os.Stdout
-	psqlCmd.Stderr = os.Stderr
 
-	return psqlCmd.Run()
+	// Use cmd's input/output streams for testability while maintaining CLI behavior
+	psqlCmd.Stdin = cmd.InOrStdin()
+	psqlCmd.Stdout = cmd.OutOrStdout()
+	psqlCmd.Stderr = cmd.ErrOrStderr()
+
+	// Only set PGPASSWORD for keyring storage method
+	// pgpass storage relies on psql automatically reading ~/.pgpass file
+	storage := GetPasswordStorage()
+	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+		if password, err := storage.Get(service); err == nil && password != "" {
+			// Set PGPASSWORD environment variable for psql when using keyring
+			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+		}
+		// Note: If keyring password retrieval fails, we let psql try without it
+		// This allows fallback to other authentication methods
+	}
+
+	return psqlCmd
+}
+
+// buildConnectionConfig creates a pgx connection config with proper password handling
+func buildConnectionConfig(connectionString string, service api.Service) (*pgx.ConnConfig, error) {
+	// Parse the connection string first to validate it
+	config, err := pgx.ParseConfig(connectionString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set password from keyring storage if available
+	// pgpass storage works automatically since pgx checks ~/.pgpass file
+	storage := GetPasswordStorage()
+	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+		if password, err := storage.Get(service); err == nil && password != "" {
+			config.Password = password
+		}
+		// Note: If keyring password retrieval fails, we let pgx try without it
+		// This allows fallback to other authentication methods
+	}
+
+	return config, nil
 }
 
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(connectionString string, timeout time.Duration, cmd *cobra.Command) error {
+func testDatabaseConnection(connectionString string, timeout time.Duration, service api.Service, cmd *cobra.Command) error {
 	// Create context with timeout if specified
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -377,11 +425,11 @@ func testDatabaseConnection(connectionString string, timeout time.Duration, cmd 
 		ctx = context.Background()
 	}
 
-	// Parse the connection string first to validate it
-	config, err := pgx.ParseConfig(connectionString)
+	// Build connection config with proper password handling
+	config, err := buildConnectionConfig(connectionString, service)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to parse connection string: %v\n", err)
-		return exitWithCode(3, err) // Invalid parameters
+		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to build connection config: %v\n", err)
+		return exitWithCode(ExitInvalidParameters, err)
 	}
 
 	// Attempt to connect to the database
@@ -390,13 +438,13 @@ func testDatabaseConnection(connectionString string, timeout time.Duration, cmd 
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(2, err) // No response to connection attempt
+			return exitWithCode(ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(1, err) // Server is rejecting connections
+			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
@@ -410,13 +458,13 @@ func testDatabaseConnection(connectionString string, timeout time.Duration, cmd 
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(2, err) // No response to connection attempt
+			return exitWithCode(ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(1, err) // Server is rejecting connections
+			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)

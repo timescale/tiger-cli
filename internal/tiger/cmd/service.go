@@ -93,7 +93,7 @@ Examples:
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -123,10 +123,12 @@ Examples:
 				// Output service in requested format
 				return outputService(cmd, service, cfg.Output)
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			default:
 				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
 			}
@@ -159,7 +161,7 @@ func buildServiceListCmd() *cobra.Command {
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -197,8 +199,10 @@ func buildServiceListCmd() *cobra.Command {
 				// Output services in requested format
 				return outputServices(cmd, services, cfg.Output)
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to project"))
 			case 404:
 				return fmt.Errorf("project not found")
 			default:
@@ -325,7 +329,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -402,8 +406,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to create services"))
 			case 404:
 				return fmt.Errorf("project not found")
 			default:
@@ -441,20 +447,20 @@ from your configuration. This command updates the master password for the
 
 Examples:
   # Update password for default service
-  tiger service update-password --password new-secure-password
+  tiger service update-password --new-password new-secure-password
 
   # Update password for specific service
-  tiger service update-password svc-12345 --password new-secure-password
+  tiger service update-password svc-12345 --new-password new-secure-password
 
-  # Update password using environment variable (TIGER_PASSWORD)
-  export TIGER_PASSWORD="new-secure-password"
+  # Update password using environment variable (TIGER_NEW_PASSWORD)
+  export TIGER_NEW_PASSWORD="new-secure-password"
   tiger service update-password svc-12345
 
   # Update password and save to .pgpass (default behavior)
-  tiger service update-password svc-12345 --password new-secure-password
+  tiger service update-password svc-12345 --new-password new-secure-password
 
   # Update password without saving (using global flag)
-  tiger service update-password svc-12345 --password new-secure-password --password-storage none`,
+  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -480,9 +486,9 @@ Examples:
 			}
 
 			// Get password from flag or environment variable via viper
-			password := viper.GetString("password")
+			password := viper.GetString("new_password")
 			if password == "" {
-				return fmt.Errorf("password is required. Use --password flag or set TIGER_PASSWORD environment variable")
+				return fmt.Errorf("new password is required. Use --new-password flag or set TIGER_NEW_PASSWORD environment variable")
 			}
 
 			cmd.SilenceUsage = true
@@ -490,7 +496,7 @@ Examples:
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
@@ -533,10 +539,12 @@ Examples:
 
 				return nil
 
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to update service password"))
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID)
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
 			case 400:
 				return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
 			default:
@@ -546,10 +554,10 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&updatePasswordValue, "password", "", "New password for the tsdbadmin user (can also be set via TIGER_PASSWORD env var)")
+	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
 
 	// Bind flags to viper
-	viper.BindPFlag("password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("new_password", cmd.Flags().Lookup("new-password"))
 
 	return cmd
 }
@@ -744,7 +752,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(2, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -923,7 +931,7 @@ Examples:
 			// Get API key
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
-				return fmt.Errorf("authentication required: %w", err)
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Prompt for confirmation unless --confirm is used
@@ -958,7 +966,7 @@ Examples:
 			switch resp.StatusCode() {
 			case 202:
 				fmt.Fprintf(cmd.OutOrStdout(), "🗑️  Delete request accepted for service '%s'.\n", serviceID)
-				
+
 				// If not waiting, return early
 				if deleteNoWait {
 					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service list' to check deletion status.")
@@ -968,9 +976,11 @@ Examples:
 				// Wait for deletion to complete
 				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 			case 404:
-				return fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID)
-			case 401, 403:
-				return fmt.Errorf("authentication failed: invalid API key")
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to delete service"))
 			default:
 				return fmt.Errorf("failed to delete service: API request failed with status %d", resp.StatusCode())
 			}
@@ -998,7 +1008,7 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 		select {
 		case <-ctx.Done():
 			fmt.Fprintln(cmd.OutOrStdout(), "") // New line after dots
-			return exitWithCode(2, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
 		case <-ticker.C:
 			// Check if service still exists
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
