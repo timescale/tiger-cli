@@ -44,4 +44,5 @@ Thumbs.db
 config.yaml
 *.key
 *.pem
-.env
+.env*
+!.env.sample

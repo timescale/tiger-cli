@@ -36,6 +36,17 @@ func setupIntegrationTest(t *testing.T) string {
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
 
+	// Set API URL in temporary config if integration URL is provided
+	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
+		// Use a simple command execution without the full executeIntegrationCommand wrapper
+		// to avoid circular dependencies during setup
+		rootCmd := buildRootCmd()
+		rootCmd.SetArgs([]string{"config", "set", "api_url", apiURL})
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatalf("Failed to set integration API URL during setup: %v", err)
+		}
+	}
+
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
@@ -86,6 +97,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Set up isolated test environment with temporary config directory
 	tmpDir := setupIntegrationTest(t)
 	t.Logf("Using temporary config directory: %s", tmpDir)
+
 
 	// Generate unique service name to avoid conflicts
 	serviceName := fmt.Sprintf("integration-test-%d", time.Now().Unix())
