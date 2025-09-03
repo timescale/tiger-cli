@@ -63,7 +63,6 @@ func (l *oauthLogin) loginWithOAuth() (credentials, error) {
 func (l *oauthLogin) getAccessToken() (string, error) {
 	// Generate PKCE parameters
 	codeVerifier := oauth2.GenerateVerifier()
-	codeChallenge := oauth2.S256ChallengeFromVerifier(codeVerifier)
 
 	// Generate random state string (to guard against CRSF attacks)
 	state, err := l.generateRandomState(32)
@@ -84,7 +83,7 @@ func (l *oauthLogin) getAccessToken() (string, error) {
 
 	// Open browser
 	fmt.Fprintln(l.out, "Opening browser for authentication...")
-	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeChallenge))
+	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
 	if err := openBrowser(authURL); err != nil {
 		fmt.Fprintf(l.out, "Failed to open browser: %s\nPlease manually navigate to: %s\n", err, authURL)
 	}
