@@ -5,10 +5,14 @@
 # Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
-
 version: 2
 
 project_name: tiger-cli
+
+# Create VERSION file before building
+before:
+  hooks:
+    - echo "{{ .Tag }}" > VERSION
 
 builds:
   - main: ./cmd/tiger
@@ -21,6 +25,12 @@ builds:
 
 archives:
   - formats: [tar.gz]
+
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -29,10 +39,110 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        formats: [zip]
+
+# S3 Blob Storage Configuration
+blobs:
+  # Versioned release artifacts
+  - provider: s3
+    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    region: us-east-1
+    directory: "releases/{{ .Tag }}"
+    ids:
+      - default  # Default archive ID
+      - packages # nfpms package ID
+    # Set public read ACL for downloads
+    acl: public-read
+    extra_files:
+      - glob: ./scripts/install.sh
+        name_template: "install.sh"
+      - glob: ./VERSION
+        name_template: "VERSION"
+      - glob: ./checksums.txt
+        name_template: "checksums.txt"
+
+  # Latest release artifacts (always current)
+  - provider: s3
+    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    region: us-east-1
+    directory: "latest"
+    ids:
+      - default  # Default archive ID
+      - packages # nfpms package ID
+    acl: public-read
+    extra_files:
+      - glob: ./scripts/install.sh
+        name_template: "install.sh"
+      - glob: ./VERSION
+        name_template: "VERSION"
+      - glob: ./checksums.txt
+        name_template: "checksums.txt"
+
+# Homebrew cask configuration
+homebrew_casks:
+  - name: tiger-cli
+
+    # TODO: Create seprate tap for tiger-cli?
+    repository:
+      owner: timescale
+      name: homebrew-tap
+      # TODO: Token with permission to write to homebrew-tap repo
+      # See: https://goreleaser.com/errors/resource-not-accessible-by-integration
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/timescale/tiger-cli # TODO: Real homepage
+    description: "Tiger CLI - TigerData Cloud Platform CLI"
+    binary: tiger
+    license: TODO
+    hooks:
+      # TODO: Sign and notarize instead of removing quarantine bit
+      # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tiger"]
+          end
+    # Optional: Add caveats for user instructions
+    caveats: |
+      Tiger CLI has been installed successfully!
+
+      Get started with:
+        tiger auth login
+
+      For help:
+        tiger --help
+
+# Linux package configuration (APT, RPM, etc.)
+nfpms:
+  - id: packages
+    package_name: tiger-cli
+    vendor: Timescale, Inc., d/b/a TigerData
+    homepage: https://github.com/timescale/tiger-cli
+    maintainer: TigerData <support@tigerdata.com>
+    description: |-
+      Tiger CLI - TigerData Cloud Platform CLI
+      Command-line interface for managing TigerData Cloud Platform resources
+    license: TODO
+    formats:
+      - deb
+      - rpm
+      - apk
+    dependencies:
+      - ca-certificates
+    recommends:
+      - git
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    file_name_template: "{{ .ConventionalFileName }}"
+    contents:
+      - src: ./tiger
+        dst: /usr/bin/tiger
+        file_info:
+          mode: 0755
+    rpm:
+      group: Applications/System
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
 
 changelog:
   sort: asc
@@ -40,3 +150,12 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+# Release configuration
+release:
+  github:
+    owner: timescale
+    name: tiger-cli
+  draft: false
+  prerelease: auto
+  name_template: "Release {{ .Tag }}"
