@@ -386,7 +386,7 @@ paths:
       tags:
         - Services
       summary: Fork a Service
-      description: Creates a new, independent service within a project by taking a snapshot of an existing one.
+      description: Creates a new, independent service within a project by taking a snapshot of an existing one. You can customize the resources (CPU, memory, replicas) for the forked service.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/ServiceId'
@@ -395,7 +395,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForkInput'
+              $ref: '#/components/schemas/ServiceCreate'
       responses:
         '202':
           description: Fork request accepted. The response contains the details of the new service being created.

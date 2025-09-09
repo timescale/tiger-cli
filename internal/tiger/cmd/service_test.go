@@ -189,7 +189,109 @@ func TestOutputServices_Table(t *testing.T) {
 	}
 }
 
-func TestFormatTimePtr(t *testing.T) {
+
+func TestServiceFork_NoAuth(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID and service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ServiceID: "source-service-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service fork command
+	_, err, _ = executeServiceCommand("service", "fork")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestServiceFork_NoSourceService(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID but no service ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication success
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service fork command without providing service ID
+	_, err, _ = executeServiceCommand("service", "fork")
+	if err == nil {
+		t.Fatal("Expected error when no service ID provided")
+	}
+
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected service ID required error, got: %v", err)
+	}
+}
+
+func TestFormatHelpers(t *testing.T) {
+	// Test service ID formatting (now uses string instead of UUID)
+	testServiceID := "12345678-9abc-def0-1234-56789abcdef0"
+	if derefString(&testServiceID) != testServiceID {
+		t.Error("derefString should return service ID string")
+	}
+	if derefString(nil) != "" {
+		t.Error("derefString should return empty string for nil")
+	}
+
+	// Test derefString
+	testStr := "test"
+	if derefString(&testStr) != "test" {
+		t.Error("derefString should return string value")
+	}
+	if derefString(nil) != "" {
+		t.Error("derefString should return empty string for nil")
+	}
+
+	// Test formatDeployStatus
+	status := api.DeployStatus("running")
+	if formatDeployStatus(&status) != "running" {
+		t.Error("formatDeployStatus should return status string")
+	}
+	if formatDeployStatus(nil) != "" {
+		t.Error("formatDeployStatus should return empty string for nil")
+	}
+
+	// Test formatServiceType
+	serviceType := api.ServiceType("POSTGRES")
+	if formatServiceType(&serviceType) != "POSTGRES" {
+		t.Error("formatServiceType should return service type string")
+	}
+	if formatServiceType(nil) != "" {
+		t.Error("formatServiceType should return empty string for nil")
+	}
+
 	// Test formatTimePtr
 	testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	if formatTimePtr(&testTime) == "" {

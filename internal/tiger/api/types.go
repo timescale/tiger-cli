@@ -70,12 +70,6 @@ type Error struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// ForkInput defines model for ForkInput.
-type ForkInput struct {
-	// Name The name for the new forked service.
-	Name string `json:"name"`
-}
-
 // ForkSpec defines model for ForkSpec.
 type ForkSpec struct {
 	IsStandby *bool   `json:"is_standby,omitempty"`
@@ -341,7 +335,7 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody = ServiceV
 type PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody = ServiceVPCInput
 
 // PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdForkService for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkInput
+type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ServiceCreate
 
 // PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSets for application/json ContentType.
 type PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody = ReadReplicaSetCreate

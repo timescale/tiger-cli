@@ -37,6 +37,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
+	cmd.AddCommand(buildServiceForkCmd())
 
 	return cmd
 }
@@ -983,4 +984,227 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
 		}
 	}
+}
+
+// formatAllowedCPUValues returns a user-friendly string of allowed CPU values
+func formatAllowedCPUValues(configs []CPUMemoryConfig) string {
+	var cpuValues []string
+	for _, config := range configs {
+		cpuCores := float64(config.CPUMillis) / 1000
+		if cpuCores == float64(int(cpuCores)) {
+			cpuValues = append(cpuValues, fmt.Sprintf("%.0f (%.0fm)", cpuCores, float64(config.CPUMillis)))
+		} else {
+			cpuValues = append(cpuValues, fmt.Sprintf("%.1f (%.0fm)", cpuCores, float64(config.CPUMillis)))
+		}
+	}
+	return strings.Join(cpuValues, ", ")
+}
+
+// buildServiceForkCmd creates the fork subcommand
+func buildServiceForkCmd() *cobra.Command {
+	var forkServiceName string
+	var forkNoWait bool
+
+	cmd := &cobra.Command{
+		Use:   "fork [service-id]",
+		Short: "Fork an existing database service",
+		Long: `Fork an existing database service to create a new independent copy.
+
+The forked service will be a snapshot of the source service at the time of forking.
+By default, the forked service name will be the original name with "-fork" appended.
+
+Examples:
+  # Fork default service with auto-generated name
+  tiger service fork
+
+  # Fork specific service with auto-generated name
+  tiger service fork svc-12345
+
+  # Fork service with custom name
+  tiger service fork svc-12345 --name my-forked-db
+
+  # Fork without waiting for completion
+  tiger service fork svc-12345 --no-wait`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Determine source service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Get source service details first
+			sourceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err != nil {
+				return fmt.Errorf("failed to get source service details: %w", err)
+			}
+
+			switch sourceResp.StatusCode() {
+			case 200:
+				if sourceResp.JSON200 == nil {
+					return fmt.Errorf("empty response from API")
+				}
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
+			case 404:
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+			default:
+				return fmt.Errorf("failed to get source service: API request failed with status %d", sourceResp.StatusCode())
+			}
+
+			sourceService := *sourceResp.JSON200
+			sourceName := derefString(sourceService.Name)
+
+			// Generate fork name if not provided
+			if forkServiceName == "" {
+				forkServiceName = fmt.Sprintf("%s-fork", sourceName)
+			}
+
+			// Display what we're about to do
+			fmt.Fprintf(cmd.OutOrStdout(), "🍴 Forking service '%s' to create '%s'...\n", sourceName, forkServiceName)
+
+			// Prepare fork request - API handler expects ServiceCreate format
+			// Extract required details from source service
+			var cpuMillis int
+			var memoryGbs int
+			var replicaCount int = 1 // default
+			var serviceType api.ServiceType
+			var regionCode string
+
+			// Get resource specs from source service
+			if sourceService.Resources != nil && len(*sourceService.Resources) > 0 {
+				resource := (*sourceService.Resources)[0]
+				if resource.Spec != nil {
+					if resource.Spec.CpuMillis != nil {
+						cpuMillis = *resource.Spec.CpuMillis
+					}
+					if resource.Spec.MemoryGbs != nil {
+						memoryGbs = *resource.Spec.MemoryGbs
+					}
+				}
+			}
+
+			// Get service type and region
+			if sourceService.ServiceType != nil {
+				serviceType = *sourceService.ServiceType
+			}
+			if sourceService.RegionCode != nil {
+				regionCode = *sourceService.RegionCode
+			}
+
+			// Create ServiceCreate request (what the API actually expects for fork)
+			forkReq := api.ServiceCreate{
+				Name:         forkServiceName,
+				ServiceType:  serviceType,
+				RegionCode:   regionCode,
+				ReplicaCount: replicaCount,
+				CpuMillis:    cpuMillis,
+				MemoryGbs:    float32(memoryGbs),
+			}
+
+			// Make API call to fork service
+			forkResp, err := client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, serviceID, forkReq)
+			if err != nil {
+				return fmt.Errorf("failed to fork service: %w", err)
+			}
+
+			// Handle API response
+			switch forkResp.StatusCode() {
+			case 202:
+				// Success - service fork accepted
+				if forkResp.JSON202 == nil {
+					fmt.Fprintln(cmd.OutOrStdout(), "✅ Fork request accepted!")
+					return nil
+				}
+
+				forkedService := *forkResp.JSON202
+				forkedServiceID := derefString(forkedService.ServiceId)
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Fork request accepted!\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "📋 New Service ID: %s\n", forkedServiceID)
+
+				// Capture initial password from fork response and save it immediately
+				var initialPassword string
+				if forkedService.InitialPassword != nil {
+					initialPassword = *forkedService.InitialPassword
+				}
+
+				// Save password immediately after service fork
+				handlePasswordSaving(forkedService, initialPassword, cmd)
+
+				// Set as default service
+				if err := setDefaultService(forkedServiceID, cmd); err != nil {
+					// Log warning but don't fail the command
+					fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to set service as default: %v\n", err)
+				}
+
+				// Handle wait behavior
+				if forkNoWait {
+					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
+					return nil
+				}
+
+				// Wait for service to be ready
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for fork to complete (timeout: 30m)...\n")
+				if err := waitForServiceReady(client, projectID, forkedServiceID, 30*time.Minute, cmd); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service fork completed successfully!\n")
+				return nil
+
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to fork services"))
+			case 404:
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+			case 409:
+				return fmt.Errorf("service name '%s' already exists", forkServiceName)
+			case 400:
+				return fmt.Errorf("invalid request parameters")
+			default:
+				return fmt.Errorf("API request failed with status %d", forkResp.StatusCode())
+			}
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&forkServiceName, "name", "", "Name for the forked service (auto-generated if not provided)")
+	cmd.Flags().BoolVar(&forkNoWait, "no-wait", false, "Don't wait for fork operation to complete")
+
+	return cmd
 }
