@@ -103,7 +103,7 @@ install_binary() {
 
     # Create temporary directory
     local tmp_dir
-    tmp_dir=$(mktemp -d)
+    tmp_dir="$(mktemp -d)"
     trap 'rm -rf "${tmp_dir}"' EXIT
 
     # Construct archive name
@@ -228,7 +228,7 @@ main() {
 
     # Get latest version from S3
     local version
-    version=$(get_latest_version)
+    version="$(get_latest_version)"
     log_info "Latest version: ${version}"
 
     # Install binary

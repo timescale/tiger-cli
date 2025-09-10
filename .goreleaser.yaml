@@ -67,13 +67,15 @@ blobs:
       - glob: ./checksums.txt
         name_template: "checksums.txt"
 
-  # Upload latest version file to bucket root
+  # Upload latest version file to bucket root (skip for prereleases)
   - provider: s3
     bucket: tiger-cli-releases # TODO: Actual S3 bucket name
     region: us-east-1
     directory: ""  # Root of bucket
     ids: []  # Don't upload any archives here
     acl: public-read
+    extra_files_only: true
+    disable: '{{ .Prerelease }}'
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
