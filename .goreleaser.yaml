@@ -28,7 +28,8 @@ builds:
       - arm64
 
 archives:
-  - formats: [tar.gz]
+  - id: archive
+    formats: [tar.gz]
 
     # use zip for windows archives
     format_overrides:
@@ -49,6 +50,31 @@ archives:
       - LICENSE
       - NOTICE
 
+# Linux package configuration (APT, RPM, etc.)
+nfpms:
+  - id: packages
+    package_name: tiger-cli
+    vendor: Timescale, Inc., d/b/a TigerData
+    homepage: https://github.com/timescale/tiger-cli
+    maintainer: TigerData <support@tigerdata.com>
+    description: |-
+      Tiger CLI - TigerData Cloud Platform CLI
+      Command-line interface for managing TigerData Cloud Platform resources
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+      - apk
+    bindir: /usr/bin
+    priority: extra
+    file_name_template: "{{ .ConventionalFileName }}"
+    rpm:
+      group: Unspecified
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+
+
 # S3 Blob Storage Configuration
 blobs:
   # Versioned release artifacts
@@ -57,7 +83,7 @@ blobs:
     region: us-east-1
     directory: "releases/{{ .Tag }}"
     ids:
-      - default  # Default archive ID
+      - archive  # Archive ID
       - packages # nfpms package ID
     # Set public read ACL for downloads
     acl: public-read
@@ -72,7 +98,6 @@ blobs:
     bucket: tiger-cli-releases # TODO: Actual S3 bucket name
     region: us-east-1
     directory: ""  # Root of bucket
-    ids: []  # Don't upload any archives here
     acl: public-read
     extra_files_only: true
     disable: '{{ .Prerelease }}'
@@ -84,15 +109,16 @@ blobs:
 homebrew_casks:
   - name: tiger-cli
 
-    # TODO: Create seprate tap for tiger-cli?
     repository:
       owner: timescale
       name: homebrew-tap
       # TODO: Token with permission to write to homebrew-tap repo
       # See: https://goreleaser.com/errors/resource-not-accessible-by-integration
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    homepage: https://github.com/timescale/tiger-cli # TODO: Real homepage
-    description: "Tiger CLI - TigerData Cloud Platform CLI"
+    homepage: https://github.com/timescale/tiger-cli
+    description: |-
+      Tiger CLI - TigerData Cloud Platform CLI
+      Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
     hooks:
@@ -113,46 +139,12 @@ homebrew_casks:
       For help:
         tiger --help
 
-# Linux package configuration (APT, RPM, etc.)
-nfpms:
-  - id: packages
-    package_name: tiger-cli
-    vendor: Timescale, Inc., d/b/a TigerData
-    homepage: https://github.com/timescale/tiger-cli
-    maintainer: TigerData <support@tigerdata.com>
-    description: |-
-      Tiger CLI - TigerData Cloud Platform CLI
-      Command-line interface for managing TigerData Cloud Platform resources
-    license: Apache-2.0
-    formats:
-      - deb
-      - rpm
-      - apk
-    dependencies:
-      - ca-certificates
-    recommends:
-      - git
-    bindir: /usr/bin
-    section: utils
-    priority: optional
-    file_name_template: "{{ .ConventionalFileName }}"
-    contents:
-      - src: ./tiger
-        dst: /usr/bin/tiger
-        file_info:
-          mode: 0755
-    rpm:
-      group: Applications/System
-    deb:
-      lintian_overrides:
-        - statically-linked-binary
-
 changelog:
   sort: asc
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
+      - "^specs:"
+      # TODO: Other files that should be ignored
 
 # Release configuration
 release:
