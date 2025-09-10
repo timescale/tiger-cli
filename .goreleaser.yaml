@@ -40,6 +40,11 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 
+    files:
+      - README.md
+      - LICENSE
+      - NOTICE
+
 # S3 Blob Storage Configuration
 blobs:
   # Versioned release artifacts
@@ -91,7 +96,7 @@ homebrew_casks:
     homepage: https://github.com/timescale/tiger-cli # TODO: Real homepage
     description: "Tiger CLI - TigerData Cloud Platform CLI"
     binary: tiger
-    license: TODO
+    license: Apache-2.0
     hooks:
       # TODO: Sign and notarize instead of removing quarantine bit
       # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
@@ -120,7 +125,7 @@ nfpms:
     description: |-
       Tiger CLI - TigerData Cloud Platform CLI
       Command-line interface for managing TigerData Cloud Platform resources
-    license: TODO
+    license: Apache-2.0
     formats:
       - deb
       - rpm
