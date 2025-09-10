@@ -12,7 +12,7 @@ project_name: tiger-cli
 # Create VERSION file before building
 before:
   hooks:
-    - echo "{{ .Tag }}" > VERSION
+    - echo "{{ .Tag }}" > latest.txt
 
 builds:
   - main: ./cmd/tiger
@@ -22,6 +22,10 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - 386
+      - amd64
+      - arm64
 
 archives:
   - formats: [tar.gz]
@@ -60,27 +64,19 @@ blobs:
     extra_files:
       - glob: ./scripts/install.sh
         name_template: "install.sh"
-      - glob: ./VERSION
-        name_template: "VERSION"
       - glob: ./checksums.txt
         name_template: "checksums.txt"
 
-  # Latest release artifacts (always current)
+  # Upload latest version file to bucket root
   - provider: s3
     bucket: tiger-cli-releases # TODO: Actual S3 bucket name
     region: us-east-1
-    directory: "latest"
-    ids:
-      - default  # Default archive ID
-      - packages # nfpms package ID
+    directory: ""  # Root of bucket
+    ids: []  # Don't upload any archives here
     acl: public-read
     extra_files:
-      - glob: ./scripts/install.sh
-        name_template: "install.sh"
-      - glob: ./VERSION
-        name_template: "VERSION"
-      - glob: ./checksums.txt
-        name_template: "checksums.txt"
+      - glob: ./latest.txt
+        name_template: "latest.txt"
 
 # Homebrew cask configuration
 homebrew_casks:

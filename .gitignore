@@ -23,6 +23,7 @@ go.work.sum
 bin/
 dist/
 /tiger
+latest.txt
 
 # IDE files
 .vscode/
