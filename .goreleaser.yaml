@@ -4,6 +4,11 @@ version: 2
 
 project_name: tiger-cli
 
+# Create VERSION file before building
+before:
+  hooks:
+    - echo "{{ .Tag }}" > latest.txt
+
 builds:
   - main: ./cmd/tiger
     env:
@@ -64,6 +69,34 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
 
+
+# S3 Blob Storage Configuration
+blobs:
+  # Versioned release artifacts
+  - provider: s3
+    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    region: us-east-1
+    directory: "releases/{{ .Tag }}"
+    ids:
+      - archive  # Archive ID
+      - packages # nfpms package ID
+    # Set public read ACL for downloads
+    acl: public-read
+
+  # Upload install script and latest version file to bucket root (skip for prereleases)
+  - provider: s3
+    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    region: us-east-1
+    directory: ""  # Root of bucket
+    acl: public-read
+    extra_files_only: true
+    disable: '{{ .Prerelease }}' # Skip this step for pre-releases
+    extra_files:
+      - glob: ./latest.txt
+        name_template: "latest.txt"
+      - glob: ./scripts/install.sh
+        name_template: "install.sh"
+
 # Homebrew cask configuration
 homebrew_casks:
   - name: tiger-cli
@@ -80,6 +113,9 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
+    skip_upload: true # TODO: Set to 'auto' when ready
+    url:
+      template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
       # TODO: Sign and notarize instead of removing quarantine bit
       # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing

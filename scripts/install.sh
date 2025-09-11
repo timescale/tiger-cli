@@ -9,11 +9,9 @@ REPO_NAME="tiger-cli"
 BINARY_NAME="tiger"
 INSTALL_DIR="${TIGER_INSTALL_DIR:-/usr/local/bin}"
 
-# GitHub Repository Configuration
-GITHUB_OWNER="timescale"
-GITHUB_REPO="tiger-cli"
-GITHUB_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
-GITHUB_API_URL="https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}"
+# S3 Configuration (primary download source)
+S3_BUCKET="${TIGER_S3_BUCKET:-tiger-cli-releases}"
+S3_BASE_URL="https://${S3_BUCKET}.s3.amazonaws.com"
 
 # Colors for output
 RED='\033[0;31m'
@@ -83,18 +81,15 @@ command_exists() {
 }
 
 
-# Get latest version from GitHub API
+# Get latest version from S3
 get_latest_version() {
-    local api_url="${GITHUB_API_URL}/releases/latest"
-
-    # Get latest release info from GitHub API
+    # Try to get version from S3 latest.txt file at bucket root
     local version
-    version=$(curl -fsSL "${api_url}" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"tag_name":[ ]*"([^"]+)".*/\1/' || echo "")
+    version=$(curl -fsSL "${S3_BASE_URL}/latest.txt" 2>/dev/null | head -n1 | tr -d '\n\r' || echo "")
 
     if [ -z "${version}" ]; then
-        log_error "Failed to get latest release from GitHub API"
-        log_error "URL: ${api_url}"
-        log_error "Make sure the repository has at least one release published"
+        log_error "latest.txt file not found in S3 bucket root"
+        log_error "URL: ${S3_BASE_URL}/latest.txt"
         exit 1
     fi
 
@@ -111,7 +106,7 @@ install_binary() {
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "${tmp_dir}"' EXIT
 
-    # Construct archive name (matches GoReleaser naming convention)
+    # Construct archive name
     local archive_name
     if [ "${platform}" = "windows_x86_64" ]; then
         archive_name="${REPO_NAME}_Windows_x86_64.zip"
@@ -119,10 +114,12 @@ install_binary() {
         archive_name="${REPO_NAME}_$(echo "${platform}" | sed 's/_/ /' | awk '{print toupper(substr($1,1,1)) tolower(substr($1,2)) "_" $2}').tar.gz"
     fi
 
-    # Construct GitHub releases download URL
-    local download_url="${GITHUB_URL}/releases/download/${version}/${archive_name}"
+    # Construct S3 download URL (artifacts are stored in releases/version/ directory)
+    local download_url="${S3_BASE_URL}/releases/${version}/${archive_name}"
 
     log_info "Downloading Tiger CLI ${version} for ${platform}..."
+    log_info "Source: S3"
+    log_info "URL: ${download_url}"
 
     # Download archive with retry logic
     local max_retries=3
@@ -137,9 +134,9 @@ install_binary() {
                 log_warn "Download failed, retrying (${retry_count}/${max_retries})..."
                 sleep 2
             else
-                log_error "Failed to download Tiger CLI from GitHub after ${max_retries} attempts"
+                log_error "Failed to download Tiger CLI from S3 after ${max_retries} attempts"
                 log_error "URL: ${download_url}"
-                log_error "Please check that the GitHub release exists and contains the expected assets"
+                log_error "Please check that the S3 bucket contains the release files"
                 exit 1
             fi
         fi
