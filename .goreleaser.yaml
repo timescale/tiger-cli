@@ -21,6 +21,11 @@ builds:
       - 386
       - amd64
       - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.Version={{.Version}}
+      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.BuildTime={{.Date}}
+      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.GitCommit={{.Commit}}
 
 archives:
   - id: archive
