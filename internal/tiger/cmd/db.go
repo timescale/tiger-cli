@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 var (

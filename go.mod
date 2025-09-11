@@ -1,4 +1,4 @@
-module github.com/tigerdata/tiger-cli
+module github.com/timescale/tiger-cli
 
 go 1.23.0
 

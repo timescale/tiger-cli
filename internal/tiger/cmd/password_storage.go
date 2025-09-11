@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/zalando/go-keyring"
 )
 

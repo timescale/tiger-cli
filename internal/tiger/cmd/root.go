@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
-	"github.com/tigerdata/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
 
 func buildRootCmd() *cobra.Command {

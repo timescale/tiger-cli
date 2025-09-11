@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 // Shared HTTP client with resource limits to prevent resource exhaustion under load

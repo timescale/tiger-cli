@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 // setupIntegrationTest sets up isolated test environment with temporary config directory

@@ -15,7 +15,7 @@ import (
 	http "net/http"
 	reflect "reflect"
 
-	api "github.com/tigerdata/tiger-cli/internal/tiger/api"
+	api "github.com/timescale/tiger-cli/internal/tiger/api"
 	gomock "go.uber.org/mock/gomock"
 )
 

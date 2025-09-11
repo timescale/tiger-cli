@@ -13,8 +13,8 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/term"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 // Keyring parameters
