@@ -80,8 +80,6 @@ blobs:
     ids:
       - archive  # Archive ID
       - packages # nfpms package ID
-    # Set public read ACL for downloads
-    acl: public-read
 
   # Upload install script and latest version file to bucket root (skip for prereleases)
   - provider: s3
