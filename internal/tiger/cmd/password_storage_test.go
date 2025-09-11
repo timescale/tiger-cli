@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
 
 // Helper function to create a test service

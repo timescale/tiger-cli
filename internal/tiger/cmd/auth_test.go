@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/zalando/go-keyring"
 )
 

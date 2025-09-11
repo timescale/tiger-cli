@@ -7,8 +7,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/api"
-	"github.com/tigerdata/tiger-cli/internal/tiger/api/mocks"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/api/mocks"
 )
 
 func TestValidateAPIKeyWithClient(t *testing.T) {
