@@ -11,6 +11,7 @@ before:
 
 builds:
   - main: ./cmd/tiger
+    binary: tiger
     env:
       - CGO_ENABLED=0
     goos:
