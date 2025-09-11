@@ -106,7 +106,8 @@ install_binary() {
     # Create temporary directory
     local tmp_dir
     tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "${tmp_dir}"' EXIT
+    # shellcheck disable=SC2064 # We want to expand ${tmp_dir} immediately, because it's out-of-scope when EXIT fires
+    trap "rm -rf '${tmp_dir}'" EXIT
 
     # Construct archive name
     local archive_name
@@ -120,7 +121,6 @@ install_binary() {
     local download_url="${S3_BASE_URL}/releases/${version}/${archive_name}"
 
     log_info "Downloading Tiger CLI ${version} for ${platform}..."
-    log_info "Source: S3"
     log_info "URL: ${download_url}"
 
     # Download archive with retry logic
@@ -245,11 +245,9 @@ main() {
     verify_installation
 
     # Show usage information
-    echo
-    log_info "Get started with:"
-    log_info "    ${BINARY_NAME} --help"
-    log_info "    ${BINARY_NAME} version"
-    echo
+    log_success "Get started with:"
+    log_success "    ${BINARY_NAME} --help"
+    log_success "    ${BINARY_NAME} version"
     log_success "Happy coding with Tiger CLI! 🐅"
 }
 
