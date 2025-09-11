@@ -7,7 +7,6 @@ set -eu
 # Configuration
 REPO_NAME="tiger-cli"
 BINARY_NAME="tiger"
-INSTALL_DIR="${TIGER_INSTALL_DIR:-/usr/local/bin}"
 
 # S3 Configuration (primary download source)
 S3_BUCKET="${TIGER_S3_BUCKET:-tiger-cli-releases}"
@@ -62,6 +61,40 @@ detect_platform() {
     echo "${os}_${arch}"
 }
 
+# Check if a directory is in PATH
+is_in_path() {
+    local dir="$1"
+    case ":${PATH}:" in
+        *":${dir}:"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Find the best install directory
+detect_install_dir() {
+    # If user specified TIGER_INSTALL_DIR, respect it
+    if [ -n "${TIGER_INSTALL_DIR:-}" ]; then
+        echo "${TIGER_INSTALL_DIR}"
+        return
+    fi
+
+    # Try to find a directory that's writable and in PATH
+    local candidate_dirs="$HOME/.local/bin $HOME/bin /usr/local/bin"
+
+    for dir in ${candidate_dirs}; do
+        # Check if we can write to it (either exists and writable, or parent is writable)
+        if ([ -d "${dir}" ] && [ -w "${dir}" ]) || [ -w "$(dirname "${dir}")" ]; then
+            if is_in_path "${dir}"; then
+                echo "${dir}"
+                return
+            fi
+        fi
+    done
+
+    # No writable directory in PATH found, default to ~/.local/bin
+    echo "$HOME/.local/bin"
+}
+
 # Check if commands are available, exit with error if any are missing
 command_exists() {
     local missing_deps=""
@@ -102,6 +135,11 @@ get_latest_version() {
 install_binary() {
     local version="$1"
     local platform="$2"
+
+    # Detect the best install directory
+    local install_dir
+    install_dir="$(detect_install_dir)"
+    log_info "Selected install directory: ${install_dir}"
 
     # Create temporary directory
     local tmp_dir
@@ -167,22 +205,22 @@ install_binary() {
     chmod +x "${binary_path}"
 
     # Install binary
-    log_info "Installing to ${INSTALL_DIR}..."
+    log_info "Installing to ${install_dir}..."
 
     # Create install directory if it doesn't exist
-    if [ ! -d "${INSTALL_DIR}" ]; then
-        if [ "${INSTALL_DIR}" = "/usr/local/bin" ]; then
-            sudo mkdir -p "${INSTALL_DIR}"
+    if [ ! -d "${install_dir}" ]; then
+        if [ "${install_dir}" = "/usr/local/bin" ]; then
+            sudo mkdir -p "${install_dir}"
         else
-            mkdir -p "${INSTALL_DIR}"
+            mkdir -p "${install_dir}"
         fi
     fi
 
     # Copy binary
-    if [ -w "${INSTALL_DIR}" ]; then
-        cp "${binary_path}" "${INSTALL_DIR}/${BINARY_NAME}"
+    if [ -w "${install_dir}" ]; then
+        cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
     else
-        sudo cp "${binary_path}" "${INSTALL_DIR}/${BINARY_NAME}"
+        sudo cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
     fi
 
     log_success "Tiger CLI installed successfully!"
@@ -190,16 +228,18 @@ install_binary() {
 
 # Verify installation
 verify_installation() {
+    local install_dir="$1"
+
     if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
         local installed_version
         installed_version=$(${BINARY_NAME} version 2>/dev/null | head -n1 || echo "unknown")
         log_success "Installation verified: ${installed_version}"
 
         # Check if install directory is in PATH
-        if ! echo ":${PATH}:" | grep -q ":${INSTALL_DIR}:"; then
-            log_warn "Warning: ${INSTALL_DIR} is not in your PATH"
+        if ! is_in_path "${install_dir}"; then
+            log_warn "Warning: ${install_dir} is not in your PATH"
             log_info "Add this to your shell profile (.bashrc, .zshrc, etc.):"
-            log_info "    export PATH=\"${INSTALL_DIR}:\${PATH}\""
+            log_info "    export PATH=\"${install_dir}:\${PATH}\""
         fi
     else
         log_error "Installation verification failed"
@@ -238,11 +278,13 @@ main() {
         log_info "Latest version: ${version}"
     fi
 
-    # Install binary
+    # Install binary and get the install directory used
+    local install_dir
+    install_dir="$(detect_install_dir)"
     install_binary "${version}" "${platform}"
 
     # Verify installation
-    verify_installation
+    verify_installation "${install_dir}"
 
     # Show usage information
     log_success "Get started with:"
