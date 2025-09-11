@@ -83,13 +83,15 @@ command_exists() {
 
 # Get latest version from S3
 get_latest_version() {
+    local url="${S3_BASE_URL}/install/latest.txt"
+
     # Try to get version from S3 latest.txt file at bucket root
     local version
-    version=$(curl -fsSL "${S3_BASE_URL}/latest.txt" 2>/dev/null | head -n1 | tr -d '\n\r' || echo "")
+    version=$(curl -fsSL "${url}" 2>/dev/null | head -n1 | tr -d '\n\r' || echo "")
 
     if [ -z "${version}" ]; then
         log_error "latest.txt file not found in S3 bucket root"
-        log_error "URL: ${S3_BASE_URL}/latest.txt"
+        log_error "URL: ${url}"
         exit 1
     fi
 
