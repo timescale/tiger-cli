@@ -35,5 +35,5 @@ jobs:
           TAP_GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB_CLOUD }}
           # AWS credentials for pushing to tiger-cli-releases S3 bucket
           AWS_ACCESS_KEY_ID: ${{ secrets.ORG_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_KEY_ID: ${{ secrets.ORG_AWS_SECRET_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ORG_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
