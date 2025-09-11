@@ -7,7 +7,7 @@ project_name: tiger-cli
 # Create VERSION file before building
 before:
   hooks:
-    - echo "{{ .Tag }}" > latest.txt
+    - sh -c 'echo "{{ .Tag }}" > latest.txt'
 
 builds:
   - main: ./cmd/tiger
@@ -74,7 +74,7 @@ nfpms:
 blobs:
   # Versioned release artifacts
   - provider: s3
-    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    bucket: tiger-cli-releases
     region: us-east-1
     directory: "releases/{{ .Tag }}"
     ids:
@@ -85,10 +85,9 @@ blobs:
 
   # Upload install script and latest version file to bucket root (skip for prereleases)
   - provider: s3
-    bucket: tiger-cli-releases # TODO: Actual S3 bucket name
+    bucket: tiger-cli-releases
     region: us-east-1
-    directory: ""  # Root of bucket
-    acl: public-read
+    directory: ""
     extra_files_only: true
     disable: '{{ .Prerelease }}' # Skip this step for pre-releases
     extra_files:
