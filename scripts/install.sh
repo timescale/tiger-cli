@@ -229,10 +229,15 @@ main() {
         command_exists ${common_deps} tar
     fi
 
-    # Get latest version from GitHub
+    # Get version (use VERSION env var if provided, otherwise get latest)
     local version
-    version="$(get_latest_version)"
-    log_info "Latest version: ${version}"
+    if [ -n "${VERSION:-}" ]; then
+        version="${VERSION}"
+        log_info "Using specified version: ${version}"
+    else
+        version="$(get_latest_version)"
+        log_info "Latest version: ${version}"
+    fi
 
     # Install binary
     install_binary "${version}" "${platform}"
