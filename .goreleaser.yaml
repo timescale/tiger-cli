@@ -82,23 +82,20 @@ blobs:
       - packages # nfpms package ID
     # Set public read ACL for downloads
     acl: public-read
-    extra_files:
-      - glob: ./scripts/install.sh
-        name_template: "install.sh"
-      - glob: ./checksums.txt
-        name_template: "checksums.txt"
 
-  # Upload latest version file to bucket root (skip for prereleases)
+  # Upload install script and latest version file to bucket root (skip for prereleases)
   - provider: s3
     bucket: tiger-cli-releases # TODO: Actual S3 bucket name
     region: us-east-1
     directory: ""  # Root of bucket
     acl: public-read
     extra_files_only: true
-    disable: '{{ .Prerelease }}'
+    disable: '{{ .Prerelease }}' # Skip this step for pre-releases
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
+      - glob: ./scripts/install.sh
+        name_template: "install.sh"
 
 # Homebrew cask configuration
 homebrew_casks:
