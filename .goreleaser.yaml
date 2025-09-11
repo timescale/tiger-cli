@@ -90,7 +90,7 @@ blobs:
   - provider: s3
     bucket: tiger-cli-releases
     region: us-east-1
-    directory: ""
+    directory: "install"
     extra_files_only: true
     disable: '{{ .Prerelease }}' # Skip this step for pre-releases
     extra_files:
