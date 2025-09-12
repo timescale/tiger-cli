@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
-	"github.com/tigerdata/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
 
 func buildConfigShowCmd() *cobra.Command {

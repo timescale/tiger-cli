@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
-	"github.com/tigerdata/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 func setupConfigTest(t *testing.T) (string, func()) {
