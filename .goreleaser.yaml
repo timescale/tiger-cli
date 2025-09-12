@@ -93,7 +93,7 @@ blobs:
     region: us-east-1
     directory: "install"
     extra_files_only: true
-    disable: '{{ .Prerelease }}' # Skip this step for pre-releases
+    disable: '{{ .Prerelease }}' # Skip this step for pre-releases TODO: This isnt' working right for some reason
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
@@ -114,7 +114,7 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
-    skip_upload: auto
+    skip_upload: false
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
