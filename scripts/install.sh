@@ -139,6 +139,64 @@ commands_exist() {
     fi
 }
 
+# Download a file with retry logic
+download_with_retry() {
+    local url="$1"
+    local output_file="$2"
+    local description="${3:-file}"
+    local max_retries=3
+    local sleep_duration=1
+
+    local retry_count=0
+
+    log_info "Downloading ${description}..."
+    log_info "URL: ${url}"
+
+    while [ ${retry_count} -lt "${max_retries}" ]; do
+        if curl -fsSL "${url}" -o "${output_file}"; then
+            return 0
+        else
+            retry_count=$((retry_count + 1))
+            if [ "${retry_count}" -lt "${max_retries}" ]; then
+                log_warn "${description} download failed, retrying (${retry_count}/${max_retries})..."
+                sleep "${sleep_duration}"
+            else
+                log_error "Failed to download ${description} after ${max_retries} attempts"
+                log_error "URL: ${url}"
+                exit 1
+            fi
+        fi
+    done
+}
+
+# Download a URL to stdout with retry logic
+fetch_with_retry() {
+    local url="$1"
+    local description="${2:-content}"
+    local max_retries=3
+    local sleep_duration=1
+
+    local retry_count=0
+
+    while [ ${retry_count} -lt "${max_retries}" ]; do
+        local content
+        if content=$(curl -fsSL "${url}" 2>/dev/null); then
+            echo "${content}"
+            return 0
+        else
+            retry_count=$((retry_count + 1))
+            if [ "${retry_count}" -lt "${max_retries}" ]; then
+                log_warn "${description} fetch failed, retrying (${retry_count}/${max_retries})..."
+                sleep "${sleep_duration}"
+            else
+                log_error "Failed to fetch ${description} after ${max_retries} attempts"
+                log_error "URL: ${url}"
+                exit 1
+            fi
+        fi
+    done
+}
+
 
 # Download and validate checksum file
 verify_checksum() {
@@ -150,29 +208,8 @@ verify_checksum() {
     local checksum_url="${S3_BASE_URL}/releases/${version}/${filename}.sha256"
     local checksum_file="${tmp_dir}/${filename}.sha256"
 
-    log_info "Downloading checksum file..."
-    log_info "URL: ${checksum_url}"
-
     # Download checksum file with retry logic
-    local max_retries=3
-    local retry_count=0
-
-    while [ ${retry_count} -lt ${max_retries} ]; do
-        if curl -fsSL "${checksum_url}" -o "${checksum_file}"; then
-            break
-        else
-            retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
-                log_warn "Checksum download failed, retrying (${retry_count}/${max_retries})..."
-                sleep 1
-            else
-                log_error "Failed to download checksum file after ${max_retries} attempts"
-                log_error "URL: ${checksum_url}"
-                log_error "For security reasons, installation has been aborted"
-                exit 1
-            fi
-        fi
-    done
+    download_with_retry "${checksum_url}" "${checksum_file}" "checksum file"
 
     log_info "Validating checksum for ${filename}..."
 
@@ -207,11 +244,13 @@ get_latest_version() {
 
     # Try to get version from S3 latest.txt file at bucket root
     local version
-    version=$(curl -fsSL "${url}" 2>/dev/null | head -n1 | tr -d '\n\r' || echo "")
+    version=$(fetch_with_retry "${url}" "latest version")
+
+    # Clean up the version string
+    version=$(echo "${version}" | head -n1 | tr -d '\n\r')
 
     if [ -z "${version}" ]; then
-        log_error "latest.txt file not found in S3 bucket root"
-        log_error "URL: ${url}"
+        log_error "latest.txt file is empty"
         exit 1
     fi
 
@@ -245,29 +284,8 @@ install_binary() {
     # Construct S3 download URL (artifacts are stored in releases/version/ directory)
     local download_url="${S3_BASE_URL}/releases/${version}/${archive_name}"
 
-    log_info "Downloading Tiger CLI ${version} for ${platform}..."
-    log_info "URL: ${download_url}"
-
     # Download archive with retry logic
-    local max_retries=3
-    local retry_count=0
-
-    while [ ${retry_count} -lt ${max_retries} ]; do
-        if curl -fsSL "${download_url}" -o "${tmp_dir}/${archive_name}"; then
-            break
-        else
-            retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
-                log_warn "Download failed, retrying (${retry_count}/${max_retries})..."
-                sleep 2
-            else
-                log_error "Failed to download Tiger CLI from S3 after ${max_retries} attempts"
-                log_error "URL: ${download_url}"
-                log_error "Please check that the S3 bucket contains the release files"
-                exit 1
-            fi
-        fi
-    done
+    download_with_retry "${download_url}" "${tmp_dir}/${archive_name}" "Tiger CLI ${version} for ${platform}"
 
     # Download and validate checksum
     log_info "Verifying file integrity..."
