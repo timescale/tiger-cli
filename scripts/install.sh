@@ -87,6 +87,117 @@ detect_platform() {
     echo "${os}_${arch}"
 }
 
+# Verify that all required dependencies are available
+verify_dependencies() {
+    local platform="$1"
+
+    # Build complete dependency list based on platform
+    local required_deps="curl mktemp head tr sed awk grep uname chmod cp mkdir sleep"
+
+    if echo "${platform}" | grep -q "windows"; then
+        required_deps="${required_deps} unzip"
+    else
+        required_deps="${required_deps} tar"
+    fi
+
+    # Check if all commands are available
+    local missing_deps=""
+    local cmd
+
+    for cmd in ${required_deps}; do
+        if ! command -v "${cmd}" >/dev/null 2>&1; then
+            missing_deps="${missing_deps} ${cmd}"
+        fi
+    done
+
+    if [ -n "${missing_deps}" ]; then
+        log_error "Missing required dependencies:${missing_deps}"
+        log_error "Please install these tools and try again"
+        exit 1
+    fi
+}
+
+# Download a URL to stdout with retry logic
+fetch_with_retry() {
+    local url="$1"
+    local description="${2:-content}"
+    local max_retries=3
+    local retry_count=0
+
+    while [ ${retry_count} -lt "${max_retries}" ]; do
+        local content
+        if content=$(curl -fsSL "${url}" 2>/dev/null); then
+            echo "${content}"
+            return 0
+        else
+            retry_count=$((retry_count + 1))
+            if [ "${retry_count}" -lt "${max_retries}" ]; then
+                log_warn "${description} fetch failed, retrying (${retry_count}/${max_retries})..."
+                sleep 1
+            else
+                log_error "Failed to fetch ${description} after ${max_retries} attempts"
+                log_error "URL: ${url}"
+                exit 1
+            fi
+        fi
+    done
+}
+
+# Download a file with retry logic
+download_with_retry() {
+    local url="$1"
+    local output_file="$2"
+    local description="${3:-file}"
+    local max_retries=3
+    local retry_count=0
+
+    log_info "Downloading ${description}..."
+    log_info "URL: ${url}"
+
+    while [ ${retry_count} -lt "${max_retries}" ]; do
+        if curl -fsSL "${url}" -o "${output_file}"; then
+            return 0
+        else
+            retry_count=$((retry_count + 1))
+            if [ "${retry_count}" -lt "${max_retries}" ]; then
+                log_warn "${description} download failed, retrying (${retry_count}/${max_retries})..."
+                sleep 1
+            else
+                log_error "Failed to download ${description} after ${max_retries} attempts"
+                log_error "URL: ${url}"
+                exit 1
+            fi
+        fi
+    done
+}
+
+# Get version (from VERSION env var or latest from S3)
+get_version() {
+    # Use VERSION env var if provided
+    if [ -n "${VERSION:-}" ]; then
+        log_info "Using specified version: ${VERSION}"
+        echo "${VERSION}"
+        return
+    fi
+
+    local url="${S3_BASE_URL}/install/latest.txt"
+
+    # Try to get version from S3 latest.txt file at bucket root
+    local version
+    version=$(fetch_with_retry "${url}" "latest version")
+
+    # Clean up the version string
+    version=$(echo "${version}" | head -n1 | tr -d '\n\r')
+
+    if [ -z "${version}" ]; then
+        log_error "latest.txt file is empty"
+        exit 1
+    fi
+
+    log_info "Latest version: ${version}"
+    echo "${version}"
+}
+
 # Check if a directory is in PATH
 is_in_path() {
     local dir="$1"
@@ -121,82 +232,36 @@ detect_install_dir() {
     echo "$HOME/.local/bin"
 }
 
-# Check if commands are available, exit with error if any are missing
-commands_exist() {
-    local missing_deps=""
-    local cmd
+# Find the best install directory and ensure it exists
+ensure_install_dir() {
+    local install_dir
+    install_dir="$(detect_install_dir)"
 
-    for cmd in "$@"; do
-        if ! command -v "${cmd}" >/dev/null 2>&1; then
-            missing_deps="${missing_deps} ${cmd}"
+    log_info "Selected install directory: ${install_dir}"
+
+    # Create install directory if it doesn't exist
+    if [ ! -d "${install_dir}" ]; then
+        if [ "${install_dir}" = "/usr/local/bin" ]; then
+            sudo mkdir -p "${install_dir}"
+        else
+            mkdir -p "${install_dir}"
         fi
-    done
+    fi
 
-    if [ -n "${missing_deps}" ]; then
-        log_error "Missing required dependencies:${missing_deps}"
-        log_error "Please install these tools and try again"
-        exit 1
+    echo "${install_dir}"
+}
+
+
+# Build archive name based on platform
+build_archive_name() {
+    local platform="$1"
+
+    if [ "${platform}" = "windows_x86_64" ]; then
+        echo "${REPO_NAME}_Windows_x86_64.zip"
+    else
+        echo "${REPO_NAME}_$(echo "${platform}" | sed 's/_/ /' | awk '{print toupper(substr($1,1,1)) tolower(substr($1,2)) "_" $2}').tar.gz"
     fi
 }
-
-# Download a file with retry logic
-download_with_retry() {
-    local url="$1"
-    local output_file="$2"
-    local description="${3:-file}"
-    local max_retries=3
-    local sleep_duration=1
-
-    local retry_count=0
-
-    log_info "Downloading ${description}..."
-    log_info "URL: ${url}"
-
-    while [ ${retry_count} -lt "${max_retries}" ]; do
-        if curl -fsSL "${url}" -o "${output_file}"; then
-            return 0
-        else
-            retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
-                log_warn "${description} download failed, retrying (${retry_count}/${max_retries})..."
-                sleep "${sleep_duration}"
-            else
-                log_error "Failed to download ${description} after ${max_retries} attempts"
-                log_error "URL: ${url}"
-                exit 1
-            fi
-        fi
-    done
-}
-
-# Download a URL to stdout with retry logic
-fetch_with_retry() {
-    local url="$1"
-    local description="${2:-content}"
-    local max_retries=3
-    local sleep_duration=1
-
-    local retry_count=0
-
-    while [ ${retry_count} -lt "${max_retries}" ]; do
-        local content
-        if content=$(curl -fsSL "${url}" 2>/dev/null); then
-            echo "${content}"
-            return 0
-        else
-            retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
-                log_warn "${description} fetch failed, retrying (${retry_count}/${max_retries})..."
-                sleep "${sleep_duration}"
-            else
-                log_error "Failed to fetch ${description} after ${max_retries} attempts"
-                log_error "URL: ${url}"
-                exit 1
-            fi
-        fi
-    done
-}
-
 
 # Download and validate checksum file
 verify_checksum() {
@@ -237,51 +302,14 @@ verify_checksum() {
     fi
 }
 
-
-# Get latest version from S3
-get_latest_version() {
-    local url="${S3_BASE_URL}/install/latest.txt"
-
-    # Try to get version from S3 latest.txt file at bucket root
-    local version
-    version=$(fetch_with_retry "${url}" "latest version")
-
-    # Clean up the version string
-    version=$(echo "${version}" | head -n1 | tr -d '\n\r')
-
-    if [ -z "${version}" ]; then
-        log_error "latest.txt file is empty"
-        exit 1
-    fi
-
-    echo "${version}"
-}
-
-# Download and install binary
-install_binary() {
+# Download archive and verify checksum
+download_archive() {
     local version="$1"
-    local platform="$2"
+    local archive_name="$2"
+    local tmp_dir="$3"
+    local platform="$4"
 
-    # Detect the best install directory
-    local install_dir
-    install_dir="$(detect_install_dir)"
-    log_info "Selected install directory: ${install_dir}"
-
-    # Create temporary directory
-    local tmp_dir
-    tmp_dir="$(mktemp -d)"
-    # shellcheck disable=SC2064 # We want to expand ${tmp_dir} immediately, because it's out-of-scope when EXIT fires
-    trap "rm -rf '${tmp_dir}'" EXIT
-
-    # Construct archive name
-    local archive_name
-    if [ "${platform}" = "windows_x86_64" ]; then
-        archive_name="${REPO_NAME}_Windows_x86_64.zip"
-    else
-        archive_name="${REPO_NAME}_$(echo "${platform}" | sed 's/_/ /' | awk '{print toupper(substr($1,1,1)) tolower(substr($1,2)) "_" $2}').tar.gz"
-    fi
-
-    # Construct S3 download URL (artifacts are stored in releases/version/ directory)
+    # Construct S3 download URL
     local download_url="${S3_BASE_URL}/releases/${version}/${archive_name}"
 
     # Download archive with retry logic
@@ -290,8 +318,14 @@ install_binary() {
     # Download and validate checksum
     log_info "Verifying file integrity..."
     verify_checksum "${version}" "${archive_name}" "${tmp_dir}"
+}
 
-    # Extract archive
+# Extract archive and return path to binary
+extract_archive() {
+    local archive_name="$1"
+    local tmp_dir="$2"
+    local platform="$3"
+
     log_info "Extracting archive..."
     cd "${tmp_dir}"
 
@@ -313,19 +347,17 @@ install_binary() {
     # Make binary executable
     chmod +x "${binary_path}"
 
-    # Install binary
+    echo "${binary_path}"
+}
+
+# Copy binary to install directory with appropriate permissions
+copy_binary_to_install_dir() {
+    local binary_path="$1"
+    local install_dir="$2"
+
     log_info "Installing to ${install_dir}..."
 
-    # Create install directory if it doesn't exist
-    if [ ! -d "${install_dir}" ]; then
-        if [ "${install_dir}" = "/usr/local/bin" ]; then
-            sudo mkdir -p "${install_dir}"
-        else
-            mkdir -p "${install_dir}"
-        fi
-    fi
-
-    # Copy binary
+    # Copy binary (using sudo if needed)
     if [ -w "${install_dir}" ]; then
         cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
     else
@@ -334,6 +366,7 @@ install_binary() {
 
     log_success "Tiger CLI installed successfully!"
 }
+
 
 # Verify installation
 verify_installation() {
@@ -379,31 +412,36 @@ main() {
     platform=$(detect_platform)
     log_info "Detected platform: ${platform}"
 
-    # Check dependencies based on platform
-    local common_deps="curl mktemp head tr sed awk grep uname chmod cp mkdir sleep"
+    # Verify all required dependencies are available
+    verify_dependencies "${platform}"
 
-    if echo "${platform}" | grep -q "windows"; then
-        # shellcheck disable=SC2086 # Word splitting intended for common_deps
-        commands_exist ${common_deps} unzip
-    else
-        # shellcheck disable=SC2086 # Word splitting intended for common_deps
-        commands_exist ${common_deps} tar
-    fi
-
-    # Get version (use VERSION env var if provided, otherwise get latest)
+    # Get version (handles VERSION env var internally)
     local version
-    if [ -n "${VERSION:-}" ]; then
-        version="${VERSION}"
-        log_info "Using specified version: ${version}"
-    else
-        version="$(get_latest_version)"
-        log_info "Latest version: ${version}"
-    fi
+    version="$(get_version)"
 
-    # Install binary and get the install directory used
+    # Ensure install directory exists and get its path
     local install_dir
-    install_dir="$(detect_install_dir)"
-    install_binary "${version}" "${platform}"
+    install_dir="$(ensure_install_dir)"
+
+    # Create temporary directory
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+    # shellcheck disable=SC2064 # We want to expand ${tmp_dir} immediately, because it's out-of-scope when EXIT fires
+    trap "rm -rf '${tmp_dir}'" EXIT
+
+    # Build archive name for the platform
+    local archive_name
+    archive_name="$(build_archive_name "${platform}")"
+
+    # Download and verify the archive
+    download_archive "${version}" "${archive_name}" "${tmp_dir}" "${platform}"
+
+    # Extract the archive and get binary path
+    local binary_path
+    binary_path="$(extract_archive "${archive_name}" "${tmp_dir}" "${platform}")"
+
+    # Copy binary to install directory
+    copy_binary_to_install_dir "${binary_path}" "${install_dir}"
 
     # Verify installation
     verify_installation "${install_dir}"
