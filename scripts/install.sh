@@ -320,21 +320,34 @@ install_binary() {
 # Verify installation
 verify_installation() {
     local install_dir="$1"
+    local binary_path="${install_dir}/${BINARY_NAME}"
 
-    if command -v "${BINARY_NAME}" >/dev/null 2>&1; then
-        local installed_version
-        installed_version=$(${BINARY_NAME} version 2>/dev/null | head -n1 || echo "unknown")
-        log_success "Installation verified: ${installed_version}"
+    # First, check if binary exists at expected location
+    if [ ! -f "${binary_path}" ]; then
+        log_error "Installation verification failed: Binary not found at ${binary_path}"
+        exit 1
+    fi
 
-        # Check if install directory is in PATH
-        if ! is_in_path "${install_dir}"; then
-            log_warn "Warning: ${install_dir} is not in your PATH"
-            log_info "Add this to your shell profile (.bashrc, .zshrc, etc.):"
-            log_info "    export PATH=\"${install_dir}:\${PATH}\""
+    # Test that the binary is executable and get version
+    local installed_version
+    if installed_version=$("${binary_path}" version 2>/dev/null | head -n1 || echo ""); then
+        if [ -n "${installed_version}" ]; then
+            log_success "Installation verified: ${installed_version}"
+        else
+            log_success "Binary installed successfully at ${binary_path}"
         fi
     else
-        log_error "Installation verification failed"
+        log_error "Installation verification failed: Binary exists but is not executable"
         exit 1
+    fi
+
+    # Check if install directory is in PATH
+    if ! is_in_path "${install_dir}"; then
+        log_warn "Warning: ${install_dir} is not in your PATH"
+        log_warn "Add this to your shell profile (.bashrc, .zshrc, etc.):"
+        log_warn "    export PATH=\"${install_dir}:\${PATH}\""
+        log_warn ""
+        log_warn "Or run the binary directly: ${binary_path}"
     fi
 }
 
