@@ -114,7 +114,7 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
-    skip_upload: false
+    skip_upload: auto
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
