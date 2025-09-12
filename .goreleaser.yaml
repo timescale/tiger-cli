@@ -93,7 +93,7 @@ blobs:
     region: us-east-1
     directory: "install"
     extra_files_only: true
-    disable: '{{ .Prerelease }}' # Skip this step for pre-releases TODO: This isnt' working right for some reason
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for pre-releases
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
