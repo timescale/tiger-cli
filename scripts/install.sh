@@ -1,7 +1,35 @@
 #!/bin/sh
 # shellcheck shell=dash
 # shellcheck disable=SC2039 # local is non-POSIX
-
+#
+# Tiger CLI Installation Script
+#
+# This script automatically downloads and installs the latest version of Tiger CLI
+# from S3 releases. It detects your platform (OS and architecture) and downloads
+# the appropriate binary for your system.
+#
+# Usage:
+#   curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
+#
+# Or with custom options:
+#   VERSION=v1.2.3 INSTALL_DIR=/usr/local/bin curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
+#
+# Environment Variables (all optional):
+#   VERSION           - Specific version to install (e.g., "v1.2.3")
+#                       Default: installs the latest version
+#
+#   INSTALL_DIR       - Custom installation directory
+#                       Default: auto-detects best location
+#
+# Supported Platforms:
+#   - Linux (x86_64, i386, arm64, armv7)
+#   - macOS/Darwin (x86_64, arm64)
+#   - Windows (x86_64)
+#
+# Requirements:
+#   - curl (for downloading)
+#   - tar/unzip (for extracting archives)
+#   - Standard POSIX utilities (mktemp, chmod, etc.)
 set -eu
 
 # Configuration
@@ -9,7 +37,7 @@ REPO_NAME="tiger-cli"
 BINARY_NAME="tiger"
 
 # S3 Configuration (primary download source)
-S3_BUCKET="${TIGER_S3_BUCKET:-tiger-cli-releases}"
+S3_BUCKET="tiger-cli-releases"
 S3_BASE_URL="https://${S3_BUCKET}.s3.amazonaws.com"
 
 # Colors for output
@@ -72,9 +100,9 @@ is_in_path() {
 
 # Find the best install directory
 detect_install_dir() {
-    # If user specified TIGER_INSTALL_DIR, respect it
-    if [ -n "${TIGER_INSTALL_DIR:-}" ]; then
-        echo "${TIGER_INSTALL_DIR}"
+    # If user specified INSTALL_DIR, respect it
+    if [ -n "${INSTALL_DIR:-}" ]; then
+        echo "${INSTALL_DIR}"
         return
     fi
 
