@@ -107,8 +107,6 @@ homebrew_casks:
     repository:
       owner: timescale
       name: homebrew-tap
-      # TODO: Token with permission to write to homebrew-tap repo
-      # See: https://goreleaser.com/errors/resource-not-accessible-by-integration
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/timescale/tiger-cli
     description: |-
@@ -116,7 +114,7 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
-    skip_upload: true # TODO: Set to 'auto' when ready
+    skip_upload: auto
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
