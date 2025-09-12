@@ -11,9 +11,6 @@
 # Usage:
 #   curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
 #
-# Or with custom options:
-#   VERSION=v1.2.3 INSTALL_DIR=/usr/local/bin curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
-#
 # Environment Variables (all optional):
 #   VERSION           - Specific version to install (e.g., "v1.2.3")
 #                       Default: installs the latest version
@@ -29,6 +26,7 @@
 # Requirements:
 #   - curl (for downloading)
 #   - tar/unzip (for extracting archives)
+#   - shasum/sha256sum (for verifying checksums)
 #   - Standard POSIX utilities (mktemp, chmod, etc.)
 set -eu
 
@@ -111,7 +109,7 @@ detect_install_dir() {
 
     for dir in ${candidate_dirs}; do
         # Check if we can write to it (either exists and writable, or parent is writable)
-        if ([ -d "${dir}" ] && [ -w "${dir}" ]) || [ -w "$(dirname "${dir}")" ]; then
+        if { [ -d "${dir}" ] && [ -w "${dir}" ]; } || [ -w "$(dirname "${dir}")" ]; then
             if is_in_path "${dir}"; then
                 echo "${dir}"
                 return
@@ -124,7 +122,7 @@ detect_install_dir() {
 }
 
 # Check if commands are available, exit with error if any are missing
-command_exists() {
+commands_exist() {
     local missing_deps=""
     local cmd
 
@@ -138,6 +136,67 @@ command_exists() {
         log_error "Missing required dependencies:${missing_deps}"
         log_error "Please install these tools and try again"
         exit 1
+    fi
+}
+
+
+# Download and validate checksum file
+verify_checksum() {
+    local version="$1"
+    local filename="$2"
+    local tmp_dir="$3"
+
+    # Construct individual checksum file URL
+    local checksum_url="${S3_BASE_URL}/releases/${version}/${filename}.sha256"
+    local checksum_file="${tmp_dir}/${filename}.sha256"
+
+    log_info "Downloading checksum file..."
+    log_info "URL: ${checksum_url}"
+
+    # Download checksum file with retry logic
+    local max_retries=3
+    local retry_count=0
+
+    while [ ${retry_count} -lt ${max_retries} ]; do
+        if curl -fsSL "${checksum_url}" -o "${checksum_file}"; then
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [ "${retry_count}" -lt "${max_retries}" ]; then
+                log_warn "Checksum download failed, retrying (${retry_count}/${max_retries})..."
+                sleep 1
+            else
+                log_error "Failed to download checksum file after ${max_retries} attempts"
+                log_error "URL: ${checksum_url}"
+                log_error "For security reasons, installation has been aborted"
+                exit 1
+            fi
+        fi
+    done
+
+    log_info "Validating checksum for ${filename}..."
+
+    cd "${tmp_dir}"
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        if sha256sum -c "${checksum_file}" >/dev/null 2>&1; then
+            log_success "Checksum validation passed"
+        else
+            log_error "Checksum validation failed using sha256sum"
+            log_error "For security reasons, installation has been aborted"
+            exit 1
+        fi
+    elif command -v shasum >/dev/null 2>&1; then
+        if shasum -a 256 -c "${checksum_file}" >/dev/null 2>&1; then
+            log_success "Checksum validation passed"
+        else
+            log_error "Checksum validation failed using shasum"
+            log_error "For security reasons, installation has been aborted"
+            exit 1
+        fi
+    else
+        log_warn "No SHA256 utility available (tried sha256sum, shasum)"
+        log_warn "Skipping checksum validation - proceed with caution"
     fi
 }
 
@@ -209,6 +268,10 @@ install_binary() {
             fi
         fi
     done
+
+    # Download and validate checksum
+    log_info "Verifying file integrity..."
+    verify_checksum "${version}" "${archive_name}" "${tmp_dir}"
 
     # Extract archive
     log_info "Extracting archive..."
@@ -290,10 +353,10 @@ main() {
 
     if echo "${platform}" | grep -q "windows"; then
         # shellcheck disable=SC2086 # Word splitting intended for common_deps
-        command_exists ${common_deps} unzip
+        commands_exist ${common_deps} unzip
     else
         # shellcheck disable=SC2086 # Word splitting intended for common_deps
-        command_exists ${common_deps} tar
+        commands_exist ${common_deps} tar
     fi
 
     # Get version (use VERSION env var if provided, otherwise get latest)

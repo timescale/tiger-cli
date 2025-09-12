@@ -137,6 +137,10 @@ homebrew_casks:
       For help:
         tiger --help
 
+# Checksum configuration - split into individual files for easier validation
+checksum:
+  split: true
+
 changelog:
   sort: asc
   filters:
