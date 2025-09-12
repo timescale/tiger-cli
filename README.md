@@ -45,7 +45,6 @@ go install github.com/timescale/tiger-cli/cmd/tiger@latest
 ```
 
 ### Direct binary download
-
 ```bash
 curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_$(uname -s)_$(uname -m).tar.gz
 tar -xzf tiger-cli_$(uname -s)_$(uname -m).tar.gz
@@ -53,26 +52,10 @@ chmod +x tiger
 mkdir -p ~/.local/bin && mv tiger ~/.local/bin/
 ```
 
-### Linux packages
-
-Replace the architecture component in the following commands with the appropriate value for your system.
-
-#### Debian/Ubuntu
+### Debian/Ubuntu package
 ```bash
-curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_amd64.deb
-sudo dpkg -i tiger-cli_linux_amd64.deb
-```
-
-#### Red Hat/CentOS/Fedora
-```bash
-curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_x86_64.rpm
-sudo rpm -i tiger-cli_linux_x86_64.rpm
-```
-
-#### Alpine Linux
-```bash
-curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_x86_64.apk
-sudo apk add tiger-cli_linux_x86_64.apk
+curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_$(dpkg --print-architecture).deb
+sudo dpkg -i tiger-cli_linux_$(dpkg --print-architecture).deb
 ```
 
 ## Usage
