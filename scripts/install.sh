@@ -280,18 +280,18 @@ verify_checksum() {
 
     cd "${tmp_dir}"
 
+    # Format checksum for validation: "hash  filename"
+    local formatted_checksum
+    formatted_checksum=$(printf "%s  %s\n" "$(cat "${checksum_file}" | tr -d '[:space:]')" "${filename}")
+
     if command -v sha256sum >/dev/null 2>&1; then
-        if sha256sum -c "${checksum_file}" >/dev/null 2>&1; then
-            log_success "Checksum validation passed"
-        else
+        if ! echo "${formatted_checksum}" | sha256sum -c >/dev/null 2>&1; then
             log_error "Checksum validation failed using sha256sum"
             log_error "For security reasons, installation has been aborted"
             exit 1
         fi
     elif command -v shasum >/dev/null 2>&1; then
-        if shasum -a 256 -c "${checksum_file}" >/dev/null 2>&1; then
-            log_success "Checksum validation passed"
-        else
+        if ! echo "${formatted_checksum}" | shasum -a 256 -c >/dev/null 2>&1; then
             log_error "Checksum validation failed using shasum"
             log_error "For security reasons, installation has been aborted"
             exit 1
@@ -363,8 +363,6 @@ copy_binary_to_install_dir() {
     else
         sudo cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
     fi
-
-    log_success "Tiger CLI installed successfully!"
 }
 
 
@@ -383,7 +381,8 @@ verify_installation() {
     local installed_version
     if installed_version=$("${binary_path}" version 2>/dev/null | head -n1 || echo ""); then
         if [ -n "${installed_version}" ]; then
-            log_success "Installation verified: ${installed_version}"
+            log_success "Tiger CLI installed successfully!"
+            log_success "Version: ${installed_version}"
         else
             log_success "Binary installed successfully at ${binary_path}"
         fi
