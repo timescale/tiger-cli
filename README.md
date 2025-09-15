@@ -14,11 +14,13 @@ go install ./cmd/tiger
 
 # (Optional) Set up the savannah-public endpoint
 # for prod (default)
-./tiger config set api-url https://console.cloud.timescale.com/public/api/v1
+tiger config set api_url https://console.cloud.timescale.com/public/api/v1
 # for dev
-./tiger config set api-url https://console.dev.timescale.com/public/api/v1
+tiger config set api_url https://console.dev.timescale.com/public/api/v1
+tiger config set console_url https://console.dev.timescale.com
+tiger config set gateway_url https://console.dev.timescale.com/api
 # for local
-./tiger config set api-url http://localhost:8080/public/api/v1
+tiger config set api_url http://localhost:8080/public/api/v1
 
 # Login to your account
 tiger auth login
