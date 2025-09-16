@@ -123,19 +123,21 @@ fetch_with_retry() {
     local description="${2:-content}"
     local max_retries=3
     local retry_count=0
+    local backoff_seconds=1
 
-    while [ ${retry_count} -lt "${max_retries}" ]; do
+    while [ ${retry_count} -le "${max_retries}" ]; do
         local content
         if content=$(curl -fsSL "${url}" 2>/dev/null); then
             echo "${content}"
             return 0
         else
             retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
+            if [ "${retry_count}" -le "${max_retries}" ]; then
                 log_warn "${description} fetch failed, retrying (${retry_count}/${max_retries})..."
-                sleep 1
+                sleep ${backoff_seconds}
+                backoff_seconds=$((backoff_seconds * 2))
             else
-                log_error "Failed to fetch ${description} after ${max_retries} attempts"
+                log_error "Failed to fetch ${description} after $((max_retries + 1)) attempts"
                 log_error "URL: ${url}"
                 exit 1
             fi
@@ -150,20 +152,22 @@ download_with_retry() {
     local description="${3:-file}"
     local max_retries=3
     local retry_count=0
+    local backoff_seconds=1
 
     log_info "Downloading ${description}..."
     log_info "URL: ${url}"
 
-    while [ ${retry_count} -lt "${max_retries}" ]; do
+    while [ ${retry_count} -le "${max_retries}" ]; do
         if curl -fsSL "${url}" -o "${output_file}"; then
             return 0
         else
             retry_count=$((retry_count + 1))
-            if [ "${retry_count}" -lt "${max_retries}" ]; then
+            if [ "${retry_count}" -le "${max_retries}" ]; then
                 log_warn "${description} download failed, retrying (${retry_count}/${max_retries})..."
-                sleep 1
+                sleep ${backoff_seconds}
+                backoff_seconds=$((backoff_seconds * 2))
             else
-                log_error "Failed to download ${description} after ${max_retries} attempts"
+                log_error "Failed to download ${description} after $((max_retries + 1)) attempts"
                 log_error "URL: ${url}"
                 exit 1
             fi
