@@ -309,8 +309,10 @@ verify_checksum() {
             exit 1
         fi
     else
-        log_warn "No SHA256 utility available (tried sha256sum, shasum)"
-        log_warn "Skipping checksum validation - proceed with caution"
+        log_error "No SHA256 utility available (tried sha256sum, shasum)"
+        log_error "Checksum validation is required for security"
+        log_error "Please install sha256sum or shasum and try again"
+        exit 1
     fi
 }
 
