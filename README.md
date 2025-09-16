@@ -46,18 +46,31 @@ brew install timescale/tap/tiger-cli
 go install github.com/timescale/tiger-cli/cmd/tiger@latest
 ```
 
-### Direct binary download
+### Debian/Ubuntu (APT)
 ```bash
-curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_$(uname -s)_$(uname -m).tar.gz
-tar -xzf tiger-cli_$(uname -s)_$(uname -m).tar.gz
-chmod +x tiger
-mkdir -p ~/.local/bin && mv tiger ~/.local/bin/
+# Add PackageCloud repository
+curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.deb.sh | sudo bash
+
+# Install tiger-cli
+sudo apt-get install tiger-cli
 ```
 
-### Debian/Ubuntu package
+### Red Hat/CentOS (YUM)
 ```bash
-curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_$(dpkg --print-architecture).deb
-sudo dpkg -i tiger-cli_linux_$(dpkg --print-architecture).deb
+# Add PackageCloud repository
+curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.rpm.sh | sudo bash
+
+# Install tiger-cli
+sudo yum install tiger-cli
+```
+
+### Fedora (DNF)
+```bash
+# Add PackageCloud repository
+curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.rpm.sh | sudo bash
+
+# Install tiger-cli
+sudo dnf install tiger-cli
 ```
 
 ## Usage
@@ -155,7 +168,7 @@ go test ./internal/tiger/cmd -v -run Integration
 #### What Integration Tests Cover
 
 - **Authentication lifecycle**: Login with credentials, verify authentication, logout
-- **Service management**: Create, list, describe, and delete database services  
+- **Service management**: Create, list, describe, and delete database services
 - **Password management**: Update service passwords with keychain storage
 - **Database connectivity**: Generate connection strings and execute psql commands
 - **Output formats**: Validate JSON, YAML, and table output formats
