@@ -207,48 +207,60 @@ is_in_path() {
     esac
 }
 
-# Find the best install directory
-detect_install_dir() {
-    # If user specified INSTALL_DIR, respect it
-    if [ -n "${INSTALL_DIR:-}" ]; then
-        echo "${INSTALL_DIR}"
-        return
+# Ensure a directory exists and is writable, creating it if needed
+ensure_writable_dir() {
+    local dir="$1"
+
+    if [ -d "${dir}" ] && [ -w "${dir}" ]; then
+        return 0  # Directory exists and is writable
+    elif [ ! -e "${dir}" ] && [ -w "$(dirname "${dir}")" ]; then
+        # Directory doesn't exist but parent is writable - create it
+        mkdir -p "${dir}"
+        return 0
+    else
+        return 1  # Neither condition met
     fi
-
-    # Try to find a directory that's writable and in PATH
-    local candidate_dirs="$HOME/.local/bin $HOME/bin /usr/local/bin"
-
-    for dir in ${candidate_dirs}; do
-        # Check if we can write to it (either exists and writable, or parent is writable)
-        if { [ -d "${dir}" ] && [ -w "${dir}" ]; } || [ -w "$(dirname "${dir}")" ]; then
-            if is_in_path "${dir}"; then
-                echo "${dir}"
-                return
-            fi
-        fi
-    done
-
-    # No writable directory in PATH found, default to ~/.local/bin
-    echo "$HOME/.local/bin"
 }
 
 # Find the best install directory and ensure it exists
-ensure_install_dir() {
-    local install_dir
-    install_dir="$(detect_install_dir)"
-
-    log_info "Selected install directory: ${install_dir}"
-
-    # Create install directory if it doesn't exist
-    if [ ! -d "${install_dir}" ]; then
-        if [ "${install_dir}" = "/usr/local/bin" ]; then
-            sudo mkdir -p "${install_dir}"
+detect_install_dir() {
+    # If user specified INSTALL_DIR, respect it and try to use it
+    if [ -n "${INSTALL_DIR:-}" ]; then
+        if ensure_writable_dir "${INSTALL_DIR}"; then
+            log_info "Using user-specified install directory: ${INSTALL_DIR}"
+            echo "${INSTALL_DIR}"
+            return
         else
-            mkdir -p "${install_dir}"
+            log_error "User-specified install directory is not writable: ${INSTALL_DIR}"
+            exit 1
         fi
     fi
 
-    echo "${install_dir}"
+    local candidate_dirs="$HOME/.local/bin $HOME/bin"
+
+    # Priority 1: Try to find a directory that's writable/creatable and in PATH
+    for dir in ${candidate_dirs}; do
+        if ensure_writable_dir "${dir}" && is_in_path "${dir}"; then
+            log_info "Selected install directory: ${dir}"
+            echo "${dir}"
+            return
+        fi
+    done
+
+    # Priority 2: Try to find any directory that's writable/creatable (not in PATH)
+    for dir in ${candidate_dirs}; do
+        if ensure_writable_dir "${dir}"; then
+            log_info "Selected install directory: ${dir}"
+            echo "${dir}"
+            return
+        fi
+    done
+
+    # No suitable directory found, fail with clear error
+    log_error "Cannot find a writable install directory"
+    log_error "Tried the following directories: ${candidate_dirs}"
+    log_error "Please set INSTALL_DIR environment variable to a writable directory"
+    exit 1
 }
 
 
@@ -350,22 +362,6 @@ extract_archive() {
     echo "${binary_path}"
 }
 
-# Copy binary to install directory with appropriate permissions
-copy_binary_to_install_dir() {
-    local binary_path="$1"
-    local install_dir="$2"
-
-    log_info "Installing to ${install_dir}..."
-
-    # Copy binary (using sudo if needed)
-    if [ -w "${install_dir}" ]; then
-        cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
-    else
-        sudo cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
-    fi
-}
-
-
 # Verify installation
 verify_installation() {
     local install_dir="$1"
@@ -418,9 +414,9 @@ main() {
     local version
     version="$(get_version)"
 
-    # Ensure install directory exists and get its path
+    # Find and ensure install directory exists and get its path
     local install_dir
-    install_dir="$(ensure_install_dir)"
+    install_dir="$(detect_install_dir)"
 
     # Create temporary directory
     local tmp_dir
@@ -440,7 +436,8 @@ main() {
     binary_path="$(extract_archive "${archive_name}" "${tmp_dir}" "${platform}")"
 
     # Copy binary to install directory
-    copy_binary_to_install_dir "${binary_path}" "${install_dir}"
+    log_info "Installing to ${install_dir}..."
+    cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
 
     # Verify installation
     verify_installation "${install_dir}"
