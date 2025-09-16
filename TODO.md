@@ -6,12 +6,6 @@ Blocked:
 
 Active List:
 - should we alias the auth login command to login?
-- add release tooling
-   - goreleaser?
-   - platforms:
-        - apt
-        - brew
-        - curl .sh script
 
 Done:
  - ✅ update exit codes for authentication and permission errors

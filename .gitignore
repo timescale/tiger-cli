@@ -46,3 +46,6 @@ config.yaml
 *.pem
 .env*
 !.env.sample
+
+# Build artifacts
+latest.txt

@@ -29,24 +29,35 @@ tiger auth login
 tiger --help
 ```
 
-
 ## Installation
+
+### Install script
+```bash
+curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
+```
 
 ### Homebrew (macOS/Linux)
 ```bash
-brew install tigerdata/tap/tiger
+brew install timescale/tap/tiger-cli
 ```
 
 ### Go install
 ```bash
-go install github.com/tigerdata/tiger-cli/cmd/tiger@latest
+go install github.com/timescale/tiger-cli/cmd/tiger@latest
 ```
 
 ### Direct binary download
 ```bash
-curl -L https://github.com/tigerdata/tiger-cli/releases/latest/download/tiger-$(uname -s)-$(uname -m) -o tiger
+curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_$(uname -s)_$(uname -m).tar.gz
+tar -xzf tiger-cli_$(uname -s)_$(uname -m).tar.gz
 chmod +x tiger
-mv tiger /usr/local/bin/
+mkdir -p ~/.local/bin && mv tiger ~/.local/bin/
+```
+
+### Debian/Ubuntu package
+```bash
+curl -LO https://github.com/timescale/tiger-cli/releases/latest/download/tiger-cli_linux_$(dpkg --print-architecture).deb
+sudo dpkg -i tiger-cli_linux_$(dpkg --print-architecture).deb
 ```
 
 ## Usage
@@ -175,4 +186,4 @@ tiger-cli/
 
 ## License
 
-[License information to be added]
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
