@@ -65,7 +65,6 @@ nfpms:
     formats:
       - deb
       - rpm
-      - apk
     bindir: /usr/bin
     priority: extra
     file_name_template: "{{ .ConventionalFileName }}"
@@ -148,7 +147,7 @@ changelog:
 
 # PackageCloud publisher for Linux packages
 publishers:
-  # Upload all Linux packages (deb, rpm, apk) to PackageCloud
+  # Upload all Linux packages (deb, rpm) to PackageCloud
   - name: packagecloud
     # Skip upload if packagecloud credentials are not set
     disable: '{{ eq .Env.PACKAGECLOUD_TOKEN "" }}'
@@ -160,8 +159,6 @@ publishers:
           any/any
         {{- else if contains .ArtifactPath ".rpm" -}}
           rpm_any/rpm_any
-        {{- else if contains .ArtifactPath ".apk" -}}
-          alpine_any/alpine_any
         {{- end }} {{ .ArtifactPath }}
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
