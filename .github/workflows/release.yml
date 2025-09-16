@@ -22,6 +22,13 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY_FILE }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -37,3 +44,14 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.ORG_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.ORG_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
+          # macOS code signing and notarization
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          # GPG signing for Linux packages and checksums
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PRIVATE_KEY_FILE: ${{ secrets.GPG_PRIVATE_KEY_FILE }}
+          NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

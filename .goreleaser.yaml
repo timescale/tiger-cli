@@ -51,6 +51,34 @@ archives:
       - LICENSE
       - NOTICE
 
+# GPG signing for checksums and archives (optional - only if env vars are set)
+signs:
+  - cmd: gpg
+    args:
+      - --batch
+      - --local-user
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - --output
+      - "${signature}"
+      - --detach-sign
+      - "${artifact}"
+    artifacts: checksum
+    stdin: "{{ .Env.GPG_PASSPHRASE }}"
+
+# macOS code signing and notarization (optional - only if env vars are set)
+notarize:
+  macos:
+    - enabled: true
+      ids:
+        - tiger-cli
+      sign:
+        certificate: "{{.Env.MACOS_SIGN_P12}}"
+        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+      notarize:
+        issuer_id: "{{.Env.MACOS_NOTARY_ISSUER_ID}}"
+        key_id: "{{.Env.MACOS_NOTARY_KEY_ID}}"
+        key: "{{.Env.MACOS_NOTARY_KEY}}"
+
 # Linux package configuration (APT, RPM, etc.)
 nfpms:
   - id: packages
@@ -71,9 +99,16 @@ nfpms:
     file_name_template: "{{ .ConventionalFileName }}"
     rpm:
       group: Unspecified
+      signature:
+        key_file: '{{ .Env.GPG_PRIVATE_KEY_FILE }}'
     deb:
+      signature:
+        key_file: '{{ .Env.GPG_PRIVATE_KEY_FILE }}'
       lintian_overrides:
         - statically-linked-binary
+    apk:
+      signature:
+        key_file: '{{ .Env.GPG_PRIVATE_KEY_FILE }}'
 
 
 # S3 Blob Storage Configuration
@@ -117,14 +152,6 @@ homebrew_casks:
     skip_upload: auto
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
-    hooks:
-      # TODO: Sign and notarize instead of removing quarantine bit
-      # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tiger"]
-          end
     # Optional: Add caveats for user instructions
     caveats: |
       Tiger CLI has been installed successfully!
