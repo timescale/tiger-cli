@@ -22,6 +22,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Install package_cloud gem
+        run: sudo gem install package_cloud --no-doc
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -37,3 +40,5 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.ORG_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.ORG_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
+          # PackageCloud credentials for publishing Linux packages
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}

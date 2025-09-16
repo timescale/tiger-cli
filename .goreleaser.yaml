@@ -146,6 +146,18 @@ changelog:
       - "^specs:"
       # TODO: Other files that should be ignored
 
+# PackageCloud publishers for Linux packages
+publishers:
+  # Upload all Linux packages (deb, rpm, apk) to PackageCloud
+  - name: packagecloud
+    # Skip upload if packagecloud credentials are not set
+    disable: '{{ eq .Env.PACKAGECLOUD_TOKEN "" }}'
+    ids:
+      - packages # Only publish nfpms packages (Linux packages)
+    cmd: package_cloud push timescale/tiger-cli {{ .ArtifactPath }}
+    env:
+      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+
 # Release configuration
 release:
   github:
