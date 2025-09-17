@@ -113,7 +113,7 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
-    skip_upload: auto
+    skip_upload: auto # Skips prerelease builds
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
@@ -149,8 +149,7 @@ changelog:
 publishers:
   # Upload all Linux packages (deb, rpm) to PackageCloud
   - name: packagecloud
-    # Skip upload if packagecloud credentials are not set
-    disable: '{{ eq .Env.PACKAGECLOUD_TOKEN "" }}'
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for pre-releases
     ids:
       - packages # Only publish nfpms packages (Linux packages)
     cmd: >-
