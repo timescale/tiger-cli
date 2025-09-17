@@ -46,7 +46,7 @@ brew install timescale/tap/tiger-cli
 go install github.com/timescale/tiger-cli/cmd/tiger@latest
 ```
 
-### Debian/Ubuntu (APT)
+### Debian/Ubuntu
 ```bash
 # Add PackageCloud repository
 curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.deb.sh | sudo bash
@@ -55,22 +55,13 @@ curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.
 sudo apt-get install tiger-cli
 ```
 
-### Red Hat/CentOS (YUM)
+### Red Hat/CentOS/Fedora
 ```bash
 # Add PackageCloud repository
 curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.rpm.sh | sudo bash
 
 # Install tiger-cli
 sudo yum install tiger-cli
-```
-
-### Fedora (DNF)
-```bash
-# Add PackageCloud repository
-curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.rpm.sh | sudo bash
-
-# Install tiger-cli
-sudo dnf install tiger-cli
 ```
 
 ## Usage
