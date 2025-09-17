@@ -48,19 +48,54 @@ go install github.com/timescale/tiger-cli/cmd/tiger@latest
 
 ### Debian/Ubuntu
 ```bash
-# Add repository
-curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.deb.sh | sudo bash
+# Add repository and GPG key
+echo "deb https://packagecloud.io/timescale/tiger-cli/debian/ $(lsb_release -c -s) main" | sudo tee /etc/apt/sources.list.d/tiger-cli.list
+curl -fsSL https://packagecloud.io/timescale/tiger-cli/gpgkey | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/tiger-cli.gpg
 
-# Install tiger-cli
-sudo apt-get install tiger-cli
+# Update package cache and install
+sudo apt update
+sudo apt install tiger-cli
 ```
 
-### Red Hat/CentOS/Fedora
+### Red Hat
 ```bash
-# Add repository
-curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.rpm.sh | sudo bash
+# Add repository configuration
+sudo tee /etc/yum.repos.d/tiger-cli.repo <<EOL
+[timescale_tiger-cli]
+name=timescale_tiger-cli
+baseurl=https://packagecloud.io/timescale/tiger-cli/el/\$(rpm -E %{rhel})/\$basearch
+repo_gpgcheck=1
+gpgcheck=0
+enabled=1
+gpgkey=https://packagecloud.io/timescale/tiger-cli/gpgkey
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+metadata_expire=300
+EOL
 
-# Install tiger-cli
+# Update package cache and install
+sudo yum update
+sudo yum install tiger-cli
+```
+
+### Fedora
+```bash
+# Add repository configuration
+sudo tee /etc/yum.repos.d/tiger-cli.repo <<EOL
+[timescale_tiger-cli]
+name=timescale_tiger-cli
+baseurl=https://packagecloud.io/timescale/tiger-cli/fedora/\$(rpm -E %{fedora})/\$basearch
+repo_gpgcheck=1
+gpgcheck=0
+enabled=1
+gpgkey=https://packagecloud.io/timescale/tiger-cli/gpgkey
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+metadata_expire=300
+EOL
+
+# Update package cache and install
+sudo yum update
 sudo yum install tiger-cli
 ```
 
