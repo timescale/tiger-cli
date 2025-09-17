@@ -65,7 +65,6 @@ nfpms:
     formats:
       - deb
       - rpm
-      - apk
     bindir: /usr/bin
     priority: extra
     file_name_template: "{{ .ConventionalFileName }}"
@@ -93,7 +92,7 @@ blobs:
     region: us-east-1
     directory: "install"
     extra_files_only: true
-    disable: '{{ ne .Prerelease "" }}' # Skip this step for pre-releases
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
@@ -114,7 +113,7 @@ homebrew_casks:
       Command-line interface for managing TigerData Cloud Platform resources
     binary: tiger
     license: Apache-2.0
-    skip_upload: auto
+    skip_upload: auto # Skips prerelease builds
     url:
       template: "https://tiger-cli-releases.s3.us-east-1.amazonaws.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
     hooks:
@@ -145,6 +144,23 @@ changelog:
     exclude:
       - "^specs:"
       # TODO: Other files that should be ignored
+
+# PackageCloud publisher for Linux packages
+publishers:
+  # Upload all Linux packages (deb, rpm) to PackageCloud
+  - name: packagecloud
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
+    ids:
+      - packages # Only publish nfpms packages (Linux packages)
+    cmd: >-
+      package_cloud push timescale/tiger-cli/{{-
+        if contains .ArtifactPath ".deb" -}}
+          any/any
+        {{- else if contains .ArtifactPath ".rpm" -}}
+          rpm_any/rpm_any
+        {{- end }} {{ .ArtifactPath }}
+    env:
+      - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
 
 # Release configuration
 release:
