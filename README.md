@@ -55,6 +55,8 @@ curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.
 sudo apt-get install tiger-cli
 ```
 
+For manual repository installation instructions, see [here](https://packagecloud.io/timescale/tiger-cli/install#manual-deb).
+
 ### Red Hat/CentOS/Fedora
 ```bash
 # Add repository
@@ -63,6 +65,8 @@ curl -s https://packagecloud.io/install/repositories/timescale/tiger-cli/script.
 # Install tiger-cli
 sudo yum install tiger-cli
 ```
+
+For manual repository installation instructions, see [here](https://packagecloud.io/timescale/tiger-cli/install#manual-rpm).
 
 ## Usage
 
