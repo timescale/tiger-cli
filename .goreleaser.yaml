@@ -92,7 +92,7 @@ blobs:
     region: us-east-1
     directory: "install"
     extra_files_only: true
-    disable: '{{ ne .Prerelease "" }}' # Skip this step for pre-releases
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
     extra_files:
       - glob: ./latest.txt
         name_template: "latest.txt"
@@ -149,7 +149,7 @@ changelog:
 publishers:
   # Upload all Linux packages (deb, rpm) to PackageCloud
   - name: packagecloud
-    disable: '{{ ne .Prerelease "" }}' # Skip this step for pre-releases
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
     ids:
       - packages # Only publish nfpms packages (Linux packages)
     cmd: >-
