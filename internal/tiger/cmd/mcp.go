@@ -10,12 +10,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
-	tigerMCP "github.com/timescale/tiger-cli/internal/tiger/mcp"
+	"github.com/timescale/tiger-cli/internal/tiger/mcp"
 )
 
 // buildMCPCmd creates the MCP server command with subcommands
@@ -112,17 +111,18 @@ Examples:
 func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
-	// Create MCP server
-	server, err := tigerMCP.NewServer()
-	if err != nil {
-		return fmt.Errorf("failed to create MCP server: %w", err)
-	}
-
 	// Setup graceful shutdown handling
 	ctx, stop := signalContext(ctx)
 	defer stop()
 
-	if err := server.Run(ctx, &mcp.StdioTransport{}); !errors.Is(err, context.Canceled) {
+	// Create MCP server
+	server, err := mcp.NewServer()
+	if err != nil {
+		return fmt.Errorf("failed to create MCP server: %w", err)
+	}
+
+	// Start the stdio transport
+	if err := server.StartStdio(ctx); !errors.Is(err, context.Canceled) {
 		return err
 	}
 	return nil
@@ -133,7 +133,7 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
 	// Create MCP server
-	server, err := tigerMCP.NewServer()
+	server, err := mcp.NewServer()
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
@@ -157,14 +157,9 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 
 	address := fmt.Sprintf("%s:%d", host, actualPort)
 
-	// Create streamable HTTP handler that returns our server for all requests
-	httpHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
-		return server.GetMCPServer()
-	}, nil)
-
 	// Create HTTP server
 	httpServer := &http.Server{
-		Handler: httpHandler,
+		Handler: server.HTTPHandler(),
 	}
 
 	fmt.Printf("🚀 Tiger MCP server listening on http://%s\n", address)

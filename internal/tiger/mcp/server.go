@@ -3,9 +3,9 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -54,18 +54,16 @@ func NewServer() (*Server, error) {
 	return server, nil
 }
 
-// Run starts the MCP server with the specified transport
-func (s *Server) Run(ctx context.Context, transport mcp.Transport) error {
-	logging.Info("Starting Tiger MCP server",
-		zap.String("name", ServerName),
-		zap.String("version", ServerVersion))
-
-	return s.mcpServer.Run(ctx, transport)
+// Run starts the MCP server with the stdio transport
+func (s *Server) StartStdio(ctx context.Context) error {
+	return s.mcpServer.Run(ctx, &mcp.StdioTransport{})
 }
 
-// GetMCPServer returns the underlying MCP server for HTTP transport
-func (s *Server) GetMCPServer() *mcp.Server {
-	return s.mcpServer
+// Returns an HTTP handler that implements the http transport
+func (s *Server) HTTPHandler() http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+		return s.mcpServer
+	}, nil)
 }
 
 // registerTools registers all available MCP tools
