@@ -73,8 +73,7 @@ func (s *Server) registerTools() {
 	// Service management tools (v0 priority)
 	s.registerServiceTools()
 
-	logging.Info("MCP tools registered successfully",
-		zap.Int("tool_count", 4)) // Update count as we add tools
+	logging.Info("MCP tools registered successfully")
 }
 
 // registerServiceTools registers service management tools
@@ -111,7 +110,7 @@ func (s *Server) ensureAuthenticated() error {
 	}
 
 	// Try to get API key and create client
-	apiKey, err := s.getAPIKey()
+	apiKey, err := config.GetAPIKey()
 	if err != nil {
 		return fmt.Errorf("authentication required: %w", err)
 	}

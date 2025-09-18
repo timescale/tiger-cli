@@ -10,13 +10,14 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/zalando/go-keyring"
 )
 
 // getPasswordServiceName returns the service name for password storage
 // Uses the same service name as auth for consistency
 func getPasswordServiceName() string {
-	return getServiceName()
+	return config.GetServiceName()
 }
 
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords

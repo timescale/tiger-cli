@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/zalando/go-keyring"
 )
 
@@ -34,8 +35,8 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// Clean up keyring
-	keyring.Delete(getServiceName(), username)
-	defer keyring.Delete(getServiceName(), username)
+	keyring.Delete(config.GetServiceName(), "api-key")
+	defer keyring.Delete(config.GetServiceName(), "api-key")
 
 	// Execute login command with public and secret key flags - should fail validation
 	output, err := executeAuthCommand("auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret", "--project-id", "test-project-invalid")
@@ -54,7 +55,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 
 	// Verify that no API key was stored
-	_, err = keyring.Get(getServiceName(), username)
+	_, err = keyring.Get(config.GetServiceName(), "api-key")
 	if err == nil {
 		t.Error("API key should not be stored when validation fails")
 	}
@@ -90,8 +91,8 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// Clean up keyring
-	keyring.Delete(getServiceName(), username)
-	defer keyring.Delete(getServiceName(), username)
+	keyring.Delete(config.GetServiceName(), "api-key")
+	defer keyring.Delete(config.GetServiceName(), "api-key")
 
 	// Execute login command with public and secret key flags - should succeed
 	output, err := executeAuthCommand("auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret", "--project-id", "test-project-valid")
@@ -105,7 +106,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 
 	// Verify that API key was stored (try keyring first, then file fallback)
-	apiKey, err := keyring.Get(getServiceName(), username)
+	apiKey, err := keyring.Get(config.GetServiceName(), "api-key")
 	if err != nil {
 		// Keyring failed, check file fallback
 		apiKeyFile := filepath.Join(tmpDir, "api-key")

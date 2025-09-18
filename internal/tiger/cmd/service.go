@@ -19,7 +19,7 @@ import (
 
 var (
 	// getAPIKeyForService can be overridden for testing
-	getAPIKeyForService = getAPIKey
+	getAPIKeyForService = config.GetAPIKey
 )
 
 // buildServiceCmd creates the main service command with all subcommands

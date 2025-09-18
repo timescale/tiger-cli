@@ -2,38 +2,17 @@ package cmd
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"syscall"
-	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/zalando/go-keyring"
 	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
-
-// Keyring parameters
-const (
-	serviceName     = "tiger-cli"
-	testServiceName = "tiger-cli-test"
-	username        = "api-key"
-)
-
-// getServiceName returns the appropriate service name for keyring operations
-// Uses a test-specific service name when running in test mode to avoid polluting the real keyring
-func getServiceName() string {
-	// Use Go's built-in testing detection
-	if testing.Testing() {
-		return testServiceName
-	}
-
-	return serviceName
-}
 
 // validateAPIKeyForLogin can be overridden for testing
 var validateAPIKeyForLogin = api.ValidateAPIKey
@@ -140,7 +119,7 @@ Examples:
 			}
 
 			// Store the API key securely
-			if err := storeAPIKey(apiKey); err != nil {
+			if err := config.StoreAPIKey(apiKey); err != nil {
 				return fmt.Errorf("failed to store API key: %w", err)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key")
@@ -171,7 +150,7 @@ func buildLogoutCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			if err := removeAPIKey(); err != nil {
+			if err := config.RemoveAPIKey(); err != nil {
 				return fmt.Errorf("failed to remove API key: %w", err)
 			}
 
@@ -189,7 +168,7 @@ func buildWhoamiCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			if _, err := getAPIKey(); err != nil {
+			if _, err := config.GetAPIKey(); err != nil {
 				return err
 			}
 
@@ -220,103 +199,6 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 		return flagVal
 	}
 	return os.Getenv(envVarName)
-}
-
-// storeAPIKey stores the API key using keyring with file fallback
-func storeAPIKey(apiKey string) error {
-	// Try keyring first
-	err := keyring.Set(getServiceName(), username, apiKey)
-	if err == nil {
-		return nil
-	}
-
-	// Fallback to file storage
-	return storeAPIKeyToFile(apiKey)
-}
-
-// getAPIKey retrieves the API key from keyring or file fallback
-func getAPIKey() (string, error) {
-	// Try keyring first
-	apiKey, err := keyring.Get(getServiceName(), username)
-	if err == nil && apiKey != "" {
-		return apiKey, nil
-	}
-
-	// Fallback to file storage
-	return getAPIKeyFromFile()
-}
-
-// removeAPIKey removes the API key from keyring and file fallback
-func removeAPIKey() error {
-	// Try to remove from keyring (ignore errors as it might not exist)
-	keyring.Delete(getServiceName(), username)
-
-	// Remove from file fallback
-	return removeAPIKeyFromFile()
-}
-
-// storeAPIKeyToFile stores API key to ~/.config/tiger/api-key with restricted permissions
-func storeAPIKeyToFile(apiKey string) error {
-	configDir := config.GetConfigDir()
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
-	file, err := os.OpenFile(apiKeyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to create API key file: %w", err)
-	}
-	defer file.Close()
-
-	if _, err := file.WriteString(apiKey); err != nil {
-		return fmt.Errorf("failed to write API key to file: %w", err)
-	}
-
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close file: %w", err)
-	}
-
-	return nil
-}
-
-var errNotLoggedIn = errors.New("not logged in")
-
-// getAPIKeyFromFile retrieves API key from ~/.config/tiger/api-key
-func getAPIKeyFromFile() (string, error) {
-	configDir := config.GetConfigDir()
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
-
-	data, err := os.ReadFile(apiKeyFile)
-	if err != nil {
-		// If the file does not exist, treat as not logged in
-		if os.IsNotExist(err) {
-			return "", errNotLoggedIn
-		}
-		return "", fmt.Errorf("failed to read API key file: %w", err)
-	}
-
-	apiKey := strings.TrimSpace(string(data))
-
-	// If file exists but is empty, treat as not logged in
-	if apiKey == "" {
-		return "", errNotLoggedIn
-	}
-
-	return apiKey, nil
-}
-
-// removeAPIKeyFromFile removes the API key file
-func removeAPIKeyFromFile() error {
-	configDir := config.GetConfigDir()
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
-
-	err := os.Remove(apiKeyFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove API key file: %w", err)
-	}
-
-	return nil
 }
 
 // promptForCredentials prompts the user to enter any missing credentials

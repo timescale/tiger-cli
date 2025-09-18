@@ -18,7 +18,7 @@ import (
 
 var (
 	// getAPIKeyForDB can be overridden for testing
-	getAPIKeyForDB = getAPIKey
+	getAPIKeyForDB = config.GetAPIKey
 )
 
 func buildDbConnectionStringCmd() *cobra.Command {
