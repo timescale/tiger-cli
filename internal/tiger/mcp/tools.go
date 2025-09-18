@@ -95,7 +95,6 @@ type ServiceUpdatePasswordOutput struct {
 	Message string `json:"message"`
 }
 
-
 // handleServiceList handles the tiger_service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Create fresh API client with current credentials
