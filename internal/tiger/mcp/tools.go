@@ -12,6 +12,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // ServiceListInput represents input for tiger_service_list
@@ -275,7 +276,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		service := *resp.JSON202
-		serviceID := s.derefString(service.ServiceId)
+		serviceID := util.Deref(service.ServiceId)
 
 		output := ServiceCreateOutput{
 			Service: s.convertToServiceDetail(api.Service(service)),

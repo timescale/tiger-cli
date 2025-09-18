@@ -12,40 +12,17 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
-
-// derefString safely dereferences a string pointer, returning empty string if nil
-func (s *Server) derefString(str *string) string {
-	if str == nil {
-		return ""
-	}
-	return *str
-}
-
-// derefInt safely dereferences an int pointer, returning 0 if nil
-func (s *Server) derefInt(i *int) int {
-	if i == nil {
-		return 0
-	}
-	return *i
-}
-
-// derefBool safely dereferences a bool pointer, returning false if nil
-func (s *Server) derefBool(b *bool) bool {
-	if b == nil {
-		return false
-	}
-	return *b
-}
 
 // convertToServiceInfo converts an API Service to MCP ServiceInfo
 func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 	info := ServiceInfo{
-		ServiceID: s.derefString(service.ServiceId),
-		Name:      s.derefString(service.Name),
-		Status:    s.formatDeployStatus(service.Status),
-		Type:      s.formatServiceType(service.ServiceType),
-		Region:    s.derefString(service.RegionCode),
+		ServiceID: util.Deref(service.ServiceId),
+		Name:      util.Deref(service.Name),
+		Status:    util.DerefStr(service.Status),
+		Type:      util.DerefStr(service.ServiceType),
+		Region:    util.Deref(service.RegionCode),
 	}
 
 	// Add creation time if available
@@ -80,12 +57,12 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
 func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 	detail := ServiceDetail{
-		ServiceID: s.derefString(service.ServiceId),
-		Name:      s.derefString(service.Name),
-		Status:    s.formatDeployStatus(service.Status),
-		Type:      s.formatServiceType(service.ServiceType),
-		Region:    s.derefString(service.RegionCode),
-		Paused:    s.derefBool(service.Paused),
+		ServiceID: util.Deref(service.ServiceId),
+		Name:      util.Deref(service.Name),
+		Status:    util.DerefStr(service.Status),
+		Type:      util.DerefStr(service.ServiceType),
+		Region:    util.Deref(service.RegionCode),
+		Paused:    util.Deref(service.Paused),
 	}
 
 	// Add creation time if available
@@ -140,41 +117,6 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 	return detail
 }
 
-// formatDeployStatus formats a DeployStatus pointer, returning empty string if nil
-func (s *Server) formatDeployStatus(status *api.DeployStatus) string {
-	if status == nil {
-		return ""
-	}
-	return string(*status)
-}
-
-// formatServiceType formats a ServiceType pointer, returning empty string if nil
-func (s *Server) formatServiceType(serviceType *api.ServiceType) string {
-	if serviceType == nil {
-		return ""
-	}
-	return string(*serviceType)
-}
-
-// CPUMemoryConfig represents an allowed CPU/Memory configuration
-type CPUMemoryConfig struct {
-	CPUMillis int     // CPU in millicores
-	MemoryGbs float64 // Memory in GB
-}
-
-// getAllowedCPUMemoryConfigs returns the allowed CPU/Memory configurations from the spec
-func (s *Server) getAllowedCPUMemoryConfigs() []CPUMemoryConfig {
-	return []CPUMemoryConfig{
-		{CPUMillis: 500, MemoryGbs: 2},     // 0.5 CPU, 2GB
-		{CPUMillis: 1000, MemoryGbs: 4},    // 1 CPU, 4GB
-		{CPUMillis: 2000, MemoryGbs: 8},    // 2 CPU, 8GB
-		{CPUMillis: 4000, MemoryGbs: 16},   // 4 CPU, 16GB
-		{CPUMillis: 8000, MemoryGbs: 32},   // 8 CPU, 32GB
-		{CPUMillis: 16000, MemoryGbs: 64},  // 16 CPU, 64GB
-		{CPUMillis: 32000, MemoryGbs: 128}, // 32 CPU, 128GB
-	}
-}
-
 // parseCPUMemory parses CPU and memory specifications and returns normalized values
 func (s *Server) parseCPUMemory(cpuStr, memoryStr string) (int, float64, error) {
 	// Parse CPU
@@ -190,15 +132,17 @@ func (s *Server) parseCPUMemory(cpuStr, memoryStr string) (int, float64, error) 
 	}
 
 	// Validate the combination is allowed
-	configs := s.getAllowedCPUMemoryConfigs()
+	configs := util.GetAllowedCPUMemoryConfigs()
 	for _, config := range configs {
 		if config.CPUMillis == cpuMillis && config.MemoryGbs == memoryGbs {
 			return cpuMillis, memoryGbs, nil
 		}
 	}
 
-	return 0, 0, fmt.Errorf("invalid CPU/Memory combination: %dm CPU and %.0fGB memory. Allowed combinations: %s",
-		cpuMillis, memoryGbs, s.formatAllowedCombinations(configs))
+	return 0, 0, fmt.Errorf(
+		"invalid CPU/Memory combination: %dm CPU and %.0fGB memory. Allowed combinations: %s",
+		cpuMillis, memoryGbs, configs,
+	)
 }
 
 // parseCPU parses a CPU specification (e.g., "2", "2000m", "0.5")
@@ -252,20 +196,6 @@ func (s *Server) parseMemory(memoryStr string) (float64, error) {
 	}
 }
 
-// formatAllowedCombinations returns a user-friendly string of allowed CPU/Memory combinations
-func (s *Server) formatAllowedCombinations(configs []CPUMemoryConfig) string {
-	var combinations []string
-	for _, config := range configs {
-		cpuCores := float64(config.CPUMillis) / 1000
-		if cpuCores == float64(int(cpuCores)) {
-			combinations = append(combinations, fmt.Sprintf("%.0f CPU/%.0fGB", cpuCores, config.MemoryGbs))
-		} else {
-			combinations = append(combinations, fmt.Sprintf("%.1f CPU/%.0fGB", cpuCores, config.MemoryGbs))
-		}
-	}
-	return strings.Join(combinations, ", ")
-}
-
 // waitForServiceReady polls the service status until it's ready or timeout occurs
 func (s *Server) waitForServiceReady(ctx context.Context, projectID, serviceID string, timeout time.Duration) error {
 	logging.Debug("MCP: Waiting for service to be ready",
@@ -295,7 +225,7 @@ func (s *Server) waitForServiceReady(ctx context.Context, projectID, serviceID s
 			}
 
 			service := *resp.JSON200
-			status := s.formatDeployStatus(service.Status)
+			status := util.DerefStr(service.Status)
 
 			switch status {
 			case "READY":
