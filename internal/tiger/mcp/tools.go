@@ -107,13 +107,14 @@ func createErrorResult(message string) *mcp.CallToolResult {
 
 // handleServiceList handles the tiger_service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
-	// Ensure authentication
-	if err := s.ensureAuthenticated(); err != nil {
+	// Create fresh API client with current credentials
+	apiClient, err := s.createAPIClient()
+	if err != nil {
 		return createErrorResult(err.Error()), ServiceListOutput{}, nil
 	}
 
-	// Ensure project ID
-	projectID, err := s.ensureProjectID()
+	// Load fresh project ID from current config
+	projectID, err := s.loadProjectID()
 	if err != nil {
 		return createErrorResult(err.Error()), ServiceListOutput{}, nil
 	}
@@ -124,7 +125,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := s.apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
 	if err != nil {
 		return createErrorResult(fmt.Sprintf("Failed to list services: %v", err)), ServiceListOutput{}, nil
 	}
@@ -158,13 +159,14 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceShow handles the tiger_service_show MCP tool
 func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest, input ServiceShowInput) (*mcp.CallToolResult, ServiceShowOutput, error) {
-	// Ensure authentication
-	if err := s.ensureAuthenticated(); err != nil {
+	// Create fresh API client with current credentials
+	apiClient, err := s.createAPIClient()
+	if err != nil {
 		return createErrorResult(err.Error()), ServiceShowOutput{}, nil
 	}
 
-	// Ensure project ID
-	projectID, err := s.ensureProjectID()
+	// Load fresh project ID from current config
+	projectID, err := s.loadProjectID()
 	if err != nil {
 		return createErrorResult(err.Error()), ServiceShowOutput{}, nil
 	}
@@ -177,7 +179,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := s.apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return createErrorResult(fmt.Sprintf("Failed to get service details: %v", err)), ServiceShowOutput{}, nil
 	}
@@ -209,13 +211,14 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceCreate handles the tiger_service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
-	// Ensure authentication
-	if err := s.ensureAuthenticated(); err != nil {
+	// Create fresh API client with current credentials
+	apiClient, err := s.createAPIClient()
+	if err != nil {
 		return createErrorResult(err.Error()), ServiceCreateOutput{}, nil
 	}
 
-	// Ensure project ID
-	projectID, err := s.ensureProjectID()
+	// Load fresh project ID from current config
+	projectID, err := s.loadProjectID()
 	if err != nil {
 		return createErrorResult(err.Error()), ServiceCreateOutput{}, nil
 	}
@@ -263,7 +266,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := s.apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 	if err != nil {
 		return createErrorResult(fmt.Sprintf("Failed to create service: %v", err)), ServiceCreateOutput{}, nil
 	}
@@ -295,7 +298,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 				timeout = *input.Timeout
 			}
 
-			if err := s.waitForServiceReady(ctx, projectID, serviceID, time.Duration(timeout)*time.Minute); err != nil {
+			if err := s.waitForServiceReady(ctx, apiClient, projectID, serviceID, time.Duration(timeout)*time.Minute); err != nil {
 				output.Message += fmt.Sprintf(". Warning: %v", err)
 			} else {
 				output.Message += ". Service is now ready!"
@@ -317,13 +320,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 // handleServiceUpdatePassword handles the tiger_service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
-	// Ensure authentication
-	if err := s.ensureAuthenticated(); err != nil {
+	// Create fresh API client with current credentials
+	apiClient, err := s.createAPIClient()
+	if err != nil {
 		return createErrorResult(err.Error()), ServiceUpdatePasswordOutput{}, nil
 	}
 
-	// Ensure project ID
-	projectID, err := s.ensureProjectID()
+	// Load fresh project ID from current config
+	projectID, err := s.loadProjectID()
 	if err != nil {
 		return createErrorResult(err.Error()), ServiceUpdatePasswordOutput{}, nil
 	}
@@ -341,7 +345,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := s.apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
 	if err != nil {
 		return createErrorResult(fmt.Sprintf("Failed to update service password: %v", err)), ServiceUpdatePasswordOutput{}, nil
 	}

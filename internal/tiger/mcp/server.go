@@ -21,22 +21,10 @@ const (
 // Server wraps the MCP server with Tiger-specific functionality
 type Server struct {
 	mcpServer *mcp.Server
-	apiClient *api.ClientWithResponses
-	config    *config.Config
 }
 
 // NewServer creates a new Tiger MCP server instance
 func NewServer() (*Server, error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Note: We don't get API key here since it requires importing cmd package
-	// API key will be retrieved in the individual tool handlers
-	var apiClient *api.ClientWithResponses
-
 	// Create MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    serverName,
@@ -46,8 +34,6 @@ func NewServer() (*Server, error) {
 
 	server := &Server{
 		mcpServer: mcpServer,
-		apiClient: apiClient,
-		config:    cfg,
 	}
 
 	// Register all tools
@@ -103,31 +89,33 @@ func (s *Server) registerServiceTools() {
 	}, s.handleServiceUpdatePassword)
 }
 
-// ensureAuthenticated checks if we can get an API key and creates a client if needed
-func (s *Server) ensureAuthenticated() error {
-	if s.apiClient != nil {
-		return nil
-	}
-
-	// Try to get API key and create client
+// createAPIClient loads fresh config and creates a new API client for each tool call
+func (s *Server) createAPIClient() (*api.ClientWithResponses, error) {
+	// Get fresh API key
 	apiKey, err := config.GetAPIKey()
 	if err != nil {
-		return fmt.Errorf("authentication required: %w", err)
+		return nil, fmt.Errorf("authentication required: %w", err)
 	}
 
-	// Create API client
-	s.apiClient, err = api.NewTigerClient(apiKey)
+	// Create API client with fresh credentials
+	apiClient, err := api.NewTigerClient(apiKey)
 	if err != nil {
-		return fmt.Errorf("failed to create API client: %w", err)
+		return nil, fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return nil
+	return apiClient, nil
 }
 
-// ensureProjectID checks if we have a project ID configured
-func (s *Server) ensureProjectID() (string, error) {
-	if s.config.ProjectID == "" {
+// loadProjectID loads fresh config and returns the current project ID
+func (s *Server) loadProjectID() (string, error) {
+	// Load fresh config
+	cfg, err := config.Load()
+	if err != nil {
+		return "", fmt.Errorf("failed to load config: %w", err)
+	}
+
+	if cfg.ProjectID == "" {
 		return "", fmt.Errorf("project ID is required. Please run 'tiger auth login' with --project-id")
 	}
-	return s.config.ProjectID, nil
+	return cfg.ProjectID, nil
 }

@@ -197,7 +197,7 @@ func (s *Server) parseMemory(memoryStr string) (float64, error) {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func (s *Server) waitForServiceReady(ctx context.Context, projectID, serviceID string, timeout time.Duration) error {
+func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration) error {
 	logging.Debug("MCP: Waiting for service to be ready",
 		zap.String("service_id", serviceID),
 		zap.Duration("timeout", timeout))
@@ -213,7 +213,7 @@ func (s *Server) waitForServiceReady(ctx context.Context, projectID, serviceID s
 		case <-ctx.Done():
 			return fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
 		case <-ticker.C:
-			resp, err := s.apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
 				logging.Warn("MCP: Error checking service status", zap.Error(err))
 				continue
