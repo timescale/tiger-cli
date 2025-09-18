@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	ServerName    = "tiger"  // TODO: Is this right?
-	ServerVersion = "v1.0.0" // TODO: Use same version as CLI?
+	// TODO: Is this right?
+	serverName  = "tiger-mcp"
+	serverTitle = "Tiger MCP"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality
@@ -38,8 +39,9 @@ func NewServer() (*Server, error) {
 
 	// Create MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
-		Name:    ServerName,
-		Version: ServerVersion,
+		Name:    serverName,
+		Title:   serverTitle,
+		Version: config.Version,
 	}, nil)
 
 	server := &Server{
