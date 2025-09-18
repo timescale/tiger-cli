@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -213,7 +214,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 }
 
 // setupOAuthTest creates a complete OAuth test environment with mock server and browser
-func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) {
+func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
 
@@ -245,6 +246,8 @@ gateway_url: "%s"
 		mockServer.Close()
 		openBrowser = originalOpenBrowser
 	})
+
+	return mockServer.URL
 }
 
 // startMockOAuthServer starts a mock server that handles all OAuth endpoints
@@ -426,7 +429,7 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 }
 
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
-	setupOAuthTest(t, []Project{
+	mockServerURL := setupOAuthTest(t, []Project{
 		{ID: "project-123", Name: "Test Project"},
 	}, "project-123")
 
@@ -437,9 +440,20 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-123\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
+	// Build regex pattern to match the complete output
+	// Auth URL format: http://mockserver/oauth/authorize?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=base64&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3APORT%2Fcallback&response_type=code&state=randomstring
+	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
+		`Opening browser for authentication\.\.\.\n`+
+		`Validating API key\.\.\.\n`+
+		`Successfully logged in and stored API key\n`+
+		`Set default project ID to: project-123\n$`, regexp.QuoteMeta(mockServerURL))
+
+	matched, err := regexp.MatchString(expectedPattern, output)
+	if err != nil {
+		t.Fatalf("Regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
 	// Verify API key was stored
@@ -465,7 +479,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 }
 
 func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
-	setupOAuthTest(t, []Project{
+	mockServerURL := setupOAuthTest(t, []Project{
 		{ID: "project-123", Name: "Test Project 1"},
 		{ID: "project-456", Name: "Test Project 2"},
 		{ID: "project-789", Name: "Test Project 3"},
@@ -490,9 +504,19 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-789\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
+	// Build regex pattern to match the complete output
+	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
+		`Opening browser for authentication\.\.\.\n`+
+		`Validating API key\.\.\.\n`+
+		`Successfully logged in and stored API key\n`+
+		`Set default project ID to: project-789\n$`, regexp.QuoteMeta(mockServerURL))
+
+	matched, err := regexp.MatchString(expectedPattern, output)
+	if err != nil {
+		t.Fatalf("Regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
 	// Verify API key was stored
