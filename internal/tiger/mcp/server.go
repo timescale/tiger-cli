@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	ServerName    = "tigerdata"
-	ServerVersion = "v1.0.0"
+	ServerName    = "tiger"  // TODO: Is this right?
+	ServerVersion = "v1.0.0" // TODO: Use same version as CLI?
 )
 
 // Server wraps the MCP server with Tiger-specific functionality

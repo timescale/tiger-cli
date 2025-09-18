@@ -157,14 +157,14 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 
 	address := fmt.Sprintf("%s:%d", host, actualPort)
 
-	// Create SSE handler that returns our server for all requests
-	sseHandler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server {
+	// Create streamable HTTP handler that returns our server for all requests
+	httpHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return server.GetMCPServer()
-	})
+	}, nil)
 
 	// Create HTTP server
 	httpServer := &http.Server{
-		Handler: sseHandler,
+		Handler: httpHandler,
 	}
 
 	fmt.Printf("🚀 Tiger MCP server listening on http://%s\n", address)
