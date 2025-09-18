@@ -59,6 +59,8 @@ func (s *Server) registerTools() {
 	// Service management tools (v0 priority)
 	s.registerServiceTools()
 
+	// TODO: Register more tool groups
+
 	logging.Info("MCP tools registered successfully")
 }
 
