@@ -95,28 +95,19 @@ type ServiceUpdatePasswordOutput struct {
 	Message string `json:"message"`
 }
 
-// createErrorResult is a helper function to create error responses
-func createErrorResult(message string) *mcp.CallToolResult {
-	return &mcp.CallToolResult{
-		IsError: true,
-		Content: []mcp.Content{&mcp.TextContent{
-			Text: message,
-		}},
-	}
-}
 
 // handleServiceList handles the tiger_service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, err
 	}
 
 	// Load fresh project ID from current config
 	projectID, err := s.loadProjectID()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, err
 	}
 
 	logging.Debug("MCP: Listing services", zap.String("project_id", projectID))
@@ -127,7 +118,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
 	if err != nil {
-		return createErrorResult(fmt.Sprintf("Failed to list services: %v", err)), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}
 
 	// Handle API response
@@ -149,11 +140,11 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 		return nil, output, nil
 
 	case 401:
-		return createErrorResult("Authentication failed: invalid API key"), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, fmt.Errorf("authentication failed: invalid API key")
 	case 403:
-		return createErrorResult("Permission denied: insufficient access to project"), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, fmt.Errorf("permission denied: insufficient access to project")
 	default:
-		return createErrorResult(fmt.Sprintf("API request failed with status %d", resp.StatusCode())), ServiceListOutput{}, nil
+		return nil, ServiceListOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
 }
 
@@ -162,13 +153,13 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, err
 	}
 
 	// Load fresh project ID from current config
 	projectID, err := s.loadProjectID()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, err
 	}
 
 	logging.Debug("MCP: Showing service details",
@@ -181,14 +172,14 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
-		return createErrorResult(fmt.Sprintf("Failed to get service details: %v", err)), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
 	// Handle API response
 	switch resp.StatusCode() {
 	case 200:
 		if resp.JSON200 == nil {
-			return createErrorResult("Empty response from API"), ServiceShowOutput{}, nil
+			return nil, ServiceShowOutput{}, fmt.Errorf("empty response from API")
 		}
 
 		service := *resp.JSON200
@@ -199,13 +190,13 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 		return nil, output, nil
 
 	case 401:
-		return createErrorResult("Authentication failed: invalid API key"), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, fmt.Errorf("authentication failed: invalid API key")
 	case 403:
-		return createErrorResult("Permission denied: insufficient access to service"), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, fmt.Errorf("permission denied: insufficient access to service")
 	case 404:
-		return createErrorResult(fmt.Sprintf("Service '%s' not found in project '%s'", input.ServiceID, projectID)), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, projectID)
 	default:
-		return createErrorResult(fmt.Sprintf("API request failed with status %d", resp.StatusCode())), ServiceShowOutput{}, nil
+		return nil, ServiceShowOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
 }
 
@@ -214,13 +205,13 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, err
 	}
 
 	// Load fresh project ID from current config
 	projectID, err := s.loadProjectID()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, err
 	}
 
 	// Set defaults
@@ -237,7 +228,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Parse CPU and Memory
 	cpuMillis, memoryGbs, err := s.parseCPUMemory(input.CPU, input.Memory)
 	if err != nil {
-		return createErrorResult(fmt.Sprintf("Invalid CPU/Memory specification: %v", err)), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 	}
 
 	// Auto-generate service name if not provided
@@ -268,14 +259,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 	if err != nil {
-		return createErrorResult(fmt.Sprintf("Failed to create service: %v", err)), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
 
 	// Handle API response
 	switch resp.StatusCode() {
 	case 202:
 		if resp.JSON202 == nil {
-			return createErrorResult("Service creation request accepted but no response data received"), ServiceCreateOutput{}, nil
+			return nil, ServiceCreateOutput{}, fmt.Errorf("service creation request accepted but no response data received")
 		}
 
 		service := *resp.JSON202
@@ -308,13 +299,13 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, output, nil
 
 	case 400:
-		return createErrorResult("Invalid request parameters"), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid request parameters")
 	case 401:
-		return createErrorResult("Authentication failed: invalid API key"), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("authentication failed: invalid API key")
 	case 403:
-		return createErrorResult("Permission denied: insufficient access to create services"), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("permission denied: insufficient access to create services")
 	default:
-		return createErrorResult(fmt.Sprintf("API request failed with status %d", resp.StatusCode())), ServiceCreateOutput{}, nil
+		return nil, ServiceCreateOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
 }
 
@@ -323,13 +314,13 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	// Load fresh project ID from current config
 	projectID, err := s.loadProjectID()
 	if err != nil {
-		return createErrorResult(err.Error()), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	logging.Debug("MCP: Updating service password",
@@ -347,7 +338,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
 	if err != nil {
-		return createErrorResult(fmt.Sprintf("Failed to update service password: %v", err)), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
 
 	// Handle API response
@@ -358,11 +349,11 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		}, nil
 
 	case 401:
-		return createErrorResult("Authentication failed: invalid API key"), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("authentication failed: invalid API key")
 	case 403:
-		return createErrorResult("Permission denied: insufficient access to update service password"), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("permission denied: insufficient access to update service password")
 	case 404:
-		return createErrorResult(fmt.Sprintf("Service '%s' not found in project '%s'", input.ServiceID, projectID)), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, projectID)
 	case 400:
 		var errorMsg string
 		if resp.JSON400 != nil && resp.JSON400.Message != nil {
@@ -370,9 +361,9 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		} else {
 			errorMsg = "Invalid password"
 		}
-		return createErrorResult(fmt.Sprintf("Invalid password: %s", errorMsg)), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("invalid password: %s", errorMsg)
 
 	default:
-		return createErrorResult(fmt.Sprintf("API request failed with status %d", resp.StatusCode())), ServiceUpdatePasswordOutput{}, nil
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
 }
