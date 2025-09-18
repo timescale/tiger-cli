@@ -17,7 +17,6 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/zalando/go-keyring"
 )
 
 func setupAuthTest(t *testing.T) string {
@@ -31,8 +30,8 @@ func setupAuthTest(t *testing.T) string {
 	}
 
 	// Aggressively clean up any existing keyring entries before starting
-	// config.GetServiceName() will return "tiger-cli-test" during tests automatically
-	keyring.Delete(config.GetServiceName(), "api-key")
+	// Uses a test-specific keyring entry.
+	config.RemoveAPIKeyFromKeyring()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
@@ -53,7 +52,7 @@ func setupAuthTest(t *testing.T) string {
 
 	t.Cleanup(func() {
 		// Clean up test keyring
-		keyring.Delete(config.GetServiceName(), "api-key")
+		config.RemoveAPIKeyFromKeyring()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
 		viper.Reset()
@@ -100,7 +99,7 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 	// Verify API key was stored (try keyring first, then file fallback)
 	// The combined key should be in format "public:secret"
 	expectedAPIKey := "test-public-key:test-secret-key"
-	apiKey, err := keyring.Get(config.GetServiceName(), "api-key")
+	apiKey, err := config.GetAPIKeyFromKeyring()
 	if err != nil {
 		// Keyring failed, check file fallback
 		apiKeyFile := filepath.Join(tmpDir, "api-key")
@@ -563,7 +562,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	apiKeyFile := filepath.Join(tmpDir, "api-key")
 
 	// If keyring worked, manually create file scenario by removing keyring and adding file
-	keyring.Delete(config.GetServiceName(), "api-key") // Remove from keyring
+	config.RemoveAPIKeyFromKeyring()
 
 	// Store to file manually to simulate fallback (combined format)
 	expectedAPIKey := "fallback-public:fallback-secret"
@@ -610,7 +609,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
 	// Clear any keyring entries to force file-only storage
-	keyring.Delete(config.GetServiceName(), "api-key")
+	config.RemoveAPIKeyFromKeyring()
 
 	// Set environment variables for public key, secret key, and project ID
 	os.Setenv("TIGER_PUBLIC_KEY", "env-file-public")
@@ -632,7 +631,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 
 	// Clear keyring again to ensure we're testing file-only retrieval
-	keyring.Delete(config.GetServiceName(), "api-key")
+	config.RemoveAPIKeyFromKeyring()
 
 	// Verify API key was stored in file (since keyring is cleared)
 	expectedAPIKey := "env-file-public:env-file-secret"

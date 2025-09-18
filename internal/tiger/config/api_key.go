@@ -12,63 +12,39 @@ import (
 
 // Keyring parameters
 const (
-	serviceName     = "tiger-cli"
-	testServiceName = "tiger-cli-test"
-	username        = "api-key"
+	keyringServiceName     = "tiger-cli"
+	keyringTestServiceName = "tiger-cli-test"
+	keyringUsername        = "api-key"
 )
 
-// getServiceName returns the appropriate service name for keyring operations
+// GetServiceName returns the appropriate service name for keyring operations
 // Uses a test-specific service name when running in test mode to avoid polluting the real keyring
-func getServiceName() string {
+func GetServiceName() string {
 	// Use Go's built-in testing detection
 	if testing.Testing() {
-		return testServiceName
+		return keyringTestServiceName
 	}
 
-	return serviceName
-}
-
-// GetServiceName returns the appropriate service name for keyring operations
-// Public function for external packages
-func GetServiceName() string {
-	return getServiceName()
+	return keyringServiceName
 }
 
 // storeAPIKey stores the API key using keyring with file fallback
 func StoreAPIKey(apiKey string) error {
 	// Try keyring first
-	err := keyring.Set(getServiceName(), username, apiKey)
-	if err == nil {
+	if err := StoreAPIKeyToKeyring(apiKey); err == nil {
 		return nil
 	}
 
 	// Fallback to file storage
-	return storeAPIKeyToFile(apiKey)
+	return StoreAPIKeyToFile(apiKey)
 }
 
-// GetAPIKey retrieves the API key from keyring or file fallback
-func GetAPIKey() (string, error) {
-	// Try keyring first
-	apiKey, err := keyring.Get(getServiceName(), username)
-	if err == nil && apiKey != "" {
-		return apiKey, nil
-	}
-
-	// Fallback to file storage
-	return getAPIKeyFromFile()
+func StoreAPIKeyToKeyring(apiKey string) error {
+	return keyring.Set(GetServiceName(), keyringUsername, apiKey)
 }
 
-// RemoveAPIKey removes the API key from keyring and file fallback
-func RemoveAPIKey() error {
-	// Try to remove from keyring (ignore errors as it might not exist)
-	keyring.Delete(getServiceName(), username)
-
-	// Remove from file fallback
-	return removeAPIKeyFromFile()
-}
-
-// storeAPIKeyToFile stores API key to ~/.config/tiger/api-key with restricted permissions
-func storeAPIKeyToFile(apiKey string) error {
+// StoreAPIKeyToFile stores API key to ~/.config/tiger/api-key with restricted permissions
+func StoreAPIKeyToFile(apiKey string) error {
 	configDir := GetConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
@@ -92,10 +68,26 @@ func storeAPIKeyToFile(apiKey string) error {
 	return nil
 }
 
-var errNotLoggedIn = errors.New("not logged in")
+var ErrNotLoggedIn = errors.New("not logged in")
 
-// getAPIKeyFromFile retrieves API key from ~/.config/tiger/api-key
-func getAPIKeyFromFile() (string, error) {
+// GetAPIKey retrieves the API key from keyring or file fallback
+func GetAPIKey() (string, error) {
+	// Try keyring first
+	apiKey, err := GetAPIKeyFromKeyring()
+	if err == nil && apiKey != "" {
+		return apiKey, nil
+	}
+
+	// Fallback to file storage
+	return GetAPIKeyFromFile()
+}
+
+func GetAPIKeyFromKeyring() (string, error) {
+	return keyring.Get(GetServiceName(), keyringUsername)
+}
+
+// GetAPIKeyFromFile retrieves API key from ~/.config/tiger/api-key
+func GetAPIKeyFromFile() (string, error) {
 	configDir := GetConfigDir()
 	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
 
@@ -103,7 +95,7 @@ func getAPIKeyFromFile() (string, error) {
 	if err != nil {
 		// If the file does not exist, treat as not logged in
 		if os.IsNotExist(err) {
-			return "", errNotLoggedIn
+			return "", ErrNotLoggedIn
 		}
 		return "", fmt.Errorf("failed to read API key file: %w", err)
 	}
@@ -112,14 +104,27 @@ func getAPIKeyFromFile() (string, error) {
 
 	// If file exists but is empty, treat as not logged in
 	if apiKey == "" {
-		return "", errNotLoggedIn
+		return "", ErrNotLoggedIn
 	}
 
 	return apiKey, nil
 }
 
-// removeAPIKeyFromFile removes the API key file
-func removeAPIKeyFromFile() error {
+// RemoveAPIKey removes the API key from keyring and file fallback
+func RemoveAPIKey() error {
+	RemoveAPIKeyFromKeyring()
+
+	// Remove from file fallback
+	return RemoveAPIKeyFromFile()
+}
+
+func RemoveAPIKeyFromKeyring() error {
+	// Try to remove from keyring (ignore errors as it might not exist)
+	return keyring.Delete(GetServiceName(), keyringUsername)
+}
+
+// RemoveAPIKeyFromFile removes the API key file
+func RemoveAPIKeyFromFile() error {
 	configDir := GetConfigDir()
 	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
 
@@ -130,23 +135,3 @@ func removeAPIKeyFromFile() error {
 
 	return nil
 }
-
-// The following functions are exported for testing purposes
-
-// StoreAPIKeyToFile stores API key to file (for testing)
-func StoreAPIKeyToFile(apiKey string) error {
-	return storeAPIKeyToFile(apiKey)
-}
-
-// GetAPIKeyFromFile retrieves API key from file (for testing)
-func GetAPIKeyFromFile() (string, error) {
-	return getAPIKeyFromFile()
-}
-
-// RemoveAPIKeyFromFile removes the API key file (for testing)
-func RemoveAPIKeyFromFile() error {
-	return removeAPIKeyFromFile()
-}
-
-// ErrNotLoggedIn is the error returned when not logged in
-var ErrNotLoggedIn = errNotLoggedIn
