@@ -2,11 +2,13 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
@@ -17,6 +19,16 @@ import (
 
 // ServiceListInput represents input for tiger_service_list
 type ServiceListInput struct{}
+
+// Schema returns the JSON schema for ServiceListInput
+func (ServiceListInput) Schema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:        "object",
+		Title:       "Service List Parameters",
+		Description: "No parameters required - lists all services in the current project",
+		Properties:  map[string]*jsonschema.Schema{},
+	}
+}
 
 // ServiceListOutput represents output for tiger_service_list
 type ServiceListOutput struct {
@@ -43,6 +55,24 @@ type ResourceInfo struct {
 // ServiceShowInput represents input for tiger_service_show
 type ServiceShowInput struct {
 	ServiceID string `json:"service_id"`
+}
+
+// Schema returns the JSON schema for ServiceShowInput
+func (ServiceShowInput) Schema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:        "object",
+		Title:       "Service Show Parameters",
+		Description: "Parameters to show detailed information about a specific service",
+		Properties: map[string]*jsonschema.Schema{
+			"service_id": {
+				Type:        "string",
+				Title:       "Service ID",
+				Description: "The unique identifier of the service to show details for. Use tiger_service_list to find service IDs.",
+				Examples:    []any{"fgg3zcsxw4"},
+			},
+		},
+		Required: []string{"service_id"},
+	}
 }
 
 // ServiceShowOutput represents output for tiger_service_show
@@ -78,6 +108,77 @@ type ServiceCreateInput struct {
 	Timeout  *int    `json:"timeout,omitempty"`
 }
 
+// Schema returns the JSON schema for ServiceCreateInput
+func (ServiceCreateInput) Schema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:        "object",
+		Title:       "Service Creation Parameters",
+		Description: "Complete configuration for creating a new database service",
+		Properties: map[string]*jsonschema.Schema{
+			"name": {
+				Type:        "string",
+				Title:       "Service Name",
+				Description: "Human-readable name for the service.",
+				Examples:    []any{"my-production-db", "analytics-service", "user-store"},
+			},
+			"type": {
+				Type:        "string",
+				Title:       "Service Type",
+				Description: "The type of database service to create. TimescaleDB includes PostgreSQL with time-series extensions.",
+				Enum:        []any{"timescaledb", "postgres", "vector"},
+				Default:     util.Must(json.Marshal("timescaledb")),
+				Examples:    []any{"timescaledb"},
+			},
+			"region": {
+				Type:        "string",
+				Title:       "Region Code",
+				Description: "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance.",
+				Examples:    []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"},
+			},
+			"cpu": {
+				Type:        "string",
+				Title:       "CPU Allocation",
+				Description: "CPU allocation in cores or millicores. Examples: '1' (1 core), '2000m' (2000 millicores = 2 cores), '0.5' (0.5 cores).",
+				Examples:    []any{"0.5", "1", "2", "4", "8", "16", "32", "500m", "1000m", "2000m"},
+			},
+			"memory": {
+				Type:        "string",
+				Title:       "Memory Allocation",
+				Description: "Memory allocation with units. Supported units: GB, MB. Example: '8GB', '4096MB'.",
+				Examples:    []any{"2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "128GB"},
+			},
+			"replicas": {
+				Type:        "integer",
+				Title:       "High Availability Replicas",
+				Description: "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability.",
+				Default:     util.Must(json.Marshal(1)),
+				Examples:    []any{1, 2, 3},
+			},
+			"vpc_id": {
+				Type:        "string",
+				Title:       "VPC ID (Optional)",
+				Description: "Virtual Private Cloud ID to deploy the service in. Leave empty for default networking.",
+				Examples:    []any{"vpc-12345678", "vpc-abcdef123456"},
+			},
+			"wait": {
+				Type:        "boolean",
+				Title:       "Wait for Ready",
+				Description: "Whether to wait for the service to be fully ready before returning. Recommended for scripting.",
+				Default:     util.Must(json.Marshal(true)),
+				Examples:    []any{true, false},
+			},
+			"timeout": {
+				Type:        "integer",
+				Title:       "Wait Timeout (Minutes)",
+				Description: "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true.",
+				Default:     util.Must(json.Marshal(30)),
+				Examples:    []any{15, 30, 60},
+			},
+		},
+		Required: []string{"name", "region", "cpu", "memory"},
+	}
+}
+
 // ServiceCreateOutput represents output for tiger_service_create
 type ServiceCreateOutput struct {
 	Service ServiceDetail `json:"service"`
@@ -88,6 +189,30 @@ type ServiceCreateOutput struct {
 type ServiceUpdatePasswordInput struct {
 	ServiceID string `json:"service_id"`
 	Password  string `json:"password"`
+}
+
+// Schema returns the JSON schema for ServiceUpdatePasswordInput
+func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:        "object",
+		Title:       "Password Update Parameters",
+		Description: "Service identification and new password",
+		Properties: map[string]*jsonschema.Schema{
+			"service_id": {
+				Type:        "string",
+				Title:       "Service ID",
+				Description: "The unique identifier of the service to update the password for. Use tiger_service_list to find service IDs.",
+				Examples:    []any{"fgg3zcsxw4"},
+			},
+			"password": {
+				Type:        "string",
+				Title:       "New Password",
+				Description: "The new password for the 'tsdbadmin' user. Must be strong and secure.",
+				Examples:    []any{"MySecurePassword123!"},
+			},
+		},
+		Required: []string{"service_id", "password"},
+	}
 }
 
 // ServiceUpdatePasswordOutput represents output for tiger_service_update_password

@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+func Must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 func Deref[T any](val *T) T {
 	if val == nil {
 		var res T
