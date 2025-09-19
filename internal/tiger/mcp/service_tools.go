@@ -97,14 +97,14 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["type"].Description = "The type of database service to create. TimescaleDB includes PostgreSQL with time-series extensions."
-	schema.Properties["type"].Enum = []any{"timescaledb", "postgres", "vector"}
-	schema.Properties["type"].Default = util.Must(json.Marshal("timescaledb"))
+	schema.Properties["type"].Enum = util.AnySlice(util.ValidServiceTypes())
+	schema.Properties["type"].Default = util.Must(json.Marshal(util.ServiceTypeTimescaleDB))
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Default = util.Must(json.Marshal("us-east-1"))
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	cpuMemoryCombinations := util.GetAllowedCPUMemoryConfigs().String()
+	cpuMemoryCombinations := util.GetAllowedCPUMemoryConfigs().Strings()
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryCombinations)
 	schema.Properties["cpu_memory"].Default = util.Must(json.Marshal(cpuMemoryCombinations[0])) // Default to smallest config
@@ -281,7 +281,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Set default service type if not provided
 	if input.Type == "" {
-		input.Type = "timescaledb"
+		input.Type = util.ServiceTypeTimescaleDB
 	}
 
 	// Set default region if not provided

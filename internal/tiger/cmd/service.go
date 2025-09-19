@@ -315,18 +315,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.SilenceUsage = true
 
 			// Validate service type
-			validTypes := []string{"timescaledb", "postgres", "vector"}
+			if !util.IsValidServiceType(createServiceType) {
+				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(util.ValidServiceTypes(), ", "))
+			}
 			serviceTypeUpper := strings.ToUpper(createServiceType)
-			isValidType := false
-			for _, validType := range validTypes {
-				if serviceTypeUpper == strings.ToUpper(validType) {
-					isValidType = true
-					break
-				}
-			}
-			if !isValidType {
-				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(validTypes, ", "))
-			}
 
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
@@ -422,7 +414,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 	// Add flags
 	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	cmd.Flags().StringVar(&createServiceType, "type", "timescaledb", "Service type (timescaledb, postgres, vector)")
+	cmd.Flags().StringVar(&createServiceType, "type", util.ServiceTypeTimescaleDB, fmt.Sprintf("Service type (%s)", strings.Join(util.ValidServiceTypes(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
 	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
 	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
