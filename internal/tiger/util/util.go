@@ -7,6 +7,10 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
+func Ptr[T any](val T) *T {
+	return &val
+}
+
 func Deref[T any](val *T) T {
 	if val == nil {
 		var res T

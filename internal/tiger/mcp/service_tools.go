@@ -110,6 +110,8 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
+	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
+	// TODO: schema.Properties["replicas"].Maximum =
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
@@ -121,6 +123,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["wait"].Examples = []any{true, false}
 
 	schema.Properties["timeout"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
+	schema.Properties["timeout"].Minimum = util.Ptr(0.0)
 	schema.Properties["timeout"].Default = util.Must(json.Marshal(30))
 	schema.Properties["timeout"].Examples = []any{15, 30, 60}
 
