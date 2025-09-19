@@ -524,11 +524,7 @@ Examples:
 				// Get the service details for password storage
 				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-					if err := SavePasswordWithMessages(*serviceResp.JSON200, password, cmd.OutOrStdout()); err != nil {
-						// Password saving failed, but password update succeeded
-						// The error message was already displayed by SavePasswordWithMessages
-						// We don't want to fail the entire password update for this
-					}
+					handlePasswordSaving(*serviceResp.JSON200, password, cmd)
 				}
 
 				return nil
@@ -753,10 +749,24 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 // handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
-	if err := SavePasswordWithMessages(service, initialPassword, cmd.OutOrStdout()); err != nil {
-		// Password saving failed, but service creation succeeded
-		// The error message was already displayed by SavePasswordWithMessages
-		// We don't want to fail the entire service creation for this
+	// Note: We don't fail the service creation if password saving fails
+	// The error is handled by displaying the appropriate message below
+	result, _ := util.SavePasswordWithResult(service, initialPassword)
+
+	if result.Method == "none" && result.Message == "No password provided" {
+		// Don't output anything for empty password
+		return
+	}
+
+	// Output the message with appropriate emoji
+	if result.Success {
+		fmt.Fprintf(cmd.OutOrStdout(), "🔐 %s\n", result.Message)
+	} else {
+		if result.Method == "none" {
+			fmt.Fprintf(cmd.OutOrStdout(), "💡 %s\n", result.Message)
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s\n", result.Message)
+		}
 	}
 }
 
