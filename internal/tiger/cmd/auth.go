@@ -64,7 +64,7 @@ The project ID will be stored in the configuration file.
 You may also provide API keys via flags or environment variables, in which case
 they will be used directly. The CLI will prompt for any missing information.
 
-You can find your API credentials and project ID at: https://console.timescale.com/dashboard/settings
+You can find your API credentials and project ID at: https://console.cloud.timescale.com/dashboard/settings
 
 Examples:
   # Interactive login with OAuth (opens browser, creates API keys automatically)
@@ -116,7 +116,7 @@ Examples:
 				}
 			} else if creds.publicKey == "" || creds.secretKey == "" || creds.projectID == "" {
 				// If some credentials were provided, prompt for missing ones
-				creds, err = promptForCredentials(creds)
+				creds, err = promptForCredentials(cfg.ConsoleURL, creds)
 				if err != nil {
 					return fmt.Errorf("failed to get credentials: %w", err)
 				}
@@ -320,14 +320,13 @@ func removeAPIKeyFromFile() error {
 }
 
 // promptForCredentials prompts the user to enter any missing credentials
-func promptForCredentials(creds credentials) (credentials, error) {
+func promptForCredentials(consoleURL string, creds credentials) (credentials, error) {
 	// Check if we're in a terminal for interactive input
 	if !term.IsTerminal(int(syscall.Stdin)) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
 	}
 
-	fmt.Println("You can find your API credentials and project ID at: https://console.timescale.com/dashboard/settings")
-	fmt.Println()
+	fmt.Printf("You can find your API credentials and project ID at: %s/dashboard/settings\n\n", consoleURL)
 
 	reader := bufio.NewReader(os.Stdin)
 
