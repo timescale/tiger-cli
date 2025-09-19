@@ -3,9 +3,6 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -115,85 +112,6 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 	}
 
 	return detail
-}
-
-// parseCPUMemory parses CPU and memory specifications and returns normalized values
-func (s *Server) parseCPUMemory(cpuStr, memoryStr string) (int, float64, error) {
-	// Parse CPU
-	cpuMillis, err := s.parseCPU(cpuStr)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid CPU specification '%s': %w", cpuStr, err)
-	}
-
-	// Parse Memory
-	memoryGbs, err := s.parseMemory(memoryStr)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid memory specification '%s': %w", memoryStr, err)
-	}
-
-	// Validate the combination is allowed
-	configs := util.GetAllowedCPUMemoryConfigs()
-	for _, config := range configs {
-		if config.CPUMillis == cpuMillis && config.MemoryGbs == memoryGbs {
-			return cpuMillis, memoryGbs, nil
-		}
-	}
-
-	return 0, 0, fmt.Errorf(
-		"invalid CPU/Memory combination: %dm CPU and %.0fGB memory. Allowed combinations: %s",
-		cpuMillis, memoryGbs, configs,
-	)
-}
-
-// parseCPU parses a CPU specification (e.g., "2", "2000m", "0.5")
-func (s *Server) parseCPU(cpuStr string) (int, error) {
-	cpuStr = strings.TrimSpace(cpuStr)
-
-	// Handle millicores (e.g., "2000m")
-	if strings.HasSuffix(cpuStr, "m") {
-		milliStr := strings.TrimSuffix(cpuStr, "m")
-		return strconv.Atoi(milliStr)
-	}
-
-	// Handle cores (e.g., "2", "0.5")
-	cores, err := strconv.ParseFloat(cpuStr, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return int(cores * 1000), nil
-}
-
-// parseMemory parses a memory specification (e.g., "8GB", "4096MB")
-func (s *Server) parseMemory(memoryStr string) (float64, error) {
-	memoryStr = strings.TrimSpace(strings.ToUpper(memoryStr))
-
-	// Regular expression to parse memory with units
-	re := regexp.MustCompile(`^(\d+(?:\.\d+)?)(GB|MB|G|M)?$`)
-	matches := re.FindStringSubmatch(memoryStr)
-
-	if len(matches) < 2 {
-		return 0, fmt.Errorf("invalid format")
-	}
-
-	value, err := strconv.ParseFloat(matches[1], 64)
-	if err != nil {
-		return 0, err
-	}
-
-	unit := matches[2]
-	if unit == "" {
-		unit = "GB" // Default to GB if no unit specified
-	}
-
-	switch unit {
-	case "GB", "G":
-		return value, nil
-	case "MB", "M":
-		return value / 1024, nil
-	default:
-		return 0, fmt.Errorf("unsupported unit: %s", unit)
-	}
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs

@@ -280,8 +280,6 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	}
 }
 
-
-
 // Helper function to create test services
 func createTestServices() []api.Service {
 	testServiceID1 := "12345678-9abc-def0-1234-56789abcdef0"

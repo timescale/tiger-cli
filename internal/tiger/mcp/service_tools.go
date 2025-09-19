@@ -82,15 +82,14 @@ type ServiceDetail struct {
 
 // ServiceCreateInput represents input for tiger_service_create
 type ServiceCreateInput struct {
-	Name     string  `json:"name"`
-	Type     string  `json:"type,omitempty"`
-	Region   string  `json:"region"`
-	CPU      string  `json:"cpu"`
-	Memory   string  `json:"memory"`
-	Replicas *int    `json:"replicas,omitempty"`
-	VpcID    *string `json:"vpc_id,omitempty"`
-	Wait     *bool   `json:"wait,omitempty"`
-	Timeout  *int    `json:"timeout,omitempty"`
+	Name      string  `json:"name"`
+	Type      string  `json:"type,omitempty"`
+	Region    string  `json:"region"`
+	CPUMemory string  `json:"cpu_memory"`
+	Replicas  *int    `json:"replicas,omitempty"`
+	VpcID     *string `json:"vpc_id,omitempty"`
+	Wait      *bool   `json:"wait,omitempty"`
+	Timeout   *int    `json:"timeout,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -107,15 +106,12 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	schema.Properties["cpu"].Description = "CPU allocation in cores or millicores. Examples: '1' (1 core), '2000m' (2000 millicores = 2 cores), '0.5' (0.5 cores)."
-	schema.Properties["cpu"].Examples = []any{"0.5", "1", "2", "4", "8", "16", "32", "500m", "1000m", "2000m"}
-
-	schema.Properties["memory"].Description = "Memory allocation with units. Supported units: GB, MB. Example: '8GB', '4096MB'."
-	schema.Properties["memory"].Examples = []any{"2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "128GB"}
+	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
-	schema.Properties["replicas"].Default = util.Must(json.Marshal(1))
-	schema.Properties["replicas"].Examples = []any{1, 2, 3}
+	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
+	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
 	schema.Properties["vpc_id"].Description = "Virtual Private Cloud ID to deploy the service in. Leave empty for default networking."
 	schema.Properties["vpc_id"].Examples = []any{"vpc-12345678", "vpc-abcdef123456"}
@@ -289,8 +285,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		replicas = *input.Replicas
 	}
 
-	// Parse CPU and Memory
-	cpuMillis, memoryGbs, err := s.parseCPUMemory(input.CPU, input.Memory)
+	// Parse CPU and Memory from combined string
+	cpuMillis, memoryGbs, err := util.ParseCPUMemory(input.CPUMemory)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 	}
