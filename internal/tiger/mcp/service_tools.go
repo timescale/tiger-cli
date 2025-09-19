@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -82,26 +81,24 @@ type ServiceDetail struct {
 
 // ServiceCreateInput represents input for tiger_service_create
 type ServiceCreateInput struct {
-	Name      string  `json:"name"`
-	Type      string  `json:"type,omitempty"`
-	Region    string  `json:"region"`
-	CPUMemory string  `json:"cpu_memory"`
-	Replicas  *int    `json:"replicas,omitempty"`
-	VpcID     *string `json:"vpc_id,omitempty"`
-	Wait      *bool   `json:"wait,omitempty"`
-	Timeout   *int    `json:"timeout,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Region    string `json:"region"`
+	CPUMemory string `json:"cpu_memory"`
+	Replicas  int    `json:"replicas,omitempty"`
+	Wait      *bool  `json:"wait,omitempty"`
+	Timeout   *int   `json:"timeout,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
-	schema.Properties["name"].Description = "Human-readable name for the service."
+	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["type"].Description = "The type of database service to create. TimescaleDB includes PostgreSQL with time-series extensions."
 	schema.Properties["type"].Enum = []any{"timescaledb", "postgres", "vector"}
 	schema.Properties["type"].Default = util.Must(json.Marshal("timescaledb"))
-	schema.Properties["type"].Examples = []any{"timescaledb"}
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
@@ -114,9 +111,6 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	// TODO: schema.Properties["replicas"].Maximum =
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
-
-	schema.Properties["vpc_id"].Description = "Virtual Private Cloud ID to deploy the service in. Leave empty for default networking."
-	schema.Properties["vpc_id"].Examples = []any{"vpc-12345678", "vpc-abcdef123456"}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Recommended for scripting."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(true))
@@ -277,15 +271,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	// Set defaults
-	serviceType := input.Type
-	if serviceType == "" {
-		serviceType = "timescaledb"
+	// Auto-generate service name if not provided
+	if input.Name == "" {
+		input.Name = util.GenerateServiceName()
 	}
 
-	replicas := 1
-	if input.Replicas != nil {
-		replicas = *input.Replicas
+	// Set defaults service type if not provided
+	if input.Type == "" {
+		input.Type = "timescaledb"
 	}
 
 	// Parse CPU and Memory from combined string
@@ -294,24 +287,18 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 	}
 
-	// Auto-generate service name if not provided
-	name := input.Name
-	if name == "" {
-		name = fmt.Sprintf("mcp-service-%d", rand.Intn(10000))
-	}
-
 	logging.Debug("MCP: Creating service",
 		zap.String("project_id", projectID),
-		zap.String("name", name),
-		zap.String("type", serviceType),
+		zap.String("name", input.Name),
+		zap.String("type", input.Type),
 		zap.String("region", input.Region))
 
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
-		Name:         name,
-		ServiceType:  api.ServiceType(strings.ToUpper(serviceType)),
+		Name:         input.Name,
+		ServiceType:  api.ServiceType(strings.ToUpper(input.Type)),
 		RegionCode:   input.Region,
-		ReplicaCount: replicas,
+		ReplicaCount: input.Replicas,
 		CpuMillis:    cpuMillis,
 		MemoryGbs:    float32(memoryGbs),
 	}
@@ -333,11 +320,12 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		service := *resp.JSON202
+		serviceName := util.Deref(service.Name)
 		serviceID := util.Deref(service.ServiceId)
 
 		output := ServiceCreateOutput{
 			Service: s.convertToServiceDetail(api.Service(service)),
-			Message: fmt.Sprintf("Service '%s' creation request accepted. Service ID: %s", name, serviceID),
+			Message: fmt.Sprintf("Service '%s' creation request accepted. Service ID: %s", serviceName, serviceID),
 		}
 
 		// If wait is requested, wait for service to be ready

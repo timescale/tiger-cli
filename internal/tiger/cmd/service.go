@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -282,7 +281,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
-				createServiceName = fmt.Sprintf("db-%d", rand.Intn(10000))
+				createServiceName = util.GenerateServiceName()
 			}
 			if createServiceType == "" {
 				return fmt.Errorf("service type is required (--type)")
