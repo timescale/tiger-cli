@@ -83,8 +83,8 @@ type ServiceDetail struct {
 type ServiceCreateInput struct {
 	Name      string `json:"name,omitempty"`
 	Type      string `json:"type,omitempty"`
-	Region    string `json:"region"`
-	CPUMemory string `json:"cpu_memory"`
+	Region    string `json:"region,omitempty"`
+	CPUMemory string `json:"cpu_memory,omitempty"`
 	Replicas  int    `json:"replicas,omitempty"`
 	Wait      *bool  `json:"wait,omitempty"`
 	Timeout   *int   `json:"timeout,omitempty"`
@@ -101,10 +101,13 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["type"].Default = util.Must(json.Marshal("timescaledb"))
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
+	schema.Properties["region"].Default = util.Must(json.Marshal("us-east-1"))
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
+	cpuMemoryCombinations := util.GetAllowedCPUMemoryConfigs().String()
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryCombinations)
+	schema.Properties["cpu_memory"].Default = util.Must(json.Marshal(cpuMemoryCombinations[0])) // Default to smallest config
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
@@ -276,9 +279,20 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = util.GenerateServiceName()
 	}
 
-	// Set defaults service type if not provided
+	// Set default service type if not provided
 	if input.Type == "" {
 		input.Type = "timescaledb"
+	}
+
+	// Set default region if not provided
+	if input.Region == "" {
+		input.Region = "us-east-1"
+	}
+
+	// Set default CPU/Memory if not provided
+	if input.CPUMemory == "" {
+		configs := util.GetAllowedCPUMemoryConfigs()
+		input.CPUMemory = configs[0].String() // Default to smallest config (0.5 CPU/2GB)
 	}
 
 	// Parse CPU and Memory from combined string
