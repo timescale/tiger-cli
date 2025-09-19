@@ -305,7 +305,11 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		zap.String("project_id", projectID),
 		zap.String("name", input.Name),
 		zap.String("type", input.Type),
-		zap.String("region", input.Region))
+		zap.String("region", input.Region),
+		zap.Int("cpu", cpuMillis),
+		zap.Float64("memory", memoryGbs),
+		zap.Int("replicas", input.Replicas),
+	)
 
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
@@ -342,19 +346,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 			Message: fmt.Sprintf("Service '%s' creation request accepted. Service ID: %s", serviceName, serviceID),
 		}
 
-		// If wait is requested, wait for service to be ready
-		wait := true
-		if input.Wait != nil {
-			wait = *input.Wait
-		}
-
-		if wait {
-			timeout := 30
+		// If wait is requested (the default), wait for service to be ready
+		if input.Wait == nil || *input.Wait {
+			timeout := 30 * time.Minute
 			if input.Timeout != nil {
-				timeout = *input.Timeout
+				timeout = *input.Timeout * time.Minute
 			}
 
-			if err := s.waitForServiceReady(ctx, apiClient, projectID, serviceID, time.Duration(timeout)*time.Minute); err != nil {
+			if err := s.waitForServiceReady(ctx, apiClient, projectID, serviceID, timeout); err != nil {
 				output.Message += fmt.Sprintf(". Warning: %v", err)
 			} else {
 				output.Message += ". Service is now ready!"
