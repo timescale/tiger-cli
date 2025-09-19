@@ -350,7 +350,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		if input.Wait == nil || *input.Wait {
 			timeout := 30 * time.Minute
 			if input.Timeout != nil {
-				timeout = *input.Timeout * time.Minute
+				timeout = time.Duration(*input.Timeout) * time.Minute
 			}
 
 			if err := s.waitForServiceReady(ctx, apiClient, projectID, serviceID, timeout); err != nil {

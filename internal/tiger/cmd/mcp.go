@@ -21,21 +21,56 @@ import (
 func buildMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "Start the Tiger MCP server",
-		Long: `Start the Tiger Model Context Protocol (MCP) server for AI assistant integration.
+		Short: "Tiger Model Context Protocol (MCP) server",
+		Long: `Tiger Model Context Protocol (MCP) server for AI assistant integration.
 
 The MCP server provides programmatic access to TigerData Cloud Platform resources
-through Claude and other AI assistants. By default, it uses stdio transport.
+through Claude and other AI assistants. It exposes Tiger CLI functionality as MCP
+tools that can be called by AI agents.
 
 Configuration:
 The server automatically uses the CLI's stored authentication and configuration.
 No additional setup is required beyond running 'tiger auth login'.
 
 Available Tools:
-  - tiger_service_list             List all services
-  - tiger_service_show             Show service details
-  - tiger_service_create           Create new services
-  - tiger_service_update_password  Update service passwords`,
+  - tiger_service_list             List all database services
+  - tiger_service_show             Show detailed service information
+  - tiger_service_create           Create new database services
+  - tiger_service_update_password  Update service master passwords
+
+Use 'tiger mcp start' to launch the MCP server.`,
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, args []string) {
+			// Show help when no subcommand is specified
+			cmd.Help()
+		},
+	}
+
+	// Add subcommands
+	cmd.AddCommand(buildMCPStartCmd())
+
+	return cmd
+}
+
+// buildMCPStartCmd creates the start subcommand with transport options
+func buildMCPStartCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "start",
+		Short: "Start the Tiger MCP server",
+		Long: `Start the Tiger Model Context Protocol (MCP) server for AI assistant integration.
+
+The MCP server provides programmatic access to TigerData Cloud Platform resources
+through Claude and other AI assistants. By default, it uses stdio transport.
+
+Examples:
+  # Start with stdio transport (default)
+  tiger mcp start
+
+  # Start with stdio transport (explicit)
+  tiger mcp start stdio
+
+  # Start with HTTP transport
+  tiger mcp start http`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
@@ -44,7 +79,7 @@ Available Tools:
 		},
 	}
 
-	// Add subcommands
+	// Add transport subcommands
 	cmd.AddCommand(buildMCPStdioCmd())
 	cmd.AddCommand(buildMCPHTTPCmd())
 
@@ -59,8 +94,8 @@ func buildMCPStdioCmd() *cobra.Command {
 		Long: `Start the MCP server using standard input/output transport.
 
 Examples:
-  # Start with stdio transport (same as 'tiger mcp')
-  tiger mcp stdio`,
+  # Start with stdio transport
+  tiger mcp start stdio`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
@@ -83,16 +118,16 @@ The server will automatically find an available port if the specified port is bu
 
 Examples:
   # Start HTTP server on default port 8080
-  tiger mcp http
+  tiger mcp start http
 
   # Start HTTP server on custom port
-  tiger mcp http --port 3001
+  tiger mcp start http --port 3001
 
   # Start HTTP server on all interfaces
-  tiger mcp http --host 0.0.0.0 --port 8080
+  tiger mcp start http --host 0.0.0.0 --port 8080
 
   # Start server and bind to specific interface
-  tiger mcp http --host 192.168.1.100 --port 9000`,
+  tiger mcp start http --host 192.168.1.100 --port 9000`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
