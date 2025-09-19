@@ -94,6 +94,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
+	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["type"].Description = "The type of database service to create. TimescaleDB includes PostgreSQL with time-series extensions."
