@@ -34,6 +34,7 @@ func (c *CPUMemoryConfig) MemoryString() string {
 type CPUMemoryConfigs []CPUMemoryConfig
 
 // GetAllowedCPUMemoryConfigs returns the allowed CPU/Memory configurations from the spec
+// TODO: It would be great if we could fetch these from the API instead of hard coding them.
 func GetAllowedCPUMemoryConfigs() CPUMemoryConfigs {
 	return CPUMemoryConfigs{
 		{CPUMillis: 500, MemoryGbs: 2},     // 0.5 CPU, 2GB
