@@ -115,7 +115,8 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration) error {
+// Returns the final service status and any error that occurred
+func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus string) (string, error) {
 	logging.Debug("MCP: Waiting for service to be ready",
 		zap.String("service_id", serviceID),
 		zap.Duration("timeout", timeout))
@@ -126,10 +127,11 @@ func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientW
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
+	lastSeenStatus := initialStatus
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
+			return lastSeenStatus, fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
 		case <-ticker.C:
 			resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -144,13 +146,14 @@ func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientW
 
 			service := *resp.JSON200
 			status := util.DerefStr(service.Status)
+			lastSeenStatus = status // Track the last status we saw
 
 			switch status {
 			case "READY":
 				logging.Debug("MCP: Service is ready", zap.String("service_id", serviceID))
-				return nil
+				return status, nil
 			case "FAILED", "ERROR":
-				return fmt.Errorf("service creation failed with status: %s", status)
+				return status, fmt.Errorf("service creation failed with status: %s", status)
 			default:
 				logging.Debug("MCP: Service status",
 					zap.String("service_id", serviceID),

@@ -132,6 +132,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 type ServiceCreateOutput struct {
 	Service         ServiceDetail               `json:"service"`
 	Message         string                      `json:"message"`
+	Status          string                      `json:"status"`
 	PasswordStorage *util.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
@@ -341,8 +342,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		service := *resp.JSON202
-		serviceName := util.Deref(service.Name)
 		serviceID := util.Deref(service.ServiceId)
+		serviceStatus := util.DerefStr(service.Status)
 
 		// Capture initial password from creation response and save it immediately
 		var initialPassword string
@@ -351,8 +352,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		output := ServiceCreateOutput{
-			Service: s.convertToServiceDetail(api.Service(service)),
-			Message: fmt.Sprintf("Service '%s' creation request accepted. Service ID: %s", serviceName, serviceID),
+			Service: s.convertToServiceDetail(service),
+			Message: "Service creation request accepted. The service may still be provisioning.",
+			Status:  serviceStatus,
 		}
 
 		// Save password immediately after service creation, before any waiting
@@ -374,15 +376,22 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 				timeout = time.Duration(*input.Timeout) * time.Minute
 			}
 
-			if err := s.waitForServiceReady(ctx, apiClient, projectID, serviceID, timeout); err != nil {
-				output.Message += fmt.Sprintf(". Warning: %v", err)
+			output.Status, err = s.waitForServiceReady(ctx, apiClient, projectID, serviceID, timeout, serviceStatus)
+
+			if err != nil {
+				// Overwrite message with error context
+				if output.Status == "FAILED" || output.Status == "ERROR" {
+					output.Message = "Service creation failed"
+				} else {
+					output.Message = fmt.Sprintf("Service creation timed out after %v", timeout)
+				}
 			} else {
-				output.Message += ". Service is now ready!"
+				// Service is ready - keep original success message
+				output.Message = "Service created successfully and is ready!"
 			}
 		}
 
 		return nil, output, nil
-
 	case 400:
 		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid request parameters")
 	case 401:
