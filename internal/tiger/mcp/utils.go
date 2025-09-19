@@ -116,12 +116,13 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
 // Returns the final service status and any error that occurred
-func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus string) (string, error) {
+func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus string) (string, error) {
 	logging.Debug("MCP: Waiting for service to be ready",
 		zap.String("service_id", serviceID),
-		zap.Duration("timeout", timeout))
+		zap.Duration("timeout", timeout),
+	)
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(10 * time.Second)
@@ -131,6 +132,7 @@ func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientW
 	for {
 		select {
 		case <-ctx.Done():
+			logging.Warn("MCP: Timed out while waiting for service to be ready", zap.Error(ctx.Err()))
 			return lastSeenStatus, fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
 		case <-ticker.C:
 			resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
@@ -157,7 +159,8 @@ func (s *Server) waitForServiceReady(ctx context.Context, apiClient *api.ClientW
 			default:
 				logging.Debug("MCP: Service status",
 					zap.String("service_id", serviceID),
-					zap.String("status", status))
+					zap.String("status", status),
+				)
 			}
 		}
 	}
