@@ -51,7 +51,7 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
-#### `tiger mcp [transport]`
+#### `tiger mcp start [transport]`
 Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
 **Transports:**
@@ -65,13 +65,13 @@ Start the MCP server with the specified transport. The server runs in the foregr
 **Examples:**
 ```bash
 # Start MCP server with stdio transport (default)
-tiger mcp
-tiger mcp stdio
+tiger mcp start
+tiger mcp start stdio
 
 # Start HTTP server for web integrations
-tiger mcp http
-tiger mcp http --port 3001
-tiger mcp http --port 8080 --host 0.0.0.0
+tiger mcp start http
+tiger mcp start http --port 3001
+tiger mcp start http --port 8080 --host 0.0.0.0
 ```
 
 **Notes:** 
@@ -101,17 +101,17 @@ Show details of a specific service.
 Create a new database service.
 
 **Parameters:**
-- `name` (string, required): Service name
+- `name` (string, optional): Service name - auto-generated if not provided
 - `type` (string, optional): Service type (timescaledb, postgres, vector) - default: timescaledb
-- `region` (string, required): Region code
-- `cpu` (string, required): CPU allocation - supports cores or millicores (e.g., "2", "2000m")
-- `memory` (string, required): Memory allocation with units (e.g., "8GB", "4096MB")
-- `replicas` (number, optional): Number of high-availability replicas - default: 1
-- `vpc_id` (string, optional): VPC ID to deploy in
+- `region` (string, optional): Region code - default: us-east-1
+- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB") - default: "0.5 CPU/2GB"
+- `replicas` (number, optional): Number of high-availability replicas - default: 0
 - `wait` (boolean, optional): Wait for service to be ready - default: true
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
 
 **Returns:** Service object with creation status and details.
+
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.).
 
 #### `tiger_service_delete`
 Delete a database service.
@@ -198,6 +198,8 @@ Update the master password for a service.
 - `password` (string, required): New password for the service
 
 **Returns:** Operation status confirmation.
+
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.).
 
 ### Database Operations
 
