@@ -166,6 +166,12 @@ type ClientInterface interface {
 
 	PostProjectsProjectIdServicesServiceIdSetHA(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostProjectsProjectIdServicesServiceIdStart request
+	PostProjectsProjectIdServicesServiceIdStart(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostProjectsProjectIdServicesServiceIdStop request
+	PostProjectsProjectIdServicesServiceIdStop(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody request with any body
 	PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -543,6 +549,30 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdSetHAWithBody(ctx context
 
 func (c *Client) PostProjectsProjectIdServicesServiceIdSetHA(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostProjectsProjectIdServicesServiceIdSetHARequest(c.Server, projectId, serviceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdStart(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdStartRequest(c.Server, projectId, serviceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdStop(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdStopRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -1651,6 +1681,88 @@ func NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody(server string
 	return req, nil
 }
 
+// NewPostProjectsProjectIdServicesServiceIdStartRequest generates requests for PostProjectsProjectIdServicesServiceIdStart
+func NewPostProjectsProjectIdServicesServiceIdStartRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/start", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostProjectsProjectIdServicesServiceIdStopRequest generates requests for PostProjectsProjectIdServicesServiceIdStop
+func NewPostProjectsProjectIdServicesServiceIdStopRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/stop", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequest calls the generic PostProjectsProjectIdServicesServiceIdUpdatePassword builder with application/json body
 func NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2233,6 +2345,12 @@ type ClientWithResponsesInterface interface {
 
 	PostProjectsProjectIdServicesServiceIdSetHAWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error)
 
+	// PostProjectsProjectIdServicesServiceIdStartWithResponse request
+	PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStartResponse, error)
+
+	// PostProjectsProjectIdServicesServiceIdStopWithResponse request
+	PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStopResponse, error)
+
 	// PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse request with any body
 	PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error)
 
@@ -2717,6 +2835,54 @@ func (r PostProjectsProjectIdServicesServiceIdSetHAResponse) StatusCode() int {
 	return 0
 }
 
+type PostProjectsProjectIdServicesServiceIdStartResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *Service
+	JSON400      *BadRequest
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r PostProjectsProjectIdServicesServiceIdStartResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostProjectsProjectIdServicesServiceIdStartResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PostProjectsProjectIdServicesServiceIdStopResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *Service
+	JSON400      *BadRequest
+	JSON404      *NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r PostProjectsProjectIdServicesServiceIdStopResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostProjectsProjectIdServicesServiceIdStopResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3195,6 +3361,24 @@ func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdSetHAWithRes
 		return nil, err
 	}
 	return ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp)
+}
+
+// PostProjectsProjectIdServicesServiceIdStartWithResponse request returning *PostProjectsProjectIdServicesServiceIdStartResponse
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStartResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdStart(ctx, projectId, serviceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp)
+}
+
+// PostProjectsProjectIdServicesServiceIdStopWithResponse request returning *PostProjectsProjectIdServicesServiceIdStopResponse
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStopResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdStop(ctx, projectId, serviceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp)
 }
 
 // PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse
@@ -3971,6 +4155,86 @@ func ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp *http.Response
 	}
 
 	response := &PostProjectsProjectIdServicesServiceIdSetHAResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostProjectsProjectIdServicesServiceIdStartResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdStartWithResponse call
+func ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdStartResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostProjectsProjectIdServicesServiceIdStartResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostProjectsProjectIdServicesServiceIdStopResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdStopWithResponse call
+func ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdStopResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostProjectsProjectIdServicesServiceIdStopResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

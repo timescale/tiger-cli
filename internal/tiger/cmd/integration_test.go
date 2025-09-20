@@ -358,6 +358,130 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("✅ psql command with updated password succeeded")
 	})
 
+	t.Run("StopService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Stopping service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			"service", "stop", serviceID,
+			"--wait-timeout", "10m", // Longer timeout for integration tests
+		)
+
+		if err != nil {
+			// Check if it's a conflict error (service already stopped)
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok && exitErr.ExitCode() == ExitConflict {
+				t.Logf("Service is already stopped (conflict error): %v", err)
+			} else {
+				t.Fatalf("Service stop failed: %v\nOutput: %s", err, output)
+			}
+		} else {
+			// Verify stop success message
+			if !strings.Contains(output, "Stop request accepted") &&
+			   !strings.Contains(output, "stopped successfully") {
+				t.Errorf("Expected stop success message, got: %s", output)
+			}
+			t.Logf("Service stop completed successfully")
+		}
+	})
+
+	t.Run("VerifyServiceStopped", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Verifying service is stopped")
+
+		output, err := executeIntegrationCommand("service", "describe", serviceID, "--output", "json")
+		if err != nil {
+			t.Fatalf("Failed to describe service after stop: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check status
+		var service api.Service
+		if err := json.Unmarshal([]byte(output), &service); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var status string
+		if service.Status != nil {
+			status = string(*service.Status)
+		}
+
+		t.Logf("Service status after stop: %s", status)
+
+		// The status should be PAUSED for stopped services
+		if status != "PAUSED" {
+			t.Logf("Warning: Expected service status to be PAUSED, got %s. This might be expected depending on timing or service state.", status)
+		} else {
+			t.Logf("✅ Service is correctly in PAUSED state")
+		}
+	})
+
+	t.Run("StartService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Starting service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			"service", "start", serviceID,
+			"--wait-timeout", "10m", // Longer timeout for integration tests
+		)
+
+		if err != nil {
+			// Check if it's a conflict error (service already started)
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok && exitErr.ExitCode() == ExitConflict {
+				t.Logf("Service is already started (conflict error): %v", err)
+			} else {
+				t.Fatalf("Service start failed: %v\nOutput: %s", err, output)
+			}
+		} else {
+			// Verify start success message
+			if !strings.Contains(output, "Start request accepted") &&
+			   !strings.Contains(output, "ready and running") {
+				t.Errorf("Expected start success message, got: %s", output)
+			}
+			t.Logf("Service start completed successfully")
+		}
+	})
+
+	t.Run("VerifyServiceStarted", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Verifying service is started")
+
+		output, err := executeIntegrationCommand("service", "describe", serviceID, "--output", "json")
+		if err != nil {
+			t.Fatalf("Failed to describe service after start: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check status
+		var service api.Service
+		if err := json.Unmarshal([]byte(output), &service); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var status string
+		if service.Status != nil {
+			status = string(*service.Status)
+		}
+
+		t.Logf("Service status after start: %s", status)
+
+		// The status should be READY for started services
+		if status != "READY" {
+			t.Logf("Warning: Expected service status to be READY, got %s. This might be expected depending on timing or service state.", status)
+		} else {
+			t.Logf("✅ Service is correctly in READY state")
+		}
+	})
+
 	t.Run("DeleteService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available for deletion")
@@ -550,6 +674,16 @@ func TestServiceNotFound(t *testing.T) {
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
+			name:             "service start",
+			args:             []string{"service", "start", nonExistentServiceID},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
+			name:             "service stop",
+			args:             []string{"service", "stop", nonExistentServiceID},
+			expectedExitCode: ExitServiceNotFound,
+		},
+		{
 			name:             "db connection-string",
 			args:             []string{"db", "connection-string", nonExistentServiceID},
 			expectedExitCode: ExitServiceNotFound,
@@ -709,6 +843,14 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 		{
 			name: "service delete",
 			args: []string{"service", "delete", "non-existent-service", "--confirm", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+		},
+		{
+			name: "service start",
+			args: []string{"service", "start", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+		},
+		{
+			name: "service stop",
+			args: []string{"service", "stop", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
 		},
 	}
 

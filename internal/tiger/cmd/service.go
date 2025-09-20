@@ -36,6 +36,8 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceListCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
+	cmd.AddCommand(buildServiceStartCmd())
+	cmd.AddCommand(buildServiceStopCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 
 	return cmd
@@ -781,6 +783,46 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	}
 }
 
+// waitForServicePaused polls the service status until it's paused or timeout occurs
+func waitForServicePaused(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, cmd *cobra.Command) error {
+	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be stopping", waitTimeout))
+		case <-ticker.C:
+			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err != nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Error checking service status: %v\n", err)
+				continue
+			}
+
+			if resp.StatusCode() != 200 || resp.JSON200 == nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Service not found or error checking status\n")
+				continue
+			}
+
+			service := *resp.JSON200
+			status := formatDeployStatus(service.Status)
+
+			switch status {
+			case "PAUSED":
+				fmt.Fprintf(cmd.OutOrStdout(), "⏹️  Service has been stopped successfully!\n")
+				return nil
+			case "FAILED", "ERROR":
+				return fmt.Errorf("service stop operation failed with status: %s", status)
+			default:
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service status: %s (stopping)...\n", status)
+			}
+		}
+	}
+}
+
 // handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
 	if err := SavePasswordWithMessages(service, initialPassword, cmd.OutOrStdout()); err != nil {
@@ -1062,4 +1104,196 @@ func formatAllowedMemoryValues(configs []CPUMemoryConfig) string {
 		memoryValues = append(memoryValues, fmt.Sprintf("%.0fGB", config.MemoryGbs))
 	}
 	return strings.Join(memoryValues, ", ")
+}
+
+// buildServiceStartCmd creates the start subcommand
+func buildServiceStartCmd() *cobra.Command {
+	var startNoWait bool
+	var startWaitTimeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "start [service-id]",
+		Short: "Start a stopped database service",
+		Long: `Start a stopped database service.
+
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
+
+Examples:
+  # Start a service (waits for completion by default)
+  tiger service start svc-12345
+
+  # Start service without waiting for completion
+  tiger service start svc-12345 --no-wait
+
+  # Start service with custom wait timeout
+  tiger service start svc-12345 --wait-timeout 10m`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Require explicit service ID
+			if len(args) < 1 {
+				return fmt.Errorf("service ID is required")
+			}
+			serviceID := args[0]
+
+			cmd.SilenceUsage = true
+
+			// Get project ID from config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			if cfg.ProjectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Get API key
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make the start request
+			resp, err := client.PostProjectsProjectIdServicesServiceIdStartWithResponse(
+				context.Background(),
+				api.ProjectId(cfg.ProjectID),
+				api.ServiceId(serviceID),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to start service: %w", err)
+			}
+
+			// Handle response
+			switch resp.StatusCode() {
+			case 202:
+				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Start request accepted for service '%s'.\n", serviceID)
+
+				// If not waiting, return early
+				if startNoWait {
+					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service describe' to check service status.")
+					return nil
+				}
+
+				// Wait for service to become ready
+				return waitForServiceReady(client, cfg.ProjectID, serviceID, startWaitTimeout, cmd)
+			case 404:
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to start service"))
+			case 409:
+				return exitWithCode(ExitConflict, fmt.Errorf("conflict: service cannot be started in its current state"))
+			default:
+				return fmt.Errorf("unexpected response status: %d", resp.StatusCode())
+			}
+		},
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&startNoWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&startWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+
+	return cmd
+}
+
+// buildServiceStopCmd creates the stop subcommand
+func buildServiceStopCmd() *cobra.Command {
+	var stopNoWait bool
+	var stopWaitTimeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "stop [service-id]",
+		Short: "Stop a running database service",
+		Long: `Stop a running database service.
+
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+
+Examples:
+  # Stop a service (waits for completion by default)
+  tiger service stop svc-12345
+
+  # Stop service without waiting for completion
+  tiger service stop svc-12345 --no-wait
+
+  # Stop service with custom wait timeout
+  tiger service stop svc-12345 --wait-timeout 10m`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Require explicit service ID
+			if len(args) < 1 {
+				return fmt.Errorf("service ID is required")
+			}
+			serviceID := args[0]
+
+			cmd.SilenceUsage = true
+
+			// Get project ID from config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			if cfg.ProjectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Get API key
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make the stop request
+			resp, err := client.PostProjectsProjectIdServicesServiceIdStopWithResponse(
+				context.Background(),
+				api.ProjectId(cfg.ProjectID),
+				api.ServiceId(serviceID),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to stop service: %w", err)
+			}
+
+			// Handle response
+			switch resp.StatusCode() {
+			case 202:
+				fmt.Fprintf(cmd.OutOrStdout(), "⏹️  Stop request accepted for service '%s'.\n", serviceID)
+
+				// If not waiting, return early
+				if stopNoWait {
+					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service describe' to check service status.")
+					return nil
+				}
+
+				// Wait for service to become paused
+				return waitForServicePaused(client, cfg.ProjectID, serviceID, stopWaitTimeout, cmd)
+			case 404:
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to stop service"))
+			case 409:
+				return exitWithCode(ExitConflict, fmt.Errorf("conflict: service cannot be stopped in its current state"))
+			default:
+				return fmt.Errorf("unexpected response status: %d", resp.StatusCode())
+			}
+		},
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&stopNoWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&stopWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+
+	return cmd
 }
