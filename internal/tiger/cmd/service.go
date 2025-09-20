@@ -289,8 +289,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if createRegionCode == "" {
 				return fmt.Errorf("region code cannot be empty (--region)")
 			}
-			if createReplicaCount <= 0 {
-				return fmt.Errorf("replica count must be positive (--replicas)")
+			if createReplicaCount < 0 {
+				return fmt.Errorf("replica count must be non-negative (--replicas)")
 			}
 
 			// Check which flags were explicitly set
@@ -418,7 +418,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
 	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
 	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
-	cmd.Flags().IntVar(&createReplicaCount, "replicas", 1, "Number of high-availability replicas")
+	cmd.Flags().IntVar(&createReplicaCount, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
