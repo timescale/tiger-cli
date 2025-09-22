@@ -112,7 +112,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
-	// TODO: schema.Properties["replicas"].Maximum =
+	schema.Properties["replicas"].Maximum = util.Ptr(5.0)
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
