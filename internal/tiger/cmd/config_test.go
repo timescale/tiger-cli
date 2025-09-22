@@ -70,6 +70,7 @@ project_id: test-project
 service_id: test-service
 output: table
 analytics: false
+password_storage: pgpass
 `
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -100,6 +101,9 @@ analytics: false
 	if !strings.Contains(output, tmpDir) {
 		t.Errorf("Output should contain config directory %s, got: %s", tmpDir, output)
 	}
+	if !strings.Contains(output, "pgpass") {
+		t.Errorf("Output should contain password storage setting, got: %s", output)
+	}
 }
 
 func TestConfigShow_JSONOutput(t *testing.T) {
@@ -110,6 +114,7 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 project_id: json-project
 output: json
 analytics: true
+password_storage: none
 `
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -143,6 +148,9 @@ analytics: true
 	if result["config_dir"] != tmpDir {
 		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
 	}
+	if result["password_storage"] != "none" {
+		t.Errorf("Expected password_storage 'none', got %v", result["password_storage"])
+	}
 }
 
 func TestConfigShow_YAMLOutput(t *testing.T) {
@@ -153,6 +161,7 @@ func TestConfigShow_YAMLOutput(t *testing.T) {
 project_id: yaml-project
 output: yaml
 analytics: false
+password_storage: keyring
 `
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -185,6 +194,9 @@ analytics: false
 	}
 	if result["config_dir"] != tmpDir {
 		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
+	}
+	if result["password_storage"] != "keyring" {
+		t.Errorf("Expected password_storage 'keyring', got %v", result["password_storage"])
 	}
 }
 
@@ -273,6 +285,9 @@ func TestConfigSet_ValidValues(t *testing.T) {
 		{"service_id", "new-service", "Set service_id = new-service"},
 		{"output", "json", "Set output = json"},
 		{"analytics", "false", "Set analytics = false"},
+		{"password_storage", "pgpass", "Set password_storage = pgpass"},
+		{"password_storage", "none", "Set password_storage = none"},
+		{"password_storage", "keyring", "Set password_storage = keyring"},
 	}
 
 	for _, tt := range tests {
@@ -330,6 +345,8 @@ func TestConfigSet_InvalidValues(t *testing.T) {
 	}{
 		{"output", "invalid", "invalid output format"},
 		{"analytics", "maybe", "invalid analytics value"},
+		{"password_storage", "invalid", "invalid password_storage value"},
+		{"password_storage", "secure", "invalid password_storage value"},
 		{"unknown", "value", "unknown configuration key"},
 	}
 
@@ -418,6 +435,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 	cfg.Set("project_id", "test-project")
 	cfg.Set("service_id", "test-service")
 	cfg.Set("output", "json")
+	cfg.Set("password_storage", "pgpass")
 
 	tests := []struct {
 		key            string
@@ -426,6 +444,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 		{"project_id", "Unset project_id"},
 		{"service_id", "Unset service_id"},
 		{"output", "Unset output"},
+		{"password_storage", "Unset password_storage"},
 	}
 
 	for _, tt := range tests {

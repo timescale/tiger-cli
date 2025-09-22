@@ -140,6 +140,7 @@ func outputTable(cfg *config.Config, cmd *cobra.Command) error {
 	fmt.Fprintf(out, "  Service ID:  %s\n", valueOrEmpty(cfg.ServiceID))
 	fmt.Fprintf(out, "  Output:      %s\n", cfg.Output)
 	fmt.Fprintf(out, "  Analytics:   %t\n", cfg.Analytics)
+	fmt.Fprintf(out, "  Password Storage: %s\n", cfg.PasswordStorage)
 	fmt.Fprintf(out, "  Debug:       %t\n", cfg.Debug)
 	fmt.Fprintf(out, "  Config Dir:  %s\n", cfg.ConfigDir)
 	return nil
@@ -147,15 +148,16 @@ func outputTable(cfg *config.Config, cmd *cobra.Command) error {
 
 func outputJSON(cfg *config.Config, cmd *cobra.Command) error {
 	data := map[string]interface{}{
-		"api_url":     cfg.APIURL,
-		"console_url": cfg.ConsoleURL,
-		"gateway_url": cfg.GatewayURL,
-		"project_id":  cfg.ProjectID,
-		"service_id":  cfg.ServiceID,
-		"output":      cfg.Output,
-		"analytics":   cfg.Analytics,
-		"debug":       cfg.Debug,
-		"config_dir":  cfg.ConfigDir,
+		"api_url":          cfg.APIURL,
+		"console_url":      cfg.ConsoleURL,
+		"gateway_url":      cfg.GatewayURL,
+		"project_id":       cfg.ProjectID,
+		"service_id":       cfg.ServiceID,
+		"output":           cfg.Output,
+		"analytics":        cfg.Analytics,
+		"password_storage": cfg.PasswordStorage,
+		"debug":            cfg.Debug,
+		"config_dir":       cfg.ConfigDir,
 	}
 
 	encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -165,15 +167,16 @@ func outputJSON(cfg *config.Config, cmd *cobra.Command) error {
 
 func outputYAML(cfg *config.Config, cmd *cobra.Command) error {
 	data := map[string]interface{}{
-		"api_url":     cfg.APIURL,
-		"console_url": cfg.ConsoleURL,
-		"gateway_url": cfg.GatewayURL,
-		"project_id":  cfg.ProjectID,
-		"service_id":  cfg.ServiceID,
-		"output":      cfg.Output,
-		"analytics":   cfg.Analytics,
-		"debug":       cfg.Debug,
-		"config_dir":  cfg.ConfigDir,
+		"api_url":          cfg.APIURL,
+		"console_url":      cfg.ConsoleURL,
+		"gateway_url":      cfg.GatewayURL,
+		"project_id":       cfg.ProjectID,
+		"service_id":       cfg.ServiceID,
+		"output":           cfg.Output,
+		"analytics":        cfg.Analytics,
+		"password_storage": cfg.PasswordStorage,
+		"debug":            cfg.Debug,
+		"config_dir":       cfg.ConfigDir,
 	}
 
 	encoder := yaml.NewEncoder(cmd.OutOrStdout())

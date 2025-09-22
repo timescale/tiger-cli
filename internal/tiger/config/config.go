@@ -10,25 +10,27 @@ import (
 )
 
 type Config struct {
-	APIURL     string `mapstructure:"api_url" yaml:"api_url"`
-	ConsoleURL string `mapstructure:"console_url" yaml:"console_url"`
-	GatewayURL string `mapstructure:"gateway_url" yaml:"gateway_url"`
-	ProjectID  string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID  string `mapstructure:"service_id" yaml:"service_id"`
-	Output     string `mapstructure:"output" yaml:"output"`
-	Analytics  bool   `mapstructure:"analytics" yaml:"analytics"`
-	ConfigDir  string `mapstructure:"config_dir" yaml:"-"`
-	Debug      bool   `mapstructure:"debug" yaml:"debug"`
+	APIURL          string `mapstructure:"api_url" yaml:"api_url"`
+	ConsoleURL      string `mapstructure:"console_url" yaml:"console_url"`
+	GatewayURL      string `mapstructure:"gateway_url" yaml:"gateway_url"`
+	ProjectID       string `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID       string `mapstructure:"service_id" yaml:"service_id"`
+	Output          string `mapstructure:"output" yaml:"output"`
+	Analytics       bool   `mapstructure:"analytics" yaml:"analytics"`
+	PasswordStorage string `mapstructure:"password_storage" yaml:"password_storage"`
+	ConfigDir       string `mapstructure:"config_dir" yaml:"-"`
+	Debug           bool   `mapstructure:"debug" yaml:"debug"`
 }
 
 const (
-	DefaultAPIURL     = "https://console.cloud.timescale.com/public/api/v1"
-	DefaultConsoleURL = "https://console.cloud.timescale.com"
-	DefaultGatewayURL = "https://console.cloud.timescale.com/api"
-	DefaultOutput     = "table"
-	DefaultAnalytics  = true
-	DefaultDebug      = false
-	ConfigFileName    = "config.yaml"
+	DefaultAPIURL          = "https://console.cloud.timescale.com/public/api/v1"
+	DefaultConsoleURL      = "https://console.cloud.timescale.com"
+	DefaultGatewayURL      = "https://console.cloud.timescale.com/api"
+	DefaultOutput          = "table"
+	DefaultAnalytics       = true
+	DefaultPasswordStorage = "keyring"
+	DefaultDebug           = false
+	ConfigFileName         = "config.yaml"
 )
 
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
@@ -49,6 +51,7 @@ func SetupViper(configDir string) error {
 	viper.SetDefault("service_id", "")
 	viper.SetDefault("output", DefaultOutput)
 	viper.SetDefault("analytics", DefaultAnalytics)
+	viper.SetDefault("password_storage", DefaultPasswordStorage)
 	viper.SetDefault("debug", DefaultDebug)
 
 	// Try to read config file if it exists
@@ -97,6 +100,7 @@ func (c *Config) Save() error {
 	viper.Set("service_id", c.ServiceID)
 	viper.Set("output", c.Output)
 	viper.Set("analytics", c.Analytics)
+	viper.Set("password_storage", c.PasswordStorage)
 	viper.Set("debug", c.Debug)
 
 	if err := viper.WriteConfigAs(configFile); err != nil {
@@ -139,6 +143,11 @@ func (c *Config) Set(key, value string) error {
 		} else {
 			return fmt.Errorf("invalid debug value: %s (must be true or false)", value)
 		}
+	case "password_storage":
+		if value != "keyring" && value != "pgpass" && value != "none" {
+			return fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
+		}
+		c.PasswordStorage = value
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -164,6 +173,8 @@ func (c *Config) Unset(key string) error {
 		c.Analytics = DefaultAnalytics
 	case "debug":
 		c.Debug = DefaultDebug
+	case "password_storage":
+		c.PasswordStorage = DefaultPasswordStorage
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
@@ -179,6 +190,7 @@ func (c *Config) Reset() error {
 	c.ServiceID = ""
 	c.Output = DefaultOutput
 	c.Analytics = DefaultAnalytics
+	c.PasswordStorage = DefaultPasswordStorage
 	c.Debug = DefaultDebug
 
 	return c.Save()
