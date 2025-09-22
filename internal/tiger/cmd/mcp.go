@@ -204,7 +204,9 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	// Wait for context cancellation. Once canceled, stop handling signals and
 	// revert to default signal handling behavior. This allows a second
 	// SIGINT/SIGTERM to forcibly kill the server (useful if there's currently
-	// an active MCP session but you want to kill it anyways).
+	// an active MCP session but you want to kill it anyways). Note that stop()
+	// is idempotent and safe to call multiple times, so it's okay that it's
+	// called here and via the deferred call above.
 	<-ctx.Done()
 	stop()
 
