@@ -115,8 +115,8 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-// Returns the final service status and any error that occurred
-func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus string) (string, error) {
+// Returns the final ServiceDetail with current state and any error that occurred
+func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus string) (ServiceDetail, error) {
 	logging.Debug("MCP: Waiting for service to be ready",
 		zap.String("service_id", serviceID),
 		zap.Duration("timeout", timeout),
@@ -128,12 +128,12 @@ func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, project
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	lastSeenStatus := initialStatus
+	var lastService ServiceDetail
 	for {
 		select {
 		case <-ctx.Done():
 			logging.Warn("MCP: Timed out while waiting for service to be ready", zap.Error(ctx.Err()))
-			return lastSeenStatus, fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
+			return lastService, fmt.Errorf("timeout reached after %v - service may still be provisioning", timeout)
 		case <-ticker.C:
 			resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -146,20 +146,18 @@ func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, project
 				continue
 			}
 
-			service := *resp.JSON200
-			status := util.DerefStr(service.Status)
-			lastSeenStatus = status // Track the last status we saw
+			lastService = s.convertToServiceDetail(*resp.JSON200)
 
-			switch status {
+			switch lastService.Status {
 			case "READY":
 				logging.Debug("MCP: Service is ready", zap.String("service_id", serviceID))
-				return status, nil
+				return lastService, nil
 			case "FAILED", "ERROR":
-				return status, fmt.Errorf("service creation failed with status: %s", status)
+				return lastService, fmt.Errorf("service creation failed with status: %s", lastService.Status)
 			default:
 				logging.Debug("MCP: Service status",
 					zap.String("service_id", serviceID),
-					zap.String("status", status),
+					zap.String("status", lastService.Status),
 				)
 			}
 		}

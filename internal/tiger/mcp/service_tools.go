@@ -132,7 +132,6 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 type ServiceCreateOutput struct {
 	Service         ServiceDetail               `json:"service"`
 	Message         string                      `json:"message"`
-	Status          string                      `json:"status"`
 	PasswordStorage *util.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
@@ -445,7 +444,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		output := ServiceCreateOutput{
 			Service: s.convertToServiceDetail(service),
 			Message: "Service creation request accepted. The service may still be provisioning.",
-			Status:  serviceStatus,
 		}
 
 		// Save password immediately after service creation, before any waiting
@@ -467,12 +465,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 				timeout = time.Duration(*input.Timeout) * time.Minute
 			}
 
-			output.Status, err = s.waitForServiceReady(apiClient, projectID, serviceID, timeout, serviceStatus)
-
+			output.Service, err = s.waitForServiceReady(apiClient, projectID, serviceID, timeout, serviceStatus)
 			if err != nil {
 				output.Message = fmt.Sprintf("Error: %s", err.Error())
 			} else {
-				// Service is ready - keep original success message
 				output.Message = "Service created successfully and is ready!"
 			}
 		}
