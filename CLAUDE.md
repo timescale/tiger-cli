@@ -112,7 +112,6 @@ Two-mode logging system using zap:
 Global flags available on all commands:
 - `--debug`: Enable debug logging
 - `--output/-o`: Set output format
-- `--api-key`: Override API key
 - `--project-id`: Override project ID
 - `--service-id`: Override service ID
 - `--analytics`: Toggle analytics
@@ -222,7 +221,6 @@ func buildRootCmd() *cobra.Command {
     var cfgFile string
     var debug bool
     var output string
-    var apiKey string
     var projectID string
     var serviceID string
     var analytics bool
@@ -242,7 +240,7 @@ func buildRootCmd() *cobra.Command {
     }
 
     // Setup configuration and flags
-    setupConfigAndFlags(cmd, &cfgFile, &debug, &output, &apiKey, &projectID, &serviceID, &analytics)
+    setupConfigAndFlags(cmd, &cfgFile, &debug, &output, &projectID, &serviceID, &analytics)
     
     // Add all subcommands (complete tree building)
     cmd.AddCommand(buildVersionCmd())
