@@ -83,10 +83,9 @@ func (l *oauthLogin) getAccessToken() (string, error) {
 
 	// Open browser
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
-	fmt.Fprintf(l.out, "Auth URL is: %s\n", authURL)
 	fmt.Fprintln(l.out, "Opening browser for authentication...")
 	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(l.out, "Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
+		fmt.Fprintf(l.out, "Failed to open browser: %s\nAuth URL: %s\nPlease manually navigate to the Auth URL.", err, authURL)
 	}
 
 	// Wait for callback with timeout
