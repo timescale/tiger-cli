@@ -6,6 +6,12 @@ The Tiger MCP (Model Context Protocol) Server provides programmatic access to Ti
 
 The MCP server is written in Go and launched via the Tiger CLI, sharing the same authentication, configuration, and API client.
 
+## Design Decisions
+
+### Dynamic Configuration Loading
+
+Each MCP tool call dynamically creates the API client and loads configuration at execution time, rather than initializing these once when the MCP server starts. This design ensures that configuration changes (API keys, project IDs, etc.) take effect immediately for subsequent tool calls without requiring users to restart the MCP server or reconnect their AI assistant. Users can run `tiger auth login` to update authentication or `tiger config set` to modify other configuration values and see changes reflected instantly in their AI interactions.
+
 ## v0 Tool Priority
 
 For the initial v0 release, implement these essential tools first:
