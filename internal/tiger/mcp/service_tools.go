@@ -160,6 +160,97 @@ type ServiceUpdatePasswordOutput struct {
 	PasswordStorage *util.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
+// registerServiceTools registers service management tools with comprehensive schemas and descriptions
+func (s *Server) registerServiceTools() {
+	// tiger_service_list
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "tiger_service_list",
+		Title: "List Database Services",
+		Description: `List all database services in your current TigerData project.
+
+This tool retrieves a complete list of database services with their basic information including status, type, region, and resource allocation. Use this to get an overview of all your services before performing operations on specific services.
+
+Perfect for:
+- Getting an overview of your database infrastructure
+- Finding service IDs for other operations
+- Checking service status and resource allocation
+- Discovering services across different regions`,
+		InputSchema: ServiceListInput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: true,
+			Title:        "List Database Services",
+		},
+	}, s.handleServiceList)
+
+	// tiger_service_show
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "tiger_service_show",
+		Title: "Show Service Details",
+		Description: `Show detailed information about a specific database service.
+
+This tool provides comprehensive information about a service including connection endpoints, replica configuration, resource allocation, creation time, and current operational status. Essential for debugging, monitoring, and connection management.
+
+Perfect for:
+- Getting connection endpoints (direct and pooled)
+- Checking detailed service configuration
+- Monitoring service health and status
+- Obtaining service specifications for scaling decisions`,
+		InputSchema: ServiceShowInput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: true,
+			Title:        "Show Service Details",
+		},
+	}, s.handleServiceShow)
+
+	// tiger_service_create
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "tiger_service_create",
+		Title: "Create Database Service",
+		Description: `Create a new database service in TigerData Cloud.
+
+This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+
+Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
+
+IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
+
+Perfect for:
+- Setting up new database infrastructure
+- Creating development or production environments
+- Provisioning databases with specific resource requirements
+- Establishing services in different geographical regions`,
+		InputSchema: ServiceCreateInput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
+			IdempotentHint:  false,           // Creating with same name would fail
+			Title:           "Create Database Service",
+		},
+	}, s.handleServiceCreate)
+
+	// tiger_service_update_password
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "tiger_service_update_password",
+		Title: "Update Service Password",
+		Description: `Update the master password for the 'tsdbadmin' user of a database service.
+
+This tool changes the master database password used for the default administrative user. The new password will be required for all future database connections. Existing connections may be terminated.
+
+SECURITY NOTE: Ensure new passwords are strong and stored securely. Password changes take effect immediately.
+
+Perfect for:
+- Password rotation for security compliance
+- Recovering from compromised credentials
+- Setting initial passwords for new services
+- Meeting organizational security policies`,
+		InputSchema: ServiceUpdatePasswordInput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(true), // Modifies authentication credentials
+			IdempotentHint:  true,           // Same password can be set multiple times
+			Title:           "Update Service Password",
+		},
+	}, s.handleServiceUpdatePassword)
+}
+
 // handleServiceList handles the tiger_service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Create fresh API client with current credentials
