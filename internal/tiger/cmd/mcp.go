@@ -32,12 +32,6 @@ Configuration:
 The server automatically uses the CLI's stored authentication and configuration.
 No additional setup is required beyond running 'tiger auth login'.
 
-Available Tools:
-  - tiger_service_list             List all database services
-  - tiger_service_show             Show detailed service information
-  - tiger_service_create           Create new database services
-  - tiger_service_update_password  Update service master passwords
-
 Use 'tiger mcp start' to launch the MCP server.`,
 		Args: cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
