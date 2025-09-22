@@ -24,9 +24,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.Version={{.Version}}
-      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.BuildTime={{.Date}}
-      - -X github.com/timescale/tiger-cli/internal/tiger/cmd.GitCommit={{.Commit}}
+      - -X github.com/timescale/tiger-cli/internal/tiger/config.Version={{.Version}}
+      - -X github.com/timescale/tiger-cli/internal/tiger/config.BuildTime={{.Date}}
+      - -X github.com/timescale/tiger-cli/internal/tiger/config.GitCommit={{.Commit}}
 
 archives:
   - id: archive

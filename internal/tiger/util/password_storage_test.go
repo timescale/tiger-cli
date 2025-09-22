@@ -1,7 +1,6 @@
-package cmd
+package util
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,13 +18,11 @@ func createTestService(serviceID string) api.Service {
 		ProjectId: &projectID,
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
-			Host: stringPtr("test-host.tigerdata.com"),
-			Port: intPtr(5432),
+			Host: Ptr("test-host.tigerdata.com"),
+			Port: Ptr(5432),
 		},
 	}
 }
-
-// Helper functions are already defined in db_test.go, so we'll use those
 
 func TestNoStorage_Save(t *testing.T) {
 	storage := &NoStorage{}
@@ -162,7 +159,7 @@ func TestKeyringStorage_Remove_NoProjectId(t *testing.T) {
 func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceId: stringPtr("test-service-123"),
+		ServiceId: Ptr("test-service-123"),
 		// No Endpoint
 	}
 
@@ -178,7 +175,7 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceId: stringPtr("test-service-123"),
+		ServiceId: Ptr("test-service-123"),
 		// No Endpoint
 	}
 
@@ -222,11 +219,11 @@ func TestGetPasswordStorage(t *testing.T) {
 		storageMethod string
 		expectedType  string
 	}{
-		{"keyring", "keyring", "*cmd.KeyringStorage"},
-		{"pgpass", "pgpass", "*cmd.PgpassStorage"},
-		{"none", "none", "*cmd.NoStorage"},
-		{"default", "", "*cmd.KeyringStorage"},        // Default case
-		{"invalid", "invalid", "*cmd.KeyringStorage"}, // Falls back to default
+		{"keyring", "keyring", "*util.KeyringStorage"},
+		{"pgpass", "pgpass", "*util.PgpassStorage"},
+		{"none", "none", "*util.NoStorage"},
+		{"default", "", "*util.KeyringStorage"},        // Default case
+		{"invalid", "invalid", "*util.KeyringStorage"}, // Falls back to default
 	}
 
 	for _, tt := range tests {
@@ -244,74 +241,6 @@ func TestGetPasswordStorage(t *testing.T) {
 			// Clean up
 			viper.Set("password_storage", "")
 		})
-	}
-}
-
-func TestSavePasswordWithMessages_EmptyPassword(t *testing.T) {
-	service := createTestService("test-service-123")
-	buf := &bytes.Buffer{}
-
-	// Should do nothing with empty password
-	err := SavePasswordWithMessages(service, "", buf)
-
-	if err != nil {
-		t.Errorf("SavePasswordWithMessages() with empty password should not return error, got: %v", err)
-	}
-	if buf.Len() > 0 {
-		t.Errorf("SavePasswordWithMessages() with empty password should not write anything, got: %s", buf.String())
-	}
-}
-
-func TestSavePasswordWithMessages_WithPassword_None(t *testing.T) {
-	service := createTestService("test-service-123")
-	buf := &bytes.Buffer{}
-
-	// Set up viper to use NoStorage for predictable behavior
-	viper.Set("password_storage", "none")
-	defer viper.Set("password_storage", "")
-
-	err := SavePasswordWithMessages(service, "test-password", buf)
-
-	if err != nil {
-		t.Errorf("SavePasswordWithMessages() should not return error with NoStorage, got: %v", err)
-	}
-	output := buf.String()
-	if !strings.Contains(output, "💡 Password not saved (--password-storage=none)") {
-		t.Errorf("SavePasswordWithMessages() should mention no storage, got: %s", output)
-	}
-	// Make sure password is never printed
-	if strings.Contains(output, "test-password") {
-		t.Errorf("SavePasswordWithMessages() should never print the password, got: %s", output)
-	}
-}
-
-func TestSavePasswordWithMessages_WithPassword_Keyring(t *testing.T) {
-	service := createTestService("test-service-123")
-	buf := &bytes.Buffer{}
-
-	// Set up viper to use keyring storage
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", "")
-
-	err := SavePasswordWithMessages(service, "test-password", buf)
-
-	// This will likely fail because keyring isn't available in test environment,
-	// but we can check that it attempts to save and returns an error
-	output := buf.String()
-	if err == nil {
-		// If keyring worked, should show success message
-		if !strings.Contains(output, "🔐 Password saved to system keyring") {
-			t.Errorf("SavePasswordWithMessages() success should mention keyring, got: %s", output)
-		}
-	} else {
-		// If keyring failed, should show error message
-		if !strings.Contains(output, "⚠️  Failed to save password to keyring") {
-			t.Errorf("SavePasswordWithMessages() error should mention keyring failure, got: %s", output)
-		}
-	}
-	// Make sure password is never printed
-	if strings.Contains(output, "test-password") {
-		t.Errorf("SavePasswordWithMessages() should never print the password, got: %s", output)
 	}
 }
 
@@ -379,107 +308,170 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	}
 }
 
-// Test HandleSaveMessage methods for all storage types
-func TestNoStorage_HandleSaveMessage(t *testing.T) {
+// Test GetStorageResult methods for all storage types
+func TestNoStorage_GetStorageResult(t *testing.T) {
 	storage := &NoStorage{}
-	buf := &bytes.Buffer{}
 	testPassword := "test-password"
 
-	// NoStorage should always show the "not saved" message regardless of error
-	storage.HandleSaveMessage(nil, testPassword, buf)
-	output := buf.String()
-	if !strings.Contains(output, "💡 Password not saved (--password-storage=none)") {
-		t.Errorf("NoStorage.HandleSaveMessage() should mention no storage, got: %s", output)
+	// NoStorage should always return a "none" result regardless of error
+	result := storage.GetStorageResult(nil, testPassword)
+	if result.Success != false {
+		t.Errorf("NoStorage.GetStorageResult() success should be false, got: %t", result.Success)
+	}
+	if result.Method != "none" {
+		t.Errorf("NoStorage.GetStorageResult() method should be 'none', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password not saved (--password-storage=none)") {
+		t.Errorf("NoStorage.GetStorageResult() should mention no storage, got: %s", result.Message)
 	}
 
-	// Test with error (should still show same message)
-	buf.Reset()
-	storage.HandleSaveMessage(fmt.Errorf("some error"), testPassword, buf)
-	output = buf.String()
-	if !strings.Contains(output, "💡 Password not saved (--password-storage=none)") {
-		t.Errorf("NoStorage.HandleSaveMessage() with error should still mention no storage, got: %s", output)
+	// Test with error (should still return same message)
+	result = storage.GetStorageResult(fmt.Errorf("some error"), testPassword)
+	if result.Method != "none" {
+		t.Errorf("NoStorage.GetStorageResult() with error should still have method 'none', got: %s", result.Method)
 	}
 
-	// Verify no password is ever printed
-	if strings.Contains(output, testPassword) {
-		t.Errorf("NoStorage.HandleSaveMessage() should not print actual passwords, got: %s", output)
+	// Verify no password is ever in the message
+	if strings.Contains(result.Message, testPassword) {
+		t.Errorf("NoStorage.GetStorageResult() should not include actual passwords, got: %s", result.Message)
 	}
 }
 
-func TestKeyringStorage_HandleSaveMessage_Success(t *testing.T) {
+func TestKeyringStorage_GetStorageResult_Success(t *testing.T) {
 	storage := &KeyringStorage{}
-	buf := &bytes.Buffer{}
 	testPassword := "test-password"
 
 	// Test success case
-	storage.HandleSaveMessage(nil, testPassword, buf)
-	output := buf.String()
-	if !strings.Contains(output, "🔐 Password saved to system keyring") {
-		t.Errorf("KeyringStorage.HandleSaveMessage() success should mention keyring, got: %s", output)
+	result := storage.GetStorageResult(nil, testPassword)
+	if !result.Success {
+		t.Errorf("KeyringStorage.GetStorageResult() success should be true, got: %t", result.Success)
 	}
-	if strings.Contains(output, testPassword) {
-		t.Errorf("KeyringStorage.HandleSaveMessage() should never print actual passwords, got: %s", output)
+	if result.Method != "keyring" {
+		t.Errorf("KeyringStorage.GetStorageResult() method should be 'keyring', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password saved to system keyring") {
+		t.Errorf("KeyringStorage.GetStorageResult() success should mention keyring, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Errorf("KeyringStorage.GetStorageResult() should never include actual passwords, got: %s", result.Message)
 	}
 }
 
-func TestKeyringStorage_HandleSaveMessage_Error(t *testing.T) {
+func TestKeyringStorage_GetStorageResult_Error(t *testing.T) {
 	storage := &KeyringStorage{}
-	buf := &bytes.Buffer{}
 	testPassword := "test-password"
 
 	// Test error case
 	testErr := fmt.Errorf("keyring service not available")
-	storage.HandleSaveMessage(testErr, testPassword, buf)
-	output := buf.String()
-	if !strings.Contains(output, "⚠️  Failed to save password to keyring") {
-		t.Errorf("KeyringStorage.HandleSaveMessage() error should mention keyring failure, got: %s", output)
+	result := storage.GetStorageResult(testErr, testPassword)
+	if result.Success {
+		t.Errorf("KeyringStorage.GetStorageResult() error should have success=false, got: %t", result.Success)
 	}
-	if !strings.Contains(output, "keyring service not available") {
-		t.Errorf("KeyringStorage.HandleSaveMessage() should include error details, got: %s", output)
+	if result.Method != "keyring" {
+		t.Errorf("KeyringStorage.GetStorageResult() method should be 'keyring', got: %s", result.Method)
 	}
-	if strings.Contains(output, testPassword) {
-		t.Errorf("KeyringStorage.HandleSaveMessage() should never print actual passwords, got: %s", output)
+	if !strings.Contains(result.Message, "Failed to save password to keyring") {
+		t.Errorf("KeyringStorage.GetStorageResult() error should mention keyring failure, got: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "keyring service not available") {
+		t.Errorf("KeyringStorage.GetStorageResult() should include error details, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Errorf("KeyringStorage.GetStorageResult() should never include actual passwords, got: %s", result.Message)
 	}
 }
 
-func TestPgpassStorage_HandleSaveMessage_Success(t *testing.T) {
+func TestPgpassStorage_GetStorageResult_Success(t *testing.T) {
 	storage := &PgpassStorage{}
-	buf := &bytes.Buffer{}
 	testPassword := "test-password"
 
 	// Test success case
-	storage.HandleSaveMessage(nil, testPassword, buf)
-	output := buf.String()
-	if !strings.Contains(output, "🔐 Password saved to ~/.pgpass") {
-		t.Errorf("PgpassStorage.HandleSaveMessage() success should mention pgpass, got: %s", output)
+	result := storage.GetStorageResult(nil, testPassword)
+	if !result.Success {
+		t.Errorf("PgpassStorage.GetStorageResult() success should be true, got: %t", result.Success)
 	}
-	if strings.Contains(output, testPassword) {
-		t.Errorf("PgpassStorage.HandleSaveMessage() should never print actual passwords, got: %s", output)
+	if result.Method != "pgpass" {
+		t.Errorf("PgpassStorage.GetStorageResult() method should be 'pgpass', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password saved to ~/.pgpass") {
+		t.Errorf("PgpassStorage.GetStorageResult() success should mention pgpass, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Errorf("PgpassStorage.GetStorageResult() should never include actual passwords, got: %s", result.Message)
 	}
 }
 
-func TestPgpassStorage_HandleSaveMessage_Error(t *testing.T) {
+func TestPgpassStorage_GetStorageResult_Error(t *testing.T) {
 	storage := &PgpassStorage{}
-	buf := &bytes.Buffer{}
 	testPassword := "test-password"
 
 	// Test error case
 	testErr := fmt.Errorf("permission denied")
-	storage.HandleSaveMessage(testErr, testPassword, buf)
-	output := buf.String()
-	if !strings.Contains(output, "⚠️  Failed to save password to ~/.pgpass") {
-		t.Errorf("PgpassStorage.HandleSaveMessage() error should mention pgpass failure, got: %s", output)
+	result := storage.GetStorageResult(testErr, testPassword)
+	if result.Success {
+		t.Errorf("PgpassStorage.GetStorageResult() error should have success=false, got: %t", result.Success)
 	}
-	if !strings.Contains(output, "permission denied") {
-		t.Errorf("PgpassStorage.HandleSaveMessage() should include error details, got: %s", output)
+	if result.Method != "pgpass" {
+		t.Errorf("PgpassStorage.GetStorageResult() method should be 'pgpass', got: %s", result.Method)
 	}
-	if strings.Contains(output, testPassword) {
-		t.Errorf("PgpassStorage.HandleSaveMessage() should never print actual passwords, got: %s", output)
+	if !strings.Contains(result.Message, "Failed to save password to ~/.pgpass") {
+		t.Errorf("PgpassStorage.GetStorageResult() error should mention pgpass failure, got: %s", result.Message)
+	}
+	if !strings.Contains(result.Message, "permission denied") {
+		t.Errorf("PgpassStorage.GetStorageResult() should include error details, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Errorf("PgpassStorage.GetStorageResult() should never include actual passwords, got: %s", result.Message)
 	}
 }
 
-// Security test: Ensure no storage type ever prints passwords in messages
-func TestHandleSaveMessage_SecurityTest_NoPasswordPrinting(t *testing.T) {
+// Test SavePasswordWithResult function
+func TestSavePasswordWithResult_EmptyPassword(t *testing.T) {
+	service := createTestService("test-service-123")
+
+	result, err := SavePasswordWithResult(service, "")
+	if err != nil {
+		t.Errorf("SavePasswordWithResult() with empty password should not return error, got: %v", err)
+	}
+	if result.Success {
+		t.Errorf("SavePasswordWithResult() with empty password should not be successful, got: %t", result.Success)
+	}
+	if result.Method != "none" {
+		t.Errorf("SavePasswordWithResult() with empty password should have method 'none', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "No password provided") {
+		t.Errorf("SavePasswordWithResult() should mention no password, got: %s", result.Message)
+	}
+}
+
+func TestSavePasswordWithResult_WithPassword(t *testing.T) {
+	service := createTestService("test-service-123")
+
+	// Set up viper to use NoStorage for predictable behavior
+	viper.Set("password_storage", "none")
+	defer viper.Set("password_storage", "")
+
+	result, err := SavePasswordWithResult(service, "test-password")
+	if err != nil {
+		t.Errorf("SavePasswordWithResult() should not return error with NoStorage, got: %v", err)
+	}
+	if result.Success {
+		t.Errorf("SavePasswordWithResult() with NoStorage should not be successful, got: %t", result.Success)
+	}
+	if result.Method != "none" {
+		t.Errorf("SavePasswordWithResult() should have method 'none', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password not saved (--password-storage=none)") {
+		t.Errorf("SavePasswordWithResult() should mention no storage, got: %s", result.Message)
+	}
+	// Make sure password is never in the result
+	if strings.Contains(result.Message, "test-password") {
+		t.Errorf("SavePasswordWithResult() should never include actual passwords, got: %s", result.Message)
+	}
+}
+
+// Security test: Ensure no storage type ever includes passwords in messages
+func TestGetStorageResult_SecurityTest_NoPasswordInResults(t *testing.T) {
 	testPassword := "super-secret-password-123"
 	testError := fmt.Errorf("failed to save %s", testPassword)
 
@@ -491,27 +483,21 @@ func TestHandleSaveMessage_SecurityTest_NoPasswordPrinting(t *testing.T) {
 
 	for _, storage := range storages {
 		t.Run(fmt.Sprintf("%T", storage), func(t *testing.T) {
-			buf := &bytes.Buffer{}
-
 			// Test both success and error cases
-			storage.HandleSaveMessage(nil, testPassword, buf)
-			successOutput := buf.String()
+			successResult := storage.GetStorageResult(nil, testPassword)
+			errorResult := storage.GetStorageResult(testError, testPassword)
 
-			buf.Reset()
-			storage.HandleSaveMessage(testError, testPassword, buf)
-			errorOutput := buf.String()
-
-			// Verify password is never printed in any message
-			if strings.Contains(successOutput, testPassword) {
-				t.Errorf("%T.HandleSaveMessage() success should never print password, got: %s", storage, successOutput)
+			// Verify password is never in any result message
+			if strings.Contains(successResult.Message, testPassword) {
+				t.Errorf("%T.GetStorageResult() success should never include password, got: %s", storage, successResult.Message)
 			}
-			if strings.Contains(errorOutput, testPassword) {
-				t.Errorf("%T.HandleSaveMessage() error should never print password, got: %s", storage, errorOutput)
+			if strings.Contains(errorResult.Message, testPassword) {
+				t.Errorf("%T.GetStorageResult() error should never include password, got: %s", storage, errorResult.Message)
 			}
 
 			// For errors containing passwords, verify they are masked
-			if strings.Contains(errorOutput, "***") {
-				t.Logf("%T.HandleSaveMessage() correctly masked password in error message: %s", storage, errorOutput)
+			if strings.Contains(errorResult.Message, "***") {
+				t.Logf("%T.GetStorageResult() correctly masked password in error message: %s", storage, errorResult.Message)
 			}
 		})
 	}
@@ -528,8 +514,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "valid service with both IDs",
 			service: api.Service{
-				ProjectId: stringPtr("project-123"),
-				ServiceId: stringPtr("service-456"),
+				ProjectId: Ptr("project-123"),
+				ServiceId: Ptr("service-456"),
 			},
 			expected:    "password-project-123-service-456",
 			expectError: false,
@@ -537,7 +523,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing service ID",
 			service: api.Service{
-				ProjectId: stringPtr("project-123"),
+				ProjectId: Ptr("project-123"),
 			},
 			expected:    "",
 			expectError: true,
@@ -545,7 +531,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing project ID",
 			service: api.Service{
-				ServiceId: stringPtr("service-456"),
+				ServiceId: Ptr("service-456"),
 			},
 			expected:    "",
 			expectError: true,

@@ -11,12 +11,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/zalando/go-keyring"
 )
 
 func setupAuthTest(t *testing.T) string {
@@ -30,8 +30,8 @@ func setupAuthTest(t *testing.T) string {
 	}
 
 	// Aggressively clean up any existing keyring entries before starting
-	// getServiceName() will return "tiger-cli-test" during tests automatically
-	keyring.Delete(getServiceName(), username)
+	// Uses a test-specific keyring entry.
+	config.RemoveAPIKeyFromKeyring()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
@@ -52,7 +52,7 @@ func setupAuthTest(t *testing.T) string {
 
 	t.Cleanup(func() {
 		// Clean up test keyring
-		keyring.Delete(getServiceName(), username)
+		config.RemoveAPIKeyFromKeyring()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
 		viper.Reset()
@@ -99,7 +99,7 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 	// Verify API key was stored (try keyring first, then file fallback)
 	// The combined key should be in format "public:secret"
 	expectedAPIKey := "test-public-key:test-secret-key"
-	apiKey, err := keyring.Get(getServiceName(), username)
+	apiKey, err := config.GetAPIKeyFromKeyring()
 	if err != nil {
 		// Keyring failed, check file fallback
 		apiKeyFile := filepath.Join(tmpDir, "api-key")
@@ -143,7 +143,7 @@ func TestAuthLogin_KeyFlags_NoProjectID(t *testing.T) {
 	}
 
 	// Verify no API key was stored since login failed
-	if _, err = getAPIKey(); err == nil {
+	if _, err = config.GetAPIKey(); err == nil {
 		t.Error("API key should not be stored when login fails")
 	}
 }
@@ -172,7 +172,7 @@ func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 
 	// Verify API key was stored (should be combined format)
 	expectedAPIKey := "env-public-key:env-secret-key"
-	storedKey, err := getAPIKey()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 
 	// Verify API key was stored (should be combined format)
 	expectedAPIKey := "env-public-key:env-secret-key"
-	storedKey, err := getAPIKey()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 }
 
 // setupOAuthTest creates a complete OAuth test environment with mock server and browser
-func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) {
+func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
 
@@ -245,6 +245,8 @@ gateway_url: "%s"
 		mockServer.Close()
 		openBrowser = originalOpenBrowser
 	})
+
+	return mockServer.URL
 }
 
 // startMockOAuthServer starts a mock server that handles all OAuth endpoints
@@ -426,7 +428,7 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 }
 
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
-	setupOAuthTest(t, []Project{
+	mockServerURL := setupOAuthTest(t, []Project{
 		{ID: "project-123", Name: "Test Project"},
 	}, "project-123")
 
@@ -437,13 +439,24 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-123\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
+	// Build regex pattern to match the complete output
+	// Auth URL format: http://mockserver/oauth/authorize?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=base64&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3APORT%2Fcallback&response_type=code&state=randomstring
+	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
+		`Opening browser for authentication\.\.\.\n`+
+		`Validating API key\.\.\.\n`+
+		`Successfully logged in and stored API key\n`+
+		`Set default project ID to: project-123\n$`, regexp.QuoteMeta(mockServerURL))
+
+	matched, err := regexp.MatchString(expectedPattern, output)
+	if err != nil {
+		t.Fatalf("Regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
 	// Verify API key was stored
-	storedKey, err := getAPIKey()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
@@ -465,7 +478,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 }
 
 func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
-	setupOAuthTest(t, []Project{
+	mockServerURL := setupOAuthTest(t, []Project{
 		{ID: "project-123", Name: "Test Project 1"},
 		{ID: "project-456", Name: "Test Project 2"},
 		{ID: "project-789", Name: "Test Project 3"},
@@ -490,13 +503,23 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Opening browser for authentication...\nValidating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: project-789\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
+	// Build regex pattern to match the complete output
+	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
+		`Opening browser for authentication\.\.\.\n`+
+		`Validating API key\.\.\.\n`+
+		`Successfully logged in and stored API key\n`+
+		`Set default project ID to: project-789\n$`, regexp.QuoteMeta(mockServerURL))
+
+	matched, err := regexp.MatchString(expectedPattern, output)
+	if err != nil {
+		t.Fatalf("Regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
 	// Verify API key was stored
-	storedKey, err := getAPIKey()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get stored API key: %v", err)
 	}
@@ -539,17 +562,17 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	apiKeyFile := filepath.Join(tmpDir, "api-key")
 
 	// If keyring worked, manually create file scenario by removing keyring and adding file
-	keyring.Delete(getServiceName(), username) // Remove from keyring
+	config.RemoveAPIKeyFromKeyring()
 
 	// Store to file manually to simulate fallback (combined format)
 	expectedAPIKey := "fallback-public:fallback-secret"
-	err = storeAPIKeyToFile(expectedAPIKey)
+	err = config.StoreAPIKeyToFile(expectedAPIKey)
 	if err != nil {
 		t.Fatalf("Failed to store API key to file: %v", err)
 	}
 
 	// Verify file storage works
-	storedKey, err := getAPIKey()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get API key from file fallback: %v", err)
 	}
@@ -586,7 +609,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
 	// Clear any keyring entries to force file-only storage
-	keyring.Delete(getServiceName(), username)
+	config.RemoveAPIKeyFromKeyring()
 
 	// Set environment variables for public key, secret key, and project ID
 	os.Setenv("TIGER_PUBLIC_KEY", "env-file-public")
@@ -608,7 +631,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 
 	// Clear keyring again to ensure we're testing file-only retrieval
-	keyring.Delete(getServiceName(), username)
+	config.RemoveAPIKeyFromKeyring()
 
 	// Verify API key was stored in file (since keyring is cleared)
 	expectedAPIKey := "env-file-public:env-file-secret"
@@ -616,7 +639,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	data, err := os.ReadFile(apiKeyFile)
 	if err != nil {
 		// If file doesn't exist, the keyring might have worked, so manually ensure file storage
-		err = storeAPIKeyToFile(expectedAPIKey)
+		err = config.StoreAPIKeyToFile(expectedAPIKey)
 		if err != nil {
 			t.Fatalf("Failed to store API key to file: %v", err)
 		}
@@ -631,7 +654,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 
 	// Verify getAPIKey works with file-only storage
-	storedKey, err := getAPIKeyFromFile()
+	storedKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get API key from file: %v", err)
 	}
@@ -644,7 +667,7 @@ func TestAuthWhoami_LoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
 	// Store API key first
-	err := storeAPIKey("test-api-key-789")
+	err := config.StoreAPIKey("test-api-key-789")
 	if err != nil {
 		t.Fatalf("Failed to store API key: %v", err)
 	}
@@ -670,7 +693,7 @@ func TestAuthWhoami_NotLoggedIn(t *testing.T) {
 	}
 
 	// Error should indicate not logged in
-	if err.Error() != errNotLoggedIn.Error() {
+	if err.Error() != config.ErrNotLoggedIn.Error() {
 		t.Errorf("Expected 'not logged in' error, got: %v", err)
 	}
 }
@@ -679,13 +702,13 @@ func TestAuthLogout_Success(t *testing.T) {
 	setupAuthTest(t)
 
 	// Store API key first
-	err := storeAPIKey("test-api-key-logout")
+	err := config.StoreAPIKey("test-api-key-logout")
 	if err != nil {
 		t.Fatalf("Failed to store API key: %v", err)
 	}
 
 	// Verify API key is stored
-	_, err = getAPIKey()
+	_, err = config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("API key should be stored: %v", err)
 	}
@@ -701,7 +724,7 @@ func TestAuthLogout_Success(t *testing.T) {
 	}
 
 	// Verify API key is removed
-	_, err = getAPIKey()
+	_, err = config.GetAPIKey()
 	if err == nil {
 		t.Fatal("API key should be removed after logout")
 	}
@@ -710,7 +733,7 @@ func TestAuthLogout_Success(t *testing.T) {
 func TestStoreAPIKeyToFile(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
-	err := storeAPIKeyToFile("file-test-key")
+	err := config.StoreAPIKeyToFile("file-test-key")
 	if err != nil {
 		t.Fatalf("Failed to store API key to file: %v", err)
 	}
@@ -749,7 +772,7 @@ func TestGetAPIKeyFromFile(t *testing.T) {
 	}
 
 	// Get API key from file
-	apiKey, err := getAPIKeyFromFile()
+	apiKey, err := config.GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get API key from file: %v", err)
 	}
@@ -763,7 +786,7 @@ func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
 	setupAuthTest(t)
 
 	// Try to get API key when file doesn't exist
-	_, err := getAPIKeyFromFile()
+	_, err := config.GetAPIKey()
 	if err == nil {
 		t.Fatal("Expected error when API key file doesn't exist")
 	}
@@ -784,7 +807,7 @@ func TestRemoveAPIKeyFromFile(t *testing.T) {
 	}
 
 	// Remove API key file
-	err = removeAPIKeyFromFile()
+	err = config.RemoveAPIKeyFromFile()
 	if err != nil {
 		t.Fatalf("Failed to remove API key file: %v", err)
 	}
@@ -799,7 +822,7 @@ func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
 	setupAuthTest(t)
 
 	// Try to remove API key file when it doesn't exist (should not error)
-	err := removeAPIKeyFromFile()
+	err := config.RemoveAPIKeyFromFile()
 	if err != nil {
 		t.Fatalf("Should not error when removing non-existent file: %v", err)
 	}

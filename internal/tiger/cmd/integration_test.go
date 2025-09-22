@@ -98,7 +98,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	tmpDir := setupIntegrationTest(t)
 	t.Logf("Using temporary config directory: %s", tmpDir)
 
-
 	// Generate unique service name to avoid conflicts
 	serviceName := fmt.Sprintf("integration-test-%d", time.Now().Unix())
 	var serviceID string

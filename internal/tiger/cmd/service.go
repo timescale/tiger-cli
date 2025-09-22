@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -15,11 +14,12 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
 	// getAPIKeyForService can be overridden for testing
-	getAPIKeyForService = getAPIKey
+	getAPIKeyForService = config.GetAPIKey
 )
 
 // buildServiceCmd creates the main service command with all subcommands
@@ -281,7 +281,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
-				createServiceName = fmt.Sprintf("db-%d", rand.Intn(10000))
+				createServiceName = util.GenerateServiceName()
 			}
 			if createServiceType == "" {
 				return fmt.Errorf("service type is required (--type)")
@@ -298,7 +298,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			memoryFlagSet := cmd.Flags().Changed("memory")
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGbs, err := validateAndNormalizeCPUMemory(createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet)
+			cpuMillis, memoryGbs, err := util.ValidateAndNormalizeCPUMemory(
+				createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet,
+			)
 			if err != nil {
 				return err
 			}
@@ -313,18 +315,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.SilenceUsage = true
 
 			// Validate service type
-			validTypes := []string{"timescaledb", "postgres", "vector"}
+			if !util.IsValidServiceType(createServiceType) {
+				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(util.ValidServiceTypes(), ", "))
+			}
 			serviceTypeUpper := strings.ToUpper(createServiceType)
-			isValidType := false
-			for _, validType := range validTypes {
-				if serviceTypeUpper == strings.ToUpper(validType) {
-					isValidType = true
-					break
-				}
-			}
-			if !isValidType {
-				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(validTypes, ", "))
-			}
 
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
@@ -372,7 +366,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				service := *resp.JSON202
-				serviceID := derefString(service.ServiceId)
+				serviceID := util.Deref(service.ServiceId)
 				fmt.Fprintf(cmd.OutOrStdout(), "✅ Service creation request accepted!\n")
 				fmt.Fprintf(cmd.OutOrStdout(), "📋 Service ID: %s\n", serviceID)
 
@@ -420,7 +414,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 	// Add flags
 	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	cmd.Flags().StringVar(&createServiceType, "type", "timescaledb", "Service type (timescaledb, postgres, vector)")
+	cmd.Flags().StringVar(&createServiceType, "type", util.ServiceTypeTimescaleDB, fmt.Sprintf("Service type (%s)", strings.Join(util.ValidServiceTypes(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
 	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
 	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
@@ -530,11 +524,7 @@ Examples:
 				// Get the service details for password storage
 				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-					if err := SavePasswordWithMessages(*serviceResp.JSON200, password, cmd.OutOrStdout()); err != nil {
-						// Password saving failed, but password update succeeded
-						// The error message was already displayed by SavePasswordWithMessages
-						// We don't want to fail the entire password update for this
-					}
+					handlePasswordSaving(*serviceResp.JSON200, password, cmd)
 				}
 
 				return nil
@@ -600,11 +590,11 @@ func outputServiceTable(cmd *cobra.Command, service api.Service) error {
 	table.Header("PROPERTY", "VALUE")
 
 	// Basic service information
-	table.Append("Service ID", derefString(service.ServiceId))
-	table.Append("Name", derefString(service.Name))
-	table.Append("Status", formatDeployStatus(service.Status))
-	table.Append("Type", formatServiceType(service.ServiceType))
-	table.Append("Region", derefString(service.RegionCode))
+	table.Append("Service ID", util.Deref(service.ServiceId))
+	table.Append("Name", util.Deref(service.Name))
+	table.Append("Status", util.DerefStr(service.Status))
+	table.Append("Type", util.DerefStr(service.ServiceType))
+	table.Append("Region", util.Deref(service.RegionCode))
 
 	// Resource information from Resources slice
 	if service.Resources != nil && len(*service.Resources) > 0 {
@@ -674,11 +664,11 @@ func outputServicesTable(cmd *cobra.Command, services []api.Service) error {
 
 	for _, service := range services {
 		table.Append(
-			derefString(service.ServiceId),
-			derefString(service.Name),
-			formatDeployStatus(service.Status),
-			formatServiceType(service.ServiceType),
-			derefString(service.RegionCode),
+			util.Deref(service.ServiceId),
+			util.Deref(service.Name),
+			util.DerefStr(service.Status),
+			util.DerefStr(service.ServiceType),
+			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
 		)
 	}
@@ -709,36 +699,12 @@ func sanitizeServicesForOutput(services []api.Service) []map[string]interface{} 
 	return sanitized
 }
 
-// derefString safely dereferences a string pointer, returning empty string if nil
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // formatTimePtr formats a time pointer, returning empty string if nil
 func formatTimePtr(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
 	return t.Format("2006-01-02 15:04")
-}
-
-// formatDeployStatus formats a DeployStatus pointer, returning empty string if nil
-func formatDeployStatus(status *api.DeployStatus) string {
-	if status == nil {
-		return ""
-	}
-	return string(*status)
-}
-
-// formatServiceType formats a ServiceType pointer, returning empty string if nil
-func formatServiceType(serviceType *api.ServiceType) string {
-	if serviceType == nil {
-		return ""
-	}
-	return string(*serviceType)
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
@@ -766,7 +732,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			}
 
 			service := *resp.JSON200
-			status := formatDeployStatus(service.Status)
+			status := util.DerefStr(service.Status)
 
 			switch status {
 			case "READY":
@@ -783,10 +749,24 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 // handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
-	if err := SavePasswordWithMessages(service, initialPassword, cmd.OutOrStdout()); err != nil {
-		// Password saving failed, but service creation succeeded
-		// The error message was already displayed by SavePasswordWithMessages
-		// We don't want to fail the entire service creation for this
+	// Note: We don't fail the service creation if password saving fails
+	// The error is handled by displaying the appropriate message below
+	result, _ := util.SavePasswordWithResult(service, initialPassword)
+
+	if result.Method == "none" && result.Message == "No password provided" {
+		// Don't output anything for empty password
+		return
+	}
+
+	// Output the message with appropriate emoji
+	if result.Success {
+		fmt.Fprintf(cmd.OutOrStdout(), "🔐 %s\n", result.Message)
+	} else {
+		if result.Method == "none" {
+			fmt.Fprintf(cmd.OutOrStdout(), "💡 %s\n", result.Message)
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s\n", result.Message)
+		}
 	}
 }
 
@@ -804,81 +784,6 @@ func setDefaultService(serviceID string, cmd *cobra.Command) error {
 
 	fmt.Fprintf(cmd.OutOrStdout(), "🎯 Set service '%s' as default service.\n", serviceID)
 	return nil
-}
-
-// CPUMemoryConfig represents an allowed CPU/Memory configuration
-type CPUMemoryConfig struct {
-	CPUMillis int     // CPU in millicores
-	MemoryGbs float64 // Memory in GB
-}
-
-// getAllowedCPUMemoryConfigs returns the allowed CPU/Memory configurations from the spec
-func getAllowedCPUMemoryConfigs() []CPUMemoryConfig {
-	return []CPUMemoryConfig{
-		{CPUMillis: 500, MemoryGbs: 2},     // 0.5 CPU, 2GB
-		{CPUMillis: 1000, MemoryGbs: 4},    // 1 CPU, 4GB
-		{CPUMillis: 2000, MemoryGbs: 8},    // 2 CPU, 8GB
-		{CPUMillis: 4000, MemoryGbs: 16},   // 4 CPU, 16GB
-		{CPUMillis: 8000, MemoryGbs: 32},   // 8 CPU, 32GB
-		{CPUMillis: 16000, MemoryGbs: 64},  // 16 CPU, 64GB
-		{CPUMillis: 32000, MemoryGbs: 128}, // 32 CPU, 128GB
-	}
-}
-
-// validateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic
-func validateAndNormalizeCPUMemory(cpuMillis int, memoryGbs float64, cpuFlagSet, memoryFlagSet bool) (int, float64, error) {
-	configs := getAllowedCPUMemoryConfigs()
-
-	// If both CPU and memory flags were explicitly set, validate they match an allowed configuration
-	if cpuFlagSet && memoryFlagSet {
-		for _, config := range configs {
-			if config.CPUMillis == cpuMillis && config.MemoryGbs == memoryGbs {
-				return cpuMillis, memoryGbs, nil
-			}
-		}
-		// If no exact match, provide helpful error
-		return 0, 0, fmt.Errorf("invalid CPU/Memory combination: %dm CPU and %.0fGB memory. Allowed combinations: %s",
-			cpuMillis, memoryGbs, formatAllowedCombinations(configs))
-	}
-
-	// If only CPU flag was explicitly set, find matching memory and auto-configure
-	if cpuFlagSet && !memoryFlagSet {
-		for _, config := range configs {
-			if config.CPUMillis == cpuMillis {
-				return cpuMillis, config.MemoryGbs, nil
-			}
-		}
-		return 0, 0, fmt.Errorf("invalid CPU allocation: %dm. Allowed CPU values: %s",
-			cpuMillis, formatAllowedCPUValues(configs))
-	}
-
-	// If only memory flag was explicitly set, find matching CPU and auto-configure
-	if !cpuFlagSet && memoryFlagSet {
-		for _, config := range configs {
-			if config.MemoryGbs == memoryGbs {
-				return config.CPUMillis, memoryGbs, nil
-			}
-		}
-		return 0, 0, fmt.Errorf("invalid memory allocation: %.0fGB. Allowed memory values: %s",
-			memoryGbs, formatAllowedMemoryValues(configs))
-	}
-
-	// If neither flag was explicitly set, use default values (0.5 CPU, 2GB)
-	return 500, 2, nil
-}
-
-// formatAllowedCombinations returns a user-friendly string of allowed CPU/Memory combinations
-func formatAllowedCombinations(configs []CPUMemoryConfig) string {
-	var combinations []string
-	for _, config := range configs {
-		cpuCores := float64(config.CPUMillis) / 1000
-		if cpuCores == float64(int(cpuCores)) {
-			combinations = append(combinations, fmt.Sprintf("%.0f CPU/%.0fGB", cpuCores, config.MemoryGbs))
-		} else {
-			combinations = append(combinations, fmt.Sprintf("%.1f CPU/%.0fGB", cpuCores, config.MemoryGbs))
-		}
-	}
-	return strings.Join(combinations, ", ")
 }
 
 // buildServiceDeleteCmd creates the delete subcommand
@@ -1039,27 +944,4 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
 		}
 	}
-}
-
-// formatAllowedCPUValues returns a user-friendly string of allowed CPU values
-func formatAllowedCPUValues(configs []CPUMemoryConfig) string {
-	var cpuValues []string
-	for _, config := range configs {
-		cpuCores := float64(config.CPUMillis) / 1000
-		if cpuCores == float64(int(cpuCores)) {
-			cpuValues = append(cpuValues, fmt.Sprintf("%.0f (%.0fm)", cpuCores, float64(config.CPUMillis)))
-		} else {
-			cpuValues = append(cpuValues, fmt.Sprintf("%.1f (%.0fm)", cpuCores, float64(config.CPUMillis)))
-		}
-	}
-	return strings.Join(cpuValues, ", ")
-}
-
-// formatAllowedMemoryValues returns a user-friendly string of allowed memory values
-func formatAllowedMemoryValues(configs []CPUMemoryConfig) string {
-	var memoryValues []string
-	for _, config := range configs {
-		memoryValues = append(memoryValues, fmt.Sprintf("%.0fGB", config.MemoryGbs))
-	}
-	return strings.Join(memoryValues, ", ")
 }

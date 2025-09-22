@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func setupDBTest(t *testing.T) string {
@@ -130,8 +131,8 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// Service without connection pooler
 	service := api.Service{
 		Endpoint: &api.Endpoint{
-			Host: stringPtr("test-host.tigerdata.com"),
-			Port: intPtr(5432),
+			Host: util.Ptr("test-host.tigerdata.com"),
+			Port: util.Ptr(5432),
 		},
 		ConnectionPooler: nil, // No pooler available
 	}
@@ -349,7 +350,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := GetPasswordStorage()
+	storage := util.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -440,7 +441,7 @@ func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-connection-config-password-789"
-	storage := GetPasswordStorage()
+	storage := util.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -795,8 +796,8 @@ func TestBuildConnectionString(t *testing.T) {
 			name: "Basic connection string",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
-					Port: intPtr(5432),
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 			},
 			pooled:         false,
@@ -808,8 +809,8 @@ func TestBuildConnectionString(t *testing.T) {
 			name: "Connection string with custom role",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
-					Port: intPtr(5432),
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 			},
 			pooled:         false,
@@ -821,7 +822,7 @@ func TestBuildConnectionString(t *testing.T) {
 			name: "Connection string with default port",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
+					Host: util.Ptr("test-host.tigerdata.com"),
 					Port: nil, // Should use default 5432
 				},
 			},
@@ -834,13 +835,13 @@ func TestBuildConnectionString(t *testing.T) {
 			name: "Pooled connection string",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: stringPtr("direct-host.tigerdata.com"),
-					Port: intPtr(5432),
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 				ConnectionPooler: &api.ConnectionPooler{
 					Endpoint: &api.Endpoint{
-						Host: stringPtr("pooler-host.tigerdata.com"),
-						Port: intPtr(6432),
+						Host: util.Ptr("pooler-host.tigerdata.com"),
+						Port: util.Ptr(6432),
 					},
 				},
 			},
@@ -853,8 +854,8 @@ func TestBuildConnectionString(t *testing.T) {
 			name: "Pooled connection fallback to direct when pooler unavailable",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: stringPtr("direct-host.tigerdata.com"),
-					Port: intPtr(5432),
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 				ConnectionPooler: nil, // No pooler available
 			},
@@ -878,7 +879,7 @@ func TestBuildConnectionString(t *testing.T) {
 			service: api.Service{
 				Endpoint: &api.Endpoint{
 					Host: nil,
-					Port: intPtr(5432),
+					Port: util.Ptr(5432),
 				},
 			},
 			pooled:      false,
@@ -925,15 +926,6 @@ func TestBuildConnectionString(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper functions for creating pointers
-func stringPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int) *int {
-	return &i
 }
 
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {

@@ -1,22 +1,22 @@
-package cmd
+package util
 
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/zalando/go-keyring"
 )
 
 // getPasswordServiceName returns the service name for password storage
 // Uses the same service name as auth for consistency
 func getPasswordServiceName() string {
-	return getServiceName()
+	return config.GetServiceName()
 }
 
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords
@@ -44,12 +44,19 @@ func sanitizeErrorMessage(err error, password string) string {
 	return errorMsg
 }
 
+// PasswordStorageResult contains the result of password storage operations
+type PasswordStorageResult struct {
+	Success bool   `json:"success"`
+	Method  string `json:"method"`  // "keyring", "pgpass", or "none"
+	Message string `json:"message"` // Human-readable message
+}
+
 // PasswordStorage defines the interface for password storage implementations
 type PasswordStorage interface {
 	Save(service api.Service, password string) error
 	Get(service api.Service) (string, error)
 	Remove(service api.Service) error
-	HandleSaveMessage(err error, password string, output io.Writer)
+	GetStorageResult(err error, password string) PasswordStorageResult
 }
 
 // KeyringStorage implements password storage using system keyring
@@ -82,12 +89,19 @@ func (k *KeyringStorage) Remove(service api.Service) error {
 	return keyring.Delete(getPasswordServiceName(), username)
 }
 
-func (k *KeyringStorage) HandleSaveMessage(err error, password string, output io.Writer) {
+func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordStorageResult {
 	if err != nil {
 		sanitizedErr := sanitizeErrorMessage(err, password)
-		fmt.Fprintf(output, "⚠️  Failed to save password to keyring: %s\n", sanitizedErr)
-	} else {
-		fmt.Fprintf(output, "🔐 Password saved to system keyring for automatic authentication\n")
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "keyring",
+			Message: fmt.Sprintf("Failed to save password to keyring: %s", sanitizedErr),
+		}
+	}
+	return PasswordStorageResult{
+		Success: true,
+		Method:  "keyring",
+		Message: "Password saved to system keyring for automatic authentication",
 	}
 }
 
@@ -265,12 +279,19 @@ func (p *PgpassStorage) removeEntry(pgpassPath, host, port, username string) err
 	return nil
 }
 
-func (p *PgpassStorage) HandleSaveMessage(err error, password string, output io.Writer) {
+func (p *PgpassStorage) GetStorageResult(err error, password string) PasswordStorageResult {
 	if err != nil {
 		sanitizedErr := sanitizeErrorMessage(err, password)
-		fmt.Fprintf(output, "⚠️  Failed to save password to ~/.pgpass: %s\n", sanitizedErr)
-	} else {
-		fmt.Fprintf(output, "🔐 Password saved to ~/.pgpass for automatic authentication\n")
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "pgpass",
+			Message: fmt.Sprintf("Failed to save password to ~/.pgpass: %s", sanitizedErr),
+		}
+	}
+	return PasswordStorageResult{
+		Success: true,
+		Method:  "pgpass",
+		Message: "Password saved to ~/.pgpass for automatic authentication",
 	}
 }
 
@@ -289,8 +310,12 @@ func (n *NoStorage) Remove(service api.Service) error {
 	return nil // Do nothing
 }
 
-func (n *NoStorage) HandleSaveMessage(err error, password string, output io.Writer) {
-	fmt.Fprintf(output, "💡 Password not saved (--password-storage=none). Make sure to store it securely.\n")
+func (n *NoStorage) GetStorageResult(err error, password string) PasswordStorageResult {
+	return PasswordStorageResult{
+		Success: false, // Not really an error, but password wasn't saved
+		Method:  "none",
+		Message: "Password not saved (--password-storage=none). Make sure to store it securely.",
+	}
 }
 
 // GetPasswordStorage returns the appropriate PasswordStorage implementation based on configuration
@@ -308,15 +333,19 @@ func GetPasswordStorage() PasswordStorage {
 	}
 }
 
-// SavePasswordWithMessages handles saving a password and displaying appropriate messages
-func SavePasswordWithMessages(service api.Service, password string, output io.Writer) error {
+// SavePasswordWithResult handles saving a password and returns both error and result info
+func SavePasswordWithResult(service api.Service, password string) (PasswordStorageResult, error) {
 	if password == "" {
-		return nil
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "none",
+			Message: "No password provided",
+		}, nil
 	}
 
 	storage := GetPasswordStorage()
 	err := storage.Save(service, password)
-	storage.HandleSaveMessage(err, password, output)
+	result := storage.GetStorageResult(err, password)
 
-	return err
+	return result, err
 }

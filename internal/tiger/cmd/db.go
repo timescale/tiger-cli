@@ -14,11 +14,12 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
 	// getAPIKeyForDB can be overridden for testing
-	getAPIKeyForDB = getAPIKey
+	getAPIKeyForDB = config.GetAPIKey
 )
 
 func buildDbConnectionStringCmd() *cobra.Command {
@@ -377,8 +378,8 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 
 	// Only set PGPASSWORD for keyring storage method
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := GetPasswordStorage()
-	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+	storage := util.GetPasswordStorage()
+	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
@@ -400,8 +401,8 @@ func buildConnectionConfig(connectionString string, service api.Service) (*pgx.C
 
 	// Set password from keyring storage if available
 	// pgpass storage works automatically since pgx checks ~/.pgpass file
-	storage := GetPasswordStorage()
-	if _, isKeyring := storage.(*KeyringStorage); isKeyring {
+	storage := util.GetPasswordStorage()
+	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service); err == nil && password != "" {
 			config.Password = password
 		}
