@@ -106,7 +106,7 @@ Create a new database service.
 - `region` (string, optional): Region code - default: us-east-1
 - `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB") - default: "0.5 CPU/2GB"
 - `replicas` (number, optional): Number of high-availability replicas - default: 0
-- `wait` (boolean, optional): Wait for service to be ready - default: true
+- `wait` (boolean, optional): Wait for service to be ready - default: false
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
 
 **Returns:** Service object with creation status and details.

@@ -116,9 +116,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Recommended for scripting."
-	schema.Properties["wait"].Default = util.Must(json.Marshal(true))
-	schema.Properties["wait"].Examples = []any{true, false}
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Set to true only if you need to use the service immediately after the tool call."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
 
 	schema.Properties["timeout"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
 	schema.Properties["timeout"].Minimum = util.Ptr(0.0)
@@ -369,8 +369,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 			}
 		}
 
-		// If wait is requested (the default), wait for service to be ready
-		if input.Wait == nil || *input.Wait {
+		// If wait is explicitly requested, wait for service to be ready
+		if input.Wait != nil && *input.Wait {
 			timeout := 30 * time.Minute
 			if input.Timeout != nil {
 				timeout = time.Duration(*input.Timeout) * time.Minute

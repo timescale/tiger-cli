@@ -112,7 +112,9 @@ Perfect for:
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud.
 
-This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. The service creation process may take several minutes to complete.
+This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+
+Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
 
 IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
 
