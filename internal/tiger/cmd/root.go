@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -14,7 +13,7 @@ import (
 )
 
 func buildRootCmd() *cobra.Command {
-	var cfgFile string
+	var configDir string
 	var debug bool
 	var output string
 	var projectID string
@@ -60,24 +59,17 @@ tiger auth login
 
 	// Setup configuration initialization
 	initConfigFunc := func() {
-		// cfgFile now always has a value (either default or user-specified)
-		if err := config.SetupViper(cfgFile); err != nil {
+		configDirFlag := cmd.PersistentFlags().Lookup("config-dir")
+		if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
 			fmt.Fprintf(os.Stderr, "Error setting up config: %v\n", err)
 			os.Exit(1)
-		}
-
-		if debug {
-			if configFile := viper.ConfigFileUsed(); configFile != "" {
-				fmt.Fprintln(os.Stderr, "Using config file:", configFile)
-			}
 		}
 	}
 
 	cobra.OnInitialize(initConfigFunc)
 
 	// Add persistent flags
-	defaultConfigFile := filepath.Join(config.GetConfigDir(), config.ConfigFileName)
-	cmd.PersistentFlags().StringVar(&cfgFile, "config", defaultConfigFile, "config file")
+	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	cmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (json, yaml, table)")
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")

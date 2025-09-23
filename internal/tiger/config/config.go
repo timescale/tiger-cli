@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -27,13 +28,16 @@ const (
 	DefaultOutput     = "table"
 	DefaultAnalytics  = true
 	DefaultDebug      = false
-	DefaultConfigDir  = "~/.config/tiger"
 	ConfigFileName    = "config.yaml"
 )
 
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
-func SetupViper(configFile string) error {
+func SetupViper(configDir string) error {
+	// Configure viper to read from config file
+	configFile := GetConfigFile(configDir)
 	viper.SetConfigFile(configFile)
+
+	// Configure viper to read from env vars
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
 
@@ -53,6 +57,11 @@ func SetupViper(configFile string) error {
 		if err := viper.ReadInConfig(); err != nil {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
+
+		// Configure viper to watch for file changes and update its in-memory
+		// representation of the config. Note that this won't automatically
+		// update [Config] structs already returned from [Load].
+		viper.WatchConfig()
 	}
 	// If file doesn't exist, that's okay - we'll use defaults and env vars
 
@@ -66,7 +75,7 @@ func Load() (*Config, error) {
 		ConfigDir: GetConfigDir(),
 	}
 
-	// Use the global Viper instance that's already configured by initConfig() and bindFlags()
+	// Use the global Viper instance that's already configured by SetupViper
 	// This gives us proper precedence: CLI flags > env vars > config file > defaults
 	if err := viper.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
@@ -76,12 +85,10 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) Save() error {
-	configDir := c.ConfigDir
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(c.ConfigDir, 0755); err != nil {
 		return fmt.Errorf("error creating config directory: %w", err)
 	}
-
-	configFile := filepath.Join(configDir, ConfigFileName)
+	configFile := GetConfigFile(c.ConfigDir)
 
 	viper.Set("api_url", c.APIURL)
 	viper.Set("console_url", c.ConsoleURL)
@@ -177,17 +184,36 @@ func (c *Config) Reset() error {
 	return c.Save()
 }
 
-func GetConfigDir() string {
-	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
-		return expandPath(dir)
-	}
+func GetConfigFile(dir string) string {
+	return filepath.Join(dir, ConfigFileName)
+}
 
+// TODO: This function is currently used to get the directory that the API
+// key fallback file should be stored in (see api_key.go). But ideally, those
+// functions would take a Config struct and use the ConfigDir field instead.
+func GetConfigDir() string {
+	return filepath.Dir(viper.ConfigFileUsed())
+}
+
+func GetDefaultConfigDir() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "./.config/tiger"
 	}
 
 	return filepath.Join(homeDir, ".config", "tiger")
+}
+
+func GetEffectiveConfigDir(configDirFlag *pflag.Flag) string {
+	if configDirFlag.Changed {
+		return expandPath(configDirFlag.Value.String())
+	}
+
+	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
+		return expandPath(dir)
+	}
+
+	return GetDefaultConfigDir()
 }
 
 func expandPath(path string) string {

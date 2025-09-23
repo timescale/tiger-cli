@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -72,7 +71,7 @@ service_id: test-service
 output: table
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -98,6 +97,9 @@ analytics: false
 	if !strings.Contains(output, "false") {
 		t.Errorf("Output should contain analytics setting, got: %s", output)
 	}
+	if !strings.Contains(output, tmpDir) {
+		t.Errorf("Output should contain config directory %s, got: %s", tmpDir, output)
+	}
 }
 
 func TestConfigShow_JSONOutput(t *testing.T) {
@@ -109,7 +111,7 @@ project_id: json-project
 output: json
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -138,6 +140,9 @@ analytics: true
 	if result["analytics"] != true {
 		t.Errorf("Expected analytics true, got %v", result["analytics"])
 	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
+	}
 }
 
 func TestConfigShow_YAMLOutput(t *testing.T) {
@@ -149,7 +154,7 @@ project_id: yaml-project
 output: yaml
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -178,6 +183,9 @@ analytics: false
 	if result["analytics"] != false {
 		t.Errorf("Expected analytics false, got %v", result["analytics"])
 	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
+	}
 }
 
 func TestConfigShow_EmptyValues(t *testing.T) {
@@ -187,7 +195,7 @@ func TestConfigShow_EmptyValues(t *testing.T) {
 	configContent := `output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -200,6 +208,55 @@ analytics: true
 	// Check that empty values show "(not set)"
 	if !strings.Contains(output, "(not set)") {
 		t.Error("Output should contain '(not set)' for empty values")
+	}
+}
+
+func TestConfigShow_ConfigDirFlag(t *testing.T) {
+	setupConfigTest(t)
+
+	// Create a different temporary directory for the --config-dir flag, which
+	// should override the value provided via the TIGER_CONFIG_DIR env var in
+	// setupConfigTest
+	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDir)
+	})
+
+	// Create a config file with test data in the specified directory
+	configContent := `api_url: https://flag-test.api.com/v1
+project_id: flag-test-project
+output: json
+analytics: false
+`
+	configFile := config.GetConfigFile(tmpDir)
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Execute config show with --config-dir flag
+	output, err := executeConfigCommand("--config-dir", tmpDir, "config", "show")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	// Parse JSON output and verify values
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v", err)
+	}
+
+	if result["project_id"] != "flag-test-project" {
+		t.Errorf("Expected project_id 'flag-test-project', got %v", result["project_id"])
+	}
+	if result["api_url"] != "https://flag-test.api.com/v1" {
+		t.Errorf("Expected api_url 'https://flag-test.api.com/v1', got %v", result["api_url"])
+	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
 	}
 }
 
@@ -309,6 +366,43 @@ func TestConfigSet_WrongArgs(t *testing.T) {
 	_, err = executeConfigCommand("config", "set", "key", "value", "extra")
 	if err == nil {
 		t.Error("Expected command to fail with too many arguments")
+	}
+}
+
+func TestConfigSet_ConfigDirFlag(t *testing.T) {
+	setupConfigTest(t)
+
+	// Create a different temporary directory for the --config-dir flag, which
+	// should override the value provided via the TIGER_CONFIG_DIR env var in
+	// setupConfigTest
+	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDir)
+	})
+
+	// Execute config set with --config-dir flag
+	if _, err := executeConfigCommand("--config-dir", tmpDir, "config", "set", "project_id", "flag-set-project"); err != nil {
+		t.Fatalf("Config set command failed: %v", err)
+	}
+
+	// Verify the config file was created in the specified directory
+	configFile := config.GetConfigFile(tmpDir)
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		t.Fatalf("Config file should exist at %s", configFile)
+	}
+
+	// Read the config file and verify the value was saved
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	if !strings.Contains(string(content), "project_id: flag-set-project") {
+		t.Errorf("Config file should contain 'project_id: flag-set-project', got: %s", string(content))
 	}
 }
 

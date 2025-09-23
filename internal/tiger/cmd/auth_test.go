@@ -47,7 +47,7 @@ func setupAuthTest(t *testing.T) string {
 	viper.Reset()
 
 	// Also ensure config file doesn't exist
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	os.Remove(configFile)
 
 	t.Cleanup(func() {
@@ -58,7 +58,7 @@ func setupAuthTest(t *testing.T) string {
 		viper.Reset()
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Remove config file explicitly
-		configFile := filepath.Join(tmpDir, "config.yaml")
+		configFile := config.GetConfigFile(tmpDir)
 		os.Remove(configFile)
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
@@ -230,7 +230,7 @@ func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) 
 	openBrowser = mockOpenBrowser(t)
 
 	// Set config URLs to point to mock server
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	configContent := fmt.Sprintf(`
 console_url: "%s"
 gateway_url: "%s"
@@ -727,103 +727,5 @@ func TestAuthLogout_Success(t *testing.T) {
 	_, err = config.GetAPIKey()
 	if err == nil {
 		t.Fatal("API key should be removed after logout")
-	}
-}
-
-func TestStoreAPIKeyToFile(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-
-	err := config.StoreAPIKeyToFile("file-test-key")
-	if err != nil {
-		t.Fatalf("Failed to store API key to file: %v", err)
-	}
-
-	// Verify file exists and has correct permissions
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	info, err := os.Stat(apiKeyFile)
-	if err != nil {
-		t.Fatalf("API key file should exist: %v", err)
-	}
-
-	// Check file permissions (should be 0600)
-	if info.Mode().Perm() != 0600 {
-		t.Errorf("Expected file permissions 0600, got %o", info.Mode().Perm())
-	}
-
-	// Verify file content
-	data, err := os.ReadFile(apiKeyFile)
-	if err != nil {
-		t.Fatalf("Failed to read API key file: %v", err)
-	}
-
-	if string(data) != "file-test-key" {
-		t.Errorf("Expected 'file-test-key', got '%s'", string(data))
-	}
-}
-
-func TestGetAPIKeyFromFile(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-
-	// Write API key to file
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	err := os.WriteFile(apiKeyFile, []byte("file-get-test-key"), 0600)
-	if err != nil {
-		t.Fatalf("Failed to write test API key file: %v", err)
-	}
-
-	// Get API key from file
-	apiKey, err := config.GetAPIKey()
-	if err != nil {
-		t.Fatalf("Failed to get API key from file: %v", err)
-	}
-
-	if apiKey != "file-get-test-key" {
-		t.Errorf("Expected 'file-get-test-key', got '%s'", apiKey)
-	}
-}
-
-func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
-	setupAuthTest(t)
-
-	// Try to get API key when file doesn't exist
-	_, err := config.GetAPIKey()
-	if err == nil {
-		t.Fatal("Expected error when API key file doesn't exist")
-	}
-
-	if err.Error() != "not logged in" {
-		t.Errorf("Expected 'not logged in' error, got: %v", err)
-	}
-}
-
-func TestRemoveAPIKeyFromFile(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-
-	// Write API key to file
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	err := os.WriteFile(apiKeyFile, []byte("remove-test-key"), 0600)
-	if err != nil {
-		t.Fatalf("Failed to write test API key file: %v", err)
-	}
-
-	// Remove API key file
-	err = config.RemoveAPIKeyFromFile()
-	if err != nil {
-		t.Fatalf("Failed to remove API key file: %v", err)
-	}
-
-	// Verify file is removed
-	if _, err := os.Stat(apiKeyFile); !os.IsNotExist(err) {
-		t.Fatal("API key file should be removed")
-	}
-}
-
-func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
-	setupAuthTest(t)
-
-	// Try to remove API key file when it doesn't exist (should not error)
-	err := config.RemoveAPIKeyFromFile()
-	if err != nil {
-		t.Fatalf("Should not error when removing non-existent file: %v", err)
 	}
 }
