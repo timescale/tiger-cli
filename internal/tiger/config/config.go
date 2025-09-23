@@ -4,31 +4,36 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	APIURL     string `mapstructure:"api_url" yaml:"api_url"`
-	ConsoleURL string `mapstructure:"console_url" yaml:"console_url"`
-	GatewayURL string `mapstructure:"gateway_url" yaml:"gateway_url"`
-	ProjectID  string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID  string `mapstructure:"service_id" yaml:"service_id"`
-	Output     string `mapstructure:"output" yaml:"output"`
-	Analytics  bool   `mapstructure:"analytics" yaml:"analytics"`
-	ConfigDir  string `mapstructure:"config_dir" yaml:"-"`
-	Debug      bool   `mapstructure:"debug" yaml:"debug"`
+	APIURL         string `mapstructure:"api_url" yaml:"api_url"`
+	ConsoleURL     string `mapstructure:"console_url" yaml:"console_url"`
+	GatewayURL     string `mapstructure:"gateway_url" yaml:"gateway_url"`
+	DocsMCPURL     string `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
+	DocsMCPEnabled bool   `mapstructure:"docs_mcp_enabled" yaml:"docs_mcp_enabled"`
+	ProjectID      string `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID      string `mapstructure:"service_id" yaml:"service_id"`
+	Output         string `mapstructure:"output" yaml:"output"`
+	Analytics      bool   `mapstructure:"analytics" yaml:"analytics"`
+	ConfigDir      string `mapstructure:"config_dir" yaml:"-"`
+	Debug          bool   `mapstructure:"debug" yaml:"debug"`
 }
 
 const (
-	DefaultAPIURL     = "https://console.cloud.timescale.com/public/api/v1"
-	DefaultConsoleURL = "https://console.cloud.timescale.com"
-	DefaultGatewayURL = "https://console.cloud.timescale.com/api"
-	DefaultOutput     = "table"
-	DefaultAnalytics  = true
-	DefaultDebug      = false
-	ConfigFileName    = "config.yaml"
+	DefaultAPIURL         = "https://console.cloud.timescale.com/public/api/v1"
+	DefaultConsoleURL     = "https://console.cloud.timescale.com"
+	DefaultGatewayURL     = "https://console.cloud.timescale.com/api"
+	DefaultDocsMCPURL     = "https://mcp.tigerdata.com/docs"
+	DefaultDocsMCPEnabled = true
+	DefaultOutput         = "table"
+	DefaultAnalytics      = true
+	DefaultDebug          = false
+	ConfigFileName        = "config.yaml"
 )
 
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
@@ -45,6 +50,8 @@ func SetupViper(configDir string) error {
 	viper.SetDefault("api_url", DefaultAPIURL)
 	viper.SetDefault("console_url", DefaultConsoleURL)
 	viper.SetDefault("gateway_url", DefaultGatewayURL)
+	viper.SetDefault("docs_mcp_url", DefaultDocsMCPURL)
+	viper.SetDefault("docs_mcp_enabled", DefaultDocsMCPEnabled)
 	viper.SetDefault("project_id", "")
 	viper.SetDefault("service_id", "")
 	viper.SetDefault("output", DefaultOutput)
@@ -93,6 +100,8 @@ func (c *Config) Save() error {
 	viper.Set("api_url", c.APIURL)
 	viper.Set("console_url", c.ConsoleURL)
 	viper.Set("gateway_url", c.GatewayURL)
+	viper.Set("docs_mcp_url", c.DocsMCPURL)
+	viper.Set("docs_mcp_enabled", c.DocsMCPEnabled)
 	viper.Set("project_id", c.ProjectID)
 	viper.Set("service_id", c.ServiceID)
 	viper.Set("output", c.Output)
@@ -114,6 +123,14 @@ func (c *Config) Set(key, value string) error {
 		c.ConsoleURL = value
 	case "gateway_url":
 		c.GatewayURL = value
+	case "docs_mcp_url":
+		c.DocsMCPURL = value
+	case "docs_mcp_enabled":
+		b, err := setBool("docs_mcp_enabled", value)
+		if err != nil {
+			return err
+		}
+		c.DocsMCPEnabled = b
 	case "project_id":
 		c.ProjectID = value
 	case "service_id":
@@ -124,26 +141,30 @@ func (c *Config) Set(key, value string) error {
 		}
 		c.Output = value
 	case "analytics":
-		if value == "true" {
-			c.Analytics = true
-		} else if value == "false" {
-			c.Analytics = false
-		} else {
-			return fmt.Errorf("invalid analytics value: %s (must be true or false)", value)
+		b, err := setBool("analytics", value)
+		if err != nil {
+			return err
 		}
+		c.Analytics = b
 	case "debug":
-		if value == "true" {
-			c.Debug = true
-		} else if value == "false" {
-			c.Debug = false
-		} else {
-			return fmt.Errorf("invalid debug value: %s (must be true or false)", value)
+		b, err := setBool("debug", value)
+		if err != nil {
+			return err
 		}
+		c.Debug = b
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
 	return c.Save()
+}
+
+func setBool(key, val string) (bool, error) {
+	b, err := strconv.ParseBool(val)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s value: %s (must be true or false)", key, val)
+	}
+	return b, nil
 }
 
 func (c *Config) Unset(key string) error {

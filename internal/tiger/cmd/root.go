@@ -20,6 +20,8 @@ func buildRootCmd() *cobra.Command {
 	var serviceID string
 	var analytics bool
 	var passwordStorage string
+	var docsMCPURL string
+	var docsMCPEnabled bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -76,6 +78,8 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", "keyring", "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().StringVar(&docsMCPURL, "docs-mcp-url", config.DefaultDocsMCPURL, "docs MCP server URL")
+	cmd.PersistentFlags().BoolVar(&docsMCPEnabled, "docs-mcp-enabled", config.DefaultDocsMCPEnabled, "enable docs MCP proxy")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
@@ -84,6 +88,8 @@ tiger auth login
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
+	viper.BindPFlag("docs_mcp_url", cmd.PersistentFlags().Lookup("docs-mcp-url"))
+	viper.BindPFlag("docs_mcp_enabled", cmd.PersistentFlags().Lookup("docs-mcp-enabled"))
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:
