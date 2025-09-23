@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -72,7 +71,7 @@ service_id: test-service
 output: table
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -109,7 +108,7 @@ project_id: json-project
 output: json
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -149,7 +148,7 @@ project_id: yaml-project
 output: yaml
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -187,7 +186,7 @@ func TestConfigShow_EmptyValues(t *testing.T) {
 	configContent := `output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, config.ConfigFileName)
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}

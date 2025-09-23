@@ -47,7 +47,7 @@ func setupAuthTest(t *testing.T) string {
 	viper.Reset()
 
 	// Also ensure config file doesn't exist
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	os.Remove(configFile)
 
 	t.Cleanup(func() {
@@ -58,7 +58,7 @@ func setupAuthTest(t *testing.T) string {
 		viper.Reset()
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Remove config file explicitly
-		configFile := filepath.Join(tmpDir, "config.yaml")
+		configFile := config.GetConfigFile(tmpDir)
 		os.Remove(configFile)
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
@@ -230,7 +230,7 @@ func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) 
 	openBrowser = mockOpenBrowser(t)
 
 	// Set config URLs to point to mock server
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	configContent := fmt.Sprintf(`
 console_url: "%s"
 gateway_url: "%s"

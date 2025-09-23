@@ -84,7 +84,7 @@ service_id: test-service-456
 output: json
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -172,7 +172,7 @@ project_id: file-project
 output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestSave(t *testing.T) {
 	}
 
 	// Verify file was created
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
@@ -571,7 +571,7 @@ func TestLoad_ErrorHandling(t *testing.T) {
 project_id: test-project
 invalid yaml content [
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(invalidConfig), 0644); err != nil {
 		t.Fatalf("Failed to write invalid config file: %v", err)
 	}
@@ -697,7 +697,7 @@ func TestSave_CreateDirectory(t *testing.T) {
 	}
 
 	// Verify config file was created
-	configFile := filepath.Join(configDir, ConfigFileName)
+	configFile := GetConfigFile(configDir)
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
