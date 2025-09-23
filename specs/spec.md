@@ -48,8 +48,6 @@ analytics: true
 
 - `-o, --output`: Set output format (json, yaml, table)
 - `--config-dir`: Path to configuration directory
-- `--public-key`: Specify TigerData public key for authentication
-- `--secret-key`: Specify TigerData secret key for authentication
 - `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
 - `--analytics`: Toggle analytics collection
