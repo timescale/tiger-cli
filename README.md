@@ -88,7 +88,6 @@ tiger --help
 
 ### Environment Variables
 
-- `TIGER_API_KEY`: TigerData API key for authentication
 - `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
 - `TIGER_PROJECT_ID`: Default project ID to use
 - `TIGER_SERVICE_ID`: Default service ID to use
@@ -100,7 +99,6 @@ tiger --help
 
 - `-o, --output`: Set output format (json, yaml, table)
 - `--config-dir`: Path to configuration directory
-- `--api-key`: Specify TigerData API key
 - `--project-id`: Specify project ID
 - `--service-id`: Specify service ID
 - `--analytics`: Toggle analytics collection

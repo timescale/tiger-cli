@@ -681,8 +681,20 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Make sure we're logged out (this should always succeed or be a no-op)
 	_, _ = executeIntegrationCommand("auth", "logout")
 
-	// Test with invalid API key to trigger authentication errors (401 response from server)
-	invalidAPIKey := "invalid-public-key:invalid-secret-key"
+	// Log in with invalid credentials to trigger authentication errors (401 response from server)
+	invalidPublicKey := "invalid-public-key"
+	invalidSecretKey := "invalid-secret-key"
+
+	// Login with invalid credentials (this should succeed locally but fail on API calls)
+	loginOutput, loginErr := executeIntegrationCommand("auth", "login",
+		"--public-key", invalidPublicKey,
+		"--secret-key", invalidSecretKey,
+		"--project-id", projectID)
+	if loginErr != nil {
+		t.Logf("Login with invalid credentials failed (expected): %s", loginOutput)
+	} else {
+		t.Fatalf("Cannot test authentication errors: login with invalid credentials succeeded: %v", loginErr)
+	}
 
 	// Test service commands that should return authentication errors
 	serviceCommands := []struct {
@@ -691,23 +703,23 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "service list",
-			args: []string{"service", "list", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"service", "list", "--project-id", projectID},
 		},
 		{
 			name: "service describe",
-			args: []string{"service", "describe", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"service", "describe", "non-existent-service", "--project-id", projectID},
 		},
 		{
 			name: "service create",
-			args: []string{"service", "create", "--name", "test-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "create", "--name", "test-service", "--project-id", projectID, "--no-wait"},
 		},
 		{
 			name: "service update-password",
-			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--project-id", projectID},
 		},
 		{
 			name: "service delete",
-			args: []string{"service", "delete", "non-existent-service", "--confirm", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "delete", "non-existent-service", "--confirm", "--project-id", projectID, "--no-wait"},
 		},
 	}
 
@@ -718,17 +730,17 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "db connection-string",
-			args: []string{"db", "connection-string", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "connection-string", "non-existent-service", "--project-id", projectID},
 		},
 		{
 			name: "db connect",
-			args: []string{"db", "connect", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "connect", "non-existent-service", "--project-id", projectID},
 		},
 		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
 		// for authentication issues, not ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
-			args: []string{"db", "test-connection", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "test-connection", "non-existent-service", "--project-id", projectID},
 		},
 	}
 

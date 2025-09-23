@@ -17,7 +17,6 @@ func buildRootCmd() *cobra.Command {
 	var cfgFile string
 	var debug bool
 	var output string
-	var apiKey string
 	var projectID string
 	var serviceID string
 	var analytics bool
@@ -81,7 +80,6 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", defaultConfigFile, "config file")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	cmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (json, yaml, table)")
-	cmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "TigerData API key")
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
@@ -90,7 +88,6 @@ tiger auth login
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
 	viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
-	viper.BindPFlag("api_key", cmd.PersistentFlags().Lookup("api-key"))
 	viper.BindPFlag("project_id", cmd.PersistentFlags().Lookup("project-id"))
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
