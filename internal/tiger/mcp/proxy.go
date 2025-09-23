@@ -4,78 +4,109 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
 
-// ProxyConfig holds configuration for connecting to a remote MCP server
-type ProxyConfig struct {
-	// URL for HTTP-based MCP servers (required)
-	URL string `json:"url"`
+// registerDocsProxy establishes a connection to the remote docs MCP server and
+// registers all tools, resources, resource templates, and prompts exposed by
+// the server. Does not connect if the docs MCP server is disabled in the
+// config or there is no URL in the config.
+func (s *Server) registerDocsProxy(ctx context.Context) {
+	cfg, err := config.Load()
+	if err != nil {
+		logging.Error("Failed to load config", zap.Error(err))
+		return
+	}
 
-	// Whether this proxy is enabled
-	Enabled bool `json:"enabled"`
+	if !cfg.DocsMCPEnabled || cfg.DocsMCPURL == "" {
+		logging.Debug("Docs MCP proxy is disabled")
+		return
+	}
+
+	logging.Info("Setting up docs MCP proxy connection",
+		zap.String("url", cfg.DocsMCPURL),
+	)
+
+	// Create timeout for establishing proxy
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL)
+	if err != nil {
+		logging.Error("Failed to connect to docs MCP server",
+			zap.String("url", cfg.DocsMCPURL),
+			zap.Error(err),
+		)
+		return
+	}
+	s.docsProxyClient = proxyClient
+
+	if err := proxyClient.RegisterTools(ctx, s.mcpServer); err != nil {
+		logging.Error("Failed to register tools from docs MCP server", zap.Error(err))
+	}
+
+	if err := proxyClient.RegisterResources(ctx, s.mcpServer); err != nil {
+		logging.Error("Failed to register resources from docs MCP server", zap.Error(err))
+	}
+
+	if err := proxyClient.RegisterResourceTemplates(ctx, s.mcpServer); err != nil {
+		logging.Error("Failed to register resource templates from docs MCP server", zap.Error(err))
+	}
+
+	if err := proxyClient.RegisterPrompts(ctx, s.mcpServer); err != nil {
+		logging.Error("Failed to register prompts from docs MCP server", zap.Error(err))
+	}
+
+	logging.Info("Successfully connected to docs MCP server",
+		zap.String("url", cfg.DocsMCPURL),
+	)
 }
 
 // ProxyClient manages connection to a remote MCP server and forwards requests
 type ProxyClient struct {
-	config  *ProxyConfig
+	url     string
 	client  *mcp.Client
 	session *mcp.ClientSession
-	server  *Server
 }
 
 // NewProxyClient creates a new proxy client for the given remote server configuration
-func NewProxyClient(config *ProxyConfig, server *Server) *ProxyClient {
-	return &ProxyClient{
-		config: config,
-		server: server,
-	}
-}
+func NewProxyClient(ctx context.Context, url string) (*ProxyClient, error) {
+	logging.Debug("Connecting to docs MCP server",
+		zap.String("url", url),
+	)
 
-// Connect establishes connection to the remote MCP server
-func (p *ProxyClient) Connect(ctx context.Context) error {
-	if !p.config.Enabled {
-		return fmt.Errorf("proxy is disabled")
-	}
-
-	logging.Debug("Connecting to remote MCP server",
-		zap.String("url", p.config.URL))
-
-	// Create HTTP transport for MCP server
-	if p.config.URL == "" {
-		return fmt.Errorf("URL must be specified for docs MCP proxy connection")
-	}
-
-	// Use streamable HTTP transport (preferred for HTTP-based MCP servers)
 	transport := &mcp.StreamableClientTransport{
-		Endpoint: p.config.URL,
+		Endpoint: url,
 	}
 
-	// Create client and connect
-	p.client = mcp.NewClient(&mcp.Implementation{
-		Name:    "tiger-mcp-proxy",
+	client := mcp.NewClient(&mcp.Implementation{
+		Name:    "tiger-mcp-proxy-client",
 		Title:   "Tiger MCP Proxy Client",
-		Version: "1.0.0",
+		Version: config.Version,
 	}, nil)
 
-	// Connect to remote server
-	session, err := p.client.Connect(ctx, transport, nil)
+	session, err := client.Connect(ctx, transport, nil)
 	if err != nil {
-		return fmt.Errorf("failed to connect to remote MCP server: %w", err)
+		return nil, fmt.Errorf("failed to connect to remote MCP server: %w", err)
 	}
 
-	p.session = session
-	logging.Info("Successfully connected to remote MCP server")
+	logging.Info("Successfully connected to docs MCP server")
 
-	return nil
+	return &ProxyClient{
+		url:     url,
+		client:  client,
+		session: session,
+	}, nil
 }
 
-// DiscoverAndRegisterTools discovers tools from remote server and registers them as proxy tools
-func (p *ProxyClient) DiscoverAndRegisterTools(ctx context.Context) error {
+// RegisterTools discovers tools from remote server and registers them as proxy tools
+func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
 		return fmt.Errorf("not connected to remote server")
 	}
@@ -104,14 +135,16 @@ func (p *ProxyClient) DiscoverAndRegisterTools(ctx context.Context) error {
 		handler := p.createToolProxyHandler(tool.Name)
 
 		// Register the proxy tool with our MCP server
-		p.server.mcpServer.AddTool(tool, handler)
+		server.AddTool(tool, handler)
 
 		logging.Debug("Registered proxy tool",
 			zap.String("name", tool.Name),
 		)
 	}
 
-	logging.Info("Successfully registered proxy tools", zap.Int("count", len(toolsResp.Tools)))
+	logging.Info("Successfully registered proxy tools",
+		zap.Int("count", len(toolsResp.Tools)),
+	)
 	return nil
 }
 
@@ -119,7 +152,8 @@ func (p *ProxyClient) DiscoverAndRegisterTools(ctx context.Context) error {
 func (p *ProxyClient) createToolProxyHandler(remoteToolName string) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		logging.Debug("Proxying tool call to remote server",
-			zap.String("tool_name", remoteToolName))
+			zap.String("tool_name", remoteToolName),
+		)
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
@@ -131,14 +165,15 @@ func (p *ProxyClient) createToolProxyHandler(remoteToolName string) mcp.ToolHand
 			if err := json.Unmarshal(req.Params.Arguments, &arguments); err != nil {
 				logging.Error("Failed to unmarshal tool arguments",
 					zap.String("tool_name", remoteToolName),
-					zap.Error(err))
+					zap.Error(err),
+				)
 				return nil, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
 			}
 		}
 
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
-			Name:      remoteToolName, // Use original tool name for remote server
+			Name:      remoteToolName,
 			Arguments: arguments,
 		}
 
@@ -147,19 +182,22 @@ func (p *ProxyClient) createToolProxyHandler(remoteToolName string) mcp.ToolHand
 		if err != nil {
 			logging.Error("Remote tool call failed",
 				zap.String("tool_name", remoteToolName),
-				zap.Error(err))
+				zap.Error(err),
+			)
 			return nil, fmt.Errorf("remote tool call failed: %w", err)
 		}
 
 		logging.Debug("Remote tool call successful",
-			zap.String("tool_name", remoteToolName))
+			zap.String("tool_name", remoteToolName),
+		)
 
 		return result, nil
 	}
 }
 
-// DiscoverAndRegisterResources discovers resources from remote server and registers them as proxy resources
-func (p *ProxyClient) DiscoverAndRegisterResources(ctx context.Context) error {
+// RegisterResources discovers resources from remote server and registers them
+// as proxy resources
+func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
 		return fmt.Errorf("not connected to remote server")
 	}
@@ -188,59 +226,21 @@ func (p *ProxyClient) DiscoverAndRegisterResources(ctx context.Context) error {
 		handler := p.createProxyResourceHandler(resource.URI)
 
 		// Register the proxy resource with our MCP server
-		p.server.mcpServer.AddResource(resource, handler)
+		server.AddResource(resource, handler)
 
 		logging.Debug("Registered proxy resource",
 			zap.String("uri", resource.URI),
 		)
 	}
 
-	logging.Info("Successfully registered proxy resources", zap.Int("count", len(resourcesResp.Resources)))
+	logging.Info("Successfully registered proxy resources",
+		zap.Int("count", len(resourcesResp.Resources)),
+	)
 	return nil
 }
 
-// createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
-func (p *ProxyClient) createProxyResourceHandler(remoteURI string) mcp.ResourceHandler {
-	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-		logging.Debug("Proxying resource read to remote server",
-			zap.String("resource_uri", remoteURI))
-
-		if p.session == nil {
-			return nil, fmt.Errorf("not connected to remote MCP server")
-		}
-
-		// Forward the request to remote server with original URI
-		readParams := &mcp.ReadResourceParams{
-			URI: remoteURI, // Use original URI for remote server
-		}
-
-		// Call remote resource
-		result, err := p.session.ReadResource(ctx, readParams)
-		if err != nil {
-			logging.Error("Remote resource read failed",
-				zap.String("resource_uri", remoteURI),
-				zap.Error(err))
-			return nil, fmt.Errorf("remote resource read failed: %w", err)
-		}
-
-		logging.Debug("Remote resource read successful",
-			zap.String("resource_uri", remoteURI))
-
-		return result, nil
-	}
-}
-
-// Close closes the connection to the remote MCP server
-func (p *ProxyClient) Close() error {
-	if p.session != nil {
-		logging.Debug("Closing connection to remote MCP server")
-		return p.session.Close()
-	}
-	return nil
-}
-
-// DiscoverAndRegisterResourceTemplates discovers resource templates from remote server and registers them as proxy resource templates
-func (p *ProxyClient) DiscoverAndRegisterResourceTemplates(ctx context.Context) error {
+// RegisterResourceTemplates discovers resource templates from remote server and registers them as proxy resource templates
+func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
 		return fmt.Errorf("not connected to remote server")
 	}
@@ -269,19 +269,55 @@ func (p *ProxyClient) DiscoverAndRegisterResourceTemplates(ctx context.Context) 
 		handler := p.createProxyResourceHandler(resourceTemplate.URITemplate)
 
 		// Register the proxy resource template with our MCP server
-		p.server.mcpServer.AddResourceTemplate(resourceTemplate, handler)
+		server.AddResourceTemplate(resourceTemplate, handler)
 
 		logging.Debug("Registered proxy resource template",
 			zap.String("uri_template", resourceTemplate.URITemplate),
 		)
 	}
 
-	logging.Info("Successfully discovered proxy resource templates", zap.Int("count", len(templatesResp.ResourceTemplates)))
+	logging.Info("Successfully registered proxy resource templates",
+		zap.Int("count", len(templatesResp.ResourceTemplates)),
+	)
 	return nil
 }
 
-// DiscoverAndRegisterPrompts discovers prompts from remote server and registers them as proxy prompts
-func (p *ProxyClient) DiscoverAndRegisterPrompts(ctx context.Context) error {
+// createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
+func (p *ProxyClient) createProxyResourceHandler(remoteURI string) mcp.ResourceHandler {
+	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		logging.Debug("Proxying resource read to remote server",
+			zap.String("resource_uri", remoteURI),
+		)
+
+		if p.session == nil {
+			return nil, fmt.Errorf("not connected to remote MCP server")
+		}
+
+		// Forward the request to remote server with original URI
+		readParams := &mcp.ReadResourceParams{
+			URI: remoteURI, // Use original URI for remote server
+		}
+
+		// Call remote resource
+		result, err := p.session.ReadResource(ctx, readParams)
+		if err != nil {
+			logging.Error("Remote resource read failed",
+				zap.String("resource_uri", remoteURI),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("remote resource read failed: %w", err)
+		}
+
+		logging.Debug("Remote resource read successful",
+			zap.String("resource_uri", remoteURI),
+		)
+
+		return result, nil
+	}
+}
+
+// RegisterPrompts discovers prompts from remote server and registers them as proxy prompts
+func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) error {
 	if p.session == nil {
 		return fmt.Errorf("not connected to remote server")
 	}
@@ -310,14 +346,16 @@ func (p *ProxyClient) DiscoverAndRegisterPrompts(ctx context.Context) error {
 		handler := p.createProxyPromptHandler(prompt.Name)
 
 		// Register the proxy prompt with our MCP server
-		p.server.mcpServer.AddPrompt(prompt, handler)
+		server.AddPrompt(prompt, handler)
 
 		logging.Debug("Registered proxy prompt",
 			zap.String("original_name", prompt.Name),
 		)
 	}
 
-	logging.Info("Successfully discovered proxy prompts", zap.Int("count", len(promptsResp.Prompts)))
+	logging.Info("Successfully registered proxy prompts",
+		zap.Int("count", len(promptsResp.Prompts)),
+	)
 	return nil
 }
 
@@ -325,7 +363,8 @@ func (p *ProxyClient) DiscoverAndRegisterPrompts(ctx context.Context) error {
 func (p *ProxyClient) createProxyPromptHandler(remotePromptName string) mcp.PromptHandler {
 	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		logging.Debug("Proxying prompt request to remote server",
-			zap.String("prompt_name", remotePromptName))
+			zap.String("prompt_name", remotePromptName),
+		)
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
@@ -348,13 +387,24 @@ func (p *ProxyClient) createProxyPromptHandler(remotePromptName string) mcp.Prom
 		if err != nil {
 			logging.Error("Remote prompt request failed",
 				zap.String("prompt_name", remotePromptName),
-				zap.Error(err))
+				zap.Error(err),
+			)
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
 		}
 
 		logging.Debug("Remote prompt request successful",
-			zap.String("prompt_name", remotePromptName))
+			zap.String("prompt_name", remotePromptName),
+		)
 
 		return result, nil
 	}
+}
+
+// Close closes the connection to the remote MCP server
+func (p *ProxyClient) Close() error {
+	if p.session != nil {
+		logging.Debug("Closing connection to remote MCP server")
+		return p.session.Close()
+	}
+	return nil
 }
