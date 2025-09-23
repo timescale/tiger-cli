@@ -97,6 +97,9 @@ analytics: false
 	if !strings.Contains(output, "false") {
 		t.Errorf("Output should contain analytics setting, got: %s", output)
 	}
+	if !strings.Contains(output, tmpDir) {
+		t.Errorf("Output should contain config directory %s, got: %s", tmpDir, output)
+	}
 }
 
 func TestConfigShow_JSONOutput(t *testing.T) {
@@ -137,6 +140,9 @@ analytics: true
 	if result["analytics"] != true {
 		t.Errorf("Expected analytics true, got %v", result["analytics"])
 	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
+	}
 }
 
 func TestConfigShow_YAMLOutput(t *testing.T) {
@@ -176,6 +182,9 @@ analytics: false
 	}
 	if result["analytics"] != false {
 		t.Errorf("Expected analytics false, got %v", result["analytics"])
+	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
 	}
 }
 
@@ -245,6 +254,9 @@ analytics: false
 	}
 	if result["api_url"] != "https://flag-test.api.com/v1" {
 		t.Errorf("Expected api_url 'https://flag-test.api.com/v1', got %v", result["api_url"])
+	}
+	if result["config_dir"] != tmpDir {
+		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
 	}
 }
 
