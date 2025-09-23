@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/viper"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 func TestMain(m *testing.M) {
@@ -45,7 +45,7 @@ service_id: file-service
 output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -70,7 +70,7 @@ analytics: true
 
 	// Set CLI flags (these should take precedence)
 	args := []string{
-		"--config", configFile,
+		"--config-dir", tmpDir,
 		"--project-id", "flag-project",
 		"--service-id", "flag-service",
 		"--output", "yaml",
@@ -143,7 +143,7 @@ func TestConfigFilePrecedence(t *testing.T) {
 	configContent := `output: json
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -157,7 +157,7 @@ analytics: false
 	testCmd := buildRootCmd()
 
 	// Execute with config file specified
-	testCmd.SetArgs([]string{"--config", configFile, "version"})
+	testCmd.SetArgs([]string{"--config-dir", tmpDir, "version"})
 	err := testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -40,8 +41,7 @@ func setupViper(t *testing.T, tmpDir string) {
 	t.Helper()
 
 	// Set up Viper configuration using the shared function
-	configFile := filepath.Join(tmpDir, ConfigFileName)
-	if err := SetupViper(configFile); err != nil {
+	if err := SetupViper(tmpDir); err != nil {
 		t.Fatalf("Failed to setup Viper: %v", err)
 	}
 }
@@ -255,8 +255,7 @@ func TestSave(t *testing.T) {
 		ConfigDir: tmpDir,
 	}
 
-	err := cfg.Save()
-	if err != nil {
+	if err := cfg.Save(); err != nil {
 		t.Fatalf("Save() failed: %v", err)
 	}
 
@@ -581,38 +580,74 @@ invalid yaml content [
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// SetupViper should fail with invalid config file
-	err := SetupViper(configFile)
-	if err == nil {
+	if err := SetupViper(tmpDir); err == nil {
 		t.Error("Expected SetupViper() to fail with invalid config file, but it succeeded")
 	}
 }
 
-func TestGetConfigDir(t *testing.T) {
-	// Test with TIGER_CONFIG_DIR environment variable
-	os.Setenv("TIGER_CONFIG_DIR", "/custom/config/path")
-	defer os.Unsetenv("TIGER_CONFIG_DIR")
-
-	dir := GetConfigDir()
-	if dir != "/custom/config/path" {
-		t.Errorf("Expected /custom/config/path, got %s", dir)
-	}
-
-	// Test with tilde expansion
-	os.Setenv("TIGER_CONFIG_DIR", "~/tiger-config")
-	dir = GetConfigDir()
+func TestGetEffectiveConfigDir(t *testing.T) {
 	homeDir, _ := os.UserHomeDir()
-	expected := filepath.Join(homeDir, "tiger-config")
-	if dir != expected {
-		t.Errorf("Expected %s, got %s", expected, dir)
+
+	tests := []struct {
+		name      string
+		envVar    string
+		flagValue string
+		expected  string
+	}{
+		{
+			name:     "default behavior",
+			expected: GetDefaultConfigDir(),
+		},
+		{
+			name:     "env var normal path",
+			envVar:   "/env/config/path",
+			expected: "/env/config/path",
+		},
+		{
+			name:     "env var tilde expansion",
+			envVar:   "~/env/config/path/tiger-config",
+			expected: filepath.Join(homeDir, "/env/config/path/tiger-config"),
+		},
+		{
+			name:      "flag normal path overrides env var",
+			envVar:    "/env/config/path",
+			flagValue: "/flag/config/path",
+			expected:  "/flag/config/path",
+		},
+		{
+			name:      "flag tilde expansion overrides env var",
+			envVar:    "/env/config/path",
+			flagValue: "~/flag/config/path",
+			expected:  filepath.Join(homeDir, "/flag/config/path"),
+		},
 	}
 
-	// Test default behavior
-	os.Unsetenv("TIGER_CONFIG_DIR")
-	dir = GetConfigDir()
-	homeDir, _ = os.UserHomeDir()
-	expected = filepath.Join(homeDir, ".config", "tiger")
-	if dir != expected {
-		t.Errorf("Expected %s, got %s", expected, dir)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clean up env var before each test
+			os.Unsetenv("TIGER_CONFIG_DIR")
+
+			// Set env var if specified
+			if tt.envVar != "" {
+				os.Setenv("TIGER_CONFIG_DIR", tt.envVar)
+				defer os.Unsetenv("TIGER_CONFIG_DIR")
+			}
+
+			// Create mock flag
+			var flagVar string
+			fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			fs.StringVar(&flagVar, "config-dir", "", "config directory")
+			if tt.flagValue != "" {
+				fs.Set("config-dir", tt.flagValue)
+			}
+			flag := fs.Lookup("config-dir")
+
+			// Test the function
+			result := GetEffectiveConfigDir(flag)
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
 	}
 }
 

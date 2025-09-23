@@ -34,7 +34,7 @@ const (
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
 func SetupViper(configDir string) error {
 	// Configure viper to read from config file
-	configFile := filepath.Join(configDir, ConfigFileName)
+	configFile := GetConfigFile(configDir)
 	viper.SetConfigFile(configFile)
 
 	// Configure vipe to read from env vars
@@ -88,6 +88,7 @@ func (c *Config) Save() error {
 	if err := os.MkdirAll(c.ConfigDir, 0755); err != nil {
 		return fmt.Errorf("error creating config directory: %w", err)
 	}
+	configFile := GetConfigFile(c.ConfigDir)
 
 	viper.Set("api_url", c.APIURL)
 	viper.Set("console_url", c.ConsoleURL)
@@ -98,7 +99,7 @@ func (c *Config) Save() error {
 	viper.Set("analytics", c.Analytics)
 	viper.Set("debug", c.Debug)
 
-	if err := viper.WriteConfig(); err != nil {
+	if err := viper.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
 
@@ -181,6 +182,10 @@ func (c *Config) Reset() error {
 	c.Debug = DefaultDebug
 
 	return c.Save()
+}
+
+func GetConfigFile(dir string) string {
+	return filepath.Join(dir, ConfigFileName)
 }
 
 func GetConfigDir() string {
