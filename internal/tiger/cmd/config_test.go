@@ -330,6 +330,12 @@ func TestConfigSet_ValidValues(t *testing.T) {
 				if cfg.Analytics != expected {
 					t.Errorf("Expected Analytics %t, got %t", expected, cfg.Analytics)
 				}
+			case "password_storage":
+				if cfg.PasswordStorage != tt.value {
+					t.Errorf("Expected PasswordStorage %s, got %s", tt.value, cfg.PasswordStorage)
+				}
+			default:
+				t.Fatalf("Unhandled test case for key: %s", tt.key)
 			}
 		})
 	}
@@ -478,6 +484,12 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 				if cfg.Output != config.DefaultOutput {
 					t.Errorf("Expected default Output %s, got %s", config.DefaultOutput, cfg.Output)
 				}
+			case "password_storage":
+				if cfg.PasswordStorage != config.DefaultPasswordStorage {
+					t.Errorf("Expected default PasswordStorage %s, got %s", config.DefaultPasswordStorage, cfg.PasswordStorage)
+				}
+			default:
+				t.Fatalf("Unhandled test case for key: %s", tt.key)
 			}
 		})
 	}
