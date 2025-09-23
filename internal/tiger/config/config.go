@@ -37,7 +37,7 @@ func SetupViper(configDir string) error {
 	configFile := GetConfigFile(configDir)
 	viper.SetConfigFile(configFile)
 
-	// Configure vipe to read from env vars
+	// Configure viper to read from env vars
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
 
@@ -188,6 +188,9 @@ func GetConfigFile(dir string) string {
 	return filepath.Join(dir, ConfigFileName)
 }
 
+// TODO: This function is currently used to get the directory that the API
+// key fallback file should be stored in (see api_key.go). But ideally, those
+// functions would take a Config struct and use the ConfigDir field instead.
 func GetConfigDir() string {
 	return filepath.Dir(viper.ConfigFileUsed())
 }
