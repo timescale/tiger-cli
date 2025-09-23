@@ -24,7 +24,7 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 		return
 	}
 
-	if !cfg.DocsMCPEnabled || cfg.DocsMCPURL == "" {
+	if !cfg.DocsMCP || cfg.DocsMCPURL == "" {
 		logging.Debug("Docs MCP proxy is disabled")
 		return
 	}
