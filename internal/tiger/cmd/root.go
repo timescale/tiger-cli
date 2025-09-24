@@ -75,7 +75,7 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
-	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", "keyring", "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
