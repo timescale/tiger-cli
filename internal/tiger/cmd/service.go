@@ -220,7 +220,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createServiceType string
 	var createRegionCode string
 	var createCpuMillis int
-	var createMemoryGbs float64
+	var createMemoryGbs int
 	var createReplicaCount int
 	var createNoWait bool
 	var createWaitTimeout time.Duration
@@ -339,7 +339,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				RegionCode:   createRegionCode,
 				ReplicaCount: createReplicaCount,
 				CpuMillis:    createCpuMillis,
-				MemoryGbs:    float32(createMemoryGbs),
+				MemoryGbs:    createMemoryGbs,
 			}
 
 			// Make API call to create service
@@ -417,7 +417,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&createServiceType, "type", util.ServiceTypeTimescaleDB, fmt.Sprintf("Service type (%s)", strings.Join(util.ValidServiceTypes(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
 	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
-	cmd.Flags().Float64Var(&createMemoryGbs, "memory", 2.0, "Memory allocation in gigabytes")
+	cmd.Flags().IntVar(&createMemoryGbs, "memory", 2, "Memory allocation in gigabytes")
 	cmd.Flags().IntVar(&createReplicaCount, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")

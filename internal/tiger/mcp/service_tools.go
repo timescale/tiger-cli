@@ -401,7 +401,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		zap.String("type", input.Type),
 		zap.String("region", input.Region),
 		zap.Int("cpu", cpuMillis),
-		zap.Float64("memory", memoryGbs),
+		zap.Int("memory", memoryGbs),
 		zap.Int("replicas", input.Replicas),
 	)
 
@@ -412,7 +412,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		RegionCode:   input.Region,
 		ReplicaCount: input.Replicas,
 		CpuMillis:    cpuMillis,
-		MemoryGbs:    float32(memoryGbs),
+		MemoryGbs:    memoryGbs,
 	}
 
 	// Make API call to create service

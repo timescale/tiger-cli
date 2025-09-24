@@ -114,7 +114,7 @@ type ReadReplicaSet struct {
 	Id        *string   `json:"id,omitempty"`
 
 	// MemoryGbs Memory allocation in gigabytes.
-	MemoryGbs *float32 `json:"memory_gbs,omitempty"`
+	MemoryGbs *int `json:"memory_gbs,omitempty"`
 
 	// Metadata Additional metadata for the read replica set
 	Metadata *struct {
@@ -137,7 +137,7 @@ type ReadReplicaSetCreate struct {
 	CpuMillis int `json:"cpu_millis"`
 
 	// MemoryGbs The initial memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	MemoryGbs int `json:"memory_gbs"`
 
 	// Name A human-readable name for the read replica.
 	Name string `json:"name"`
@@ -152,7 +152,7 @@ type ResizeInput struct {
 	CpuMillis int `json:"cpu_millis"`
 
 	// MemoryGbs The new memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	MemoryGbs int `json:"memory_gbs"`
 
 	// Nodes The new number of nodes in the replica set.
 	Nodes *int `json:"nodes,omitempty"`
@@ -222,8 +222,11 @@ type ServiceCreate struct {
 	// CpuMillis The initial CPU allocation in milli-cores.
 	CpuMillis int `json:"cpu_millis"`
 
+	// Free Whether to create a free service (if true, replica_count, cpu_millis, and memory_gbs must not be provided)
+	Free *bool `json:"free,omitempty"`
+
 	// MemoryGbs The initial memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	MemoryGbs int `json:"memory_gbs"`
 
 	// Name A human-readable name for the service.
 	Name       string `json:"name"`

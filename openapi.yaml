@@ -896,10 +896,9 @@ components:
           description: CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: Memory allocation in gigabytes.
-          example: 0.5
+          example: 1
         metadata:
           type: object
           description: Additional metadata for the read replica set
@@ -941,10 +940,13 @@ components:
           description: The initial CPU allocation in milli-cores.
           example: 1000
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The initial memory allocation in gigabytes.
           example: 4
+        free:
+          type: boolean
+          description: Whether to create a free service (if true, replica_count, cpu_millis, and memory_gbs must not be provided)
+          example: true
     HAReplica:
       type: object
       properties:
@@ -989,10 +991,9 @@ components:
           description: The initial CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The initial memory allocation in gigabytes.
-          example: 0.5
+          example: 1
     ResizeInput:
       type: object
       required:
@@ -1004,8 +1005,7 @@ components:
           description: The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
           example: 1000
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The new memory allocation in gigabytes.
           example: 4
         nodes:
