@@ -35,10 +35,11 @@ jobs:
           # Action-scoped GitHub token used for downloading code, etc.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Cross-repo GitHub token for publishing to timescale/homebrew-tap
-          TAP_GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB_CLOUD }}
+          # NOTE: this token will need to be rotated once per year.
+          TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           # AWS credentials for pushing to tiger-cli-releases S3 bucket
-          AWS_ACCESS_KEY_ID: ${{ secrets.ORG_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.ORG_AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
