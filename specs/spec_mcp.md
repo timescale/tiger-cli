@@ -57,11 +57,59 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
+#### `tiger mcp install <editor>`
+Install and configure the Tiger MCP server for a specific editor or AI assistant. This command automates the configuration process by modifying the appropriate configuration files.
+
+**Supported Editors:**
+- `claude-code` (or `claude`): Configure for Claude Code
+- `cursor`: Configure for Cursor IDE
+
+**Options:**
+- `--no-backup`: Skip creating backup of existing configuration (default: create backup)
+- `--config-path`: Custom path to configuration file (overrides default locations)
+
+**Examples:**
+```bash
+# Install for Claude Code/Desktop
+tiger mcp install claude-code
+tiger mcp install claude
+
+# Install for Cursor IDE
+tiger mcp install cursor
+
+# Install without creating backup
+tiger mcp install claude-code --no-backup
+
+# Use custom configuration file path
+tiger mcp install claude-code --config-path ~/custom/config.json
+```
+
+**Behavior:**
+- Automatically detects the appropriate configuration file location for the specified editor
+- Creates configuration directory if it doesn't exist
+- Creates backup of existing configuration file by default (use `--no-backup` to skip)
+- Merges with existing MCP server configurations (doesn't overwrite other servers)
+- Validates configuration after installation
+- Provides clear success/failure feedback with next steps
+
+**Configuration Format:**
+The command adds the Tiger MCP server configuration using the appropriate format for each editor. Example configuration:
+```json
+{
+  "mcpServers": {
+    "tigerdata": {
+      "command": "tiger",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
 #### `tiger mcp start [transport]`
 Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
 **Transports:**
-- `stdio` (default): Standard input/output transport for AI assistant integration  
+- `stdio` (default): Standard input/output transport for AI assistant integration
 - `http`: HTTP server transport for web-based integrations
 
 **Options for HTTP transport:**
@@ -80,7 +128,7 @@ tiger mcp start http --port 3001
 tiger mcp start http --port 8080 --host 0.0.0.0
 ```
 
-**Notes:** 
+**Notes:**
 - The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process
 - For HTTP transport, the server will print the listening address (including port) on startup for easy connection
 
