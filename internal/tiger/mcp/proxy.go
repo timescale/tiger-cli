@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -132,7 +131,7 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 		}
 
 		// Create handler that forwards tool calls to remote server
-		handler := p.createToolProxyHandler(tool.Name)
+		handler := p.createProxyToolHandler()
 
 		// Register the proxy tool with our MCP server
 		server.AddTool(tool, handler)
@@ -148,47 +147,36 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 	return nil
 }
 
-// createToolProxyHandler creates a handler function that forwards tool calls to the remote server
-func (p *ProxyClient) createToolProxyHandler(remoteToolName string) mcp.ToolHandler {
+// createProxyToolHandler creates a handler function that forwards tool calls to the remote server
+func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		logging.Debug("Proxying tool call to remote server",
-			zap.String("tool_name", remoteToolName),
+			zap.String("tool_name", req.Params.Name),
 		)
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
 		}
 
-		// Extract arguments from the request
-		var arguments map[string]any
-		if req.Params != nil && req.Params.Arguments != nil {
-			if err := json.Unmarshal(req.Params.Arguments, &arguments); err != nil {
-				logging.Error("Failed to unmarshal tool arguments",
-					zap.String("tool_name", remoteToolName),
-					zap.Error(err),
-				)
-				return nil, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
-			}
-		}
-
 		// Forward the request to remote server with original tool name
 		params := &mcp.CallToolParams{
-			Name:      remoteToolName,
-			Arguments: arguments,
+			Meta:      req.Params.Meta,
+			Name:      req.Params.Name,
+			Arguments: req.Params.Arguments,
 		}
 
 		// Call remote tool
 		result, err := p.session.CallTool(ctx, params)
 		if err != nil {
 			logging.Error("Remote tool call failed",
-				zap.String("tool_name", remoteToolName),
+				zap.String("tool_name", req.Params.Name),
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("remote tool call failed: %w", err)
 		}
 
 		logging.Debug("Remote tool call successful",
-			zap.String("tool_name", remoteToolName),
+			zap.String("tool_name", req.Params.Name),
 		)
 
 		return result, nil
@@ -223,7 +211,7 @@ func (p *ProxyClient) RegisterResources(ctx context.Context, server *mcp.Server)
 		}
 
 		// Create handler that forwards resource reads to remote server
-		handler := p.createProxyResourceHandler(resource.URI)
+		handler := p.createProxyResourceHandler()
 
 		// Register the proxy resource with our MCP server
 		server.AddResource(resource, handler)
@@ -266,7 +254,7 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 		}
 
 		// Create handler that forwards resource template reads to remote server
-		handler := p.createProxyResourceHandler(resourceTemplate.URITemplate)
+		handler := p.createProxyResourceHandler()
 
 		// Register the proxy resource template with our MCP server
 		server.AddResourceTemplate(resourceTemplate, handler)
@@ -283,33 +271,28 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 }
 
 // createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
-func (p *ProxyClient) createProxyResourceHandler(remoteURI string) mcp.ResourceHandler {
+func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
 	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		logging.Debug("Proxying resource read to remote server",
-			zap.String("resource_uri", remoteURI),
+			zap.String("resource_uri", req.Params.URI),
 		)
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
 		}
 
-		// Forward the request to remote server with original URI
-		readParams := &mcp.ReadResourceParams{
-			URI: remoteURI, // Use original URI for remote server
-		}
-
 		// Call remote resource
-		result, err := p.session.ReadResource(ctx, readParams)
+		result, err := p.session.ReadResource(ctx, req.Params)
 		if err != nil {
 			logging.Error("Remote resource read failed",
-				zap.String("resource_uri", remoteURI),
+				zap.String("resource_uri", req.Params.URI),
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("remote resource read failed: %w", err)
 		}
 
 		logging.Debug("Remote resource read successful",
-			zap.String("resource_uri", remoteURI),
+			zap.String("resource_uri", req.Params.URI),
 		)
 
 		return result, nil
@@ -343,7 +326,7 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 		}
 
 		// Create handler that forwards prompt requests to remote server
-		handler := p.createProxyPromptHandler(prompt.Name)
+		handler := p.createProxyPromptHandler()
 
 		// Register the proxy prompt with our MCP server
 		server.AddPrompt(prompt, handler)
@@ -360,40 +343,28 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 }
 
 // createProxyPromptHandler creates a handler function that forwards prompt requests to the remote server
-func (p *ProxyClient) createProxyPromptHandler(remotePromptName string) mcp.PromptHandler {
+func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		logging.Debug("Proxying prompt request to remote server",
-			zap.String("prompt_name", remotePromptName),
+			zap.String("prompt_name", req.Params.Name),
 		)
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
 		}
 
-		// Extract arguments from the request
-		var arguments map[string]string
-		if req.Params != nil && req.Params.Arguments != nil {
-			arguments = req.Params.Arguments
-		}
-
-		// Forward the request to remote server with original prompt name
-		getParams := &mcp.GetPromptParams{
-			Name:      remotePromptName, // Use original prompt name for remote server
-			Arguments: arguments,
-		}
-
 		// Call remote prompt
-		result, err := p.session.GetPrompt(ctx, getParams)
+		result, err := p.session.GetPrompt(ctx, req.Params)
 		if err != nil {
 			logging.Error("Remote prompt request failed",
-				zap.String("prompt_name", remotePromptName),
+				zap.String("prompt_name", req.Params.Name),
 				zap.Error(err),
 			)
 			return nil, fmt.Errorf("remote prompt request failed: %w", err)
 		}
 
 		logging.Debug("Remote prompt request successful",
-			zap.String("prompt_name", remotePromptName),
+			zap.String("prompt_name", req.Params.Name),
 		)
 
 		return result, nil
