@@ -145,14 +145,19 @@ func startStdioServer(ctx context.Context) error {
 	defer stop()
 
 	// Create MCP server
-	server, err := mcp.NewServer()
+	server, err := mcp.NewServer(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
 
 	// Start the stdio transport
 	if err := server.StartStdio(ctx); !errors.Is(err, context.Canceled) {
-		return err
+		return fmt.Errorf("failed to start MCP server: %w", err)
+	}
+
+	// Close the MCP server when finished
+	if err := server.Close(); err != nil {
+		return fmt.Errorf("failed to close MCP server: %w", err)
 	}
 	return nil
 }
@@ -161,15 +166,15 @@ func startStdioServer(ctx context.Context) error {
 func startHTTPServer(ctx context.Context, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
-	// Create MCP server
-	server, err := mcp.NewServer()
-	if err != nil {
-		return fmt.Errorf("failed to create MCP server: %w", err)
-	}
-
 	// Setup graceful shutdown handling
 	ctx, stop := signalContext(ctx)
 	defer stop()
+
+	// Create MCP server
+	server, err := mcp.NewServer(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create MCP server: %w", err)
+	}
 
 	// Find available port and get the listener
 	listener, actualPort, err := getListener(host, port)
@@ -181,7 +186,8 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	if actualPort != port {
 		logging.Info("Specified port was busy, using alternative port",
 			zap.Int("requested_port", port),
-			zap.Int("actual_port", actualPort))
+			zap.Int("actual_port", actualPort),
+		)
 	}
 
 	address := fmt.Sprintf("%s:%d", host, actualPort)
@@ -212,7 +218,15 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 
 	// Shutdown server gracefully
 	logging.Info("Shutting down HTTP server...")
-	return httpServer.Shutdown(context.Background())
+	if err := httpServer.Shutdown(context.Background()); err != nil {
+		return fmt.Errorf("failed to shut down HTTP server: %w", err)
+	}
+
+	// Close the MCP server when finished
+	if err := server.Close(); err != nil {
+		return fmt.Errorf("failed to close MCP server: %w", err)
+	}
+	return nil
 }
 
 // getListener finds an available port starting from the specified port and returns the listener

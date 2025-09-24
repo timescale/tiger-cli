@@ -20,11 +20,12 @@ const (
 
 // Server wraps the MCP server with Tiger-specific functionality
 type Server struct {
-	mcpServer *mcp.Server
+	mcpServer       *mcp.Server
+	docsProxyClient *ProxyClient
 }
 
 // NewServer creates a new Tiger MCP server instance
-func NewServer() (*Server, error) {
+func NewServer(ctx context.Context) (*Server, error) {
 	// Create MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    serverName,
@@ -36,8 +37,8 @@ func NewServer() (*Server, error) {
 		mcpServer: mcpServer,
 	}
 
-	// Register all tools
-	server.registerTools()
+	// Register all tools (including proxied docs tools)
+	server.registerTools(ctx)
 
 	return server, nil
 }
@@ -55,11 +56,14 @@ func (s *Server) HTTPHandler() http.Handler {
 }
 
 // registerTools registers all available MCP tools
-func (s *Server) registerTools() {
-	// Service management tools (v0 priority)
+func (s *Server) registerTools(ctx context.Context) {
+	// Service management tools
 	s.registerServiceTools()
 
 	// TODO: Register more tool groups
+
+	// Register remote docs MCP server proxy
+	s.registerDocsProxy(ctx)
 
 	logging.Info("MCP tools registered successfully")
 }
@@ -93,4 +97,16 @@ func (s *Server) loadProjectID() (string, error) {
 		return "", fmt.Errorf("project ID is required. Please run 'tiger auth login' with --project-id")
 	}
 	return cfg.ProjectID, nil
+}
+
+// Close gracefully shuts down the MCP server and all proxy connections
+func (s *Server) Close() error {
+	logging.Debug("Closing MCP server and proxy connections")
+
+	// Close docs proxy connection
+	if err := s.docsProxyClient.Close(); err != nil {
+		return fmt.Errorf("failed to close docs proxy client: %w", err)
+	}
+
+	return nil
 }
