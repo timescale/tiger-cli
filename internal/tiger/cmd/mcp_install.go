@@ -22,14 +22,14 @@ import (
 // lockTimeout is the maximum time to wait for a file lock
 const lockTimeout = 1 * time.Second
 
-// TigerMCPClient represents our internal client types (extends beyond toolhive support)
-type TigerMCPClient string
+// MCPClient represents our internal client types (extends beyond toolhive support)
+type MCPClient string
 
 const (
-	TigerClaudeCode TigerMCPClient = "claude-code"
-	TigerCursor     TigerMCPClient = "cursor"
-	TigerWindsurf   TigerMCPClient = "windsurf"
-	TigerCodex      TigerMCPClient = "codex" // Not supported by toolhive - uses CLI
+	ClaudeCode MCPClient = "claude-code"
+	Cursor     MCPClient = "cursor"
+	Windsurf   MCPClient = "windsurf"
+	Codex      MCPClient = "codex" // Not supported by toolhive - uses CLI
 )
 
 // TigerMCPServer represents the Tiger MCP server configuration
@@ -40,7 +40,7 @@ type TigerMCPServer struct {
 
 // clientConfig represents our own client configuration for Tiger MCP installation
 type clientConfig struct {
-	TigerClientType      TigerMCPClient // Our internal client type
+	ClientType           MCPClient // Our internal client type
 	Name                 string
 	EditorNames          []string // supported editor names for this client
 	MCPServersPathPrefix string
@@ -53,16 +53,17 @@ type clientConfig struct {
 // https://github.com/stacklok/toolhive/blob/main/pkg/client/config.go
 var supportedClients = []clientConfig{
 	{
-		TigerClientType:      TigerClaudeCode,
+		ClientType:           ClaudeCode,
 		Name:                 "Claude Code",
 		EditorNames:          []string{"claude-code", "claude"},
-		MCPServersPathPrefix: "/mcpServers",
+		MCPServersPathPrefix: "", // Not used for CLI-based installation
 		ConfigPaths: []string{
-			"~/.claude.json", // Default Claude Code config location
+			"~/.claude.json", // Default Claude Code config location - needed for backup
 		},
+		InstallCommand: []string{"claude", "mcp", "add", "tigerdata", "tiger", "mcp"},
 	},
 	{
-		TigerClientType:      TigerCursor,
+		ClientType:           Cursor,
 		Name:                 "Cursor",
 		EditorNames:          []string{"cursor"},
 		MCPServersPathPrefix: "/mcpServers",
@@ -71,7 +72,7 @@ var supportedClients = []clientConfig{
 		},
 	},
 	{
-		TigerClientType:      TigerWindsurf,
+		ClientType:           Windsurf,
 		Name:                 "Windsurf",
 		EditorNames:          []string{"windsurf"},
 		MCPServersPathPrefix: "/mcpServers",
@@ -80,7 +81,7 @@ var supportedClients = []clientConfig{
 		},
 	},
 	{
-		TigerClientType:      TigerCodex,
+		ClientType:           Codex,
 		Name:                 "Codex",
 		EditorNames:          []string{"codex"},
 		MCPServersPathPrefix: "", // Not used for Codex - uses TOML instead
@@ -168,14 +169,14 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 }
 
 // mapEditorToTigerClientType maps editor names to our Tiger client types using our supportedClients config
-func mapEditorToTigerClientType(editorName string) (TigerMCPClient, error) {
+func mapEditorToTigerClientType(editorName string) (MCPClient, error) {
 	normalizedName := strings.ToLower(editorName)
 
 	// Look up in our supported clients config
 	for _, cfg := range supportedClients {
 		for _, name := range cfg.EditorNames {
 			if strings.ToLower(name) == normalizedName {
-				return cfg.TigerClientType, nil
+				return cfg.ClientType, nil
 			}
 		}
 	}
@@ -190,9 +191,9 @@ func mapEditorToTigerClientType(editorName string) (TigerMCPClient, error) {
 }
 
 // findOurClientConfig finds our client configuration for a given Tiger client type
-func findOurClientConfig(tigerClientType TigerMCPClient) (*clientConfig, error) {
+func findOurClientConfig(tigerClientType MCPClient) (*clientConfig, error) {
 	for _, cfg := range supportedClients {
-		if cfg.TigerClientType == tigerClientType {
+		if cfg.ClientType == tigerClientType {
 			return &cfg, nil
 		}
 	}

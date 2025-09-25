@@ -12,22 +12,22 @@ import (
 
 // testClientMapping pairs our Tiger client types with their corresponding toolhive types for testing
 type testClientMapping struct {
-	TigerClientType    TigerMCPClient
+	ClientType         MCPClient
 	ToolhiveClientType client.MCPClient
 }
 
 // testClientMappings defines which clients we want to test for equivalence between ConfigPaths and toolhive
 var testClientMappings = []testClientMapping{
 	{
-		TigerClientType:    TigerClaudeCode,
+		ClientType:         ClaudeCode,
 		ToolhiveClientType: client.ClaudeCode,
 	},
 	{
-		TigerClientType:    TigerCursor,
+		ClientType:         Cursor,
 		ToolhiveClientType: client.Cursor,
 	},
 	{
-		TigerClientType:    TigerWindsurf,
+		ClientType:         Windsurf,
 		ToolhiveClientType: client.Windsurf,
 	},
 }
@@ -78,13 +78,13 @@ func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
 		// Find our client config
 		var ourClientConfig *clientConfig
 		for _, cfg := range supportedClients {
-			if cfg.TigerClientType == mapping.TigerClientType {
+			if cfg.ClientType == mapping.ClientType {
 				ourClientConfig = &cfg
 				break
 			}
 		}
-		require.NotNil(t, ourClientConfig, "should find client config for %s", mapping.TigerClientType)
-		require.NotEmpty(t, ourClientConfig.ConfigPaths, "client should have ConfigPaths defined for %s", mapping.TigerClientType)
+		require.NotNil(t, ourClientConfig, "should find client config for %s", mapping.ClientType)
+		require.NotEmpty(t, ourClientConfig.ConfigPaths, "client should have ConfigPaths defined for %s", mapping.ClientType)
 
 		t.Run(ourClientConfig.Name+" equivalent to toolhive when file exists", func(t *testing.T) {
 			// Create the config file at the first ConfigPath location
