@@ -4,7 +4,9 @@ go 1.25.1
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/gofrs/flock v0.12.1
 	github.com/google/jsonschema-go v0.2.3
+	github.com/google/renameio/v2 v2.0.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/modelcontextprotocol/go-sdk v0.5.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
@@ -14,7 +16,9 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stacklok/toolhive v0.3.5
+	github.com/stretchr/testify v1.11.1
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
+	github.com/tidwall/gjson v1.18.0
 	github.com/zalando/go-keyring v0.2.6
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.0
@@ -79,12 +83,10 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.6 // indirect
-	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20250417193237-f615e6bd150b // indirect
@@ -133,7 +135,6 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect

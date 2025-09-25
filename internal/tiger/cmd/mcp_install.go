@@ -12,7 +12,6 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/google/renameio/v2"
-	"github.com/stacklok/toolhive/pkg/client"
 	"github.com/tailscale/hujson"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -41,12 +40,11 @@ type TigerMCPServer struct {
 
 // clientConfig represents our own client configuration for Tiger MCP installation
 type clientConfig struct {
-	TigerClientType      TigerMCPClient   // Our internal client type
-	ToolhiveClientType   client.MCPClient // Toolhive client type (empty if not supported)
+	TigerClientType      TigerMCPClient // Our internal client type
 	Name                 string
 	EditorNames          []string // supported editor names for this client
 	MCPServersPathPrefix string
-	ConfigPaths          []string // possible config file locations (for non-toolhive clients)
+	ConfigPaths          []string // config file locations for JSON-based clients
 	InstallCommand       []string // CLI command to install MCP server (for CLI-based clients)
 }
 
@@ -56,28 +54,33 @@ type clientConfig struct {
 var supportedClients = []clientConfig{
 	{
 		TigerClientType:      TigerClaudeCode,
-		ToolhiveClientType:   client.ClaudeCode,
 		Name:                 "Claude Code",
 		EditorNames:          []string{"claude-code", "claude"},
 		MCPServersPathPrefix: "/mcpServers",
+		ConfigPaths: []string{
+			"~/.claude.json", // Default Claude Code config location
+		},
 	},
 	{
 		TigerClientType:      TigerCursor,
-		ToolhiveClientType:   client.Cursor,
 		Name:                 "Cursor",
 		EditorNames:          []string{"cursor"},
 		MCPServersPathPrefix: "/mcpServers",
+		ConfigPaths: []string{
+			"~/.cursor/mcp.json", // Default Cursor config location
+		},
 	},
 	{
 		TigerClientType:      TigerWindsurf,
-		ToolhiveClientType:   client.Windsurf,
 		Name:                 "Windsurf",
 		EditorNames:          []string{"windsurf"},
 		MCPServersPathPrefix: "/mcpServers",
+		ConfigPaths: []string{
+			"~/.codeium/windsurf/mcp_config.json", // Default Windsurf config location
+		},
 	},
 	{
 		TigerClientType:      TigerCodex,
-		ToolhiveClientType:   "", // Not supported by toolhive - use CLI approach
 		Name:                 "Codex",
 		EditorNames:          []string{"codex"},
 		MCPServersPathPrefix: "", // Not used for Codex - uses TOML instead
@@ -116,12 +119,8 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
 		}
 	} else {
-		// Use toolhive to find the client configuration file path
-		configFile, err := client.FindClientConfig(clientCfg.ToolhiveClientType)
-		if err != nil {
-			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
-		}
-		configPath = configFile.Path
+		// All clients should now have either ConfigPaths or InstallCommand defined
+		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", editorName)
 	}
 
 	logging.Info("Installing Tiger MCP server configuration",
