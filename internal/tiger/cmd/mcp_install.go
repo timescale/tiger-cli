@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -22,6 +23,16 @@ import (
 // lockTimeout is the maximum time to wait for a file lock
 const lockTimeout = 1 * time.Second
 
+// TigerMCPClient represents our internal client types (extends beyond toolhive support)
+type TigerMCPClient string
+
+const (
+	TigerClaudeCode TigerMCPClient = "claude-code"
+	TigerCursor     TigerMCPClient = "cursor"
+	TigerWindsurf   TigerMCPClient = "windsurf"
+	TigerCodex      TigerMCPClient = "codex" // Not supported by toolhive - uses CLI
+)
+
 // TigerMCPServer represents the Tiger MCP server configuration
 type TigerMCPServer struct {
 	Command string   `json:"command"`
@@ -30,10 +41,13 @@ type TigerMCPServer struct {
 
 // clientConfig represents our own client configuration for Tiger MCP installation
 type clientConfig struct {
-	ClientType           client.MCPClient
+	TigerClientType      TigerMCPClient   // Our internal client type
+	ToolhiveClientType   client.MCPClient // Toolhive client type (empty if not supported)
 	Name                 string
 	EditorNames          []string // supported editor names for this client
 	MCPServersPathPrefix string
+	ConfigPaths          []string // possible config file locations (for non-toolhive clients)
+	InstallCommand       []string // CLI command to install MCP server (for CLI-based clients)
 }
 
 // supportedClients defines the clients we support for Tiger MCP installation
@@ -41,47 +55,69 @@ type clientConfig struct {
 // https://github.com/stacklok/toolhive/blob/main/pkg/client/config.go
 var supportedClients = []clientConfig{
 	{
-		ClientType:           client.ClaudeCode,
+		TigerClientType:      TigerClaudeCode,
+		ToolhiveClientType:   client.ClaudeCode,
 		Name:                 "Claude Code",
 		EditorNames:          []string{"claude-code", "claude"},
 		MCPServersPathPrefix: "/mcpServers",
 	},
 	{
-		ClientType:           client.Cursor,
+		TigerClientType:      TigerCursor,
+		ToolhiveClientType:   client.Cursor,
 		Name:                 "Cursor",
 		EditorNames:          []string{"cursor"},
 		MCPServersPathPrefix: "/mcpServers",
 	},
 	{
-		ClientType:           client.Windsurf,
+		TigerClientType:      TigerWindsurf,
+		ToolhiveClientType:   client.Windsurf,
 		Name:                 "Windsurf",
 		EditorNames:          []string{"windsurf"},
 		MCPServersPathPrefix: "/mcpServers",
+	},
+	{
+		TigerClientType:      TigerCodex,
+		ToolhiveClientType:   "", // Not supported by toolhive - use CLI approach
+		Name:                 "Codex",
+		EditorNames:          []string{"codex"},
+		MCPServersPathPrefix: "", // Not used for Codex - uses TOML instead
+		ConfigPaths: []string{
+			"$CODEX_HOME/config.toml",
+			"~/.codex/config.toml", // Default fallback
+		},
+		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp"},
 	},
 }
 
 // installMCPForEditor installs the Tiger MCP server configuration for the specified editor
 func installMCPForEditor(editorName string, createBackup bool, customConfigPath string) error {
-	// Map editor names to toolhive client types
-	clientType, err := mapEditorToClientType(editorName)
+	// Map editor names to our client types
+	tigerClientType, err := mapEditorToTigerClientType(editorName)
 	if err != nil {
 		return err
 	}
 
 	// Get the MCP servers path prefix from our own configuration
-	clientCfg, err := findOurClientConfig(clientType)
+	clientCfg, err := findOurClientConfig(tigerClientType)
 	if err != nil {
 		return err
 	}
+
 	mcpServersPathPrefix := clientCfg.MCPServersPathPrefix
 
 	var configPath string
 	if customConfigPath != "" {
-		// Use custom config path directly, skip toolhive discovery
+		// Use custom config path directly, skip discovery
 		configPath = customConfigPath
+	} else if len(clientCfg.ConfigPaths) > 0 {
+		// Use manual config path discovery for clients with configured paths
+		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
+		if err != nil {
+			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
+		}
 	} else {
 		// Use toolhive to find the client configuration file path
-		configFile, err := client.FindClientConfig(clientType)
+		configFile, err := client.FindClientConfig(clientCfg.ToolhiveClientType)
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
 		}
@@ -106,8 +142,16 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	}
 
 	// Add Tiger MCP server to configuration
-	if err := addTigerMCPServer(configPath, mcpServersPathPrefix); err != nil {
-		return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
+	if len(clientCfg.InstallCommand) > 0 {
+		// Use CLI approach when install command is configured
+		if err := addTigerMCPServerViaCLI(clientCfg); err != nil {
+			return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
+		}
+	} else {
+		// Use JSON patching approach for toolhive-supported clients
+		if err := addTigerMCPServer(configPath, mcpServersPathPrefix); err != nil {
+			return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
+		}
 	}
 
 	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", editorName)
@@ -124,15 +168,15 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	return nil
 }
 
-// mapEditorToClientType maps editor names to toolhive client types using our supportedClients config
-func mapEditorToClientType(editorName string) (client.MCPClient, error) {
+// mapEditorToTigerClientType maps editor names to our Tiger client types using our supportedClients config
+func mapEditorToTigerClientType(editorName string) (TigerMCPClient, error) {
 	normalizedName := strings.ToLower(editorName)
 
 	// Look up in our supported clients config
 	for _, cfg := range supportedClients {
 		for _, name := range cfg.EditorNames {
 			if strings.ToLower(name) == normalizedName {
-				return cfg.ClientType, nil
+				return cfg.TigerClientType, nil
 			}
 		}
 	}
@@ -146,14 +190,14 @@ func mapEditorToClientType(editorName string) (client.MCPClient, error) {
 	return "", fmt.Errorf("unsupported editor: %s. Supported editors: %s", editorName, strings.Join(supportedNames, ", "))
 }
 
-// findOurClientConfig finds our client configuration for a given client type
-func findOurClientConfig(clientType client.MCPClient) (*clientConfig, error) {
+// findOurClientConfig finds our client configuration for a given Tiger client type
+func findOurClientConfig(tigerClientType TigerMCPClient) (*clientConfig, error) {
 	for _, cfg := range supportedClients {
-		if cfg.ClientType == clientType {
+		if cfg.TigerClientType == tigerClientType {
 			return &cfg, nil
 		}
 	}
-	return nil, fmt.Errorf("unsupported client type: %s", clientType)
+	return nil, fmt.Errorf("unsupported client type: %s", tigerClientType)
 }
 
 // generateSupportedEditorsHelp generates the supported editors section for help text
@@ -168,6 +212,72 @@ func generateSupportedEditorsHelp() string {
 		result += fmt.Sprintf("  %-24s Configure for %s\n", editorNames, cfg.Name)
 	}
 	return result
+}
+
+// findClientConfigFile finds a client configuration file from a list of possible paths
+func findClientConfigFile(configPaths []string) (string, error) {
+	for _, path := range configPaths {
+		// Expand environment variables and home directory
+		expandedPath := expandPath(path)
+
+		// Check if file exists
+		if _, err := os.Stat(expandedPath); err == nil {
+			logging.Info("Found existing config file", zap.String("path", expandedPath))
+			return expandedPath, nil
+		}
+	}
+
+	// If no existing config found, use the last path as default
+	if len(configPaths) == 0 {
+		return "", fmt.Errorf("no config paths provided")
+	}
+
+	defaultPath := expandPath(configPaths[len(configPaths)-1]) // Use last path as fallback
+	logging.Info("No existing config found, will create at default location",
+		zap.String("path", defaultPath))
+	return defaultPath, nil
+}
+
+// expandPath expands environment variables and tilde in file paths
+func expandPath(path string) string {
+	// Expand environment variables
+	expanded := os.ExpandEnv(path)
+
+	// Expand home directory
+	if strings.HasPrefix(expanded, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			expanded = filepath.Join(homeDir, expanded[2:])
+		}
+	}
+
+	return expanded
+}
+
+// addTigerMCPServerViaCLI adds Tiger MCP server using a CLI command configured in clientConfig
+func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
+	if len(clientCfg.InstallCommand) == 0 {
+		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
+	}
+
+	logging.Info("Adding Tiger MCP server using CLI",
+		zap.String("client", clientCfg.Name),
+		zap.Strings("command", clientCfg.InstallCommand))
+
+	// Run the configured CLI command
+	cmd := exec.Command(clientCfg.InstallCommand[0], clientCfg.InstallCommand[1:]...)
+
+	// Capture output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to run %s CLI command: %w\nOutput: %s", clientCfg.Name, err, string(output))
+	}
+
+	logging.Info("Successfully added Tiger MCP server via CLI",
+		zap.String("client", clientCfg.Name),
+		zap.String("output", string(output)))
+
+	return nil
 }
 
 // createConfigBackup creates a backup of the existing configuration file and returns the backup path
