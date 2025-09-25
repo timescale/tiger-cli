@@ -1032,3 +1032,258 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestAddPasswordToConnectionString_KeyringStorage(t *testing.T) {
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-password-service"
+	projectID := "test-password-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Store a test password in keyring
+	testPassword := "test-password-keyring-123"
+	storage := util.GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	// Test connection string without password
+	baseConnectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+
+	// Call addPasswordToConnectionString
+	result, err := addPasswordToConnectionString(baseConnectionString, service)
+
+	if err != nil {
+		t.Fatalf("addPasswordToConnectionString failed: %v", err)
+	}
+
+	// Verify that the password is included in the result
+	expectedResult := fmt.Sprintf("postgresql://testuser:%s@testhost:5432/testdb?sslmode=require", testPassword)
+	if result != expectedResult {
+		t.Errorf("Expected connection string with password '%s', got '%s'", expectedResult, result)
+	}
+
+	// Verify the password is actually in the connection string
+	if !strings.Contains(result, testPassword) {
+		t.Errorf("Password '%s' not found in connection string: %s", testPassword, result)
+	}
+}
+
+func TestAddPasswordToConnectionString_PgpassStorage(t *testing.T) {
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service with endpoint information (required for pgpass)
+	serviceID := "test-pgpass-service"
+	projectID := "test-pgpass-project"
+	host := "test-pgpass-host.com"
+	port := 5432
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	// Store a test password in pgpass
+	testPassword := "test-password-pgpass-456"
+	storage := util.GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	// Test connection string without password
+	baseConnectionString := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
+
+	// Call addPasswordToConnectionString
+	result, err := addPasswordToConnectionString(baseConnectionString, service)
+
+	if err != nil {
+		t.Fatalf("addPasswordToConnectionString failed: %v", err)
+	}
+
+	// Verify that the password is included in the result
+	expectedResult := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
+	if result != expectedResult {
+		t.Errorf("Expected connection string with password '%s', got '%s'", expectedResult, result)
+	}
+
+	// Verify the password is actually in the connection string
+	if !strings.Contains(result, testPassword) {
+		t.Errorf("Password '%s' not found in connection string: %s", testPassword, result)
+	}
+}
+
+func TestAddPasswordToConnectionString_NoStorage(t *testing.T) {
+	// Set no storage as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "none")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-nostorage-service"
+	projectID := "test-nostorage-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Test connection string without password
+	baseConnectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+
+	// Call addPasswordToConnectionString - should fail
+	_, err := addPasswordToConnectionString(baseConnectionString, service)
+
+	if err == nil {
+		t.Fatal("Expected error when password storage is disabled, but got none")
+	}
+
+	// Verify we get the expected error message
+	expectedError := "password storage is disabled (--password-storage=none)"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	}
+}
+
+func TestAddPasswordToConnectionString_NoPasswordAvailable(t *testing.T) {
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service (but don't store any password for it)
+	serviceID := "test-nopassword-service"
+	projectID := "test-nopassword-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Test connection string without password
+	baseConnectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
+
+	// Call addPasswordToConnectionString - should fail
+	_, err := addPasswordToConnectionString(baseConnectionString, service)
+
+	if err == nil {
+		t.Fatal("Expected error when no password is available, but got none")
+	}
+
+	// Verify we get the expected error message
+	expectedError := "no password found in keyring for this service"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	}
+}
+
+func TestDBConnectionString_WithPassword(t *testing.T) {
+	// This test verifies the end-to-end --with-password flag functionality
+	// using direct function testing since full integration would require a real service
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-e2e-service"
+	projectID := "test-e2e-project"
+	host := "test-e2e-host.com"
+	port := 5432
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	// Store a test password
+	testPassword := "test-e2e-password-789"
+	storage := util.GetPasswordStorage()
+	err := storage.Save(service, testPassword)
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service) // Clean up after test
+
+	// Test buildConnectionString without password (default behavior)
+	cmd := &cobra.Command{}
+	baseConnectionString, err := buildConnectionString(service, false, "tsdbadmin", cmd)
+	if err != nil {
+		t.Fatalf("buildConnectionString failed: %v", err)
+	}
+
+	expectedBase := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
+	if baseConnectionString != expectedBase {
+		t.Errorf("Expected base connection string '%s', got '%s'", expectedBase, baseConnectionString)
+	}
+
+	// Verify base connection string doesn't contain password
+	if strings.Contains(baseConnectionString, testPassword) {
+		t.Errorf("Base connection string should not contain password, but it does: %s", baseConnectionString)
+	}
+
+	// Test addPasswordToConnectionString (simulating --with-password flag)
+	connectionStringWithPassword, err := addPasswordToConnectionString(baseConnectionString, service)
+	if err != nil {
+		t.Fatalf("addPasswordToConnectionString failed: %v", err)
+	}
+
+	expectedWithPassword := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
+	if connectionStringWithPassword != expectedWithPassword {
+		t.Errorf("Expected connection string with password '%s', got '%s'", expectedWithPassword, connectionStringWithPassword)
+	}
+
+	// Verify connection string with password contains the password
+	if !strings.Contains(connectionStringWithPassword, testPassword) {
+		t.Errorf("Connection string with password should contain '%s', but it doesn't: %s", testPassword, connectionStringWithPassword)
+	}
+}
+
+func TestAddPasswordToConnectionString_InvalidConnectionString(t *testing.T) {
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-invalid-service"
+	projectID := "test-invalid-project"
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	// Test with invalid connection string
+	invalidConnectionString := "this is not a valid connection string"
+
+	// Call addPasswordToConnectionString - should fail
+	_, err := addPasswordToConnectionString(invalidConnectionString, service)
+
+	if err == nil {
+		t.Fatal("Expected error for invalid connection string, but got none")
+	}
+
+	// Verify we get a parsing error
+	expectedError := "failed to parse connection string"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	}
+}
