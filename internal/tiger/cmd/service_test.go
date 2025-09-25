@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1350,5 +1351,146 @@ func TestServiceCreate_NoSetDefaultFlag(t *testing.T) {
 	// Verify the help text mentions the default behavior
 	if !strings.Contains(output, "newly created service will be set as your default service") {
 		t.Error("Expected help text to mention default service behavior")
+	}
+}
+
+func TestServiceCreate_EnvFlag(t *testing.T) {
+	// Test that the --env flag is recognized and doesn't cause parsing errors
+	output, err, _ := executeServiceCommand("service", "create", "--help")
+	if err != nil {
+		t.Fatalf("Help command should not fail: %v", err)
+	}
+
+	// Verify the flag appears in help output
+	if !strings.Contains(output, "--env string") {
+		t.Error("Expected --env flag to appear in help output")
+	}
+
+	// Verify the flag description
+	if !strings.Contains(output, "Path to .env file to write connection variables") {
+		t.Error("Expected --env flag description to appear in help output")
+	}
+
+	// Verify examples show env flag usage
+	if !strings.Contains(output, "tiger service create --name my-db --env .env") {
+		t.Error("Expected help text to show .env example")
+	}
+	if !strings.Contains(output, "tiger service create --name my-db --env .env.dev") {
+		t.Error("Expected help text to show custom env file example")
+	}
+}
+
+func TestServiceCreate_EnvFlagRequiresArgument(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "https://api.tigerdata.com/public/v1",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service create command with --env flag but no argument
+	_, err, _ = executeServiceCommand("service", "create", "--name", "test-service", "--env")
+	if err == nil {
+		t.Fatal("Expected error when --env flag is used without argument")
+	}
+
+	if !strings.Contains(err.Error(), "flag needs an argument: --env") {
+		t.Errorf("Expected error about missing argument for --env flag, got: %v", err)
+	}
+}
+
+func TestServiceCreate_EnvFlagWithNoWait(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Mock URL to prevent actual API calls
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service create command with --env and --no-wait flags
+	output, err, _ := executeServiceCommand("service", "create",
+		"--name", "test-service",
+		"--type", "postgres",
+		"--region", "us-east-1",
+		"--env", ".env",
+		"--no-wait")
+
+	// Should fail due to network error (expected in tests)
+	if err == nil {
+		t.Fatal("Expected network error due to mock URL")
+	}
+
+	// The test mainly verifies that using --env with --no-wait doesn't cause flag parsing errors
+	// The actual warning would only appear if service creation succeeded, which won't happen with mock URL
+	if strings.Contains(err.Error(), "flag") || strings.Contains(err.Error(), "env") {
+		// Only fail if it's a flag parsing error, not network error
+		if strings.Contains(err.Error(), "flag needs an argument") {
+			t.Errorf("Flag parsing should work correctly with --env and --no-wait, got: %v", err)
+		}
+	}
+
+	// Should contain the service creation attempt message
+	if !strings.Contains(output, "Creating service 'test-service'") {
+		t.Errorf("Expected service creation attempt message, got output: %s", output)
+	}
+}
+
+func TestWriteEnvFile_MissingServiceDetails(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Non-existent server
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient("test-api-key")
+	if err != nil {
+		t.Fatalf("Failed to create API client: %v", err)
+	}
+
+	// Test writeEnvFile with non-existent service
+	envPath := filepath.Join(tmpDir, "test.env")
+	err = writeEnvFile(client, "test-project-123", "nonexistent-service", "test-password", envPath)
+
+	// Should fail because service doesn't exist
+	if err == nil {
+		t.Fatal("Expected error when service doesn't exist")
+	}
+
+	if !strings.Contains(err.Error(), "failed to get service details") {
+		t.Errorf("Expected error about failed service details retrieval, got: %v", err)
 	}
 }
