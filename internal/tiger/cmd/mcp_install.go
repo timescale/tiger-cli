@@ -96,8 +96,11 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	)
 
 	// Create backup if requested
+	var backupPath string
 	if createBackup {
-		if err := createConfigBackup(configPath); err != nil {
+		var err error
+		backupPath, err = createConfigBackup(configPath)
+		if err != nil {
 			return fmt.Errorf("failed to create backup: %w", err)
 		}
 	}
@@ -110,8 +113,8 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", editorName)
 	fmt.Printf("📁 Configuration file: %s\n", configPath)
 
-	if createBackup {
-		fmt.Printf("💾 Backup created: %s.backup\n", configPath)
+	if createBackup && backupPath != "" {
+		fmt.Printf("💾 Backup created: %s\n", backupPath)
 	}
 
 	fmt.Printf("\n💡 Next steps:\n")
@@ -167,30 +170,30 @@ func generateSupportedEditorsHelp() string {
 	return result
 }
 
-// createConfigBackup creates a backup of the existing configuration file
-func createConfigBackup(configPath string) error {
+// createConfigBackup creates a backup of the existing configuration file and returns the backup path
+func createConfigBackup(configPath string) (string, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// No existing config file, no backup needed
 		logging.Info("No existing configuration file found, skipping backup")
-		return nil
+		return "", nil
 	}
 
-	backupPath := configPath + ".backup"
+	backupPath := fmt.Sprintf("%s.backup.%d", configPath, time.Now().Unix())
 
 	// Read original file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to read original config file: %w", err)
+		return "", fmt.Errorf("failed to read original config file: %w", err)
 	}
 
 	// Write backup file atomically
 	if err := renameio.WriteFile(backupPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write backup file: %w", err)
+		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
 	logging.Info("Created configuration backup", zap.String("backup_path", backupPath))
-	return nil
+	return backupPath, nil
 }
 
 // addTigerMCPServer adds the Tiger MCP server to the configuration file using JSON patching with file locking
