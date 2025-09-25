@@ -217,7 +217,7 @@ func buildServiceListCmd() *cobra.Command {
 // serviceCreateCmd represents the create command under service
 func buildServiceCreateCmd() *cobra.Command {
 	var createServiceName string
-	var createServiceType string
+	var createAddons []string
 	var createRegionCode string
 	var createCpuMillis int
 	var createMemoryGbs int
@@ -231,36 +231,42 @@ func buildServiceCreateCmd() *cobra.Command {
 		Short: "Create a new database service",
 		Long: `Create a new database service in the current project.
 
-By default, the newly created service will be set as your default service for future 
+By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
 Examples:
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
-  
+
   # Create a TimescaleDB service with custom name
   tiger service create --name my-db
 
-  # Create a PostgreSQL service with more resources (waits for ready by default)
-  tiger service create --name prod-db --type postgres --cpu 2000 --memory 8 --replicas 2
+  # Create a TimescaleDB service with AI add-ons
+  tiger service create --name hybrid-db --addons time-series,ai
+
+  # Create a plain Postgres service
+  tiger service create --name postgres-db --addons none
+
+  # Create a service with more resources (waits for ready by default)
+  tiger service create --name resources-db --cpu 2000 --memory 8 --replicas 2
 
   # Create service in a different region
-  tiger service create --name eu-db --region google-europe-west1
+  tiger service create --name eu-db --region eu-central-1
 
   # Create service without setting it as default
   tiger service create --name temp-db --no-set-default
 
   # Create service specifying only CPU (memory will be auto-configured to 8GB)
-  tiger service create --name auto-memory --type postgres --cpu 2000
+  tiger service create --name auto-memory --cpu 2000
 
   # Create service specifying only memory (CPU will be auto-configured to 4000m)
-  tiger service create --name auto-cpu --type timescaledb --memory 16
+  tiger service create --name auto-cpu --memory 16
 
   # Create service without waiting for completion
-  tiger service create --name quick-db --type postgres --cpu 1000 --memory 4 --replicas 1 --no-wait
+  tiger service create --name quick-db --no-wait
 
   # Create service with custom wait timeout
-  tiger service create --name patient-db --type timescaledb --cpu 2000 --memory 8 --replicas 2 --wait-timeout 1h
+  tiger service create --name patient-db --wait-timeout 1h
 
 Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB    |  2 CPU (2000m) / 8GB    |  4 CPU (4000m) / 16GB
@@ -283,14 +289,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
 			}
-			if createServiceType == "" {
-				return fmt.Errorf("service type is required (--type)")
-			}
 			if createRegionCode == "" {
 				return fmt.Errorf("region code cannot be empty (--region)")
 			}
 			if createReplicaCount < 0 {
 				return fmt.Errorf("replica count must be non-negative (--replicas)")
+			}
+
+			addons, err := util.ValidateAddons(createAddons)
+			if err != nil {
+				return err
 			}
 
 			// Check which flags were explicitly set
@@ -314,12 +322,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			// Validate service type
-			if !util.IsValidServiceType(createServiceType) {
-				return fmt.Errorf("invalid service type '%s'. Valid types: %s", createServiceType, strings.Join(util.ValidServiceTypes(), ", "))
-			}
-			serviceTypeUpper := strings.ToUpper(createServiceType)
-
 			// Get API key for authentication
 			apiKey, err := getAPIKeyForService()
 			if err != nil {
@@ -335,7 +337,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Prepare service creation request
 			serviceCreateReq := api.ServiceCreate{
 				Name:         createServiceName,
-				ServiceType:  api.ServiceType(serviceTypeUpper),
+				Addons:       util.ConvertAddonsToAPI(addons),
 				RegionCode:   createRegionCode,
 				ReplicaCount: createReplicaCount,
 				CpuMillis:    createCpuMillis,
@@ -414,7 +416,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 	// Add flags
 	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	cmd.Flags().StringVar(&createServiceType, "type", util.ServiceTypeTimescaleDB, fmt.Sprintf("Service type (%s)", strings.Join(util.ValidServiceTypes(), ", ")))
+	cmd.Flags().StringSliceVar(&createAddons, "addons", []string{util.AddonTimeSeries}, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(util.ValidAddons(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "us-east-1", "Region code")
 	cmd.Flags().IntVar(&createCpuMillis, "cpu", 500, "CPU allocation in millicores")
 	cmd.Flags().IntVar(&createMemoryGbs, "memory", 2, "Memory allocation in gigabytes")

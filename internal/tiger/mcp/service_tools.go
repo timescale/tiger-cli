@@ -81,13 +81,13 @@ type ServiceDetail struct {
 
 // ServiceCreateInput represents input for tiger_service_create
 type ServiceCreateInput struct {
-	Name      string `json:"name,omitempty"`
-	Type      string `json:"type,omitempty"`
-	Region    string `json:"region,omitempty"`
-	CPUMemory string `json:"cpu_memory,omitempty"`
-	Replicas  int    `json:"replicas,omitempty"`
-	Wait      *bool  `json:"wait,omitempty"`
-	Timeout   *int   `json:"timeout,omitempty"`
+	Name      string   `json:"name,omitempty"`
+	Addons    []string `json:"addons,omitempty"`
+	Region    string   `json:"region,omitempty"`
+	CPUMemory string   `json:"cpu_memory,omitempty"`
+	Replicas  int      `json:"replicas,omitempty"`
+	Wait      *bool    `json:"wait,omitempty"`
+	Timeout   *int     `json:"timeout,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -97,9 +97,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
-	schema.Properties["type"].Description = "The type of database service to create. TimescaleDB includes PostgreSQL with time-series extensions."
-	schema.Properties["type"].Enum = util.AnySlice(util.ValidServiceTypes())
-	schema.Properties["type"].Default = util.Must(json.Marshal(util.ServiceTypeTimescaleDB))
+	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array or null for PostgreSQL-only."
+	schema.Properties["addons"].Examples = []any{[]string{"time-series"}, []string{"ai"}, []string{"time-series", "ai"}, []string{}}
+	schema.Properties["addons"].Default = util.Must(json.Marshal([]string{util.AddonTimeSeries}))
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Default = util.Must(json.Marshal("us-east-1"))
@@ -207,16 +207,19 @@ Perfect for:
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud.
 
-This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+This tool provisions a new database service with specified configuration including addons, compute resources, region, and high availability options. Service capabilities are controlled by addons: 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions, or specify both for hybrid services.
+
+By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
 
 Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
 
 IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
 
 Perfect for:
-- Setting up new database infrastructure
-- Creating development or production environments
-- Provisioning databases with specific resource requirements
+- Setting up time-series databases with TimescaleDB
+- Creating AI/vector databases for embeddings and similarity search
+- Building hybrid services with both time-series and AI capabilities
+- Provisioning PostgreSQL-only services with no specialized extensions
 - Establishing services in different geographical regions`,
 		InputSchema: ServiceCreateInput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -373,11 +376,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = util.GenerateServiceName()
 	}
 
-	// Set default service type if not provided
-	if input.Type == "" {
-		input.Type = util.ServiceTypeTimescaleDB
-	}
-
 	// Set default region if not provided
 	if input.Region == "" {
 		input.Region = "us-east-1"
@@ -389,6 +387,13 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.CPUMemory = configs[0].String() // Default to smallest config (0.5 CPU/2GB)
 	}
 
+	// Validate addons
+	for _, addon := range input.Addons {
+		if !util.IsValidAddon(addon) {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid addon '%s'. Valid addons: %s", addon, strings.Join(util.ValidAddons(), ", "))
+		}
+	}
+
 	// Parse CPU and Memory from combined string
 	cpuMillis, memoryGbs, err := util.ParseCPUMemory(input.CPUMemory)
 	if err != nil {
@@ -398,17 +403,20 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	logging.Debug("MCP: Creating service",
 		zap.String("project_id", projectID),
 		zap.String("name", input.Name),
-		zap.String("type", input.Type),
+		zap.Strings("addons", input.Addons),
 		zap.String("region", input.Region),
 		zap.Int("cpu", cpuMillis),
 		zap.Int("memory", memoryGbs),
 		zap.Int("replicas", input.Replicas),
 	)
 
+	// Convert addons to API format
+	apiAddons := util.ConvertAddonsToAPI(input.Addons)
+
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
 		Name:         input.Name,
-		ServiceType:  api.ServiceType(strings.ToUpper(input.Type)),
+		Addons:       apiAddons,
 		RegionCode:   input.Region,
 		ReplicaCount: input.Replicas,
 		CpuMillis:    cpuMillis,

@@ -31,6 +31,12 @@ const (
 	ReadReplicaSetStatusResizing ReadReplicaSetStatus = "resizing"
 )
 
+// Defines values for ServiceCreateAddons.
+const (
+	Ai         ServiceCreateAddons = "ai"
+	TimeSeries ServiceCreateAddons = "time-series"
+)
+
 // Defines values for ServiceType.
 const (
 	POSTGRES    ServiceType = "POSTGRES"
@@ -219,6 +225,9 @@ type Service struct {
 
 // ServiceCreate defines model for ServiceCreate.
 type ServiceCreate struct {
+	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
+
 	// CpuMillis The initial CPU allocation in milli-cores.
 	CpuMillis int `json:"cpu_millis"`
 
@@ -233,9 +242,11 @@ type ServiceCreate struct {
 	RegionCode string `json:"region_code"`
 
 	// ReplicaCount Number of high-availability replicas to create (all replicas are asynchronous by default).
-	ReplicaCount int         `json:"replica_count"`
-	ServiceType  ServiceType `json:"service_type"`
+	ReplicaCount int `json:"replica_count"`
 }
+
+// ServiceCreateAddons defines model for ServiceCreate.Addons.
+type ServiceCreateAddons string
 
 // ServiceType defines model for ServiceType.
 type ServiceType string

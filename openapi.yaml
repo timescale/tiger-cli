@@ -914,7 +914,6 @@ components:
       type: object
       required:
         - name
-        - service_type
         - region_code
         - replica_count
         - cpu_millis
@@ -924,10 +923,13 @@ components:
           type: string
           description: A human-readable name for the service.
           example: "my-production-db"
-        service_type:
-          $ref: '#/components/schemas/ServiceType'
-          description: The type of the service.
-          default: TIMESCALEDB
+        addons:
+          type: array
+          items:
+            type: string
+            enum: ["time-series", "ai"]
+          description: List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+          example: ["time-series", "ai"]
         region_code:
           type: string
           example: "google-europe-west1"

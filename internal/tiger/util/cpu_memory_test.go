@@ -6,12 +6,12 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 	testCases := []struct {
 		name          string
 		cpuMillis     int
-		memoryGbs     float64
+		memoryGbs     int
 		cpuFlagSet    bool
 		memoryFlagSet bool
 		expectError   bool
 		expectedCPU   int
-		expectedMem   float64
+		expectedMem   int
 	}{
 		{
 			name:          "Valid combination both set (1 CPU, 4GB)",
@@ -110,7 +110,7 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			}
 
 			if memory != tc.expectedMem {
-				t.Errorf("Expected memory %.0f, got %.0f", tc.expectedMem, memory)
+				t.Errorf("Expected memory %d, got %d", tc.expectedMem, memory)
 			}
 		})
 	}
