@@ -38,7 +38,7 @@ curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
 
 ### Homebrew (macOS/Linux)
 ```bash
-brew install timescale/tap/tiger-cli
+brew install --cask timescale/tap/tiger-cli
 ```
 
 ### Go install
