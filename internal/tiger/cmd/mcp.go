@@ -41,7 +41,62 @@ Use 'tiger mcp start' to launch the MCP server.`,
 	}
 
 	// Add subcommands
+	cmd.AddCommand(buildMCPInstallCmd())
 	cmd.AddCommand(buildMCPStartCmd())
+
+	return cmd
+}
+
+// buildMCPInstallCmd creates the install subcommand for configuring editors
+func buildMCPInstallCmd() *cobra.Command {
+	var noBackup bool
+	var configPath string
+
+	cmd := &cobra.Command{
+		Use:   "install <editor>",
+		Short: "Install and configure Tiger MCP server for an editor",
+		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific editor or AI assistant.
+
+This command automates the configuration process by modifying the appropriate
+configuration files for the specified editor.
+
+%s
+The command will:
+- Automatically detect the appropriate configuration file location
+- Create the configuration directory if it doesn't exist
+- Create a backup of existing configuration by default
+- Merge with existing MCP server configurations (doesn't overwrite other servers)
+- Validate the configuration after installation
+
+Examples:
+  # Install for Claude Code
+  tiger mcp install claude-code
+  tiger mcp install claude
+
+  # Install for Cursor IDE
+  tiger mcp install cursor
+
+  # Install without creating backup
+  tiger mcp install claude-code --no-backup
+
+  # Use custom configuration file path
+  tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("editor name is required")
+			}
+
+			cmd.SilenceUsage = true
+
+			editorName := args[0]
+			return installMCPForEditor(editorName, !noBackup, configPath)
+		},
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&noBackup, "no-backup", false, "Skip creating backup of existing configuration (default: create backup)")
+	cmd.Flags().StringVar(&configPath, "config-path", "", "Custom path to configuration file (overrides default locations)")
 
 	return cmd
 }
