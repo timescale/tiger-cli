@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -214,6 +215,76 @@ func buildServiceListCmd() *cobra.Command {
 	return cmd
 }
 
+// writeEnvFile writes PostgreSQL connection environment variables to the specified file
+func writeEnvFile(client *api.ClientWithResponses, projectID, serviceID, password, envFilePath string) error {
+	// Get the current service details to ensure we have endpoint information
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get service details: %w", err)
+	}
+
+	if resp.StatusCode() != 200 || resp.JSON200 == nil {
+		return fmt.Errorf("could not retrieve service details")
+	}
+
+	service := *resp.JSON200
+
+	// Extract connection details from service
+	var host, port string = "", ""
+
+	// Use connection pooler endpoint if available, fallback to direct endpoint
+	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil && service.ConnectionPooler.Endpoint.Host != nil {
+		host = *service.ConnectionPooler.Endpoint.Host
+		if service.ConnectionPooler.Endpoint.Port != nil {
+			port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
+		} else {
+			return fmt.Errorf("service connection pooler port is not available")
+		}
+	} else if service.Endpoint != nil && service.Endpoint.Host != nil {
+		host = *service.Endpoint.Host
+		if service.Endpoint.Port != nil {
+			port = fmt.Sprintf("%d", *service.Endpoint.Port)
+		} else {
+			return fmt.Errorf("service endpoint port is not available")
+		}
+	}
+
+	// Validate that we have the required connection details
+	if host == "" {
+		return fmt.Errorf("service host is not available")
+	}
+	if port == "" {
+		return fmt.Errorf("service port is not available")
+	}
+
+	// Create environment variables content
+	envContent := fmt.Sprintf(`
+PGHOST=%s
+PGDATABASE=tsdb
+PGPORT=%s
+PGUSER=tsdbadmin
+PGPASSWORD=%s
+PGSSLMODE=require
+`, host, port, password)
+
+	// Open file for appending, create if doesn't exist
+	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open env file '%s': %w", envFilePath, err)
+	}
+	defer file.Close()
+
+	// Write environment variables
+	if _, err := file.WriteString(envContent); err != nil {
+		return fmt.Errorf("failed to write to env file '%s': %w", envFilePath, err)
+	}
+
+	return nil
+}
+
 // serviceCreateCmd represents the create command under service
 func buildServiceCreateCmd() *cobra.Command {
 	var createServiceName string
@@ -225,19 +296,20 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createNoWait bool
 	var createWaitTimeout time.Duration
 	var createNoSetDefault bool
+	var createEnvFile string
 
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new database service",
 		Long: `Create a new database service in the current project.
 
-By default, the newly created service will be set as your default service for future 
+By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
 Examples:
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
-  
+
   # Create a TimescaleDB service with custom name
   tiger service create --name my-db
 
@@ -261,6 +333,12 @@ Examples:
 
   # Create service with custom wait timeout
   tiger service create --name patient-db --type timescaledb --cpu 2000 --memory 8 --replicas 2 --wait-timeout 1h
+
+  # Create service and write connection variables to .env file
+  tiger service create --name my-db --env .env
+
+  # Create service and write connection variables to custom file
+  tiger service create --name my-db --env .env.dev
 
 Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB    |  2 CPU (2000m) / 8GB    |  4 CPU (4000m) / 16GB
@@ -390,13 +468,30 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Handle wait behavior
 				if createNoWait {
+					// Check if env file is requested
+					if cmd.Flags().Changed("env") {
+						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Cannot write .env file with --no-wait since service endpoints are not available until service is ready.\n")
+					}
 					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 					return nil
 				}
 
 				// Wait for service to be ready
 				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-				return waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd)
+				if err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd); err != nil {
+					return err
+				}
+
+				// Write env file if requested, after service is ready
+				if cmd.Flags().Changed("env") {
+					if err := writeEnvFile(client, projectID, serviceID, initialPassword, createEnvFile); err != nil {
+						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to write .env file: %v\n", err)
+					} else {
+						fmt.Fprintf(cmd.OutOrStdout(), "📄 PostgreSQL connection variables written to %s\n", createEnvFile)
+					}
+				}
+
+				return nil
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
@@ -422,6 +517,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
+	cmd.Flags().StringVar(&createEnvFile, "env", "", "Path to .env file to write connection variables")
 
 	return cmd
 }
