@@ -60,17 +60,9 @@ Examples:
 				return err
 			}
 
-			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, cmd)
+			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, dbConnectionStringWithPassword, cmd)
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
-			}
-
-			// Add password to connection string if requested
-			if dbConnectionStringWithPassword {
-				connectionString, err = addPasswordToConnectionString(connectionString, service)
-				if err != nil {
-					return fmt.Errorf("failed to add password to connection string: %w", err)
-				}
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
@@ -141,7 +133,7 @@ Examples:
 			}
 
 			// Get connection string using existing logic
-			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, cmd)
+			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, false, cmd)
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -200,7 +192,7 @@ Examples:
 			}
 
 			// Build connection string for testing
-			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, cmd)
+			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, false, cmd)
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
@@ -238,7 +230,7 @@ func buildDbCmd() *cobra.Command {
 }
 
 // buildConnectionString creates a PostgreSQL connection string from service details
-func buildConnectionString(service api.Service, pooled bool, role string, cmd *cobra.Command) (string, error) {
+func buildConnectionString(service api.Service, pooled bool, role string, withPassword bool, cmd *cobra.Command) (string, error) {
 	if service.Endpoint == nil {
 		return "", fmt.Errorf("service endpoint not available")
 	}
@@ -272,10 +264,38 @@ func buildConnectionString(service api.Service, pooled bool, role string, cmd *c
 	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
 	database := "tsdb"
 
-	// Build connection string in PostgreSQL URI format (username only, no password)
-	// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-	// This ensures credentials are never visible in process arguments
-	connectionString := fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
+	// Build connection string in PostgreSQL URI format
+	var connectionString string
+	if withPassword {
+		// Get password from storage if requested
+		storage := util.GetPasswordStorage()
+		password, err := storage.Get(service)
+		if err != nil {
+			// Provide specific error messages based on storage type
+			switch storage.(type) {
+			case *util.NoStorage:
+				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+			case *util.KeyringStorage:
+				return "", fmt.Errorf("no password found in keyring for this service")
+			case *util.PgpassStorage:
+				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+			default:
+				return "", fmt.Errorf("failed to retrieve password: %w", err)
+			}
+		}
+
+		if password == "" {
+			return "", fmt.Errorf("no password available for service")
+		}
+
+		// Include password in connection string
+		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, password, host, port, database)
+	} else {
+		// Build connection string without password (default behavior)
+		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
+		// This ensures credentials are never visible in process arguments
+		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
+	}
 
 	return connectionString, nil
 }
@@ -516,39 +536,3 @@ func isConnectionRejected(err error) bool {
 	return false
 }
 
-// addPasswordToConnectionString adds the password to a connection string if available
-func addPasswordToConnectionString(connectionString string, service api.Service) (string, error) {
-	// Parse the existing connection string
-	config, err := pgx.ParseConfig(connectionString)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse connection string: %w", err)
-	}
-
-	// Get password from storage if available
-	storage := util.GetPasswordStorage()
-	password, err := storage.Get(service)
-	if err != nil {
-		// Provide specific error messages based on storage type
-		switch storage.(type) {
-		case *util.NoStorage:
-			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-		case *util.KeyringStorage:
-			return "", fmt.Errorf("no password found in keyring for this service")
-		case *util.PgpassStorage:
-			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
-		default:
-			return "", fmt.Errorf("failed to retrieve password: %w", err)
-		}
-	}
-
-	if password == "" {
-		return "", fmt.Errorf("no password available for service")
-	}
-
-	// Manually build connection string with password
-	// Format: postgresql://username:password@host:port/database?params
-	result := fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require",
-		config.User, password, config.Host, config.Port, config.Database)
-
-	return result, nil
-}
