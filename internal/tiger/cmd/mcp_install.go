@@ -27,7 +27,7 @@ type MCPClient string
 
 const (
 	ClaudeCode MCPClient = "claude-code"
-	Cursor     MCPClient = "cursor"
+	Cursor     MCPClient = "cursor" //both the ide and the cli.
 	Windsurf   MCPClient = "windsurf"
 	Codex      MCPClient = "codex" // Not supported by toolhive - uses CLI
 )
