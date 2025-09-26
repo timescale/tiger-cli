@@ -271,18 +271,42 @@ func expandPath(path string) string {
 	return expanded
 }
 
+// getTigerExecutablePath returns the full path to the currently executing Tiger binary
+func getTigerExecutablePath() (string, error) {
+	tigerPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	return tigerPath, nil
+}
+
 // addTigerMCPServerViaCLI adds Tiger MCP server using a CLI command configured in clientConfig
 func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
 	if len(clientCfg.InstallCommand) == 0 {
 		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
 	}
 
+	// Get the full path of the currently executing Tiger binary
+	tigerPath, err := getTigerExecutablePath()
+	if err != nil {
+		return fmt.Errorf("failed to get Tiger executable path: %w", err)
+	}
+
+	// Build command with full Tiger path replacing "tiger" placeholder
+	installCommand := make([]string, len(clientCfg.InstallCommand))
+	copy(installCommand, clientCfg.InstallCommand)
+	for i, arg := range installCommand {
+		if arg == "tiger" {
+			installCommand[i] = tigerPath
+		}
+	}
+
 	logging.Info("Adding Tiger MCP server using CLI",
 		zap.String("client", clientCfg.Name),
-		zap.Strings("command", clientCfg.InstallCommand))
+		zap.Strings("command", installCommand))
 
 	// Run the configured CLI command
-	cmd := exec.Command(clientCfg.InstallCommand[0], clientCfg.InstallCommand[1:]...)
+	cmd := exec.Command(installCommand[0], installCommand[1:]...)
 
 	// Capture output
 	output, err := cmd.CombinedOutput()
@@ -330,9 +354,15 @@ func addTigerMCPServer(configPath string, mcpServersPathPrefix string) error {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create configuration directory %s: %w", configDir, err)
 	}
+	// Get the full path of the currently executing Tiger binary
+	tigerPath, err := getTigerExecutablePath()
+	if err != nil {
+		return fmt.Errorf("failed to get Tiger executable path: %w", err)
+	}
+
 	// Tiger MCP server configuration
 	tigerServer := TigerMCPServer{
-		Command: "tiger",
+		Command: tigerPath,
 		Args:    []string{"mcp", "start"},
 	}
 
