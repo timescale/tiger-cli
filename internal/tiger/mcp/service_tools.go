@@ -29,12 +29,16 @@ type ServiceListOutput struct {
 	Services []ServiceInfo `json:"services"`
 }
 
+func (ServiceListOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceListOutput](nil))
+}
+
 // ServiceInfo represents simplified service information for MCP output
 type ServiceInfo struct {
-	ServiceID string        `json:"id"`
+	ServiceID string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name      string        `json:"name"`
-	Status    string        `json:"status"`
-	Type      string        `json:"type"`
+	Status    string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Type      string        `json:"type" jsonschema:"One of: TIMESCALEDB, POSTGRES, VECTOR"`
 	Region    string        `json:"region"`
 	Created   string        `json:"created,omitempty"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
@@ -42,8 +46,8 @@ type ServiceInfo struct {
 
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
-	CPU    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
+	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation (e.g., '0.5 cores', '1 core')"`
+	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation (e.g., '2 GB', '4 GB')"`
 }
 
 // ServiceShowInput represents input for service_show
@@ -54,8 +58,9 @@ type ServiceShowInput struct {
 func (ServiceShowInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service to show details for. Use service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
+	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
+	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
 	return schema
 }
@@ -65,18 +70,22 @@ type ServiceShowOutput struct {
 	Service ServiceDetail `json:"service"`
 }
 
+func (ServiceShowOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceShowOutput](nil))
+}
+
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
-	ServiceID      string        `json:"id"`
+	ServiceID      string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name           string        `json:"name"`
-	Status         string        `json:"status"`
-	Type           string        `json:"type"`
+	Status         string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Type           string        `json:"type" jsonschema:"One of: TIMESCALEDB, POSTGRES, VECTOR"`
 	Region         string        `json:"region"`
 	Created        string        `json:"created,omitempty"`
 	Resources      *ResourceInfo `json:"resources,omitempty"`
-	Replicas       int           `json:"replicas,omitempty"`
-	DirectEndpoint string        `json:"direct_endpoint,omitempty"`
-	PoolerEndpoint string        `json:"pooler_endpoint,omitempty"`
+	Replicas       int           `json:"replicas,omitempty" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
+	DirectEndpoint string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
+	PoolerEndpoint string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
 	Paused         bool          `json:"paused"`
 }
 
@@ -144,6 +153,10 @@ type ServiceCreateOutput struct {
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
+func (ServiceCreateOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
+}
+
 // ServiceUpdatePasswordInput represents input for service_update_password
 type ServiceUpdatePasswordInput struct {
 	ServiceID string `json:"service_id"`
@@ -153,8 +166,9 @@ type ServiceUpdatePasswordInput struct {
 func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceUpdatePasswordInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service to update the password for. Use service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
+	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
+	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
 	schema.Properties["password"].Description = "The new password for the 'tsdbadmin' user. Must be strong and secure."
 	schema.Properties["password"].Examples = []any{"MySecurePassword123!"}
@@ -166,6 +180,10 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 type ServiceUpdatePasswordOutput struct {
 	Message         string                          `json:"message"`
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+}
+
+func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -183,7 +201,8 @@ Perfect for:
 - Finding service IDs for other operations
 - Checking service status and resource allocation
 - Discovering services across different regions`,
-		InputSchema: ServiceListInput{}.Schema(),
+		InputSchema:  ServiceListInput{}.Schema(),
+		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
 			Title:        "List Database Services",
@@ -203,7 +222,8 @@ Perfect for:
 - Checking detailed service configuration
 - Monitoring service health and status
 - Obtaining service specifications for scaling decisions`,
-		InputSchema: ServiceShowInput{}.Schema(),
+		InputSchema:  ServiceShowInput{}.Schema(),
+		OutputSchema: ServiceShowOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
 			Title:        "Show Service Details",
@@ -216,9 +236,11 @@ Perfect for:
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud.
 
-This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options.
 
-Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
+By default, this tool returns immediately after the creation request is accepted. The service will continue provisioning in the background and may not be ready for connections yet.
+
+Set 'wait: true' to block until the service is fully ready for connections. Use 'timeout' to control how long to wait (only applies when wait=true).
 
 IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
 
@@ -227,7 +249,8 @@ Perfect for:
 - Creating development or production environments
 - Provisioning databases with specific resource requirements
 - Establishing services in different geographical regions`,
-		InputSchema: ServiceCreateInput{}.Schema(),
+		InputSchema:  ServiceCreateInput{}.Schema(),
+		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,           // Creating with same name would fail
@@ -250,7 +273,8 @@ Perfect for:
 - Recovering from compromised credentials
 - Setting initial passwords for new services
 - Meeting organizational security policies`,
-		InputSchema: ServiceUpdatePasswordInput{}.Schema(),
+		InputSchema:  ServiceUpdatePasswordInput{}.Schema(),
+		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(true), // Modifies authentication credentials
 			IdempotentHint:  true,           // Same password can be set multiple times
