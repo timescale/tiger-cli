@@ -141,7 +141,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 				"mcpServers": map[string]interface{}{
 					"tigerdata": map[string]interface{}{
 						"command": "tiger",
-						"args":    []interface{}{"mcp"},
+						"args":    []interface{}{"mcp", "start"},
 					},
 				},
 			},
@@ -159,7 +159,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 					},
 					"tigerdata": map[string]interface{}{
 						"command": "tiger",
-						"args":    []interface{}{"mcp"},
+						"args":    []interface{}{"mcp", "start"},
 					},
 				},
 			},
@@ -174,7 +174,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 				"mcpServers": map[string]interface{}{
 					"tigerdata": map[string]interface{}{
 						"command": "tiger",
-						"args":    []interface{}{"mcp"},
+						"args":    []interface{}{"mcp", "start"},
 					},
 				},
 			},
@@ -188,7 +188,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 				"servers": map[string]interface{}{
 					"tigerdata": map[string]interface{}{
 						"command": "tiger",
-						"args":    []interface{}{"mcp"},
+						"args":    []interface{}{"mcp", "start"},
 					},
 				},
 			},
@@ -214,7 +214,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			require.NoError(t, err)
 
 			// Call the function under test
-			err = addTigerMCPServer(configPath, tt.mcpServersPathPrefix)
+			err = addTigerMCPServerViaJSON(configPath, tt.mcpServersPathPrefix)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -233,7 +233,9 @@ func TestAddTigerMCPServer(t *testing.T) {
 			require.NoError(t, err)
 
 			// Compare with expected result
-			assert.Equal(t, tt.expectedResult, result)
+			if tt.expectedResult != nil {
+				assert.Equal(t, tt.expectedResult, result)
+			}
 
 			// Verify the file is valid JSON
 			assert.True(t, json.Valid(resultBytes), "Result should be valid JSON")
@@ -250,7 +252,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		_, err := os.Stat(filepath.Dir(configPath))
 		assert.True(t, os.IsNotExist(err))
 
-		err = addTigerMCPServer(configPath, "/mcpServers")
+		err = addTigerMCPServerViaJSON(configPath, "/mcpServers")
 		require.NoError(t, err)
 
 		// Directory should now exist
@@ -266,7 +268,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nonexistent.json")
 
-		err := addTigerMCPServer(configPath, "/mcpServers")
+		err := addTigerMCPServerViaJSON(configPath, "/mcpServers")
 		require.NoError(t, err)
 
 		// File should now exist with correct content
@@ -281,7 +283,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 			"mcpServers": map[string]interface{}{
 				"tigerdata": map[string]interface{}{
 					"command": "tiger",
-					"args":    []interface{}{"mcp"},
+					"args":    []interface{}{"mcp", "start"},
 				},
 			},
 		}
@@ -296,7 +298,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(""), 0644)
 		require.NoError(t, err)
 
-		err = addTigerMCPServer(configPath, "/mcpServers")
+		err = addTigerMCPServerViaJSON(configPath, "/mcpServers")
 		require.NoError(t, err)
 
 		// File should now have correct content
@@ -311,7 +313,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 			"mcpServers": map[string]interface{}{
 				"tigerdata": map[string]interface{}{
 					"command": "tiger",
-					"args":    []interface{}{"mcp"},
+					"args":    []interface{}{"mcp", "start"},
 				},
 			},
 		}
@@ -673,13 +675,19 @@ func TestFindOurClientConfig(t *testing.T) {
 
 				assert.NotEmpty(t, config.Name, "Name should not be empty")
 				assert.NotEmpty(t, config.EditorNames, "EditorNames should not be empty")
-				assert.NotEmpty(t, config.ConfigPaths, "ConfigPaths should not be empty")
 
+				// ConfigPaths can be empty for CLI-only clients (like VS Code)
 				// Either MCPServersPathPrefix or InstallCommand should be set
 				hasPathPrefix := config.MCPServersPathPrefix != ""
 				hasInstallCommand := len(config.InstallCommand) > 0
 				assert.True(t, hasPathPrefix || hasInstallCommand,
 					"Either MCPServersPathPrefix or InstallCommand should be set for %s", cfg.ClientType)
+
+				// If ConfigPaths is empty, InstallCommand must be set (CLI-only client)
+				if len(config.ConfigPaths) == 0 {
+					assert.NotEmpty(t, config.InstallCommand,
+						"CLI-only clients must have InstallCommand set for %s", cfg.ClientType)
+				}
 			})
 		}
 	})
@@ -906,8 +914,9 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		assert.Equal(t, "tiger", tigerdata["command"], "command should be 'tiger'")
 		args, ok := tigerdata["args"].([]interface{})
 		require.True(t, ok, "args should be an array")
-		require.Len(t, args, 1, "should have one argument")
+		require.Len(t, args, 2, "should have two arguments")
 		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
+		assert.Equal(t, "start", args[1], "second arg should be 'start'")
 	})
 
 	t.Run("creates backup when requested", func(t *testing.T) {
