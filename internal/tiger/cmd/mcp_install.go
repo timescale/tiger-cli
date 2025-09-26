@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gofrs/flock"
 	"github.com/google/renameio/v2"
 	"github.com/tailscale/hujson"
@@ -278,6 +282,139 @@ func getTigerExecutablePath() (string, error) {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 	return tigerPath, nil
+}
+
+// EditorOption represents an editor choice for interactive selection
+type EditorOption struct {
+	Name       string // Display name
+	EditorName string // Editor name to pass to installMCPForEditor
+}
+
+// selectEditorInteractively prompts the user to select an editor using Bubble Tea
+func selectEditorInteractively(out io.Writer) (string, error) {
+	// Build editor options from supportedClients
+	var options []EditorOption
+	for _, cfg := range supportedClients {
+		// Use the first editor name as the primary identifier
+		primaryName := cfg.EditorNames[0]
+		options = append(options, EditorOption{
+			Name:       cfg.Name,
+			EditorName: primaryName,
+		})
+	}
+
+	// Sort options alphabetically by name
+	sort.Slice(options, func(i, j int) bool {
+		return options[i].Name < options[j].Name
+	})
+
+	model := editorSelectModel{
+		options: options,
+		cursor:  0,
+	}
+
+	program := tea.NewProgram(model, tea.WithOutput(out))
+	finalModel, err := program.Run()
+	if err != nil {
+		return "", fmt.Errorf("failed to run editor selection: %w", err)
+	}
+
+	result := finalModel.(editorSelectModel)
+	if result.selected == "" {
+		return "", fmt.Errorf("no editor selected")
+	}
+
+	return result.selected, nil
+}
+
+// editorSelectModel represents the Bubble Tea model for editor selection
+type editorSelectModel struct {
+	options      []EditorOption
+	cursor       int
+	selected     string
+	numberBuffer string
+}
+
+func (m editorSelectModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m editorSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "up", "k":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
+			if m.cursor < len(m.options)-1 {
+				m.cursor++
+			}
+		case "enter", " ":
+			m.selected = m.options[m.cursor].EditorName
+			return m, tea.Quit
+		case "backspace":
+			// Handle backspace to remove last character from buffer
+			if len(m.numberBuffer) > 0 {
+				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
+			}
+		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			// Add digit to buffer and update cursor position
+			m.updateNumberBuffer(m.numberBuffer + msg.String())
+		case "ctrl+w", "esc":
+			// Clear buffer on escape
+			m.numberBuffer = ""
+		}
+	}
+	return m, nil
+}
+
+// updateNumberBuffer moves the cursor to the editor matching the number buffer
+func (m *editorSelectModel) updateNumberBuffer(newBuffer string) {
+	if newBuffer == "" {
+		m.numberBuffer = newBuffer
+		return
+	}
+
+	// Parse the buffer as a number
+	num, err := strconv.Atoi(newBuffer)
+	if err != nil {
+		return
+	}
+
+	// Convert from 1-based to 0-based index and validate bounds
+	index := num - 1
+	if index >= 0 && index < len(m.options) {
+		m.numberBuffer = newBuffer
+		m.cursor = index
+	}
+}
+
+func (m editorSelectModel) View() string {
+	s := "Select an editor or AI assistant to configure:\n\n"
+
+	for i, option := range m.options {
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, option.Name)
+	}
+
+	// Show the current number buffer if user is typing
+	if m.numberBuffer != "" {
+		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
+	}
+
+	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
+	return s
 }
 
 // addTigerMCPServerViaCLI adds Tiger MCP server using a CLI command configured in clientConfig

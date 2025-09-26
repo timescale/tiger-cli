@@ -53,7 +53,7 @@ func buildMCPInstallCmd() *cobra.Command {
 	var configPath string
 
 	cmd := &cobra.Command{
-		Use:   "install <editor>",
+		Use:   "install [editor]",
 		Short: "Install and configure Tiger MCP server for an editor",
 		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific editor or AI assistant.
 
@@ -68,7 +68,12 @@ The command will:
 - Merge with existing MCP server configurations (doesn't overwrite other servers)
 - Validate the configuration after installation
 
+If no editor is specified, you'll be prompted to select one interactively.
+
 Examples:
+  # Interactive editor selection
+  tiger mcp install
+
   # Install for Claude Code
   tiger mcp install claude-code
   tiger mcp install claude
@@ -81,15 +86,25 @@ Examples:
 
   # Use custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return fmt.Errorf("editor name is required")
-			}
-
 			cmd.SilenceUsage = true
 
-			editorName := args[0]
+			var editorName string
+			if len(args) == 0 {
+				// No editor specified, prompt user to select one
+				var err error
+				editorName, err = selectEditorInteractively(cmd.OutOrStdout())
+				if err != nil {
+					return fmt.Errorf("failed to select editor: %w", err)
+				}
+				if editorName == "" {
+					return fmt.Errorf("no editor selected")
+				}
+			} else {
+				editorName = args[0]
+			}
+
 			return installMCPForEditor(editorName, !noBackup, configPath)
 		},
 	}
