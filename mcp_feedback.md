@@ -213,9 +213,9 @@ For `create`, add approximate hourly costs:
 2. ✅ **HIGH:** Add service_id format documentation and examples - **COMPLETED**
 3. ✅ **MEDIUM:** Clarify wait/timeout behavior - **COMPLETED**
 4. ✅ **MEDIUM:** Document response schemas - **COMPLETED**
-5. **MEDIUM:** Add error scenario documentation - **PENDING**
-6. **LOW:** Enhance security documentation - **PENDING**
-7. **LOW:** Add cost estimation information - **PENDING**
+5. **MEDIUM:** Add error scenario documentation - **SKIPPED** (would consume context without helping LLM tool selection)
+6. **LOW:** Enhance security documentation - **SKIPPED** (current documentation already appropriate)
+7. **LOW:** Add cost estimation information - **SKIPPED** (hardcoded estimates would become outdated and misleading)
 
 ## Testing Notes
 
@@ -257,11 +257,15 @@ For `create`, add approximate hourly costs:
   - Non-obvious meanings (replicas: 0=single node/no HA, 1+=HA enabled)
 - **Result**: No bitrot, always accurate, automatically maintained schemas
 
+### ⚠️ Known Issues (API-level, cannot fix in MCP)
+
+**Resource Format Inconsistency**: Input uses combined format `"0.5 CPU/2GB"` while output returns separate fields `"cpu": "0.5 cores", "memory": "2 GB"` with different unit notation. This inconsistency exists at the API level and cannot be resolved in the MCP layer.
+
 ### 🔄 Pending Improvements
 
-5. **Add error scenario documentation** - Document common error cases and HTTP status codes
-6. **Enhance security documentation** - Add password requirements and connection impact details
-7. **Add cost estimation** - Include approximate hourly costs for resource configurations
+5. **Add error scenario documentation** - Document common error cases and HTTP status codes - **SKIPPED**: Most errors are standard HTTP responses (401, 403, 404) that don't help LLM tool selection and would consume valuable context
+6. **Enhance security documentation** - Add password requirements and connection impact details - **SKIPPED**: Current documentation already appropriately covers security considerations without making unverifiable claims
+7. **Add cost estimation** - Include approximate hourly costs for resource configurations - **SKIPPED**: Hardcoded cost estimates would become outdated, vary by region/customer, and create maintenance burden
 
 ## Conclusion
 
