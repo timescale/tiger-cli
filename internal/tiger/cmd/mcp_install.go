@@ -60,7 +60,7 @@ var supportedClients = []clientConfig{
 		ConfigPaths: []string{
 			"~/.claude.json", // Default Claude Code config location - needed for backup
 		},
-		InstallCommand: []string{"claude", "mcp", "add", "tigerdata", "tiger", "mcp"},
+		InstallCommand: []string{"claude", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
 	{
 		ClientType:           Cursor,
@@ -89,7 +89,7 @@ var supportedClients = []clientConfig{
 			"$CODEX_HOME/config.toml",
 			"~/.codex/config.toml", // Default fallback
 		},
-		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp"},
+		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
 }
 
@@ -164,6 +164,23 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	fmt.Printf("\n💡 Next steps:\n")
 	fmt.Printf("   1. Restart %s to load the new configuration\n", editorName)
 	fmt.Printf("   2. The TigerData MCP server will be available as 'tigerdata'\n")
+	fmt.Printf("\n🤖 Try asking your AI assistant:\n")
+	fmt.Printf("\n   📊 List and manage your TigerData services:\n")
+	fmt.Printf("   • \"List my TigerData services\"\n")
+	fmt.Printf("   • \"Show me details for service xyz-123\"\n")
+	fmt.Printf("   • \"Create a new database service called my-app-db\"\n")
+	fmt.Printf("   • \"Update the password for my database service\"\n")
+	fmt.Printf("   • \"What TigerData services do I have access to?\"\n")
+	fmt.Printf("\n   📚 Ask questions from the PostgreSQL and TigerData documentation:\n")
+	fmt.Printf("   • \"Show me TigerData documentation about hypertables?\"\n")
+	fmt.Printf("   • \"What are the best practices for PostgreSQL indexing?\"\n")
+	fmt.Printf("   • \"What is the command for renaming a table?\"\n")
+	fmt.Printf("   • \"Help me optimize my PostgreSQL queries\"\n")
+	fmt.Printf("\n   📋 Make use of our optimized AI guides for common workflows:\n")
+	fmt.Printf("   • \"Help me create a new database schema for my application\"\n")
+	fmt.Printf("   • \"Help me set up hypertables for the device_readings table\"\n")
+	fmt.Printf("   • \"Help me figure out which tables should be hypertables\"\n")
+	fmt.Printf("   • \"What's the best way to structure time-series data?\"\n")
 
 	return nil
 }
@@ -316,7 +333,7 @@ func addTigerMCPServer(configPath string, mcpServersPathPrefix string) error {
 	// Tiger MCP server configuration
 	tigerServer := TigerMCPServer{
 		Command: "tiger",
-		Args:    []string{"mcp"},
+		Args:    []string{"mcp", "start"},
 	}
 
 	// Create a lock file
