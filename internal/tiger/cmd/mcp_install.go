@@ -33,7 +33,9 @@ const (
 	ClaudeCode MCPClient = "claude-code"
 	Cursor     MCPClient = "cursor" //both the ide and the cli.
 	Windsurf   MCPClient = "windsurf"
-	Codex      MCPClient = "codex" // Not supported by toolhive - uses CLI
+	Codex      MCPClient = "codex"
+	Gemini     MCPClient = "gemini"
+	VSCode     MCPClient = "vscode"
 )
 
 // TigerMCPServer represents the Tiger MCP server configuration
@@ -95,6 +97,26 @@ var supportedClients = []clientConfig{
 		},
 		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
+	{
+		ClientType:           Gemini,
+		Name:                 "Gemini CLI",
+		EditorNames:          []string{"gemini", "gemini-cli"},
+		MCPServersPathPrefix: "", // Not used for Gemini - uses CLI
+		ConfigPaths: []string{
+			"~/.gemini/settings.json", // Default Gemini CLI config location - needed for backup
+		},
+		InstallCommand: []string{"gemini", "mcp", "add", "-s", "user", "tigerdata", "tiger", "mcp", "start"},
+	},
+	{
+		ClientType:           VSCode,
+		Name:                 "VS Code",
+		EditorNames:          []string{"vscode", "code", "vs-code"},
+		MCPServersPathPrefix: "", // Not used for VS Code - uses CLI
+		ConfigPaths:          []string{
+			// VS Code doesn't need config paths for backup - it manages its own config
+		},
+		InstallCommand: []string{"code", "--add-mcp", `{"name":"tigerdata","command":"tiger","args":["mcp","start"]}`},
+	},
 }
 
 // installMCPForEditor installs the Tiger MCP server configuration for the specified editor
@@ -123,8 +145,11 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
 		}
+	} else if len(clientCfg.InstallCommand) > 0 {
+		// CLI-only client - no config path needed, will use InstallCommand
+		configPath = "" // Will be set appropriately in success message
 	} else {
-		// All clients should now have either ConfigPaths or InstallCommand defined
+		// Client has neither ConfigPaths nor InstallCommand
 		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", editorName)
 	}
 
@@ -135,9 +160,9 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 		zap.Bool("create_backup", createBackup),
 	)
 
-	// Create backup if requested
+	// Create backup if requested and we have a config file
 	var backupPath string
-	if createBackup {
+	if createBackup && configPath != "" {
 		var err error
 		backupPath, err = createConfigBackup(configPath)
 		if err != nil {
@@ -159,7 +184,11 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	}
 
 	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", editorName)
-	fmt.Printf("📁 Configuration file: %s\n", configPath)
+	if configPath != "" {
+		fmt.Printf("📁 Configuration file: %s\n", configPath)
+	} else {
+		fmt.Printf("⚙️  Configuration managed by %s\n", editorName)
+	}
 
 	if createBackup && backupPath != "" {
 		fmt.Printf("💾 Backup created: %s\n", backupPath)
@@ -281,6 +310,13 @@ func getTigerExecutablePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
+
+	// If running via 'go run', os.Executable() returns a temp path like /tmp/go-build*/exe/tiger
+	// In this case, return "tiger" assuming it's in PATH for development
+	if strings.Contains(tigerPath, "go-build") && strings.Contains(tigerPath, "/exe/") {
+		return "tiger", nil
+	}
+
 	return tigerPath, nil
 }
 
@@ -435,6 +471,9 @@ func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
 	for i, arg := range installCommand {
 		if arg == "tiger" {
 			installCommand[i] = tigerPath
+		} else if strings.Contains(arg, `"command":"tiger"`) {
+			// Handle JSON format for VS Code: replace "tiger" in JSON string
+			installCommand[i] = strings.Replace(arg, `"command":"tiger"`, fmt.Sprintf(`"command":"%s"`, tigerPath), 1)
 		}
 	}
 
