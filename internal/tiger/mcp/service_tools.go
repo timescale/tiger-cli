@@ -17,14 +17,14 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// ServiceListInput represents input for tiger_service_list
+// ServiceListInput represents input for service_list
 type ServiceListInput struct{}
 
 func (ServiceListInput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceListInput](nil))
 }
 
-// ServiceListOutput represents output for tiger_service_list
+// ServiceListOutput represents output for service_list
 type ServiceListOutput struct {
 	Services []ServiceInfo `json:"services"`
 }
@@ -46,7 +46,7 @@ type ResourceInfo struct {
 	Memory string `json:"memory,omitempty"`
 }
 
-// ServiceShowInput represents input for tiger_service_show
+// ServiceShowInput represents input for service_show
 type ServiceShowInput struct {
 	ServiceID string `json:"service_id"`
 }
@@ -54,13 +54,13 @@ type ServiceShowInput struct {
 func (ServiceShowInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service to show details for. Use tiger_service_list to find service IDs."
+	schema.Properties["service_id"].Description = "The unique identifier of the service to show details for. Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
 
 	return schema
 }
 
-// ServiceShowOutput represents output for tiger_service_show
+// ServiceShowOutput represents output for service_show
 type ServiceShowOutput struct {
 	Service ServiceDetail `json:"service"`
 }
@@ -80,7 +80,7 @@ type ServiceDetail struct {
 	Paused         bool          `json:"paused"`
 }
 
-// ServiceCreateInput represents input for tiger_service_create
+// ServiceCreateInput represents input for service_create
 type ServiceCreateInput struct {
 	Name       string   `json:"name,omitempty"`
 	Addons     []string `json:"addons,omitempty"`
@@ -137,14 +137,14 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-// ServiceCreateOutput represents output for tiger_service_create
+// ServiceCreateOutput represents output for service_create
 type ServiceCreateOutput struct {
 	Service         ServiceDetail                   `json:"service"`
 	Message         string                          `json:"message"`
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-// ServiceUpdatePasswordInput represents input for tiger_service_update_password
+// ServiceUpdatePasswordInput represents input for service_update_password
 type ServiceUpdatePasswordInput struct {
 	ServiceID string `json:"service_id"`
 	Password  string `json:"password"`
@@ -153,7 +153,7 @@ type ServiceUpdatePasswordInput struct {
 func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceUpdatePasswordInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service to update the password for. Use tiger_service_list to find service IDs."
+	schema.Properties["service_id"].Description = "The unique identifier of the service to update the password for. Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
 
 	schema.Properties["password"].Description = "The new password for the 'tsdbadmin' user. Must be strong and secure."
@@ -162,7 +162,7 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-// ServiceUpdatePasswordOutput represents output for tiger_service_update_password
+// ServiceUpdatePasswordOutput represents output for service_update_password
 type ServiceUpdatePasswordOutput struct {
 	Message         string                          `json:"message"`
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
@@ -170,9 +170,9 @@ type ServiceUpdatePasswordOutput struct {
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools() {
-	// tiger_service_list
+	// service_list
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_list",
+		Name:  "service_list",
 		Title: "List Database Services",
 		Description: `List all database services in your current TigerData project.
 
@@ -190,9 +190,9 @@ Perfect for:
 		},
 	}, s.handleServiceList)
 
-	// tiger_service_show
+	// service_show
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_show",
+		Name:  "service_show",
 		Title: "Show Service Details",
 		Description: `Show detailed information about a specific database service.
 
@@ -210,9 +210,9 @@ Perfect for:
 		},
 	}, s.handleServiceShow)
 
-	// tiger_service_create
+	// service_create
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_create",
+		Name:  "service_create",
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud.
 
@@ -235,9 +235,9 @@ Perfect for:
 		},
 	}, s.handleServiceCreate)
 
-	// tiger_service_update_password
+	// service_update_password
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_update_password",
+		Name:  "service_update_password",
 		Title: "Update Service Password",
 		Description: `Update the master password for the 'tsdbadmin' user of a database service.
 
@@ -259,7 +259,7 @@ Perfect for:
 	}, s.handleServiceUpdatePassword)
 }
 
-// handleServiceList handles the tiger_service_list MCP tool
+// handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -311,7 +311,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 }
 
-// handleServiceShow handles the tiger_service_show MCP tool
+// handleServiceShow handles the service_show MCP tool
 func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest, input ServiceShowInput) (*mcp.CallToolResult, ServiceShowOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -363,7 +363,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 	}
 }
 
-// handleServiceCreate handles the tiger_service_create MCP tool
+// handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -536,7 +536,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 }
 
-// handleServiceUpdatePassword handles the tiger_service_update_password MCP tool
+// handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
