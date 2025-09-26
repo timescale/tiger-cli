@@ -914,6 +914,7 @@ components:
       type: object
       required:
         - name
+        - addons
         - region_code
         - replica_count
         - cpu_millis

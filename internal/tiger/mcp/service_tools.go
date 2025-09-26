@@ -86,8 +86,9 @@ type ServiceCreateInput struct {
 	Region    string   `json:"region,omitempty"`
 	CPUMemory string   `json:"cpu_memory,omitempty"`
 	Replicas  int      `json:"replicas,omitempty"`
-	Wait      *bool    `json:"wait,omitempty"`
-	Timeout   *int     `json:"timeout,omitempty"`
+	Free      bool     `json:"free,omitempty"`
+	Wait      bool     `json:"wait,omitempty"`
+	Timeout   int      `json:"timeout,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -97,24 +98,26 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
-	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array or null for PostgreSQL-only."
-	schema.Properties["addons"].Examples = []any{[]string{"time-series"}, []string{"ai"}, []string{"time-series", "ai"}, []string{}}
-	schema.Properties["addons"].Default = util.Must(json.Marshal([]string{util.AddonTimeSeries}))
+	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array or null for PostgreSQL-only. Defaults to time-series."
+	schema.Properties["addons"].Items.Enum = []any{util.AddonTimeSeries, util.AddonAI}
+	schema.Properties["addons"].UniqueItems = true
 
-	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
-	schema.Properties["region"].Default = util.Must(json.Marshal("us-east-1"))
+	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance. Defaults to us-east-1."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
 	cpuMemoryCombinations := util.GetAllowedCPUMemoryConfigs().Strings()
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
+	schema.Properties["cpu_memory"].Description = fmt.Sprintf("CPU and memory allocation combination. Choose from the available configurations. Defaults to %s", cpuMemoryCombinations[0])
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryCombinations)
-	schema.Properties["cpu_memory"].Default = util.Must(json.Marshal(cpuMemoryCombinations[0])) // Default to smallest config
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
 	schema.Properties["replicas"].Maximum = util.Ptr(5.0)
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
+
+	schema.Properties["free"].Description = "Create a free service. When true, addons, region, cpu_memory, and replicas cannot be specified."
+	schema.Properties["free"].Default = util.Must(json.Marshal(false))
+	schema.Properties["free"].Examples = []any{false, true}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Set to true only if you need to use the service immediately after the tool call."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -207,19 +210,16 @@ Perfect for:
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud.
 
-This tool provisions a new database service with specified configuration including addons, compute resources, region, and high availability options. Service capabilities are controlled by addons: 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions, or specify both for hybrid services.
-
-By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
 
 Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
 
 IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
 
 Perfect for:
-- Setting up time-series databases with TimescaleDB
-- Creating AI/vector databases for embeddings and similarity search
-- Building hybrid services with both time-series and AI capabilities
-- Provisioning PostgreSQL-only services with no specialized extensions
+- Setting up new database infrastructure
+- Creating development or production environments
+- Provisioning databases with specific resource requirements
 - Establishing services in different geographical regions`,
 		InputSchema: ServiceCreateInput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -376,28 +376,55 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = util.GenerateServiceName()
 	}
 
-	// Set default region if not provided
-	if input.Region == "" {
-		input.Region = "us-east-1"
-	}
-
-	// Set default CPU/Memory if not provided
-	if input.CPUMemory == "" {
-		configs := util.GetAllowedCPUMemoryConfigs()
-		input.CPUMemory = configs[0].String() // Default to smallest config (0.5 CPU/2GB)
-	}
-
-	// Validate addons
-	for _, addon := range input.Addons {
-		if !util.IsValidAddon(addon) {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid addon '%s'. Valid addons: %s", addon, strings.Join(util.ValidAddons(), ", "))
+	var cpuMillis, memoryGbs int
+	if input.Free {
+		// Validate free service restrictions
+		if input.Addons != nil {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("addons cannot be specified for free services")
 		}
-	}
+		if input.Region != "" {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("region cannot be specified for free services")
+		}
+		if input.CPUMemory != "" {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("cpu_memory cannot be specified for free services")
+		}
+		if input.Replicas != 0 {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("replicas cannot be specified for free services")
+		}
 
-	// Parse CPU and Memory from combined string
-	cpuMillis, memoryGbs, err := util.ParseCPUMemory(input.CPUMemory)
-	if err != nil {
-		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
+		// Set free service defaults (in the future, we might geolocate
+		// the user to the closest free region here)
+		input.Region = "us-east-1"
+	} else {
+		// Set default addons if not provided
+		if input.Addons == nil {
+			input.Addons = []string{util.AddonTimeSeries}
+		} else {
+			// Validate addons for non-free services
+			for _, addon := range input.Addons {
+				if !util.IsValidAddon(addon) {
+					return nil, ServiceCreateOutput{}, fmt.Errorf("invalid addon '%s'. Valid addons: %s", addon, strings.Join(util.ValidAddons(), ", "))
+				}
+			}
+		}
+
+		// Set default region if not provided
+		if input.Region == "" {
+			input.Region = "us-east-1"
+		}
+
+		// Set default CPU/Memory if not provided
+		if input.CPUMemory == "" {
+			config := util.GetAllowedCPUMemoryConfigs()[0] // Default to smallest config (0.5 CPU/2GB)
+			cpuMillis, memoryGbs = config.CPUMillis, config.MemoryGbs
+		} else {
+			// Validate cpu/memory for non-free services
+			cpuMillis, memoryGbs, err = util.ParseCPUMemory(input.CPUMemory)
+			if err != nil {
+				return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
+			}
+		}
+
 	}
 
 	logging.Debug("MCP: Creating service",
@@ -408,6 +435,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		zap.Int("cpu", cpuMillis),
 		zap.Int("memory", memoryGbs),
 		zap.Int("replicas", input.Replicas),
+		zap.Bool("free", input.Free),
 	)
 
 	// Convert addons to API format
@@ -421,6 +449,11 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		ReplicaCount: input.Replicas,
 		CpuMillis:    cpuMillis,
 		MemoryGbs:    memoryGbs,
+	}
+
+	// Set free flag if specified
+	if input.Free {
+		serviceCreateReq.Free = &input.Free
 	}
 
 	// Make API call to create service
@@ -467,11 +500,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		// If wait is explicitly requested, wait for service to be ready
-		if input.Wait != nil && *input.Wait {
-			timeout := 30 * time.Minute
-			if input.Timeout != nil {
-				timeout = time.Duration(*input.Timeout) * time.Minute
-			}
+		if input.Wait {
+			timeout := time.Duration(input.Timeout) * time.Minute
 
 			output.Service, err = s.waitForServiceReady(apiClient, projectID, serviceID, timeout, serviceStatus)
 			if err != nil {

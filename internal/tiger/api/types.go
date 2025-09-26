@@ -226,7 +226,7 @@ type Service struct {
 // ServiceCreate defines model for ServiceCreate.
 type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
-	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
+	Addons []ServiceCreateAddons `json:"addons"`
 
 	// CpuMillis The initial CPU allocation in milli-cores.
 	CpuMillis int `json:"cpu_millis"`

@@ -225,6 +225,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createNoWait bool
 	var createWaitTimeout time.Duration
 	var createNoSetDefault bool
+	var createFree bool
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -238,8 +239,8 @@ Examples:
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 
-  # Create a TimescaleDB service with custom name
-  tiger service create --name my-db
+  # Create a free TimescaleDB service
+  tiger service create --name free-db --free
 
   # Create a TimescaleDB service with AI add-ons
   tiger service create --name hybrid-db --addons time-series,ai
@@ -268,7 +269,10 @@ Examples:
   # Create service with custom wait timeout
   tiger service create --name patient-db --wait-timeout 1h
 
-Allowed CPU/Memory Configurations:
+Free Tier:
+  When using --free, resource flags (--cpu, --memory, --replicas, --addons, --region) cannot be specified
+
+Allowed CPU/Memory Configurations (non-free services):
   0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB    |  2 CPU (2000m) / 8GB    |  4 CPU (4000m) / 16GB
   8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
@@ -289,31 +293,50 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
 			}
-			if createRegionCode == "" {
-				return fmt.Errorf("region code cannot be empty (--region)")
-			}
-			if createReplicaCount < 0 {
-				return fmt.Errorf("replica count must be non-negative (--replicas)")
-			}
 
-			addons, err := util.ValidateAddons(createAddons)
-			if err != nil {
-				return err
-			}
+			// Validate free tier restrictions
+			var addons []string
+			if createFree {
+				// Check which flags were explicitly set by the user
+				if cmd.Flags().Changed("addons") {
+					return fmt.Errorf("--addons cannot be specified with --free")
+				}
+				if cmd.Flags().Changed("region") {
+					return fmt.Errorf("--region cannot be specified with --free")
+				}
+				if cmd.Flags().Changed("cpu") {
+					return fmt.Errorf("--cpu cannot be specified with --free")
+				}
+				if cmd.Flags().Changed("memory") {
+					return fmt.Errorf("--memory cannot be specified with --free")
+				}
+				if cmd.Flags().Changed("replicas") {
+					return fmt.Errorf("--replicas cannot be specified with --free")
+				}
+			} else {
+				// For non-free services, validate addons and resources
+				addons, err = util.ValidateAddons(createAddons)
+				if err != nil {
+					return err
+				}
+				if createRegionCode == "" {
+					return fmt.Errorf("region code cannot be empty (--region)")
+				}
+				if createReplicaCount < 0 {
+					return fmt.Errorf("replica count must be non-negative (--replicas)")
+				}
 
-			// Check which flags were explicitly set
-			cpuFlagSet := cmd.Flags().Changed("cpu")
-			memoryFlagSet := cmd.Flags().Changed("memory")
+				cpuFlagSet := cmd.Flags().Changed("cpu")
+				memoryFlagSet := cmd.Flags().Changed("memory")
 
-			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGbs, err := util.ValidateAndNormalizeCPUMemory(
-				createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet,
-			)
-			if err != nil {
-				return err
+				// Validate and normalize CPU/Memory configuration
+				createCpuMillis, createMemoryGbs, err = util.ValidateAndNormalizeCPUMemory(
+					createCpuMillis, createMemoryGbs, cpuFlagSet, memoryFlagSet,
+				)
+				if err != nil {
+					return err
+				}
 			}
-			createCpuMillis = cpuMillis
-			createMemoryGbs = memoryGbs
 
 			// Validate wait timeout (Cobra handles parsing automatically)
 			if createWaitTimeout <= 0 {
@@ -336,12 +359,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Prepare service creation request
 			serviceCreateReq := api.ServiceCreate{
-				Name:         createServiceName,
-				Addons:       util.ConvertAddonsToAPI(addons),
-				RegionCode:   createRegionCode,
-				ReplicaCount: createReplicaCount,
-				CpuMillis:    createCpuMillis,
-				MemoryGbs:    createMemoryGbs,
+				Name: createServiceName,
+			}
+
+			// Set free flag if specified
+			if createFree {
+				serviceCreateReq.Free = &createFree
+				serviceCreateReq.RegionCode = "us-east-1"
+			} else {
+				serviceCreateReq.Addons = util.ConvertAddonsToAPI(addons)
+				serviceCreateReq.RegionCode = createRegionCode
+				serviceCreateReq.ReplicaCount = createReplicaCount
+				serviceCreateReq.CpuMillis = createCpuMillis
+				serviceCreateReq.MemoryGbs = createMemoryGbs
 			}
 
 			// Make API call to create service
@@ -424,6 +454,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
+	cmd.Flags().BoolVar(&createFree, "free", false, "Create a free tier service (limitations apply)")
 
 	return cmd
 }
@@ -609,10 +640,16 @@ func outputServiceTable(cmd *cobra.Command, service api.Service) error {
 				} else {
 					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
 				}
+			} else {
+				// CPU is null - this indicates a free tier service
+				table.Append("CPU", "shared")
 			}
 
 			if resource.Spec.MemoryGbs != nil {
 				table.Append("Memory", fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs))
+			} else {
+				// Memory is null - this indicates a free tier service
+				table.Append("Memory", "shared")
 			}
 		}
 	}

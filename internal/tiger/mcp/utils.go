@@ -40,10 +40,16 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 				} else {
 					info.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
 				}
+			} else {
+				// CPU is null - this indicates a free tier service
+				info.Resources.CPU = "shared"
 			}
 
 			if resource.Spec.MemoryGbs != nil {
 				info.Resources.Memory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
+			} else {
+				// Memory is null - this indicates a free tier service
+				info.Resources.Memory = "shared"
 			}
 		}
 	}
@@ -80,10 +86,16 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 				} else {
 					detail.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
 				}
+			} else {
+				// CPU is null - this indicates a free tier service
+				detail.Resources.CPU = "shared"
 			}
 
 			if resource.Spec.MemoryGbs != nil {
 				detail.Resources.Memory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
+			} else {
+				// Memory is null - this indicates a free tier service
+				detail.Resources.Memory = "shared"
 			}
 		}
 	}

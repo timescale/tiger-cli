@@ -38,9 +38,7 @@ func IsValidAddon(addon string) bool {
 	return false
 }
 
-// ValidateAddons validates a slice of add-ons, handling both individual add-ons
-// and comma-separated values within individual elements (for pflag StringSlice compatibility)
-// Returns a flattened, validated slice or error if any add-on is invalid
+// ValidateAddons validates a slice of add-ons and removes duplicate values
 func ValidateAddons(addons []string) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
@@ -73,7 +71,7 @@ func ValidateAddons(addons []string) ([]string, error) {
 
 // ConvertAddonsToAPI converts a slice of addon strings to the API format
 // Returns nil if addons slice is empty or nil (for PostgreSQL-only services)
-func ConvertAddonsToAPI(addons []string) *[]api.ServiceCreateAddons {
+func ConvertAddonsToAPI(addons []string) []api.ServiceCreateAddons {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -82,5 +80,5 @@ func ConvertAddonsToAPI(addons []string) *[]api.ServiceCreateAddons {
 	for i, addon := range addons {
 		apiAddons[i] = api.ServiceCreateAddons(addon)
 	}
-	return &apiAddons
+	return apiAddons
 }

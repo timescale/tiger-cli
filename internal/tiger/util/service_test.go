@@ -134,14 +134,14 @@ func TestConvertAddonsToAPI(t *testing.T) {
 				return
 			}
 
-			if len(*got) != tt.wantLen {
-				t.Errorf("ConvertAddonsToAPI(%v) length = %d, want %d", tt.addons, len(*got), tt.wantLen)
+			if len(got) != tt.wantLen {
+				t.Errorf("ConvertAddonsToAPI(%v) length = %d, want %d", tt.addons, len(got), tt.wantLen)
 			}
 
 			// Verify the conversion is correct
 			for i, addon := range tt.addons {
-				if string((*got)[i]) != addon {
-					t.Errorf("ConvertAddonsToAPI(%v)[%d] = %s, want %s", tt.addons, i, (*got)[i], addon)
+				if string(got[i]) != addon {
+					t.Errorf("ConvertAddonsToAPI(%v)[%d] = %s, want %s", tt.addons, i, got[i], addon)
 				}
 			}
 		})

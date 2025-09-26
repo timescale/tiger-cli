@@ -373,7 +373,7 @@ func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
 
 // Close closes the connection to the remote MCP server
 func (p *ProxyClient) Close() error {
-	if p.session != nil {
+	if p != nil && p.session != nil {
 		logging.Debug("Closing connection to remote MCP server")
 		return p.session.Close()
 	}

@@ -1352,3 +1352,179 @@ func TestServiceCreate_NoSetDefaultFlag(t *testing.T) {
 		t.Error("Expected help text to mention default service behavior")
 	}
 }
+
+func TestServiceCreate_FreeFlag(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID and a mock API URL to prevent network calls
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Test that --free flag works without other resource flags
+	_, err, _ = executeServiceCommand("service", "create", "--free", "--name", "free-test")
+	// Should fail at network call, not validation
+	if err != nil && strings.Contains(err.Error(), "cannot be specified with --free") {
+		t.Error("Free flag should work without other resource flags")
+	}
+}
+
+func TestServiceCreate_FreeWithIncompatibleFlags(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with project ID
+	cfg := &config.Config{
+		APIURL:    "http://localhost:9999",
+		ProjectID: "test-project-123",
+		ConfigDir: tmpDir,
+	}
+	err := cfg.Save()
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Test cases for incompatible flags with --free
+	testCases := []struct {
+		name        string
+		flags       []string
+		expectError string
+	}{
+		{
+			name:        "free with addons",
+			flags:       []string{"service", "create", "--free", "--addons", "time-series"},
+			expectError: "--addons cannot be specified with --free",
+		},
+		{
+			name:        "free with region",
+			flags:       []string{"service", "create", "--free", "--region", "eu-west-1"},
+			expectError: "--region cannot be specified with --free",
+		},
+		{
+			name:        "free with cpu",
+			flags:       []string{"service", "create", "--free", "--cpu", "1000"},
+			expectError: "--cpu cannot be specified with --free",
+		},
+		{
+			name:        "free with memory",
+			flags:       []string{"service", "create", "--free", "--memory", "4"},
+			expectError: "--memory cannot be specified with --free",
+		},
+		{
+			name:        "free with replicas",
+			flags:       []string{"service", "create", "--free", "--replicas", "1"},
+			expectError: "--replicas cannot be specified with --free",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err, _ := executeServiceCommand(tc.flags...)
+			if err == nil {
+				t.Fatalf("Expected error for %s", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("Expected error containing '%s', got: %v", tc.expectError, err)
+			}
+		})
+	}
+}
+
+func TestOutputService_FreeTier(t *testing.T) {
+	// Create a test free tier service object with null CPU and memory
+	serviceID := "svc-free-123"
+	serviceName := "free-tier-service"
+	serviceType := api.TIMESCALEDB
+	regionCode := "us-east-1"
+	status := api.READY
+	created := time.Now()
+	replicaCount := 0
+	host := "free.tigerdata.com"
+	port := 5432
+
+	service := api.Service{
+		ServiceId:   &serviceID,
+		Name:        &serviceName,
+		ServiceType: &serviceType,
+		RegionCode:  &regionCode,
+		Status:      &status,
+		Created:     &created,
+		Resources: &[]struct {
+			Id   *string `json:"id,omitempty"`
+			Spec *struct {
+				CpuMillis  *int    `json:"cpu_millis,omitempty"`
+				MemoryGbs  *int    `json:"memory_gbs,omitempty"`
+				VolumeType *string `json:"volume_type,omitempty"`
+			} `json:"spec,omitempty"`
+		}{
+			{
+				Spec: &struct {
+					CpuMillis  *int    `json:"cpu_millis,omitempty"`
+					MemoryGbs  *int    `json:"memory_gbs,omitempty"`
+					VolumeType *string `json:"volume_type,omitempty"`
+				}{
+					// CPU and Memory are nil for free tier services
+					CpuMillis: nil,
+					MemoryGbs: nil,
+				},
+			},
+		},
+		HaReplicas: &api.HAReplica{
+			ReplicaCount: &replicaCount,
+		},
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	// Create a test command
+	cmd := &cobra.Command{}
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+
+	// Test table output
+	err := outputService(cmd, service, "table")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify table output contains free tier indicators
+	output := buf.String()
+	expectedContents := []string{
+		"svc-free-123",
+		"free-tier-service",
+		"READY",
+		"TIMESCALEDB",
+		"us-east-1",
+		"shared", // CPU should show as "shared" for free tier
+		"shared", // Memory should show as "shared" for free tier
+		"0",      // Replicas
+		"free.tigerdata.com:5432",
+	}
+
+	for _, content := range expectedContents {
+		if !strings.Contains(output, content) {
+			t.Errorf("Expected table to contain %q, got: %s", content, output)
+		}
+	}
+}
