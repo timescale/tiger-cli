@@ -682,7 +682,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCCreate:
       type: object
       required:
@@ -698,7 +698,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCRename:
       type: object
       required:
@@ -778,7 +778,7 @@ components:
         region_code:
           type: string
           description: The cloud region where the service is hosted.
-          example: "google-europe-west1"
+          example: "us-east-1"
         service_type:
           $ref: '#/components/schemas/ServiceType'
           description: The type of the service.
@@ -933,7 +933,7 @@ components:
           example: ["time-series", "ai"]
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
         replica_count:
           type: integer
           description: Number of high-availability replicas to create (all replicas are asynchronous by default).
@@ -948,7 +948,7 @@ components:
           example: 4
         free:
           type: boolean
-          description: Whether to create a free service (if true, replica_count, cpu_millis, and memory_gbs must not be provided)
+          description: Whether to create a free service (if true, addons, replica_count, cpu_millis, and memory_gbs must not be provided)
           example: true
     HAReplica:
       type: object
