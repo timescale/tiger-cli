@@ -17,6 +17,7 @@ func buildConfigShowCmd() *cobra.Command {
 		Use:   "show",
 		Short: "Show current configuration",
 		Long:  `Display the current CLI configuration settings`,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -96,6 +97,7 @@ func buildConfigResetCmd() *cobra.Command {
 		Use:   "reset",
 		Short: "Reset to defaults",
 		Long:  `Reset all configuration settings to their default values`,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
