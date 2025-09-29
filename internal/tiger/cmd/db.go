@@ -535,4 +535,3 @@ func isConnectionRejected(err error) bool {
 	// should be treated as "unreachable" (exit code 2)
 	return false
 }
-

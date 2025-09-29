@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -81,28 +82,28 @@ password_storage: pgpass
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
+	lines := strings.Split(output, "\n")
 
-	// Check table output contains expected values
-	if !strings.Contains(output, "https://test.api.com/v1") {
-		t.Errorf("Output should contain API URL, got: %s", output)
+	// Check table output contains all expected key:value lines
+	expectedLines := []string{
+		"  api_url:          https://test.api.com/v1",
+		"  console_url:      https://console.cloud.timescale.com",
+		"  gateway_url:      https://console.cloud.timescale.com/api",
+		"  docs_mcp:         true",
+		"  docs_mcp_url:     https://mcp.tigerdata.com/docs",
+		"  project_id:       test-project",
+		"  service_id:       test-service",
+		"  output:           table",
+		"  analytics:        false",
+		"  password_storage: pgpass",
+		"  debug:            false",
+		"  config_dir:       " + tmpDir,
 	}
-	if !strings.Contains(output, "test-project") {
-		t.Errorf("Output should contain project ID, got: %s", output)
-	}
-	if !strings.Contains(output, "test-service") {
-		t.Errorf("Output should contain service ID, got: %s", output)
-	}
-	if !strings.Contains(output, "table") {
-		t.Errorf("Output should contain output format, got: %s", output)
-	}
-	if !strings.Contains(output, "false") {
-		t.Errorf("Output should contain analytics setting, got: %s", output)
-	}
-	if !strings.Contains(output, tmpDir) {
-		t.Errorf("Output should contain config directory %s, got: %s", tmpDir, output)
-	}
-	if !strings.Contains(output, "pgpass") {
-		t.Errorf("Output should contain password storage setting, got: %s", output)
+
+	for _, expectedLine := range expectedLines {
+		if !slices.Contains(lines, expectedLine) {
+			t.Errorf("Output should contain line '%s', got: %s", expectedLine, output)
+		}
 	}
 }
 
@@ -132,24 +133,31 @@ password_storage: none
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
 
-	// Verify JSON content
-	if result["api_url"] != "https://json.api.com/v1" {
-		t.Errorf("Expected api_url 'https://json.api.com/v1', got %v", result["api_url"])
+	// Verify ALL JSON keys and their expected values
+	expectedValues := map[string]interface{}{
+		"api_url":          "https://json.api.com/v1",
+		"console_url":      "https://console.cloud.timescale.com",
+		"gateway_url":      "https://console.cloud.timescale.com/api",
+		"docs_mcp":         true,
+		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
+		"project_id":       "json-project",
+		"service_id":       "",
+		"output":           "json",
+		"analytics":        true,
+		"password_storage": "none",
+		"debug":            false,
+		"config_dir":       tmpDir,
 	}
-	if result["project_id"] != "json-project" {
-		t.Errorf("Expected project_id 'json-project', got %v", result["project_id"])
+
+	for key, expectedValue := range expectedValues {
+		if result[key] != expectedValue {
+			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
+		}
 	}
-	if result["output"] != "json" {
-		t.Errorf("Expected output 'json', got %v", result["output"])
-	}
-	if result["analytics"] != true {
-		t.Errorf("Expected analytics true, got %v", result["analytics"])
-	}
-	if result["config_dir"] != tmpDir {
-		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
-	}
-	if result["password_storage"] != "none" {
-		t.Errorf("Expected password_storage 'none', got %v", result["password_storage"])
+
+	// Ensure no extra keys are present
+	if len(result) != len(expectedValues) {
+		t.Errorf("Expected %d keys in JSON output, got %d", len(expectedValues), len(result))
 	}
 }
 
@@ -179,24 +187,31 @@ password_storage: keyring
 		t.Fatalf("Failed to parse YAML output: %v", err)
 	}
 
-	// Verify YAML content
-	if result["api_url"] != "https://yaml.api.com/v1" {
-		t.Errorf("Expected api_url 'https://yaml.api.com/v1', got %v", result["api_url"])
+	// Verify ALL YAML keys and their expected values
+	expectedValues := map[string]interface{}{
+		"api_url":          "https://yaml.api.com/v1",
+		"console_url":      "https://console.cloud.timescale.com",
+		"gateway_url":      "https://console.cloud.timescale.com/api",
+		"docs_mcp":         true,
+		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
+		"project_id":       "yaml-project",
+		"service_id":       "",
+		"output":           "yaml",
+		"analytics":        false,
+		"password_storage": "keyring",
+		"debug":            false,
+		"config_dir":       tmpDir,
 	}
-	if result["project_id"] != "yaml-project" {
-		t.Errorf("Expected project_id 'yaml-project', got %v", result["project_id"])
+
+	for key, expectedValue := range expectedValues {
+		if result[key] != expectedValue {
+			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
+		}
 	}
-	if result["output"] != "yaml" {
-		t.Errorf("Expected output 'yaml', got %v", result["output"])
-	}
-	if result["analytics"] != false {
-		t.Errorf("Expected analytics false, got %v", result["analytics"])
-	}
-	if result["config_dir"] != tmpDir {
-		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
-	}
-	if result["password_storage"] != "keyring" {
-		t.Errorf("Expected password_storage 'keyring', got %v", result["password_storage"])
+
+	// Ensure no extra keys are present
+	if len(result) != len(expectedValues) {
+		t.Errorf("Expected %d keys in YAML output, got %d", len(expectedValues), len(result))
 	}
 }
 
