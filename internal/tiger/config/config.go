@@ -140,8 +140,8 @@ func (c *Config) Set(key, value string) error {
 	case "service_id":
 		c.ServiceID = value
 	case "output":
-		if value != "json" && value != "yaml" && value != "table" {
-			return fmt.Errorf("invalid output format: %s (must be json, yaml, or table)", value)
+		if err := ValidateOutputFormat(value); err != nil {
+			return err
 		}
 		c.Output = value
 	case "analytics":
