@@ -76,7 +76,6 @@ Examples:
 
   # Install for Claude Code
   tiger mcp install claude-code
-  tiger mcp install claude
 
   # Install for Cursor IDE
   tiger mcp install cursor

@@ -61,7 +61,7 @@ var supportedClients = []clientConfig{
 	{
 		ClientType:           ClaudeCode,
 		Name:                 "Claude Code",
-		EditorNames:          []string{"claude-code", "claude"},
+		EditorNames:          []string{"claude-code"},
 		MCPServersPathPrefix: "", // Not used for CLI-based installation
 		ConfigPaths: []string{
 			"~/.claude.json", // Default Claude Code config location - needed for backup

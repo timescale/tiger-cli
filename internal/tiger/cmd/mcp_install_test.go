@@ -590,7 +590,6 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 			expectedType MCPClient
 		}{
 			{"claude-code", ClaudeCode},
-			{"claude", ClaudeCode},
 			{"cursor", Cursor},
 			{"windsurf", Windsurf},
 			{"codex", Codex},
@@ -611,7 +610,6 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 			expectedType MCPClient
 		}{
 			{"CLAUDE-CODE", ClaudeCode},
-			{"Claude", ClaudeCode},
 			{"CURSOR", Cursor},
 			{"WindSurf", Windsurf},
 			{"CODEX", Codex},
