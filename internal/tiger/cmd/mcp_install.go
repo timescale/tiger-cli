@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -120,10 +119,19 @@ var supportedClients = []clientConfig{
 	},
 }
 
-// installMCPForEditor installs the Tiger MCP server configuration for the specified editor
-func installMCPForEditor(editorName string, createBackup bool, customConfigPath string) error {
-	// Map editor names to our client types
-	tigerClientType, err := mapEditorToTigerClientType(editorName)
+// getValidEditorNames returns all valid client names from supportedClients
+func getValidEditorNames() []string {
+	var validNames []string
+	for _, client := range supportedClients {
+		validNames = append(validNames, client.EditorNames...)
+	}
+	return validNames
+}
+
+// installMCPForClient installs the Tiger MCP server configuration for the specified client
+func installMCPForClient(clientName string, createBackup bool, customConfigPath string) error {
+	// Map client names to our client types
+	tigerClientType, err := mapClientToTigerClientType(clientName)
 	if err != nil {
 		return err
 	}
@@ -144,18 +152,18 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 		// Use manual config path discovery for clients with configured paths
 		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
 		if err != nil {
-			return fmt.Errorf("failed to find configuration for %s: %w", editorName, err)
+			return fmt.Errorf("failed to find configuration for %s: %w", clientName, err)
 		}
 	} else if len(clientCfg.InstallCommand) > 0 {
 		// CLI-only client - no config path needed, will use InstallCommand
 		configPath = "" // Will be set appropriately in success message
 	} else {
 		// Client has neither ConfigPaths nor InstallCommand
-		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", editorName)
+		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", clientName)
 	}
 
 	logging.Info("Installing Tiger MCP server configuration",
-		zap.String("editor", editorName),
+		zap.String("client", clientName),
 		zap.String("config_path", configPath),
 		zap.String("mcp_servers_path", mcpServersPathPrefix),
 		zap.Bool("create_backup", createBackup),
@@ -184,11 +192,11 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 		}
 	}
 
-	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", editorName)
+	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", clientName)
 	if configPath != "" {
 		fmt.Printf("📁 Configuration file: %s\n", configPath)
 	} else {
-		fmt.Printf("⚙️  Configuration managed by %s\n", editorName)
+		fmt.Printf("⚙️  Configuration managed by %s\n", clientName)
 	}
 
 	if createBackup && backupPath != "" {
@@ -196,7 +204,7 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	}
 
 	fmt.Printf("\n💡 Next steps:\n")
-	fmt.Printf("   1. Restart %s to load the new configuration\n", editorName)
+	fmt.Printf("   1. Restart %s to load the new configuration\n", clientName)
 	fmt.Printf("   2. The TigerData MCP server will be available as 'tigerdata'\n")
 	fmt.Printf("\n🤖 Try asking your AI assistant:\n")
 	fmt.Printf("\n   📊 List and manage your TigerData services:\n")
@@ -219,9 +227,9 @@ func installMCPForEditor(editorName string, createBackup bool, customConfigPath 
 	return nil
 }
 
-// mapEditorToTigerClientType maps editor names to our Tiger client types using our supportedClients config
-func mapEditorToTigerClientType(editorName string) (MCPClient, error) {
-	normalizedName := strings.ToLower(editorName)
+// mapClientToTigerClientType maps client names to our Tiger client types using our supportedClients config
+func mapClientToTigerClientType(clientName string) (MCPClient, error) {
+	normalizedName := strings.ToLower(clientName)
 
 	// Look up in our supported clients config
 	for _, cfg := range supportedClients {
@@ -232,13 +240,13 @@ func mapEditorToTigerClientType(editorName string) (MCPClient, error) {
 		}
 	}
 
-	// Build list of supported editors from our config
+	// Build list of supported clients from our config
 	var supportedNames []string
 	for _, cfg := range supportedClients {
 		supportedNames = append(supportedNames, cfg.EditorNames...)
 	}
 
-	return "", fmt.Errorf("unsupported editor: %s. Supported editors: %s", editorName, strings.Join(supportedNames, ", "))
+	return "", fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
 }
 
 // findOurClientConfig finds our client configuration for a given Tiger client type
@@ -251,16 +259,13 @@ func findOurClientConfig(tigerClientType MCPClient) (*clientConfig, error) {
 	return nil, fmt.Errorf("unsupported client type: %s", tigerClientType)
 }
 
-// generateSupportedEditorsHelp generates the supported editors section for help text
+// generateSupportedEditorsHelp generates the supported clients section for help text
 func generateSupportedEditorsHelp() string {
-	result := "Supported Editors:\n"
+	result := "Supported Clients:\n"
 	for _, cfg := range supportedClients {
-		// Show all editor names for this client
-		editorNames := strings.Join(cfg.EditorNames, " (or ")
-		if len(cfg.EditorNames) > 1 {
-			editorNames = fmt.Sprintf("%s)", editorNames)
-		}
-		result += fmt.Sprintf("  %-24s Configure for %s\n", editorNames, cfg.Name)
+		// Show only the primary editor name in help text
+		primaryName := cfg.EditorNames[0]
+		result += fmt.Sprintf("  %-24s Configure for %s\n", primaryName, cfg.Name)
 	}
 	return result
 }
@@ -305,13 +310,16 @@ func expandPath(path string) string {
 	return expanded
 }
 
+// tigerExecutablePathFunc can be overridden in tests to return a fixed path
+var tigerExecutablePathFunc = defaultGetTigerExecutablePath
+
 // getTigerExecutablePath returns the full path to the currently executing Tiger binary
 func getTigerExecutablePath() (string, error) {
-	// If we're in testing mode, always return "tiger" for consistent test results
-	if testing.Testing() {
-		return "tiger", nil
-	}
+	return tigerExecutablePathFunc()
+}
 
+// defaultGetTigerExecutablePath is the default implementation
+func defaultGetTigerExecutablePath() (string, error) {
 	tigerPath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
@@ -326,22 +334,22 @@ func getTigerExecutablePath() (string, error) {
 	return tigerPath, nil
 }
 
-// EditorOption represents an editor choice for interactive selection
-type EditorOption struct {
+// ClientOption represents a client choice for interactive selection
+type ClientOption struct {
 	Name       string // Display name
-	EditorName string // Editor name to pass to installMCPForEditor
+	ClientName string // Client name to pass to installMCPForClient
 }
 
-// selectEditorInteractively prompts the user to select an editor using Bubble Tea
-func selectEditorInteractively(out io.Writer) (string, error) {
-	// Build editor options from supportedClients
-	var options []EditorOption
+// selectClientInteractively prompts the user to select a client using Bubble Tea
+func selectClientInteractively(out io.Writer) (string, error) {
+	// Build client options from supportedClients
+	var options []ClientOption
 	for _, cfg := range supportedClients {
-		// Use the first editor name as the primary identifier
+		// Use the first client name as the primary identifier
 		primaryName := cfg.EditorNames[0]
-		options = append(options, EditorOption{
+		options = append(options, ClientOption{
 			Name:       cfg.Name,
-			EditorName: primaryName,
+			ClientName: primaryName,
 		})
 	}
 
@@ -350,7 +358,7 @@ func selectEditorInteractively(out io.Writer) (string, error) {
 		return options[i].Name < options[j].Name
 	})
 
-	model := editorSelectModel{
+	model := clientSelectModel{
 		options: options,
 		cursor:  0,
 	}
@@ -361,7 +369,7 @@ func selectEditorInteractively(out io.Writer) (string, error) {
 		return "", fmt.Errorf("failed to run editor selection: %w", err)
 	}
 
-	result := finalModel.(editorSelectModel)
+	result := finalModel.(clientSelectModel)
 	if result.selected == "" {
 		return "", fmt.Errorf("no editor selected")
 	}
@@ -369,19 +377,19 @@ func selectEditorInteractively(out io.Writer) (string, error) {
 	return result.selected, nil
 }
 
-// editorSelectModel represents the Bubble Tea model for editor selection
-type editorSelectModel struct {
-	options      []EditorOption
+// clientSelectModel represents the Bubble Tea model for client selection
+type clientSelectModel struct {
+	options      []ClientOption
 	cursor       int
 	selected     string
 	numberBuffer string
 }
 
-func (m editorSelectModel) Init() tea.Cmd {
+func (m clientSelectModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m editorSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -400,7 +408,7 @@ func (m editorSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter", " ":
-			m.selected = m.options[m.cursor].EditorName
+			m.selected = m.options[m.cursor].ClientName
 			return m, tea.Quit
 		case "backspace":
 			// Handle backspace to remove last character from buffer
@@ -419,7 +427,7 @@ func (m editorSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateNumberBuffer moves the cursor to the editor matching the number buffer
-func (m *editorSelectModel) updateNumberBuffer(newBuffer string) {
+func (m *clientSelectModel) updateNumberBuffer(newBuffer string) {
 	if newBuffer == "" {
 		m.numberBuffer = newBuffer
 		return
@@ -439,8 +447,8 @@ func (m *editorSelectModel) updateNumberBuffer(newBuffer string) {
 	}
 }
 
-func (m editorSelectModel) View() string {
-	s := "Select an editor or AI assistant to configure:\n\n"
+func (m clientSelectModel) View() string {
+	s := "Select an MCP client to configure:\n\n"
 
 	for i, option := range m.options {
 		cursor := " "

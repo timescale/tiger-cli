@@ -53,12 +53,12 @@ func buildMCPInstallCmd() *cobra.Command {
 	var configPath string
 
 	cmd := &cobra.Command{
-		Use:   "install [editor]",
-		Short: "Install and configure Tiger MCP server for an editor",
-		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific editor or AI assistant.
+		Use:   "install [client]",
+		Short: "Install and configure Tiger MCP server for a client",
+		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific MCP client or AI assistant.
 
 This command automates the configuration process by modifying the appropriate
-configuration files for the specified editor.
+configuration files for the specified client.
 
 %s
 The command will:
@@ -68,10 +68,10 @@ The command will:
 - Merge with existing MCP server configurations (doesn't overwrite other servers)
 - Validate the configuration after installation
 
-If no editor is specified, you'll be prompted to select one interactively.
+If no client is specified, you'll be prompted to select one interactively.
 
 Examples:
-  # Interactive editor selection
+  # Interactive client selection
   tiger mcp install
 
   # Install for Claude Code
@@ -86,26 +86,27 @@ Examples:
 
   # Use custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
-		Args: cobra.MaximumNArgs(1),
+		Args:      cobra.MaximumNArgs(1),
+		ValidArgs: getValidEditorNames(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			var editorName string
+			var clientName string
 			if len(args) == 0 {
-				// No editor specified, prompt user to select one
+				// No client specified, prompt user to select one
 				var err error
-				editorName, err = selectEditorInteractively(cmd.OutOrStdout())
+				clientName, err = selectClientInteractively(cmd.OutOrStdout())
 				if err != nil {
-					return fmt.Errorf("failed to select editor: %w", err)
+					return fmt.Errorf("failed to select client: %w", err)
 				}
-				if editorName == "" {
-					return fmt.Errorf("no editor selected")
+				if clientName == "" {
+					return fmt.Errorf("no client selected")
 				}
 			} else {
-				editorName = args[0]
+				clientName = args[0]
 			}
 
-			return installMCPForEditor(editorName, !noBackup, configPath)
+			return installMCPForClient(clientName, !noBackup, configPath)
 		},
 	}
 

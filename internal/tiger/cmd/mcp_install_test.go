@@ -126,6 +126,15 @@ func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
 }
 
 func TestAddTigerMCPServer(t *testing.T) {
+	// Override getTigerExecutablePath to return "tiger" for tests
+	oldFunc := tigerExecutablePathFunc
+	tigerExecutablePathFunc = func() (string, error) {
+		return "tiger", nil
+	}
+	defer func() {
+		tigerExecutablePathFunc = oldFunc
+	}()
+
 	tests := []struct {
 		name                 string
 		initialConfig        string
@@ -244,6 +253,15 @@ func TestAddTigerMCPServer(t *testing.T) {
 }
 
 func TestAddTigerMCPServerFileOperations(t *testing.T) {
+	// Override getTigerExecutablePath to return "tiger" for tests
+	oldFunc := tigerExecutablePathFunc
+	tigerExecutablePathFunc = func() (string, error) {
+		return "tiger", nil
+	}
+	defer func() {
+		tigerExecutablePathFunc = oldFunc
+	}()
+
 	t.Run("creates directory if it doesn't exist", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nested", "dir", "config.json")
@@ -580,7 +598,7 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.editorName, func(t *testing.T) {
-				result, err := mapEditorToTigerClientType(tc.editorName)
+				result, err := mapClientToTigerClientType(tc.editorName)
 				require.NoError(t, err, "should not error for supported editor")
 				assert.Equal(t, tc.expectedType, result, "should map to correct client type")
 			})
@@ -601,7 +619,7 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.editorName, func(t *testing.T) {
-				result, err := mapEditorToTigerClientType(tc.editorName)
+				result, err := mapClientToTigerClientType(tc.editorName)
 				require.NoError(t, err, "should not error for supported editor regardless of case")
 				assert.Equal(t, tc.expectedType, result, "should map to correct client type")
 			})
@@ -609,21 +627,21 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 	})
 
 	t.Run("returns error for unsupported editor", func(t *testing.T) {
-		result, err := mapEditorToTigerClientType("unsupported-editor")
+		result, err := mapClientToTigerClientType("unsupported-editor")
 		assert.Error(t, err, "should error for unsupported editor")
 		assert.Empty(t, result, "should return empty client type")
-		assert.Contains(t, err.Error(), "unsupported editor: unsupported-editor", "error should mention the unsupported editor")
-		assert.Contains(t, err.Error(), "Supported editors:", "error should list supported editors")
+		assert.Contains(t, err.Error(), "unsupported client: unsupported-editor", "error should mention the unsupported client")
+		assert.Contains(t, err.Error(), "Supported clients:", "error should list supported clients")
 		// Verify it includes some known supported editors
 		assert.Contains(t, err.Error(), "claude-code", "error should include claude-code in supported list")
 		assert.Contains(t, err.Error(), "cursor", "error should include cursor in supported list")
 	})
 
 	t.Run("handles empty editor name", func(t *testing.T) {
-		result, err := mapEditorToTigerClientType("")
+		result, err := mapClientToTigerClientType("")
 		assert.Error(t, err, "should error for empty editor name")
 		assert.Empty(t, result, "should return empty client type")
-		assert.Contains(t, err.Error(), "unsupported editor:", "error should mention unsupported editor")
+		assert.Contains(t, err.Error(), "unsupported client:", "error should mention unsupported client")
 	})
 }
 
@@ -882,6 +900,15 @@ func TestEnsurePathExists(t *testing.T) {
 }
 
 func TestInstallMCPForEditor_Integration(t *testing.T) {
+	// Override getTigerExecutablePath to return "tiger" for tests
+	oldFunc := tigerExecutablePathFunc
+	tigerExecutablePathFunc = func() (string, error) {
+		return "tiger", nil
+	}
+	defer func() {
+		tigerExecutablePathFunc = oldFunc
+	}()
+
 	t.Run("installs for Cursor with JSON config", func(t *testing.T) {
 		// Use Cursor since it uses JSON-based config that we can fully control
 		tempDir := t.TempDir()
@@ -892,9 +919,9 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
 		require.NoError(t, err, "should create initial config file")
 
-		// Call installMCPForEditor to install Tiger MCP server
-		err = installMCPForEditor("cursor", false, configPath)
-		require.NoError(t, err, "installMCPForEditor should succeed")
+		// Call installMCPForClient to install Tiger MCP server
+		err = installMCPForClient("cursor", false, configPath)
+		require.NoError(t, err, "installMCPForClient should succeed")
 
 		// Verify the config file was modified
 		configContent, err := os.ReadFile(configPath)
@@ -928,9 +955,9 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
 		require.NoError(t, err)
 
-		// Call installMCPForEditor with backup enabled for Cursor
-		err = installMCPForEditor("cursor", true, configPath)
-		require.NoError(t, err, "installMCPForEditor should succeed with backup")
+		// Call installMCPForClient with backup enabled for Cursor
+		err = installMCPForClient("cursor", true, configPath)
+		require.NoError(t, err, "installMCPForClient should succeed with backup")
 
 		// Check that a backup file was created
 		backupFiles, err := filepath.Glob(configPath + ".backup.*")
@@ -958,8 +985,8 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 	})
 
 	t.Run("handles unsupported editor", func(t *testing.T) {
-		err := installMCPForEditor("unsupported-editor", false, "")
+		err := installMCPForClient("unsupported-editor", false, "")
 		assert.Error(t, err, "should error for unsupported editor")
-		assert.Contains(t, err.Error(), "unsupported editor", "error should mention unsupported editor")
+		assert.Contains(t, err.Error(), "unsupported client", "error should mention unsupported client")
 	})
 }
