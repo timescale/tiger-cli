@@ -60,10 +60,15 @@ Examples:
 				return err
 			}
 
+			passwordMode := util.PasswordExclude
+			if dbConnectionStringWithPassword {
+				passwordMode = util.PasswordRequired
+			}
+
 			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				WithPassword: dbConnectionStringWithPassword,
+				PasswordMode: passwordMode,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -137,11 +142,10 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			// Get connection string using existing logic
 			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
-				WithPassword: false,
+				PasswordMode: util.PasswordExclude,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -201,11 +205,11 @@ Examples:
 				return exitWithCode(ExitInvalidParameters, err)
 			}
 
-			// Build connection string for testing
+			// Build connection string for testing with password (if available)
 			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				WithPassword: false,
+				PasswordMode: util.PasswordOptional,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -218,7 +222,7 @@ Examples:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, service, cmd)
+			return testDatabaseConnection(cmd.Context(), connectionString, dbTestConnectionTimeout, cmd)
 		},
 	}
 
@@ -284,7 +288,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	// Fetch service details
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
 	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
@@ -371,50 +375,18 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	return psqlCmd
 }
 
-// buildConnectionConfig creates a pgx connection config with proper password handling
-func buildConnectionConfig(connectionString string, service api.Service) (*pgx.ConnConfig, error) {
-	// Parse the connection string first to validate it
-	config, err := pgx.ParseConfig(connectionString)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set password from keyring storage if available
-	// pgpass storage works automatically since pgx checks ~/.pgpass file
-	storage := util.GetPasswordStorage()
-	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service); err == nil && password != "" {
-			config.Password = password
-		}
-		// Note: If keyring password retrieval fails, we let pgx try without it
-		// This allows fallback to other authentication methods
-	}
-
-	return config, nil
-}
-
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(connectionString string, timeout time.Duration, service api.Service, cmd *cobra.Command) error {
+func testDatabaseConnection(ctx context.Context, connectionString string, timeout time.Duration, cmd *cobra.Command) error {
 	// Create context with timeout if specified
-	var ctx context.Context
 	var cancel context.CancelFunc
-
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
-	} else {
-		ctx = context.Background()
-	}
-
-	// Build connection config with proper password handling
-	config, err := buildConnectionConfig(connectionString, service)
-	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to build connection config: %v\n", err)
-		return exitWithCode(ExitInvalidParameters, err)
 	}
 
 	// Attempt to connect to the database
-	conn, err := pgx.ConnectConfig(ctx, config)
+	// The connection string already includes the password (if available) thanks to PasswordOptional mode
+	conn, err := pgx.Connect(ctx, connectionString)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {

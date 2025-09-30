@@ -7,6 +7,23 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
 
+// PasswordMode determines how passwords are handled in connection strings
+type PasswordMode int
+
+const (
+	// PasswordExclude means don't include password in connection string (default)
+	// Connection will rely on PGPASSWORD env var or ~/.pgpass file
+	PasswordExclude PasswordMode = iota
+
+	// PasswordRequired means include password in connection string, return error if unavailable
+	// Used when user explicitly requests --with-password flag
+	PasswordRequired
+
+	// PasswordOptional means include password if available, but don't error if unavailable
+	// Used for connection testing and psql launching where we want best-effort password inclusion
+	PasswordOptional
+)
+
 // ConnectionStringOptions configures how the connection string is built
 type ConnectionStringOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
@@ -15,9 +32,8 @@ type ConnectionStringOptions struct {
 	// Role is the database role/username to use (e.g., "tsdbadmin")
 	Role string
 
-	// WithPassword determines whether to include the password in the connection string
-	// If false, the connection string will not include a password (for use with PGPASSWORD env var or ~/.pgpass)
-	WithPassword bool
+	// PasswordMode determines how passwords are handled
+	PasswordMode PasswordMode
 
 	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
 	// If nil, warnings are suppressed
@@ -89,8 +105,10 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 
 	// Build connection string in PostgreSQL URI format
 	var connectionString string
-	if opts.WithPassword {
-		// Get password from storage
+
+	switch opts.PasswordMode {
+	case PasswordRequired:
+		// Password is required - error if unavailable
 		storage := GetPasswordStorage()
 		password, err := storage.Get(service)
 		if err != nil {
@@ -113,7 +131,21 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 
 		// Include password in connection string
 		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
-	} else {
+
+	case PasswordOptional:
+		// Try to include password, but don't error if unavailable
+		storage := GetPasswordStorage()
+		password, err := storage.Get(service)
+
+		// Only include password if we successfully retrieved it
+		if err == nil && password != "" {
+			connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
+		} else {
+			// Fall back to connection string without password
+			connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database)
+		}
+
+	default: // PasswordExclude
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
 		// This ensures credentials are never visible in process arguments

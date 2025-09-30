@@ -31,7 +31,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -47,7 +47,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "readonly",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -63,7 +63,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -85,7 +85,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
 			expectError:    false,
@@ -102,7 +102,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 				WarnWriter:   new(bytes.Buffer), // Enable warnings
 			},
 			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
@@ -117,7 +117,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectError: true,
 		},
@@ -132,7 +132,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				WithPassword: false,
+				PasswordMode: PasswordExclude,
 			},
 			expectError: true,
 		},
@@ -217,7 +217,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		WithPassword: true,
+		PasswordMode: PasswordRequired,
 	})
 
 	if err != nil {
@@ -269,7 +269,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		WithPassword: true,
+		PasswordMode: PasswordRequired,
 	})
 
 	if err != nil {
@@ -312,7 +312,7 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	_, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		WithPassword: true,
+		PasswordMode: PasswordRequired,
 	})
 
 	if err == nil {
@@ -350,7 +350,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	_, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		WithPassword: true,
+		PasswordMode: PasswordRequired,
 	})
 
 	if err == nil {
@@ -383,7 +383,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	_, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		WithPassword: true,
+		PasswordMode: PasswordRequired,
 	})
 
 	if err == nil {
@@ -414,7 +414,7 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 	connectionString, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
-		WithPassword: false,
+		PasswordMode: PasswordExclude,
 		WarnWriter:   warnBuf,
 	})
 
