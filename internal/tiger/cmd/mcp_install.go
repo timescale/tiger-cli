@@ -55,7 +55,8 @@ type clientConfig struct {
 }
 
 // supportedClients defines the clients we support for Tiger MCP installation
-// Note: MCPServersPathPrefix can be found in the supportedClientIntegrations map found in:
+// Note: A good place to find the json config location for MCPServersPathPrefix
+// is in the supportedClientIntegrations map found in:
 // https://github.com/stacklok/toolhive/blob/main/pkg/client/config.go
 var supportedClients = []clientConfig{
 	{
@@ -148,13 +149,11 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", clientName, err)
 		}
-	} else if len(clientCfg.InstallCommand) > 0 {
-		// CLI-only client - no config path needed, will use InstallCommand
-		configPath = "" // Will be set appropriately in success message
-	} else {
+	} else if len(clientCfg.InstallCommand) == 0 {
 		// Client has neither ConfigPaths nor InstallCommand
 		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", clientName)
 	}
+	// else: CLI-only client - configPath remains empty, will use InstallCommand
 
 	logging.Info("Installing Tiger MCP server configuration",
 		zap.String("client", clientName),
