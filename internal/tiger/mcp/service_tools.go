@@ -91,15 +91,15 @@ type ServiceDetail struct {
 
 // ServiceCreateInput represents input for service_create
 type ServiceCreateInput struct {
-	Name       string   `json:"name,omitempty"`
-	Addons     []string `json:"addons,omitempty"`
-	Region     string   `json:"region,omitempty"`
-	CPUMemory  string   `json:"cpu_memory,omitempty"`
-	Replicas   int      `json:"replicas,omitempty"`
-	Free       bool     `json:"free,omitempty"`
-	Wait       bool     `json:"wait,omitempty"`
-	Timeout    int      `json:"timeout,omitempty"`
-	SetDefault bool     `json:"set_default,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Addons         []string `json:"addons,omitempty"`
+	Region         string   `json:"region,omitempty"`
+	CPUMemory      string   `json:"cpu_memory,omitempty"`
+	Replicas       int      `json:"replicas,omitempty"`
+	Free           bool     `json:"free,omitempty"`
+	Wait           bool     `json:"wait,omitempty"`
+	TimeoutMinutes *int     `json:"timeout_minutes,omitempty"`
+	SetDefault     bool     `json:"set_default,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -134,10 +134,10 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
 
-	schema.Properties["timeout"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
-	schema.Properties["timeout"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout"].Default = util.Must(json.Marshal(30))
-	schema.Properties["timeout"].Examples = []any{15, 30, 60}
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(30))
+	schema.Properties["timeout_minutes"].Examples = []any{15, 30, 60}
 
 	schema.Properties["set_default"].Description = "Whether to set the newly created service as the default service. When true, the service will be set as the default for future commands."
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
@@ -224,7 +224,7 @@ func (s *Server) registerServiceTools() {
 			"\n" +
 			"Default: Returns immediately (service provisions in background).\n" +
 			"wait=true: Blocks until service ready.\n" +
-			"timeout: Wait duration in minutes (with wait=true).\n" +
+			"timeout_minutes: Wait duration in minutes (with wait=true).\n" +
 			"\n" +
 			"WARNING: Creates billable resources.",
 		InputSchema:  ServiceCreateInput{}.Schema(),
@@ -507,7 +507,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 		// If wait is explicitly requested, wait for service to be ready
 		if input.Wait {
-			timeout := time.Duration(input.Timeout) * time.Minute
+			timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
 
 			output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
 			if err != nil {
