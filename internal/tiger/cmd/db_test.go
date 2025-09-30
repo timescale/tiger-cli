@@ -126,7 +126,7 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 
 func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// This test demonstrates that the warning functionality works
-	// by directly testing the buildConnectionString function
+	// by directly testing the util.BuildConnectionString function
 
 	// Service without connection pooler
 	service := api.Service{
@@ -137,13 +137,16 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 		ConnectionPooler: nil, // No pooler available
 	}
 
-	// Create a test command to capture stderr
-	cmd := &cobra.Command{}
+	// Create a buffer to capture stderr
 	errBuf := new(bytes.Buffer)
-	cmd.SetErr(errBuf)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := buildConnectionString(service, true, "tsdbadmin", false, cmd)
+	connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+		Pooled:       true,
+		Role:         "tsdbadmin",
+		WithPassword: false,
+		WarnWriter:   errBuf,
+	})
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -782,152 +785,6 @@ func TestIsConnectionRejected(t *testing.T) {
 	}
 }
 
-func TestBuildConnectionString(t *testing.T) {
-	testCases := []struct {
-		name           string
-		service        api.Service
-		pooled         bool
-		role           string
-		expectedString string
-		expectError    bool
-		expectWarning  bool
-	}{
-		{
-			name: "Basic connection string",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(5432),
-				},
-			},
-			pooled:         false,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Connection string with custom role",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(5432),
-				},
-			},
-			pooled:         false,
-			role:           "readonly",
-			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Connection string with default port",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: nil, // Should use default 5432
-				},
-			},
-			pooled:         false,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Pooled connection string",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: util.Ptr("direct-host.tigerdata.com"),
-					Port: util.Ptr(5432),
-				},
-				ConnectionPooler: &api.ConnectionPooler{
-					Endpoint: &api.Endpoint{
-						Host: util.Ptr("pooler-host.tigerdata.com"),
-						Port: util.Ptr(6432),
-					},
-				},
-			},
-			pooled:         true,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Pooled connection fallback to direct when pooler unavailable",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: util.Ptr("direct-host.tigerdata.com"),
-					Port: util.Ptr(5432),
-				},
-				ConnectionPooler: nil, // No pooler available
-			},
-			pooled:         true,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-			expectWarning:  true, // Should warn about pooler not available
-		},
-		{
-			name: "Error when no endpoint available",
-			service: api.Service{
-				Endpoint: nil,
-			},
-			pooled:      false,
-			role:        "tsdbadmin",
-			expectError: true,
-		},
-		{
-			name: "Error when no host available",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: nil,
-					Port: util.Ptr(5432),
-				},
-			},
-			pooled:      false,
-			role:        "tsdbadmin",
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create a test command to capture stderr output
-			cmd := &cobra.Command{}
-			errBuf := new(bytes.Buffer)
-			cmd.SetErr(errBuf)
-
-			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, false, cmd)
-
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
-
-			if result != tc.expectedString {
-				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result)
-			}
-
-			// Check for warning message
-			stderrOutput := errBuf.String()
-			if tc.expectWarning {
-				if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
-					t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
-				}
-			} else {
-				if stderrOutput != "" {
-					t.Errorf("Expected no warning, but got: %q", stderrOutput)
-				}
-			}
-		})
-	}
-}
-
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -1033,182 +890,6 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	}
 }
 
-func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service
-	serviceID := "test-password-service"
-	projectID := "test-password-project"
-	host := "test-host.com"
-	port := 5432
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
-		},
-	}
-
-	// Store a test password in keyring
-	testPassword := "test-password-keyring-123"
-	storage := util.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
-	if err != nil {
-		t.Fatalf("Failed to save test password: %v", err)
-	}
-	defer storage.Remove(service) // Clean up after test
-
-	// Create a test command
-	cmd := &cobra.Command{}
-
-	// Call buildConnectionString with withPassword=true
-	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
-
-	if err != nil {
-		t.Fatalf("buildConnectionString failed: %v", err)
-	}
-
-	// Verify that the password is included in the result
-	expectedResult := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
-	if result != expectedResult {
-		t.Errorf("Expected connection string with password '%s', got '%s'", expectedResult, result)
-	}
-
-	// Verify the password is actually in the connection string
-	if !strings.Contains(result, testPassword) {
-		t.Errorf("Password '%s' not found in connection string: %s", testPassword, result)
-	}
-}
-
-func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
-	// Set pgpass as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "pgpass")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service with endpoint information (required for pgpass)
-	serviceID := "test-pgpass-service"
-	projectID := "test-pgpass-project"
-	host := "test-pgpass-host.com"
-	port := 5432
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
-		},
-	}
-
-	// Store a test password in pgpass
-	testPassword := "test-password-pgpass-456"
-	storage := util.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
-	if err != nil {
-		t.Fatalf("Failed to save test password: %v", err)
-	}
-	defer storage.Remove(service) // Clean up after test
-
-	// Create a test command
-	cmd := &cobra.Command{}
-
-	// Call buildConnectionString with withPassword=true
-	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
-
-	if err != nil {
-		t.Fatalf("buildConnectionString failed: %v", err)
-	}
-
-	// Verify that the password is included in the result
-	expectedResult := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
-	if result != expectedResult {
-		t.Errorf("Expected connection string with password '%s', got '%s'", expectedResult, result)
-	}
-
-	// Verify the password is actually in the connection string
-	if !strings.Contains(result, testPassword) {
-		t.Errorf("Password '%s' not found in connection string: %s", testPassword, result)
-	}
-}
-
-func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
-	// Set no storage as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "none")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service
-	serviceID := "test-nostorage-service"
-	projectID := "test-nostorage-project"
-	host := "test-host.com"
-	port := 5432
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
-		},
-	}
-
-	// Create a test command
-	cmd := &cobra.Command{}
-
-	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
-
-	if err == nil {
-		t.Fatal("Expected error when password storage is disabled, but got none")
-	}
-
-	// Verify we get the expected error message
-	expectedError := "password storage is disabled (--password-storage=none)"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
-	}
-}
-
-func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service (but don't store any password for it)
-	serviceID := "test-nopassword-service"
-	projectID := "test-nopassword-project"
-	host := "test-host.com"
-	port := 5432
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
-		},
-	}
-
-	// Create a test command
-	cmd := &cobra.Command{}
-
-	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
-
-	if err == nil {
-		t.Fatal("Expected error when no password is available, but got none")
-	}
-
-	// Verify we get the expected error message
-	expectedError := "no password found in keyring for this service"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
-	}
-}
-
 func TestDBConnectionString_WithPassword(t *testing.T) {
 	// This test verifies the end-to-end --with-password flag functionality
 	// using direct function testing since full integration would require a real service
@@ -1241,11 +922,16 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 	defer storage.Remove(service) // Clean up after test
 
-	// Test buildConnectionString without password (default behavior)
+	// Test util.BuildConnectionString without password (default behavior)
 	cmd := &cobra.Command{}
-	baseConnectionString, err := buildConnectionString(service, false, "tsdbadmin", false, cmd)
+	baseConnectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		WithPassword: false,
+		WarnWriter:   cmd.ErrOrStderr(),
+	})
 	if err != nil {
-		t.Fatalf("buildConnectionString failed: %v", err)
+		t.Fatalf("BuildConnectionString failed: %v", err)
 	}
 
 	expectedBase := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
@@ -1258,10 +944,15 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 		t.Errorf("Base connection string should not contain password, but it does: %s", baseConnectionString)
 	}
 
-	// Test buildConnectionString with password (simulating --with-password flag)
-	connectionStringWithPassword, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	// Test util.BuildConnectionString with password (simulating --with-password flag)
+	connectionStringWithPassword, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		WithPassword: true,
+		WarnWriter:   cmd.ErrOrStderr(),
+	})
 	if err != nil {
-		t.Fatalf("buildConnectionString with password failed: %v", err)
+		t.Fatalf("BuildConnectionString with password failed: %v", err)
 	}
 
 	expectedWithPassword := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
@@ -1272,37 +963,5 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	// Verify connection string with password contains the password
 	if !strings.Contains(connectionStringWithPassword, testPassword) {
 		t.Errorf("Connection string with password should contain '%s', but it doesn't: %s", testPassword, connectionStringWithPassword)
-	}
-}
-
-func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T) {
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service without endpoint (invalid)
-	serviceID := "test-invalid-service"
-	projectID := "test-invalid-project"
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-		Endpoint:  nil, // Invalid - no endpoint
-	}
-
-	// Create a test command
-	cmd := &cobra.Command{}
-
-	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
-
-	if err == nil {
-		t.Fatal("Expected error for invalid service endpoint, but got none")
-	}
-
-	// Verify we get an endpoint error
-	expectedError := "service endpoint not available"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
 	}
 }

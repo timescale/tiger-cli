@@ -60,7 +60,12 @@ Examples:
 				return err
 			}
 
-			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, dbConnectionStringWithPassword, cmd)
+			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+				Pooled:       dbConnectionStringPooled,
+				Role:         dbConnectionStringRole,
+				WithPassword: dbConnectionStringWithPassword,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -133,7 +138,12 @@ Examples:
 			}
 
 			// Get connection string using existing logic
-			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, false, cmd)
+			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+				Pooled:       dbConnectPooled,
+				Role:         dbConnectRole,
+				WithPassword: false,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -192,7 +202,12 @@ Examples:
 			}
 
 			// Build connection string for testing
-			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, false, cmd)
+			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+				Pooled:       dbTestConnectionPooled,
+				Role:         dbTestConnectionRole,
+				WithPassword: false,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
@@ -227,77 +242,6 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbTestConnectionCmd())
 
 	return cmd
-}
-
-// buildConnectionString creates a PostgreSQL connection string from service details
-func buildConnectionString(service api.Service, pooled bool, role string, withPassword bool, cmd *cobra.Command) (string, error) {
-	if service.Endpoint == nil {
-		return "", fmt.Errorf("service endpoint not available")
-	}
-
-	var endpoint *api.Endpoint
-	var host string
-	var port int
-
-	// Use pooler endpoint if requested and available, otherwise use direct endpoint
-	if pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		endpoint = service.ConnectionPooler.Endpoint
-	} else {
-		// If pooled was requested but no pooler is available, warn the user
-		if pooled {
-			fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
-		}
-		endpoint = service.Endpoint
-	}
-
-	if endpoint.Host == nil {
-		return "", fmt.Errorf("endpoint host not available")
-	}
-	host = *endpoint.Host
-
-	if endpoint.Port != nil {
-		port = *endpoint.Port
-	} else {
-		port = 5432 // Default PostgreSQL port
-	}
-
-	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
-	database := "tsdb"
-
-	// Build connection string in PostgreSQL URI format
-	var connectionString string
-	if withPassword {
-		// Get password from storage if requested
-		storage := util.GetPasswordStorage()
-		password, err := storage.Get(service)
-		if err != nil {
-			// Provide specific error messages based on storage type
-			switch storage.(type) {
-			case *util.NoStorage:
-				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-			case *util.KeyringStorage:
-				return "", fmt.Errorf("no password found in keyring for this service")
-			case *util.PgpassStorage:
-				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
-			default:
-				return "", fmt.Errorf("failed to retrieve password: %w", err)
-			}
-		}
-
-		if password == "" {
-			return "", fmt.Errorf("no password available for service")
-		}
-
-		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, password, host, port, database)
-	} else {
-		// Build connection string without password (default behavior)
-		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-		// This ensures credentials are never visible in process arguments
-		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
-	}
-
-	return connectionString, nil
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details

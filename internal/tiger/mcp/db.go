@@ -11,7 +11,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
@@ -130,7 +129,12 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	service := *serviceResp.JSON200
 
 	// Build connection string with password (use direct connection, default role tsdbadmin)
-	connString, err := s.buildConnectionString(service, false, "tsdbadmin")
+	connString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		WithPassword: true, // MCP always includes password
+		WarnWriter:   nil,  // No warnings in MCP context
+	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)
 	}
@@ -185,53 +189,4 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	return nil, output, nil
-}
-
-// buildConnectionString creates a PostgreSQL connection string from service details with password included
-func (s *Server) buildConnectionString(service api.Service, pooled bool, role string) (string, error) {
-	if service.Endpoint == nil {
-		return "", fmt.Errorf("service endpoint not available")
-	}
-
-	var endpoint *api.Endpoint
-	var host string
-	var port int
-
-	// Use pooler endpoint if requested and available, otherwise use direct endpoint
-	if pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		endpoint = service.ConnectionPooler.Endpoint
-	} else {
-		// If pooled was requested but no pooler is available, use direct endpoint
-		endpoint = service.Endpoint
-	}
-
-	if endpoint.Host == nil {
-		return "", fmt.Errorf("endpoint host not available")
-	}
-	host = *endpoint.Host
-
-	if endpoint.Port != nil {
-		port = *endpoint.Port
-	} else {
-		port = 5432 // Default PostgreSQL port
-	}
-
-	// Get password from storage
-	storage := util.GetPasswordStorage()
-	password, err := storage.Get(service)
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve password: %w", err)
-	}
-
-	if password == "" {
-		return "", fmt.Errorf("no password available for service")
-	}
-
-	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
-	database := "tsdb"
-
-	// Build connection string with password included
-	connectionString := fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, password, host, port, database)
-
-	return connectionString, nil
 }
