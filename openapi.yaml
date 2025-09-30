@@ -682,7 +682,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCCreate:
       type: object
       required:
@@ -698,7 +698,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCRename:
       type: object
       required:
@@ -778,7 +778,7 @@ components:
         region_code:
           type: string
           description: The cloud region where the service is hosted.
-          example: "google-europe-west1"
+          example: "us-east-1"
         service_type:
           $ref: '#/components/schemas/ServiceType'
           description: The type of the service.
@@ -896,10 +896,9 @@ components:
           description: CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: Memory allocation in gigabytes.
-          example: 0.5
+          example: 1
         metadata:
           type: object
           description: Additional metadata for the read replica set
@@ -915,7 +914,7 @@ components:
       type: object
       required:
         - name
-        - service_type
+        - addons
         - region_code
         - replica_count
         - cpu_millis
@@ -925,13 +924,16 @@ components:
           type: string
           description: A human-readable name for the service.
           example: "my-production-db"
-        service_type:
-          $ref: '#/components/schemas/ServiceType'
-          description: The type of the service.
-          default: TIMESCALEDB
+        addons:
+          type: array
+          items:
+            type: string
+            enum: ["time-series", "ai"]
+          description: List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+          example: ["time-series", "ai"]
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
         replica_count:
           type: integer
           description: Number of high-availability replicas to create (all replicas are asynchronous by default).
@@ -941,10 +943,13 @@ components:
           description: The initial CPU allocation in milli-cores.
           example: 1000
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The initial memory allocation in gigabytes.
           example: 4
+        free:
+          type: boolean
+          description: Whether to create a free service (if true, addons, replica_count, cpu_millis, and memory_gbs must not be provided)
+          example: true
     HAReplica:
       type: object
       properties:
@@ -989,10 +994,9 @@ components:
           description: The initial CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The initial memory allocation in gigabytes.
-          example: 0.5
+          example: 1
     ResizeInput:
       type: object
       required:
@@ -1004,8 +1008,7 @@ components:
           description: The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
           example: 1000
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The new memory allocation in gigabytes.
           example: 4
         nodes:

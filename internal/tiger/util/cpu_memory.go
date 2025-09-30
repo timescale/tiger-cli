@@ -7,8 +7,8 @@ import (
 
 // CPUMemoryConfig represents an allowed CPU/Memory configuration
 type CPUMemoryConfig struct {
-	CPUMillis int     // CPU in millicores
-	MemoryGbs float64 // Memory in GB
+	CPUMillis int // CPU in millicores
+	MemoryGbs int // Memory in GB
 }
 
 func (c *CPUMemoryConfig) String() string {
@@ -28,7 +28,7 @@ func (c *CPUMemoryConfig) CPUString() string {
 }
 
 func (c *CPUMemoryConfig) MemoryString() string {
-	return fmt.Sprintf("%.0fGB", c.MemoryGbs)
+	return fmt.Sprintf("%dGB", c.MemoryGbs)
 }
 
 type CPUMemoryConfigs []CPUMemoryConfig
@@ -80,7 +80,7 @@ func (c CPUMemoryConfigs) MemoryString() string {
 }
 
 // ValidateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic
-func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs float64, cpuFlagSet, memoryFlagSet bool) (int, float64, error) {
+func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs int, cpuFlagSet, memoryFlagSet bool) (int, int, error) {
 	configs := GetAllowedCPUMemoryConfigs()
 
 	// If both CPU and memory were explicitly set, validate they match an allowed configuration
@@ -92,7 +92,7 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs float64, cpuFlagSet,
 		}
 		// If no exact match, provide helpful error
 		return 0, 0, fmt.Errorf(
-			"invalid CPU/Memory combination: %dm CPU and %.0fGB memory. Allowed combinations: %s",
+			"invalid CPU/Memory combination: %dm CPU and %dGB memory. Allowed combinations: %s",
 			cpuMillis, memoryGbs, configs,
 		)
 	}
@@ -118,7 +118,7 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs float64, cpuFlagSet,
 			}
 		}
 		return 0, 0, fmt.Errorf(
-			"invalid memory allocation: %.0fGB. Allowed memory values: %s",
+			"invalid memory allocation: %dGB. Allowed memory values: %s",
 			memoryGbs, configs.MemoryString(),
 		)
 	}
@@ -128,7 +128,7 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs float64, cpuFlagSet,
 }
 
 // ParseCPUMemory parses a CPU/Memory combination string (e.g., "2 CPU/8GB") and returns millicores and GB
-func ParseCPUMemory(cpuMemoryStr string) (int, float64, error) {
+func ParseCPUMemory(cpuMemoryStr string) (int, int, error) {
 	// Get allowed configurations
 	configs := GetAllowedCPUMemoryConfigs()
 
