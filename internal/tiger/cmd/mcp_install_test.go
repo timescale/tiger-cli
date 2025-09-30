@@ -583,30 +583,34 @@ func TestExpandPath(t *testing.T) {
 	})
 }
 
-func TestMapEditorToTigerClientType(t *testing.T) {
-	t.Run("maps supported editors correctly", func(t *testing.T) {
+func TestFindClientConfig(t *testing.T) {
+	t.Run("finds client config for supported client names", func(t *testing.T) {
 		testCases := []struct {
-			editorName   string
+			clientName   string
 			expectedType MCPClient
+			expectedName string
 		}{
-			{"claude-code", ClaudeCode},
-			{"cursor", Cursor},
-			{"windsurf", Windsurf},
-			{"codex", Codex},
+			{"claude-code", ClaudeCode, "Claude Code"},
+			{"cursor", Cursor, "Cursor"},
+			{"windsurf", Windsurf, "Windsurf"},
+			{"codex", Codex, "Codex"},
 		}
 
 		for _, tc := range testCases {
-			t.Run(tc.editorName, func(t *testing.T) {
-				result, err := mapClientToTigerClientType(tc.editorName)
-				require.NoError(t, err, "should not error for supported editor")
-				assert.Equal(t, tc.expectedType, result, "should map to correct client type")
+			t.Run(tc.clientName, func(t *testing.T) {
+				result, err := findClientConfig(tc.clientName)
+				require.NoError(t, err, "should not error for supported client")
+				require.NotNil(t, result, "should return a config")
+				assert.Equal(t, tc.expectedType, result.ClientType, "should have correct client type")
+				assert.Equal(t, tc.expectedName, result.Name, "should have correct name")
+				assert.NotEmpty(t, result.EditorNames, "should have editor names")
 			})
 		}
 	})
 
-	t.Run("handles case insensitive editor names", func(t *testing.T) {
+	t.Run("handles case insensitive client names", func(t *testing.T) {
 		testCases := []struct {
-			editorName   string
+			clientName   string
 			expectedType MCPClient
 		}{
 			{"CLAUDE-CODE", ClaudeCode},
@@ -616,76 +620,39 @@ func TestMapEditorToTigerClientType(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			t.Run(tc.editorName, func(t *testing.T) {
-				result, err := mapClientToTigerClientType(tc.editorName)
-				require.NoError(t, err, "should not error for supported editor regardless of case")
-				assert.Equal(t, tc.expectedType, result, "should map to correct client type")
+			t.Run(tc.clientName, func(t *testing.T) {
+				result, err := findClientConfig(tc.clientName)
+				require.NoError(t, err, "should not error for supported client regardless of case")
+				require.NotNil(t, result, "should return a config")
+				assert.Equal(t, tc.expectedType, result.ClientType, "should map to correct client type")
 			})
 		}
 	})
 
-	t.Run("returns error for unsupported editor", func(t *testing.T) {
-		result, err := mapClientToTigerClientType("unsupported-editor")
-		assert.Error(t, err, "should error for unsupported editor")
-		assert.Empty(t, result, "should return empty client type")
+	t.Run("returns error for unsupported client", func(t *testing.T) {
+		result, err := findClientConfig("unsupported-editor")
+		assert.Error(t, err, "should error for unsupported client")
+		assert.Nil(t, result, "should return nil config")
 		assert.Contains(t, err.Error(), "unsupported client: unsupported-editor", "error should mention the unsupported client")
 		assert.Contains(t, err.Error(), "Supported clients:", "error should list supported clients")
-		// Verify it includes some known supported editors
+		// Verify it includes some known supported clients
 		assert.Contains(t, err.Error(), "claude-code", "error should include claude-code in supported list")
 		assert.Contains(t, err.Error(), "cursor", "error should include cursor in supported list")
 	})
 
-	t.Run("handles empty editor name", func(t *testing.T) {
-		result, err := mapClientToTigerClientType("")
-		assert.Error(t, err, "should error for empty editor name")
-		assert.Empty(t, result, "should return empty client type")
+	t.Run("handles empty client name", func(t *testing.T) {
+		result, err := findClientConfig("")
+		assert.Error(t, err, "should error for empty client name")
+		assert.Nil(t, result, "should return nil config")
 		assert.Contains(t, err.Error(), "unsupported client:", "error should mention unsupported client")
-	})
-}
-
-func TestFindOurClientConfig(t *testing.T) {
-	t.Run("finds client config for supported client types", func(t *testing.T) {
-		testCases := []struct {
-			clientType   MCPClient
-			expectedName string
-		}{
-			{ClaudeCode, "Claude Code"},
-			{Cursor, "Cursor"},
-			{Windsurf, "Windsurf"},
-			{Codex, "Codex"},
-		}
-
-		for _, tc := range testCases {
-			t.Run(string(tc.clientType), func(t *testing.T) {
-				result, err := findOurClientConfig(tc.clientType)
-				require.NoError(t, err, "should not error for supported client type")
-				require.NotNil(t, result, "should return a config")
-				assert.Equal(t, tc.clientType, result.ClientType, "should have correct client type")
-				assert.Equal(t, tc.expectedName, result.Name, "should have correct name")
-				assert.NotEmpty(t, result.EditorNames, "should have editor names")
-			})
-		}
-	})
-
-	t.Run("returns error for unsupported client type", func(t *testing.T) {
-		result, err := findOurClientConfig("unsupported-client")
-		assert.Error(t, err, "should error for unsupported client type")
-		assert.Nil(t, result, "should return nil config")
-		assert.Contains(t, err.Error(), "unsupported client type: unsupported-client", "error should mention the unsupported client type")
-	})
-
-	t.Run("returns error for empty client type", func(t *testing.T) {
-		result, err := findOurClientConfig("")
-		assert.Error(t, err, "should error for empty client type")
-		assert.Nil(t, result, "should return nil config")
-		assert.Contains(t, err.Error(), "unsupported client type:", "error should mention unsupported client type")
 	})
 
 	t.Run("verifies client config structure", func(t *testing.T) {
 		// Test that each client config has required fields populated
 		for _, cfg := range supportedClients {
 			t.Run(string(cfg.ClientType), func(t *testing.T) {
-				config, err := findOurClientConfig(cfg.ClientType)
+				// Use the first editor name to look up the config
+				config, err := findClientConfig(cfg.EditorNames[0])
 				require.NoError(t, err)
 				require.NotNil(t, config)
 

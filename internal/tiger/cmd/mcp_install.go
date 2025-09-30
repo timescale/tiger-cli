@@ -130,14 +130,8 @@ func getValidEditorNames() []string {
 
 // installMCPForClient installs the Tiger MCP server configuration for the specified client
 func installMCPForClient(clientName string, createBackup bool, customConfigPath string) error {
-	// Map client names to our client types
-	tigerClientType, err := mapClientToTigerClientType(clientName)
-	if err != nil {
-		return err
-	}
-
-	// Get the MCP servers path prefix from our own configuration
-	clientCfg, err := findOurClientConfig(tigerClientType)
+	// Find the client configuration by name
+	clientCfg, err := findClientConfig(clientName)
 	if err != nil {
 		return err
 	}
@@ -227,36 +221,27 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 	return nil
 }
 
-// mapClientToTigerClientType maps client names to our Tiger client types using our supportedClients config
-func mapClientToTigerClientType(clientName string) (MCPClient, error) {
+// findClientConfig finds the client configuration for a given client name
+// This consolidates the logic of mapping client names to client types and finding the config
+func findClientConfig(clientName string) (*clientConfig, error) {
 	normalizedName := strings.ToLower(clientName)
 
 	// Look up in our supported clients config
 	for _, cfg := range supportedClients {
 		for _, name := range cfg.EditorNames {
 			if strings.ToLower(name) == normalizedName {
-				return cfg.ClientType, nil
+				return &cfg, nil
 			}
 		}
 	}
 
-	// Build list of supported clients from our config
+	// Build list of supported clients from our config for error message
 	var supportedNames []string
 	for _, cfg := range supportedClients {
 		supportedNames = append(supportedNames, cfg.EditorNames...)
 	}
 
-	return "", fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
-}
-
-// findOurClientConfig finds our client configuration for a given Tiger client type
-func findOurClientConfig(tigerClientType MCPClient) (*clientConfig, error) {
-	for _, cfg := range supportedClients {
-		if cfg.ClientType == tigerClientType {
-			return &cfg, nil
-		}
-	}
-	return nil, fmt.Errorf("unsupported client type: %s", tigerClientType)
+	return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
 }
 
 // generateSupportedEditorsHelp generates the supported clients section for help text
