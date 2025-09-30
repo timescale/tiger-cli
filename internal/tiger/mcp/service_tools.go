@@ -192,15 +192,8 @@ func (s *Server) registerServiceTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_list",
 		Title: "List Database Services",
-		Description: `List all database services in your current TigerData project.
-
-This tool retrieves a complete list of database services with their basic information including status, type, region, and resource allocation. Use this to get an overview of all your services before performing operations on specific services.
-
-Perfect for:
-- Getting an overview of your database infrastructure
-- Finding service IDs for other operations
-- Checking service status and resource allocation
-- Discovering services across different regions`,
+		Description: "List all database services in current TigerData project. " +
+			"Returns services with status, type, region, and resource allocation.",
 		InputSchema:  ServiceListInput{}.Schema(),
 		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -213,15 +206,8 @@ Perfect for:
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_show",
 		Title: "Show Service Details",
-		Description: `Show detailed information about a specific database service.
-
-This tool provides comprehensive information about a service including connection endpoints, replica configuration, resource allocation, creation time, and current operational status. Essential for debugging, monitoring, and connection management.
-
-Perfect for:
-- Getting connection endpoints (direct and pooled)
-- Checking detailed service configuration
-- Monitoring service health and status
-- Obtaining service specifications for scaling decisions`,
+		Description: "Get detailed information for a specific database service. " +
+			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
 		InputSchema:  ServiceShowInput{}.Schema(),
 		OutputSchema: ServiceShowOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -234,21 +220,13 @@ Perfect for:
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_create",
 		Title: "Create Database Service",
-		Description: `Create a new database service in TigerData Cloud.
-
-This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options.
-
-By default, this tool returns immediately after the creation request is accepted. The service will continue provisioning in the background and may not be ready for connections yet.
-
-Set 'wait: true' to block until the service is fully ready for connections. Use 'timeout' to control how long to wait (only applies when wait=true).
-
-IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
-
-Perfect for:
-- Setting up new database infrastructure
-- Creating development or production environments
-- Provisioning databases with specific resource requirements
-- Establishing services in different geographical regions`,
+		Description: "Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.\n" +
+			"\n" +
+			"Default: Returns immediately (service provisions in background).\n" +
+			"wait=true: Blocks until service ready.\n" +
+			"timeout: Wait duration in minutes (with wait=true).\n" +
+			"\n" +
+			"WARNING: Creates billable resources.",
 		InputSchema:  ServiceCreateInput{}.Schema(),
 		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -262,17 +240,8 @@ Perfect for:
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_update_password",
 		Title: "Update Service Password",
-		Description: `Update the master password for the 'tsdbadmin' user of a database service.
-
-This tool changes the master database password used for the default administrative user. The new password will be required for all future database connections. Existing connections may be terminated.
-
-SECURITY NOTE: Ensure new passwords are strong and stored securely. Password changes take effect immediately.
-
-Perfect for:
-- Password rotation for security compliance
-- Recovering from compromised credentials
-- Setting initial passwords for new services
-- Meeting organizational security policies`,
+		Description: "Update master password for 'tsdbadmin' user of a database service. " +
+			"Takes effect immediately. May terminate existing connections.",
 		InputSchema:  ServiceUpdatePasswordInput{}.Schema(),
 		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
