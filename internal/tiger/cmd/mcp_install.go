@@ -26,7 +26,7 @@ import (
 // lockTimeout is the maximum time to wait for a file lock
 const lockTimeout = 1 * time.Second
 
-// MCPClient represents our internal client types (extends beyond toolhive support)
+// MCPClient represents our internal client types
 type MCPClient string
 
 const (
@@ -180,7 +180,7 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 			return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
 		}
 	} else {
-		// Use JSON patching approach for toolhive-supported clients
+		// Use JSON patching approach for JSON-config clients
 		if err := addTigerMCPServerViaJSON(configPath, mcpServersPathPrefix); err != nil {
 			return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
 		}
