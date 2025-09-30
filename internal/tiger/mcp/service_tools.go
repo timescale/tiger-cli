@@ -98,7 +98,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
-	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array or null for PostgreSQL-only. Defaults to time-series."
+	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only. Defaults to time-series."
 	schema.Properties["addons"].Items.Enum = []any{util.AddonTimeSeries, util.AddonAI}
 	schema.Properties["addons"].UniqueItems = true
 
