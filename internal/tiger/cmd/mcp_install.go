@@ -65,7 +65,7 @@ var supportedClients = []clientConfig{
 		EditorNames:          []string{"claude-code"},
 		MCPServersPathPrefix: "", // Not used for CLI-based installation
 		ConfigPaths: []string{
-			"~/.claude.json", // Default Claude Code config location - needed for backup
+			"~/.claude.json",
 		},
 		InstallCommand: []string{"claude", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
@@ -75,7 +75,7 @@ var supportedClients = []clientConfig{
 		EditorNames:          []string{"cursor"},
 		MCPServersPathPrefix: "/mcpServers",
 		ConfigPaths: []string{
-			"~/.cursor/mcp.json", // Default Cursor config location
+			"~/.cursor/mcp.json",
 		},
 	},
 	{
@@ -84,17 +84,17 @@ var supportedClients = []clientConfig{
 		EditorNames:          []string{"windsurf"},
 		MCPServersPathPrefix: "/mcpServers",
 		ConfigPaths: []string{
-			"~/.codeium/windsurf/mcp_config.json", // Default Windsurf config location
+			"~/.codeium/windsurf/mcp_config.json",
 		},
 	},
 	{
 		ClientType:           Codex,
 		Name:                 "Codex",
 		EditorNames:          []string{"codex"},
-		MCPServersPathPrefix: "", // Not used for Codex - uses TOML instead
+		MCPServersPathPrefix: "", // Not used for CLI-based installation
 		ConfigPaths: []string{
+			"~/.codex/config.toml", // Default Codex config location
 			"$CODEX_HOME/config.toml",
-			"~/.codex/config.toml", // Default fallback
 		},
 		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
@@ -267,12 +267,12 @@ func findClientConfigFile(configPaths []string) (string, error) {
 		}
 	}
 
-	// If no existing config found, use the last path as default
+	// If no existing config found, use the first path as default
 	if len(configPaths) == 0 {
 		return "", fmt.Errorf("no config paths provided")
 	}
 
-	defaultPath := expandPath(configPaths[len(configPaths)-1]) // Use last path as fallback
+	defaultPath := expandPath(configPaths[0]) // Use first path as default
 	logging.Info("No existing config found, will create at default location",
 		zap.String("path", defaultPath))
 	return defaultPath, nil

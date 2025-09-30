@@ -57,7 +57,7 @@ func TestFindClientConfigFileFallback(t *testing.T) {
 			require.NoError(t, err, "findClientConfigFile should not error")
 
 			// Verify our path matches the expected fallback (last path in ConfigPaths)
-			expectedPath := expandPath(cfg.ConfigPaths[len(cfg.ConfigPaths)-1])
+			expectedPath := expandPath(cfg.ConfigPaths[0])
 			ourAbsPath, err := filepath.Abs(ourPath)
 			require.NoError(t, err, "should be able to get absolute path for our result")
 			expectedAbsPath, err := filepath.Abs(expectedPath)
@@ -769,13 +769,13 @@ func TestFindClientConfigFile(t *testing.T) {
 
 	t.Run("returns fallback path when no files exist", func(t *testing.T) {
 		tempDir := t.TempDir()
+		fallbackPath := filepath.Join(tempDir, "fallback.json")
 		nonExistentPath1 := filepath.Join(tempDir, "nonexistent1.json")
 		nonExistentPath2 := filepath.Join(tempDir, "nonexistent2.json")
-		fallbackPath := filepath.Join(tempDir, "fallback.json")
 
-		result, err := findClientConfigFile([]string{nonExistentPath1, nonExistentPath2, fallbackPath})
+		result, err := findClientConfigFile([]string{fallbackPath, nonExistentPath1, nonExistentPath2})
 		assert.NoError(t, err, "should not error when using fallback")
-		assert.Equal(t, fallbackPath, result, "should return the fallback (last) path")
+		assert.Equal(t, fallbackPath, result, "should return the fallback (first) path")
 	})
 
 	t.Run("finds first existing file when multiple exist", func(t *testing.T) {
