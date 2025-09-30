@@ -258,19 +258,19 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceListOutput{}, err
 	}
 
-	// Load fresh project ID from current config
-	projectID, err := s.loadProjectID()
+	// Load fresh config and validate project ID is set
+	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}
 
-	logging.Debug("MCP: Listing services", zap.String("project_id", projectID))
+	logging.Debug("MCP: Listing services", zap.String("project_id", cfg.ProjectID))
 
 	// Make API call to list services
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}
@@ -310,21 +310,21 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceShowOutput{}, err
 	}
 
-	// Load fresh project ID from current config
-	projectID, err := s.loadProjectID()
+	// Load fresh config and validate project ID is set
+	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
 		return nil, ServiceShowOutput{}, err
 	}
 
 	logging.Debug("MCP: Showing service details",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceShowOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -348,7 +348,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 	case 403:
 		return nil, ServiceShowOutput{}, fmt.Errorf("permission denied: insufficient access to service")
 	case 404:
-		return nil, ServiceShowOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, projectID)
+		return nil, ServiceShowOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
 	default:
 		return nil, ServiceShowOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
 	}
@@ -362,8 +362,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	// Load fresh project ID from current config
-	projectID, err := s.loadProjectID()
+	// Load fresh config and validate project ID is set
+	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
@@ -396,7 +396,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	logging.Debug("MCP: Creating service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("name", input.Name),
 		zap.String("type", input.Type),
 		zap.String("region", input.Region),
@@ -419,7 +419,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -465,7 +465,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 				timeout = time.Duration(*input.Timeout) * time.Minute
 			}
 
-			output.Service, err = s.waitForServiceReady(apiClient, projectID, serviceID, timeout, serviceStatus)
+			output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
 			if err != nil {
 				output.Message = fmt.Sprintf("Error: %s", err.Error())
 			} else {
@@ -493,14 +493,14 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	// Load fresh project ID from current config
-	projectID, err := s.loadProjectID()
+	// Load fresh config and validate project ID is set
+	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	logging.Debug("MCP: Updating service password",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Prepare password update request
@@ -512,7 +512,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -525,7 +525,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		}
 
 		// Get service details for password storage (similar to CLI implementation)
-		serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+		serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 		if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 			// Save the new password using the shared util function
 			result, err := util.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
@@ -544,7 +544,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	case 403:
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("permission denied: insufficient access to update service password")
 	case 404:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, projectID)
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
 	case 400:
 		var errorMsg string
 		if resp.JSON400 != nil && resp.JSON400.Message != nil {
