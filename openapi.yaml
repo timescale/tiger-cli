@@ -276,6 +276,48 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /projects/{project_id}/services/{service_id}/start:
+    post:
+      tags:
+        - Services
+      summary: Start a Service
+      description: Starts a stopped service within a project. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '202':
+          description: Service start request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/services/{service_id}/stop:
+    post:
+      tags:
+        - Services
+      summary: Stop a Service
+      description: Stops a running service within a project. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '202':
+          description: Service stop request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /projects/{project_id}/services/{service_id}/attachToVPC:
     post:
       tags:

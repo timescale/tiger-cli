@@ -9,6 +9,7 @@ const (
 	ExitAuthenticationError = 4 // Authentication error
 	ExitPermissionDenied    = 5 // Permission denied
 	ExitServiceNotFound     = 6 // Service not found
+	ExitConflict            = 7 // Resource conflict (e.g., service cannot be modified in current state)
 )
 
 // exitCodeError creates an error that will cause the program to exit with the specified code
