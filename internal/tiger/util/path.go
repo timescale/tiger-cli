@@ -22,7 +22,10 @@ func ExpandPath(path string) string {
 
 	// Expand home directory
 	if expanded == "~" {
-		homeDir, _ := os.UserHomeDir()
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
 		return homeDir
 	}
 

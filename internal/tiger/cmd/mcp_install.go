@@ -220,10 +220,10 @@ func findClientConfig(clientName string) (*clientConfig, error) {
 	normalizedName := strings.ToLower(clientName)
 
 	// Look up in our supported clients config
-	for _, cfg := range supportedClients {
-		for _, name := range cfg.EditorNames {
+	for i := range supportedClients {
+		for _, name := range supportedClients[i].EditorNames {
 			if strings.ToLower(name) == normalizedName {
-				return &cfg, nil
+				return &supportedClients[i], nil
 			}
 		}
 	}
@@ -499,7 +499,7 @@ func createConfigBackup(configPath string) (string, error) {
 	return backupPath, nil
 }
 
-// addTigerMCPServerViaJSON adds the Tiger MCP server to the configuration file using JSON patching with file locking
+// addTigerMCPServerViaJSON adds the Tiger MCP server to the configuration file using JSON patching
 func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) error {
 	// Create configuration directory if it doesn't exist
 	configDir := filepath.Dir(configPath)

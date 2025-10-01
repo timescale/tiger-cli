@@ -57,7 +57,7 @@ func TestFindClientConfigFileFallback(t *testing.T) {
 			ourPath, err := findClientConfigFile(cfg.ConfigPaths)
 			require.NoError(t, err, "findClientConfigFile should not error")
 
-			// Verify our path matches the expected fallback (last path in ConfigPaths)
+			// Verify our path matches the expected fallback (first path in ConfigPaths)
 			expectedPath := util.ExpandPath(cfg.ConfigPaths[0])
 			ourAbsPath, err := filepath.Abs(ourPath)
 			require.NoError(t, err, "should be able to get absolute path for our result")
@@ -925,5 +925,79 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err := installMCPForClient("unsupported-editor", false, "")
 		assert.Error(t, err, "should error for unsupported editor")
 		assert.Contains(t, err.Error(), "unsupported client", "error should mention unsupported client")
+	})
+
+	t.Run("is idempotent - can install multiple times", func(t *testing.T) {
+		// Create temp directory for test config
+		tempDir, err := os.MkdirTemp("", "test-mcp-idempotent-*")
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		configPath := filepath.Join(tempDir, "mcp.json")
+
+		// Create initial config with mcpServers including an OLD tigerdata entry
+		initialConfig := `{
+			"mcpServers": {
+				"existing": {
+					"command": "existing",
+					"args": ["arg1", "arg2"]
+				},
+				"tigerdata": {
+					"command": "/old/path/to/tiger",
+					"args": ["old", "args"]
+				}
+			}
+		}`
+		err = os.WriteFile(configPath, []byte(initialConfig), 0644)
+		require.NoError(t, err)
+
+		// First installation (should update existing tigerdata entry)
+		err = installMCPForClient("cursor", false, configPath)
+		require.NoError(t, err, "first installation should succeed")
+
+		// Read config after first installation
+		content1, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+
+		var config1 map[string]interface{}
+		err = json.Unmarshal(content1, &config1)
+		require.NoError(t, err)
+
+		// Verify tigerdata was updated
+		mcpServers1 := config1["mcpServers"].(map[string]interface{})
+		assert.Contains(t, mcpServers1, "tigerdata", "tigerdata should exist after install")
+		assert.Contains(t, mcpServers1, "existing", "existing server should be preserved")
+
+		tigerdataConfig := mcpServers1["tigerdata"].(map[string]interface{})
+		assert.Equal(t, "tiger", tigerdataConfig["command"], "command should be updated to 'tiger' in test mode")
+
+		args := tigerdataConfig["args"].([]interface{})
+		assert.Equal(t, 2, len(args), "should have 2 args")
+		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
+		assert.Equal(t, "start", args[1], "second arg should be 'start'")
+
+		// Second installation (should be idempotent, no changes)
+		err = installMCPForClient("cursor", false, configPath)
+		require.NoError(t, err, "second installation should succeed")
+
+		// Read config after second installation
+		content2, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+
+		var config2 map[string]interface{}
+		err = json.Unmarshal(content2, &config2)
+		require.NoError(t, err)
+
+		// Verify config is identical after second install
+		mcpServers2 := config2["mcpServers"].(map[string]interface{})
+		assert.Contains(t, mcpServers2, "tigerdata", "tigerdata should still exist after second install")
+		assert.Contains(t, mcpServers2, "existing", "existing server should still be preserved")
+
+		// Verify only one tigerdata entry exists (not duplicated)
+		assert.Equal(t, len(mcpServers1), len(mcpServers2), "number of MCP servers should not increase")
+
+		// Verify tigerdata config is still correct
+		tigerdataConfig2 := mcpServers2["tigerdata"].(map[string]interface{})
+		assert.Equal(t, tigerdataConfig, tigerdataConfig2, "tigerdata config should remain the same")
 	})
 }

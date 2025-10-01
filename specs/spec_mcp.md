@@ -47,7 +47,7 @@ Add to `~/.claude_desktop_config.json`:
   "mcpServers": {
     "tigerdata": {
       "command": "tiger",
-      "args": ["mcp"]
+      "args": ["mcp", "start"]
     }
   }
 }
@@ -111,7 +111,7 @@ The command adds the Tiger MCP server configuration using the appropriate format
   "mcpServers": {
     "tigerdata": {
       "command": "tiger",
-      "args": ["mcp"]
+      "args": ["mcp", "start"]
     }
   }
 }
