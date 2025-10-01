@@ -61,8 +61,12 @@ The MCP server will automatically use the CLI's stored authentication and config
 Install and configure the Tiger MCP server for a specific editor or AI assistant. This command automates the configuration process by modifying the appropriate configuration files.
 
 **Supported Editors:**
-- `claude-code` (or `claude`): Configure for Claude Code
+- `claude-code`: Configure for Claude Code
 - `cursor`: Configure for Cursor IDE
+- `windsurf`: Configure for Windsurf editor
+- `codex`: Configure for Codex
+- `gemini` or `gemini-cli`: Configure for Gemini CLI
+- `vscode`, `code`, or `vs-code`: Configure for VS Code
 
 **Options:**
 - `--no-backup`: Skip creating backup of existing configuration (default: create backup)
@@ -70,12 +74,20 @@ Install and configure the Tiger MCP server for a specific editor or AI assistant
 
 **Examples:**
 ```bash
-# Install for Claude Code/Desktop
+# Interactive editor selection
+tiger mcp install
+
+# Install for Claude Code
 tiger mcp install claude-code
-tiger mcp install claude
 
 # Install for Cursor IDE
 tiger mcp install cursor
+
+# Install for Windsurf
+tiger mcp install windsurf
+
+# Install for VS Code
+tiger mcp install vscode
 
 # Install without creating backup
 tiger mcp install claude-code --no-backup
