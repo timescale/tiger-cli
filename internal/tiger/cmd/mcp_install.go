@@ -569,6 +569,9 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 	// Read existing configuration or create empty one
 	content, err := os.ReadFile(configPath)
 	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("failed to read config file: %w", err)
+		}
 		logging.Info("Config file not found, creating new one")
 		content = []byte("{}")
 	}
