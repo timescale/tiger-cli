@@ -301,13 +301,13 @@ verify_checksum() {
     formatted_checksum=$(printf "%s  %s\n" "$(cat "${checksum_file}" | tr -d '[:space:]')" "${filename}")
 
     if command -v sha256sum >/dev/null 2>&1; then
-        if ! echo "${formatted_checksum}" | sha256sum -c >/dev/null 2>&1; then
+        if ! echo "${formatted_checksum}" | sha256sum -c - >/dev/null 2>&1; then
             log_error "Checksum validation failed using sha256sum"
             log_error "For security reasons, installation has been aborted"
             exit 1
         fi
     elif command -v shasum >/dev/null 2>&1; then
-        if ! echo "${formatted_checksum}" | shasum -a 256 -c >/dev/null 2>&1; then
+        if ! echo "${formatted_checksum}" | shasum -a 256 -c - >/dev/null 2>&1; then
             log_error "Checksum validation failed using shasum"
             log_error "For security reasons, installation has been aborted"
             exit 1
