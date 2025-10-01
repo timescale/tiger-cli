@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func TestMain(m *testing.M) {
@@ -667,7 +668,7 @@ func TestExpandPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := expandPath(tt.input)
+			result := util.ExpandPath(tt.input)
 			if result != tt.expected {
 				t.Errorf("expandPath(%s) = %s, expected %s", tt.input, result, tt.expected)
 			}

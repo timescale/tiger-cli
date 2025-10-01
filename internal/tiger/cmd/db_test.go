@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -350,7 +351,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -441,7 +442,7 @@ func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-connection-config-password-789"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)

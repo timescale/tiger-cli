@@ -11,6 +11,8 @@ import (
 	"github.com/stacklok/toolhive/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // testClientMapping pairs our Tiger client types with their corresponding toolhive types for testing
@@ -56,7 +58,7 @@ func TestFindClientConfigFileFallback(t *testing.T) {
 			require.NoError(t, err, "findClientConfigFile should not error")
 
 			// Verify our path matches the expected fallback (last path in ConfigPaths)
-			expectedPath := expandPath(cfg.ConfigPaths[0])
+			expectedPath := util.ExpandPath(cfg.ConfigPaths[0])
 			ourAbsPath, err := filepath.Abs(ourPath)
 			require.NoError(t, err, "should be able to get absolute path for our result")
 			expectedAbsPath, err := filepath.Abs(expectedPath)
@@ -91,7 +93,7 @@ func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
 
 		t.Run(ourClientConfig.Name+" equivalent to toolhive when file exists", func(t *testing.T) {
 			// Create the config file at the first ConfigPath location
-			expandedPath := expandPath(ourClientConfig.ConfigPaths[0])
+			expandedPath := util.ExpandPath(ourClientConfig.ConfigPaths[0])
 
 			// Create directory structure
 			dir := filepath.Dir(expandedPath)
@@ -518,26 +520,26 @@ func TestExpandPath(t *testing.T) {
 	require.NoError(t, err, "should be able to get user home directory")
 
 	t.Run("expands tilde to home directory", func(t *testing.T) {
-		result := expandPath("~/config.json")
+		result := util.ExpandPath("~/config.json")
 		expected := filepath.Join(homeDir, "config.json")
 		assert.Equal(t, expected, result, "should expand tilde to home directory")
 	})
 
 	t.Run("expands tilde with subdirectory", func(t *testing.T) {
-		result := expandPath("~/.config/tiger/config.json")
+		result := util.ExpandPath("~/.config/tiger/config.json")
 		expected := filepath.Join(homeDir, ".config/tiger/config.json")
 		assert.Equal(t, expected, result, "should expand tilde with subdirectory path")
 	})
 
 	t.Run("does not modify paths without tilde", func(t *testing.T) {
 		testPath := "/absolute/path/config.json"
-		result := expandPath(testPath)
+		result := util.ExpandPath(testPath)
 		assert.Equal(t, testPath, result, "should not modify absolute paths without tilde")
 	})
 
 	t.Run("does not modify relative paths without tilde", func(t *testing.T) {
 		testPath := "relative/path/config.json"
-		result := expandPath(testPath)
+		result := util.ExpandPath(testPath)
 		assert.Equal(t, testPath, result, "should not modify relative paths without tilde")
 	})
 
@@ -547,7 +549,7 @@ func TestExpandPath(t *testing.T) {
 		testValue := "/test/env/path"
 		t.Setenv(testEnvVar, testValue)
 
-		result := expandPath("$" + testEnvVar + "/config.json")
+		result := util.ExpandPath("$" + testEnvVar + "/config.json")
 		expected := testValue + "/config.json"
 		assert.Equal(t, expected, result, "should expand environment variables")
 	})
@@ -557,7 +559,7 @@ func TestExpandPath(t *testing.T) {
 		testValue := "/test/env/braces"
 		t.Setenv(testEnvVar, testValue)
 
-		result := expandPath("${" + testEnvVar + "}/config.json")
+		result := util.ExpandPath("${" + testEnvVar + "}/config.json")
 		expected := testValue + "/config.json"
 		assert.Equal(t, expected, result, "should expand environment variables with braces")
 	})
@@ -567,13 +569,13 @@ func TestExpandPath(t *testing.T) {
 		testValue := "Documents"
 		t.Setenv(testEnvVar, testValue)
 
-		result := expandPath("~/$" + testEnvVar + "/config.json")
+		result := util.ExpandPath("~/$" + testEnvVar + "/config.json")
 		expected := filepath.Join(homeDir, testValue, "config.json")
 		assert.Equal(t, expected, result, "should expand both environment variables and tilde")
 	})
 
 	t.Run("handles undefined environment variables", func(t *testing.T) {
-		result := expandPath("$UNDEFINED_ENV_VAR/config.json")
+		result := util.ExpandPath("$UNDEFINED_ENV_VAR/config.json")
 		// os.ExpandEnv replaces undefined variables with empty string
 		expected := "/config.json"
 		assert.Equal(t, expected, result, "should replace undefined env vars with empty string")
@@ -581,25 +583,25 @@ func TestExpandPath(t *testing.T) {
 
 	t.Run("handles tilde not at beginning", func(t *testing.T) {
 		testPath := "/some/path/~/config.json"
-		result := expandPath(testPath)
+		result := util.ExpandPath(testPath)
 		// Should not expand tilde that's not at the beginning
 		assert.Equal(t, testPath, result, "should not expand tilde that's not at path beginning")
 	})
 
 	t.Run("handles just tilde", func(t *testing.T) {
-		result := expandPath("~")
-		// Just tilde should not be expanded (needs to be ~/something)
-		assert.Equal(t, "~", result, "should not expand bare tilde")
+		result := util.ExpandPath("~")
+		// Just tilde should expand to home directory
+		assert.Equal(t, homeDir, result, "should expand bare tilde to home directory")
 	})
 
 	t.Run("handles tilde with just slash", func(t *testing.T) {
-		result := expandPath("~/")
+		result := util.ExpandPath("~/")
 		expected := filepath.Join(homeDir, "")
 		assert.Equal(t, expected, result, "should expand tilde with just slash")
 	})
 
 	t.Run("handles empty path", func(t *testing.T) {
-		result := expandPath("")
+		result := util.ExpandPath("")
 		assert.Equal(t, "", result, "should handle empty path")
 	})
 }

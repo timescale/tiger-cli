@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // MCPClient represents our internal client types
@@ -251,7 +252,7 @@ func generateSupportedEditorsHelp() string {
 func findClientConfigFile(configPaths []string) (string, error) {
 	for _, path := range configPaths {
 		// Expand environment variables and home directory
-		expandedPath := expandPath(path)
+		expandedPath := util.ExpandPath(path)
 
 		// Check if file exists
 		if _, err := os.Stat(expandedPath); err == nil {
@@ -265,30 +266,10 @@ func findClientConfigFile(configPaths []string) (string, error) {
 		return "", fmt.Errorf("no config paths provided")
 	}
 
-	defaultPath := expandPath(configPaths[0]) // Use first path as default
+	defaultPath := util.ExpandPath(configPaths[0]) // Use first path as default
 	logging.Info("No existing config found, will create at default location",
 		zap.String("path", defaultPath))
 	return defaultPath, nil
-}
-
-// expandPath expands environment variables and tilde in file paths
-func expandPath(path string) string {
-	if path == "" {
-		return ""
-	}
-
-	// Expand environment variables
-	expanded := os.ExpandEnv(path)
-
-	// Expand home directory
-	if strings.HasPrefix(expanded, "~/") {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			expanded = filepath.Join(homeDir, expanded[2:])
-		}
-	}
-
-	return filepath.Clean(expanded)
 }
 
 // tigerExecutablePathFunc can be overridden in tests to return a fixed path
