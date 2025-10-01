@@ -851,12 +851,12 @@ components:
     ForkStrategy:
       type: string
       enum:
-      - LATEST_SNAPSHOT
+      - LAST_SNAPSHOT
       - NOW
       - PITR
       description: |
         Strategy for creating the fork:
-        - LATEST: Use existing snapshot for fast fork
+        - LAST_SNAPSHOT: Use existing snapshot for fast fork
         - NOW: Create new snapshot for up-to-date fork
         - PITR: Point-in-time recovery using target_time
     DeployStatus:

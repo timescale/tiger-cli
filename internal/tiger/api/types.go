@@ -24,9 +24,9 @@ const (
 
 // Defines values for ForkStrategy.
 const (
-	LATESTSNAPSHOT ForkStrategy = "LATEST_SNAPSHOT"
-	NOW            ForkStrategy = "NOW"
-	PITR           ForkStrategy = "PITR"
+	LASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
+	NOW          ForkStrategy = "NOW"
+	PITR         ForkStrategy = "PITR"
 )
 
 // Defines values for ReadReplicaSetStatus.
@@ -84,7 +84,7 @@ type ForkServiceCreate struct {
 	CpuMillis *int `json:"cpu_millis,omitempty"`
 
 	// ForkStrategy Strategy for creating the fork:
-	// - LATEST: Use existing snapshot for fast fork
+	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
 	// - NOW: Create new snapshot for up-to-date fork
 	// - PITR: Point-in-time recovery using target_time
 	ForkStrategy ForkStrategy `json:"fork_strategy"`
@@ -110,7 +110,7 @@ type ForkSpec struct {
 }
 
 // ForkStrategy Strategy for creating the fork:
-// - LATEST: Use existing snapshot for fast fork
+// - LAST_SNAPSHOT: Use existing snapshot for fast fork
 // - NOW: Create new snapshot for up-to-date fork
 // - PITR: Point-in-time recovery using target_time
 type ForkStrategy string

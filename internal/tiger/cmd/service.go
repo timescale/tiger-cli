@@ -1133,7 +1133,7 @@ Examples:
 			if forkNow {
 				forkStrategy = api.NOW
 			} else if forkLastSnapshot {
-				forkStrategy = api.LATESTSNAPSHOT
+				forkStrategy = api.LASTSNAPSHOT
 			} else if forkToTimestamp != "" {
 				forkStrategy = api.PITR
 				parsedTime, _ := time.Parse(time.RFC3339, forkToTimestamp) // Already validated above
@@ -1145,7 +1145,7 @@ Examples:
 			switch forkStrategy {
 			case api.NOW:
 				strategyDesc = "current state"
-			case api.LATESTSNAPSHOT:
+			case api.LASTSNAPSHOT:
 				strategyDesc = "last snapshot"
 			case api.PITR:
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
