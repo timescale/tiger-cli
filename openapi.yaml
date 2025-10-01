@@ -975,7 +975,7 @@ components:
           description: The initial CPU allocation in milli-cores. If not provided, will inherit from parent service.
           example: 1000
         memory_gbs:
-          format: integer
+          type: integer
           description: The initial memory allocation in gigabytes. If not provided, will inherit from parent service.
           example: 4
         fork_strategy:
