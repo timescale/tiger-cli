@@ -4,7 +4,6 @@ go 1.25.1
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/gofrs/flock v0.12.1
 	github.com/google/jsonschema-go v0.2.3
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/modelcontextprotocol/go-sdk v0.5.0
@@ -82,6 +81,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect

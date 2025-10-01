@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,16 +15,12 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gofrs/flock"
 	"github.com/tailscale/hujson"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
-
-// lockTimeout is the maximum time to wait for a file lock
-const lockTimeout = 1 * time.Second
 
 // MCPClient represents our internal client types
 type MCPClient string
@@ -542,28 +537,6 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 		Command: tigerPath,
 		Args:    []string{"mcp", "start"},
 	}
-
-	// Create a lock file
-	lockPath := configPath + ".lock"
-	fileLock := flock.New(lockPath)
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
-	defer cancel()
-
-	// Try to acquire the lock with a timeout
-	locked, err := fileLock.TryLockContext(ctx, 100*time.Millisecond)
-	if err != nil {
-		return fmt.Errorf("failed to acquire lock: %w", err)
-	}
-	if !locked {
-		return fmt.Errorf("failed to acquire lock: timeout after %v", lockTimeout)
-	}
-	defer func() {
-		if err := fileLock.Unlock(); err != nil {
-			logging.Error("Failed to release file lock", zap.Error(err))
-		}
-	}()
 
 	// Read existing configuration or create empty one
 	content, err := os.ReadFile(configPath)
