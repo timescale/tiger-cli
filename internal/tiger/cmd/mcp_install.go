@@ -17,7 +17,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gofrs/flock"
-	"github.com/google/renameio/v2"
 	"github.com/tailscale/hujson"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -516,8 +515,8 @@ func createConfigBackup(configPath string) (string, error) {
 		return "", fmt.Errorf("failed to read original config file: %w", err)
 	}
 
-	// Write backup file atomically
-	if err := renameio.WriteFile(backupPath, data, 0644); err != nil {
+	// Write backup file
+	if err := os.WriteFile(backupPath, data, 0644); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -612,8 +611,8 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 		return fmt.Errorf("failed to format patched JSON: %w", err)
 	}
 
-	// Write back to file atomically
-	if err := renameio.WriteFile(configPath, formatted, 0644); err != nil {
+	// Write back to file
+	if err := os.WriteFile(configPath, formatted, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

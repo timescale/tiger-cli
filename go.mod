@@ -6,7 +6,6 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/gofrs/flock v0.12.1
 	github.com/google/jsonschema-go v0.2.3
-	github.com/google/renameio/v2 v2.0.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/modelcontextprotocol/go-sdk v0.5.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
