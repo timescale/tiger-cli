@@ -11,7 +11,6 @@ import (
 	"github.com/stacklok/toolhive/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tailscale/hujson"
 )
 
 // testClientMapping pairs our Tiger client types with their corresponding toolhive types for testing
@@ -165,6 +164,28 @@ func TestAddTigerMCPServer(t *testing.T) {
 					"existing": map[string]interface{}{
 						"command": "existing",
 						"args":    []interface{}{"test"},
+					},
+					"tigerdata": map[string]interface{}{
+						"command": "tiger",
+						"args":    []interface{}{"mcp", "start"},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name:                 "preserves multiple sibling servers",
+			initialConfig:        `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`,
+			mcpServersPathPrefix: "/mcpServers",
+			expectedResult: map[string]interface{}{
+				"mcpServers": map[string]interface{}{
+					"server1": map[string]interface{}{
+						"command": "cmd1",
+						"args":    []interface{}{"arg1"},
+					},
+					"server2": map[string]interface{}{
+						"command": "cmd2",
+						"args":    []interface{}{"arg2", "arg3"},
 					},
 					"tigerdata": map[string]interface{}{
 						"command": "tiger",
@@ -810,57 +831,6 @@ func TestFindClientConfigFile(t *testing.T) {
 		result, err := findClientConfigFile([]string{envPath})
 		assert.NoError(t, err, "should not error with environment variable path")
 		assert.Equal(t, configPath, result, "should expand environment variable and find file")
-	})
-}
-
-func TestEnsurePathExists(t *testing.T) {
-	t.Run("returns error for nested paths", func(t *testing.T) {
-		content := []byte(`{}`)
-		value, err := hujson.Parse(content)
-		require.NoError(t, err)
-
-		err = ensurePathExists(&value, content, "/nested/path")
-		assert.Error(t, err, "should error for nested paths")
-		assert.Contains(t, err.Error(), "nested paths are not supported", "error should mention nested paths not supported")
-		assert.Contains(t, err.Error(), "/nested/path", "error should include the problematic path")
-	})
-
-	t.Run("handles paths with dots", func(t *testing.T) {
-		content := []byte(`{}`)
-		value, err := hujson.Parse(content)
-		require.NoError(t, err)
-
-		err = ensurePathExists(&value, content, "/amp.mcpServers")
-		assert.NoError(t, err, "should not error when creating path with dots")
-
-		// Verify the path was created
-		result := value.Pack()
-		var parsed map[string]interface{}
-		err = json.Unmarshal(result, &parsed)
-		require.NoError(t, err)
-
-		ampMcpServers, exists := parsed["amp.mcpServers"].(map[string]interface{})
-		assert.True(t, exists, "amp.mcpServers should be created")
-		assert.Empty(t, ampMcpServers, "amp.mcpServers should be an empty object")
-	})
-
-	t.Run("does nothing when path with dots already exists", func(t *testing.T) {
-		content := []byte(`{"amp.mcpServers": {"existing": "value"}}`)
-		value, err := hujson.Parse(content)
-		require.NoError(t, err)
-
-		err = ensurePathExists(&value, content, "/amp.mcpServers")
-		assert.NoError(t, err, "should not error when path with dots already exists")
-
-		// Verify the value is unchanged
-		result := value.Pack()
-		var parsed map[string]interface{}
-		err = json.Unmarshal(result, &parsed)
-		require.NoError(t, err)
-
-		ampMcpServers, exists := parsed["amp.mcpServers"].(map[string]interface{})
-		assert.True(t, exists, "amp.mcpServers should still exist")
-		assert.Equal(t, "value", ampMcpServers["existing"], "existing value should be unchanged")
 	})
 }
 

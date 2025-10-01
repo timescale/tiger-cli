@@ -16,7 +16,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tailscale/hujson"
-	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
@@ -559,9 +558,14 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 		return fmt.Errorf("failed to parse existing config: %w", err)
 	}
 
-	// Ensure the MCP servers path exists
-	if err := ensurePathExists(&value, content, mcpServersPathPrefix); err != nil {
-		return fmt.Errorf("failed to ensure MCP servers path exists: %w", err)
+	// Check if the parent path exists using hujson's Find method
+	// Find uses JSON Pointer format (RFC 6901) which matches our path format
+	if value.Find(mcpServersPathPrefix) == nil {
+		// Path doesn't exist, create it
+		parentPatch := fmt.Sprintf(`[{ "op": "add", "path": "%s", "value": {} }]`, mcpServersPathPrefix)
+		if err := value.Patch([]byte(parentPatch)); err != nil {
+			return fmt.Errorf("failed to create MCP servers path: %w", err)
+		}
 	}
 
 	// Marshal the Tiger MCP server data
@@ -594,36 +598,6 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 		zap.String("command", tigerServer.Command),
 		zap.Strings("args", tigerServer.Args),
 	)
-
-	return nil
-}
-
-// ensurePathExists ensures that the MCP servers path exists in the parsed JSON value.
-// This simplified version only handles single-level paths like "/mcpServers", "/servers", "/amp.mcpServers".
-// It returns an error if nested paths (containing "/") are detected.
-// The function modifies the provided hujson.Value in place.
-func ensurePathExists(value *hujson.Value, content []byte, path string) error {
-	// Validate that this is a single-level path
-	key := strings.TrimPrefix(path, "/")
-	if strings.Contains(key, "/") {
-		return fmt.Errorf("nested paths are not supported, got: %s", path)
-	}
-
-	// Check if the key already exists using gjson
-	// For keys with dots (like "amp.mcpServers"), we need to escape the dots for gjson
-	escapedKey := strings.ReplaceAll(key, ".", `\.`)
-	if gjson.GetBytes(content, escapedKey).Exists() {
-		// Path already exists, nothing to do
-		return nil
-	}
-
-	// Create a JSON patch to add an empty object at this path
-	patch := fmt.Sprintf(`[{ "op": "add", "path": "%s", "value": {} }]`, path)
-
-	// Apply the patch
-	if err := value.Patch([]byte(patch)); err != nil {
-		return fmt.Errorf("failed to apply JSON patch: %w", err)
-	}
 
 	return nil
 }
