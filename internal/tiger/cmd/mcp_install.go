@@ -62,7 +62,7 @@ var supportedClients = []clientConfig{
 		ConfigPaths: []string{
 			"~/.claude.json",
 		},
-		InstallCommand: []string{"claude", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
+		InstallCommand: []string{"claude", "mcp", "add", "-s", "user", "tigerdata", "tiger", "mcp", "start"},
 	},
 	{
 		ClientType:           Cursor,

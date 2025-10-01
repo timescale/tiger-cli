@@ -74,7 +74,7 @@ Examples:
   # Interactive client selection
   tiger mcp install
 
-  # Install for Claude Code
+  # Install for Claude Code (User scope - available in all projects)
   tiger mcp install claude-code
 
   # Install for Cursor IDE
