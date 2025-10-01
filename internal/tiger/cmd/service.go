@@ -996,7 +996,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkLastSnapshot bool
 	var forkToTimestamp string
 	var forkCPU int
-	var forkMemory float64
+	var forkMemory int
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -1008,8 +1008,12 @@ You must specify exactly one timing option for the fork strategy:
 - --last-snapshot: Fork at the last existing snapshot (faster fork)
 - --to-timestamp: Fork at a specific point in time (point-in-time recovery)
 
-By default, the forked service will be set as your default service and will inherit
-the source service's resources. You can customize the resources with --cpu and --memory.
+By default:
+- Name will be auto-generated as '{source-service-name}-fork'
+- CPU and memory will be inherited from the source service
+- The forked service will be set as your default service
+
+You can override any of these defaults with the corresponding flags.
 
 Examples:
   # Fork a service at the current state
@@ -1103,95 +1107,24 @@ Examples:
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			// Get source service details first
-			sourceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				return fmt.Errorf("failed to get source service details: %w", err)
-			}
-
-			switch sourceResp.StatusCode() {
-			case 200:
-				if sourceResp.JSON200 == nil {
-					return fmt.Errorf("empty response from API")
-				}
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-			default:
-				return fmt.Errorf("failed to get source service: API request failed with status %d", sourceResp.StatusCode())
-			}
-
-			sourceService := *sourceResp.JSON200
-			sourceName := derefString(sourceService.Name)
-
-			// Generate fork name if not provided
-			if forkServiceName == "" {
-				forkServiceName = fmt.Sprintf("%s-fork", sourceName)
-			}
-
-			// Extract resource specs from source service as defaults
-			var defaultCPU int
-			var defaultMemory float64
-			var replicaCount int = 1 // default
-			var serviceType api.ServiceType
-			var regionCode string
-
-			// Get resource specs from source service
-			if sourceService.Resources != nil && len(*sourceService.Resources) > 0 {
-				resource := (*sourceService.Resources)[0]
-				if resource.Spec != nil {
-					if resource.Spec.CpuMillis != nil {
-						defaultCPU = *resource.Spec.CpuMillis
-					}
-					if resource.Spec.MemoryGbs != nil {
-						defaultMemory = float64(*resource.Spec.MemoryGbs)
-					}
-				}
-			}
-
-			// Get service type and region
-			if sourceService.ServiceType != nil {
-				serviceType = *sourceService.ServiceType
-			}
-			if sourceService.RegionCode != nil {
-				regionCode = *sourceService.RegionCode
-			}
-
-			// Determine CPU and memory to use
+			// Validate custom CPU/memory if provided
 			cpuFlagSet := cmd.Flags().Changed("cpu")
 			memoryFlagSet := cmd.Flags().Changed("memory")
 
-			var finalCPU int
-			var finalMemory float64
+			var finalCPU *int
+			var finalMemory *int
 
 			if cpuFlagSet || memoryFlagSet {
 				// Use provided custom values, validate against allowed combinations
-				cpuToValidate := forkCPU
-				memoryToValidate := forkMemory
-
-				// If only one flag is set, use default for the other
-				if cpuFlagSet && !memoryFlagSet {
-					memoryToValidate = defaultMemory
-				}
-				if memoryFlagSet && !cpuFlagSet {
-					cpuToValidate = defaultCPU
-				}
-
-				validatedCPU, validatedMemory, err := validateAndNormalizeCPUMemory(cpuToValidate, memoryToValidate, cpuFlagSet, memoryFlagSet)
+				validatedCPU, validatedMemory, err := util.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory, cpuFlagSet, memoryFlagSet)
 				if err != nil {
 					return err
 				}
 
-				finalCPU = validatedCPU
-				finalMemory = validatedMemory
-			} else {
-				// Use source service resources
-				finalCPU = defaultCPU
-				finalMemory = defaultMemory
+				finalCPU = &validatedCPU
+				finalMemory = &validatedMemory
 			}
+			// Otherwise leave finalCPU and finalMemory as nil to inherit from source
 
 			// Determine fork strategy and target time
 			var forkStrategy api.ForkStrategy
@@ -1200,7 +1133,7 @@ Examples:
 			if forkNow {
 				forkStrategy = api.NOW
 			} else if forkLastSnapshot {
-				forkStrategy = api.LATEST
+				forkStrategy = api.LATESTSNAPSHOT
 			} else if forkToTimestamp != "" {
 				forkStrategy = api.PITR
 				parsedTime, _ := time.Parse(time.RFC3339, forkToTimestamp) // Already validated above
@@ -1212,23 +1145,33 @@ Examples:
 			switch forkStrategy {
 			case api.NOW:
 				strategyDesc = "current state"
-			case api.LATEST:
+			case api.LATESTSNAPSHOT:
 				strategyDesc = "last snapshot"
 			case api.PITR:
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "🍴 Forking service '%s' to create '%s' at %s...\n", sourceName, forkServiceName, strategyDesc)
+			// Prepare output message for name
+			displayName := forkServiceName
+			if !cmd.Flags().Changed("name") {
+				displayName = "(auto-generated)"
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
 
 			// Create ForkServiceCreate request
 			forkReq := api.ForkServiceCreate{
-				Name:         forkServiceName,
-				ServiceType:  serviceType,
-				RegionCode:   regionCode,
-				ReplicaCount: replicaCount,
-				CpuMillis:    finalCPU,
-				MemoryGbs:    float32(finalMemory),
 				ForkStrategy: forkStrategy,
 				TargetTime:   targetTime,
+			}
+
+			// Only set optional fields if flags were provided
+			if cmd.Flags().Changed("name") {
+				forkReq.Name = &forkServiceName
+			}
+			if finalCPU != nil {
+				forkReq.CpuMillis = finalCPU
+			}
+			if finalMemory != nil {
+				forkReq.MemoryGbs = finalMemory
 			}
 
 			// Make API call to fork service
@@ -1247,7 +1190,7 @@ Examples:
 				}
 
 				forkedService := *forkResp.JSON202
-				forkedServiceID := derefString(forkedService.ServiceId)
+				forkedServiceID := util.DerefStr(forkedService.ServiceId)
 				fmt.Fprintf(cmd.OutOrStdout(), "✅ Fork request accepted!\n")
 				fmt.Fprintf(cmd.OutOrStdout(), "📋 New Service ID: %s\n", forkedServiceID)
 
@@ -1299,7 +1242,7 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&forkServiceName, "name", "", "Name for the forked service (auto-generated if not provided)")
+	cmd.Flags().StringVar(&forkServiceName, "name", "", "Name for the forked service (defaults to '{source-name}-fork')")
 	cmd.Flags().BoolVar(&forkNoWait, "no-wait", false, "Don't wait for fork operation to complete")
 	cmd.Flags().BoolVar(&forkNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().DurationVar(&forkWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
@@ -1310,8 +1253,8 @@ Examples:
 	cmd.Flags().StringVar(&forkToTimestamp, "to-timestamp", "", "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
 
 	// Resource customization flags
-	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (e.g., 1000 for 1 vCPU)")
-	cmd.Flags().Float64Var(&forkMemory, "memory", 0, "Memory allocation in gigabytes (e.g., 4 for 4GB)")
+	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
+	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
 
 	return cmd
 }

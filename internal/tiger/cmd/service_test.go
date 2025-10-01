@@ -189,7 +189,6 @@ func TestOutputServices_Table(t *testing.T) {
 	}
 }
 
-
 func TestServiceFork_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
@@ -391,44 +390,7 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 	// The detailed validation logic is tested in integration tests
 }
 
-func TestFormatHelpers(t *testing.T) {
-	// Test service ID formatting (now uses string instead of UUID)
-	testServiceID := "12345678-9abc-def0-1234-56789abcdef0"
-	if derefString(&testServiceID) != testServiceID {
-		t.Error("derefString should return service ID string")
-	}
-	if derefString(nil) != "" {
-		t.Error("derefString should return empty string for nil")
-	}
-
-	// Test derefString
-	testStr := "test"
-	if derefString(&testStr) != "test" {
-		t.Error("derefString should return string value")
-	}
-	if derefString(nil) != "" {
-		t.Error("derefString should return empty string for nil")
-	}
-
-	// Test formatDeployStatus
-	status := api.DeployStatus("running")
-	if formatDeployStatus(&status) != "running" {
-		t.Error("formatDeployStatus should return status string")
-	}
-	if formatDeployStatus(nil) != "" {
-		t.Error("formatDeployStatus should return empty string for nil")
-	}
-
-	// Test formatServiceType
-	serviceType := api.ServiceType("POSTGRES")
-	if formatServiceType(&serviceType) != "POSTGRES" {
-		t.Error("formatServiceType should return service type string")
-	}
-	if formatServiceType(nil) != "" {
-		t.Error("formatServiceType should return empty string for nil")
-	}
-
-	// Test formatTimePtr
+func TestFormatTimePtr(t *testing.T) {
 	testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 	if formatTimePtr(&testTime) == "" {
 		t.Error("formatTimePtr should return formatted time string")

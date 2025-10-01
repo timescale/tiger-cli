@@ -93,7 +93,7 @@ type ForkServiceCreate struct {
 	Free *bool `json:"free,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes. If not provided, will inherit from parent service.
-	MemoryGbs *float32 `json:"memory_gbs,omitempty"`
+	MemoryGbs interface{} `json:"memory_gbs,omitempty"`
 
 	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
 	Name *string `json:"name,omitempty"`
