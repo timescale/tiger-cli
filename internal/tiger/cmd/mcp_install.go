@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -500,7 +502,7 @@ func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
 // createConfigBackup creates a backup of the existing configuration file and returns the backup path
 func createConfigBackup(configPath string) (string, error) {
 	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		// No existing config file, no backup needed
 		logging.Info("No existing configuration file found, skipping backup")
 		return "", nil
