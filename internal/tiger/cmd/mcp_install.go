@@ -278,6 +278,10 @@ func findClientConfigFile(configPaths []string) (string, error) {
 
 // expandPath expands environment variables and tilde in file paths
 func expandPath(path string) string {
+	if path == "" {
+		return ""
+	}
+
 	// Expand environment variables
 	expanded := os.ExpandEnv(path)
 
@@ -289,7 +293,7 @@ func expandPath(path string) string {
 		}
 	}
 
-	return expanded
+	return filepath.Clean(expanded)
 }
 
 // tigerExecutablePathFunc can be overridden in tests to return a fixed path
