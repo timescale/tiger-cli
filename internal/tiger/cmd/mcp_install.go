@@ -48,10 +48,10 @@ type TigerMCPServer struct {
 type clientConfig struct {
 	ClientType           MCPClient // Our internal client type
 	Name                 string
-	EditorNames          []string // supported editor names for this client
-	MCPServersPathPrefix string
-	ConfigPaths          []string // config file locations for JSON-based clients
-	InstallCommand       []string // CLI command to install MCP server (for CLI-based clients)
+	EditorNames          []string // Supported client names for this client
+	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor/Windsurf)
+	ConfigPaths          []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
+	InstallCommand       []string // CLI command to install MCP server (for CLI-based installation clients like Claude Code/Codex/Gemini/VSCode)
 }
 
 // supportedClients defines the clients we support for Tiger MCP installation
@@ -60,10 +60,9 @@ type clientConfig struct {
 // https://github.com/stacklok/toolhive/blob/main/pkg/client/config.go
 var supportedClients = []clientConfig{
 	{
-		ClientType:           ClaudeCode,
-		Name:                 "Claude Code",
-		EditorNames:          []string{"claude-code"},
-		MCPServersPathPrefix: "", // Not used for CLI-based installation
+		ClientType:  ClaudeCode,
+		Name:        "Claude Code",
+		EditorNames: []string{"claude-code"},
 		ConfigPaths: []string{
 			"~/.claude.json",
 		},
@@ -88,33 +87,32 @@ var supportedClients = []clientConfig{
 		},
 	},
 	{
-		ClientType:           Codex,
-		Name:                 "Codex",
-		EditorNames:          []string{"codex"},
-		MCPServersPathPrefix: "", // Not used for CLI-based installation
+		ClientType:  Codex,
+		Name:        "Codex",
+		EditorNames: []string{"codex"},
 		ConfigPaths: []string{
-			"~/.codex/config.toml", // Default Codex config location
+			"~/.codex/config.toml",
 			"$CODEX_HOME/config.toml",
 		},
 		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
 	},
 	{
-		ClientType:           Gemini,
-		Name:                 "Gemini CLI",
-		EditorNames:          []string{"gemini", "gemini-cli"},
-		MCPServersPathPrefix: "", // Not used for Gemini - uses CLI
+		ClientType:  Gemini,
+		Name:        "Gemini CLI",
+		EditorNames: []string{"gemini", "gemini-cli"},
 		ConfigPaths: []string{
-			"~/.gemini/settings.json", // Default Gemini CLI config location - needed for backup
+			"~/.gemini/settings.json",
 		},
 		InstallCommand: []string{"gemini", "mcp", "add", "-s", "user", "tigerdata", "tiger", "mcp", "start"},
 	},
 	{
-		ClientType:           VSCode,
-		Name:                 "VS Code",
-		EditorNames:          []string{"vscode", "code", "vs-code"},
-		MCPServersPathPrefix: "", // Not used for VS Code - uses CLI
-		ConfigPaths:          []string{
-			// VS Code doesn't need config paths for backup - it manages its own config
+		ClientType:  VSCode,
+		Name:        "VS Code",
+		EditorNames: []string{"vscode", "code", "vs-code"},
+		ConfigPaths: []string{
+			"~/.config/Code/User/mcp.json",
+			"~/Library/Application Support/Code/User/mcp.json",
+			"~/AppData/Roaming/Code/User/mcp.json",
 		},
 		InstallCommand: []string{"code", "--add-mcp", `{"name":"tigerdata","command":"tiger","args":["mcp","start"]}`},
 	},
