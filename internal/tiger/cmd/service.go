@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -44,6 +45,8 @@ func buildServiceCmd() *cobra.Command {
 
 // serviceDescribeCmd represents the describe command under service
 func buildServiceDescribeCmd() *cobra.Command {
+	var withPassword bool
+
 	cmd := &cobra.Command{
 		Use:   "describe [service-id]",
 		Short: "Show detailed information about a service",
@@ -122,7 +125,7 @@ Examples:
 				service := *resp.JSON200
 
 				// Output service in requested format
-				return outputService(cmd, service, cfg.Output)
+				return outputService(cmd, service, cfg.Output, withPassword)
 
 			case 401:
 				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
@@ -135,6 +138,8 @@ Examples:
 			}
 		},
 	}
+
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 
 	return cmd
 }
@@ -227,6 +232,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createWaitTimeout time.Duration
 	var createNoSetDefault bool
 	var createFree bool
+	var createWithPassword bool
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -379,10 +385,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
+			// Get output format early to decide where to write messages
+			outputFormat := strings.ToLower(cfg.Output)
+			outputWriter := cmd.OutOrStdout()
+			if outputFormat == "json" || outputFormat == "yaml" {
+				outputWriter = cmd.ErrOrStderr()
+			}
+
 			if cmd.Flags().Changed("name") {
-				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s'...\n", createServiceName)
+				fmt.Fprintf(outputWriter, "🚀 Creating service '%s'...\n", createServiceName)
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
+				fmt.Fprintf(outputWriter, "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
 			}
 			resp, err := client.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 			if err != nil {
@@ -400,8 +413,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				service := *resp.JSON202
 				serviceID := util.Deref(service.ServiceId)
-				fmt.Fprintf(cmd.OutOrStdout(), "✅ Service creation request accepted!\n")
-				fmt.Fprintf(cmd.OutOrStdout(), "📋 Service ID: %s\n", serviceID)
+				fmt.Fprintf(outputWriter, "✅ Service creation request accepted!\n")
+				fmt.Fprintf(outputWriter, "📋 Service ID: %s\n", serviceID)
 
 				// Capture initial password from creation response and save it immediately
 				var initialPassword string
@@ -411,25 +424,30 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Save password immediately after service creation, before any waiting
 				// This ensures users have access even if they interrupt the wait or it fails
-				handlePasswordSaving(service, initialPassword, cmd)
+				handlePasswordSaving(service, initialPassword, cmd, outputWriter)
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
-					if err := setDefaultService(serviceID, cmd); err != nil {
+					if err := setDefaultService(serviceID, cmd, outputWriter); err != nil {
 						// Log warning but don't fail the command
-						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to set service as default: %v\n", err)
+						fmt.Fprintf(outputWriter, "⚠️  Warning: Failed to set service as default: %v\n", err)
 					}
 				}
 
 				// Handle wait behavior
 				if createNoWait {
-					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being created. Use 'tiger service list' to check status.\n")
-					return nil
+					fmt.Fprintf(outputWriter, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
+				} else {
+					// Wait for service to be ready
+					fmt.Fprintf(outputWriter, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
+					if status, err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd, outputWriter); err != nil {
+						fmt.Fprintf(outputWriter, "❌ %v\n", err)
+					} else {
+						service.Status = status
+					}
 				}
 
-				// Wait for service to be ready
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-				return waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd)
+				return outputService(cmd, service, cfg.Output, createWithPassword)
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
@@ -456,6 +474,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createFree, "free", false, "Create a free tier service (limitations apply)")
+	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include initial password in output")
 
 	return cmd
 }
@@ -558,7 +577,7 @@ Examples:
 				// Get the service details for password storage
 				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-					handlePasswordSaving(*serviceResp.JSON200, password, cmd)
+					handlePasswordSaving(*serviceResp.JSON200, password, cmd, nil)
 				}
 
 				return nil
@@ -587,18 +606,18 @@ Examples:
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, service api.Service, format string) error {
+func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
 	switch strings.ToLower(format) {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(sanitizeServiceForOutput(service))
+		return encoder.Encode(prepareServiceForOutput(service, withPassword, cmd))
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(sanitizeServiceForOutput(service))
+		return encoder.Encode(prepareServiceForOutput(service, withPassword, cmd))
 	default: // table format (default)
-		return outputServiceTable(cmd, service)
+		return outputServiceTable(cmd, service, withPassword)
 	}
 }
 
@@ -619,7 +638,7 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string) e
 }
 
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(cmd *cobra.Command, service api.Service) error {
+func outputServiceTable(cmd *cobra.Command, service api.Service, withPassword bool) error {
 	table := tablewriter.NewWriter(cmd.OutOrStdout())
 	table.Header("PROPERTY", "VALUE")
 
@@ -694,6 +713,14 @@ func outputServiceTable(cmd *cobra.Command, service api.Service) error {
 		table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
 	}
 
+	if service.InitialPassword != nil && withPassword {
+		table.Append("Initial Password", *service.InitialPassword)
+	}
+	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, cmd)
+	if err == nil {
+		table.Append("Connection String", connectionString)
+	}
+
 	return table.Render()
 }
 
@@ -716,16 +743,38 @@ func outputServicesTable(cmd *cobra.Command, services []api.Service) error {
 	return table.Render()
 }
 
-// sanitizeServiceForOutput creates a copy of the service with sensitive fields removed
-func sanitizeServiceForOutput(service api.Service) map[string]interface{} {
+func serviceToMap(service api.Service) map[string]interface{} {
 	// Convert service to map and remove sensitive fields
 	serviceBytes, _ := json.Marshal(service)
 	var serviceMap map[string]interface{}
 	json.Unmarshal(serviceBytes, &serviceMap)
 
+	return serviceMap
+}
+
+// sanitizeServiceForOutput creates a copy of the service with sensitive fields removed
+func sanitizeServiceForOutput(service api.Service) map[string]interface{} {
+	serviceMap := serviceToMap(service)
+
 	// Remove sensitive fields
 	delete(serviceMap, "initial_password")
 	delete(serviceMap, "initialpassword")
+
+	return serviceMap
+}
+
+func prepareServiceForOutput(service api.Service, withPassword bool, cmd *cobra.Command) map[string]interface{} {
+	var serviceMap map[string]interface{}
+	if withPassword {
+		serviceMap = serviceToMap(service)
+	} else {
+		serviceMap = sanitizeServiceForOutput(service)
+	}
+
+	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, cmd)
+	if err == nil {
+		serviceMap["connection_string"] = connectionString
+	}
 
 	return serviceMap
 }
@@ -748,9 +797,16 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, cmd *cobra.Command) error {
+// statusWriter determines where status messages are written (defaults to cmd.OutOrStdout() if nil)
+func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, cmd *cobra.Command, statusWriter io.Writer) (*api.DeployStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
+
+	// Determine where to write status messages
+	output := statusWriter
+	if output == nil {
+		output = cmd.OutOrStdout()
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -758,16 +814,16 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return nil, exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Error checking service status: %v\n", err)
+				fmt.Fprintf(output, "⚠️  Error checking service status: %v\n", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Service not found or error checking status\n")
+				fmt.Fprintf(output, "⚠️  Service not found or error checking status\n")
 				continue
 			}
 
@@ -776,19 +832,25 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 			switch status {
 			case "READY":
-				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service is ready and running!\n")
-				return nil
+				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
+				return service.Status, nil
 			case "FAILED", "ERROR":
-				return fmt.Errorf("service creation failed with status: %s", status)
+				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
 			default:
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service status: %s...\n", status)
+				fmt.Fprintf(output, "⏳ Service status: %s...\n", status)
 			}
 		}
 	}
 }
 
 // handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
-func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
+func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command, outputWriter io.Writer) {
+	// Determine where to write status messages
+	output := outputWriter
+	if output == nil {
+		output = cmd.OutOrStdout()
+	}
+
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
 	result, _ := util.SavePasswordWithResult(service, initialPassword)
@@ -800,18 +862,24 @@ func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobr
 
 	// Output the message with appropriate emoji
 	if result.Success {
-		fmt.Fprintf(cmd.OutOrStdout(), "🔐 %s\n", result.Message)
+		fmt.Fprintf(output, "🔐 %s\n", result.Message)
 	} else {
 		if result.Method == "none" {
-			fmt.Fprintf(cmd.OutOrStdout(), "💡 %s\n", result.Message)
+			fmt.Fprintf(output, "💡 %s\n", result.Message)
 		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s\n", result.Message)
+			fmt.Fprintf(output, "⚠️  %s\n", result.Message)
 		}
 	}
 }
 
 // setDefaultService sets the given service as the default service in the configuration
-func setDefaultService(serviceID string, cmd *cobra.Command) error {
+func setDefaultService(serviceID string, cmd *cobra.Command, outputWriter io.Writer) error {
+	// Determine where to write status messages
+	output := outputWriter
+	if output == nil {
+		output = cmd.OutOrStdout()
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -822,7 +890,7 @@ func setDefaultService(serviceID string, cmd *cobra.Command) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "🎯 Set service '%s' as default service.\n", serviceID)
+	fmt.Fprintf(output, "🎯 Set service '%s' as default service.\n", serviceID)
 	return nil
 }
 
@@ -1201,11 +1269,11 @@ Examples:
 				}
 
 				// Save password immediately after service fork
-				handlePasswordSaving(forkedService, initialPassword, cmd)
+				handlePasswordSaving(forkedService, initialPassword, cmd, nil)
 
 				// Set as default service unless --no-set-default is used
 				if !forkNoSetDefault {
-					if err := setDefaultService(forkedServiceID, cmd); err != nil {
+					if err := setDefaultService(forkedServiceID, cmd, nil); err != nil {
 						// Log warning but don't fail the command
 						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to set service as default: %v\n", err)
 					}
@@ -1219,7 +1287,7 @@ Examples:
 
 				// Wait for service to be ready with custom timeout
 				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				if err := waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, cmd); err != nil {
+				if _, err := waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, cmd, nil); err != nil {
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service fork completed successfully!\n")

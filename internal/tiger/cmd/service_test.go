@@ -671,7 +671,7 @@ func TestOutputService_JSON(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test JSON output
-	err := outputService(cmd, service, "json")
+	err := outputService(cmd, service, "json", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestOutputService_YAML(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test YAML output
-	err := outputService(cmd, service, "yaml")
+	err := outputService(cmd, service, "yaml", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -834,7 +834,7 @@ func TestOutputService_Table(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table")
+	err := outputService(cmd, service, "table", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1234,7 +1234,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	cmd.SetErr(errBuf)
 
 	// Test waitForServiceReady with very short timeout to trigger timeout quickly
-	err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd)
+	_, err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd, nil)
 
 	// Should return an error with ExitTimeout
 	if err == nil {
@@ -1703,7 +1703,7 @@ func TestOutputService_FreeTier(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table")
+	err := outputService(cmd, service, "table", false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
