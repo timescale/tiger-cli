@@ -395,7 +395,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForkInput'
+              $ref: '#/components/schemas/ForkServiceCreate'
       responses:
         '202':
           description: Fork request accepted. The response contains the details of the new service being created.
@@ -848,6 +848,17 @@ components:
       - TIMESCALEDB
       - POSTGRES
       - VECTOR
+    ForkStrategy:
+      type: string
+      enum:
+      - LAST_SNAPSHOT
+      - NOW
+      - PITR
+      description: |
+        Strategy for creating the fork:
+        - LAST_SNAPSHOT: Use existing snapshot for fast fork
+        - NOW: Create new snapshot for up-to-date fork
+        - PITR: Point-in-time recovery using target_time
     DeployStatus:
       type: string
       enum:
@@ -950,6 +961,38 @@ components:
           type: boolean
           description: Whether to create a free service (if true, addons, replica_count, cpu_millis, and memory_gbs must not be provided)
           example: true
+    ForkServiceCreate:
+      type: object
+      required:
+        - fork_strategy
+      properties:
+        name:
+          type: string
+          description: A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+          example: "my-production-db-fork"
+        cpu_millis:
+          type: integer
+          description: The initial CPU allocation in milli-cores. If not provided, will inherit from parent service.
+          example: 1000
+        memory_gbs:
+          type: integer
+          description: The initial memory allocation in gigabytes. If not provided, will inherit from parent service.
+          example: 4
+        fork_strategy:
+          $ref: '#/components/schemas/ForkStrategy'
+          description: Strategy for creating the fork. This field is required.
+        target_time:
+          type: string
+          format: date-time
+          description: Target time for point-in-time recovery. Required when fork_strategy is PITR.
+          example: "2024-01-01T00:00:00Z"
+        free:
+          type: boolean
+          description: Whether to create a free forked service (if true, cpu_millis and memory_gbs must not be provided)
+          example: false
+      description: |
+        Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
+        HA replica count is always set to 0 for forked services.
     HAReplica:
       type: object
       properties:

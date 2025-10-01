@@ -37,6 +37,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
+	cmd.AddCommand(buildServiceForkCmd())
 
 	return cmd
 }
@@ -983,4 +984,277 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
 		}
 	}
+}
+
+// buildServiceForkCmd creates the fork subcommand
+func buildServiceForkCmd() *cobra.Command {
+	var forkServiceName string
+	var forkNoWait bool
+	var forkNoSetDefault bool
+	var forkWaitTimeout time.Duration
+	var forkNow bool
+	var forkLastSnapshot bool
+	var forkToTimestamp string
+	var forkCPU int
+	var forkMemory int
+
+	cmd := &cobra.Command{
+		Use:   "fork [service-id]",
+		Short: "Fork an existing database service",
+		Long: `Fork an existing database service to create a new independent copy.
+
+You must specify exactly one timing option for the fork strategy:
+- --now: Fork at the current database state (creates new snapshot or uses WAL replay)
+- --last-snapshot: Fork at the last existing snapshot (faster fork)
+- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
+
+By default:
+- Name will be auto-generated as '{source-service-name}-fork'
+- CPU and memory will be inherited from the source service
+- The forked service will be set as your default service
+
+You can override any of these defaults with the corresponding flags.
+
+Examples:
+  # Fork a service at the current state
+  tiger service fork svc-12345 --now
+
+  # Fork a service at the last snapshot
+  tiger service fork svc-12345 --last-snapshot
+
+  # Fork a service at a specific point in time
+  tiger service fork svc-12345 --to-timestamp 2025-01-15T10:30:00Z
+
+  # Fork with custom name
+  tiger service fork svc-12345 --now --name my-forked-db
+
+  # Fork with custom resources
+  tiger service fork svc-12345 --now --cpu 2000 --memory 8
+
+  # Fork without setting as default service
+  tiger service fork svc-12345 --now --no-set-default
+
+  # Fork without waiting for completion
+  tiger service fork svc-12345 --now --no-wait
+
+  # Fork with custom wait timeout
+  tiger service fork svc-12345 --now --wait-timeout 45m`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate timing flags first - exactly one must be specified
+			timingFlagsSet := 0
+			if forkNow {
+				timingFlagsSet++
+			}
+			if forkLastSnapshot {
+				timingFlagsSet++
+			}
+			if forkToTimestamp != "" {
+				timingFlagsSet++
+			}
+
+			if timingFlagsSet == 0 {
+				return fmt.Errorf("must specify --now, --last-snapshot or --to-timestamp")
+			}
+			if timingFlagsSet > 1 {
+				return fmt.Errorf("can only specify one of --now, --last-snapshot or --to-timestamp")
+			}
+
+			// Validate timestamp format early if --to-timestamp is used
+			if forkToTimestamp != "" {
+				_, err := time.Parse(time.RFC3339, forkToTimestamp)
+				if err != nil {
+					return fmt.Errorf("invalid timestamp format '%s'. Use RFC3339 format (e.g., 2025-01-15T10:30:00Z): %w", forkToTimestamp, err)
+				}
+			}
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			projectID := cfg.ProjectID
+			if projectID == "" {
+				return fmt.Errorf("project ID is required. Set it using login with --project-id")
+			}
+
+			// Determine source service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key for authentication
+			apiKey, err := getAPIKeyForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			// Validate custom CPU/memory if provided
+			cpuFlagSet := cmd.Flags().Changed("cpu")
+			memoryFlagSet := cmd.Flags().Changed("memory")
+
+			var finalCPU *int
+			var finalMemory *int
+
+			if cpuFlagSet || memoryFlagSet {
+				// Use provided custom values, validate against allowed combinations
+				validatedCPU, validatedMemory, err := util.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory, cpuFlagSet, memoryFlagSet)
+				if err != nil {
+					return err
+				}
+
+				finalCPU = &validatedCPU
+				finalMemory = &validatedMemory
+			}
+			// Otherwise leave finalCPU and finalMemory as nil to inherit from source
+
+			// Determine fork strategy and target time
+			var forkStrategy api.ForkStrategy
+			var targetTime *time.Time
+
+			if forkNow {
+				forkStrategy = api.NOW
+			} else if forkLastSnapshot {
+				forkStrategy = api.LASTSNAPSHOT
+			} else if forkToTimestamp != "" {
+				forkStrategy = api.PITR
+				parsedTime, _ := time.Parse(time.RFC3339, forkToTimestamp) // Already validated above
+				targetTime = &parsedTime
+			}
+
+			// Display what we're about to do
+			strategyDesc := ""
+			switch forkStrategy {
+			case api.NOW:
+				strategyDesc = "current state"
+			case api.LASTSNAPSHOT:
+				strategyDesc = "last snapshot"
+			case api.PITR:
+				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
+			}
+			// Prepare output message for name
+			displayName := forkServiceName
+			if !cmd.Flags().Changed("name") {
+				displayName = "(auto-generated)"
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
+
+			// Create ForkServiceCreate request
+			forkReq := api.ForkServiceCreate{
+				ForkStrategy: forkStrategy,
+				TargetTime:   targetTime,
+			}
+
+			// Only set optional fields if flags were provided
+			if cmd.Flags().Changed("name") {
+				forkReq.Name = &forkServiceName
+			}
+			if finalCPU != nil {
+				forkReq.CpuMillis = finalCPU
+			}
+			if finalMemory != nil {
+				forkReq.MemoryGbs = finalMemory
+			}
+
+			// Make API call to fork service
+			forkResp, err := client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, serviceID, forkReq)
+			if err != nil {
+				return fmt.Errorf("failed to fork service: %w", err)
+			}
+
+			// Handle API response
+			switch forkResp.StatusCode() {
+			case 202:
+				// Success - service fork accepted
+				if forkResp.JSON202 == nil {
+					fmt.Fprintln(cmd.OutOrStdout(), "✅ Fork request accepted!")
+					return nil
+				}
+
+				forkedService := *forkResp.JSON202
+				forkedServiceID := util.DerefStr(forkedService.ServiceId)
+				fmt.Fprintf(cmd.OutOrStdout(), "✅ Fork request accepted!\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "📋 New Service ID: %s\n", forkedServiceID)
+
+				// Capture initial password from fork response and save it immediately
+				var initialPassword string
+				if forkedService.InitialPassword != nil {
+					initialPassword = *forkedService.InitialPassword
+				}
+
+				// Save password immediately after service fork
+				handlePasswordSaving(forkedService, initialPassword, cmd)
+
+				// Set as default service unless --no-set-default is used
+				if !forkNoSetDefault {
+					if err := setDefaultService(forkedServiceID, cmd); err != nil {
+						// Log warning but don't fail the command
+						fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warning: Failed to set service as default: %v\n", err)
+					}
+				}
+
+				// Handle wait behavior
+				if forkNoWait {
+					fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
+					return nil
+				}
+
+				// Wait for service to be ready with custom timeout
+				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+				if err := waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, cmd); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service fork completed successfully!\n")
+				return nil
+
+			case 401:
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+			case 403:
+				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to fork services"))
+			case 404:
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+			case 409:
+				return fmt.Errorf("service name '%s' already exists", forkServiceName)
+			case 400:
+				return fmt.Errorf("invalid request parameters")
+			default:
+				return fmt.Errorf("API request failed with status %d", forkResp.StatusCode())
+			}
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&forkServiceName, "name", "", "Name for the forked service (defaults to '{source-name}-fork')")
+	cmd.Flags().BoolVar(&forkNoWait, "no-wait", false, "Don't wait for fork operation to complete")
+	cmd.Flags().BoolVar(&forkNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
+	cmd.Flags().DurationVar(&forkWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+
+	// Timing strategy flags
+	cmd.Flags().BoolVar(&forkNow, "now", false, "Fork at the current database state (creates new snapshot or uses WAL replay)")
+	cmd.Flags().BoolVar(&forkLastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
+	cmd.Flags().StringVar(&forkToTimestamp, "to-timestamp", "", "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
+
+	// Resource customization flags
+	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
+	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
+
+	return cmd
 }

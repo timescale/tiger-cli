@@ -22,6 +22,13 @@ const (
 	UPGRADING   DeployStatus = "UPGRADING"
 )
 
+// Defines values for ForkStrategy.
+const (
+	LASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
+	NOW          ForkStrategy = "NOW"
+	PITR         ForkStrategy = "PITR"
+)
+
 // Defines values for ReadReplicaSetStatus.
 const (
 	ReadReplicaSetStatusActive   ReadReplicaSetStatus = "active"
@@ -70,10 +77,29 @@ type Error struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// ForkInput defines model for ForkInput.
-type ForkInput struct {
-	// Name The name for the new forked service.
-	Name string `json:"name"`
+// ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
+// HA replica count is always set to 0 for forked services.
+type ForkServiceCreate struct {
+	// CpuMillis The initial CPU allocation in milli-cores. If not provided, will inherit from parent service.
+	CpuMillis *int `json:"cpu_millis,omitempty"`
+
+	// ForkStrategy Strategy for creating the fork:
+	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
+	// - NOW: Create new snapshot for up-to-date fork
+	// - PITR: Point-in-time recovery using target_time
+	ForkStrategy ForkStrategy `json:"fork_strategy"`
+
+	// Free Whether to create a free forked service (if true, cpu_millis and memory_gbs must not be provided)
+	Free *bool `json:"free,omitempty"`
+
+	// MemoryGbs The initial memory allocation in gigabytes. If not provided, will inherit from parent service.
+	MemoryGbs *int `json:"memory_gbs,omitempty"`
+
+	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+	Name *string `json:"name,omitempty"`
+
+	// TargetTime Target time for point-in-time recovery. Required when fork_strategy is PITR.
+	TargetTime *time.Time `json:"target_time,omitempty"`
 }
 
 // ForkSpec defines model for ForkSpec.
@@ -82,6 +108,12 @@ type ForkSpec struct {
 	ProjectId *string `json:"project_id,omitempty"`
 	ServiceId *string `json:"service_id,omitempty"`
 }
+
+// ForkStrategy Strategy for creating the fork:
+// - LAST_SNAPSHOT: Use existing snapshot for fast fork
+// - NOW: Create new snapshot for up-to-date fork
+// - PITR: Point-in-time recovery using target_time
+type ForkStrategy string
 
 // HAReplica defines model for HAReplica.
 type HAReplica struct {
@@ -231,7 +263,7 @@ type ServiceCreate struct {
 	// CpuMillis The initial CPU allocation in milli-cores.
 	CpuMillis int `json:"cpu_millis"`
 
-	// Free Whether to create a free service (if true, replica_count, cpu_millis, and memory_gbs must not be provided)
+	// Free Whether to create a free service (if true, addons, replica_count, cpu_millis, and memory_gbs must not be provided)
 	Free *bool `json:"free,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes.
@@ -341,7 +373,7 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody = ServiceV
 type PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody = ServiceVPCInput
 
 // PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdForkService for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkInput
+type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkServiceCreate
 
 // PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSets for application/json ContentType.
 type PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody = ReadReplicaSetCreate
