@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -409,6 +410,10 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 
 		// Give the OAuth server a moment to start
 		go func() {
+			// Sleep to ensure the OAuth callback server is listening
+			// This prevents "EOF" errors in CI when the server hasn't started yet
+			time.Sleep(50 * time.Millisecond)
+
 			// Make the OAuth callback request directly
 			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
 			t.Logf("Mock browser making callback request to: %s", callbackURL)
