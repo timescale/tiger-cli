@@ -1056,7 +1056,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-keyring-123"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -1107,7 +1107,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 
 	// Store a test password in pgpass
 	testPassword := "test-password-pgpass-456"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -1235,7 +1235,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
