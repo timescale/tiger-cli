@@ -40,3 +40,6 @@ jobs:
         with:
           name: coverage.html
           path: coverage.html
+
+      - name: ShellCheck
+        run: shellcheck scripts/install.sh
