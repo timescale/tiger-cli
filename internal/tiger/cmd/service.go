@@ -450,7 +450,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
-					return err
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
 				return result
@@ -837,17 +837,14 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
-	if output == nil {
-		return nil, fmt.Errorf("output cannot be nil")
-	}
-
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
+	var lastStatus *api.DeployStatus
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -861,6 +858,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			}
 
 			service := *resp.JSON200
+			lastStatus = service.Status
 			status := util.DerefStr(service.Status)
 
 			switch status {
