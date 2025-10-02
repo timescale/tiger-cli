@@ -479,9 +479,9 @@ func TestCreateConfigBackup(t *testing.T) {
 		backupInfo, err := os.Stat(backupPath)
 		require.NoError(t, err)
 
-		// The backup is created with 0644 permissions (as specified in the function)
-		expectedMode := os.FileMode(0644)
-		assert.Equal(t, expectedMode, backupInfo.Mode().Perm(), "backup should have 0644 permissions")
+		// The backup should preserve the original file's permissions (0600)
+		expectedMode := os.FileMode(0600)
+		assert.Equal(t, expectedMode, backupInfo.Mode().Perm(), "backup should preserve original file permissions")
 	})
 
 	t.Run("handles permission errors gracefully", func(t *testing.T) {

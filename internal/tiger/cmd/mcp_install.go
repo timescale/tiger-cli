@@ -352,7 +352,7 @@ func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 		case "up", "k":
 			// Clear buffer when using arrows
@@ -377,8 +377,8 @@ func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			// Add digit to buffer and update cursor position
 			m.updateNumberBuffer(m.numberBuffer + msg.String())
-		case "ctrl+w", "esc":
-			// Clear buffer on escape
+		case "ctrl+w":
+			// Clear buffer
 			m.numberBuffer = ""
 		}
 	}

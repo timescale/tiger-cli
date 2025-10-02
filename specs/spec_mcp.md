@@ -38,9 +38,9 @@ For the initial v0 release, implement these essential tools first:
 
 ## Configuration
 
-### Claude Desktop Configuration
+The recommended approach is to use the `tiger mcp install` command, which automatically configures the Tiger MCP server for your AI assistant. See the CLI MCP Commands section below for details.
 
-Add to `~/.claude_desktop_config.json`:
+Alternatively, for manual configuration, the Tiger MCP server can be added to your AI assistant's configuration file with the following settings:
 
 ```json
 {
