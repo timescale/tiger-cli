@@ -23,10 +23,10 @@ func ExpandPath(path string) string {
 	// Expand home directory
 	if expanded == "~" {
 		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return ""
+		if err == nil {
+			return homeDir
 		}
-		return homeDir
+		// If UserHomeDir fails, fall through to return original
 	}
 
 	if strings.HasPrefix(expanded, "~/") {
@@ -34,6 +34,7 @@ func ExpandPath(path string) string {
 		if err == nil {
 			expanded = filepath.Join(homeDir, expanded[2:])
 		}
+		// If UserHomeDir fails, leave expanded as-is (with ~/ prefix)
 	}
 
 	return filepath.Clean(expanded)

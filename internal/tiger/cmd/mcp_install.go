@@ -135,8 +135,8 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 
 	var configPath string
 	if customConfigPath != "" {
-		// Use custom config path directly, skip discovery
-		configPath = customConfigPath
+		// Expand custom config path for ~ and environment variables, then use it directly
+		configPath = util.ExpandPath(customConfigPath)
 	} else if len(clientCfg.ConfigPaths) > 0 {
 		// Use manual config path discovery for clients with configured paths
 		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
@@ -229,10 +229,7 @@ func findClientConfig(clientName string) (*clientConfig, error) {
 	}
 
 	// Build list of supported clients from our config for error message
-	var supportedNames []string
-	for _, cfg := range supportedClients {
-		supportedNames = append(supportedNames, cfg.EditorNames...)
-	}
+	supportedNames := getValidEditorNames()
 
 	return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
 }
@@ -482,7 +479,14 @@ func createConfigBackup(configPath string) (string, error) {
 		return "", nil
 	}
 
-	backupPath := fmt.Sprintf("%s.backup.%d", configPath, time.Now().Unix())
+	backupPath := fmt.Sprintf("%s.backup.%d", configPath, time.Now().UnixNano())
+
+	// Get original file mode, fallback to 0600 if unavailable
+	origInfo, err := os.Stat(configPath)
+	var mode fs.FileMode = 0600
+	if err == nil {
+		mode = origInfo.Mode().Perm()
+	}
 
 	// Read original file
 	data, err := os.ReadFile(configPath)
@@ -491,7 +495,7 @@ func createConfigBackup(configPath string) (string, error) {
 	}
 
 	// Write backup file
-	if err := os.WriteFile(backupPath, data, 0644); err != nil {
+	if err := os.WriteFile(backupPath, data, mode); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -516,6 +520,12 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 	tigerServer := TigerMCPServer{
 		Command: tigerPath,
 		Args:    []string{"mcp", "start"},
+	}
+
+	// Get original file mode to preserve it, fallback to 0600 for new files
+	var fileMode fs.FileMode = 0600
+	if info, err := os.Stat(configPath); err == nil {
+		fileMode = info.Mode().Perm()
 	}
 
 	// Read existing configuration or create empty one
@@ -569,8 +579,8 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 		return fmt.Errorf("failed to format patched JSON: %w", err)
 	}
 
-	// Write back to file
-	if err := os.WriteFile(configPath, formatted, 0644); err != nil {
+	// Write back to file (preserve original file mode)
+	if err := os.WriteFile(configPath, formatted, fileMode); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
