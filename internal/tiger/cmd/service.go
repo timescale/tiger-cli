@@ -791,7 +791,9 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	}
 }
 
-// handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
+// handlePasswordSaving handles saving password using the configured storage
+// method and displaying appropriate messages. Returns true if the password was
+// successfully saved, or false if not.
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
