@@ -146,6 +146,8 @@ Examples:
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
+	var withPassword bool
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all services",
@@ -205,7 +207,7 @@ func buildServiceListCmd() *cobra.Command {
 				}
 
 				// Output services in requested format
-				return outputServices(cmd, services, cfg.Output)
+				return outputServices(cmd, services, cfg.Output, withPassword)
 
 			case 401:
 				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
@@ -218,6 +220,8 @@ func buildServiceListCmd() *cobra.Command {
 			}
 		},
 	}
+
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
 
 	return cmd
 }
@@ -611,42 +615,90 @@ Examples:
 	return cmd
 }
 
+// OutputService represents a service with computed fields for output
+type OutputService struct {
+	api.Service
+	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
+}
+
+// Convert to JSON to respect omitempty tags, then unmarshal to a map
+func toMap(v any) (map[string]interface{}, error) {
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonMap map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &jsonMap); err != nil {
+		return nil, err
+	}
+	return jsonMap, nil
+}
+
+func toMapSlice(v any) ([]map[string]interface{}, error) {
+	jsonBytes, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonArray []map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &jsonArray); err != nil {
+		return nil, err
+	}
+	return jsonArray, nil
+}
+
 // outputService formats and outputs a single service based on the specified format
 func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
+	// Prepare the output service with computed fields
+	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+
 	switch strings.ToLower(format) {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(prepareServiceForOutput(service, withPassword, cmd))
+		return encoder.Encode(outputSvc)
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(prepareServiceForOutput(service, withPassword, cmd))
+		jsonMap, err := toMap(outputSvc)
+		if err != nil {
+			return fmt.Errorf("failed to convert service to map: %w", err)
+		}
+		return encoder.Encode(jsonMap)
 	default: // table format (default)
-		return outputServiceTable(cmd, service, withPassword)
+		return outputServiceTable(cmd, outputSvc)
 	}
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
+func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
+	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+
 	switch strings.ToLower(format) {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent("", "  ")
-		return encoder.Encode(sanitizeServicesForOutput(services))
+		return encoder.Encode(outputServices)
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		return encoder.Encode(sanitizeServicesForOutput(services))
+		jsonArray, err := toMapSlice(outputServices)
+		if err != nil {
+			return fmt.Errorf("failed to convert services to map: %w", err)
+		}
+		return encoder.Encode(jsonArray)
 	default: // table format (default)
-		return outputServicesTable(cmd, services)
+		return outputServicesTable(cmd, outputServices)
 	}
 }
 
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(cmd *cobra.Command, service api.Service, withPassword bool) error {
+func outputServiceTable(cmd *cobra.Command, outputSvc OutputService) error {
 	table := tablewriter.NewWriter(cmd.OutOrStdout())
 	table.Header("PROPERTY", "VALUE")
+
+	service := outputSvc.Service
 
 	// Basic service information
 	table.Append("Service ID", util.Deref(service.ServiceId))
@@ -719,21 +771,23 @@ func outputServiceTable(cmd *cobra.Command, service api.Service, withPassword bo
 		table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
 	}
 
-	if service.InitialPassword != nil && withPassword {
+	// Output password if available
+	if service.InitialPassword != nil {
 		table.Append("Initial Password", *service.InitialPassword)
 	}
-	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, cmd)
-	if err == nil {
-		table.Append("Connection String", connectionString)
+
+	// Output connection string if available
+	if outputSvc.ConnectionString != nil {
+		table.Append("Connection String", *outputSvc.ConnectionString)
 	}
 
 	return table.Render()
 }
 
 // outputServicesTable outputs services in a formatted table using tablewriter
-func outputServicesTable(cmd *cobra.Command, services []api.Service) error {
+func outputServicesTable(cmd *cobra.Command, services []OutputService) error {
 	table := tablewriter.NewWriter(cmd.OutOrStdout())
-	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
+	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED", "CONNECTION STRING")
 
 	for _, service := range services {
 		table.Append(
@@ -743,55 +797,45 @@ func outputServicesTable(cmd *cobra.Command, services []api.Service) error {
 			util.DerefStr(service.ServiceType),
 			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
+			util.Deref(service.ConnectionString),
 		)
 	}
 
 	return table.Render()
 }
 
-func serviceToMap(service api.Service) map[string]interface{} {
-	// Convert service to map and remove sensitive fields
-	serviceBytes, _ := json.Marshal(service)
-	var serviceMap map[string]interface{}
-	json.Unmarshal(serviceBytes, &serviceMap)
-
-	return serviceMap
-}
-
-// sanitizeServiceForOutput creates a copy of the service with sensitive fields removed
-func sanitizeServiceForOutput(service api.Service) map[string]interface{} {
-	serviceMap := serviceToMap(service)
-
-	// Remove sensitive fields
-	delete(serviceMap, "initial_password")
-	delete(serviceMap, "initialpassword")
-
-	return serviceMap
-}
-
-func prepareServiceForOutput(service api.Service, withPassword bool, cmd *cobra.Command) map[string]interface{} {
-	var serviceMap map[string]interface{}
-	if withPassword {
-		serviceMap = serviceToMap(service)
-	} else {
-		serviceMap = sanitizeServiceForOutput(service)
+func prepareServiceForOutput(service api.Service, withPassword bool, output io.Writer) OutputService {
+	outputSvc := OutputService{
+		Service: service,
 	}
 
-	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, cmd)
+	// Remove password if not requested
+	if !withPassword {
+		outputSvc.Service.InitialPassword = nil
+	} else if service.InitialPassword == nil {
+		password, err := getServicePassword(service)
+		if err != nil {
+			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
+		}
+		outputSvc.Service.InitialPassword = &password
+	}
+
+	// Build connection string
+	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, output)
 	if err == nil {
-		serviceMap["connection_string"] = connectionString
+		outputSvc.ConnectionString = &connectionString
 	}
 
-	return serviceMap
+	return outputSvc
 }
 
-// sanitizeServicesForOutput creates copies of services with sensitive fields removed
-func sanitizeServicesForOutput(services []api.Service) []map[string]interface{} {
-	sanitized := make([]map[string]interface{}, len(services))
+// prepareServicesForOutput creates copies of services with sensitive fields removed
+func prepareServicesForOutput(services []api.Service, withPassword bool, output io.Writer) []OutputService {
+	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		sanitized[i] = sanitizeServiceForOutput(service)
+		prepared[i] = prepareServiceForOutput(service, withPassword, output)
 	}
-	return sanitized
+	return prepared
 }
 
 // formatTimePtr formats a time pointer, returning empty string if nil

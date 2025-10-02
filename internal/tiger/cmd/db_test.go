@@ -143,7 +143,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	cmd.SetErr(errBuf)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := buildConnectionString(service, true, "tsdbadmin", false, cmd)
+	connectionString, err := buildConnectionString(service, true, "tsdbadmin", false, cmd.ErrOrStderr())
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -895,7 +895,7 @@ func TestBuildConnectionString(t *testing.T) {
 			errBuf := new(bytes.Buffer)
 			cmd.SetErr(errBuf)
 
-			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, false, cmd)
+			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, false, cmd.ErrOrStderr())
 
 			if tc.expectError {
 				if err == nil {
@@ -1066,7 +1066,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	cmd := &cobra.Command{}
 
 	// Call buildConnectionString with withPassword=true
-	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 
 	if err != nil {
 		t.Fatalf("buildConnectionString failed: %v", err)
@@ -1117,7 +1117,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	cmd := &cobra.Command{}
 
 	// Call buildConnectionString with withPassword=true
-	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	result, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 
 	if err != nil {
 		t.Fatalf("buildConnectionString failed: %v", err)
@@ -1159,7 +1159,7 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	cmd := &cobra.Command{}
 
 	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 
 	if err == nil {
 		t.Fatal("Expected error when password storage is disabled, but got none")
@@ -1196,7 +1196,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	cmd := &cobra.Command{}
 
 	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 
 	if err == nil {
 		t.Fatal("Expected error when no password is available, but got none")
@@ -1243,7 +1243,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Test buildConnectionString without password (default behavior)
 	cmd := &cobra.Command{}
-	baseConnectionString, err := buildConnectionString(service, false, "tsdbadmin", false, cmd)
+	baseConnectionString, err := buildConnectionString(service, false, "tsdbadmin", false, cmd.ErrOrStderr())
 	if err != nil {
 		t.Fatalf("buildConnectionString failed: %v", err)
 	}
@@ -1259,7 +1259,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test buildConnectionString with password (simulating --with-password flag)
-	connectionStringWithPassword, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	connectionStringWithPassword, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 	if err != nil {
 		t.Fatalf("buildConnectionString with password failed: %v", err)
 	}
@@ -1294,7 +1294,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	cmd := &cobra.Command{}
 
 	// Call buildConnectionString with withPassword=true - should fail
-	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd)
+	_, err := buildConnectionString(service, false, "tsdbadmin", true, cmd.ErrOrStderr())
 
 	if err == nil {
 		t.Fatal("Expected error for invalid service endpoint, but got none")

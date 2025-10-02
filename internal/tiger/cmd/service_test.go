@@ -109,7 +109,7 @@ func TestOutputServices_JSON(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test JSON output
-	err := outputServices(cmd, services, "json")
+	err := outputServices(cmd, services, "json", false)
 	if err != nil {
 		t.Fatalf("Failed to output JSON: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestOutputServices_YAML(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test YAML output
-	err := outputServices(cmd, services, "yaml")
+	err := outputServices(cmd, services, "yaml", false)
 	if err != nil {
 		t.Fatalf("Failed to output YAML: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestOutputServices_Table(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputServices(cmd, services, "table")
+	err := outputServices(cmd, services, "table", false)
 	if err != nil {
 		t.Fatalf("Failed to output table: %v", err)
 	}
@@ -865,7 +865,7 @@ func TestOutputService_Table(t *testing.T) {
 	}
 }
 
-func TestSanitizeServiceForOutput(t *testing.T) {
+func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	// Create a service with sensitive data
 	serviceID := "svc-12345"
 	serviceName := "test-service"
@@ -877,23 +877,61 @@ func TestSanitizeServiceForOutput(t *testing.T) {
 		InitialPassword: &initialPassword,
 	}
 
-	// Sanitize the service
-	sanitized := sanitizeServiceForOutput(service)
+	// Mock a cobra command for testing
+	cmd := &cobra.Command{}
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
-	// Verify that sensitive fields are removed
-	if _, exists := sanitized["initial_password"]; exists {
-		t.Error("Expected initial_password to be removed from sanitized service")
-	}
-	if _, exists := sanitized["initialpassword"]; exists {
-		t.Error("Expected initialpassword to be removed from sanitized service")
+	// Prepare service for output without password
+	outputSvc := prepareServiceForOutput(service, false, cmd.ErrOrStderr())
+
+	// Verify that password is removed
+	if outputSvc.Service.InitialPassword != nil {
+		t.Error("Expected InitialPassword to be nil when withPassword=false")
 	}
 
 	// Verify that other fields are preserved
-	if serviceIDVal, exists := sanitized["service_id"]; !exists || serviceIDVal != serviceID {
-		t.Error("Expected service_id to be preserved in sanitized service")
+	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+		t.Error("Expected service_id to be preserved")
 	}
-	if nameVal, exists := sanitized["name"]; !exists || nameVal != serviceName {
-		t.Error("Expected name to be preserved in sanitized service")
+	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+		t.Error("Expected name to be preserved")
+	}
+}
+
+func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
+	// Create a service with sensitive data
+	serviceID := "svc-12345"
+	serviceName := "test-service"
+	initialPassword := "secret-password-123"
+
+	service := api.Service{
+		ServiceId:       &serviceID,
+		Name:            &serviceName,
+		InitialPassword: &initialPassword,
+	}
+
+	// Mock a cobra command for testing
+	cmd := &cobra.Command{}
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	// Prepare service for output with password
+	outputSvc := prepareServiceForOutput(service, true, cmd.ErrOrStderr())
+
+	// Verify that password is preserved
+	if outputSvc.Service.InitialPassword == nil || *outputSvc.Service.InitialPassword != initialPassword {
+		t.Error("Expected InitialPassword to be preserved when withPassword=true")
+	}
+
+	// Verify that other fields are preserved
+	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+		t.Error("Expected service_id to be preserved")
+	}
+	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+		t.Error("Expected name to be preserved")
 	}
 }
 
@@ -921,7 +959,7 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 	}
 
 	// Sanitize the services
-	sanitized := sanitizeServicesForOutput(services)
+	sanitized := prepareServicesForOutput(services, false, nil)
 
 	// Verify that we have the same number of services
 	if len(sanitized) != len(services) {
@@ -930,19 +968,16 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 
 	// Verify that sensitive fields are removed from all services
 	for i, service := range sanitized {
-		if _, exists := service["initial_password"]; exists {
-			t.Errorf("Expected initial_password to be removed from sanitized service %d", i)
-		}
-		if _, exists := service["initialpassword"]; exists {
-			t.Errorf("Expected initialpassword to be removed from sanitized service %d", i)
+		if service.InitialPassword != nil {
+			t.Errorf("Expected InitialPassword to be nil in sanitized service %d", i)
 		}
 
 		// Verify that other fields are preserved
-		if _, exists := service["service_id"]; !exists {
-			t.Errorf("Expected service_id to be preserved in sanitized service %d", i)
+		if service.ServiceId == nil {
+			t.Errorf("Expected ServiceId to be preserved in sanitized service %d", i)
 		}
-		if _, exists := service["name"]; !exists {
-			t.Errorf("Expected name to be preserved in sanitized service %d", i)
+		if service.Name == nil {
+			t.Errorf("Expected Name to be preserved in sanitized service %d", i)
 		}
 	}
 }
