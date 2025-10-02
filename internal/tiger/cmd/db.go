@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"time"
@@ -60,7 +61,7 @@ Examples:
 				return err
 			}
 
-			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, dbConnectionStringWithPassword, cmd)
+			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, dbConnectionStringWithPassword, cmd.ErrOrStderr())
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -133,7 +134,7 @@ Examples:
 			}
 
 			// Get connection string using existing logic
-			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, false, cmd)
+			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, false, cmd.ErrOrStderr())
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -192,7 +193,7 @@ Examples:
 			}
 
 			// Build connection string for testing
-			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, false, cmd)
+			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, false, cmd.ErrOrStderr())
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
@@ -229,8 +230,32 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
+func getServicePassword(service api.Service) (string, error) {
+	// Get password from storage if requested
+	storage := password.GetPasswordStorage()
+	passwd, err := storage.Get(service)
+	if err != nil {
+		// Provide specific error messages based on storage type
+		switch storage.(type) {
+		case *password.NoStorage:
+			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+		case *password.KeyringStorage:
+			return "", fmt.Errorf("no password found in keyring for this service")
+		case *password.PgpassStorage:
+			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+		default:
+			return "", fmt.Errorf("failed to retrieve password: %w", err)
+		}
+	}
+
+	if passwd == "" {
+		return "", fmt.Errorf("no password available for service")
+	}
+	return passwd, nil
+}
+
 // buildConnectionString creates a PostgreSQL connection string from service details
-func buildConnectionString(service api.Service, pooled bool, role string, withPassword bool, cmd *cobra.Command) (string, error) {
+func buildConnectionString(service api.Service, pooled bool, role string, withPassword bool, output io.Writer) (string, error) {
 	if service.Endpoint == nil {
 		return "", fmt.Errorf("service endpoint not available")
 	}
@@ -245,7 +270,7 @@ func buildConnectionString(service api.Service, pooled bool, role string, withPa
 	} else {
 		// If pooled was requested but no pooler is available, warn the user
 		if pooled {
-			fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
+			fmt.Fprintf(output, "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
 		}
 		endpoint = service.Endpoint
 	}
@@ -268,24 +293,9 @@ func buildConnectionString(service api.Service, pooled bool, role string, withPa
 	var connectionString string
 	if withPassword {
 		// Get password from storage if requested
-		storage := password.GetPasswordStorage()
-		passwd, err := storage.Get(service)
+		passwd, err := getServicePassword(service)
 		if err != nil {
-			// Provide specific error messages based on storage type
-			switch storage.(type) {
-			case *password.NoStorage:
-				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-			case *password.KeyringStorage:
-				return "", fmt.Errorf("no password found in keyring for this service")
-			case *password.PgpassStorage:
-				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
-			default:
-				return "", fmt.Errorf("failed to retrieve password: %w", err)
-			}
-		}
-
-		if passwd == "" {
-			return "", fmt.Errorf("no password available for service")
+			return "", err
 		}
 
 		// Include password in connection string
