@@ -412,7 +412,7 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 		go func() {
 			// Sleep to ensure the OAuth callback server is listening
 			// This prevents "EOF" errors in CI when the server hasn't started yet
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			// Make the OAuth callback request directly
 			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
