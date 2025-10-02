@@ -433,19 +433,25 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Handle wait behavior
+				var result error
 				if createNoWait {
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					if status, err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput); err != nil {
+					status, err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput)
+					if err != nil {
 						fmt.Fprintf(statusOutput, "❌ %v\n", err)
-					} else {
-						service.Status = status
 					}
+					result = err
+					service.Status = status
 				}
 
-				return outputService(cmd, service, cfg.Output, createWithPassword)
+				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
+					return err
+				}
+
+				return result
 
 			case 400:
 				return fmt.Errorf("invalid request parameters")
