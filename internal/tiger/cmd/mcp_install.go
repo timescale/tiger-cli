@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/mcp"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -44,10 +45,18 @@ type TigerMCPServer struct {
 type clientConfig struct {
 	ClientType           MCPClient // Our internal client type
 	Name                 string
-	EditorNames          []string // Supported client names for this client
-	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor/Windsurf)
-	ConfigPaths          []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
-	InstallCommand       []string // CLI command to install MCP server (for CLI-based installation clients like Claude Code/Codex/Gemini/VSCode)
+	EditorNames          []string                        // Supported client names for this client
+	MCPServersPathPrefix string                          // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor/Windsurf)
+	ConfigPaths          []string                        // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
+	buildInstallCommand  func(tigerPath string) []string // Function to build CLI install command (for CLI-based installation clients)
+}
+
+// BuildInstallCommand constructs the install command with the given Tiger binary path
+func (c *clientConfig) BuildInstallCommand(tigerPath string) []string {
+	if c.buildInstallCommand == nil {
+		return nil
+	}
+	return c.buildInstallCommand(tigerPath)
 }
 
 // supportedClients defines the clients we support for Tiger MCP installation
@@ -62,7 +71,9 @@ var supportedClients = []clientConfig{
 		ConfigPaths: []string{
 			"~/.claude.json",
 		},
-		InstallCommand: []string{"claude", "mcp", "add", "-s", "user", "tigerdata", "tiger", "mcp", "start"},
+		buildInstallCommand: func(tigerPath string) []string {
+			return []string{"claude", "mcp", "add", "-s", "user", mcp.ServerName, tigerPath, "mcp", "start"}
+		},
 	},
 	{
 		ClientType:           Cursor,
@@ -90,7 +101,9 @@ var supportedClients = []clientConfig{
 			"~/.codex/config.toml",
 			"$CODEX_HOME/config.toml",
 		},
-		InstallCommand: []string{"codex", "mcp", "add", "tigerdata", "tiger", "mcp", "start"},
+		buildInstallCommand: func(tigerPath string) []string {
+			return []string{"codex", "mcp", "add", mcp.ServerName, tigerPath, "mcp", "start"}
+		},
 	},
 	{
 		ClientType:  Gemini,
@@ -99,7 +112,9 @@ var supportedClients = []clientConfig{
 		ConfigPaths: []string{
 			"~/.gemini/settings.json",
 		},
-		InstallCommand: []string{"gemini", "mcp", "add", "-s", "user", "tigerdata", "tiger", "mcp", "start"},
+		buildInstallCommand: func(tigerPath string) []string {
+			return []string{"gemini", "mcp", "add", "-s", "user", mcp.ServerName, tigerPath, "mcp", "start"}
+		},
 	},
 	{
 		ClientType:  VSCode,
@@ -110,7 +125,9 @@ var supportedClients = []clientConfig{
 			"~/Library/Application Support/Code/User/mcp.json",
 			"~/AppData/Roaming/Code/User/mcp.json",
 		},
-		InstallCommand: []string{"code", "--add-mcp", `{"name":"tigerdata","command":"tiger","args":["mcp","start"]}`},
+		buildInstallCommand: func(tigerPath string) []string {
+			return []string{"code", "--add-mcp", fmt.Sprintf(`{"name":"%s","command":"%s","args":["mcp","start"]}`, mcp.ServerName, tigerPath)}
+		},
 	},
 }
 
@@ -143,11 +160,11 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", clientName, err)
 		}
-	} else if len(clientCfg.InstallCommand) == 0 {
-		// Client has neither ConfigPaths nor InstallCommand
-		return fmt.Errorf("client %s has no ConfigPaths or InstallCommand defined", clientName)
+	} else if clientCfg.buildInstallCommand == nil {
+		// Client has neither ConfigPaths nor buildInstallCommand
+		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", clientName)
 	}
-	// else: CLI-only client - configPath remains empty, will use InstallCommand
+	// else: CLI-only client - configPath remains empty, will use buildInstallCommand
 
 	logging.Info("Installing Tiger MCP server configuration",
 		zap.String("client", clientName),
@@ -167,8 +184,8 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 	}
 
 	// Add Tiger MCP server to configuration
-	if len(clientCfg.InstallCommand) > 0 {
-		// Use CLI approach when install command is configured
+	if clientCfg.buildInstallCommand != nil {
+		// Use CLI approach when install command builder is configured
 		if err := addTigerMCPServerViaCLI(clientCfg); err != nil {
 			return fmt.Errorf("failed to add Tiger MCP server configuration: %w", err)
 		}
@@ -192,7 +209,7 @@ func installMCPForClient(clientName string, createBackup bool, customConfigPath 
 
 	fmt.Printf("\n💡 Next steps:\n")
 	fmt.Printf("   1. Restart %s to load the new configuration\n", clientName)
-	fmt.Printf("   2. The TigerData MCP server will be available as 'tigerdata'\n")
+	fmt.Printf("   2. The TigerData MCP server will be available as '%s'\n", mcp.ServerName)
 	fmt.Printf("\n🤖 Try asking your AI assistant:\n")
 	fmt.Printf("\n   📊 List and manage your TigerData services:\n")
 	fmt.Printf("   • \"List my TigerData services\"\n")
@@ -428,7 +445,7 @@ func (m clientSelectModel) View() string {
 
 // addTigerMCPServerViaCLI adds Tiger MCP server using a CLI command configured in clientConfig
 func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
-	if len(clientCfg.InstallCommand) == 0 {
+	if clientCfg.buildInstallCommand == nil {
 		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
 	}
 
@@ -438,17 +455,8 @@ func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
 		return fmt.Errorf("failed to get Tiger executable path: %w", err)
 	}
 
-	// Build command with full Tiger path replacing "tiger" placeholder
-	installCommand := make([]string, len(clientCfg.InstallCommand))
-	copy(installCommand, clientCfg.InstallCommand)
-	for i, arg := range installCommand {
-		if arg == "tiger" {
-			installCommand[i] = tigerPath
-		} else if strings.Contains(arg, `"command":"tiger"`) {
-			// Handle JSON format for VS Code: replace "tiger" in JSON string
-			installCommand[i] = strings.Replace(arg, `"command":"tiger"`, fmt.Sprintf(`"command":"%s"`, tigerPath), 1)
-		}
-	}
+	// Build the install command with the full Tiger path
+	installCommand := clientCfg.BuildInstallCommand(tigerPath)
 
 	logging.Info("Adding Tiger MCP server using CLI",
 		zap.String("client", clientCfg.Name),
@@ -566,7 +574,7 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 	}
 
 	// Create JSON patch to add the Tiger MCP server
-	patch := fmt.Sprintf(`[{ "op": "add", "path": "%s/tigerdata", "value": %s }]`, mcpServersPathPrefix, dataJSON)
+	patch := fmt.Sprintf(`[{ "op": "add", "path": "%s/%s", "value": %s }]`, mcpServersPathPrefix, mcp.ServerName, dataJSON)
 
 	// Apply the patch
 	if err := value.Patch([]byte(patch)); err != nil {
@@ -585,7 +593,7 @@ func addTigerMCPServerViaJSON(configPath string, mcpServersPathPrefix string) er
 	}
 
 	logging.Info("Added Tiger MCP server to configuration",
-		zap.String("server_name", "tigerdata"),
+		zap.String("server_name", mcp.ServerName),
 		zap.String("command", tigerServer.Command),
 		zap.Strings("args", tigerServer.Args),
 	)

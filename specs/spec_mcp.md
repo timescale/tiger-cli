@@ -45,7 +45,7 @@ Alternatively, for manual configuration, the Tiger MCP server can be added to yo
 ```json
 {
   "mcpServers": {
-    "tigerdata": {
+    "tiger": {
       "command": "tiger",
       "args": ["mcp", "start"]
     }
@@ -109,7 +109,7 @@ The command adds the Tiger MCP server configuration using the appropriate format
 ```json
 {
   "mcpServers": {
-    "tigerdata": {
+    "tiger": {
       "command": "tiger",
       "args": ["mcp", "start"]
     }

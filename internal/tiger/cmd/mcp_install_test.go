@@ -149,7 +149,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			mcpServersPathPrefix: "/mcpServers",
 			expectedResult: map[string]interface{}{
 				"mcpServers": map[string]interface{}{
-					"tigerdata": map[string]interface{}{
+					"tiger": map[string]interface{}{
 						"command": "tiger",
 						"args":    []interface{}{"mcp", "start"},
 					},
@@ -167,7 +167,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 						"command": "existing",
 						"args":    []interface{}{"test"},
 					},
-					"tigerdata": map[string]interface{}{
+					"tiger": map[string]interface{}{
 						"command": "tiger",
 						"args":    []interface{}{"mcp", "start"},
 					},
@@ -189,7 +189,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 						"command": "cmd2",
 						"args":    []interface{}{"arg2", "arg3"},
 					},
-					"tigerdata": map[string]interface{}{
+					"tiger": map[string]interface{}{
 						"command": "tiger",
 						"args":    []interface{}{"mcp", "start"},
 					},
@@ -204,7 +204,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			expectedResult: map[string]interface{}{
 				"other": "config",
 				"mcpServers": map[string]interface{}{
-					"tigerdata": map[string]interface{}{
+					"tiger": map[string]interface{}{
 						"command": "tiger",
 						"args":    []interface{}{"mcp", "start"},
 					},
@@ -218,7 +218,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			mcpServersPathPrefix: "/servers",
 			expectedResult: map[string]interface{}{
 				"servers": map[string]interface{}{
-					"tigerdata": map[string]interface{}{
+					"tiger": map[string]interface{}{
 						"command": "tiger",
 						"args":    []interface{}{"mcp", "start"},
 					},
@@ -322,7 +322,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 
 		expected := map[string]interface{}{
 			"mcpServers": map[string]interface{}{
-				"tigerdata": map[string]interface{}{
+				"tiger": map[string]interface{}{
 					"command": "tiger",
 					"args":    []interface{}{"mcp", "start"},
 				},
@@ -352,7 +352,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 
 		expected := map[string]interface{}{
 			"mcpServers": map[string]interface{}{
-				"tigerdata": map[string]interface{}{
+				"tiger": map[string]interface{}{
 					"command": "tiger",
 					"args":    []interface{}{"mcp", "start"},
 				},
@@ -683,16 +683,16 @@ func TestFindClientConfig(t *testing.T) {
 				assert.NotEmpty(t, config.EditorNames, "EditorNames should not be empty")
 
 				// ConfigPaths can be empty for CLI-only clients (like VS Code)
-				// Either MCPServersPathPrefix or InstallCommand should be set
+				// Either MCPServersPathPrefix or buildInstallCommand should be set
 				hasPathPrefix := config.MCPServersPathPrefix != ""
-				hasInstallCommand := len(config.InstallCommand) > 0
-				assert.True(t, hasPathPrefix || hasInstallCommand,
-					"Either MCPServersPathPrefix or InstallCommand should be set for %s", cfg.ClientType)
+				hasBuildInstallCommand := config.buildInstallCommand != nil
+				assert.True(t, hasPathPrefix || hasBuildInstallCommand,
+					"Either MCPServersPathPrefix or buildInstallCommand should be set for %s", cfg.ClientType)
 
-				// If ConfigPaths is empty, InstallCommand must be set (CLI-only client)
+				// If ConfigPaths is empty, buildInstallCommand must be set (CLI-only client)
 				if len(config.ConfigPaths) == 0 {
-					assert.NotEmpty(t, config.InstallCommand,
-						"CLI-only clients must have InstallCommand set for %s", cfg.ClientType)
+					assert.NotNil(t, config.buildInstallCommand,
+						"CLI-only clients must have buildInstallCommand set for %s", cfg.ClientType)
 				}
 			})
 		}
@@ -702,9 +702,9 @@ func TestFindClientConfig(t *testing.T) {
 func TestAddTigerMCPServerViaCLI(t *testing.T) {
 	t.Run("returns error when no install command configured", func(t *testing.T) {
 		clientCfg := &clientConfig{
-			ClientType:     "test-client",
-			Name:           "Test Client",
-			InstallCommand: []string{}, // Empty command
+			ClientType:          "test-client",
+			Name:                "Test Client",
+			buildInstallCommand: nil, // No build function
 		}
 
 		err := addTigerMCPServerViaCLI(clientCfg)
@@ -712,24 +712,14 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 		assert.Contains(t, err.Error(), "no install command configured for client Test Client", "error should mention missing install command")
 	})
 
-	t.Run("returns error when install command is nil", func(t *testing.T) {
-		clientCfg := &clientConfig{
-			ClientType:     "test-client",
-			Name:           "Test Client",
-			InstallCommand: nil, // Nil command
-		}
-
-		err := addTigerMCPServerViaCLI(clientCfg)
-		assert.Error(t, err, "should error when install command is nil")
-		assert.Contains(t, err.Error(), "no install command configured for client Test Client", "error should mention missing install command")
-	})
-
 	t.Run("attempts to execute command when configured", func(t *testing.T) {
 		// Use a command that will fail but test that we get to the execution stage
 		clientCfg := &clientConfig{
-			ClientType:     "test-client",
-			Name:           "Test Client",
-			InstallCommand: []string{"nonexistent-command-12345", "arg1", "arg2"},
+			ClientType: "test-client",
+			Name:       "Test Client",
+			buildInstallCommand: func(tigerPath string) []string {
+				return []string{"nonexistent-command-12345", "arg1", "arg2"}
+			},
 		}
 
 		err := addTigerMCPServerViaCLI(clientCfg)
@@ -740,9 +730,11 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 
 	t.Run("handles client config with single command", func(t *testing.T) {
 		clientCfg := &clientConfig{
-			ClientType:     "test-client",
-			Name:           "Test Client",
-			InstallCommand: []string{"echo"}, // Command with no args - should work
+			ClientType: "test-client",
+			Name:       "Test Client",
+			buildInstallCommand: func(tigerPath string) []string {
+				return []string{"echo"} // Command with no args - should work
+			},
 		}
 
 		err := addTigerMCPServerViaCLI(clientCfg)
@@ -752,9 +744,11 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 
 	t.Run("handles client config with command and args", func(t *testing.T) {
 		clientCfg := &clientConfig{
-			ClientType:     "test-client",
-			Name:           "Test Client",
-			InstallCommand: []string{"echo", "test", "output"}, // Command with args
+			ClientType: "test-client",
+			Name:       "Test Client",
+			buildInstallCommand: func(tigerPath string) []string {
+				return []string{"echo", "test", "output"} // Command with args
+			},
 		}
 
 		err := addTigerMCPServerViaCLI(clientCfg)
@@ -868,15 +862,15 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err = json.Unmarshal(configContent, &config)
 		require.NoError(t, err, "config should be valid JSON")
 
-		// Check that mcpServers exists and contains tigerdata
+		// Check that mcpServers exists and contains tiger
 		mcpServers, exists := config["mcpServers"].(map[string]interface{})
 		require.True(t, exists, "mcpServers should exist in config")
 
-		tigerdata, exists := mcpServers["tigerdata"].(map[string]interface{})
-		require.True(t, exists, "tigerdata should be added to mcpServers")
+		tiger, exists := mcpServers["tiger"].(map[string]interface{})
+		require.True(t, exists, "tiger should be added to mcpServers")
 
-		assert.Equal(t, "tiger", tigerdata["command"], "command should be 'tiger'")
-		args, ok := tigerdata["args"].([]interface{})
+		assert.Equal(t, "tiger", tiger["command"], "command should be 'tiger'")
+		args, ok := tiger["args"].([]interface{})
 		require.True(t, ok, "args should be an array")
 		require.Len(t, args, 2, "should have two arguments")
 		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
@@ -908,7 +902,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 			assert.Equal(t, initialConfig, string(backupContent), "backup should contain original config")
 		}
 
-		// Verify config was modified to include tigerdata
+		// Verify config was modified to include tiger
 		configContent, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
@@ -917,7 +911,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		mcpServers := config["mcpServers"].(map[string]interface{})
-		assert.Contains(t, mcpServers, "tigerdata", "tigerdata should be added")
+		assert.Contains(t, mcpServers, "tiger", "tiger should be added")
 		assert.Contains(t, mcpServers, "existing", "existing server should be preserved")
 	})
 
@@ -935,14 +929,14 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 
 		configPath := filepath.Join(tempDir, "mcp.json")
 
-		// Create initial config with mcpServers including an OLD tigerdata entry
+		// Create initial config with mcpServers including an OLD tiger entry
 		initialConfig := `{
 			"mcpServers": {
 				"existing": {
 					"command": "existing",
 					"args": ["arg1", "arg2"]
 				},
-				"tigerdata": {
+				"tiger": {
 					"command": "/old/path/to/tiger",
 					"args": ["old", "args"]
 				}
@@ -951,7 +945,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err = os.WriteFile(configPath, []byte(initialConfig), 0644)
 		require.NoError(t, err)
 
-		// First installation (should update existing tigerdata entry)
+		// First installation (should update existing tiger entry)
 		err = installMCPForClient("cursor", false, configPath)
 		require.NoError(t, err, "first installation should succeed")
 
@@ -963,15 +957,15 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err = json.Unmarshal(content1, &config1)
 		require.NoError(t, err)
 
-		// Verify tigerdata was updated
+		// Verify tiger was updated
 		mcpServers1 := config1["mcpServers"].(map[string]interface{})
-		assert.Contains(t, mcpServers1, "tigerdata", "tigerdata should exist after install")
+		assert.Contains(t, mcpServers1, "tiger", "tiger should exist after install")
 		assert.Contains(t, mcpServers1, "existing", "existing server should be preserved")
 
-		tigerdataConfig := mcpServers1["tigerdata"].(map[string]interface{})
-		assert.Equal(t, "tiger", tigerdataConfig["command"], "command should be updated to 'tiger' in test mode")
+		tigerConfig := mcpServers1["tiger"].(map[string]interface{})
+		assert.Equal(t, "tiger", tigerConfig["command"], "command should be updated to 'tiger' in test mode")
 
-		args := tigerdataConfig["args"].([]interface{})
+		args := tigerConfig["args"].([]interface{})
 		assert.Equal(t, 2, len(args), "should have 2 args")
 		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
 		assert.Equal(t, "start", args[1], "second arg should be 'start'")
@@ -990,14 +984,14 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 
 		// Verify config is identical after second install
 		mcpServers2 := config2["mcpServers"].(map[string]interface{})
-		assert.Contains(t, mcpServers2, "tigerdata", "tigerdata should still exist after second install")
+		assert.Contains(t, mcpServers2, "tiger", "tiger should still exist after second install")
 		assert.Contains(t, mcpServers2, "existing", "existing server should still be preserved")
 
-		// Verify only one tigerdata entry exists (not duplicated)
+		// Verify only one tiger entry exists (not duplicated)
 		assert.Equal(t, len(mcpServers1), len(mcpServers2), "number of MCP servers should not increase")
 
-		// Verify tigerdata config is still correct
-		tigerdataConfig2 := mcpServers2["tigerdata"].(map[string]interface{})
-		assert.Equal(t, tigerdataConfig, tigerdataConfig2, "tigerdata config should remain the same")
+		// Verify tiger config is still correct
+		tigerConfig2 := mcpServers2["tiger"].(map[string]interface{})
+		assert.Equal(t, tigerConfig, tigerConfig2, "tiger config should remain the same")
 	})
 }

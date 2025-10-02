@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	// TODO: Is this right?
-	serverName  = "tiger-mcp"
+	ServerName  = "tiger"
 	serverTitle = "Tiger MCP"
 )
 
@@ -28,7 +27,7 @@ type Server struct {
 func NewServer(ctx context.Context) (*Server, error) {
 	// Create MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
-		Name:    serverName,
+		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
 	}, nil)
