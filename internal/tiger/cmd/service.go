@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -411,7 +412,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Save password immediately after service creation, before any waiting
 				// This ensures users have access even if they interrupt the wait or it fails
-				handlePasswordSaving(service, initialPassword, cmd)
+				passwordSaved := handlePasswordSaving(service, initialPassword, cmd)
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
@@ -429,8 +430,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Wait for service to be ready
 				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-				return waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd)
-
+				if err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, cmd); err != nil {
+					return err
+				}
+				printConnectMessage(cmd.ErrOrStderr(), passwordSaved, createNoSetDefault, serviceID)
+				return nil
 			case 400:
 				return fmt.Errorf("invalid request parameters")
 			case 401:
@@ -788,26 +792,26 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 }
 
 // handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
-func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
+func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
 	result, _ := util.SavePasswordWithResult(service, initialPassword)
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password
-		return
+		return false
 	}
 
 	// Output the message with appropriate emoji
 	if result.Success {
 		fmt.Fprintf(cmd.OutOrStdout(), "🔐 %s\n", result.Message)
+		return true
+	} else if result.Method == "none" {
+		fmt.Fprintf(cmd.OutOrStdout(), "💡 %s\n", result.Message)
 	} else {
-		if result.Method == "none" {
-			fmt.Fprintf(cmd.OutOrStdout(), "💡 %s\n", result.Message)
-		} else {
-			fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s\n", result.Message)
-		}
+		fmt.Fprintf(cmd.OutOrStdout(), "⚠️  %s\n", result.Message)
 	}
+	return false
 }
 
 // setDefaultService sets the given service as the default service in the configuration
@@ -824,6 +828,19 @@ func setDefaultService(serviceID string, cmd *cobra.Command) error {
 
 	fmt.Fprintf(cmd.OutOrStdout(), "🎯 Set service '%s' as default service.\n", serviceID)
 	return nil
+}
+
+func printConnectMessage(output io.Writer, passwordSaved, noSetDefault bool, serviceID string) {
+	if !passwordSaved {
+		// We can't connect if no password was saved, so don't show message
+		return
+	} else if noSetDefault {
+		// If the service wasn't set as the default, include the serviceID in the command
+		fmt.Fprintf(output, "🔌 Run 'tiger db connect %s' to connect to your new service\n", serviceID)
+	} else {
+		// If the service was set as the default, no need to include the serviceID in the command
+		fmt.Fprintf(output, "🔌 Run 'tiger db connect' to connect to your new service\n")
+	}
 }
 
 // buildServiceDeleteCmd creates the delete subcommand
@@ -1201,7 +1218,7 @@ Examples:
 				}
 
 				// Save password immediately after service fork
-				handlePasswordSaving(forkedService, initialPassword, cmd)
+				passwordSaved := handlePasswordSaving(forkedService, initialPassword, cmd)
 
 				// Set as default service unless --no-set-default is used
 				if !forkNoSetDefault {
@@ -1223,6 +1240,7 @@ Examples:
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "🎉 Service fork completed successfully!\n")
+				printConnectMessage(cmd.ErrOrStderr(), passwordSaved, forkNoSetDefault, serviceID)
 				return nil
 
 			case 401:
