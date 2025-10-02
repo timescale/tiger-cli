@@ -1,4 +1,4 @@
-package util
+package password
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // Helper function to create a test service
@@ -18,8 +19,8 @@ func createTestService(serviceID string) api.Service {
 		ProjectId: &projectID,
 		ServiceId: &serviceID,
 		Endpoint: &api.Endpoint{
-			Host: Ptr("test-host.tigerdata.com"),
-			Port: Ptr(5432),
+			Host: util.Ptr("test-host.tigerdata.com"),
+			Port: util.Ptr(5432),
 		},
 	}
 }
@@ -159,7 +160,7 @@ func TestKeyringStorage_Remove_NoProjectId(t *testing.T) {
 func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceId: Ptr("test-service-123"),
+		ServiceId: util.Ptr("test-service-123"),
 		// No Endpoint
 	}
 
@@ -175,7 +176,7 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceId: Ptr("test-service-123"),
+		ServiceId: util.Ptr("test-service-123"),
 		// No Endpoint
 	}
 
@@ -219,11 +220,11 @@ func TestGetPasswordStorage(t *testing.T) {
 		storageMethod string
 		expectedType  string
 	}{
-		{"keyring", "keyring", "*util.KeyringStorage"},
-		{"pgpass", "pgpass", "*util.PgpassStorage"},
-		{"none", "none", "*util.NoStorage"},
-		{"default", "", "*util.KeyringStorage"},        // Default case
-		{"invalid", "invalid", "*util.KeyringStorage"}, // Falls back to default
+		{"keyring", "keyring", "*password.KeyringStorage"},
+		{"pgpass", "pgpass", "*password.PgpassStorage"},
+		{"none", "none", "*password.NoStorage"},
+		{"default", "", "*password.KeyringStorage"},        // Default case
+		{"invalid", "invalid", "*password.KeyringStorage"}, // Falls back to default
 	}
 
 	for _, tt := range tests {
@@ -514,8 +515,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "valid service with both IDs",
 			service: api.Service{
-				ProjectId: Ptr("project-123"),
-				ServiceId: Ptr("service-456"),
+				ProjectId: util.Ptr("project-123"),
+				ServiceId: util.Ptr("service-456"),
 			},
 			expected:    "password-project-123-service-456",
 			expectError: false,
@@ -523,7 +524,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing service ID",
 			service: api.Service{
-				ProjectId: Ptr("project-123"),
+				ProjectId: util.Ptr("project-123"),
 			},
 			expected:    "",
 			expectError: true,
@@ -531,7 +532,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing project ID",
 			service: api.Service{
-				ServiceId: Ptr("service-456"),
+				ServiceId: util.Ptr("service-456"),
 			},
 			expected:    "",
 			expectError: true,

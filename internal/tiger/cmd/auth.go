@@ -17,6 +17,14 @@ import (
 // validateAPIKeyForLogin can be overridden for testing
 var validateAPIKeyForLogin = api.ValidateAPIKey
 
+// nextStepsMessage is the message shown after successful login
+const nextStepsMessage = `
+🎉 Next steps:
+• Install MCP server for your favorite AI coding tool: tiger mcp install
+• List existing services: tiger service list
+• Create a new service: tiger service create
+`
+
 type credentials struct {
 	publicKey string
 	secretKey string
@@ -129,6 +137,9 @@ Examples:
 				return fmt.Errorf("failed to store project ID: %w", err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Set default project ID to: %s\n", creds.projectID)
+
+			// Show helpful next steps
+			fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
 
 			return nil
 		},

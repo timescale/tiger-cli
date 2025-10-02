@@ -38,16 +38,16 @@ For the initial v0 release, implement these essential tools first:
 
 ## Configuration
 
-### Claude Desktop Configuration
+The recommended approach is to use the `tiger mcp install` command, which automatically configures the Tiger MCP server for your AI assistant. See the CLI MCP Commands section below for details.
 
-Add to `~/.claude_desktop_config.json`:
+Alternatively, for manual configuration, the Tiger MCP server can be added to your AI assistant's configuration file with the following settings:
 
 ```json
 {
   "mcpServers": {
-    "tigerdata": {
+    "tiger": {
       "command": "tiger",
-      "args": ["mcp"]
+      "args": ["mcp", "start"]
     }
   }
 }
@@ -57,11 +57,71 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
+#### `tiger mcp install <editor>`
+Install and configure the Tiger MCP server for a specific editor or AI assistant. This command automates the configuration process by modifying the appropriate configuration files.
+
+**Supported Editors:**
+- `claude-code`: Configure for Claude Code
+- `cursor`: Configure for Cursor IDE
+- `windsurf`: Configure for Windsurf editor
+- `codex`: Configure for Codex
+- `gemini` or `gemini-cli`: Configure for Gemini CLI
+- `vscode`, `code`, or `vs-code`: Configure for VS Code
+
+**Options:**
+- `--no-backup`: Skip creating backup of existing configuration (default: create backup)
+- `--config-path`: Custom path to configuration file (overrides default locations)
+
+**Examples:**
+```bash
+# Interactive editor selection
+tiger mcp install
+
+# Install for Claude Code
+tiger mcp install claude-code
+
+# Install for Cursor IDE
+tiger mcp install cursor
+
+# Install for Windsurf
+tiger mcp install windsurf
+
+# Install for VS Code
+tiger mcp install vscode
+
+# Install without creating backup
+tiger mcp install claude-code --no-backup
+
+# Use custom configuration file path
+tiger mcp install claude-code --config-path ~/custom/config.json
+```
+
+**Behavior:**
+- Automatically detects the appropriate configuration file location for the specified editor
+- Creates configuration directory if it doesn't exist
+- Creates backup of existing configuration file by default (use `--no-backup` to skip)
+- Merges with existing MCP server configurations (doesn't overwrite other servers)
+- Validates configuration after installation
+- Provides clear success/failure feedback with next steps
+
+**Configuration Format:**
+The command adds the Tiger MCP server configuration using the appropriate format for each editor. Example configuration:
+```json
+{
+  "mcpServers": {
+    "tiger": {
+      "command": "tiger",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
 #### `tiger mcp start [transport]`
 Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
 **Transports:**
-- `stdio` (default): Standard input/output transport for AI assistant integration  
+- `stdio` (default): Standard input/output transport for AI assistant integration
 - `http`: HTTP server transport for web-based integrations
 
 **Options for HTTP transport:**
@@ -80,7 +140,7 @@ tiger mcp start http --port 3001
 tiger mcp start http --port 8080 --host 0.0.0.0
 ```
 
-**Notes:** 
+**Notes:**
 - The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process
 - For HTTP transport, the server will print the listening address (including port) on startup for easy connection
 

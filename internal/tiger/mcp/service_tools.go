@@ -13,6 +13,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -133,9 +134,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 
 // ServiceCreateOutput represents output for tiger_service_create
 type ServiceCreateOutput struct {
-	Service         ServiceDetail               `json:"service"`
-	Message         string                      `json:"message"`
-	PasswordStorage *util.PasswordStorageResult `json:"password_storage,omitempty"`
+	Service         ServiceDetail                   `json:"service"`
+	Message         string                          `json:"message"`
+	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 // ServiceUpdatePasswordInput represents input for tiger_service_update_password
@@ -158,8 +159,8 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 
 // ServiceUpdatePasswordOutput represents output for tiger_service_update_password
 type ServiceUpdatePasswordOutput struct {
-	Message         string                      `json:"message"`
-	PasswordStorage *util.PasswordStorageResult `json:"password_storage,omitempty"`
+	Message         string                          `json:"message"`
+	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -487,7 +488,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		// Save password immediately after service creation, before any waiting
 		// This ensures the password is stored even if the wait fails or is interrupted
 		if initialPassword != "" {
-			result, err := util.SavePasswordWithResult(api.Service(service), initialPassword)
+			result, err := password.SavePasswordWithResult(api.Service(service), initialPassword)
 			output.PasswordStorage = &result
 			if err != nil {
 				logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -563,7 +564,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 		if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 			// Save the new password using the shared util function
-			result, err := util.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
+			result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
 			output.PasswordStorage = &result
 			if err != nil {
 				logging.Debug("MCP: Password storage failed", zap.Error(err))

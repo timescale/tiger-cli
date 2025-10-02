@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -791,7 +792,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 func handlePasswordSaving(service api.Service, initialPassword string, cmd *cobra.Command) {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := util.SavePasswordWithResult(service, initialPassword)
+	result, _ := password.SavePasswordWithResult(service, initialPassword)
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password

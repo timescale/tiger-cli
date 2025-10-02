@@ -2,9 +2,11 @@ package util
 
 import (
 	"testing"
-
-	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
+
+// Define local types for testing to avoid import cycles
+type testDeployStatus string
+type testServiceType string
 
 func TestDeref(t *testing.T) {
 	// Test service ID formatting (now uses string instead of UUID)
@@ -28,20 +30,20 @@ func TestDeref(t *testing.T) {
 
 func TestDerefStr(t *testing.T) {
 	// Test DerefStr with DeployStatus
-	status := api.DeployStatus("running")
+	status := testDeployStatus("running")
 	if DerefStr(&status) != "running" {
 		t.Error("DerefStr should return status string")
 	}
-	if DerefStr((*api.DeployStatus)(nil)) != "" {
+	if DerefStr((*testDeployStatus)(nil)) != "" {
 		t.Error("DerefStr should return empty string for nil")
 	}
 
 	// Test DerefStr with ServiceType
-	serviceType := api.ServiceType("POSTGRES")
+	serviceType := testServiceType("POSTGRES")
 	if DerefStr(&serviceType) != "POSTGRES" {
 		t.Error("DerefStr should return service type string")
 	}
-	if DerefStr((*api.ServiceType)(nil)) != "" {
+	if DerefStr((*testServiceType)(nil)) != "" {
 		t.Error("DerefStr should return empty string for nil")
 	}
 }
