@@ -23,6 +23,22 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Install keyring dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring dbus-x11
+
+      - name: Start D-Bus and keyring
+        run: |
+          # Start D-Bus session
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+          # Initialize gnome-keyring with a test password
+          echo 'test' | gnome-keyring-daemon --unlock
+          eval $(echo 'test' | gnome-keyring-daemon --start --components=secrets)
+          echo "GNOME_KEYRING_CONTROL=$GNOME_KEYRING_CONTROL" >> $GITHUB_ENV
+
       - name: Build
         run: go build ./...
 
