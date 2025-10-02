@@ -443,12 +443,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					status, err := waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput)
-					if err != nil {
-						fmt.Fprintf(statusOutput, "❌ %v\n", err)
+					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput)
+					if result != nil {
+						fmt.Fprintf(statusOutput, "❌ %v\n", result)
 					}
-					result = err
-					service.Status = status
 				}
 
 				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
@@ -621,31 +619,18 @@ type OutputService struct {
 	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 }
 
-// Convert to JSON to respect omitempty tags, then unmarshal to a map
-func toMap(v any) (map[string]interface{}, error) {
+// Convert to JSON to respect omitempty tags, then unmarshal
+func toJSON(v any) (any, error) {
 	jsonBytes, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
 
-	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &jsonMap); err != nil {
+	var jsonOut any
+	if err := json.Unmarshal(jsonBytes, &jsonOut); err != nil {
 		return nil, err
 	}
-	return jsonMap, nil
-}
-
-func toMapSlice(v any) ([]map[string]interface{}, error) {
-	jsonBytes, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-
-	var jsonArray []map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &jsonArray); err != nil {
-		return nil, err
-	}
-	return jsonArray, nil
+	return jsonOut, nil
 }
 
 // outputService formats and outputs a single service based on the specified format
@@ -661,7 +646,7 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		jsonMap, err := toMap(outputSvc)
+		jsonMap, err := toJSON(outputSvc)
 		if err != nil {
 			return fmt.Errorf("failed to convert service to map: %w", err)
 		}
@@ -683,7 +668,7 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string, w
 	case "yaml":
 		encoder := yaml.NewEncoder(cmd.OutOrStdout())
 		encoder.SetIndent(2)
-		jsonArray, err := toMapSlice(outputServices)
+		jsonArray, err := toJSON(outputServices)
 		if err != nil {
 			return fmt.Errorf("failed to convert services to map: %w", err)
 		}
@@ -694,11 +679,9 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string, w
 }
 
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(cmd *cobra.Command, outputSvc OutputService) error {
+func outputServiceTable(cmd *cobra.Command, service OutputService) error {
 	table := tablewriter.NewWriter(cmd.OutOrStdout())
 	table.Header("PROPERTY", "VALUE")
-
-	service := outputSvc.Service
 
 	// Basic service information
 	table.Append("Service ID", util.Deref(service.ServiceId))
@@ -777,8 +760,8 @@ func outputServiceTable(cmd *cobra.Command, outputSvc OutputService) error {
 	}
 
 	// Output connection string if available
-	if outputSvc.ConnectionString != nil {
-		table.Append("Connection String", *outputSvc.ConnectionString)
+	if service.ConnectionString != nil {
+		table.Append("Connection String", *service.ConnectionString)
 	}
 
 	return table.Render()
@@ -811,13 +794,13 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 
 	// Remove password if not requested
 	if !withPassword {
-		outputSvc.Service.InitialPassword = nil
+		outputSvc.InitialPassword = nil
 	} else if service.InitialPassword == nil {
 		password, err := getServicePassword(service)
 		if err != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
 		}
-		outputSvc.Service.InitialPassword = &password
+		outputSvc.InitialPassword = &password
 	}
 
 	// Build connection string
