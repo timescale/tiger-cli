@@ -15,6 +15,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -380,7 +381,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				serviceCreateReq.Free = &createFree
 				serviceCreateReq.RegionCode = "us-east-1"
 			} else {
-				serviceCreateReq.Addons = util.ConvertAddonsToAPI(addons)
+				serviceCreateReq.Addons = util.ConvertStringSlice[api.ServiceCreateAddons](addons)
 				serviceCreateReq.RegionCode = createRegionCode
 				serviceCreateReq.ReplicaCount = createReplicaCount
 				serviceCreateReq.CpuMillis = createCpuMillis
@@ -878,7 +879,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := util.SavePasswordWithResult(service, initialPassword)
+	result, _ := password.SavePasswordWithResult(service, initialPassword)
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password

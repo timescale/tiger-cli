@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 type Config struct {
@@ -245,28 +247,14 @@ func GetDefaultConfigDir() string {
 
 func GetEffectiveConfigDir(configDirFlag *pflag.Flag) string {
 	if configDirFlag.Changed {
-		return expandPath(configDirFlag.Value.String())
+		return util.ExpandPath(configDirFlag.Value.String())
 	}
 
 	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
-		return expandPath(dir)
+		return util.ExpandPath(dir)
 	}
 
 	return GetDefaultConfigDir()
-}
-
-func expandPath(path string) string {
-	if path == "~" {
-		homeDir, _ := os.UserHomeDir()
-		return homeDir
-	}
-
-	if len(path) > 1 && path[:2] == "~/" {
-		homeDir, _ := os.UserHomeDir()
-		return filepath.Join(homeDir, path[2:])
-	}
-
-	return path
 }
 
 // ResetGlobalConfig clears the global viper state for testing

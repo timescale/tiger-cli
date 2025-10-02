@@ -15,7 +15,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/util"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 )
 
 var (
@@ -232,26 +232,26 @@ func buildDbCmd() *cobra.Command {
 
 func getServicePassword(service api.Service) (string, error) {
 	// Get password from storage if requested
-	storage := util.GetPasswordStorage()
-	password, err := storage.Get(service)
+	storage := password.GetPasswordStorage()
+	passwd, err := storage.Get(service)
 	if err != nil {
 		// Provide specific error messages based on storage type
 		switch storage.(type) {
-		case *util.NoStorage:
+		case *password.NoStorage:
 			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-		case *util.KeyringStorage:
+		case *password.KeyringStorage:
 			return "", fmt.Errorf("no password found in keyring for this service")
-		case *util.PgpassStorage:
+		case *password.PgpassStorage:
 			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
 		default:
 			return "", fmt.Errorf("failed to retrieve password: %w", err)
 		}
 	}
 
-	if password == "" {
+	if passwd == "" {
 		return "", fmt.Errorf("no password available for service")
 	}
-	return password, nil
+	return passwd, nil
 }
 
 // buildConnectionString creates a PostgreSQL connection string from service details
@@ -293,13 +293,13 @@ func buildConnectionString(service api.Service, pooled bool, role string, withPa
 	var connectionString string
 	if withPassword {
 		// Get password from storage if requested
-		password, err := getServicePassword(service)
+		passwd, err := getServicePassword(service)
 		if err != nil {
 			return "", err
 		}
 
 		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, password, host, port, database)
+		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, passwd, host, port, database)
 	} else {
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
@@ -424,8 +424,8 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 
 	// Only set PGPASSWORD for keyring storage method
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := util.GetPasswordStorage()
-	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
+	storage := password.GetPasswordStorage()
+	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
@@ -447,8 +447,8 @@ func buildConnectionConfig(connectionString string, service api.Service) (*pgx.C
 
 	// Set password from keyring storage if available
 	// pgpass storage works automatically since pgx checks ~/.pgpass file
-	storage := util.GetPasswordStorage()
-	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
+	storage := password.GetPasswordStorage()
+	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service); err == nil && password != "" {
 			config.Password = password
 		}
