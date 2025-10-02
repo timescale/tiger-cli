@@ -617,6 +617,7 @@ Examples:
 type OutputService struct {
 	api.Service
 	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
+	Password         *string `json:"password,omitempty" yaml:"password,omitempty"`
 }
 
 // Convert to JSON to respect omitempty tags, then unmarshal
@@ -755,7 +756,9 @@ func outputServiceTable(cmd *cobra.Command, service OutputService) error {
 	}
 
 	// Output password if available
-	if service.InitialPassword != nil {
+	if service.Password != nil {
+		table.Append("Password", *service.Password)
+	} else if service.InitialPassword != nil {
 		table.Append("Initial Password", *service.InitialPassword)
 	}
 
@@ -800,7 +803,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		if err != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
 		}
-		outputSvc.InitialPassword = &password
+		outputSvc.Password = &password
 	}
 
 	// Build connection string
