@@ -91,7 +91,7 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -165,7 +165,7 @@ func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -196,7 +196,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -445,7 +445,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
 		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-123\n$`, regexp.QuoteMeta(mockServerURL))
+		`Set default project ID to: project-123\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -508,7 +508,7 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
 		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-789\n$`, regexp.QuoteMeta(mockServerURL))
+		`Set default project ID to: project-789\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -553,7 +553,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -625,7 +625,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
