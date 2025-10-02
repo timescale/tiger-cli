@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-
-	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
 
 // Matches front-end logic for generating a random service name
@@ -67,18 +65,4 @@ func ValidateAddons(addons []string) ([]string, error) {
 	}
 
 	return result, nil
-}
-
-// ConvertAddonsToAPI converts a slice of addon strings to the API format
-// Returns nil if addons slice is empty or nil (for PostgreSQL-only services)
-func ConvertAddonsToAPI(addons []string) []api.ServiceCreateAddons {
-	if len(addons) == 0 {
-		return nil
-	}
-
-	apiAddons := make([]api.ServiceCreateAddons, len(addons))
-	for i, addon := range addons {
-		apiAddons[i] = api.ServiceCreateAddons(addon)
-	}
-	return apiAddons
 }

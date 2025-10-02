@@ -369,7 +369,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				serviceCreateReq.Free = &createFree
 				serviceCreateReq.RegionCode = "us-east-1"
 			} else {
-				serviceCreateReq.Addons = util.ConvertAddonsToAPI(addons)
+				serviceCreateReq.Addons = util.ConvertStringSlice[api.ServiceCreateAddons](addons)
 				serviceCreateReq.RegionCode = createRegionCode
 				serviceCreateReq.ReplicaCount = createReplicaCount
 				serviceCreateReq.CpuMillis = createCpuMillis

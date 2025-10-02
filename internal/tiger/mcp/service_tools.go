@@ -442,7 +442,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
 		Name:         input.Name,
-		Addons:       util.ConvertAddonsToAPI(input.Addons),
+		Addons:       util.ConvertStringSlice[api.ServiceCreateAddons](input.Addons),
 		RegionCode:   input.Region,
 		ReplicaCount: input.Replicas,
 		CpuMillis:    cpuMillis,
