@@ -101,78 +101,86 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) Save() error {
+func (c *Config) ensureConfigDir() (string, error) {
 	if err := os.MkdirAll(c.ConfigDir, 0755); err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
+		return "", fmt.Errorf("error creating config directory: %w", err)
 	}
-	configFile := GetConfigFile(c.ConfigDir)
-
-	viper.Set("api_url", c.APIURL)
-	viper.Set("console_url", c.ConsoleURL)
-	viper.Set("gateway_url", c.GatewayURL)
-	viper.Set("docs_mcp", c.DocsMCP)
-	viper.Set("docs_mcp_url", c.DocsMCPURL)
-	viper.Set("project_id", c.ProjectID)
-	viper.Set("service_id", c.ServiceID)
-	viper.Set("output", c.Output)
-	viper.Set("analytics", c.Analytics)
-	viper.Set("password_storage", c.PasswordStorage)
-	viper.Set("debug", c.Debug)
-
-	if err := viper.WriteConfigAs(configFile); err != nil {
-		return fmt.Errorf("error writing config file: %w", err)
-	}
-
-	return nil
+	return GetConfigFile(c.ConfigDir), nil
 }
 
 func (c *Config) Set(key, value string) error {
+	var validated any
 	switch key {
 	case "api_url":
 		c.APIURL = value
+		validated = value
 	case "console_url":
 		c.ConsoleURL = value
+		validated = value
 	case "gateway_url":
 		c.GatewayURL = value
+		validated = value
 	case "docs_mcp":
 		b, err := setBool("docs_mcp", value)
 		if err != nil {
 			return err
 		}
 		c.DocsMCP = b
+		validated = b
 	case "docs_mcp_url":
 		c.DocsMCPURL = value
+		validated = value
 	case "project_id":
 		c.ProjectID = value
+		validated = value
 	case "service_id":
 		c.ServiceID = value
+		validated = value
 	case "output":
 		if err := ValidateOutputFormat(value); err != nil {
 			return err
 		}
 		c.Output = value
+		validated = value
 	case "analytics":
 		b, err := setBool("analytics", value)
 		if err != nil {
 			return err
 		}
 		c.Analytics = b
+		validated = b
 	case "password_storage":
 		if value != "keyring" && value != "pgpass" && value != "none" {
 			return fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
 		}
 		c.PasswordStorage = value
+		validated = value
 	case "debug":
 		b, err := setBool("debug", value)
 		if err != nil {
 			return err
 		}
 		c.Debug = b
+		validated = b
 	default:
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
-	return c.Save()
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
+	}
+
+	v := viper.New()
+	v.SetConfigFile(configFile)
+	v.ReadInConfig()
+
+	v.Set(key, validated)
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+	return nil
 }
 
 func setBool(key, val string) (bool, error) {
@@ -184,50 +192,46 @@ func setBool(key, val string) (bool, error) {
 }
 
 func (c *Config) Unset(key string) error {
-	switch key {
-	case "api_url":
-		c.APIURL = DefaultAPIURL
-	case "console_url":
-		c.ConsoleURL = DefaultConsoleURL
-	case "gateway_url":
-		c.GatewayURL = DefaultGatewayURL
-	case "docs_mcp":
-		c.DocsMCP = DefaultDocsMCP
-	case "docs_mcp_url":
-		c.DocsMCPURL = DefaultDocsMCPURL
-	case "project_id":
-		c.ProjectID = ""
-	case "service_id":
-		c.ServiceID = ""
-	case "output":
-		c.Output = DefaultOutput
-	case "analytics":
-		c.Analytics = DefaultAnalytics
-	case "password_storage":
-		c.PasswordStorage = DefaultPasswordStorage
-	case "debug":
-		c.Debug = DefaultDebug
-	default:
-		return fmt.Errorf("unknown configuration key: %s", key)
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
 	}
 
-	return c.Save()
+	vCurrent := viper.New()
+	vCurrent.SetConfigFile(configFile)
+	vCurrent.ReadInConfig()
+
+	vNew := viper.New()
+	vNew.SetConfigFile(configFile)
+
+	for k, v := range vCurrent.AllSettings() {
+		if k != key {
+			vNew.Set(k, v)
+		}
+	}
+
+	if err := vNew.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+	return nil
 }
 
 func (c *Config) Reset() error {
-	c.APIURL = DefaultAPIURL
-	c.ConsoleURL = DefaultConsoleURL
-	c.GatewayURL = DefaultGatewayURL
-	c.DocsMCP = DefaultDocsMCP
-	c.DocsMCPURL = DefaultDocsMCPURL
-	c.ProjectID = ""
-	c.ServiceID = ""
-	c.Output = DefaultOutput
-	c.Analytics = DefaultAnalytics
-	c.PasswordStorage = DefaultPasswordStorage
-	c.Debug = DefaultDebug
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
+	}
 
-	return c.Save()
+	v := viper.New()
+	v.SetConfigFile(configFile)
+
+	// Preserve the project id, as this is part of the auth scheme
+	v.Set("project_id", c.ProjectID)
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+	return nil
 }
 
 func GetConfigFile(dir string) string {
