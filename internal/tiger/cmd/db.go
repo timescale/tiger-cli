@@ -268,28 +268,28 @@ func buildConnectionString(service api.Service, pooled bool, role string, withPa
 	var connectionString string
 	if withPassword {
 		// Get password from storage if requested
-		storage := util.GetPasswordStorage()
-		password, err := storage.Get(service)
+		storage := password.GetPasswordStorage()
+		passwd, err := storage.Get(service)
 		if err != nil {
 			// Provide specific error messages based on storage type
 			switch storage.(type) {
-			case *util.NoStorage:
+			case *password.NoStorage:
 				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-			case *util.KeyringStorage:
+			case *password.KeyringStorage:
 				return "", fmt.Errorf("no password found in keyring for this service")
-			case *util.PgpassStorage:
+			case *password.PgpassStorage:
 				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
 			default:
 				return "", fmt.Errorf("failed to retrieve password: %w", err)
 			}
 		}
 
-		if password == "" {
+		if passwd == "" {
 			return "", fmt.Errorf("no password available for service")
 		}
 
 		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, password, host, port, database)
+		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, passwd, host, port, database)
 	} else {
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file

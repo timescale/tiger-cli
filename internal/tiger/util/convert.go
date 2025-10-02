@@ -33,3 +33,17 @@ func AnySlice[T any](in []T) []any {
 	}
 	return out
 }
+
+// ConvertStringSlice converts a slice of strings to another string-like type.
+// Returns nil if the input slice is empty or nil.
+func ConvertStringSlice[T ~string](ss []string) []T {
+	if len(ss) == 0 {
+		return nil
+	}
+
+	out := make([]T, len(ss))
+	for i, s := range ss {
+		out[i] = T(s)
+	}
+	return out
+}
