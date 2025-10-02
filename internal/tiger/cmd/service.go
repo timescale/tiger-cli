@@ -448,7 +448,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					if result != nil {
 						fmt.Fprintf(statusOutput, "❌ %v\n", result)
 					} else {
-						printConnectMessage(cmd.ErrOrStderr(), passwordSaved, createNoSetDefault, serviceID)
+						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
 					}
 				}
 
@@ -1332,7 +1332,7 @@ Examples:
 					return err
 				}
 				fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
-				printConnectMessage(cmd.ErrOrStderr(), passwordSaved, forkNoSetDefault, serviceID)
+				printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, serviceID)
 				return nil
 
 			case 401:
