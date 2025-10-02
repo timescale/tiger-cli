@@ -27,7 +27,7 @@ type MCPClient string
 
 const (
 	ClaudeCode MCPClient = "claude-code"
-	Cursor     MCPClient = "cursor" //both the ide and the cli.
+	Cursor     MCPClient = "cursor" // Both the IDE and the CLI
 	Windsurf   MCPClient = "windsurf"
 	Codex      MCPClient = "codex"
 	Gemini     MCPClient = "gemini"
