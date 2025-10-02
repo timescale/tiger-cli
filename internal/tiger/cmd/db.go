@@ -269,7 +269,7 @@ func buildConnectionString(service api.Service, pooled bool, role string, withPa
 		endpoint = service.ConnectionPooler.Endpoint
 	} else {
 		// If pooled was requested but no pooler is available, warn the user
-		if pooled && output != nil {
+		if pooled {
 			fmt.Fprintf(output, "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
 		}
 		endpoint = service.Endpoint
