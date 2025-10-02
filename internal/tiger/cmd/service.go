@@ -427,7 +427,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Save password immediately after service creation, before any waiting
 				// This ensures users have access even if they interrupt the wait or it fails
-				handlePasswordSaving(service, initialPassword, statusOutput)
+				passwordSaved := handlePasswordSaving(service, initialPassword, statusOutput)
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
@@ -447,6 +447,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput)
 					if result != nil {
 						fmt.Fprintf(statusOutput, "❌ %v\n", result)
+					} else {
+						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
 					}
 				}
 
@@ -455,7 +457,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				return result
-
 			case 400:
 				return fmt.Errorf("invalid request parameters")
 			case 401:
@@ -875,27 +876,29 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	}
 }
 
-// handlePasswordSaving handles saving password using the configured storage method and displaying appropriate messages
-func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) {
+// handlePasswordSaving handles saving password using the configured storage
+// method and displaying appropriate messages. Returns true if the password was
+// successfully saved, or false if not.
+func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
 	result, _ := password.SavePasswordWithResult(service, initialPassword)
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password
-		return
+		return false
 	}
 
 	// Output the message with appropriate emoji
 	if result.Success {
 		fmt.Fprintf(output, "🔐 %s\n", result.Message)
+		return true
+	} else if result.Method == "none" {
+		fmt.Fprintf(output, "💡 %s\n", result.Message)
 	} else {
-		if result.Method == "none" {
-			fmt.Fprintf(output, "💡 %s\n", result.Message)
-		} else {
-			fmt.Fprintf(output, "⚠️  %s\n", result.Message)
-		}
+		fmt.Fprintf(output, "⚠️  %s\n", result.Message)
 	}
+	return false
 }
 
 // setDefaultService sets the given service as the default service in the configuration
@@ -912,6 +915,19 @@ func setDefaultService(serviceID string, output io.Writer) error {
 
 	fmt.Fprintf(output, "🎯 Set service '%s' as default service.\n", serviceID)
 	return nil
+}
+
+func printConnectMessage(output io.Writer, passwordSaved, noSetDefault bool, serviceID string) {
+	if !passwordSaved {
+		// We can't connect if no password was saved, so don't show message
+		return
+	} else if noSetDefault {
+		// If the service wasn't set as the default, include the serviceID in the command
+		fmt.Fprintf(output, "🔌 Run 'tiger db connect %s' to connect to your new service\n", serviceID)
+	} else {
+		// If the service was set as the default, no need to include the serviceID in the command
+		fmt.Fprintf(output, "🔌 Run 'tiger db connect' to connect to your new service\n")
+	}
 }
 
 // buildServiceDeleteCmd creates the delete subcommand
@@ -1294,7 +1310,7 @@ Examples:
 				}
 
 				// Save password immediately after service fork
-				handlePasswordSaving(forkedService, initialPassword, statusOutput)
+				passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
 
 				// Set as default service unless --no-set-default is used
 				if !forkNoSetDefault {
@@ -1316,6 +1332,7 @@ Examples:
 					return err
 				}
 				fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
+				printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, serviceID)
 				return nil
 
 			case 401:
