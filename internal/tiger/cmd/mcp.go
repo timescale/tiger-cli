@@ -221,7 +221,8 @@ func startStdioServer(ctx context.Context) error {
 	}
 
 	// Start the stdio transport
-	if err := server.StartStdio(ctx); !errors.Is(err, context.Canceled) {
+	err = server.StartStdio(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("failed to start MCP server: %w", err)
 	}
 

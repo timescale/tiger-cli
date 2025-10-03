@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -11,6 +12,40 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
+
+// isMethodNotFoundError checks if the error is a JSON-RPC "Method not found" error.
+//
+// This implementation uses string matching as a pragmatic workaround for several limitations:
+//
+//  1. The actual error type is github.com/modelcontextprotocol/go-sdk/internal/jsonrpc2.WireError,
+//     which is in an internal package that we cannot import.
+//
+//  2. The WireError type has an Is() method that only matches against other WireError instances
+//     with the same code, so we can't create our own type that will match via errors.Is().
+//
+//  3. The MCP SDK doesn't export ErrMethodNotFound or provide a way to create WireError
+//     instances with arbitrary codes. It only exports specific constructors like
+//     ResourceNotFoundError() and a few error codes, but not the -32601 code we need.
+//
+//  4. Using errors.As() with a local struct that has the same shape as WireError doesn't work
+//     because errors.As requires type identity, not structural compatibility.
+//
+// 5. Using reflection to access the Code field would work but adds complexity and runtime overhead.
+//
+// Therefore, we use string matching on the error message. This is brittle but works for our
+// specific use case where we're checking for unsupported resources/resource_templates methods.
+// The error chain looks like:
+//   - "failed to list resources from remote server: calling \"resources/list\": Method not found"
+//   - "failed to list resource templates from remote server: calling \"resources/templates/list\": Method not found"
+func isMethodNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	// Check for the specific "Method not found" JSON-RPC error
+	return strings.Contains(errStr, "Method not found")
+}
 
 // registerDocsProxy establishes a connection to the remote docs MCP server and
 // registers all tools, resources, resource templates, and prompts exposed by
@@ -51,11 +86,21 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 
 	if err := proxyClient.RegisterResources(ctx, s.mcpServer); err != nil {
-		logging.Error("Failed to register resources from docs MCP server", zap.Error(err))
+		// Check if this is a "Method not found" error as those are expected in servers that don't have any resources
+		if isMethodNotFoundError(err) {
+			logging.Debug("Resources not supported by remote MCP server")
+		} else {
+			logging.Error("Failed to register resources from docs MCP server", zap.Error(err))
+		}
 	}
 
 	if err := proxyClient.RegisterResourceTemplates(ctx, s.mcpServer); err != nil {
-		logging.Error("Failed to register resource templates from docs MCP server", zap.Error(err))
+		// Check if this is a "Method not found" error as those are expected in servers that don't have any resource templates
+		if isMethodNotFoundError(err) {
+			logging.Debug("Resource templates not supported by remote MCP server")
+		} else {
+			logging.Error("Failed to register resource templates from docs MCP server", zap.Error(err))
+		}
 	}
 
 	if err := proxyClient.RegisterPrompts(ctx, s.mcpServer); err != nil {
