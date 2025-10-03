@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 
 	"github.com/spf13/pflag"
@@ -42,6 +43,20 @@ const (
 	ConfigFileName         = "config.yaml"
 )
 
+var defaultValues = map[string]any{
+	"api_url":          DefaultAPIURL,
+	"console_url":      DefaultConsoleURL,
+	"gateway_url":      DefaultGatewayURL,
+	"docs_mcp":         DefaultDocsMCP,
+	"docs_mcp_url":     DefaultDocsMCPURL,
+	"project_id":       "",
+	"service_id":       "",
+	"output":           DefaultOutput,
+	"analytics":        DefaultAnalytics,
+	"password_storage": DefaultPasswordStorage,
+	"debug":            DefaultDebug,
+}
+
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
 func SetupViper(configDir string) error {
 	// Configure viper to read from config file
@@ -53,17 +68,9 @@ func SetupViper(configDir string) error {
 	viper.AutomaticEnv()
 
 	// Set defaults for all config values
-	viper.SetDefault("api_url", DefaultAPIURL)
-	viper.SetDefault("console_url", DefaultConsoleURL)
-	viper.SetDefault("gateway_url", DefaultGatewayURL)
-	viper.SetDefault("docs_mcp", DefaultDocsMCP)
-	viper.SetDefault("docs_mcp_url", DefaultDocsMCPURL)
-	viper.SetDefault("project_id", "")
-	viper.SetDefault("service_id", "")
-	viper.SetDefault("output", DefaultOutput)
-	viper.SetDefault("analytics", DefaultAnalytics)
-	viper.SetDefault("password_storage", DefaultPasswordStorage)
-	viper.SetDefault("debug", DefaultDebug)
+	for key, value := range defaultValues {
+		viper.SetDefault(key, value)
+	}
 
 	return readInConfig()
 }
@@ -101,11 +108,54 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) ensureConfigDir() (string, error) {
-	if err := os.MkdirAll(c.ConfigDir, 0755); err != nil {
+func ensureConfigDir(configDir string) (string, error) {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", fmt.Errorf("error creating config directory: %w", err)
 	}
-	return GetConfigFile(c.ConfigDir), nil
+	return GetConfigFile(configDir), nil
+}
+
+func (c *Config) ensureConfigDir() (string, error) {
+	return ensureConfigDir(c.ConfigDir)
+}
+
+// UseTestConfig writes only the specified key-value pairs to the config file and
+// returns a Config instance with those values set.
+// This function is intended for testing purposes only, where you need to set up
+// specific config file state without writing default values for unspecified keys.
+func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
+	configFile, err := ensureConfigDir(configDir)
+	if err != nil {
+		return nil, err
+	}
+
+	v := viper.New()
+	v.SetConfigFile(configFile)
+
+	// Write only the specified key-value pairs
+	for key, value := range values {
+		v.Set(key, value)
+	}
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return nil, fmt.Errorf("error writing config file: %w", err)
+	}
+
+	viper.Reset()
+	if err := SetupViper(configDir); err != nil {
+		return nil, err
+	}
+
+	// Construct and return a Config instance with the values
+	cfg := &Config{
+		ConfigDir: configDir,
+	}
+
+	if err := viper.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return cfg, nil
 }
 
 func (c *Config) Set(key, value string) error {
@@ -176,6 +226,8 @@ func (c *Config) Set(key, value string) error {
 	v.ReadInConfig()
 
 	v.Set(key, validated)
+	// Also update the global viper state
+	viper.Set(key, validated)
 
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
@@ -191,6 +243,29 @@ func setBool(key, val string) (bool, error) {
 	return b, nil
 }
 
+// updateField uses reflection to update the field in the Config struct corresponding to the given key.
+// This is used to keep the struct in sync with the viper state when setting values.
+func (c *Config) updateField(key string, value any) error {
+	v := reflect.ValueOf(c).Elem()
+	t := v.Type()
+
+	// Find field by json tag
+	for i := range t.NumField() {
+		field := t.Field(i)
+		tag := field.Tag.Get("mapstructure")
+
+		if tag == key {
+			fieldValue := v.Field(i)
+			if fieldValue.CanSet() {
+				fieldValue.Set(reflect.ValueOf(value))
+				viper.Set(key, value)
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("field not found: %s", key)
+}
+
 func (c *Config) Unset(key string) error {
 	configFile, err := c.ensureConfigDir()
 	if err != nil {
@@ -204,10 +279,22 @@ func (c *Config) Unset(key string) error {
 	vNew := viper.New()
 	vNew.SetConfigFile(configFile)
 
+	_, validKey := defaultValues[key]
 	for k, v := range vCurrent.AllSettings() {
 		if k != key {
 			vNew.Set(k, v)
+		} else {
+			validKey = true
 		}
+	}
+
+	if !validKey {
+		return fmt.Errorf("unknown configuration key: %s", key)
+	}
+
+	// Apply the default to the current global viper state
+	if def, ok := defaultValues[key]; ok {
+		c.updateField(key, def)
 	}
 
 	if err := vNew.WriteConfigAs(configFile); err != nil {
@@ -231,6 +318,15 @@ func (c *Config) Reset() error {
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
+
+	// Apply all defaults to the current global viper state
+	for key, value := range defaultValues {
+		if key == "project_id" {
+			continue
+		}
+		c.updateField(key, value)
+	}
+
 	return nil
 }
 

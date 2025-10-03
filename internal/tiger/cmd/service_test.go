@@ -31,7 +31,6 @@ func setupServiceTest(t *testing.T) string {
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
@@ -40,7 +39,6 @@ func setupServiceTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		// Then clean up file system
@@ -69,12 +67,10 @@ func TestServiceList_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and API URL
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -193,13 +189,11 @@ func TestServiceFork_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "source-service-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "source-service-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -226,12 +220,10 @@ func TestServiceFork_NoSourceService(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID but no service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -258,13 +250,11 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "source-service-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "source-service-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -291,13 +281,11 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "source-service-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "source-service-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -324,13 +312,11 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "source-service-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "source-service-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -357,13 +343,11 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "source-service-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "source-service-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -404,12 +388,10 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and a mock API URL to prevent network calls
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -452,12 +434,10 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and API URL
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -520,12 +500,10 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and a mock API URL to prevent network calls
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -584,12 +562,10 @@ func TestServiceDescribe_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -616,13 +592,11 @@ func TestServiceDescribe_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -986,12 +960,10 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1018,13 +990,11 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1051,13 +1021,11 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1084,13 +1052,11 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
-		ProjectID: "test-project-123",
-		ServiceID: "test-service-456",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
+		"project_id": "test-project-123",
+		"service_id": "test-service-456",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1136,12 +1102,10 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID to get past initial validation
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Use local URL that will fail fast
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Use local URL that will fail fast
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1238,12 +1202,10 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Non-existent server to force timeout
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Non-existent server to force timeout
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1343,12 +1305,10 @@ func TestServiceDelete_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1368,12 +1328,10 @@ func TestServiceDelete_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1400,11 +1358,9 @@ func TestServiceDelete_NoProjectID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config without project ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1431,12 +1387,10 @@ func TestServiceDelete_WithConfirmFlag(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Non-existent server for testing
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Non-existent server for testing
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1468,12 +1422,10 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1523,12 +1475,10 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1592,12 +1542,10 @@ func TestServiceCreate_FreeFlag(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID and a mock API URL to prevent network calls
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999", // Use a local URL that will fail fast
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -1621,12 +1569,10 @@ func TestServiceCreate_FreeWithIncompatibleFlags(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}

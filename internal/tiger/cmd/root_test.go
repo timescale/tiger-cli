@@ -10,7 +10,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Clean up any global state before tests
-	viper.Reset()
+	config.ResetGlobalConfig()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -27,7 +27,7 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
-		viper.Reset()
+		config.ResetGlobalConfig()
 	}
 
 	t.Cleanup(cleanup)
@@ -121,7 +121,7 @@ func TestFlagBindingWithViper(t *testing.T) {
 	}
 
 	// Reset for next test
-	viper.Reset()
+	config.ResetGlobalConfig()
 
 	// Test 2: Flag should override environment variable
 	testCmd2 := buildRootCmd()

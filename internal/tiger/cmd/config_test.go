@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -16,12 +15,6 @@ import (
 
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
-
-	// Reset viper state to ensure clean test environment
-	viper.Reset()
-
-	// Reset global config in the config package
-	config.ResetGlobalConfig()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
@@ -32,11 +25,12 @@ func setupConfigTest(t *testing.T) (string, func()) {
 	// Set environment variable to use test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	config.UseTestConfig(tmpDir, map[string]any{})
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		viper.Reset()
 
 		// Reset global config in the config package
 		// This is important for test isolation
@@ -563,17 +557,19 @@ func TestConfigReset(t *testing.T) {
 		t.Errorf("Expected output to contain reset message, got '%s'", strings.TrimSpace(output))
 	}
 
-	// Verify all values were reset to defaults
 	cfg, err = config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
+	// ProjectID should be preserved
+	if cfg.ProjectID != "custom-project" {
+		t.Errorf("Expected ProjectID %s, got %s", "custom-project", cfg.ProjectID)
+	}
+
+	// Verify all other values were reset to defaults
 	if cfg.APIURL != config.DefaultAPIURL {
 		t.Errorf("Expected default APIURL %s, got %s", config.DefaultAPIURL, cfg.APIURL)
-	}
-	if cfg.ProjectID != "" {
-		t.Errorf("Expected empty ProjectID, got %s", cfg.ProjectID)
 	}
 	if cfg.ServiceID != "" {
 		t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
