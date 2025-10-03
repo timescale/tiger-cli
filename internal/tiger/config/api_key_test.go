@@ -11,6 +11,9 @@ import (
 func setupAPIKeyTest(t *testing.T) string {
 	t.Helper()
 
+	// Clean up any existing keyring entries before test
+	RemoveAPIKeyFromKeyring()
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-api-key-test-*")
 	if err != nil {
@@ -21,6 +24,9 @@ func setupAPIKeyTest(t *testing.T) string {
 	viper.SetConfigFile(GetConfigFile(tmpDir))
 
 	t.Cleanup(func() {
+		// Clean up keyring entries
+		RemoveAPIKeyFromKeyring()
+
 		// Reset global config to ensure test isolation
 		ResetGlobalConfig()
 

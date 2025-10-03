@@ -298,7 +298,7 @@ verify_checksum() {
 
     # Format checksum for validation: "hash  filename"
     local formatted_checksum
-    formatted_checksum=$(printf "%s  %s\n" "$(cat "${checksum_file}" | tr -d '[:space:]')" "${filename}")
+    formatted_checksum=$(printf "%s  %s\n" "$(tr -d '[:space:]' < "${checksum_file}")" "${filename}")
 
     if command -v sha256sum >/dev/null 2>&1; then
         if ! echo "${formatted_checksum}" | sha256sum -c - >/dev/null 2>&1; then

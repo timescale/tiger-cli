@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -63,26 +65,29 @@ func SetupViper(configDir string) error {
 	viper.SetDefault("password_storage", DefaultPasswordStorage)
 	viper.SetDefault("debug", DefaultDebug)
 
+	return readInConfig()
+}
+
+func readInConfig() error {
 	// Try to read config file if it exists
-	if _, err := os.Stat(configFile); err == nil {
-		// File exists, try to read it
-		if err := viper.ReadInConfig(); err != nil {
-			return fmt.Errorf("error reading config file: %w", err)
-		}
-
-		// Configure viper to watch for file changes and update its in-memory
-		// representation of the config. Note that this won't automatically
-		// update [Config] structs already returned from [Load].
-		viper.WatchConfig()
-	}
 	// If file doesn't exist, that's okay - we'll use defaults and env vars
-
+	if err := viper.ReadInConfig(); err != nil &&
+		!errors.As(err, &viper.ConfigFileNotFoundError{}) &&
+		!errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	return nil
 }
 
 // Load creates a new Config instance from the current viper state
 // This function should be called after SetupViper has been called to initialize viper
 func Load() (*Config, error) {
+	// Try to read config file into viper to ensure we're unmarshaling the most
+	// up-to-date values into the config struct.
+	if err := readInConfig(); err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		ConfigDir: GetConfigDir(),
 	}

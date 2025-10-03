@@ -1,0 +1,59 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ./go.mod
+          check-latest: true
+          cache: true
+
+      - name: Install keyring dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring dbus-x11
+
+      - name: Start D-Bus and keyring
+        run: |
+          # Start D-Bus session
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+          # Initialize gnome-keyring with a test password
+          echo 'test' | gnome-keyring-daemon --unlock
+          eval $(echo 'test' | gnome-keyring-daemon --start --components=secrets)
+          echo "GNOME_KEYRING_CONTROL=$GNOME_KEYRING_CONTROL" >> $GITHUB_ENV
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -p 1 -race -coverprofile=coverage.out -coverpkg=./... ./...
+
+      - name: Generate Coverage Report
+        run: go tool cover -html=coverage.out -o=coverage.html
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage.html
+          path: coverage.html
+
+      - name: ShellCheck
+        run: shellcheck scripts/install.sh
