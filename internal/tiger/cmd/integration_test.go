@@ -30,7 +30,6 @@ func setupIntegrationTest(t *testing.T) string {
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
@@ -50,7 +49,6 @@ func setupIntegrationTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		// Then clean up file system
@@ -65,7 +63,6 @@ func executeIntegrationCommand(args ...string) (string, error) {
 	// Reset both global config and viper before each command execution
 	// This ensures fresh config loading with proper flag precedence
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")

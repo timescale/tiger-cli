@@ -42,6 +42,20 @@ const (
 	ConfigFileName         = "config.yaml"
 )
 
+var defaultValues = map[string]any{
+	"api_url":          DefaultAPIURL,
+	"console_url":      DefaultConsoleURL,
+	"gateway_url":      DefaultGatewayURL,
+	"docs_mcp":         DefaultDocsMCP,
+	"docs_mcp_url":     DefaultDocsMCPURL,
+	"project_id":       "",
+	"service_id":       "",
+	"output":           DefaultOutput,
+	"analytics":        DefaultAnalytics,
+	"password_storage": DefaultPasswordStorage,
+	"debug":            DefaultDebug,
+}
+
 // SetupViper configures the global Viper instance with defaults, env vars, and config file
 func SetupViper(configDir string) error {
 	// Configure viper to read from config file
@@ -53,17 +67,9 @@ func SetupViper(configDir string) error {
 	viper.AutomaticEnv()
 
 	// Set defaults for all config values
-	viper.SetDefault("api_url", DefaultAPIURL)
-	viper.SetDefault("console_url", DefaultConsoleURL)
-	viper.SetDefault("gateway_url", DefaultGatewayURL)
-	viper.SetDefault("docs_mcp", DefaultDocsMCP)
-	viper.SetDefault("docs_mcp_url", DefaultDocsMCPURL)
-	viper.SetDefault("project_id", "")
-	viper.SetDefault("service_id", "")
-	viper.SetDefault("output", DefaultOutput)
-	viper.SetDefault("analytics", DefaultAnalytics)
-	viper.SetDefault("password_storage", DefaultPasswordStorage)
-	viper.SetDefault("debug", DefaultDebug)
+	for key, value := range defaultValues {
+		viper.SetDefault(key, value)
+	}
 
 	return readInConfig()
 }
@@ -101,78 +107,79 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) Save() error {
-	if err := os.MkdirAll(c.ConfigDir, 0755); err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
+func ensureConfigDir(configDir string) (string, error) {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return "", fmt.Errorf("error creating config directory: %w", err)
 	}
-	configFile := GetConfigFile(c.ConfigDir)
+	return GetConfigFile(configDir), nil
+}
 
-	viper.Set("api_url", c.APIURL)
-	viper.Set("console_url", c.ConsoleURL)
-	viper.Set("gateway_url", c.GatewayURL)
-	viper.Set("docs_mcp", c.DocsMCP)
-	viper.Set("docs_mcp_url", c.DocsMCPURL)
-	viper.Set("project_id", c.ProjectID)
-	viper.Set("service_id", c.ServiceID)
-	viper.Set("output", c.Output)
-	viper.Set("analytics", c.Analytics)
-	viper.Set("password_storage", c.PasswordStorage)
-	viper.Set("debug", c.Debug)
+func (c *Config) ensureConfigDir() (string, error) {
+	return ensureConfigDir(c.ConfigDir)
+}
 
-	if err := viper.WriteConfigAs(configFile); err != nil {
-		return fmt.Errorf("error writing config file: %w", err)
+// UseTestConfig writes only the specified key-value pairs to the config file and
+// returns a Config instance with those values set.
+// This function is intended for testing purposes only, where you need to set up
+// specific config file state without writing default values for unspecified keys.
+func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
+	configFile, err := ensureConfigDir(configDir)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	v := viper.New()
+	v.SetConfigFile(configFile)
+
+	// Write only the specified key-value pairs
+	for key, value := range values {
+		v.Set(key, value)
+	}
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return nil, fmt.Errorf("error writing config file: %w", err)
+	}
+
+	viper.Reset()
+	if err := SetupViper(configDir); err != nil {
+		return nil, err
+	}
+
+	// Construct and return a Config instance with the values
+	cfg := &Config{
+		ConfigDir: configDir,
+	}
+
+	if err := viper.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return cfg, nil
 }
 
 func (c *Config) Set(key, value string) error {
-	switch key {
-	case "api_url":
-		c.APIURL = value
-	case "console_url":
-		c.ConsoleURL = value
-	case "gateway_url":
-		c.GatewayURL = value
-	case "docs_mcp":
-		b, err := setBool("docs_mcp", value)
-		if err != nil {
-			return err
-		}
-		c.DocsMCP = b
-	case "docs_mcp_url":
-		c.DocsMCPURL = value
-	case "project_id":
-		c.ProjectID = value
-	case "service_id":
-		c.ServiceID = value
-	case "output":
-		if err := ValidateOutputFormat(value); err != nil {
-			return err
-		}
-		c.Output = value
-	case "analytics":
-		b, err := setBool("analytics", value)
-		if err != nil {
-			return err
-		}
-		c.Analytics = b
-	case "password_storage":
-		if value != "keyring" && value != "pgpass" && value != "none" {
-			return fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
-		}
-		c.PasswordStorage = value
-	case "debug":
-		b, err := setBool("debug", value)
-		if err != nil {
-			return err
-		}
-		c.Debug = b
-	default:
-		return fmt.Errorf("unknown configuration key: %s", key)
+	// Validate and update the field
+	validated, err := c.updateField(key, value)
+	if err != nil {
+		return err
 	}
 
-	return c.Save()
+	// Write to config file
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
+	}
+
+	v := viper.New()
+	v.SetConfigFile(configFile)
+	v.ReadInConfig()
+
+	v.Set(key, validated)
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+	return nil
 }
 
 func setBool(key, val string) (bool, error) {
@@ -183,55 +190,213 @@ func setBool(key, val string) (bool, error) {
 	return b, nil
 }
 
-func (c *Config) Unset(key string) error {
+// updateField updates the field in the Config struct corresponding to the given key.
+// It accepts either a string (from user input) or a typed value (string/bool from defaults).
+// The function validates the value and updates both the struct field and viper state.
+func (c *Config) updateField(key string, value any) (any, error) {
+	var validated any
+
 	switch key {
 	case "api_url":
-		c.APIURL = DefaultAPIURL
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("api_url must be string, got %T", value)
+		}
+		c.APIURL = s
+		validated = s
+
 	case "console_url":
-		c.ConsoleURL = DefaultConsoleURL
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("console_url must be string, got %T", value)
+		}
+		c.ConsoleURL = s
+		validated = s
+
 	case "gateway_url":
-		c.GatewayURL = DefaultGatewayURL
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("gateway_url must be string, got %T", value)
+		}
+		c.GatewayURL = s
+		validated = s
+
 	case "docs_mcp":
-		c.DocsMCP = DefaultDocsMCP
+		switch v := value.(type) {
+		case bool:
+			c.DocsMCP = v
+			validated = v
+		case string:
+			b, err := setBool("docs_mcp", v)
+			if err != nil {
+				return nil, err
+			}
+			c.DocsMCP = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("docs_mcp must be string or bool, got %T", value)
+		}
+
 	case "docs_mcp_url":
-		c.DocsMCPURL = DefaultDocsMCPURL
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("docs_mcp_url must be string, got %T", value)
+		}
+		c.DocsMCPURL = s
+		validated = s
+
 	case "project_id":
-		c.ProjectID = ""
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("project_id must be string, got %T", value)
+		}
+		c.ProjectID = s
+		validated = s
+
 	case "service_id":
-		c.ServiceID = ""
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("service_id must be string, got %T", value)
+		}
+		c.ServiceID = s
+		validated = s
+
 	case "output":
-		c.Output = DefaultOutput
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("output must be string, got %T", value)
+		}
+		if err := ValidateOutputFormat(s); err != nil {
+			return nil, err
+		}
+		c.Output = s
+		validated = s
+
 	case "analytics":
-		c.Analytics = DefaultAnalytics
+		switch v := value.(type) {
+		case bool:
+			c.Analytics = v
+			validated = v
+		case string:
+			b, err := setBool("analytics", v)
+			if err != nil {
+				return nil, err
+			}
+			c.Analytics = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("analytics must be string or bool, got %T", value)
+		}
+
 	case "password_storage":
-		c.PasswordStorage = DefaultPasswordStorage
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("password_storage must be string, got %T", value)
+		}
+		if s != "keyring" && s != "pgpass" && s != "none" {
+			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", s)
+		}
+		c.PasswordStorage = s
+		validated = s
+
 	case "debug":
-		c.Debug = DefaultDebug
+		switch v := value.(type) {
+		case bool:
+			c.Debug = v
+			validated = v
+		case string:
+			b, err := setBool("debug", v)
+			if err != nil {
+				return nil, err
+			}
+			c.Debug = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("debug must be string or bool, got %T", value)
+		}
+
 	default:
+		return nil, fmt.Errorf("unknown configuration key: %s", key)
+	}
+
+	viper.Set(key, validated)
+	return validated, nil
+}
+
+func (c *Config) Unset(key string) error {
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
+	}
+
+	vCurrent := viper.New()
+	vCurrent.SetConfigFile(configFile)
+	vCurrent.ReadInConfig()
+
+	vNew := viper.New()
+	vNew.SetConfigFile(configFile)
+
+	_, validKey := defaultValues[key]
+	for k, v := range vCurrent.AllSettings() {
+		if k != key {
+			vNew.Set(k, v)
+		} else {
+			validKey = true
+		}
+	}
+
+	if !validKey {
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
-	return c.Save()
+	// Apply the default to the current global viper state
+	if def, ok := defaultValues[key]; ok {
+		if _, err := c.updateField(key, def); err != nil {
+			return err
+		}
+	}
+
+	if err := vNew.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+	return nil
 }
 
 func (c *Config) Reset() error {
-	c.APIURL = DefaultAPIURL
-	c.ConsoleURL = DefaultConsoleURL
-	c.GatewayURL = DefaultGatewayURL
-	c.DocsMCP = DefaultDocsMCP
-	c.DocsMCPURL = DefaultDocsMCPURL
-	c.ProjectID = ""
-	c.ServiceID = ""
-	c.Output = DefaultOutput
-	c.Analytics = DefaultAnalytics
-	c.PasswordStorage = DefaultPasswordStorage
-	c.Debug = DefaultDebug
+	configFile, err := c.ensureConfigDir()
+	if err != nil {
+		return err
+	}
 
-	return c.Save()
+	v := viper.New()
+	v.SetConfigFile(configFile)
+
+	// Preserve the project id, as this is part of the auth scheme
+	v.Set("project_id", c.ProjectID)
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return fmt.Errorf("error writing config file: %w", err)
+	}
+
+	// Apply all defaults to the current global viper state
+	for key, value := range defaultValues {
+		if key == "project_id" {
+			continue
+		}
+		if _, err := c.updateField(key, value); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func GetConfigFile(dir string) string {
 	return filepath.Join(dir, ConfigFileName)
+}
+
+func (c *Config) GetConfigFile() string {
+	return GetConfigFile(c.ConfigDir)
 }
 
 // TODO: This function is currently used to get the directory that the API

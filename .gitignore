@@ -49,3 +49,6 @@ config.yaml
 
 # Build artifacts
 latest.txt
+
+# Claude
+/.claude/*.local.*
