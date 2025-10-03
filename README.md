@@ -1,11 +1,11 @@
 # Tiger CLI
 
-Tiger CLI is a command-line interface for managing TigerData Cloud Platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
+Tiger CLI is a command-line interface for managing Tiger, the modern database cloud. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
 
 ## Quick Start During Development
 ```bash
 # Clone the repository
-git clone https://github.com/tigerdata/tiger-cli.git
+git clone https://github.com/timescale/tiger-cli.git
 cd tiger-cli
 git checkout <branch>
 
@@ -15,10 +15,6 @@ go install ./cmd/tiger
 # (Optional) Set up the savannah-public endpoint
 # for prod (default)
 tiger config set api_url https://console.cloud.timescale.com/public/api/v1
-# for dev
-tiger config set api_url https://console.dev.timescale.com/public/api/v1
-tiger config set console_url https://console.dev.timescale.com
-tiger config set gateway_url https://console.dev.timescale.com/api
 # for local
 tiger config set api_url http://localhost:8080/public/api/v1
 
@@ -88,7 +84,7 @@ tiger --help
 
 ### Environment Variables
 
-- `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
+- `TIGER_API_URL`: Base URL for Tiger API (default: https://console.cloud.timescale.com/public/api/v1)
 - `TIGER_PROJECT_ID`: Default project ID to use
 - `TIGER_SERVICE_ID`: Default service ID to use
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
@@ -111,7 +107,7 @@ tiger --help
 ### Building from Source
 
 ```bash
-git clone https://github.com/tigerdata/tiger-cli.git
+git clone https://github.com/timescale/tiger-cli.git
 cd tiger-cli
 go build -o bin/tiger ./cmd/tiger
 ```
@@ -128,7 +124,7 @@ go test -v ./...
 
 ### Integration Testing
 
-Integration tests execute real API calls against a TigerData environment to validate end-to-end functionality. These tests require valid credentials and will create/delete actual resources.
+Integration tests execute real API calls against a Tiger environment to validate end-to-end functionality. These tests require valid credentials and will create/delete actual resources.
 
 #### Setup
 
