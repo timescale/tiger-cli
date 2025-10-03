@@ -66,7 +66,7 @@ analytics: true
 	}()
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd := BuildRootCmd()
 
 	// Set CLI flags (these should take precedence)
 	args := []string{
@@ -109,7 +109,7 @@ func TestFlagBindingWithViper(t *testing.T) {
 	}()
 
 	// Test 1: Environment variable should be used when no flag is set
-	testCmd1 := buildRootCmd()
+	testCmd1 := BuildRootCmd()
 	testCmd1.SetArgs([]string{"version"}) // Need a subcommand
 	err := testCmd1.Execute()
 	if err != nil {
@@ -124,7 +124,7 @@ func TestFlagBindingWithViper(t *testing.T) {
 	viper.Reset()
 
 	// Test 2: Flag should override environment variable
-	testCmd2 := buildRootCmd()
+	testCmd2 := BuildRootCmd()
 	testCmd2.SetArgs([]string{"--output", "table", "version"})
 	err = testCmd2.Execute()
 	if err != nil {
@@ -154,7 +154,7 @@ analytics: false
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd := BuildRootCmd()
 
 	// Execute with config file specified
 	testCmd.SetArgs([]string{"--config-dir", tmpDir, "version"})

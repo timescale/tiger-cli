@@ -40,7 +40,7 @@ func setupIntegrationTest(t *testing.T) string {
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
 		// to avoid circular dependencies during setup
-		rootCmd := buildRootCmd()
+		rootCmd := BuildRootCmd()
 		rootCmd.SetArgs([]string{"config", "set", "api_url", apiURL})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("Failed to set integration API URL during setup: %v", err)
@@ -72,7 +72,7 @@ func executeIntegrationCommand(args ...string) (string, error) {
 	viper.AutomaticEnv()
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot := BuildRootCmd()
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

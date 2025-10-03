@@ -49,7 +49,7 @@ func setupDBTest(t *testing.T) string {
 
 func executeDBCommand(args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot := BuildRootCmd()
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

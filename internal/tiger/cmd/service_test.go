@@ -54,7 +54,7 @@ func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
 	// No need to reset any flags - we build fresh commands with local variables
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot := BuildRootCmd()
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
@@ -1298,7 +1298,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 
 func TestServiceCommandAliases(t *testing.T) {
 	// Build a fresh root command to test aliases
-	rootCmd := buildRootCmd()
+	rootCmd := BuildRootCmd()
 
 	// Test that 'service' command exists
 	serviceCmd, _, err := rootCmd.Find([]string{"service"})

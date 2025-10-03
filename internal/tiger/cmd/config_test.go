@@ -51,7 +51,7 @@ func setupConfigTest(t *testing.T) (string, func()) {
 
 func executeConfigCommand(args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot := BuildRootCmd()
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)

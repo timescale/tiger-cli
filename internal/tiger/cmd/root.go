@@ -12,7 +12,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
 
-func buildRootCmd() *cobra.Command {
+func BuildRootCmd() *cobra.Command {
 	var configDir string
 	var debug bool
 	var output string
@@ -104,7 +104,7 @@ tiger auth login
 }
 
 func Execute() {
-	rootCmd := buildRootCmd()
+	rootCmd := BuildRootCmd()
 	err := rootCmd.Execute()
 	if err != nil {
 		// Check if it's a custom exit code error
