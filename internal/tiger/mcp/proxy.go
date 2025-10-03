@@ -44,7 +44,6 @@ func isMethodNotFoundError(err error) bool {
 
 	errStr := err.Error()
 	// Check for the specific "Method not found" JSON-RPC error
-	// We also verify it's for the resources endpoints we're calling
 	return strings.Contains(errStr, "Method not found")
 }
 
@@ -87,8 +86,7 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 
 	if err := proxyClient.RegisterResources(ctx, s.mcpServer); err != nil {
-		// Check if this is a "Method not found" error (code -32601)
-		// We use reflection to check the error code since wireError is unexported
+		// Check if this is a "Method not found" error as those are expected in servers that don't have any resources
 		if isMethodNotFoundError(err) {
 			logging.Debug("Resources not supported by remote MCP server")
 		} else {
@@ -97,7 +95,7 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 	}
 
 	if err := proxyClient.RegisterResourceTemplates(ctx, s.mcpServer); err != nil {
-		// Check if this is a "Method not found" error (code -32601)
+		// Check if this is a "Method not found" error as those are expected in servers that don't have any resource templates
 		if isMethodNotFoundError(err) {
 			logging.Debug("Resource templates not supported by remote MCP server")
 		} else {
