@@ -174,6 +174,7 @@ Create a new database service.
 - `replicas` (number, optional): Number of high-availability replicas - default: 0
 - `wait` (boolean, optional): Wait for service to be ready - default: false
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
+- `set_default` (boolean, optional): Set the newly created service as the default service for future commands - default: true
 
 **Returns:** Service object with creation status and details.
 
