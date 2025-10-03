@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 
 	"github.com/spf13/pflag"
@@ -159,63 +158,13 @@ func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
 }
 
 func (c *Config) Set(key, value string) error {
-	var validated any
-	switch key {
-	case "api_url":
-		c.APIURL = value
-		validated = value
-	case "console_url":
-		c.ConsoleURL = value
-		validated = value
-	case "gateway_url":
-		c.GatewayURL = value
-		validated = value
-	case "docs_mcp":
-		b, err := setBool("docs_mcp", value)
-		if err != nil {
-			return err
-		}
-		c.DocsMCP = b
-		validated = b
-	case "docs_mcp_url":
-		c.DocsMCPURL = value
-		validated = value
-	case "project_id":
-		c.ProjectID = value
-		validated = value
-	case "service_id":
-		c.ServiceID = value
-		validated = value
-	case "output":
-		if err := ValidateOutputFormat(value); err != nil {
-			return err
-		}
-		c.Output = value
-		validated = value
-	case "analytics":
-		b, err := setBool("analytics", value)
-		if err != nil {
-			return err
-		}
-		c.Analytics = b
-		validated = b
-	case "password_storage":
-		if value != "keyring" && value != "pgpass" && value != "none" {
-			return fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
-		}
-		c.PasswordStorage = value
-		validated = value
-	case "debug":
-		b, err := setBool("debug", value)
-		if err != nil {
-			return err
-		}
-		c.Debug = b
-		validated = b
-	default:
-		return fmt.Errorf("unknown configuration key: %s", key)
+	// Validate and update the field
+	validated, err := c.updateField(key, value)
+	if err != nil {
+		return err
 	}
 
+	// Write to config file
 	configFile, err := c.ensureConfigDir()
 	if err != nil {
 		return err
@@ -226,8 +175,6 @@ func (c *Config) Set(key, value string) error {
 	v.ReadInConfig()
 
 	v.Set(key, validated)
-	// Also update the global viper state
-	viper.Set(key, validated)
 
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
@@ -243,27 +190,137 @@ func setBool(key, val string) (bool, error) {
 	return b, nil
 }
 
-// updateField uses reflection to update the field in the Config struct corresponding to the given key.
-// This is used to keep the struct in sync with the viper state when setting values.
-func (c *Config) updateField(key string, value any) error {
-	v := reflect.ValueOf(c).Elem()
-	t := v.Type()
+// updateField updates the field in the Config struct corresponding to the given key.
+// It accepts either a string (from user input) or a typed value (string/bool from defaults).
+// The function validates the value and updates both the struct field and viper state.
+func (c *Config) updateField(key string, value any) (any, error) {
+	var validated any
 
-	// Find field by json tag
-	for i := range t.NumField() {
-		field := t.Field(i)
-		tag := field.Tag.Get("mapstructure")
-
-		if tag == key {
-			fieldValue := v.Field(i)
-			if fieldValue.CanSet() {
-				fieldValue.Set(reflect.ValueOf(value))
-				viper.Set(key, value)
-				return nil
-			}
+	switch key {
+	case "api_url":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("api_url must be string, got %T", value)
 		}
+		c.APIURL = s
+		validated = s
+
+	case "console_url":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("console_url must be string, got %T", value)
+		}
+		c.ConsoleURL = s
+		validated = s
+
+	case "gateway_url":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("gateway_url must be string, got %T", value)
+		}
+		c.GatewayURL = s
+		validated = s
+
+	case "docs_mcp":
+		switch v := value.(type) {
+		case bool:
+			c.DocsMCP = v
+			validated = v
+		case string:
+			b, err := setBool("docs_mcp", v)
+			if err != nil {
+				return nil, err
+			}
+			c.DocsMCP = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("docs_mcp must be string or bool, got %T", value)
+		}
+
+	case "docs_mcp_url":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("docs_mcp_url must be string, got %T", value)
+		}
+		c.DocsMCPURL = s
+		validated = s
+
+	case "project_id":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("project_id must be string, got %T", value)
+		}
+		c.ProjectID = s
+		validated = s
+
+	case "service_id":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("service_id must be string, got %T", value)
+		}
+		c.ServiceID = s
+		validated = s
+
+	case "output":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("output must be string, got %T", value)
+		}
+		if err := ValidateOutputFormat(s); err != nil {
+			return nil, err
+		}
+		c.Output = s
+		validated = s
+
+	case "analytics":
+		switch v := value.(type) {
+		case bool:
+			c.Analytics = v
+			validated = v
+		case string:
+			b, err := setBool("analytics", v)
+			if err != nil {
+				return nil, err
+			}
+			c.Analytics = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("analytics must be string or bool, got %T", value)
+		}
+
+	case "password_storage":
+		s, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("password_storage must be string, got %T", value)
+		}
+		if s != "keyring" && s != "pgpass" && s != "none" {
+			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", s)
+		}
+		c.PasswordStorage = s
+		validated = s
+
+	case "debug":
+		switch v := value.(type) {
+		case bool:
+			c.Debug = v
+			validated = v
+		case string:
+			b, err := setBool("debug", v)
+			if err != nil {
+				return nil, err
+			}
+			c.Debug = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("debug must be string or bool, got %T", value)
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown configuration key: %s", key)
 	}
-	return fmt.Errorf("field not found: %s", key)
+
+	viper.Set(key, validated)
+	return validated, nil
 }
 
 func (c *Config) Unset(key string) error {
@@ -294,7 +351,9 @@ func (c *Config) Unset(key string) error {
 
 	// Apply the default to the current global viper state
 	if def, ok := defaultValues[key]; ok {
-		c.updateField(key, def)
+		if _, err := c.updateField(key, def); err != nil {
+			return err
+		}
 	}
 
 	if err := vNew.WriteConfigAs(configFile); err != nil {
@@ -324,7 +383,9 @@ func (c *Config) Reset() error {
 		if key == "project_id" {
 			continue
 		}
-		c.updateField(key, value)
+		if _, err := c.updateField(key, value); err != nil {
+			return err
+		}
 	}
 
 	return nil
