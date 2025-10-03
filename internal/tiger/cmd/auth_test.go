@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -44,8 +43,9 @@ func setupAuthTest(t *testing.T) string {
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
 	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-	viper.Reset()
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
+		t.Fatalf("Failed to use test config: %v", err)
+	}
 
 	// Also ensure config file doesn't exist
 	configFile := config.GetConfigFile(tmpDir)
@@ -56,7 +56,6 @@ func setupAuthTest(t *testing.T) string {
 		config.RemoveAPIKeyFromKeyring()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)

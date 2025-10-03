@@ -32,12 +32,10 @@ func setupDBTest(t *testing.T) string {
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		// Then clean up file system
@@ -64,12 +62,10 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -96,13 +92,11 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -172,12 +166,10 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -204,13 +196,11 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -237,13 +227,11 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -596,12 +584,10 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -628,13 +614,11 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -980,13 +964,11 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			tmpDir := setupDBTest(t)
 
 			// Set up config
-			cfg := &config.Config{
-				APIURL:    "http://localhost:9999", // Non-existent server
-				ProjectID: "test-project-123",
-				ServiceID: "svc-12345",
-				ConfigDir: tmpDir,
-			}
-			err := cfg.Save()
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":    "http://localhost:9999", // Non-existent server
+				"project_id": "test-project-123",
+				"service_id": "svc-12345",
+			})
 			if err != nil {
 				t.Fatalf("Failed to save test config: %v", err)
 			}

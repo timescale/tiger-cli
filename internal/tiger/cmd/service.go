@@ -908,8 +908,7 @@ func setDefaultService(serviceID string, output io.Writer) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	cfg.ServiceID = serviceID
-	if err := cfg.Save(); err != nil {
+	if err := cfg.Set("service_id", serviceID); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
