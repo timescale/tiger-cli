@@ -431,7 +431,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
-					if err := setDefaultService(serviceID, statusOutput); err != nil {
+					if err := setDefaultService(cfg, serviceID, statusOutput); err != nil {
 						// Log warning but don't fail the command
 						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
 					}
@@ -902,12 +902,7 @@ func handlePasswordSaving(service api.Service, initialPassword string, output io
 }
 
 // setDefaultService sets the given service as the default service in the configuration
-func setDefaultService(serviceID string, output io.Writer) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
+func setDefaultService(cfg *config.Config, serviceID string, output io.Writer) error {
 	if err := cfg.Set("service_id", serviceID); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
@@ -1313,7 +1308,7 @@ Examples:
 
 				// Set as default service unless --no-set-default is used
 				if !forkNoSetDefault {
-					if err := setDefaultService(forkedServiceID, statusOutput); err != nil {
+					if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
 						// Log warning but don't fail the command
 						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
 					}
