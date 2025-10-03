@@ -667,3 +667,66 @@ func TestConfigCommands_Integration(t *testing.T) {
 		t.Errorf("Expected output reset to default %s, got %s", config.DefaultOutput, cfg.Output)
 	}
 }
+
+func TestConfigSet_OutputDoesPersist(t *testing.T) {
+	tmpDir, _ := setupConfigTest(t)
+
+	// Start with default config (no output setting in file)
+	configFile := config.GetConfigFile(tmpDir)
+
+	// Execute config set to explicitly set output to json
+	_, err := executeConfigCommand("config", "set", "output", "json")
+	if err != nil {
+		t.Fatalf("Failed to set output to json: %v", err)
+	}
+
+	// Read the config file directly
+	configBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	// Parse the YAML to check
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
+		t.Fatalf("Failed to parse config YAML: %v", err)
+	}
+
+	if outputVal, exists := configMap["output"]; !exists || outputVal != "json" {
+		t.Errorf("Expected output in config file to be 'json', got: %v (exists: %v)", outputVal, exists)
+	}
+
+	// Also verify by loading config
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Output != "json" {
+		t.Errorf("Expected loaded config output to be 'json', got: %s", cfg.Output)
+	}
+
+	// Now test that setting it to a different value updates the file
+	_, err = executeConfigCommand("config", "set", "output", "yaml")
+	if err != nil {
+		t.Fatalf("Failed to set output to yaml: %v", err)
+	}
+
+	// Read the config file again
+	configBytes, err = os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file after second set: %v", err)
+	}
+
+	configContent := string(configBytes)
+
+	// Verify that output was updated in the config file
+	if !strings.Contains(configContent, "output: yaml") {
+		t.Errorf("Config file should contain 'output: yaml' after update. Config content:\n%s", configContent)
+	}
+
+	// Should NOT contain the old value
+	if strings.Contains(configContent, "output: json") {
+		t.Errorf("Config file should NOT contain old 'output: json' value. Config content:\n%s", configContent)
+	}
+}

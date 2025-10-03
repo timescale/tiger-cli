@@ -334,6 +334,10 @@ func GetConfigFile(dir string) string {
 	return filepath.Join(dir, ConfigFileName)
 }
 
+func (c *Config) GetConfigFile() string {
+	return GetConfigFile(c.ConfigDir)
+}
+
 // TODO: This function is currently used to get the directory that the API
 // key fallback file should be stored in (see api_key.go). But ideally, those
 // functions would take a Config struct and use the ConfigDir field instead.

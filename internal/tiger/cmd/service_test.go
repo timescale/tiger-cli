@@ -1709,3 +1709,99 @@ func TestOutputService_FreeTier(t *testing.T) {
 		}
 	}
 }
+
+func parseConfigFile(t *testing.T, configFile string) map[string]interface{} {
+	t.Helper()
+
+	// Read the config file directly
+	configBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
+		t.Fatalf("Failed to parse config YAML: %v", err)
+	}
+	return configMap
+}
+
+func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with default output format (table)
+	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"output":     "table", // Explicitly set default
+	})
+	if err != nil {
+		t.Fatalf("Failed to setup test config: %v", err)
+	}
+	configFile := cfg.GetConfigFile()
+
+	// Validate starting config file
+	configMap := parseConfigFile(t, configFile)
+	if outputVal, exists := configMap["output"]; !exists || outputVal != "table" {
+		t.Fatalf("Expected initial output in config file to be 'table', got: %v", outputVal)
+	}
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Execute service create with -o json flag
+	// This will fail due to network error (localhost:9999 doesn't exist), but that's OK
+	// We just want to verify that the config file doesn't get the output flag written to it
+	executeServiceCommand("service", "create", "-o", "json", "--free")
+
+	configMap = parseConfigFile(t, configFile)
+	if outputVal, exists := configMap["output"]; !exists || outputVal != "table" {
+		t.Fatalf("Expected output in config file to be 'table', got: %v", outputVal)
+	}
+}
+
+func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config with output format explicitly set to "table"
+	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"output":     "table",
+	})
+	if err != nil {
+		t.Fatalf("Failed to setup test config: %v", err)
+	}
+	configFile := cfg.GetConfigFile()
+
+	// Mock authentication
+	originalGetAPIKey := getAPIKeyForService
+	getAPIKeyForService = func() (string, error) {
+		return "test-api-key", nil
+	}
+	defer func() { getAPIKeyForService = originalGetAPIKey }()
+
+	// Store original config file content
+	originalConfigBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read original config file: %v", err)
+	}
+
+	// Execute service list with -o json flag (will fail due to no mock API, but that's OK)
+	executeServiceCommand("service", "list", "-o", "json")
+
+	// Read the config file again
+	newConfigBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file after command: %v", err)
+	}
+
+	// Verify config file was NOT modified
+	if string(originalConfigBytes) != string(newConfigBytes) {
+		t.Errorf("Config file should not be modified by using -o flag.\nOriginal:\n%s\nNew:\n%s",
+			string(originalConfigBytes), string(newConfigBytes))
+	}
+}
