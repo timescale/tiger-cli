@@ -14,8 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -43,8 +43,9 @@ func setupAuthTest(t *testing.T) string {
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
 	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-	viper.Reset()
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
+		t.Fatalf("Failed to use test config: %v", err)
+	}
 
 	// Also ensure config file doesn't exist
 	configFile := config.GetConfigFile(tmpDir)
@@ -55,7 +56,6 @@ func setupAuthTest(t *testing.T) string {
 		config.RemoveAPIKeyFromKeyring()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		validateAPIKeyForLogin = originalValidator // Restore original validator
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)
@@ -91,7 +91,7 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -165,7 +165,7 @@ func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -196,7 +196,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -409,6 +409,10 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 
 		// Give the OAuth server a moment to start
 		go func() {
+			// Sleep to ensure the OAuth callback server is listening
+			// This prevents "EOF" errors in CI when the server hasn't started yet
+			time.Sleep(100 * time.Millisecond)
+
 			// Make the OAuth callback request directly
 			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
 			t.Logf("Mock browser making callback request to: %s", callbackURL)
@@ -445,7 +449,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
 		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-123\n$`, regexp.QuoteMeta(mockServerURL))
+		`Set default project ID to: project-123\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -508,7 +512,7 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
 		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-789\n$`, regexp.QuoteMeta(mockServerURL))
+		`Set default project ID to: project-789\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -553,7 +557,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
@@ -625,7 +629,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}

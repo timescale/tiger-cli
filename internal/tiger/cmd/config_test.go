@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -16,12 +15,6 @@ import (
 
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
-
-	// Reset viper state to ensure clean test environment
-	viper.Reset()
-
-	// Reset global config in the config package
-	config.ResetGlobalConfig()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
@@ -32,11 +25,12 @@ func setupConfigTest(t *testing.T) (string, func()) {
 	// Set environment variable to use test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	config.UseTestConfig(tmpDir, map[string]any{})
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		viper.Reset()
 
 		// Reset global config in the config package
 		// This is important for test isolation
@@ -563,17 +557,19 @@ func TestConfigReset(t *testing.T) {
 		t.Errorf("Expected output to contain reset message, got '%s'", strings.TrimSpace(output))
 	}
 
-	// Verify all values were reset to defaults
 	cfg, err = config.Load()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
+	// ProjectID should be preserved
+	if cfg.ProjectID != "custom-project" {
+		t.Errorf("Expected ProjectID %s, got %s", "custom-project", cfg.ProjectID)
+	}
+
+	// Verify all other values were reset to defaults
 	if cfg.APIURL != config.DefaultAPIURL {
 		t.Errorf("Expected default APIURL %s, got %s", config.DefaultAPIURL, cfg.APIURL)
-	}
-	if cfg.ProjectID != "" {
-		t.Errorf("Expected empty ProjectID, got %s", cfg.ProjectID)
 	}
 	if cfg.ServiceID != "" {
 		t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
@@ -669,5 +665,68 @@ func TestConfigCommands_Integration(t *testing.T) {
 
 	if cfg.Output != config.DefaultOutput {
 		t.Errorf("Expected output reset to default %s, got %s", config.DefaultOutput, cfg.Output)
+	}
+}
+
+func TestConfigSet_OutputDoesPersist(t *testing.T) {
+	tmpDir, _ := setupConfigTest(t)
+
+	// Start with default config (no output setting in file)
+	configFile := config.GetConfigFile(tmpDir)
+
+	// Execute config set to explicitly set output to json
+	_, err := executeConfigCommand("config", "set", "output", "json")
+	if err != nil {
+		t.Fatalf("Failed to set output to json: %v", err)
+	}
+
+	// Read the config file directly
+	configBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	// Parse the YAML to check
+	var configMap map[string]interface{}
+	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
+		t.Fatalf("Failed to parse config YAML: %v", err)
+	}
+
+	if outputVal, exists := configMap["output"]; !exists || outputVal != "json" {
+		t.Errorf("Expected output in config file to be 'json', got: %v (exists: %v)", outputVal, exists)
+	}
+
+	// Also verify by loading config
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Output != "json" {
+		t.Errorf("Expected loaded config output to be 'json', got: %s", cfg.Output)
+	}
+
+	// Now test that setting it to a different value updates the file
+	_, err = executeConfigCommand("config", "set", "output", "yaml")
+	if err != nil {
+		t.Fatalf("Failed to set output to yaml: %v", err)
+	}
+
+	// Read the config file again
+	configBytes, err = os.ReadFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to read config file after second set: %v", err)
+	}
+
+	configContent := string(configBytes)
+
+	// Verify that output was updated in the config file
+	if !strings.Contains(configContent, "output: yaml") {
+		t.Errorf("Config file should contain 'output: yaml' after update. Config content:\n%s", configContent)
+	}
+
+	// Should NOT contain the old value
+	if strings.Contains(configContent, "output: json") {
+		t.Errorf("Config file should NOT contain old 'output: json' value. Config content:\n%s", configContent)
 	}
 }

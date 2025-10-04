@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -248,6 +249,30 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
+func getServicePassword(service api.Service) (string, error) {
+	// Get password from storage if requested
+	storage := password.GetPasswordStorage()
+	passwd, err := storage.Get(service)
+	if err != nil {
+		// Provide specific error messages based on storage type
+		switch storage.(type) {
+		case *password.NoStorage:
+			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+		case *password.KeyringStorage:
+			return "", fmt.Errorf("no password found in keyring for this service")
+		case *password.PgpassStorage:
+			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+		default:
+			return "", fmt.Errorf("failed to retrieve password: %w", err)
+		}
+	}
+
+	if passwd == "" {
+		return "", fmt.Errorf("no password available for service")
+	}
+	return passwd, nil
+}
+
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
 func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	// Get config
@@ -362,8 +387,8 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 
 	// Only set PGPASSWORD for keyring storage method
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := util.GetPasswordStorage()
-	if _, isKeyring := storage.(*util.KeyringStorage); isKeyring {
+	storage := password.GetPasswordStorage()
+	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)

@@ -98,7 +98,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 		t.Fatalf("Expected login to succeed with valid keys, got error: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-valid\n"
+	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-valid\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Expected output %q, got %q", expectedOutput, output)
 	}

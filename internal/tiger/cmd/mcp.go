@@ -41,7 +41,77 @@ Use 'tiger mcp start' to launch the MCP server.`,
 	}
 
 	// Add subcommands
+	cmd.AddCommand(buildMCPInstallCmd())
 	cmd.AddCommand(buildMCPStartCmd())
+
+	return cmd
+}
+
+// buildMCPInstallCmd creates the install subcommand for configuring editors
+func buildMCPInstallCmd() *cobra.Command {
+	var noBackup bool
+	var configPath string
+
+	cmd := &cobra.Command{
+		Use:   "install [client]",
+		Short: "Install and configure Tiger MCP server for a client",
+		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific MCP client or AI assistant.
+
+This command automates the configuration process by modifying the appropriate
+configuration files for the specified client.
+
+%s
+The command will:
+- Automatically detect the appropriate configuration file location
+- Create the configuration directory if it doesn't exist
+- Create a backup of existing configuration by default
+- Merge with existing MCP server configurations (doesn't overwrite other servers)
+- Validate the configuration after installation
+
+If no client is specified, you'll be prompted to select one interactively.
+
+Examples:
+  # Interactive client selection
+  tiger mcp install
+
+  # Install for Claude Code (User scope - available in all projects)
+  tiger mcp install claude-code
+
+  # Install for Cursor IDE
+  tiger mcp install cursor
+
+  # Install without creating backup
+  tiger mcp install claude-code --no-backup
+
+  # Use custom configuration file path
+  tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
+		Args:      cobra.MaximumNArgs(1),
+		ValidArgs: getValidEditorNames(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
+			var clientName string
+			if len(args) == 0 {
+				// No client specified, prompt user to select one
+				var err error
+				clientName, err = selectClientInteractively(cmd.OutOrStdout())
+				if err != nil {
+					return fmt.Errorf("failed to select client: %w", err)
+				}
+				if clientName == "" {
+					return fmt.Errorf("no client selected")
+				}
+			} else {
+				clientName = args[0]
+			}
+
+			return installMCPForClient(clientName, !noBackup, configPath)
+		},
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&noBackup, "no-backup", false, "Skip creating backup of existing configuration (default: create backup)")
+	cmd.Flags().StringVar(&configPath, "config-path", "", "Custom path to configuration file (overrides default locations)")
 
 	return cmd
 }
@@ -151,7 +221,8 @@ func startStdioServer(ctx context.Context) error {
 	}
 
 	// Start the stdio transport
-	if err := server.StartStdio(ctx); !errors.Is(err, context.Canceled) {
+	err = server.StartStdio(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("failed to start MCP server: %w", err)
 	}
 

@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func TestMain(m *testing.M) {
 	// Reset viper state before each test run
-	viper.Reset()
+	ResetGlobalConfig()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -25,13 +25,13 @@ func setupTestConfig(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-
-	// Clean up Viper state
-	viper.Reset()
+	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
+		t.Fatalf("Failed to setup Viper: %v", err)
+	}
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
-		viper.Reset()
+		ResetGlobalConfig()
 	})
 
 	return tmpDir
@@ -246,17 +246,15 @@ func TestSave(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	setupViper(t, tmpDir)
 
-	cfg := &Config{
-		APIURL:    "https://test.api.com/v1",
-		ProjectID: "test-project",
-		ServiceID: "test-service",
-		Output:    "json",
-		Analytics: false,
-		ConfigDir: tmpDir,
-	}
-
-	if err := cfg.Save(); err != nil {
-		t.Fatalf("Save() failed: %v", err)
+	cfg, err := UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://test.api.com/v1",
+		"project_id": "test-project",
+		"service_id": "test-service",
+		"output":     "json",
+		"analytics":  false,
+	})
+	if err != nil {
+		t.Fatalf("UseTestConfig() failed: %v", err)
 	}
 
 	// Verify file was created
@@ -269,7 +267,7 @@ func TestSave(t *testing.T) {
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	viper.Reset()
+	ResetGlobalConfig()
 
 	// Setup Viper again to read the saved config file
 	setupViper(t, tmpDir)
@@ -504,12 +502,14 @@ func TestReset(t *testing.T) {
 		t.Fatalf("Reset() failed: %v", err)
 	}
 
-	// Verify all values are reset to defaults
+	// ProjectID should be preserved
+	if cfg.ProjectID != "custom-project" {
+		t.Errorf("Expected ProjectID %s, got %s", "custom-project", cfg.ProjectID)
+	}
+
+	// Verify all other values are reset to defaults
 	if cfg.APIURL != DefaultAPIURL {
 		t.Errorf("Expected APIURL %s, got %s", DefaultAPIURL, cfg.APIURL)
-	}
-	if cfg.ProjectID != "" {
-		t.Errorf("Expected empty ProjectID, got %s", cfg.ProjectID)
 	}
 	if cfg.ServiceID != "" {
 		t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
@@ -667,7 +667,7 @@ func TestExpandPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := expandPath(tt.input)
+			result := util.ExpandPath(tt.input)
 			if result != tt.expected {
 				t.Errorf("expandPath(%s) = %s, expected %s", tt.input, result, tt.expected)
 			}
@@ -681,14 +681,11 @@ func TestSave_CreateDirectory(t *testing.T) {
 	// Use non-existent subdirectory
 	configDir := filepath.Join(tmpDir, "nested", "config")
 
-	cfg := &Config{
-		APIURL:    "https://test.api.com/v1",
-		ConfigDir: configDir,
-	}
-
-	err := cfg.Save()
+	_, err := UseTestConfig(configDir, map[string]any{
+		"api_url": "https://test.api.com/v1",
+	})
 	if err != nil {
-		t.Fatalf("Save() failed: %v", err)
+		t.Fatalf("UseTestConfig() failed: %v", err)
 	}
 
 	// Verify directory was created

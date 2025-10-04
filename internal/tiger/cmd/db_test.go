@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -31,12 +32,10 @@ func setupDBTest(t *testing.T) string {
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
 		// Clean up environment variable BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		// Then clean up file system
@@ -63,12 +62,10 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -95,13 +92,11 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -174,12 +169,10 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -206,13 +199,11 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -239,13 +230,11 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -353,7 +342,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -519,12 +508,10 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -551,13 +538,11 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -704,6 +689,152 @@ func TestIsConnectionRejected(t *testing.T) {
 	}
 }
 
+func TestBuildConnectionString(t *testing.T) {
+	testCases := []struct {
+		name           string
+		service        api.Service
+		pooled         bool
+		role           string
+		expectedString string
+		expectError    bool
+		expectWarning  bool
+	}{
+		{
+			name: "Basic connection string",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+			},
+			pooled:         false,
+			role:           "tsdbadmin",
+			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
+			expectError:    false,
+		},
+		{
+			name: "Connection string with custom role",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+			},
+			pooled:         false,
+			role:           "readonly",
+			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
+			expectError:    false,
+		},
+		{
+			name: "Connection string with default port",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: nil, // Should use default 5432
+				},
+			},
+			pooled:         false,
+			role:           "tsdbadmin",
+			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
+			expectError:    false,
+		},
+		{
+			name: "Pooled connection string",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+				ConnectionPooler: &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{
+						Host: util.Ptr("pooler-host.tigerdata.com"),
+						Port: util.Ptr(6432),
+					},
+				},
+			},
+			pooled:         true,
+			role:           "tsdbadmin",
+			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
+			expectError:    false,
+		},
+		{
+			name: "Pooled connection fallback to direct when pooler unavailable",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+				ConnectionPooler: nil, // No pooler available
+			},
+			pooled:         true,
+			role:           "tsdbadmin",
+			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
+			expectError:    false,
+			expectWarning:  true, // Should warn about pooler not available
+		},
+		{
+			name: "Error when no endpoint available",
+			service: api.Service{
+				Endpoint: nil,
+			},
+			pooled:      false,
+			role:        "tsdbadmin",
+			expectError: true,
+		},
+		{
+			name: "Error when no host available",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: nil,
+					Port: util.Ptr(5432),
+				},
+			},
+			pooled:      false,
+			role:        "tsdbadmin",
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a test command to capture stderr output
+			cmd := &cobra.Command{}
+			errBuf := new(bytes.Buffer)
+			cmd.SetErr(errBuf)
+
+			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, false, cmd.ErrOrStderr())
+
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if result != tc.expectedString {
+				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result)
+			}
+
+			// Check for warning message
+			stderrOutput := errBuf.String()
+			if tc.expectWarning {
+				if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
+					t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
+				}
+			} else {
+				if stderrOutput != "" {
+					t.Errorf("Expected no warning, but got: %q", stderrOutput)
+				}
+			}
+		})
+	}
+}
+
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -755,13 +886,11 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			tmpDir := setupDBTest(t)
 
 			// Set up config
-			cfg := &config.Config{
-				APIURL:    "http://localhost:9999", // Non-existent server
-				ProjectID: "test-project-123",
-				ServiceID: "svc-12345",
-				ConfigDir: tmpDir,
-			}
-			err := cfg.Save()
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":    "http://localhost:9999", // Non-existent server
+				"project_id": "test-project-123",
+				"service_id": "svc-12345",
+			})
 			if err != nil {
 				t.Fatalf("Failed to save test config: %v", err)
 			}
@@ -834,7 +963,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := util.GetPasswordStorage()
+	storage := password.GetPasswordStorage()
 	err := storage.Save(service, testPassword)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
