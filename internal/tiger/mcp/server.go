@@ -84,18 +84,18 @@ func (s *Server) createAPIClient() (*api.ClientWithResponses, error) {
 	return apiClient, nil
 }
 
-// loadProjectID loads fresh config and returns the current project ID
-func (s *Server) loadProjectID() (string, error) {
+// loadConfigWithProjectID loads fresh config and validates that project ID is set
+func (s *Server) loadConfigWithProjectID() (*config.Config, error) {
 	// Load fresh config
 	cfg, err := config.Load()
 	if err != nil {
-		return "", fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if cfg.ProjectID == "" {
-		return "", fmt.Errorf("project ID is required. Please run 'tiger auth login' with --project-id")
+		return nil, fmt.Errorf("project ID is required. Please run 'tiger auth login' with --project-id")
 	}
-	return cfg.ProjectID, nil
+	return cfg, nil
 }
 
 // Close gracefully shuts down the MCP server and all proxy connections
