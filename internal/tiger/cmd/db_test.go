@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -121,7 +122,7 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 
 func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// This test demonstrates that the warning functionality works
-	// by directly testing the util.BuildConnectionString function
+	// by directly testing the password.BuildConnectionString function
 
 	// Service without connection pooler
 	service := api.Service{
@@ -136,10 +137,10 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+	connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
-		PasswordMode: util.PasswordExclude,
+		PasswordMode: password.PasswordExclude,
 		WarnWriter:   errBuf,
 	})
 
@@ -576,7 +577,8 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 
 	// Test with malformed connection string (should return ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
-	err := testDatabaseConnection(invalidConnectionString, 1, cmd)
+	ctx := context.Background()
+	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
 
 	if err == nil {
 		t.Error("Expected error for invalid connection string")
@@ -604,8 +606,9 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	// Use a connection string to a non-routable IP to test timeout
 	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
 
+	ctx := context.Background()
 	start := time.Now()
-	err := testDatabaseConnection(timeoutConnectionString, 1, cmd) // 1 second timeout
+	err := testDatabaseConnection(ctx, timeoutConnectionString, 1*time.Second, cmd) // 1 second timeout
 	duration := time.Since(start)
 
 	if err == nil {
@@ -802,7 +805,12 @@ func TestBuildConnectionString(t *testing.T) {
 			errBuf := new(bytes.Buffer)
 			cmd.SetErr(errBuf)
 
-			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, false, cmd.ErrOrStderr())
+			result, err := password.BuildConnectionString(tc.service, password.ConnectionStringOptions{
+				Pooled:       tc.pooled,
+				Role:         tc.role,
+				PasswordMode: password.PasswordExclude,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 
 			if tc.expectError {
 				if err == nil {
@@ -970,12 +978,12 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 	defer storage.Remove(service) // Clean up after test
 
-	// Test util.BuildConnectionString without password (default behavior)
+	// Test password.BuildConnectionString without password (default behavior)
 	cmd := &cobra.Command{}
-	baseConnectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+	baseConnectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: util.PasswordExclude,
+		PasswordMode: password.PasswordExclude,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {
@@ -992,11 +1000,11 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 		t.Errorf("Base connection string should not contain password, but it does: %s", baseConnectionString)
 	}
 
-	// Test util.BuildConnectionString with password (simulating --with-password flag)
-	connectionStringWithPassword, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+	// Test password.BuildConnectionString with password (simulating --with-password flag)
+	connectionStringWithPassword, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: util.PasswordRequired,
+		PasswordMode: password.PasswordRequired,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {

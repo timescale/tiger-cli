@@ -15,7 +15,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
-	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
@@ -61,12 +60,12 @@ Examples:
 				return err
 			}
 
-			passwordMode := util.PasswordExclude
+			passwordMode := password.PasswordExclude
 			if dbConnectionStringWithPassword {
-				passwordMode = util.PasswordRequired
+				passwordMode = password.PasswordRequired
 			}
 
-			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				PasswordMode: passwordMode,
@@ -143,10 +142,10 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
-				PasswordMode: util.PasswordExclude,
+				PasswordMode: password.PasswordExclude,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -207,10 +206,10 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			connectionString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				PasswordMode: util.PasswordOptional,
+				PasswordMode: password.PasswordOptional,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {

@@ -809,7 +809,16 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 
 	// Build connection string
-	connectionString, err := buildConnectionString(service, false, "tsdbadmin", withPassword, output)
+	passwordMode := password.PasswordExclude
+	if withPassword {
+		passwordMode = password.PasswordRequired
+	}
+	connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		PasswordMode: passwordMode,
+		WarnWriter:   output,
+	})
 	if err == nil {
 		outputSvc.ConnectionString = &connectionString
 	}

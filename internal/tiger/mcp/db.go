@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -129,11 +130,11 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	service := *serviceResp.JSON200
 
 	// Build connection string with password (use direct connection, default role tsdbadmin)
-	connString, err := util.BuildConnectionString(service, util.ConnectionStringOptions{
+	connString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: util.PasswordRequired, // MCP always requires password
-		WarnWriter:   nil,                   // No warnings in MCP context
+		PasswordMode: password.PasswordRequired, // MCP always requires password
+		WarnWriter:   nil,                       // No warnings in MCP context
 	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)

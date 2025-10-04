@@ -1,4 +1,4 @@
-package util
+package password
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func TestBuildConnectionString_Basic(t *testing.T) {
@@ -24,8 +25,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Basic connection string without password",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: Ptr("test-host.tigerdata.com"),
-					Port: Ptr(5432),
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 			},
 			opts: ConnectionStringOptions{
@@ -40,8 +41,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Connection string with custom role",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: Ptr("test-host.tigerdata.com"),
-					Port: Ptr(5432),
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 			},
 			opts: ConnectionStringOptions{
@@ -56,7 +57,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Connection string with default port",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: Ptr("test-host.tigerdata.com"),
+					Host: util.Ptr("test-host.tigerdata.com"),
 					Port: nil, // Should use default 5432
 				},
 			},
@@ -72,13 +73,13 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Pooled connection string",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: Ptr("direct-host.tigerdata.com"),
-					Port: Ptr(5432),
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 				ConnectionPooler: &api.ConnectionPooler{
 					Endpoint: &api.Endpoint{
-						Host: Ptr("pooler-host.tigerdata.com"),
-						Port: Ptr(6432),
+						Host: util.Ptr("pooler-host.tigerdata.com"),
+						Port: util.Ptr(6432),
 					},
 				},
 			},
@@ -94,8 +95,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Pooled connection fallback to direct when pooler unavailable",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: Ptr("direct-host.tigerdata.com"),
-					Port: Ptr(5432),
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
 				},
 				ConnectionPooler: nil, // No pooler available
 			},
@@ -126,7 +127,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			service: api.Service{
 				Endpoint: &api.Endpoint{
 					Host: nil,
-					Port: Ptr(5432),
+					Port: util.Ptr(5432),
 				},
 			},
 			opts: ConnectionStringOptions{
@@ -401,8 +402,8 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 	// Service without connection pooler
 	service := api.Service{
 		Endpoint: &api.Endpoint{
-			Host: Ptr("test-host.tigerdata.com"),
-			Port: Ptr(5432),
+			Host: util.Ptr("test-host.tigerdata.com"),
+			Port: util.Ptr(5432),
 		},
 		ConnectionPooler: nil, // No pooler available
 	}
