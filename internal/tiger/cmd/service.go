@@ -1108,6 +1108,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkToTimestamp string
 	var forkCPU int
 	var forkMemory int
+	var forkWithPassword bool
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -1324,20 +1325,26 @@ Examples:
 				}
 
 				// Handle wait behavior
+				var result error
 				if forkNoWait {
 					fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
-					return nil
+				} else {
+					// Wait for service to be ready
+					fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+					forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
+					if result != nil {
+						fmt.Fprintf(statusOutput, "❌ %v\n", result)
+					} else {
+						fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
+						printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
+					}
 				}
 
-				// Wait for service to be ready with custom timeout
-				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				if _, err := waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput); err != nil {
-					return err
+				if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
-				fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
-				printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, serviceID)
-				return nil
 
+				return result
 			case 401:
 				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
 			case 403:
@@ -1368,6 +1375,7 @@ Examples:
 	// Resource customization flags
 	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
+	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include initial password in output")
 
 	return cmd
 }
