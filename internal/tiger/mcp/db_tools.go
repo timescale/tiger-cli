@@ -44,8 +44,26 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 type DBExecuteQueryOutput struct {
 	Columns       []string `json:"columns"`
 	Rows          [][]any  `json:"rows"`
-	RowCount      int      `json:"row_count"`
+	RowsAffected  int64    `json:"rows_affected"`
 	ExecutionTime string   `json:"execution_time"`
+}
+
+func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[DBExecuteQueryOutput](nil))
+
+	schema.Properties["columns"].Description = "Column names from the query result"
+	schema.Properties["columns"].Examples = []any{[]string{"id", "name", "created_at"}}
+
+	schema.Properties["rows"].Description = "Result rows as arrays of values. Empty for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
+	schema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
+
+	schema.Properties["rows_affected"].Description = "Number of rows affected by the query. For SELECT, this is the number of rows returned. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
+	schema.Properties["rows_affected"].Examples = []any{5, 42, 1000}
+
+	schema.Properties["execution_time"].Description = "Query execution time as a human-readable duration string"
+	schema.Properties["execution_time"].Examples = []any{"123ms", "1.5s", "45.2µs"}
+
+	return schema
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
@@ -58,7 +76,8 @@ func (s *Server) registerDatabaseTools() {
 This tool connects to a PostgreSQL database service in TigerData Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata. Perfect for data exploration, schema inspection, and database operations.
 
 WARNING: Use with caution - this tool can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
-		InputSchema: DBExecuteQueryInput{}.Schema(),
+		InputSchema:  DBExecuteQueryInput{}.Schema(),
+		OutputSchema: DBExecuteQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(true), // Can execute destructive SQL
 			Title:           "Execute SQL Query",
@@ -167,7 +186,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	output := DBExecuteQueryOutput{
 		Columns:       columns,
 		Rows:          resultRows,
-		RowCount:      len(resultRows),
+		RowsAffected:  rows.CommandTag().RowsAffected(),
 		ExecutionTime: time.Since(startTime).String(),
 	}
 
