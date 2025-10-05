@@ -58,8 +58,8 @@ type DBExecuteQueryColumn struct {
 
 // DBExecuteQueryOutput represents output for tiger_db_execute_query
 type DBExecuteQueryOutput struct {
-	Columns       []DBExecuteQueryColumn `json:"columns"`
-	Rows          [][]any                `json:"rows"`
+	Columns       []DBExecuteQueryColumn `json:"columns,omitempty"`
+	Rows          [][]any                `json:"rows,omitempty"`
 	RowsAffected  int64                  `json:"rows_affected"`
 	ExecutionTime string                 `json:"execution_time"`
 }
@@ -184,18 +184,18 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	// Get column metadata from field descriptions
 	fieldDescriptions := rows.FieldDescriptions()
-	columns := make([]DBExecuteQueryColumn, len(fieldDescriptions))
-	for i, fd := range fieldDescriptions {
+	var columns []DBExecuteQueryColumn
+	for _, fd := range fieldDescriptions {
 		// Get the type name from the connection's type map
 		dataType, ok := conn.TypeMap().TypeForOID(fd.DataTypeOID)
 		typeName := "unknown"
 		if ok && dataType != nil {
 			typeName = dataType.Name
 		}
-		columns[i] = DBExecuteQueryColumn{
+		columns = append(columns, DBExecuteQueryColumn{
 			Name: fd.Name,
 			Type: typeName,
-		}
+		})
 	}
 
 	// Collect all rows
