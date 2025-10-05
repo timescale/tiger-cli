@@ -21,6 +21,8 @@ type DBExecuteQueryInput struct {
 	ServiceID      string `json:"service_id"`
 	Query          string `json:"query"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+	Role           string `json:"role,omitempty"`
+	Pooled         bool   `json:"pooled,omitempty"`
 }
 
 func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
@@ -36,6 +38,14 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema.Properties["timeout_seconds"].Minimum = util.Ptr(0.0)
 	schema.Properties["timeout_seconds"].Default = util.Must(json.Marshal(30))
 	schema.Properties["timeout_seconds"].Examples = []any{10, 30, 60}
+
+	schema.Properties["role"].Description = "Database role/username to connect as"
+	schema.Properties["role"].Default = util.Must(json.Marshal("tsdbadmin"))
+	schema.Properties["role"].Examples = []any{"tsdbadmin", "readonly", "postgres"}
+
+	schema.Properties["pooled"].Description = "Use connection pooling (if available for the service)"
+	schema.Properties["pooled"].Default = util.Must(json.Marshal(false))
+	schema.Properties["pooled"].Examples = []any{false, true}
 
 	return schema
 }
@@ -116,6 +126,8 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Duration("timeout", timeout),
+		zap.String("role", input.Role),
+		zap.Bool("pooled", input.Pooled),
 	)
 
 	// Get service details to construct connection string
@@ -141,10 +153,10 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	service := *serviceResp.JSON200
 
-	// Build connection string with password (use direct connection, default role tsdbadmin)
+	// Build connection string with password
 	connString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
-		Pooled:       false,
-		Role:         "tsdbadmin",
+		Pooled:       input.Pooled,
+		Role:         input.Role,
 		PasswordMode: password.PasswordRequired, // MCP always requires password
 	})
 	if err != nil {
