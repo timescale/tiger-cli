@@ -40,19 +40,29 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	return schema
 }
 
+// DBExecuteQueryColumn represents a column in the query result
+type DBExecuteQueryColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // DBExecuteQueryOutput represents output for tiger_db_execute_query
 type DBExecuteQueryOutput struct {
-	Columns       []string `json:"columns"`
-	Rows          [][]any  `json:"rows"`
-	RowsAffected  int64    `json:"rows_affected"`
-	ExecutionTime string   `json:"execution_time"`
+	Columns       []DBExecuteQueryColumn `json:"columns"`
+	Rows          [][]any                `json:"rows"`
+	RowsAffected  int64                  `json:"rows_affected"`
+	ExecutionTime string                 `json:"execution_time"`
 }
 
 func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryOutput](nil))
 
-	schema.Properties["columns"].Description = "Column names from the query result"
-	schema.Properties["columns"].Examples = []any{[]string{"id", "name", "created_at"}}
+	schema.Properties["columns"].Description = "Column metadata from the query result including name and PostgreSQL type"
+	schema.Properties["columns"].Examples = []any{[]DBExecuteQueryColumn{
+		{Name: "id", Type: "int4"},
+		{Name: "name", Type: "text"},
+		{Name: "created_at", Type: "timestamptz"},
+	}}
 
 	schema.Properties["rows"].Description = "Result rows as arrays of values. Empty for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
 	schema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
@@ -160,11 +170,20 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 	defer rows.Close()
 
-	// Get column names from field descriptions
+	// Get column metadata from field descriptions
 	fieldDescriptions := rows.FieldDescriptions()
-	columns := make([]string, len(fieldDescriptions))
+	columns := make([]DBExecuteQueryColumn, len(fieldDescriptions))
 	for i, fd := range fieldDescriptions {
-		columns[i] = string(fd.Name)
+		// Get the type name from the connection's type map
+		dataType, ok := conn.TypeMap().TypeForOID(fd.DataTypeOID)
+		typeName := "unknown"
+		if ok && dataType != nil {
+			typeName = dataType.Name
+		}
+		columns[i] = DBExecuteQueryColumn{
+			Name: fd.Name,
+			Type: typeName,
+		}
 	}
 
 	// Collect all rows
