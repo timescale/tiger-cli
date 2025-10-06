@@ -294,6 +294,7 @@ Execute a SQL query on a service database.
 **Parameters:**
 - `service_id` (string, required): Service ID
 - `query` (string, required): SQL query to execute
+- `parameters` (array, optional): Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query.
 - `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)
 - `role` (string, optional): Database role/username to connect as (default: tsdbadmin)
 - `pooled` (boolean, optional): Use connection pooling (default: false)

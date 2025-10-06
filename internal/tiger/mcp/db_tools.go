@@ -20,6 +20,7 @@ import (
 type DBExecuteQueryInput struct {
 	ServiceID      string `json:"service_id"`
 	Query          string `json:"query"`
+	Parameters     []any  `json:"parameters,omitempty"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
 	Role           string `json:"role,omitempty"`
 	Pooled         bool   `json:"pooled,omitempty"`
@@ -33,6 +34,9 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
 	schema.Properties["query"].Description = "PostgreSQL query to execute"
+
+	schema.Properties["parameters"].Description = "Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query."
+	schema.Properties["parameters"].Examples = []any{[]any{1, "alice"}, []any{"2024-01-01", 100}}
 
 	schema.Properties["timeout_seconds"].Description = "Query timeout in seconds"
 	schema.Properties["timeout_seconds"].Minimum = util.Ptr(0.0)
@@ -176,7 +180,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	// Execute query and measure time
 	startTime := time.Now()
-	rows, err := conn.Query(queryCtx, input.Query)
+	rows, err := conn.Query(queryCtx, input.Query, input.Parameters...)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("query execution failed: %w", err)
 	}
