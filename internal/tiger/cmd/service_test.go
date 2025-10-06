@@ -334,7 +334,7 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 		t.Fatal("Expected error when invalid timestamp provided")
 	}
 
-	if !strings.Contains(err.Error(), "invalid timestamp format") {
+	if !strings.Contains(err.Error(), "invalid time format") {
 		t.Errorf("Expected invalid timestamp error, got: %v", err)
 	}
 }
