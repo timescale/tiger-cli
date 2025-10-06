@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"time"
@@ -61,7 +60,17 @@ Examples:
 				return err
 			}
 
-			connectionString, err := buildConnectionString(service, dbConnectionStringPooled, dbConnectionStringRole, dbConnectionStringWithPassword, cmd.ErrOrStderr())
+			passwordMode := password.PasswordExclude
+			if dbConnectionStringWithPassword {
+				passwordMode = password.PasswordRequired
+			}
+
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+				Pooled:       dbConnectionStringPooled,
+				Role:         dbConnectionStringRole,
+				PasswordMode: passwordMode,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -133,8 +142,12 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			// Get connection string using existing logic
-			connectionString, err := buildConnectionString(service, dbConnectPooled, dbConnectRole, false, cmd.ErrOrStderr())
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+				Pooled:       dbConnectPooled,
+				Role:         dbConnectRole,
+				PasswordMode: password.PasswordExclude,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
@@ -192,8 +205,13 @@ Examples:
 				return exitWithCode(ExitInvalidParameters, err)
 			}
 
-			// Build connection string for testing
-			connectionString, err := buildConnectionString(service, dbTestConnectionPooled, dbTestConnectionRole, false, cmd.ErrOrStderr())
+			// Build connection string for testing with password (if available)
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+				Pooled:       dbTestConnectionPooled,
+				Role:         dbTestConnectionRole,
+				PasswordMode: password.PasswordOptional,
+				WarnWriter:   cmd.ErrOrStderr(),
+			})
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
@@ -204,7 +222,7 @@ Examples:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(connectionString, dbTestConnectionTimeout, service, cmd)
+			return testDatabaseConnection(cmd.Context(), connectionString, dbTestConnectionTimeout, cmd)
 		},
 	}
 
@@ -254,62 +272,6 @@ func getServicePassword(service api.Service) (string, error) {
 	return passwd, nil
 }
 
-// buildConnectionString creates a PostgreSQL connection string from service details
-func buildConnectionString(service api.Service, pooled bool, role string, withPassword bool, output io.Writer) (string, error) {
-	if service.Endpoint == nil {
-		return "", fmt.Errorf("service endpoint not available")
-	}
-
-	var endpoint *api.Endpoint
-	var host string
-	var port int
-
-	// Use pooler endpoint if requested and available, otherwise use direct endpoint
-	if pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		endpoint = service.ConnectionPooler.Endpoint
-	} else {
-		// If pooled was requested but no pooler is available, warn the user
-		if pooled {
-			fmt.Fprintf(output, "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
-		}
-		endpoint = service.Endpoint
-	}
-
-	if endpoint.Host == nil {
-		return "", fmt.Errorf("endpoint host not available")
-	}
-	host = *endpoint.Host
-
-	if endpoint.Port != nil {
-		port = *endpoint.Port
-	} else {
-		port = 5432 // Default PostgreSQL port
-	}
-
-	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
-	database := "tsdb"
-
-	// Build connection string in PostgreSQL URI format
-	var connectionString string
-	if withPassword {
-		// Get password from storage if requested
-		passwd, err := getServicePassword(service)
-		if err != nil {
-			return "", err
-		}
-
-		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", role, passwd, host, port, database)
-	} else {
-		// Build connection string without password (default behavior)
-		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-		// This ensures credentials are never visible in process arguments
-		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", role, host, port, database)
-	}
-
-	return connectionString, nil
-}
-
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
 func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	// Get config
@@ -350,7 +312,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	// Fetch service details
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
 	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
@@ -437,50 +399,18 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	return psqlCmd
 }
 
-// buildConnectionConfig creates a pgx connection config with proper password handling
-func buildConnectionConfig(connectionString string, service api.Service) (*pgx.ConnConfig, error) {
-	// Parse the connection string first to validate it
-	config, err := pgx.ParseConfig(connectionString)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set password from keyring storage if available
-	// pgpass storage works automatically since pgx checks ~/.pgpass file
-	storage := password.GetPasswordStorage()
-	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service); err == nil && password != "" {
-			config.Password = password
-		}
-		// Note: If keyring password retrieval fails, we let pgx try without it
-		// This allows fallback to other authentication methods
-	}
-
-	return config, nil
-}
-
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
-func testDatabaseConnection(connectionString string, timeout time.Duration, service api.Service, cmd *cobra.Command) error {
+func testDatabaseConnection(ctx context.Context, connectionString string, timeout time.Duration, cmd *cobra.Command) error {
 	// Create context with timeout if specified
-	var ctx context.Context
 	var cancel context.CancelFunc
-
 	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
-	} else {
-		ctx = context.Background()
-	}
-
-	// Build connection config with proper password handling
-	config, err := buildConnectionConfig(connectionString, service)
-	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Failed to build connection config: %v\n", err)
-		return exitWithCode(ExitInvalidParameters, err)
 	}
 
 	// Attempt to connect to the database
-	conn, err := pgx.ConnectConfig(ctx, config)
+	// The connection string already includes the password (if available) thanks to PasswordOptional mode
+	conn, err := pgx.Connect(ctx, connectionString)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {

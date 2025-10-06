@@ -292,24 +292,37 @@ Test database connectivity.
 Execute a SQL query on a service database.
 
 **Parameters:**
-- `service_id` (string, optional): Service ID (uses default if not provided)
+- `service_id` (string, required): Service ID
 - `query` (string, required): SQL query to execute
-- `timeout` (number, optional): Query timeout in seconds (default: 30)
+- `parameters` (array, optional): Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query.
+- `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)
+- `role` (string, optional): Database role/username to connect as (default: tsdbadmin)
+- `pooled` (boolean, optional): Use connection pooling (default: false)
 
-**Returns:** Query results with rows, columns, and execution metadata.
+**Returns:** Query results with rows, columns (including types), rows affected count, and execution metadata.
 
 **Example Response:**
 ```json
 {
-  "columns": ["id", "name", "created_at"],
+  "columns": [
+    {"name": "id", "type": "int4"},
+    {"name": "name", "type": "text"},
+    {"name": "created_at", "type": "timestamptz"}
+  ],
   "rows": [
     [1, "example", "2024-01-01T00:00:00Z"],
     [2, "test", "2024-01-02T00:00:00Z"]
   ],
-  "row_count": 2,
-  "execution_time_ms": 15
+  "rows_affected": 2,
+  "execution_time": "15.2ms"
 }
 ```
+
+**Note:**
+- `rows_affected` returns the number of rows returned for SELECT queries, and the number of rows modified for INSERT/UPDATE/DELETE queries
+- `columns` includes both the column name and PostgreSQL data type for each column
+- Empty `rows` array for commands that don't return rows (INSERT, UPDATE, DELETE, DDL commands)
+- For parity with `tiger db connect` command, supports custom roles and connection pooling
 
 ### High-Availability Management
 
