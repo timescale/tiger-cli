@@ -1,8 +1,6 @@
 # Tiger CLI
 
-Tiger CLI is the command-line interface for Tiger Cloud. It provides tools for
-managing and querying database services, as well as an integrated Model Context
-Protocol (MCP) server for use with AI assistants.
+Tiger CLI is the command-line interface for Tiger Cloud. It provides commands for managing and querying database services, as well as an integrated Model Context Protocol (MCP) server for use with AI assistants.
 
 ## Installation
 
