@@ -71,7 +71,7 @@ tiger auth login
 	// Add persistent flags
 	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	cmd.PersistentFlags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.PersistentFlags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")

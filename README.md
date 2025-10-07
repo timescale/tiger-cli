@@ -235,7 +235,7 @@ These flags are available on all commands and take precedence over both environm
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--project-id <id>` - Specify project ID
 - `--service-id <id>` - Specify service ID
-- `-o, --output <format>` - Output format: `json`, `yaml`, or `table`
+- `-o, --output <format>` - Output format: `json`, `yaml`, `env`, or `table`
 - `--analytics` - Enable/disable analytics
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
 - `--debug` - Enable/disable debug logging

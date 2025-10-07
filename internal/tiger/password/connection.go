@@ -24,8 +24,8 @@ const (
 	PasswordOptional
 )
 
-// ConnectionStringOptions configures how the connection string is built
-type ConnectionStringOptions struct {
+// ConnectionDetailsOptions configures how the connection string is built
+type ConnectionDetailsOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
 	Pooled bool
 
@@ -40,43 +40,20 @@ type ConnectionStringOptions struct {
 	WarnWriter io.Writer
 }
 
-// BuildConnectionString creates a PostgreSQL connection string from service details
-//
-// The function supports various configuration options through ConnectionStringOptions:
-// - Pooled connections (if available on the service)
-// - With or without password embedded in the URI
-// - Custom database role/username
-// - Optional warning output when pooler is unavailable
-//
-// Examples:
-//
-//	// Simple connection string without password (for use with PGPASSWORD or ~/.pgpass)
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: false,
-//	})
-//
-//	// Connection string with password embedded
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//	})
-//
-//	// Pooled connection with warnings
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Pooled: true,
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//		WarnWriter: os.Stderr,
-//	})
-func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (string, error) {
+type ConnectionDetails struct {
+	Role     string
+	Password string
+	Host     string
+	Port     int
+	Database string
+}
+
+func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
 	if service.Endpoint == nil {
-		return "", fmt.Errorf("service endpoint not available")
+		return nil, fmt.Errorf("service endpoint not available")
 	}
 
 	var endpoint *api.Endpoint
-	var host string
-	var port int
 
 	// Use pooler endpoint if requested and available, otherwise use direct endpoint
 	if opts.Pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
@@ -90,21 +67,19 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 	}
 
 	if endpoint.Host == nil {
-		return "", fmt.Errorf("endpoint host not available")
+		return nil, fmt.Errorf("endpoint host not available")
 	}
-	host = *endpoint.Host
+
+	details := &ConnectionDetails{
+		Role:     opts.Role,
+		Host:     *endpoint.Host,
+		Port:     5432,   // Default PostgreSQL port
+		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
+	}
 
 	if endpoint.Port != nil {
-		port = *endpoint.Port
-	} else {
-		port = 5432 // Default PostgreSQL port
+		details.Port = *endpoint.Port
 	}
-
-	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
-	database := "tsdb"
-
-	// Build connection string in PostgreSQL URI format
-	var connectionString string
 
 	switch opts.PasswordMode {
 	case PasswordRequired:
@@ -115,22 +90,21 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 			// Provide specific error messages based on storage type
 			switch storage.(type) {
 			case *NoStorage:
-				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+				return nil, fmt.Errorf("password storage is disabled (--password-storage=none)")
 			case *KeyringStorage:
-				return "", fmt.Errorf("no password found in keyring for this service")
+				return nil, fmt.Errorf("no password found in keyring for this service")
 			case *PgpassStorage:
-				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+				return nil, fmt.Errorf("no password found in ~/.pgpass for this service")
 			default:
-				return "", fmt.Errorf("failed to retrieve password: %w", err)
+				return nil, fmt.Errorf("failed to retrieve password: %w", err)
 			}
 		}
 
 		if password == "" {
-			return "", fmt.Errorf("no password available for service")
+			return nil, fmt.Errorf("no password available for service")
 		}
 
-		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
+		details.Password = password
 
 	case PasswordOptional:
 		// Try to include password, but don't error if unavailable
@@ -139,17 +113,62 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 
 		// Only include password if we successfully retrieved it
 		if err == nil && password != "" {
-			connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
-		} else {
-			// Fall back to connection string without password
-			connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database)
+			details.Password = password
 		}
 
 	default: // PasswordExclude
+	}
+
+	return details, nil
+}
+
+// BuildConnectionString creates a PostgreSQL connection string from service details
+//
+// The function supports various configuration options through ConnectionDetailsOptions:
+// - Pooled connections (if available on the service)
+// - With or without password embedded in the URI
+// - Custom database role/username
+// - Optional warning output when pooler is unavailable
+//
+// Examples:
+//
+//	// Simple connection string without password (for use with PGPASSWORD or ~/.pgpass)
+//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
+//		Role: "tsdbadmin",
+//		WithPassword: false,
+//	})
+//
+//	// Connection string with password embedded
+//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
+//		Role: "tsdbadmin",
+//		WithPassword: true,
+//	})
+//
+//	// Pooled connection with warnings
+//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
+//		Pooled: true,
+//		Role: "tsdbadmin",
+//		WithPassword: true,
+//		WarnWriter: os.Stderr,
+//	})
+func BuildConnectionString(service api.Service, opts ConnectionDetailsOptions) (string, error) {
+	details, err := GetConnectionDetails(service, opts)
+	if err != nil {
+		return "", err
+	}
+
+	// Build connection string in PostgreSQL URI format
+	var connectionString string
+
+	switch details.Password {
+	case "":
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
 		// This ensures credentials are never visible in process arguments
-		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database)
+		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, details.Host, details.Port, details.Database)
+	default:
+		// Include password in connection string
+		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, details.Password, details.Host, details.Port, details.Database)
 	}
 
 	return connectionString, nil

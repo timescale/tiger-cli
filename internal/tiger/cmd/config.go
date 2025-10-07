@@ -31,6 +31,8 @@ func buildConfigShowCmd() *cobra.Command {
 				return outputJSON(cfg, cmd)
 			case "yaml":
 				return outputYAML(cfg, cmd)
+			case "env":
+				return fmt.Errorf("environment variable output is not supported for config")
 			default:
 				return outputTable(cfg, cmd)
 			}

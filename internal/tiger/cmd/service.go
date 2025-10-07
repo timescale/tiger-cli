@@ -482,7 +482,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createFree, "free", false, "Create a free tier service (limitations apply)")
-	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include initial password in output")
+	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
 
 	return cmd
 }
@@ -620,6 +620,10 @@ type OutputService struct {
 	api.Service
 	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 	Password         *string `json:"password,omitempty" yaml:"password,omitempty"`
+	Role             *string `json:"role,omitempty" yaml:"role,omitempty"`
+	Host             *string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port             *int    `json:"port,omitempty" yaml:"port,omitempty"`
+	Database         *string `json:"database,omitempty" yaml:"database,omitempty"`
 }
 
 // Convert to JSON to respect omitempty tags, then unmarshal
@@ -640,50 +644,76 @@ func toJSON(v any) (any, error) {
 func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder := json.NewEncoder(outputWriter)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(outputSvc)
 	case "yaml":
-		encoder := yaml.NewEncoder(cmd.OutOrStdout())
+		encoder := yaml.NewEncoder(outputWriter)
 		encoder.SetIndent(2)
 		jsonMap, err := toJSON(outputSvc)
 		if err != nil {
 			return fmt.Errorf("failed to convert service to map: %w", err)
 		}
 		return encoder.Encode(jsonMap)
+	case "env":
+		return outputServiceEnv(outputSvc, outputWriter)
 	default: // table format (default)
-		return outputServiceTable(cmd, outputSvc)
+		return outputServiceTable(outputSvc, outputWriter)
 	}
 }
 
 // outputServices formats and outputs the services list based on the specified format
 func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
 	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder := json.NewEncoder(outputWriter)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(outputServices)
 	case "yaml":
-		encoder := yaml.NewEncoder(cmd.OutOrStdout())
+		encoder := yaml.NewEncoder(outputWriter)
 		encoder.SetIndent(2)
 		jsonArray, err := toJSON(outputServices)
 		if err != nil {
 			return fmt.Errorf("failed to convert services to map: %w", err)
 		}
 		return encoder.Encode(jsonArray)
+	case "env":
+		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)
-		return outputServicesTable(cmd, outputServices)
+		return outputServicesTable(outputServices, outputWriter)
 	}
 }
 
+// outputServiceEnv outputs service details in environment variable format
+func outputServiceEnv(service OutputService, output io.Writer) error {
+	if service.Host != nil {
+		fmt.Fprintf(output, "PGHOST=%s\n", *service.Host)
+	}
+	if service.Role != nil {
+		fmt.Fprintf(output, "PGUSER=%s\n", *service.Role)
+	}
+	if service.Password != nil {
+		fmt.Fprintf(output, "PGPASSWORD=%s\n", *service.Password)
+	}
+	if service.Database != nil {
+		fmt.Fprintf(output, "PGDATABASE=%s\n", *service.Database)
+	}
+	if service.Port != nil {
+		fmt.Fprintf(output, "PGPORT=%d\n", *service.Port)
+	}
+	return nil
+}
+
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(cmd *cobra.Command, service OutputService) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputServiceTable(service OutputService, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
 	// Basic service information
@@ -760,8 +790,6 @@ func outputServiceTable(cmd *cobra.Command, service OutputService) error {
 	// Output password if available
 	if service.Password != nil {
 		table.Append("Password", *service.Password)
-	} else if service.InitialPassword != nil {
-		table.Append("Initial Password", *service.InitialPassword)
 	}
 
 	// Output connection string if available
@@ -773,8 +801,8 @@ func outputServiceTable(cmd *cobra.Command, service OutputService) error {
 }
 
 // outputServicesTable outputs services in a formatted table using tablewriter
-func outputServicesTable(cmd *cobra.Command, services []OutputService) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputServicesTable(services []OutputService, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
 	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED", "CONNECTION STRING")
 
 	for _, service := range services {
@@ -796,31 +824,34 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc := OutputService{
 		Service: service,
 	}
+	outputSvc.InitialPassword = nil
 
-	// Remove password if not requested
-	if !withPassword {
-		outputSvc.InitialPassword = nil
-	} else if service.InitialPassword == nil {
-		password, err := getServicePassword(service)
-		if err != nil {
-			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
-		}
-		outputSvc.Password = &password
-	}
-
-	// Build connection string
-	passwordMode := password.PasswordExclude
-	if withPassword {
-		passwordMode = password.PasswordRequired
-	}
-	connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	opts := password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: passwordMode,
+		PasswordMode: password.PasswordExclude,
 		WarnWriter:   output,
-	})
+	}
+	if withPassword {
+		opts.PasswordMode = password.PasswordRequired
+	}
+	connectionDetails, err := password.GetConnectionDetails(service, opts)
+	if err == nil {
+		outputSvc.Role = &connectionDetails.Role
+		outputSvc.Host = &connectionDetails.Host
+		outputSvc.Port = &connectionDetails.Port
+		outputSvc.Database = &connectionDetails.Database
+		if connectionDetails.Password != "" {
+			outputSvc.Password = &connectionDetails.Password
+		}
+	} else {
+		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
+	}
+	connectionString, err := password.BuildConnectionString(service, opts)
 	if err == nil {
 		outputSvc.ConnectionString = &connectionString
+	} else {
+		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection string: %v\n", err)
 	}
 
 	return outputSvc
@@ -1369,7 +1400,7 @@ Examples:
 	// Resource customization flags
 	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
-	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include initial password in output")
+	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
 
 	return cmd
 }

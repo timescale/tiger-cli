@@ -158,7 +158,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	service := *serviceResp.JSON200
 
 	// Build connection string with password
-	connString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	connString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		PasswordMode: password.PasswordRequired, // MCP always requires password

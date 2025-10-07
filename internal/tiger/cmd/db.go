@@ -65,7 +65,7 @@ Examples:
 				passwordMode = password.PasswordRequired
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				PasswordMode: passwordMode,
@@ -142,7 +142,7 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
 				PasswordMode: password.PasswordExclude,
@@ -206,7 +206,7 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				PasswordMode: password.PasswordOptional,

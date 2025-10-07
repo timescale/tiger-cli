@@ -137,7 +137,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordExclude,
@@ -805,7 +805,7 @@ func TestBuildConnectionString(t *testing.T) {
 			errBuf := new(bytes.Buffer)
 			cmd.SetErr(errBuf)
 
-			result, err := password.BuildConnectionString(tc.service, password.ConnectionStringOptions{
+			result, err := password.BuildConnectionString(tc.service, password.ConnectionDetailsOptions{
 				Pooled:       tc.pooled,
 				Role:         tc.role,
 				PasswordMode: password.PasswordExclude,
@@ -980,7 +980,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Test password.BuildConnectionString without password (default behavior)
 	cmd := &cobra.Command{}
-	baseConnectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	baseConnectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordExclude,
@@ -1001,7 +1001,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test password.BuildConnectionString with password (simulating --with-password flag)
-	connectionStringWithPassword, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	connectionStringWithPassword, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordRequired,

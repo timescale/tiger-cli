@@ -46,7 +46,7 @@ analytics: true
 
 ### Global Options
 
-- `-o, --output`: Set output format (json, yaml, table)
+- `-o, --output`: Set output format (json, yaml, env, table)
 - `--config-dir`: Path to configuration directory
 - `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)

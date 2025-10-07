@@ -16,7 +16,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 	testCases := []struct {
 		name           string
 		service        api.Service
-		opts           ConnectionStringOptions
+		opts           ConnectionDetailsOptions
 		expectedString string
 		expectError    bool
 		expectWarning  bool
@@ -29,7 +29,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 					Port: util.Ptr(5432),
 				},
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -45,7 +45,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 					Port: util.Ptr(5432),
 				},
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "readonly",
 				PasswordMode: PasswordExclude,
@@ -61,7 +61,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 					Port: nil, // Should use default 5432
 				},
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -83,7 +83,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 					},
 				},
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -100,7 +100,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 				},
 				ConnectionPooler: nil, // No pooler available
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -115,7 +115,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			service: api.Service{
 				Endpoint: nil,
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -130,7 +130,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 					Port: util.Ptr(5432),
 				},
 			},
-			opts: ConnectionStringOptions{
+			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
 				PasswordMode: PasswordExclude,
@@ -215,7 +215,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	defer storage.Remove(service) // Clean up after test
 
 	// Call BuildConnectionString with withPassword=true
-	result, err := BuildConnectionString(service, ConnectionStringOptions{
+	result, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordRequired,
@@ -267,7 +267,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	defer storage.Remove(service) // Clean up after test
 
 	// Call BuildConnectionString with withPassword=true
-	result, err := BuildConnectionString(service, ConnectionStringOptions{
+	result, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordRequired,
@@ -310,7 +310,7 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	}
 
 	// Call BuildConnectionString with withPassword=true - should fail
-	_, err := BuildConnectionString(service, ConnectionStringOptions{
+	_, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordRequired,
@@ -348,7 +348,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	}
 
 	// Call BuildConnectionString with withPassword=true - should fail
-	_, err := BuildConnectionString(service, ConnectionStringOptions{
+	_, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordRequired,
@@ -381,7 +381,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	}
 
 	// Call BuildConnectionString with withPassword=true - should fail
-	_, err := BuildConnectionString(service, ConnectionStringOptions{
+	_, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordRequired,
@@ -412,7 +412,7 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 	warnBuf := new(bytes.Buffer)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := BuildConnectionString(service, ConnectionStringOptions{
+	connectionString, err := BuildConnectionString(service, ConnectionDetailsOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
 		PasswordMode: PasswordExclude,
