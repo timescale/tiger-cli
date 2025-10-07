@@ -281,6 +281,29 @@ WARNING: Creates billable resources.`,
 	}, s.handleServiceUpdatePassword)
 }
 
+// formatAPIError creates an error message from an API error response.
+// If the API error contains a message, it will be used; otherwise the fallback message is returned.
+func formatAPIError(apiErr *api.Error, fallback string) error {
+	if apiErr != nil && apiErr.Message != nil && *apiErr.Message != "" {
+		return fmt.Errorf("%s", *apiErr.Message)
+	}
+	return fmt.Errorf("%s", fallback)
+}
+
+// formatAPIErrorFromBody attempts to parse an API error from a response body.
+// If the body contains a valid API error with a message, it will be used; otherwise the fallback message is returned.
+func formatAPIErrorFromBody(body []byte, fallback string) error {
+	if len(body) > 0 {
+		var apiErr api.Error
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			if apiErr.Message != nil && *apiErr.Message != "" {
+				return fmt.Errorf("%s", *apiErr.Message)
+			}
+		}
+	}
+	return fmt.Errorf("%s", fallback)
+}
+
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Load config and validate project ID
@@ -325,11 +348,15 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 		return nil, output, nil
 
 	case 401:
-		return nil, ServiceListOutput{}, fmt.Errorf("authentication failed: invalid API key")
+		return nil, ServiceListOutput{}, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key")
 	case 403:
-		return nil, ServiceListOutput{}, fmt.Errorf("permission denied: insufficient access to project")
+		return nil, ServiceListOutput{}, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to project")
 	default:
-		return nil, ServiceListOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		statusCode := resp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			return nil, ServiceListOutput{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+		}
+		return nil, ServiceListOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}
 }
 
@@ -375,13 +402,17 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 		return nil, output, nil
 
 	case 401:
-		return nil, ServiceShowOutput{}, fmt.Errorf("authentication failed: invalid API key")
+		return nil, ServiceShowOutput{}, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key")
 	case 403:
-		return nil, ServiceShowOutput{}, fmt.Errorf("permission denied: insufficient access to service")
+		return nil, ServiceShowOutput{}, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to service")
 	case 404:
-		return nil, ServiceShowOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
+		return nil, ServiceShowOutput{}, formatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID))
 	default:
-		return nil, ServiceShowOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		statusCode := resp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			return nil, ServiceShowOutput{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+		}
+		return nil, ServiceShowOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}
 }
 
@@ -548,13 +579,17 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 		return nil, output, nil
 	case 400:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid request parameters")
+		return nil, ServiceCreateOutput{}, formatAPIError(resp.JSON400, "invalid request parameters")
 	case 401:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("authentication failed: invalid API key")
+		return nil, ServiceCreateOutput{}, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key")
 	case 403:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("permission denied: insufficient access to create services")
+		return nil, ServiceCreateOutput{}, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to create services")
 	default:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		statusCode := resp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			return nil, ServiceCreateOutput{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+		}
+		return nil, ServiceCreateOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}
 }
 
@@ -613,21 +648,19 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, output, nil
 
 	case 401:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("authentication failed: invalid API key")
+		return nil, ServiceUpdatePasswordOutput{}, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key")
 	case 403:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("permission denied: insufficient access to update service password")
+		return nil, ServiceUpdatePasswordOutput{}, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to update service password")
 	case 404:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
+		return nil, ServiceUpdatePasswordOutput{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID))
 	case 400:
-		var errorMsg string
-		if resp.JSON400 != nil && resp.JSON400.Message != nil {
-			errorMsg = *resp.JSON400.Message
-		} else {
-			errorMsg = "Invalid password"
-		}
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("invalid password: %s", errorMsg)
+		return nil, ServiceUpdatePasswordOutput{}, formatAPIError(resp.JSON400, "invalid password")
 
 	default:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+		statusCode := resp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			return nil, ServiceUpdatePasswordOutput{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+		}
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}
 }

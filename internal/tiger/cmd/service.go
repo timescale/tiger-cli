@@ -129,13 +129,17 @@ Examples:
 				return outputService(cmd, service, cfg.Output, withPassword)
 
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to service"))
 			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+				return exitWithCode(ExitServiceNotFound, formatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
 			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+				statusCode := resp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("API request failed with status %d", statusCode)
 			}
 		},
 	}
@@ -211,13 +215,17 @@ func buildServiceListCmd() *cobra.Command {
 				return outputServices(cmd, services, cfg.Output, withPassword)
 
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to project"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to project"))
 			case 404:
-				return fmt.Errorf("project not found")
+				return formatAPIError(resp.JSON404, "project not found")
 			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+				statusCode := resp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("API request failed with status %d", statusCode)
 			}
 		},
 	}
@@ -458,15 +466,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				return result
 			case 400:
-				return fmt.Errorf("invalid request parameters")
+				return formatAPIError(resp.JSON400, "invalid request parameters")
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to create services"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to create services"))
 			case 404:
-				return fmt.Errorf("project not found")
+				return formatAPIErrorFromBody(resp.Body, "project not found")
 			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+				statusCode := resp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("API request failed with status %d", statusCode)
 			}
 		},
 	}
@@ -593,15 +605,19 @@ Examples:
 				return nil
 
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to update service password"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to update service password"))
 			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+				return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID))
 			case 400:
-				return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
+				return formatAPIError(resp.JSON400, "invalid password")
 			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+				statusCode := resp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("API request failed with status %d", statusCode)
 			}
 		},
 	}
@@ -1030,13 +1046,17 @@ Examples:
 				// Wait for deletion to complete
 				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
+				return exitWithCode(ExitServiceNotFound, formatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID)))
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to delete service"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to delete service"))
 			default:
-				return fmt.Errorf("failed to delete service: API request failed with status %d", resp.StatusCode())
+				statusCode := resp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(resp.Body, fmt.Sprintf("failed to delete service: API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("failed to delete service: API request failed with status %d", statusCode)
 			}
 		},
 	}
@@ -1340,17 +1360,21 @@ Examples:
 
 				return result
 			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
+				return exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(forkResp.Body, "authentication failed: invalid API key"))
 			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to fork services"))
+				return exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(forkResp.Body, "permission denied: insufficient access to fork services"))
 			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
+				return exitWithCode(ExitServiceNotFound, formatAPIError(forkResp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
 			case 409:
-				return fmt.Errorf("service name '%s' already exists", forkServiceName)
+				return formatAPIErrorFromBody(forkResp.Body, fmt.Sprintf("service name '%s' already exists", forkServiceName))
 			case 400:
-				return fmt.Errorf("invalid request parameters")
+				return formatAPIErrorFromBody(forkResp.Body, "invalid request parameters")
 			default:
-				return fmt.Errorf("API request failed with status %d", forkResp.StatusCode())
+				statusCode := forkResp.StatusCode()
+				if statusCode >= 400 && statusCode < 500 {
+					return formatAPIErrorFromBody(forkResp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+				}
+				return fmt.Errorf("API request failed with status %d", statusCode)
 			}
 		},
 	}

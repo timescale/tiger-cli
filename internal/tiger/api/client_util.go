@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -94,14 +95,41 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 	// Check the response status
 	switch resp.StatusCode() {
 	case 401, 403:
+		// Try to extract API error message from response body
+		if len(resp.Body) > 0 {
+			var apiErr Error
+			if err := json.Unmarshal(resp.Body, &apiErr); err == nil {
+				if apiErr.Message != nil && *apiErr.Message != "" {
+					return fmt.Errorf("invalid API key: %s", *apiErr.Message)
+				}
+			}
+		}
 		return fmt.Errorf("invalid API key: authentication failed")
 	case 404:
+		// Try to extract API error message from JSON404 field
+		if resp.JSON404 != nil && resp.JSON404.Message != nil && *resp.JSON404.Message != "" {
+			// But 404 is actually OK for validation - it means the API key is valid but project doesn't exist
+			return nil
+		}
 		// Project not found is OK - it means the API key is valid but project doesn't exist
 		return nil
 	case 200:
 		// Success - API key is valid
 		return nil
 	default:
-		return fmt.Errorf("unexpected API response: %d", resp.StatusCode())
+		statusCode := resp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			// Try to extract API error message from response body
+			if len(resp.Body) > 0 {
+				var apiErr Error
+				if err := json.Unmarshal(resp.Body, &apiErr); err == nil {
+					if apiErr.Message != nil && *apiErr.Message != "" {
+						return fmt.Errorf("unexpected API response: %s", *apiErr.Message)
+					}
+				}
+			}
+			return fmt.Errorf("unexpected API response: %d", statusCode)
+		}
+		return fmt.Errorf("unexpected API response: %d", statusCode)
 	}
 }
