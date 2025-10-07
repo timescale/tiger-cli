@@ -161,6 +161,7 @@ go generate ./internal/tiger/api
 5. **Use the pure functional builder pattern** for new commands (see CLAUDE.md)
 6. **Test with multiple output formats** (json, yaml, table)
 7. **Validate configuration changes** don't break existing functionality
+8. **Use CLAUDE.md** other guidelines are listed there and you can use it with any AI-enabled coding editor.
 
 ## Contributing Guidelines
 
