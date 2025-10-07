@@ -1,6 +1,6 @@
 # Tiger CLI
 
-Tiger CLI is the command-line interface for managing Tiger, the modern database cloud. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
+Tiger CLI is the command-line interface for managing databases on Tiger Cloud.
 
 ## Installation
 
