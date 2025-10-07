@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -186,6 +187,9 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
@@ -328,6 +332,9 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
@@ -366,6 +373,9 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")

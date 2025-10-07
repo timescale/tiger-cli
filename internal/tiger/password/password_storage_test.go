@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -573,6 +574,10 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 		{
 			name:    "KeyringStorage",
 			storage: &KeyringStorage{},
+			setup: func(t *testing.T) {
+				// Use a unique service name for this test to avoid conflicts
+				config.SetTestServiceName(t)
+			},
 			cleanup: func(t *testing.T, service api.Service) {
 				storage := &KeyringStorage{}
 				storage.Remove(service) // Ignore errors in cleanup
