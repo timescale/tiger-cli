@@ -17,6 +17,22 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
+// Service type constants matching OpenAPI spec (uppercase)
+const (
+	serviceTypeTimescaleDB = "TIMESCALEDB"
+	serviceTypePostgres    = "POSTGRES"
+	serviceTypeVector      = "VECTOR"
+)
+
+// validServiceTypes returns a slice of all valid service type values
+func validServiceTypes() []string {
+	return []string{
+		serviceTypeTimescaleDB,
+		serviceTypePostgres,
+		serviceTypeVector,
+	}
+}
+
 // ServiceListInput represents input for service_list
 type ServiceListInput struct{}
 
@@ -38,16 +54,29 @@ type ServiceInfo struct {
 	ServiceID string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name      string        `json:"name"`
 	Status    string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
-	Type      string        `json:"type" jsonschema:"One of: TIMESCALEDB, POSTGRES, VECTOR"`
+	Type      string        `json:"type"`
 	Region    string        `json:"region"`
 	Created   string        `json:"created,omitempty"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
+}
+
+func (ServiceInfo) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceInfo](nil))
+	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	return schema
 }
 
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation (e.g., '0.5 cores', '1 core')"`
 	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation (e.g., '2 GB', '4 GB')"`
+}
+
+// setServiceIDSchemaProperties sets common service_id schema properties
+func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
+	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
 
 // ServiceShowInput represents input for service_show
@@ -57,11 +86,7 @@ type ServiceShowInput struct {
 
 func (ServiceShowInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
-
-	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
-	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
-
+	setServiceIDSchemaProperties(schema)
 	return schema
 }
 
@@ -79,7 +104,7 @@ type ServiceDetail struct {
 	ServiceID      string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name           string        `json:"name"`
 	Status         string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
-	Type           string        `json:"type" jsonschema:"One of: TIMESCALEDB, POSTGRES, VECTOR"`
+	Type           string        `json:"type"`
 	Region         string        `json:"region"`
 	Created        string        `json:"created,omitempty"`
 	Resources      *ResourceInfo `json:"resources,omitempty"`
@@ -87,6 +112,12 @@ type ServiceDetail struct {
 	DirectEndpoint string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
 	PoolerEndpoint string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
 	Paused         bool          `json:"paused"`
+}
+
+func (ServiceDetail) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	return schema
 }
 
 // ServiceCreateInput represents input for service_create
@@ -130,7 +161,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["free"].Default = util.Must(json.Marshal(false))
 	schema.Properties["free"].Examples = []any{false, true}
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Set to true only if you need to use the service immediately after the tool call."
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false and is recommended because service creation can take a few minutes and it's usually better to return immediately. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
 
@@ -166,9 +197,7 @@ type ServiceUpdatePasswordInput struct {
 func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceUpdatePasswordInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
-	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
+	setServiceIDSchemaProperties(schema)
 
 	schema.Properties["password"].Description = "The new password for the 'tsdbadmin' user. Must be strong and secure."
 	schema.Properties["password"].Examples = []any{"MySecurePassword123!"}
@@ -220,13 +249,13 @@ func (s *Server) registerServiceTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_create",
 		Title: "Create Database Service",
-		Description: "Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.\n" +
-			"\n" +
-			"Default: Returns immediately (service provisions in background).\n" +
-			"wait=true: Blocks until service ready.\n" +
-			"timeout_minutes: Wait duration in minutes (with wait=true).\n" +
-			"\n" +
-			"WARNING: Creates billable resources.",
+		Description: `Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.
+
+Default behavior: Returns immediately while service provisions in background (recommended).
+Setting wait=true will block for a few minutes until ready - only use if user explicitly needs immediate access.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).
+
+WARNING: Creates billable resources.`,
 		InputSchema:  ServiceCreateInput{}.Schema(),
 		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{

@@ -33,7 +33,7 @@ The TigerData MCP tools provide useful database management functionality but hav
 ### `mcp__tigerdata__service_create`
 **Strengths**: Excellent use of enums, clear defaults, good examples
 **✅ IMPLEMENTED**: Renamed `timeout` parameter to `timeout_minutes` for clarity
-**Result**: Parameter name now explicitly indicates units, preventing confusion
+**Result**: Parameter name now explicitly indicates units, preventing confusion.
 
 ### `mcp__tigerdata__service_update_password`
 **Missing**: No password strength requirements documented
