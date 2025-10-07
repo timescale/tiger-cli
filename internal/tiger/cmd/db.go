@@ -330,15 +330,15 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 		return *resp.JSON200, nil
 
 	case 401:
-		return api.Service{}, exitWithCode(ExitAuthenticationError, formatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
+		return api.Service{}, exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
 	case 403:
-		return api.Service{}, exitWithCode(ExitPermissionDenied, formatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to service"))
+		return api.Service{}, exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to service"))
 	case 404:
-		return api.Service{}, exitWithCode(ExitServiceNotFound, formatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
+		return api.Service{}, exitWithCode(ExitServiceNotFound, api.FormatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
 	default:
 		statusCode := resp.StatusCode()
 		if statusCode >= 400 && statusCode < 500 {
-			return api.Service{}, formatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+			return api.Service{}, api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
 		}
 		return api.Service{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}

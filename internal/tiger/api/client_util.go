@@ -95,22 +95,8 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 	// Check the response status
 	switch resp.StatusCode() {
 	case 401, 403:
-		// Try to extract API error message from response body
-		if len(resp.Body) > 0 {
-			var apiErr Error
-			if err := json.Unmarshal(resp.Body, &apiErr); err == nil {
-				if apiErr.Message != nil && *apiErr.Message != "" {
-					return fmt.Errorf("invalid API key: %s", *apiErr.Message)
-				}
-			}
-		}
-		return fmt.Errorf("invalid API key: authentication failed")
+		return FormatAPIErrorFromBody(resp.Body, "invalid API key: authentication failed")
 	case 404:
-		// Try to extract API error message from JSON404 field
-		if resp.JSON404 != nil && resp.JSON404.Message != nil && *resp.JSON404.Message != "" {
-			// But 404 is actually OK for validation - it means the API key is valid but project doesn't exist
-			return nil
-		}
 		// Project not found is OK - it means the API key is valid but project doesn't exist
 		return nil
 	case 200:
@@ -119,17 +105,31 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 	default:
 		statusCode := resp.StatusCode()
 		if statusCode >= 400 && statusCode < 500 {
-			// Try to extract API error message from response body
-			if len(resp.Body) > 0 {
-				var apiErr Error
-				if err := json.Unmarshal(resp.Body, &apiErr); err == nil {
-					if apiErr.Message != nil && *apiErr.Message != "" {
-						return fmt.Errorf("unexpected API response: %s", *apiErr.Message)
-					}
-				}
-			}
-			return fmt.Errorf("unexpected API response: %d", statusCode)
+			return FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("unexpected API response: %d", statusCode))
 		}
 		return fmt.Errorf("unexpected API response: %d", statusCode)
 	}
+}
+
+// FormatAPIError creates an error message from an API error response.
+// If the API error contains a message, it will be used; otherwise the fallback message is returned.
+func FormatAPIError(apiErr *Error, fallback string) error {
+	if apiErr != nil && apiErr.Message != nil && *apiErr.Message != "" {
+		return fmt.Errorf("%s", *apiErr.Message)
+	}
+	return fmt.Errorf("%s", fallback)
+}
+
+// FormatAPIErrorFromBody attempts to parse an API error from a response body.
+// If the body contains a valid API error with a message, it will be used; otherwise the fallback message is returned.
+func FormatAPIErrorFromBody(body []byte, fallback string) error {
+	if len(body) > 0 {
+		var apiErr Error
+		if err := json.Unmarshal(body, &apiErr); err == nil {
+			if apiErr.Message != nil && *apiErr.Message != "" {
+				return fmt.Errorf("%s", *apiErr.Message)
+			}
+		}
+	}
+	return fmt.Errorf("%s", fallback)
 }
