@@ -207,46 +207,38 @@ tiger config reset
 
 All configuration options can be set via `tiger config set <key> <value>`:
 
-- `api_url` - Tiger API endpoint (default: https://console.cloud.timescale.com/public/api/v1)
-- `console_url` - Tiger Console URL (default: https://console.cloud.timescale.com)
-- `gateway_url` - Tiger Gateway URL (default: https://console.cloud.timescale.com/api)
-- `docs_mcp_url` - Docs MCP server URL (default: https://mcp.tigerdata.com/docs)
-- `docs_mcp` - Enable/disable the proxied docs MCP tools (default: true)
-- `project_id` - Default project ID for operations (set via `tiger auth login`)
-- `service_id` - Default service ID for database operations
-- `output` - Output format: `json`, `yaml`, or `table` (default: table)
-- `analytics` - Enable/disable usage analytics (default: true)
-- `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: keyring)
-- `debug` - Enable/disable debug logging (default: false)
+- `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
+- `project_id` - Default project ID (set via `tiger auth login`)
+- `service_id` - Default service ID
+- `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
+- `analytics` - Enable/disable analytics (default: `true`)
+- `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
+- `debug` - Enable/disable debug logging (default: `false`)
 
 ### Environment Variables
 
 Environment variables override configuration file values. All variables use the `TIGER_` prefix:
 
-- `TIGER_CONFIG_DIR` - Path to configuration directory (default: ~/.config/tiger)
-- `TIGER_API_URL` - Tiger API endpoint
-- `TIGER_CONSOLE_URL` - Tiger Console URL
-- `TIGER_GATEWAY_URL` - Tiger Gateway URL
-- `TIGER_DOCS_MCP_URL` - Docs MCP server URL
+- `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_PROJECT_ID` - Default project ID
 - `TIGER_SERVICE_ID` - Default service ID
-- `TIGER_OUTPUT` - Output format (json, yaml, table)
-- `TIGER_ANALYTICS` - Enable/disable analytics (true/false)
-- `TIGER_PASSWORD_STORAGE` - Password storage method (keyring, pgpass, none)
-- `TIGER_DEBUG` - Enable/disable debug logging (true/false)
+- `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
+- `TIGER_ANALYTICS` - Enable/disable analytics
+- `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_DEBUG` - Enable/disable debug logging
 
 ### Global Flags
 
 These flags are available on all commands and take precedence over both environment variables and configuration file values:
 
-- `--config-dir <path>` - Path to configuration directory (default: ~/.config/tiger)
+- `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--project-id <id>` - Specify project ID
 - `--service-id <id>` - Specify service ID
-- `-o, --output <format>` - Set output format (json, yaml, table)
-- `--analytics` - Toggle analytics collection
-- `--password-storage <method>` - Password storage method (keyring, pgpass, none)
-- `--debug` - Enable debug logging
+- `-o, --output <format>` - Output format: `json`, `yaml`, or `table`
+- `--analytics` - Enable/disable analytics
+- `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
+- `--debug` - Enable/disable debug logging
 - `-h, --help` - Show help information
 
 ## Contributing
