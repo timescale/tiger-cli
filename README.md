@@ -110,7 +110,7 @@ Tiger CLI includes a Model Context Protocol (MCP) server that enables AI assista
 
 ### Installation
 
-Configure the MCP server for your AI assistant with one command:
+Configure the MCP server for your AI assistant:
 
 ```bash
 # Interactive installation (prompts for client selection)
