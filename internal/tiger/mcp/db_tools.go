@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -146,13 +147,17 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 			return nil, DBExecuteQueryOutput{}, fmt.Errorf("empty response from API")
 		}
 	case 401:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("authentication failed: invalid API key")
+		return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, "authentication failed: invalid API key")
 	case 403:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("permission denied: insufficient access to service")
+		return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, "permission denied: insufficient access to service")
 	case 404:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
+		return nil, DBExecuteQueryOutput{}, api.FormatAPIError(serviceResp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID))
 	default:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("API request failed with status %d", serviceResp.StatusCode())
+		statusCode := serviceResp.StatusCode()
+		if statusCode >= 400 && statusCode < 500 {
+			return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
+		}
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
 	}
 
 	service := *serviceResp.JSON200
