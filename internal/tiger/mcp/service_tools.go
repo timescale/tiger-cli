@@ -17,80 +17,120 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// ServiceListInput represents input for tiger_service_list
+// Service type constants matching OpenAPI spec (uppercase)
+const (
+	serviceTypeTimescaleDB = "TIMESCALEDB"
+	serviceTypePostgres    = "POSTGRES"
+	serviceTypeVector      = "VECTOR"
+)
+
+// validServiceTypes returns a slice of all valid service type values
+func validServiceTypes() []string {
+	return []string{
+		serviceTypeTimescaleDB,
+		serviceTypePostgres,
+		serviceTypeVector,
+	}
+}
+
+// ServiceListInput represents input for service_list
 type ServiceListInput struct{}
 
 func (ServiceListInput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceListInput](nil))
 }
 
-// ServiceListOutput represents output for tiger_service_list
+// ServiceListOutput represents output for service_list
 type ServiceListOutput struct {
 	Services []ServiceInfo `json:"services"`
 }
 
+func (ServiceListOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceListOutput](nil))
+}
+
 // ServiceInfo represents simplified service information for MCP output
 type ServiceInfo struct {
-	ServiceID string        `json:"id"`
+	ServiceID string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name      string        `json:"name"`
-	Status    string        `json:"status"`
+	Status    string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
 	Type      string        `json:"type"`
 	Region    string        `json:"region"`
 	Created   string        `json:"created,omitempty"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
 }
 
-// ResourceInfo represents resource allocation information
-type ResourceInfo struct {
-	CPU    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
+func (ServiceInfo) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceInfo](nil))
+	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	return schema
 }
 
-// ServiceShowInput represents input for tiger_service_show
+// ResourceInfo represents resource allocation information
+type ResourceInfo struct {
+	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation (e.g., '0.5 cores', '1 core')"`
+	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation (e.g., '2 GB', '4 GB')"`
+}
+
+// setServiceIDSchemaProperties sets common service_id schema properties
+func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
+	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
+}
+
+// ServiceShowInput represents input for service_show
 type ServiceShowInput struct {
 	ServiceID string `json:"service_id"`
 }
 
 func (ServiceShowInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
-
-	schema.Properties["service_id"].Description = "The unique identifier of the service to show details for. Use tiger_service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
-
+	setServiceIDSchemaProperties(schema)
 	return schema
 }
 
-// ServiceShowOutput represents output for tiger_service_show
+// ServiceShowOutput represents output for service_show
 type ServiceShowOutput struct {
 	Service ServiceDetail `json:"service"`
 }
 
+func (ServiceShowOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceShowOutput](nil))
+}
+
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
-	ServiceID      string        `json:"id"`
+	ServiceID      string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name           string        `json:"name"`
-	Status         string        `json:"status"`
+	Status         string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
 	Type           string        `json:"type"`
 	Region         string        `json:"region"`
 	Created        string        `json:"created,omitempty"`
 	Resources      *ResourceInfo `json:"resources,omitempty"`
-	Replicas       int           `json:"replicas,omitempty"`
-	DirectEndpoint string        `json:"direct_endpoint,omitempty"`
-	PoolerEndpoint string        `json:"pooler_endpoint,omitempty"`
+	Replicas       int           `json:"replicas,omitempty" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
+	DirectEndpoint string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
+	PoolerEndpoint string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
 	Paused         bool          `json:"paused"`
 }
 
-// ServiceCreateInput represents input for tiger_service_create
+func (ServiceDetail) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	return schema
+}
+
+// ServiceCreateInput represents input for service_create
 type ServiceCreateInput struct {
-	Name       string   `json:"name,omitempty"`
-	Addons     []string `json:"addons,omitempty"`
-	Region     string   `json:"region,omitempty"`
-	CPUMemory  string   `json:"cpu_memory,omitempty"`
-	Replicas   int      `json:"replicas,omitempty"`
-	Free       bool     `json:"free,omitempty"`
-	Wait       bool     `json:"wait,omitempty"`
-	Timeout    int      `json:"timeout,omitempty"`
-	SetDefault bool     `json:"set_default,omitempty"`
+	Name           string   `json:"name,omitempty"`
+	Addons         []string `json:"addons,omitempty"`
+	Region         string   `json:"region,omitempty"`
+	CPUMemory      string   `json:"cpu_memory,omitempty"`
+	Replicas       int      `json:"replicas,omitempty"`
+	Free           bool     `json:"free,omitempty"`
+	Wait           bool     `json:"wait,omitempty"`
+	TimeoutMinutes *int     `json:"timeout_minutes,omitempty"`
+	SetDefault     bool     `json:"set_default,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -121,14 +161,14 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["free"].Default = util.Must(json.Marshal(false))
 	schema.Properties["free"].Examples = []any{false, true}
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Set to true only if you need to use the service immediately after the tool call."
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false and is recommended because service creation can take a few minutes and it's usually better to return immediately. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
 
-	schema.Properties["timeout"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
-	schema.Properties["timeout"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout"].Default = util.Must(json.Marshal(30))
-	schema.Properties["timeout"].Examples = []any{15, 30, 60}
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(30))
+	schema.Properties["timeout_minutes"].Examples = []any{15, 30, 60}
 
 	schema.Properties["set_default"].Description = "Whether to set the newly created service as the default service. When true, the service will be set as the default for future commands."
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
@@ -137,14 +177,18 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-// ServiceCreateOutput represents output for tiger_service_create
+// ServiceCreateOutput represents output for service_create
 type ServiceCreateOutput struct {
 	Service         ServiceDetail                   `json:"service"`
 	Message         string                          `json:"message"`
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-// ServiceUpdatePasswordInput represents input for tiger_service_update_password
+func (ServiceCreateOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
+}
+
+// ServiceUpdatePasswordInput represents input for service_update_password
 type ServiceUpdatePasswordInput struct {
 	ServiceID string `json:"service_id"`
 	Password  string `json:"password"`
@@ -153,8 +197,7 @@ type ServiceUpdatePasswordInput struct {
 func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceUpdatePasswordInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service to update the password for. Use tiger_service_list to find service IDs."
-	schema.Properties["service_id"].Examples = []any{"fgg3zcsxw4"}
+	setServiceIDSchemaProperties(schema)
 
 	schema.Properties["password"].Description = "The new password for the 'tsdbadmin' user. Must be strong and secure."
 	schema.Properties["password"].Examples = []any{"MySecurePassword123!"}
@@ -162,72 +205,59 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-// ServiceUpdatePasswordOutput represents output for tiger_service_update_password
+// ServiceUpdatePasswordOutput represents output for service_update_password
 type ServiceUpdatePasswordOutput struct {
 	Message         string                          `json:"message"`
 	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
+func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools() {
-	// tiger_service_list
+	// service_list
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_list",
+		Name:  "service_list",
 		Title: "List Database Services",
-		Description: `List all database services in your current TigerData project.
-
-This tool retrieves a complete list of database services with their basic information including status, type, region, and resource allocation. Use this to get an overview of all your services before performing operations on specific services.
-
-Perfect for:
-- Getting an overview of your database infrastructure
-- Finding service IDs for other operations
-- Checking service status and resource allocation
-- Discovering services across different regions`,
-		InputSchema: ServiceListInput{}.Schema(),
+		Description: "List all database services in current TigerData project. " +
+			"Returns services with status, type, region, and resource allocation.",
+		InputSchema:  ServiceListInput{}.Schema(),
+		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
 			Title:        "List Database Services",
 		},
 	}, s.handleServiceList)
 
-	// tiger_service_show
+	// service_show
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_show",
+		Name:  "service_show",
 		Title: "Show Service Details",
-		Description: `Show detailed information about a specific database service.
-
-This tool provides comprehensive information about a service including connection endpoints, replica configuration, resource allocation, creation time, and current operational status. Essential for debugging, monitoring, and connection management.
-
-Perfect for:
-- Getting connection endpoints (direct and pooled)
-- Checking detailed service configuration
-- Monitoring service health and status
-- Obtaining service specifications for scaling decisions`,
-		InputSchema: ServiceShowInput{}.Schema(),
+		Description: "Get detailed information for a specific database service. " +
+			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
+		InputSchema:  ServiceShowInput{}.Schema(),
+		OutputSchema: ServiceShowOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
 			Title:        "Show Service Details",
 		},
 	}, s.handleServiceShow)
 
-	// tiger_service_create
+	// service_create
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_create",
+		Name:  "service_create",
 		Title: "Create Database Service",
-		Description: `Create a new database service in TigerData Cloud.
+		Description: `Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.
 
-This tool provisions a new database service with specified configuration including service type, compute resources, region, and high availability options. By default, the tool returns immediately after the creation request is accepted, but the service may still be provisioning and not ready for connections yet.
+Default behavior: Returns immediately while service provisions in background (recommended).
+Setting wait=true will block for a few minutes until ready - only use if user explicitly needs immediate access.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).
 
-Only set 'wait: true' if you need the service to be fully ready immediately after the tool call returns. In most cases, leave wait as false (default) for faster responses.
-
-IMPORTANT: This operation incurs costs and creates billable resources. Always confirm requirements before proceeding.
-
-Perfect for:
-- Setting up new database infrastructure
-- Creating development or production environments
-- Provisioning databases with specific resource requirements
-- Establishing services in different geographical regions`,
-		InputSchema: ServiceCreateInput{}.Schema(),
+WARNING: Creates billable resources.`,
+		InputSchema:  ServiceCreateInput{}.Schema(),
+		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,           // Creating with same name would fail
@@ -235,22 +265,14 @@ Perfect for:
 		},
 	}, s.handleServiceCreate)
 
-	// tiger_service_update_password
+	// service_update_password
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "tiger_service_update_password",
+		Name:  "service_update_password",
 		Title: "Update Service Password",
-		Description: `Update the master password for the 'tsdbadmin' user of a database service.
-
-This tool changes the master database password used for the default administrative user. The new password will be required for all future database connections. Existing connections may be terminated.
-
-SECURITY NOTE: Ensure new passwords are strong and stored securely. Password changes take effect immediately.
-
-Perfect for:
-- Password rotation for security compliance
-- Recovering from compromised credentials
-- Setting initial passwords for new services
-- Meeting organizational security policies`,
-		InputSchema: ServiceUpdatePasswordInput{}.Schema(),
+		Description: "Update master password for 'tsdbadmin' user of a database service. " +
+			"Takes effect immediately. May terminate existing connections.",
+		InputSchema:  ServiceUpdatePasswordInput{}.Schema(),
+		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(true), // Modifies authentication credentials
 			IdempotentHint:  true,           // Same password can be set multiple times
@@ -259,7 +281,7 @@ Perfect for:
 	}, s.handleServiceUpdatePassword)
 }
 
-// handleServiceList handles the tiger_service_list MCP tool
+// handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -311,7 +333,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 }
 
-// handleServiceShow handles the tiger_service_show MCP tool
+// handleServiceShow handles the service_show MCP tool
 func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest, input ServiceShowInput) (*mcp.CallToolResult, ServiceShowOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -363,7 +385,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 	}
 }
 
-// handleServiceCreate handles the tiger_service_create MCP tool
+// handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
@@ -514,7 +536,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 		// If wait is explicitly requested, wait for service to be ready
 		if input.Wait {
-			timeout := time.Duration(input.Timeout) * time.Minute
+			timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
 
 			output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
 			if err != nil {
@@ -536,7 +558,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 }
 
-// handleServiceUpdatePassword handles the tiger_service_update_password MCP tool
+// handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
