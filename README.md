@@ -48,7 +48,7 @@ go install github.com/timescale/tiger-cli/cmd/tiger@latest
 
 ## Quick Start
 
-After installing Tiger CLI, authenticate with your Tiger account:
+After installing Tiger CLI, authenticate with your Tiger Cloud account:
 
 ```bash
 # Login to your Tiger account
