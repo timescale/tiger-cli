@@ -170,7 +170,7 @@ The MCP server automatically uses your CLI authentication and configuration, so 
 
 #### Proxied Tools
 
-In addition to the service management tools listed above, the Tiger MCP server also proxies tools from a remote documentation MCP server. This feature provides AI assistants with semantic search capabilities for PostgreSQL, TimescaleDB, and Tiger documentation, as well as prompts/guides for various Tiger features.
+In addition to the service management tools listed above, the Tiger MCP server also proxies tools from a remote documentation MCP server. This feature provides AI assistants with semantic search capabilities for PostgreSQL, TimescaleDB, and Tiger Cloud documentation, as well as prompts/guides for various Tiger Cloud features.
 
 The proxied documentation server ([tiger-docs-mcp-server](https://github.com/timescale/tiger-docs-mcp-server)) currently provides the following tools:
 - `get_guide` - Retrieve comprehensive guides for TimescaleDB features and best practices
