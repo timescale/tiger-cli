@@ -152,16 +152,6 @@ go generate ./internal/tiger/api
 # - mocks/mock_client.go: Mock implementations for testing
 ```
 
-## Dependencies
-
-- **Cobra**: CLI framework and command structure
-- **Viper**: Configuration management with multiple sources
-- **Zap**: Structured logging
-- **oapi-codegen**: OpenAPI client generation (build-time dependency)
-- **gomock**: Mock generation for testing (build-time dependency)
-- **go-sdk (MCP)**: Model Context Protocol SDK
-- **Go 1.25+**: Required Go version
-
 ## Development Best Practices
 
 1. **Always use go fmt** after making file changes and before committing
