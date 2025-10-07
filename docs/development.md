@@ -150,7 +150,7 @@ The CLI uses a layered configuration approach (listed from lowest to highest pre
 
 Two-mode logging system using zap:
 - **Production mode**: Minimal output, warn level and above, clean formatting
-- **Debug mode**: Full development logging with colors and debug level
+- **Debug mode**: Full development logging with colors and debug level. Enable with `--debug` or `TIGER_DEBUG=true`.
 
 ## Code Generation
 
