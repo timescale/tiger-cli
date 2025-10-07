@@ -106,7 +106,7 @@ Use `tiger <command> --help` for detailed information about each command.
 
 ## MCP Server
 
-Tiger CLI includes a Model Context Protocol (MCP) server that enables AI assistants like Claude Code to interact with your Tiger infrastructure. The MCP server provides programmatic access to database services and operations.
+Tiger CLI includes a Model Context Protocol (MCP) server that enables AI assistants like Claude Code to interact with your Tiger Cloud infrastructure. The MCP server provides programmatic access to database services and operations.
 
 ### Installation
 
