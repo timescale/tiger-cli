@@ -824,6 +824,9 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc := OutputService{
 		Service: service,
 	}
+	if withPassword {
+		outputSvc.Password = outputSvc.InitialPassword
+	}
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
@@ -844,13 +847,13 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		if connectionDetails.Password != "" {
 			outputSvc.Password = &connectionDetails.Password
 		}
-	} else {
+	} else if output != nil {
 		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 	}
 	connectionString, err := password.BuildConnectionString(service, opts)
 	if err == nil {
 		outputSvc.ConnectionString = &connectionString
-	} else {
+	} else if output != nil {
 		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection string: %v\n", err)
 	}
 
