@@ -128,7 +128,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
 
 ### Configuration System
 
-The CLI uses a layered configuration approach:
+The CLI uses a layered configuration approach (listed from lowest to highest precedence):
 1. Default values in code
 2. Configuration file at `~/.config/tiger/config.yaml`
 3. Environment variables with `TIGER_` prefix
