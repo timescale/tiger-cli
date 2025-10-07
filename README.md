@@ -166,6 +166,9 @@ The MCP server exposes the following tools to AI assistants:
 - `service_create` - Create new database services with configurable resources
 - `service_update_password` - Update the master password for a service
 
+**Database Operations:**
+- `db_execute_query` - Execute SQL queries against a database service with support for parameterized queries, custom timeouts, and connection pooling
+
 The MCP server automatically uses your CLI authentication and configuration, so no additional setup is required beyond `tiger auth login`.
 
 #### Proxied Tools
