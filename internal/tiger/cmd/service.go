@@ -1105,7 +1105,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkWaitTimeout time.Duration
 	var forkNow bool
 	var forkLastSnapshot bool
-	var forkToTimestamp string
+	var forkToTimestamp time.Time
 	var forkCPU int
 	var forkMemory int
 	var forkWithPassword bool
@@ -1151,6 +1151,7 @@ Examples:
 
   # Fork with custom wait timeout
   tiger service fork svc-12345 --now --wait-timeout 45m`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -1160,7 +1161,8 @@ Examples:
 			if forkLastSnapshot {
 				timingFlagsSet++
 			}
-			if forkToTimestamp != "" {
+			toTimestampSet := cmd.Flags().Changed("to-timestamp")
+			if toTimestampSet {
 				timingFlagsSet++
 			}
 
@@ -1169,14 +1171,6 @@ Examples:
 			}
 			if timingFlagsSet > 1 {
 				return fmt.Errorf("can only specify one of --now, --last-snapshot or --to-timestamp")
-			}
-
-			// Validate timestamp format early if --to-timestamp is used
-			if forkToTimestamp != "" {
-				_, err := time.Parse(time.RFC3339, forkToTimestamp)
-				if err != nil {
-					return fmt.Errorf("invalid timestamp format '%s'. Use RFC3339 format (e.g., 2025-01-15T10:30:00Z): %w", forkToTimestamp, err)
-				}
 			}
 
 			// Get config
@@ -1246,9 +1240,9 @@ Examples:
 				forkStrategy = api.NOW
 			} else if forkLastSnapshot {
 				forkStrategy = api.LASTSNAPSHOT
-			} else if forkToTimestamp != "" {
+			} else if toTimestampSet {
 				forkStrategy = api.PITR
-				parsedTime, _ := time.Parse(time.RFC3339, forkToTimestamp) // Already validated above
+				parsedTime := forkToTimestamp
 				targetTime = &parsedTime
 			}
 
@@ -1370,7 +1364,7 @@ Examples:
 	// Timing strategy flags
 	cmd.Flags().BoolVar(&forkNow, "now", false, "Fork at the current database state (creates new snapshot or uses WAL replay)")
 	cmd.Flags().BoolVar(&forkLastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
-	cmd.Flags().StringVar(&forkToTimestamp, "to-timestamp", "", "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
+	cmd.Flags().TimeVar(&forkToTimestamp, "to-timestamp", time.Time{}, []string{time.RFC3339}, "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
 
 	// Resource customization flags
 	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
