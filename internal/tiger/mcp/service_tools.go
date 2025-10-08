@@ -526,20 +526,17 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 
 		// Include password in ServiceDetail if requested
-		if input.WithPassword && service.InitialPassword != nil {
-			output.Service.Password = *service.InitialPassword
+		if input.WithPassword {
+			output.Service.Password = util.Deref(service.InitialPassword)
 		}
 
 		// Always include connection string in ServiceDetail
 		// Password is embedded in connection string only if with_password=true
-		passwordMode := password.PasswordExclude
-		if input.WithPassword {
-			passwordMode = password.PasswordRequired
-		}
 		if connectionString, err := password.BuildConnectionString(api.Service(service), password.ConnectionStringOptions{
-			Pooled:       false,
-			Role:         "tsdbadmin",
-			PasswordMode: passwordMode,
+			Pooled:          false,
+			Role:            "tsdbadmin",
+			PasswordMode:    password.GetPasswordMode(input.WithPassword),
+			InitialPassword: util.Deref(service.InitialPassword),
 		}); err != nil {
 			logging.Debug("MCP: Failed to build connection string", zap.Error(err))
 		} else {

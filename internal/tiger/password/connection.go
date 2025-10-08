@@ -24,6 +24,16 @@ const (
 	PasswordOptional
 )
 
+// GetPasswordMode is a helper function for getting a [PasswordMode] from a
+// boolean. It only ever returns [PasswordRequired]/[PasswordExcluded]. If you
+// need [PasswordOptional], do not use this function.
+func GetPasswordMode(required bool) PasswordMode {
+	if required {
+		return PasswordRequired
+	}
+	return PasswordExclude
+}
+
 // ConnectionStringOptions configures how the connection string is built
 type ConnectionStringOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
@@ -34,6 +44,11 @@ type ConnectionStringOptions struct {
 
 	// PasswordMode determines how passwords are handled
 	PasswordMode PasswordMode
+
+	// InitialPassword is an optional password to use directly (e.g., from service creation response)
+	// If provided and PasswordMode is PasswordRequired or PasswordOptional, this password will be used
+	// instead of fetching from password storage. This is useful when password_storage=none.
+	InitialPassword string
 
 	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
 	// If nil, warnings are suppressed
@@ -74,11 +89,8 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 		return "", fmt.Errorf("service endpoint not available")
 	}
 
-	var endpoint *api.Endpoint
-	var host string
-	var port int
-
 	// Use pooler endpoint if requested and available, otherwise use direct endpoint
+	var endpoint *api.Endpoint
 	if opts.Pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
 		endpoint = service.ConnectionPooler.Endpoint
 	} else {
@@ -92,65 +104,78 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 	if endpoint.Host == nil {
 		return "", fmt.Errorf("endpoint host not available")
 	}
-	host = *endpoint.Host
+	host := *endpoint.Host
 
+	port := 5432 // Default PostgreSQL port
 	if endpoint.Port != nil {
 		port = *endpoint.Port
-	} else {
-		port = 5432 // Default PostgreSQL port
 	}
 
 	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
 	database := "tsdb"
 
 	// Build connection string in PostgreSQL URI format
-	var connectionString string
-
 	switch opts.PasswordMode {
 	case PasswordRequired:
-		// Password is required - error if unavailable
-		storage := GetPasswordStorage()
-		password, err := storage.Get(service)
-		if err != nil {
-			// Provide specific error messages based on storage type
-			switch storage.(type) {
-			case *NoStorage:
-				return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-			case *KeyringStorage:
-				return "", fmt.Errorf("no password found in keyring for this service")
-			case *PgpassStorage:
-				return "", fmt.Errorf("no password found in ~/.pgpass for this service")
-			default:
-				return "", fmt.Errorf("failed to retrieve password: %w", err)
+		// Password is required - use InitialPassword if provided, otherwise fetch from storage
+		var password string
+		if opts.InitialPassword != "" {
+			password = opts.InitialPassword
+		} else {
+			var err error
+			if password, err = GetPassword(service); err != nil {
+				return "", err
 			}
 		}
 
-		if password == "" {
-			return "", fmt.Errorf("no password available for service")
+		// Include password in connection string
+		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
+	case PasswordOptional:
+		// Try to include password - use InitialPassword if provided, otherwise try fetching from storage
+		var password string
+		if opts.InitialPassword != "" {
+			password = opts.InitialPassword
+		} else {
+			password, _ = GetPassword(service) // Ignore error for optional mode
 		}
 
-		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
-
-	case PasswordOptional:
-		// Try to include password, but don't error if unavailable
-		storage := GetPasswordStorage()
-		password, err := storage.Get(service)
-
-		// Only include password if we successfully retrieved it
-		if err == nil && password != "" {
-			connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database)
+		// Only include password if we have one
+		if password != "" {
+			return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
 		} else {
 			// Fall back to connection string without password
-			connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database)
+			return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
 		}
-
 	default: // PasswordExclude
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
 		// This ensures credentials are never visible in process arguments
-		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database)
+		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
+	}
+}
+
+// GetPassword fetches the password for the specified service from the
+// configured password storage mechanism. It returns an error if it fails to
+// find the password.
+func GetPassword(service api.Service) (string, error) {
+	storage := GetPasswordStorage()
+	password, err := storage.Get(service)
+	if err != nil {
+		// Provide specific error messages based on storage type
+		switch storage.(type) {
+		case *NoStorage:
+			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
+		case *KeyringStorage:
+			return "", fmt.Errorf("no password found in keyring for this service")
+		case *PgpassStorage:
+			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+		default:
+			return "", fmt.Errorf("failed to retrieve password: %w", err)
+		}
 	}
 
-	return connectionString, nil
+	if password == "" {
+		return "", fmt.Errorf("no password available for service")
+	}
+	return password, nil
 }
