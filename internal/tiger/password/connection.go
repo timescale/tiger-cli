@@ -157,19 +157,14 @@ func BuildConnectionString(service api.Service, opts ConnectionDetailsOptions) (
 		return "", err
 	}
 
-	// Build connection string in PostgreSQL URI format
-	var connectionString string
-
 	switch details.Password {
 	case "":
 		// Build connection string without password (default behavior)
 		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
 		// This ensures credentials are never visible in process arguments
-		connectionString = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, details.Host, details.Port, details.Database)
+		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, details.Host, details.Port, details.Database), nil
 	default:
 		// Include password in connection string
-		connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, details.Password, details.Host, details.Port, details.Database)
+		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, details.Password, details.Host, details.Port, details.Database), nil
 	}
-
-	return connectionString, nil
 }
