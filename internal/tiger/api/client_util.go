@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -115,9 +116,9 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 // If the API error contains a message, it will be used; otherwise the fallback message is returned.
 func FormatAPIError(apiErr *Error, fallback string) error {
 	if apiErr != nil && apiErr.Message != nil && *apiErr.Message != "" {
-		return fmt.Errorf("%s", *apiErr.Message)
+		return errors.New(*apiErr.Message)
 	}
-	return fmt.Errorf("%s", fallback)
+	return errors.New(fallback)
 }
 
 // FormatAPIErrorFromBody attempts to parse an API error from a response body.
