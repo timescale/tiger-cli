@@ -128,9 +128,9 @@ func FormatAPIErrorFromBody(body []byte, fallback string) error {
 		var apiErr Error
 		if err := json.Unmarshal(body, &apiErr); err == nil {
 			if apiErr.Message != nil && *apiErr.Message != "" {
-				return fmt.Errorf("%s", *apiErr.Message)
+				return errors.New(*apiErr.Message)
 			}
 		}
 	}
-	return fmt.Errorf("%s", fallback)
+	return errors.New(fallback)
 }
