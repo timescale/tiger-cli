@@ -7,33 +7,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
 
-// PasswordMode determines how passwords are handled in connection strings
-type PasswordMode int
-
-const (
-	// PasswordExclude means don't include password in connection string (default)
-	// Connection will rely on PGPASSWORD env var or ~/.pgpass file
-	PasswordExclude PasswordMode = iota
-
-	// PasswordRequired means include password in connection string, return error if unavailable
-	// Used when user explicitly requests --with-password flag
-	PasswordRequired
-
-	// PasswordOptional means include password if available, but don't error if unavailable
-	// Used for connection testing and psql launching where we want best-effort password inclusion
-	PasswordOptional
-)
-
-// GetPasswordMode is a helper function for getting a [PasswordMode] from a
-// boolean. It only ever returns [PasswordRequired]/[PasswordExcluded]. If you
-// need [PasswordOptional], do not use this function.
-func GetPasswordMode(required bool) PasswordMode {
-	if required {
-		return PasswordRequired
-	}
-	return PasswordExclude
-}
-
 // ConnectionStringOptions configures how the connection string is built
 type ConnectionStringOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
@@ -42,16 +15,18 @@ type ConnectionStringOptions struct {
 	// Role is the database role/username to use (e.g., "tsdbadmin")
 	Role string
 
-	// PasswordMode determines how passwords are handled
-	PasswordMode PasswordMode
+	// WithPassword determines whether to include the password in the connection string.
+	// When true, the password will be embedded if available (from InitialPassword or storage).
+	// When false, the password is never included (connection relies on PGPASSWORD env var or ~/.pgpass).
+	WithPassword bool
 
-	// InitialPassword is an optional password to use directly (e.g., from service creation response)
-	// If provided and PasswordMode is PasswordRequired or PasswordOptional, this password will be used
-	// instead of fetching from password storage. This is useful when password_storage=none.
+	// InitialPassword is an optional password to use directly (e.g., from service creation response).
+	// If provided and WithPassword is true, this password will be used instead of fetching from password
+	// storage. This is useful when password_storage=none.
 	InitialPassword string
 
-	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
-	// If nil, warnings are suppressed
+	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available,
+	// or when password is requested but not found). If nil, warnings are suppressed.
 	WarnWriter io.Writer
 }
 
@@ -114,44 +89,29 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
 	database := "tsdb"
 
-	// Build connection string in PostgreSQL URI format
-	switch opts.PasswordMode {
-	case PasswordRequired:
-		// Password is required - use InitialPassword if provided, otherwise fetch from storage
-		var password string
+	// WithPassword is true - try to include password if available
+	var password string
+	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			password = opts.InitialPassword
 		} else {
+			// Try fetching from storage, but don't fail if unavailable
 			var err error
-			if password, err = GetPassword(service); err != nil {
-				return "", err
+			password, err = GetPassword(service)
+			if err != nil && opts.WarnWriter != nil {
+				// Password was requested but not found - issue warning if WarnWriter is provided
+				fmt.Fprintf(opts.WarnWriter, "⚠️  Warning: Password was requested but could not be found: %s", err)
 			}
 		}
-
-		// Include password in connection string
-		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
-	case PasswordOptional:
-		// Try to include password - use InitialPassword if provided, otherwise try fetching from storage
-		var password string
-		if opts.InitialPassword != "" {
-			password = opts.InitialPassword
-		} else {
-			password, _ = GetPassword(service) // Ignore error for optional mode
-		}
-
-		// Only include password if we have one
-		if password != "" {
-			return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
-		} else {
-			// Fall back to connection string without password
-			return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
-		}
-	default: // PasswordExclude
-		// Build connection string without password (default behavior)
-		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-		// This ensures credentials are never visible in process arguments
-		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
 	}
+
+	// Include password in connection string if we have one
+	if password != "" {
+		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
+	}
+
+	// Fall back to connection string without password
+	return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
 }
 
 // GetPassword fetches the password for the specified service from the

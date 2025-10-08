@@ -801,7 +801,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 		Pooled:          false,
 		Role:            "tsdbadmin",
-		PasswordMode:    password.GetPasswordMode(withPassword),
+		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 		WarnWriter:      output,
 	}); err == nil {

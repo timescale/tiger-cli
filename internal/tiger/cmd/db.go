@@ -63,7 +63,7 @@ Examples:
 			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
+				WithPassword: dbConnectionStringWithPassword,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -140,7 +140,7 @@ Examples:
 			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
-				PasswordMode: password.PasswordExclude,
+				WithPassword: false, // psql will use PGPASSWORD env var
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -204,7 +204,7 @@ Examples:
 			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				PasswordMode: password.PasswordOptional,
+				WithPassword: true,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {

@@ -33,7 +33,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -49,7 +49,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "readonly",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -65,7 +65,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -87,7 +87,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
 			expectError:    false,
@@ -104,7 +104,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 				WarnWriter:   new(bytes.Buffer), // Enable warnings
 			},
 			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
@@ -119,7 +119,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectError: true,
 		},
@@ -134,7 +134,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionStringOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectError: true,
 		},
@@ -222,7 +222,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
 	if err != nil {
@@ -274,7 +274,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
 	if err != nil {
@@ -313,21 +313,30 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 		},
 	}
 
-	// Call BuildConnectionString with withPassword=true - should fail
-	_, err := BuildConnectionString(service, ConnectionStringOptions{
+	// Create a buffer to capture warnings
+	warnBuf := new(bytes.Buffer)
+
+	// Call BuildConnectionString with WithPassword=true - should return connection string without password and issue warning
+	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
+		WarnWriter:   warnBuf,
 	})
 
-	if err == nil {
-		t.Fatal("Expected error when password storage is disabled, but got none")
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
 	}
 
-	// Verify we get the expected error message
-	expectedError := "password storage is disabled (--password-storage=none)"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	// Verify we get a connection string WITHOUT password
+	expectedResult := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
+	if result != expectedResult {
+		t.Errorf("Expected '%s', got '%s'", expectedResult, result)
+	}
+
+	// Verify warning was issued
+	if !strings.Contains(warnBuf.String(), "Warning") || !strings.Contains(warnBuf.String(), "password") {
+		t.Errorf("Expected warning about password not found, but got: %s", warnBuf.String())
 	}
 }
 
@@ -354,21 +363,30 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 		},
 	}
 
-	// Call BuildConnectionString with withPassword=true - should fail
-	_, err := BuildConnectionString(service, ConnectionStringOptions{
+	// Create a buffer to capture warnings
+	warnBuf := new(bytes.Buffer)
+
+	// Call BuildConnectionString with WithPassword=true - should return connection string without password and issue warning
+	result, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
+		WarnWriter:   warnBuf,
 	})
 
-	if err == nil {
-		t.Fatal("Expected error when no password is available, but got none")
+	if err != nil {
+		t.Fatalf("Expected no error, but got: %v", err)
 	}
 
-	// Verify we get the expected error message
-	expectedError := "no password found in keyring for this service"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	// Verify we get a connection string WITHOUT password
+	expectedResult := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
+	if result != expectedResult {
+		t.Errorf("Expected '%s', got '%s'", expectedResult, result)
+	}
+
+	// Verify warning was issued
+	if !strings.Contains(warnBuf.String(), "Warning") || !strings.Contains(warnBuf.String(), "password") {
+		t.Errorf("Expected warning about password not found, but got: %s", warnBuf.String())
 	}
 }
 
@@ -394,7 +412,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	_, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
 	if err == nil {
@@ -425,7 +443,7 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 	connectionString, err := BuildConnectionString(service, ConnectionStringOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordExclude,
+		WithPassword: false,
 		WarnWriter:   warnBuf,
 	})
 

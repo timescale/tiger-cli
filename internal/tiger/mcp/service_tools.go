@@ -402,7 +402,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 		if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 			Pooled:       false,
 			Role:         "tsdbadmin",
-			PasswordMode: password.GetPasswordMode(input.WithPassword),
+			WithPassword: input.WithPassword,
 		}); err != nil {
 			logging.Debug("MCP: Failed to build connection string", zap.Error(err))
 		} else {
@@ -565,7 +565,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		if connectionString, err := password.BuildConnectionString(api.Service(service), password.ConnectionStringOptions{
 			Pooled:          false,
 			Role:            "tsdbadmin",
-			PasswordMode:    password.GetPasswordMode(input.WithPassword),
+			WithPassword:    input.WithPassword,
 			InitialPassword: util.Deref(service.InitialPassword),
 		}); err != nil {
 			logging.Debug("MCP: Failed to build connection string", zap.Error(err))

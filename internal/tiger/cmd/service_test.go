@@ -15,6 +15,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
 )
 
 func setupServiceTest(t *testing.T) string {
@@ -839,73 +840,201 @@ func TestOutputService_Table(t *testing.T) {
 	}
 }
 
-func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
-	// Create a service with sensitive data
-	serviceID := "svc-12345"
-	serviceName := "test-service"
-	initialPassword := "secret-password-123"
-
-	service := api.Service{
-		ServiceId:       &serviceID,
-		Name:            &serviceName,
-		InitialPassword: &initialPassword,
+func TestPrepareServiceForOutput(t *testing.T) {
+	tests := []struct {
+		name               string
+		withPassword       bool
+		hasInitialPassword bool
+		hasStoredPassword  bool
+		passwordStorage    string
+		expectedPassword   bool
+	}{
+		// withPassword=false cases
+		{
+			name:               "withPassword=false, has InitialPassword",
+			withPassword:       false,
+			hasInitialPassword: true,
+			hasStoredPassword:  false,
+			passwordStorage:    "keyring",
+			expectedPassword:   false,
+		},
+		{
+			name:               "withPassword=false, has stored password",
+			withPassword:       false,
+			hasInitialPassword: false,
+			hasStoredPassword:  true,
+			passwordStorage:    "keyring",
+			expectedPassword:   false,
+		},
+		// withPassword=true cases
+		{
+			name:               "withPassword=true, has InitialPassword, password_storage=keyring, no stored password",
+			withPassword:       true,
+			hasInitialPassword: true,
+			hasStoredPassword:  false,
+			passwordStorage:    "keyring",
+			expectedPassword:   true,
+		},
+		{
+			name:               "withPassword=true, has InitialPassword, password_storage=none",
+			withPassword:       true,
+			hasInitialPassword: true,
+			hasStoredPassword:  false,
+			passwordStorage:    "none",
+			expectedPassword:   true,
+		},
+		{
+			name:               "withPassword=true, no InitialPassword, has stored password",
+			withPassword:       true,
+			hasInitialPassword: false,
+			hasStoredPassword:  true,
+			passwordStorage:    "keyring",
+			expectedPassword:   true,
+		},
+		{
+			name:               "withPassword=true, no InitialPassword, password_storage=keyring, no stored password",
+			withPassword:       true,
+			hasInitialPassword: false,
+			hasStoredPassword:  false,
+			passwordStorage:    "keyring",
+			expectedPassword:   false,
+		},
+		{
+			name:               "withPassword=true, no InitialPassword, password_storage=none",
+			withPassword:       true,
+			hasInitialPassword: false,
+			hasStoredPassword:  false,
+			passwordStorage:    "none",
+			expectedPassword:   false,
+		},
 	}
 
-	// Mock a cobra command for testing
-	cmd := &cobra.Command{}
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := setupServiceTest(t)
 
-	// Prepare service for output without password
-	outputSvc := prepareServiceForOutput(service, false, cmd.ErrOrStderr())
+			// Use a unique service name for tests that use keyring
+			if tt.passwordStorage == "keyring" {
+				config.SetTestServiceName(t)
+			}
 
-	// Verify that password is removed
-	if outputSvc.Service.InitialPassword != nil {
-		t.Error("Expected InitialPassword to be nil when withPassword=false")
-	}
+			// Set up config with password_storage
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"password_storage": tt.passwordStorage,
+			})
+			if err != nil {
+				t.Fatalf("Failed to save test config: %v", err)
+			}
 
-	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
-		t.Error("Expected service_id to be preserved")
-	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
-		t.Error("Expected name to be preserved")
-	}
-}
+			// Create service with test data
+			serviceID := "svc-12345"
+			serviceName := "test-service"
+			projectID := "test-project-123"
+			initialPassword := "initial-password-123"
+			storedPassword := "stored-password-456"
+			host := "test.example.com"
+			port := 5432
 
-func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
-	// Create a service with sensitive data
-	serviceID := "svc-12345"
-	serviceName := "test-service"
-	initialPassword := "secret-password-123"
+			service := api.Service{
+				ServiceId: &serviceID,
+				Name:      &serviceName,
+				ProjectId: &projectID,
+				Endpoint: &api.Endpoint{
+					Host: &host,
+					Port: &port,
+				},
+			}
 
-	service := api.Service{
-		ServiceId:       &serviceID,
-		Name:            &serviceName,
-		InitialPassword: &initialPassword,
-	}
+			// Add InitialPassword if test case requires it
+			if tt.hasInitialPassword {
+				service.InitialPassword = &initialPassword
+			}
 
-	// Mock a cobra command for testing
-	cmd := &cobra.Command{}
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+			// Store password if test case requires it
+			if tt.hasStoredPassword {
+				storage := password.GetPasswordStorage()
+				err := storage.Save(service, storedPassword)
+				if err != nil {
+					t.Fatalf("Failed to save test password: %v", err)
+				}
+				defer storage.Remove(service) // Clean up after test
+			}
 
-	// Prepare service for output with password
-	outputSvc := prepareServiceForOutput(service, true, cmd.ErrOrStderr())
+			// Mock a cobra command for testing
+			cmd := &cobra.Command{}
+			buf := new(bytes.Buffer)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
 
-	// Verify that password is preserved
-	if outputSvc.Service.InitialPassword == nil || *outputSvc.Service.InitialPassword != initialPassword {
-		t.Error("Expected InitialPassword to be preserved when withPassword=true")
-	}
+			// Prepare service for output
+			outputSvc := prepareServiceForOutput(service, tt.withPassword, cmd.ErrOrStderr())
 
-	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
-		t.Error("Expected service_id to be preserved")
-	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
-		t.Error("Expected name to be preserved")
+			// Verify password field in output
+			if tt.expectedPassword {
+				// When hasInitialPassword, password is in Service.InitialPassword
+				// When no InitialPassword but has stored password, password is in Password field
+				if tt.hasInitialPassword {
+					if outputSvc.InitialPassword == nil {
+						t.Error("Expected InitialPassword to be present in output")
+					} else if *outputSvc.InitialPassword != initialPassword {
+						t.Errorf("Expected InitialPassword=%s, got %s", initialPassword, *outputSvc.InitialPassword)
+					}
+				} else if tt.hasStoredPassword {
+					if outputSvc.Password == nil {
+						t.Error("Expected Password to be present in output")
+					} else if *outputSvc.Password != storedPassword {
+						t.Errorf("Expected Password=%s, got %s", storedPassword, *outputSvc.Password)
+					}
+				}
+			} else {
+				// Both InitialPassword and Password should be nil when withPassword=false
+				if outputSvc.InitialPassword != nil {
+					t.Errorf("Expected InitialPassword to be nil, got %s", *outputSvc.InitialPassword)
+				}
+				if outputSvc.Password != nil && *outputSvc.Password != "" {
+					t.Errorf("Expected Password to be nil or empty, got %s", *outputSvc.Password)
+				}
+			}
+
+			// Verify connection string presence
+			if outputSvc.ConnectionString == nil {
+				t.Error("Expected ConnectionString to be present")
+			} else {
+				connStr := *outputSvc.ConnectionString
+
+				// Verify password presence in connection string
+				if tt.expectedPassword {
+					if !strings.Contains(connStr, "postgresql://tsdbadmin:") {
+						t.Errorf("Expected connection string to have password embedded after username, got: %s", connStr)
+					}
+					// Check which password we expect in conn string
+					var expectedPwd string
+					if tt.hasInitialPassword {
+						expectedPwd = initialPassword
+					} else if tt.hasStoredPassword {
+						expectedPwd = storedPassword
+					}
+					if !strings.Contains(connStr, expectedPwd) {
+						t.Errorf("Expected connection string to contain password %s, got: %s", expectedPwd, connStr)
+					}
+				} else {
+					if strings.Contains(connStr, "postgresql://tsdbadmin:") {
+						t.Errorf("Expected connection string to NOT have password embedded, got: %s", connStr)
+					}
+					if !strings.Contains(connStr, "postgresql://tsdbadmin@") {
+						t.Errorf("Expected connection string to have format without password, got: %s", connStr)
+					}
+				}
+			}
+
+			// Verify that other fields are preserved
+			if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
+				t.Error("Expected service_id to be preserved")
+			}
+			if outputSvc.Name == nil || *outputSvc.Name != serviceName {
+				t.Error("Expected name to be preserved")
+			}
+		})
 	}
 }
 
