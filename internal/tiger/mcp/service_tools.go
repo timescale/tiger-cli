@@ -399,7 +399,6 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 		// Always include connection string in ServiceDetail
 		// Password is embedded in connection string only if with_password=true
-		// Note: InitialPassword is empty string here since service_show doesn't have it
 		if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 			Pooled:       false,
 			Role:         "tsdbadmin",
