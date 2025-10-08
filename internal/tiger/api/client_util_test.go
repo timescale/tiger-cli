@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"go.uber.org/mock/gomock"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -129,8 +130,8 @@ func TestFormatAPIError(t *testing.T) {
 		{
 			name: "API error with message",
 			apiErr: &api.Error{
-				Code:    strPtr("ENTITLEMENT_ERROR"),
-				Message: strPtr("Unauthorized. Entitlement check has failed."),
+				Code:    util.Ptr("ENTITLEMENT_ERROR"),
+				Message: util.Ptr("Unauthorized. Entitlement check has failed."),
 			},
 			fallback: "fallback message",
 			expected: "Unauthorized. Entitlement check has failed.",
@@ -144,7 +145,7 @@ func TestFormatAPIError(t *testing.T) {
 		{
 			name: "API error with nil message",
 			apiErr: &api.Error{
-				Code:    strPtr("ERROR_CODE"),
+				Code:    util.Ptr("ERROR_CODE"),
 				Message: nil,
 			},
 			fallback: "fallback message",
@@ -153,8 +154,8 @@ func TestFormatAPIError(t *testing.T) {
 		{
 			name: "API error with empty message",
 			apiErr: &api.Error{
-				Code:    strPtr("ERROR_CODE"),
-				Message: strPtr(""),
+				Code:    util.Ptr("ERROR_CODE"),
+				Message: util.Ptr(""),
 			},
 			fallback: "fallback message",
 			expected: "fallback message",
@@ -224,9 +225,4 @@ func TestFormatAPIErrorFromBody(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function for creating string pointers
-func strPtr(s string) *string {
-	return &s
 }
