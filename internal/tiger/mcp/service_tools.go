@@ -79,14 +79,24 @@ func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
 
+// setServiceIDSchemaProperties sets common with_password schema properties
+func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["with_password"].Description = "Whether to include the password in the response and in the returned connection string."
+	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
+	schema.Properties["with_password"].Examples = []any{false, true}
+}
+
 // ServiceShowInput represents input for service_show
 type ServiceShowInput struct {
-	ServiceID string `json:"service_id"`
+	ServiceID    string `json:"service_id"`
+	WithPassword bool   `json:"with_password,omitempty"`
 }
 
 func (ServiceShowInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
 	setServiceIDSchemaProperties(schema)
+	setWithPasswordSchemaProperties(schema)
+
 	return schema
 }
 
@@ -108,7 +118,7 @@ type ServiceDetail struct {
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
-	Replicas         int           `json:"replicas,omitempty" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
+	Replicas         int           `json:"replicas" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
 	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
 	Paused           bool          `json:"paused"`
@@ -177,9 +187,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
 	schema.Properties["set_default"].Examples = []any{true, false}
 
-	schema.Properties["with_password"].Description = "Whether to include the initial password and password in connection string in the response. When false (default), password is excluded from response but still saved to configured password storage."
-	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
-	schema.Properties["with_password"].Examples = []any{false, true}
+	setWithPasswordSchemaProperties(schema)
 
 	return schema
 }
@@ -377,6 +385,29 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 		service := *resp.JSON200
 		output := ServiceShowOutput{
 			Service: s.convertToServiceDetail(service),
+		}
+
+		// Include password in ServiceDetail if requested
+		// Note: service_show doesn't have access to InitialPassword, so we fetch from storage
+		if input.WithPassword {
+			if passwd, err := password.GetPassword(service); err != nil {
+				logging.Debug("MCP: Failed to retrieve password from storage", zap.Error(err))
+			} else {
+				output.Service.Password = passwd
+			}
+		}
+
+		// Always include connection string in ServiceDetail
+		// Password is embedded in connection string only if with_password=true
+		// Note: InitialPassword is empty string here since service_show doesn't have it
+		if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			Pooled:       false,
+			Role:         "tsdbadmin",
+			PasswordMode: password.GetPasswordMode(input.WithPassword),
+		}); err != nil {
+			logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+		} else {
+			output.Service.ConnectionString = connectionString
 		}
 
 		return nil, output, nil
