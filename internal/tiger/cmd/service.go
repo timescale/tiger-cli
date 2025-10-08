@@ -797,6 +797,17 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		Service: service,
 	}
 
+	// Build connection string
+	if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+		Pooled:          false,
+		Role:            "tsdbadmin",
+		PasswordMode:    password.GetPasswordMode(withPassword),
+		InitialPassword: util.Deref(service.InitialPassword),
+		WarnWriter:      output,
+	}); err == nil {
+		outputSvc.ConnectionString = &connectionString
+	}
+
 	// Remove password if not requested
 	if !withPassword {
 		outputSvc.InitialPassword = nil
@@ -806,21 +817,6 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
 		}
 		outputSvc.Password = &password
-	}
-
-	// Build connection string
-	passwordMode := password.PasswordExclude
-	if withPassword {
-		passwordMode = password.PasswordRequired
-	}
-	connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
-		Pooled:       false,
-		Role:         "tsdbadmin",
-		PasswordMode: passwordMode,
-		WarnWriter:   output,
-	})
-	if err == nil {
-		outputSvc.ConnectionString = &connectionString
 	}
 
 	return outputSvc

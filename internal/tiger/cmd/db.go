@@ -60,15 +60,10 @@ Examples:
 				return err
 			}
 
-			passwordMode := password.PasswordExclude
-			if dbConnectionStringWithPassword {
-				passwordMode = password.PasswordRequired
-			}
-
 			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: passwordMode,
+				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
