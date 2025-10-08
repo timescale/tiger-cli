@@ -824,9 +824,6 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc := OutputService{
 		Service: service,
 	}
-	if withPassword {
-		outputSvc.Password = outputSvc.InitialPassword
-	}
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
@@ -835,11 +832,18 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		PasswordMode: password.PasswordExclude,
 		WarnWriter:   output,
 	}
+	if service.InitialPassword != nil {
+		opts.InitialPassword = *service.InitialPassword
+	}
 	if withPassword {
 		opts.PasswordMode = password.PasswordRequired
 	}
-	connectionDetails, err := password.GetConnectionDetails(service, opts)
-	if err == nil {
+
+	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
+		if output != nil {
+			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
+		}
+	} else {
 		outputSvc.Role = &connectionDetails.Role
 		outputSvc.Host = &connectionDetails.Host
 		outputSvc.Port = &connectionDetails.Port
@@ -847,14 +851,14 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		if connectionDetails.Password != "" {
 			outputSvc.Password = &connectionDetails.Password
 		}
-	} else if output != nil {
-		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 	}
-	connectionString, err := password.BuildConnectionString(service, opts)
-	if err == nil {
+
+	if connectionString, err := password.BuildConnectionString(service, opts); err != nil {
+		if output != nil {
+			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection string: %v\n", err)
+		}
+	} else {
 		outputSvc.ConnectionString = &connectionString
-	} else if output != nil {
-		fmt.Fprintf(output, "⚠️  Warning: Failed to get connection string: %v\n", err)
 	}
 
 	return outputSvc

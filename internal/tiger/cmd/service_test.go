@@ -888,11 +888,17 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	serviceID := "svc-12345"
 	serviceName := "test-service"
 	initialPassword := "secret-password-123"
+	serviceHost := "test.tigerdata.com"
+	servicePort := 5432
 
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
 		InitialPassword: &initialPassword,
+		Endpoint: &api.Endpoint{
+			Host: &serviceHost,
+			Port: &servicePort,
+		},
 	}
 
 	// Mock a cobra command for testing

@@ -38,6 +38,9 @@ type ConnectionDetailsOptions struct {
 	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
 	// If nil, warnings are suppressed
 	WarnWriter io.Writer
+
+	// If passed, we skip fetching from the password storage
+	InitialPassword string
 }
 
 type ConnectionDetails struct {
@@ -81,42 +84,35 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		details.Port = *endpoint.Port
 	}
 
-	switch opts.PasswordMode {
-	case PasswordRequired:
-		// Password is required - error if unavailable
-		storage := GetPasswordStorage()
-		password, err := storage.Get(service)
-		if err != nil {
-			// Provide specific error messages based on storage type
-			switch storage.(type) {
-			case *NoStorage:
-				return nil, fmt.Errorf("password storage is disabled (--password-storage=none)")
-			case *KeyringStorage:
-				return nil, fmt.Errorf("no password found in keyring for this service")
-			case *PgpassStorage:
-				return nil, fmt.Errorf("no password found in ~/.pgpass for this service")
-			default:
-				return nil, fmt.Errorf("failed to retrieve password: %w", err)
+	if opts.PasswordMode == PasswordRequired || opts.PasswordMode == PasswordOptional {
+		var password string
+		if opts.InitialPassword != "" {
+			password = opts.InitialPassword
+		}
+		if password == "" {
+			storage := GetPasswordStorage()
+			if storedPassword, err := storage.Get(service); err != nil && opts.PasswordMode == PasswordRequired {
+				// Provide specific error messages based on storage type
+				switch storage.(type) {
+				case *NoStorage:
+					return nil, fmt.Errorf("password storage is disabled (--password-storage=none)")
+				case *KeyringStorage:
+					return nil, fmt.Errorf("no password found in keyring for this service")
+				case *PgpassStorage:
+					return nil, fmt.Errorf("no password found in ~/.pgpass for this service")
+				default:
+					return nil, fmt.Errorf("failed to retrieve password: %w", err)
+				}
+			} else {
+				password = storedPassword
 			}
 		}
 
-		if password == "" {
+		if password == "" && opts.PasswordMode == PasswordRequired {
 			return nil, fmt.Errorf("no password available for service")
 		}
 
 		details.Password = password
-
-	case PasswordOptional:
-		// Try to include password, but don't error if unavailable
-		storage := GetPasswordStorage()
-		password, err := storage.Get(service)
-
-		// Only include password if we successfully retrieved it
-		if err == nil && password != "" {
-			details.Password = password
-		}
-
-	default: // PasswordExclude
 	}
 
 	return details, nil
