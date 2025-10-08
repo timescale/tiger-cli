@@ -308,7 +308,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return nil, ServiceListOutput{}, api.NewResponseError(resp.HTTPResponse)
+		return nil, ServiceListOutput{}, resp.JSON4XX
 	}
 
 	if resp.JSON200 == nil {
@@ -356,7 +356,7 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return nil, ServiceShowOutput{}, api.NewResponseError(resp.HTTPResponse)
+		return nil, ServiceShowOutput{}, resp.JSON4XX
 	}
 
 	service := *resp.JSON200
@@ -474,7 +474,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Handle API response
 	if resp.StatusCode() != 202 {
-		return nil, ServiceCreateOutput{}, api.NewResponseError(resp.HTTPResponse)
+		return nil, ServiceCreateOutput{}, resp.JSON4XX
 	}
 
 	service := *resp.JSON202
@@ -563,7 +563,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	// Handle API response
 	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
-		return nil, ServiceUpdatePasswordOutput{}, api.NewResponseError(resp.HTTPResponse)
+		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
 	}
 
 	output := ServiceUpdatePasswordOutput{

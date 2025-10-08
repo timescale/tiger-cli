@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"go.uber.org/mock/gomock"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -118,111 +117,4 @@ func TestValidateAPIKey_Integration(t *testing.T) {
 
 	// This test would require a real API key and network connectivity
 	t.Skip("Integration test requires real API key - implement when needed")
-}
-
-func TestFormatAPIError(t *testing.T) {
-	tests := []struct {
-		name     string
-		apiErr   *api.Error
-		fallback string
-		expected string
-	}{
-		{
-			name: "API error with message",
-			apiErr: &api.Error{
-				Code:    util.Ptr("ENTITLEMENT_ERROR"),
-				Message: util.Ptr("Unauthorized. Entitlement check has failed."),
-			},
-			fallback: "fallback message",
-			expected: "Unauthorized. Entitlement check has failed.",
-		},
-		{
-			name:     "nil API error",
-			apiErr:   nil,
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name: "API error with nil message",
-			apiErr: &api.Error{
-				Code:    util.Ptr("ERROR_CODE"),
-				Message: nil,
-			},
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name: "API error with empty message",
-			apiErr: &api.Error{
-				Code:    util.Ptr("ERROR_CODE"),
-				Message: util.Ptr(""),
-			},
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := api.FormatAPIError(tt.apiErr, tt.fallback)
-			if err.Error() != tt.expected {
-				t.Errorf("Expected error message '%s', got '%s'", tt.expected, err.Error())
-			}
-		})
-	}
-}
-
-func TestFormatAPIErrorFromBody(t *testing.T) {
-	tests := []struct {
-		name     string
-		body     []byte
-		fallback string
-		expected string
-	}{
-		{
-			name:     "valid JSON with error message",
-			body:     []byte(`{"code":"ENTITLEMENT_ERROR","message":"Unauthorized. Entitlement check has failed."}`),
-			fallback: "fallback message",
-			expected: "Unauthorized. Entitlement check has failed.",
-		},
-		{
-			name:     "empty body",
-			body:     []byte{},
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name:     "nil body",
-			body:     nil,
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name:     "invalid JSON",
-			body:     []byte(`{invalid json}`),
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name:     "valid JSON with empty message",
-			body:     []byte(`{"code":"ERROR_CODE","message":""}`),
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-		{
-			name:     "valid JSON with null message",
-			body:     []byte(`{"code":"ERROR_CODE","message":null}`),
-			fallback: "fallback message",
-			expected: "fallback message",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := api.FormatAPIErrorFromBody(tt.body, tt.fallback)
-			if err.Error() != tt.expected {
-				t.Errorf("Expected error message '%s', got '%s'", tt.expected, err.Error())
-			}
-		})
-	}
 }

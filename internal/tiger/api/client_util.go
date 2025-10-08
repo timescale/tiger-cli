@@ -3,10 +3,8 @@ package api
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -95,45 +93,15 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 	}
 
 	// Check the response status
-	switch resp.StatusCode() {
-	case 401, 403:
-		return FormatAPIErrorFromBody(resp.Body, "invalid API key: authentication failed")
-	case 404:
-		// Project not found is OK - it means the API key is valid but project doesn't exist
-		return nil
-	case 200:
-		// Success - API key is valid
-		return nil
-	default:
-		statusCode := resp.StatusCode()
-		if statusCode >= 400 && statusCode < 500 {
-			return FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("unexpected API response: %d", statusCode))
+	if resp.StatusCode() != 200 {
+		if resp.JSON4XX != nil {
+			return resp.JSON4XX
+		} else {
+			return errors.New("unknown error")
 		}
-		return fmt.Errorf("unexpected API response: %d", statusCode)
+	} else {
+		return nil
 	}
-}
-
-// FormatAPIError creates an error message from an API error response.
-// If the API error contains a message, it will be used; otherwise the fallback message is returned.
-func FormatAPIError(apiErr *Error, fallback string) error {
-	if apiErr != nil && apiErr.Message != nil && *apiErr.Message != "" {
-		return errors.New(*apiErr.Message)
-	}
-	return errors.New(fallback)
-}
-
-// FormatAPIErrorFromBody attempts to parse an API error from a response body.
-// If the body contains a valid API error with a message, it will be used; otherwise the fallback message is returned.
-func FormatAPIErrorFromBody(body []byte, fallback string) error {
-	if len(body) > 0 {
-		var apiErr Error
-		if err := json.Unmarshal(body, &apiErr); err == nil {
-			if apiErr.Message != nil && *apiErr.Message != "" {
-				return errors.New(*apiErr.Message)
-			}
-		}
-	}
-	return errors.New(fallback)
 }
 
 // Error implements the error interface for the Error type.
@@ -146,61 +114,4 @@ func (e *Error) Error() string {
 		return *e.Message
 	}
 	return "unknown error"
-}
-
-// ResponseError wraps an API response with an error, preserving the status code
-// for proper exit code mapping in CLI commands
-type ResponseError struct {
-	statusCode int
-	response   *http.Response
-	err        error
-}
-
-func (r *ResponseError) Error() string {
-	return r.err.Error()
-}
-
-func (r *ResponseError) StatusCode() int {
-	return r.statusCode
-}
-
-func (r *ResponseError) HTTPResponse() *http.Response {
-	return r.response
-}
-
-func (r *ResponseError) Unwrap() error {
-	return r.err
-}
-
-// NewResponseError creates an error from an API response
-// It attempts to extract the error message from the response body
-func NewResponseError(response *http.Response) error {
-	if response == nil {
-		return errors.New("unknown error")
-	}
-
-	var err error
-	bodyBytes, readErr := io.ReadAll(response.Body)
-	err = errors.New(string(bodyBytes))
-	return &ResponseError{
-		statusCode: response.StatusCode,
-		response:   response,
-		err:        err,
-	}
-	if readErr == nil && len(bodyBytes) > 0 {
-		var apiErr Error
-		if unmarshalErr := json.Unmarshal(bodyBytes, &apiErr); unmarshalErr == nil {
-			err = &apiErr
-		} else {
-			err = fmt.Errorf("API error: status %d", unmarshalErr.Error())
-		}
-	} else {
-		err = fmt.Errorf("API error: status %d", response.StatusCode)
-	}
-
-	return &ResponseError{
-		statusCode: response.StatusCode,
-		response:   response,
-		err:        err,
-	}
 }

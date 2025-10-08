@@ -11,7 +11,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -142,7 +141,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	if serviceResp.StatusCode() != 200 {
-		return nil, DBExecuteQueryOutput{}, api.NewResponseError(serviceResp.HTTPResponse)
+		return nil, DBExecuteQueryOutput{}, serviceResp.JSON4XX
 	}
 
 	service := *serviceResp.JSON200
