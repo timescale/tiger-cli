@@ -117,30 +117,18 @@ Examples:
 			}
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				if resp.JSON200 == nil {
-					return fmt.Errorf("empty response from API")
-				}
-
-				service := *resp.JSON200
-
-				// Output service in requested format
-				return outputService(cmd, service, cfg.Output, withPassword)
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to service"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, api.FormatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
-			default:
-				statusCode := resp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("API request failed with status %d", statusCode)
+			if resp.StatusCode() != 200 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+
+			service := *resp.JSON200
+
+			// Output service in requested format
+			return outputService(cmd, service, cfg.Output, withPassword)
 		},
 	}
 
@@ -195,38 +183,19 @@ func buildServiceListCmd() *cobra.Command {
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				// Success - process services
-				if resp.JSON200 == nil {
-					fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-					fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-					return nil
-				}
-
-				services := *resp.JSON200
-				if len(services) == 0 {
-					fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-					fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-					return nil
-				}
-
-				// Output services in requested format
-				return outputServices(cmd, services, cfg.Output, withPassword)
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to project"))
-			case 404:
-				return api.FormatAPIError(resp.JSON404, "project not found")
-			default:
-				statusCode := resp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("API request failed with status %d", statusCode)
+			if resp.StatusCode() != 200 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			services := *resp.JSON200
+			if len(services) == 0 {
+				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				return nil
+			}
+
+			// Output services in requested format
+			return outputServices(cmd, services, cfg.Output, withPassword)
 		},
 	}
 
@@ -465,20 +434,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				return result
-			case 400:
-				return api.FormatAPIError(resp.JSON400, "invalid request parameters")
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to create services"))
-			case 404:
-				return api.FormatAPIErrorFromBody(resp.Body, "project not found")
 			default:
-				statusCode := resp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("API request failed with status %d", statusCode)
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 		},
 	}
@@ -589,36 +546,20 @@ Examples:
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				fallthrough
-			case 204:
-				fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
-
-				// Handle password storage using the configured method
-				// Get the service details for password storage
-				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-					handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
-				}
-
-				return nil
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to update service password"))
-			case 404:
-				return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID))
-			case 400:
-				return api.FormatAPIError(resp.JSON400, "invalid password")
-			default:
-				statusCode := resp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("API request failed with status %d", statusCode)
+			if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
+
+			// Handle password storage using the configured method
+			// Get the service details for password storage
+			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+				handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
+			}
+
+			return nil
 		},
 	}
 
@@ -1033,31 +974,20 @@ Examples:
 			}
 
 			// Handle response
-			switch resp.StatusCode() {
-			case 202:
-				fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
-
-				// If not waiting, return early
-				if deleteNoWait {
-					fmt.Fprintln(statusOutput, "💡 Use 'tiger service list' to check deletion status.")
-					return nil
-				}
-
-				// Wait for deletion to complete
-				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
-			case 404:
-				return exitWithCode(ExitServiceNotFound, api.FormatAPIError(resp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID)))
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(resp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(resp.Body, "permission denied: insufficient access to delete service"))
-			default:
-				statusCode := resp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(resp.Body, fmt.Sprintf("failed to delete service: API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("failed to delete service: API request failed with status %d", statusCode)
+			if resp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if deleteNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service list' to check deletion status.")
+				return nil
+			}
+
+			// Wait for deletion to complete
+			return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 		},
 	}
 
@@ -1308,74 +1238,54 @@ Examples:
 			}
 
 			// Handle API response
-			switch forkResp.StatusCode() {
-			case 202:
-				// Success - service fork accepted
-				if forkResp.JSON202 == nil {
-					fmt.Fprintln(statusOutput, "✅ Fork request accepted!")
-					return nil
-				}
-
-				forkedService := *forkResp.JSON202
-				forkedServiceID := util.DerefStr(forkedService.ServiceId)
-				fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
-				fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
-
-				// Capture initial password from fork response and save it immediately
-				var initialPassword string
-				if forkedService.InitialPassword != nil {
-					initialPassword = *forkedService.InitialPassword
-				}
-
-				// Save password immediately after service fork
-				passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
-
-				// Set as default service unless --no-set-default is used
-				if !forkNoSetDefault {
-					if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
-						// Log warning but don't fail the command
-						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
-					}
-				}
-
-				// Handle wait behavior
-				var result error
-				if forkNoWait {
-					fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
-				} else {
-					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-					forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
-					if result != nil {
-						fmt.Fprintf(statusOutput, "❌ %v\n", result)
-					} else {
-						fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
-						printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
-					}
-				}
-
-				if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
-				}
-
-				return result
-			case 401:
-				return exitWithCode(ExitAuthenticationError, api.FormatAPIErrorFromBody(forkResp.Body, "authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, api.FormatAPIErrorFromBody(forkResp.Body, "permission denied: insufficient access to fork services"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, api.FormatAPIError(forkResp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", serviceID, projectID)))
-			case 409:
-				return api.FormatAPIErrorFromBody(forkResp.Body, fmt.Sprintf("service name '%s' already exists", forkServiceName))
-			case 400:
-				return api.FormatAPIErrorFromBody(forkResp.Body, "invalid request parameters")
-			default:
-				statusCode := forkResp.StatusCode()
-				if statusCode >= 400 && statusCode < 500 {
-					return api.FormatAPIErrorFromBody(forkResp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-				}
-				return fmt.Errorf("API request failed with status %d", statusCode)
+			if forkResp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
 			}
+
+			// Success - service fork accepted
+			forkedService := *forkResp.JSON202
+			forkedServiceID := util.DerefStr(forkedService.ServiceId)
+			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
+			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
+
+			// Capture initial password from fork response and save it immediately
+			var initialPassword string
+			if forkedService.InitialPassword != nil {
+				initialPassword = *forkedService.InitialPassword
+			}
+
+			// Save password immediately after service fork
+			passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
+
+			// Set as default service unless --no-set-default is used
+			if !forkNoSetDefault {
+				if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
+					// Log warning but don't fail the command
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+				}
+			}
+
+			// Handle wait behavior
+			var result error
+			if forkNoWait {
+				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
+			} else {
+				// Wait for service to be ready
+				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
+				if result != nil {
+					fmt.Fprintf(statusOutput, "❌ %v\n", result)
+				} else {
+					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
+					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
+				}
+			}
+
+			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+			}
+
+			return result
 		},
 	}
 

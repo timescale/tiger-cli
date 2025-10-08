@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -133,4 +134,73 @@ func FormatAPIErrorFromBody(body []byte, fallback string) error {
 		}
 	}
 	return errors.New(fallback)
+}
+
+// Error implements the error interface for the Error type.
+// This allows Error values to be used directly as Go errors.
+func (e *Error) Error() string {
+	if e == nil {
+		return "unknown error"
+	}
+	if e.Message != nil && *e.Message != "" {
+		return *e.Message
+	}
+	return "unknown error"
+}
+
+// ResponseError wraps an API response with an error, preserving the status code
+// for proper exit code mapping in CLI commands
+type ResponseError struct {
+	statusCode int
+	response   *http.Response
+	err        error
+}
+
+func (r *ResponseError) Error() string {
+	return r.err.Error()
+}
+
+func (r *ResponseError) StatusCode() int {
+	return r.statusCode
+}
+
+func (r *ResponseError) HTTPResponse() *http.Response {
+	return r.response
+}
+
+func (r *ResponseError) Unwrap() error {
+	return r.err
+}
+
+// NewResponseError creates an error from an API response
+// It attempts to extract the error message from the response body
+func NewResponseError(response *http.Response) error {
+	if response == nil {
+		return errors.New("unknown error")
+	}
+
+	var err error
+	bodyBytes, readErr := io.ReadAll(response.Body)
+	err = errors.New(string(bodyBytes))
+	return &ResponseError{
+		statusCode: response.StatusCode,
+		response:   response,
+		err:        err,
+	}
+	if readErr == nil && len(bodyBytes) > 0 {
+		var apiErr Error
+		if unmarshalErr := json.Unmarshal(bodyBytes, &apiErr); unmarshalErr == nil {
+			err = &apiErr
+		} else {
+			err = fmt.Errorf("API error: status %d", unmarshalErr.Error())
+		}
+	} else {
+		err = fmt.Errorf("API error: status %d", response.StatusCode)
+	}
+
+	return &ResponseError{
+		statusCode: response.StatusCode,
+		response:   response,
+		err:        err,
+	}
 }

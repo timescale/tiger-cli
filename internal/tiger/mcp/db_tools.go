@@ -141,23 +141,8 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
-	switch serviceResp.StatusCode() {
-	case 200:
-		if serviceResp.JSON200 == nil {
-			return nil, DBExecuteQueryOutput{}, fmt.Errorf("empty response from API")
-		}
-	case 401:
-		return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, "authentication failed: invalid API key")
-	case 403:
-		return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, "permission denied: insufficient access to service")
-	case 404:
-		return nil, DBExecuteQueryOutput{}, api.FormatAPIError(serviceResp.JSON404, fmt.Sprintf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID))
-	default:
-		statusCode := serviceResp.StatusCode()
-		if statusCode >= 400 && statusCode < 500 {
-			return nil, DBExecuteQueryOutput{}, api.FormatAPIErrorFromBody(serviceResp.Body, fmt.Sprintf("API request failed with status %d", statusCode))
-		}
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("API request failed with status %d", statusCode)
+	if serviceResp.StatusCode() != 200 {
+		return nil, DBExecuteQueryOutput{}, api.NewResponseError(serviceResp.HTTPResponse)
 	}
 
 	service := *serviceResp.JSON200
