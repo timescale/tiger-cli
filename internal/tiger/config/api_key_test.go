@@ -4,12 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/spf13/viper"
 )
 
 func setupAPIKeyTest(t *testing.T) string {
 	t.Helper()
+
+	// Use a unique service name for this test to avoid conflicts
+	SetTestServiceName(t)
 
 	// Clean up any existing keyring entries before test
 	RemoveAPIKeyFromKeyring()
@@ -20,8 +21,11 @@ func setupAPIKeyTest(t *testing.T) string {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Wire up the tmp directory as the viper config directory
-	viper.SetConfigFile(GetConfigFile(tmpDir))
+	// Reset viper completely and set up with test directory
+	// This ensures proper test isolation by resetting all viper state
+	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
+		t.Fatalf("Failed to use test config: %v", err)
+	}
 
 	t.Cleanup(func() {
 		// Clean up keyring entries
@@ -69,7 +73,6 @@ func TestStoreAPIKeyToFile(t *testing.T) {
 
 func TestGetAPIKeyFromFile(t *testing.T) {
 	tmpDir := setupAPIKeyTest(t)
-	viper.SetConfigFile(GetConfigFile(tmpDir))
 
 	// Write API key to file
 	apiKeyFile := filepath.Join(tmpDir, "api-key")
@@ -77,7 +80,8 @@ func TestGetAPIKeyFromFile(t *testing.T) {
 		t.Fatalf("Failed to write test API key file: %v", err)
 	}
 
-	// Get API key from file
+	// Get API key - should get from file since keyring is empty
+	// (each test uses a unique keyring service name)
 	apiKey, err := GetAPIKey()
 	if err != nil {
 		t.Fatalf("Failed to get API key from file: %v", err)
@@ -89,8 +93,7 @@ func TestGetAPIKeyFromFile(t *testing.T) {
 }
 
 func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
-	tmpDir := setupAPIKeyTest(t)
-	viper.SetConfigFile(GetConfigFile(tmpDir))
+	setupAPIKeyTest(t)
 
 	// Try to get API key when file doesn't exist
 	_, err := GetAPIKey()
@@ -105,7 +108,6 @@ func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
 
 func TestRemoveAPIKeyFromFile(t *testing.T) {
 	tmpDir := setupAPIKeyTest(t)
-	viper.SetConfigFile(GetConfigFile(tmpDir))
 
 	// Write API key to file
 	apiKeyFile := filepath.Join(tmpDir, "api-key")
