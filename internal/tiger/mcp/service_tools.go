@@ -81,7 +81,7 @@ func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 
 // setServiceIDSchemaProperties sets common with_password schema properties
 func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
-	schema.Properties["with_password"].Description = "Whether to include the password in the response and in the returned connection string."
+	schema.Properties["with_password"].Description = "Whether to include the password in the response and connection string."
 	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
