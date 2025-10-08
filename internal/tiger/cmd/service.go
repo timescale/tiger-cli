@@ -801,7 +801,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	if !withPassword {
 		outputSvc.InitialPassword = nil
 	} else if service.InitialPassword == nil {
-		password, err := getServicePassword(service)
+		password, err := password.GetPassword(service)
 		if err != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
 		}
