@@ -15,7 +15,6 @@ import (
 func buildRootCmd() *cobra.Command {
 	var configDir string
 	var debug bool
-	var output string
 	var projectID string
 	var serviceID string
 	var analytics bool
@@ -71,7 +70,6 @@ tiger auth login
 	// Add persistent flags
 	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	cmd.PersistentFlags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
@@ -79,7 +77,6 @@ tiger auth login
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
 	viper.BindPFlag("project_id", cmd.PersistentFlags().Lookup("project-id"))
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))

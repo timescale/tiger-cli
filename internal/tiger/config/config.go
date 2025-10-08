@@ -15,18 +15,18 @@ import (
 )
 
 type Config struct {
-	APIURL          string `mapstructure:"api_url" yaml:"api_url"`
-	ConsoleURL      string `mapstructure:"console_url" yaml:"console_url"`
-	GatewayURL      string `mapstructure:"gateway_url" yaml:"gateway_url"`
-	DocsMCP         bool   `mapstructure:"docs_mcp" yaml:"docs_mcp"`
-	DocsMCPURL      string `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
-	ProjectID       string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID       string `mapstructure:"service_id" yaml:"service_id"`
-	Output          string `mapstructure:"output" yaml:"output"`
-	Analytics       bool   `mapstructure:"analytics" yaml:"analytics"`
-	PasswordStorage string `mapstructure:"password_storage" yaml:"password_storage"`
-	Debug           bool   `mapstructure:"debug" yaml:"debug"`
-	ConfigDir       string `mapstructure:"config_dir" yaml:"-"`
+	APIURL          string `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
+	ConsoleURL      string `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
+	GatewayURL      string `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
+	DocsMCP         bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
+	DocsMCPURL      string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
+	ProjectID       string `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
+	ServiceID       string `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Output          string `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
+	Analytics       bool   `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
+	PasswordStorage string `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
+	Debug           bool   `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
+	ConfigDir       string `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
 }
 
 const (
@@ -56,28 +56,21 @@ var defaultValues = map[string]any{
 	"debug":            DefaultDebug,
 }
 
-// SetupViper configures the global Viper instance with defaults, env vars, and config file
-func SetupViper(configDir string) error {
-	// Configure viper to read from config file
-	configFile := GetConfigFile(configDir)
-	viper.SetConfigFile(configFile)
-
-	// Configure viper to read from env vars
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
-
-	// Set defaults for all config values
+func ApplyDefaults(v *viper.Viper) {
 	for key, value := range defaultValues {
-		viper.SetDefault(key, value)
+		v.SetDefault(key, value)
 	}
-
-	return readInConfig()
 }
 
-func readInConfig() error {
+func ApplyEnvOverrides(v *viper.Viper) {
+	v.SetEnvPrefix("TIGER")
+	v.AutomaticEnv()
+}
+
+func ReadInConfig(v *viper.Viper) error {
 	// Try to read config file if it exists
 	// If file doesn't exist, that's okay - we'll use defaults and env vars
-	if err := viper.ReadInConfig(); err != nil &&
+	if err := v.ReadInConfig(); err != nil &&
 		!errors.As(err, &viper.ConfigFileNotFoundError{}) &&
 		!errors.Is(err, fs.ErrNotExist) {
 		return err
@@ -85,26 +78,47 @@ func readInConfig() error {
 	return nil
 }
 
-// Load creates a new Config instance from the current viper state
-// This function should be called after SetupViper has been called to initialize viper
-func Load() (*Config, error) {
-	// Try to read config file into viper to ensure we're unmarshaling the most
-	// up-to-date values into the config struct.
-	if err := readInConfig(); err != nil {
-		return nil, err
-	}
+// SetupViper configures the global Viper instance with defaults, env vars, and config file
+func SetupViper(configDir string) error {
+	v := viper.GetViper()
 
+	// Configure viper to read from config file
+	configFile := GetConfigFile(configDir)
+	v.SetConfigFile(configFile)
+
+	// Configure viper to read from env vars
+	ApplyEnvOverrides(v)
+
+	// Set defaults for all config values
+	ApplyDefaults(v)
+
+	return ReadInConfig(v)
+}
+
+func FromViper(v *viper.Viper) (*Config, error) {
 	cfg := &Config{
 		ConfigDir: GetConfigDir(),
 	}
 
-	// Use the global Viper instance that's already configured by SetupViper
-	// This gives us proper precedence: CLI flags > env vars > config file > defaults
-	if err := viper.Unmarshal(cfg); err != nil {
+	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
 
 	return cfg, nil
+}
+
+// Load creates a new Config instance from the current viper state
+// This function should be called after SetupViper has been called to initialize viper
+func Load() (*Config, error) {
+	v := viper.GetViper()
+
+	// Try to read config file into viper to ensure we're unmarshaling the most
+	// up-to-date values into the config struct.
+	if err := ReadInConfig(v); err != nil {
+		return nil, err
+	}
+
+	return FromViper(v)
 }
 
 func ensureConfigDir(configDir string) (string, error) {
@@ -114,7 +128,7 @@ func ensureConfigDir(configDir string) (string, error) {
 	return GetConfigFile(configDir), nil
 }
 
-func (c *Config) ensureConfigDir() (string, error) {
+func (c *Config) EnsureConfigDir() (string, error) {
 	return ensureConfigDir(c.ConfigDir)
 }
 
@@ -165,7 +179,7 @@ func (c *Config) Set(key, value string) error {
 	}
 
 	// Write to config file
-	configFile, err := c.ensureConfigDir()
+	configFile, err := c.EnsureConfigDir()
 	if err != nil {
 		return err
 	}
@@ -266,7 +280,7 @@ func (c *Config) updateField(key string, value any) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("output must be string, got %T", value)
 		}
-		if err := ValidateOutputFormat(s); err != nil {
+		if err := ValidateOutputFormat(s, false); err != nil {
 			return nil, err
 		}
 		c.Output = s
@@ -324,7 +338,7 @@ func (c *Config) updateField(key string, value any) (any, error) {
 }
 
 func (c *Config) Unset(key string) error {
-	configFile, err := c.ensureConfigDir()
+	configFile, err := c.EnsureConfigDir()
 	if err != nil {
 		return err
 	}
@@ -363,7 +377,7 @@ func (c *Config) Unset(key string) error {
 }
 
 func (c *Config) Reset() error {
-	configFile, err := c.ensureConfigDir()
+	configFile, err := c.EnsureConfigDir()
 	if err != nil {
 		return err
 	}

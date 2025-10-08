@@ -47,6 +47,7 @@ func buildServiceCmd() *cobra.Command {
 // serviceDescribeCmd represents the describe command under service
 func buildServiceDescribeCmd() *cobra.Command {
 	var withPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "describe [service-id]",
@@ -74,6 +75,11 @@ Examples:
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -141,6 +147,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -148,6 +155,7 @@ Examples:
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
 	var withPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -158,6 +166,11 @@ func buildServiceListCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -223,6 +236,7 @@ func buildServiceListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }
@@ -240,6 +254,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createNoSetDefault bool
 	var createFree bool
 	var createWithPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -296,6 +311,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -483,6 +503,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createFree, "free", false, "Create a free tier service (limitations apply)")
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -1129,6 +1150,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkCPU int
 	var forkMemory int
 	var forkWithPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -1197,6 +1219,11 @@ Examples:
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -1390,6 +1417,7 @@ Examples:
 	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }

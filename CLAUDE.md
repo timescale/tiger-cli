@@ -405,7 +405,6 @@ func buildRootCmd() *cobra.Command {
     // Declare ALL flag variables locally within this function
     var configDir string
     var debug bool
-    var output string
     var projectID string
     var serviceID string
     var analytics bool
@@ -429,7 +428,6 @@ func buildRootCmd() *cobra.Command {
     cobra.OnInitialize(initConfigFunc)
     cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
     cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-    cmd.PersistentFlags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
     cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
     cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
     cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
@@ -437,7 +435,6 @@ func buildRootCmd() *cobra.Command {
 
     // Bind flags to viper
     viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-    viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
     // ... bind remaining flags
 
     // Add all subcommands (complete tree building)
