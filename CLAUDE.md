@@ -161,6 +161,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
   - `server.go` - MCP server initialization, tool registration, and lifecycle management
   - `service_tools.go` - Service management tools (list, show, create, update-password)
+  - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
 - **Password Storage**: `internal/tiger/password/` - Secure password storage utilities
 
@@ -191,7 +192,9 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 **Two Types of Tools:**
 
-1. **Direct Tiger Tools** (`service_tools.go`) - Native tools for Tiger service management
+1. **Direct Tiger Tools** - Native tools for Tiger operations
+   - `service_tools.go` - Service management (list, show, create, update-password)
+   - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
 **Tool Definition Pattern:**
@@ -281,6 +284,7 @@ Global flags available on all commands:
 - **oapi-codegen**: OpenAPI client generation (build-time dependency)
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
+- **pgx/v5**: PostgreSQL driver for database operations in MCP tools
 - **Go 1.25+**: Required Go version
 
 ## Project Structure

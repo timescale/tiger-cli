@@ -328,6 +328,9 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 }
 
 func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
@@ -949,6 +952,9 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 func TestDBConnectionString_WithPassword(t *testing.T) {
 	// This test verifies the end-to-end --with-password flag functionality
 	// using direct function testing since full integration would require a real service
+
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
 
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")

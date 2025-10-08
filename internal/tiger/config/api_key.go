@@ -12,20 +12,38 @@ import (
 
 // Keyring parameters
 const (
-	keyringServiceName     = "tiger-cli"
-	keyringTestServiceName = "tiger-cli-test"
-	keyringUsername        = "api-key"
+	keyringServiceName = "tiger-cli"
+	keyringUsername    = "api-key"
 )
 
+// testServiceNameOverride allows tests to override the service name for isolation
+var testServiceNameOverride string
+
 // GetServiceName returns the appropriate service name for keyring operations
-// Uses a test-specific service name when running in test mode to avoid polluting the real keyring
 func GetServiceName() string {
-	// Use Go's built-in testing detection
+	// Tests should set a unique service name to avoid conflicts
+	if testServiceNameOverride != "" {
+		return testServiceNameOverride
+	}
+
+	// In test mode without an override, panic to catch missing test setup
 	if testing.Testing() {
-		return keyringTestServiceName
+		panic("test must call SetTestServiceName() to set a unique keyring service name")
 	}
 
 	return keyringServiceName
+}
+
+// SetTestServiceName sets a unique service name for testing based on the test name
+// This allows tests to use unique service names to avoid conflicts when running in parallel
+// The cleanup is automatically registered with t.Cleanup()
+func SetTestServiceName(t *testing.T) {
+	testServiceNameOverride = "tiger-test-" + t.Name()
+
+	// Automatically clean up when the test finishes
+	t.Cleanup(func() {
+		testServiceNameOverride = ""
+	})
 }
 
 // storeAPIKey stores the API key using keyring with file fallback

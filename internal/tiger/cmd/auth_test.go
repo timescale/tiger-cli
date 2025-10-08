@@ -22,6 +22,9 @@ import (
 func setupAuthTest(t *testing.T) string {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
 	validateAPIKeyForLogin = func(apiKey, projectID string) error {
@@ -46,10 +49,6 @@ func setupAuthTest(t *testing.T) string {
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
-
-	// Also ensure config file doesn't exist
-	configFile := config.GetConfigFile(tmpDir)
-	os.Remove(configFile)
 
 	t.Cleanup(func() {
 		// Clean up test keyring

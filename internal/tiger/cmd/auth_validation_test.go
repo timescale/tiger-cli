@@ -18,6 +18,9 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Use a unique service name for this test
+	config.SetTestServiceName(t)
+
 	originalValidator := validateAPIKeyForLogin
 
 	// Mock the validator to return an error
@@ -72,6 +75,9 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+
+	// Use a unique service name for this test
+	config.SetTestServiceName(t)
 
 	originalValidator := validateAPIKeyForLogin
 
