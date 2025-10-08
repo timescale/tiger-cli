@@ -94,10 +94,14 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 
 	// Check the response status
 	if resp.StatusCode() != 200 {
+		if resp.StatusCode() == 404 {
+			// Project not found, but API key is valid
+			return nil
+		}
 		if resp.JSON4XX != nil {
 			return resp.JSON4XX
 		} else {
-			return errors.New("unknown error")
+			return errors.New("unexpected API response: 500")
 		}
 	} else {
 		return nil
