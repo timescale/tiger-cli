@@ -44,11 +44,11 @@ type ConnectionDetailsOptions struct {
 }
 
 type ConnectionDetails struct {
-	Role     string
-	Password string
-	Host     string
-	Port     int
-	Database string
+	Role     string `json:"role,omitempty" yaml:"role,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+	Host     string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`
+	Database string `json:"database,omitempty" yaml:"database,omitempty"`
 }
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {

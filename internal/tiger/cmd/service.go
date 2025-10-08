@@ -618,12 +618,8 @@ Examples:
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
-	Password         *string `json:"password,omitempty" yaml:"password,omitempty"`
-	Role             *string `json:"role,omitempty" yaml:"role,omitempty"`
-	Host             *string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port             *int    `json:"port,omitempty" yaml:"port,omitempty"`
-	Database         *string `json:"database,omitempty" yaml:"database,omitempty"`
+	password.ConnectionDetails
+	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 }
 
 // Convert to JSON to respect omitempty tags, then unmarshal
@@ -693,20 +689,12 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string, w
 
 // outputServiceEnv outputs service details in environment variable format
 func outputServiceEnv(service OutputService, output io.Writer) error {
-	if service.Host != nil {
-		fmt.Fprintf(output, "PGHOST=%s\n", *service.Host)
-	}
-	if service.Role != nil {
-		fmt.Fprintf(output, "PGUSER=%s\n", *service.Role)
-	}
-	if service.Password != nil {
-		fmt.Fprintf(output, "PGPASSWORD=%s\n", *service.Password)
-	}
-	if service.Database != nil {
-		fmt.Fprintf(output, "PGDATABASE=%s\n", *service.Database)
-	}
-	if service.Port != nil {
-		fmt.Fprintf(output, "PGPORT=%d\n", *service.Port)
+	fmt.Fprintf(output, "PGHOST=%s\n", service.Host)
+	fmt.Fprintf(output, "PGPORT=%d\n", service.Port)
+	fmt.Fprintf(output, "PGDATABASE=%s\n", service.Database)
+	fmt.Fprintf(output, "PGUSER=%s\n", service.Role)
+	if service.Password != "" {
+		fmt.Fprintf(output, "PGPASSWORD=%s\n", service.Password)
 	}
 	return nil
 }
@@ -788,13 +776,13 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	}
 
 	// Output password if available
-	if service.Password != nil {
-		table.Append("Password", *service.Password)
+	if service.Password != "" {
+		table.Append("Password", service.Password)
 	}
 
 	// Output connection string if available
-	if service.ConnectionString != nil {
-		table.Append("Connection String", *service.ConnectionString)
+	if service.ConnectionString != "" {
+		table.Append("Connection String", service.ConnectionString)
 	}
 
 	return table.Render()
@@ -813,7 +801,7 @@ func outputServicesTable(services []OutputService, output io.Writer) error {
 			util.DerefStr(service.ServiceType),
 			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
-			util.Deref(service.ConnectionString),
+			service.ConnectionString,
 		)
 	}
 
@@ -844,13 +832,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 		}
 	} else {
-		outputSvc.Role = &connectionDetails.Role
-		outputSvc.Host = &connectionDetails.Host
-		outputSvc.Port = &connectionDetails.Port
-		outputSvc.Database = &connectionDetails.Database
-		if connectionDetails.Password != "" {
-			outputSvc.Password = &connectionDetails.Password
-		}
+		outputSvc.ConnectionDetails = *connectionDetails
 	}
 
 	if connectionString, err := password.BuildConnectionString(service, opts); err != nil {
@@ -858,7 +840,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection string: %v\n", err)
 		}
 	} else {
-		outputSvc.ConnectionString = &connectionString
+		outputSvc.ConnectionString = connectionString
 	}
 
 	return outputSvc

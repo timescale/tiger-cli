@@ -867,18 +867,18 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	outputSvc := prepareServiceForOutput(service, false, cmd.ErrOrStderr())
 
 	// Verify that password is removed
-	if outputSvc.Service.InitialPassword != nil {
+	if outputSvc.InitialPassword != nil {
 		t.Error("Expected InitialPassword to be nil when withPassword=false")
 	}
-	if outputSvc.Password != nil {
-		t.Error("Expected Password to be nil when withPassword=false")
+	if outputSvc.Password != "" {
+		t.Error("Expected Password to be empty when withPassword=false")
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+	if outputSvc.Name == nil || *outputSvc.Name != serviceName {
 		t.Error("Expected name to be preserved")
 	}
 }
@@ -911,18 +911,18 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	outputSvc := prepareServiceForOutput(service, true, cmd.ErrOrStderr())
 
 	// Verify that password is preserved
-	if outputSvc.Service.InitialPassword != nil {
+	if outputSvc.InitialPassword != nil {
 		t.Error("Expected InitialPassword to be nil when withPassword=true")
 	}
-	if outputSvc.Password == nil || *outputSvc.Password != initialPassword {
+	if outputSvc.Password == "" || outputSvc.Password != initialPassword {
 		t.Error("Expected Password to be preserved when withPassword=true")
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+	if outputSvc.Name == nil || *outputSvc.Name != serviceName {
 		t.Error("Expected name to be preserved")
 	}
 }
@@ -963,8 +963,8 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 		if service.InitialPassword != nil {
 			t.Errorf("Expected InitialPassword to be nil in sanitized service %d", i)
 		}
-		if service.Password != nil {
-			t.Errorf("Expected Password to be nil in sanitized service %d", i)
+		if service.Password != "" {
+			t.Errorf("Expected Password to be empty in sanitized service %d", i)
 		}
 
 		// Verify that other fields are preserved
