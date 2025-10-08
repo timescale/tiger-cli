@@ -1,6 +1,6 @@
 # Tiger CLI
 
-Tiger CLI is the command-line interface for managing databases on Tiger Cloud.
+Tiger CLI is the command-line interface for Tiger Cloud. It provides commands for managing and querying database services, as well as an integrated Model Context Protocol (MCP) server for use with AI assistants.
 
 ## Installation
 
@@ -165,6 +165,9 @@ The MCP server exposes the following tools to AI assistants:
 - `service_show` - Show detailed information about a specific service
 - `service_create` - Create new database services with configurable resources
 - `service_update_password` - Update the master password for a service
+
+**Database Operations:**
+- `db_execute_query` - Execute SQL queries against a database service with support for parameterized queries, custom timeouts, and connection pooling
 
 The MCP server automatically uses your CLI authentication and configuration, so no additional setup is required beyond `tiger auth login`.
 
