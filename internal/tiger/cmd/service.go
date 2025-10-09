@@ -605,6 +605,7 @@ type OutputService struct {
 	api.Service
 	password.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
+	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
 }
 
 // Convert to JSON to respect omitempty tags, then unmarshal
@@ -769,6 +770,9 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	if service.ConnectionString != "" {
 		table.Append("Connection String", service.ConnectionString)
 	}
+	if service.ConsoleURL != "" {
+		table.Append("Console URL", service.ConsoleURL)
+	}
 
 	return table.Render()
 }
@@ -819,6 +823,13 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	} else {
 		outputSvc.ConnectionDetails = *connectionDetails
 		outputSvc.ConnectionString = connectionDetails.String()
+	}
+
+	// Build console URL
+	cfg, err := config.Load()
+	if err == nil {
+		url := fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
+		outputSvc.ConsoleURL = url
 	}
 
 	return outputSvc
