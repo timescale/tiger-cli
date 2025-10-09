@@ -122,7 +122,7 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 
 func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// This test demonstrates that the warning functionality works
-	// by directly testing the password.BuildConnectionString function
+	// by directly testing the password.GetConnectionDetails function
 
 	// Service without connection pooler
 	service := api.Service{
@@ -137,7 +137,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 
 	// Request pooled connection when pooler is not available
-	connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordExclude,
@@ -150,8 +150,8 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 
 	// Should return direct connection string
 	expectedString := "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require"
-	if connectionString != expectedString {
-		t.Errorf("Expected connection string %q, got %q", expectedString, connectionString)
+	if details.String() != expectedString {
+		t.Errorf("Expected connection string %q, got %q", expectedString, details.String())
 	}
 
 	// Should have warning message on stderr
@@ -808,7 +808,7 @@ func TestBuildConnectionString(t *testing.T) {
 			errBuf := new(bytes.Buffer)
 			cmd.SetErr(errBuf)
 
-			result, err := password.BuildConnectionString(tc.service, password.ConnectionDetailsOptions{
+			result, err := password.GetConnectionDetails(tc.service, password.ConnectionDetailsOptions{
 				Pooled:       tc.pooled,
 				Role:         tc.role,
 				PasswordMode: password.PasswordExclude,
@@ -827,7 +827,7 @@ func TestBuildConnectionString(t *testing.T) {
 				return
 			}
 
-			if result != tc.expectedString {
+			if result.String() != tc.expectedString {
 				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result)
 			}
 
@@ -984,17 +984,18 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 	defer storage.Remove(service) // Clean up after test
 
-	// Test password.BuildConnectionString without password (default behavior)
+	// Test connection string without password (default behavior)
 	cmd := &cobra.Command{}
-	baseConnectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordExclude,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {
-		t.Fatalf("BuildConnectionString failed: %v", err)
+		t.Fatalf("GetConnectionDetails failed: %v", err)
 	}
+	baseConnectionString := details.String()
 
 	expectedBase := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
 	if baseConnectionString != expectedBase {
@@ -1006,16 +1007,17 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 		t.Errorf("Base connection string should not contain password, but it does: %s", baseConnectionString)
 	}
 
-	// Test password.BuildConnectionString with password (simulating --with-password flag)
-	connectionStringWithPassword, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+	// Test connection string with password (simulating --with-password flag)
+	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
 		PasswordMode: password.PasswordRequired,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {
-		t.Fatalf("BuildConnectionString with password failed: %v", err)
+		t.Fatalf("GetConnectionDetails with password failed: %v", err)
 	}
+	connectionStringWithPassword := details2.String()
 
 	expectedWithPassword := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
 	if connectionStringWithPassword != expectedWithPassword {

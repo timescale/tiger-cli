@@ -118,49 +118,12 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 	return details, nil
 }
 
-// BuildConnectionString creates a PostgreSQL connection string from service details
-//
-// The function supports various configuration options through ConnectionDetailsOptions:
-// - Pooled connections (if available on the service)
-// - With or without password embedded in the URI
-// - Custom database role/username
-// - Optional warning output when pooler is unavailable
-//
-// Examples:
-//
-//	// Simple connection string without password (for use with PGPASSWORD or ~/.pgpass)
-//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: false,
-//	})
-//
-//	// Connection string with password embedded
-//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//	})
-//
-//	// Pooled connection with warnings
-//	connStr, err := BuildConnectionString(service, ConnectionDetailsOptions{
-//		Pooled: true,
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//		WarnWriter: os.Stderr,
-//	})
-func BuildConnectionString(service api.Service, opts ConnectionDetailsOptions) (string, error) {
-	details, err := GetConnectionDetails(service, opts)
-	if err != nil {
-		return "", err
-	}
-
-	switch details.Password {
-	case "":
+// String creates a PostgreSQL connection string from service details
+func (d *ConnectionDetails) String() string {
+	if d.Password == "" {
 		// Build connection string without password (default behavior)
-		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-		// This ensures credentials are never visible in process arguments
-		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, details.Host, details.Port, details.Database), nil
-	default:
-		// Include password in connection string
-		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, details.Password, details.Host, details.Port, details.Database), nil
+		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", d.Role, d.Host, d.Port, d.Database)
 	}
+	// Include password in connection string
+	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", d.Role, d.Password, d.Host, d.Port, d.Database)
 }

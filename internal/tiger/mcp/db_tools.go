@@ -147,7 +147,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	service := *serviceResp.JSON200
 
 	// Build connection string with password
-	connString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		PasswordMode: password.PasswordRequired, // MCP always requires password
@@ -161,7 +161,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	defer cancel()
 
 	// Connect to database
-	conn, err := pgx.Connect(queryCtx, connString)
+	conn, err := pgx.Connect(queryCtx, details.String())
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to connect to database: %w", err)
 	}

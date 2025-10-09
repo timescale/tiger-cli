@@ -65,7 +65,7 @@ Examples:
 				passwordMode = password.PasswordRequired
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				PasswordMode: passwordMode,
@@ -75,7 +75,7 @@ Examples:
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
+			fmt.Fprintln(cmd.OutOrStdout(), details.String())
 			return nil
 		},
 	}
@@ -142,7 +142,7 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
 				PasswordMode: password.PasswordExclude,
@@ -153,7 +153,7 @@ Examples:
 			}
 
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, service, cmd)
+			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, cmd)
 		},
 	}
 
@@ -206,7 +206,7 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionDetailsOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				PasswordMode: password.PasswordOptional,
@@ -222,7 +222,7 @@ Examples:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), connectionString, dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details.String(), dbTestConnectionTimeout, cmd)
 		},
 	}
 
