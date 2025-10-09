@@ -2276,7 +2276,7 @@ type GetProjectsProjectIdServicesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Service
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2299,7 +2299,7 @@ type PostProjectsProjectIdServicesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
-	JSON400      *BadRequest
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2321,7 +2321,7 @@ func (r PostProjectsProjectIdServicesResponse) StatusCode() int {
 type DeleteProjectsProjectIdServicesServiceIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2344,7 +2344,7 @@ type GetProjectsProjectIdServicesServiceIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Service
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2367,9 +2367,7 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *SuccessMessage
-	JSON400      *BadRequest
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2392,8 +2390,7 @@ type PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *SuccessMessage
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2416,8 +2413,7 @@ type PostProjectsProjectIdServicesServiceIdDisablePoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2440,8 +2436,7 @@ type PostProjectsProjectIdServicesServiceIdEnablePoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2464,7 +2459,7 @@ type PostProjectsProjectIdServicesServiceIdForkServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2487,7 +2482,7 @@ type GetProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]ReadReplicaSet
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2510,7 +2505,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *ReadReplicaSet
-	JSON400      *BadRequest
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2532,7 +2527,7 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsResponse) StatusCode() 
 type DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2555,8 +2550,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerR
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2579,8 +2573,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerRe
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON404      *NotFound
-	JSON409      *Conflict
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2602,8 +2595,7 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoole
 type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2626,8 +2618,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2649,8 +2640,7 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironm
 type PostProjectsProjectIdServicesServiceIdResizeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2673,8 +2663,7 @@ type PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2697,8 +2686,7 @@ type PostProjectsProjectIdServicesServiceIdSetHAResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2720,8 +2708,7 @@ func (r PostProjectsProjectIdServicesServiceIdSetHAResponse) StatusCode() int {
 type PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2744,6 +2731,7 @@ type GetProjectsProjectIdVpcsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]VPC
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2766,7 +2754,7 @@ type PostProjectsProjectIdVpcsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *VPC
-	JSON400      *BadRequest
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2788,7 +2776,7 @@ func (r PostProjectsProjectIdVpcsResponse) StatusCode() int {
 type DeleteProjectsProjectIdVpcsVpcIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2811,7 +2799,7 @@ type GetProjectsProjectIdVpcsVpcIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *VPC
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2834,7 +2822,7 @@ type GetProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Peering
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2857,8 +2845,7 @@ type PostProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *Peering
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2880,7 +2867,7 @@ func (r PostProjectsProjectIdVpcsVpcIdPeeringsResponse) StatusCode() int {
 type DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2903,7 +2890,7 @@ type GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Peering
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -2926,8 +2913,7 @@ type PostProjectsProjectIdVpcsVpcIdRenameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *VPC
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -3340,12 +3326,12 @@ func ParseGetProjectsProjectIdServicesResponse(rsp *http.Response) (*GetProjects
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3373,12 +3359,12 @@ func ParsePostProjectsProjectIdServicesResponse(rsp *http.Response) (*PostProjec
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3399,12 +3385,12 @@ func ParseDeleteProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3432,12 +3418,12 @@ func ParseGetProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (*Ge
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3465,26 +3451,12 @@ func ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse(rsp *http.Re
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3512,19 +3484,12 @@ func ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse(rsp *http.
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3552,19 +3517,12 @@ func ParsePostProjectsProjectIdServicesServiceIdDisablePoolerResponse(rsp *http.
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3592,19 +3550,12 @@ func ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp *http.R
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3632,12 +3583,12 @@ func ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse(rsp *http.Re
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3665,12 +3616,12 @@ func ParseGetProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Res
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3698,12 +3649,12 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Re
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3724,12 +3675,12 @@ func ParseDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRespons
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3757,19 +3708,12 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3797,19 +3741,12 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON409 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3830,19 +3767,12 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRes
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3870,19 +3800,12 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnviro
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3903,19 +3826,12 @@ func ParsePostProjectsProjectIdServicesServiceIdResizeResponse(rsp *http.Respons
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3943,19 +3859,12 @@ func ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse(rsp *http
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -3983,19 +3892,12 @@ func ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp *http.Response
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4016,19 +3918,12 @@ func ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse(rsp *http
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4056,6 +3951,13 @@ func ParseGetProjectsProjectIdVpcsResponse(rsp *http.Response) (*GetProjectsProj
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -4082,12 +3984,12 @@ func ParsePostProjectsProjectIdVpcsResponse(rsp *http.Response) (*PostProjectsPr
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4108,12 +4010,12 @@ func ParseDeleteProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*DeleteP
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4141,12 +4043,12 @@ func ParseGetProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*GetProject
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4174,12 +4076,12 @@ func ParseGetProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*Ge
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4207,19 +4109,12 @@ func ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*P
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4240,12 +4135,12 @@ func ParseDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Re
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4273,12 +4168,12 @@ func ParseGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Respo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4306,19 +4201,12 @@ func ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp *http.Response) (*Pos
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 

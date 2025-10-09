@@ -321,23 +321,15 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 200:
-		if resp.JSON200 == nil {
-			return api.Service{}, fmt.Errorf("empty response from API")
-		}
-
-		return *resp.JSON200, nil
-
-	case 401:
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-	case 403:
-		return api.Service{}, exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
-	case 404:
-		return api.Service{}, exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-	default:
-		return api.Service{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 200 {
+		return api.Service{}, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
+
+	if resp.JSON200 == nil {
+		return api.Service{}, fmt.Errorf("empty response from API")
+	}
+
+	return *resp.JSON200, nil
 }
 
 // ArgsLenAtDashProvider defines the interface for getting ArgsLenAtDash

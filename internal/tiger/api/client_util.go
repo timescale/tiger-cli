@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -92,16 +93,29 @@ func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID str
 	}
 
 	// Check the response status
-	switch resp.StatusCode() {
-	case 401, 403:
-		return fmt.Errorf("invalid API key: authentication failed")
-	case 404:
-		// Project not found is OK - it means the API key is valid but project doesn't exist
+	if resp.StatusCode() != 200 {
+		if resp.StatusCode() == 404 {
+			// Project not found, but API key is valid
+			return nil
+		}
+		if resp.JSON4XX != nil {
+			return resp.JSON4XX
+		} else {
+			return errors.New("unexpected API response: 500")
+		}
+	} else {
 		return nil
-	case 200:
-		// Success - API key is valid
-		return nil
-	default:
-		return fmt.Errorf("unexpected API response: %d", resp.StatusCode())
 	}
+}
+
+// Error implements the error interface for the Error type.
+// This allows Error values to be used directly as Go errors.
+func (e *Error) Error() string {
+	if e == nil {
+		return "unknown error"
+	}
+	if e.Message != nil && *e.Message != "" {
+		return *e.Message
+	}
+	return "unknown error"
 }
