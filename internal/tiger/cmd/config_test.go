@@ -665,7 +665,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 		t.Fatalf("Failed to show config after unset: %v", err)
 	}
 
-	result = make(map[string]interface{})
+	result = make(map[string]any)
 	json.Unmarshal([]byte(showOutput), &result)
 	if result["project_id"] != nil {
 		t.Errorf("Expected empty project_id after unset, got %v", result["project_id"])
