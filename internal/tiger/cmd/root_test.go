@@ -73,7 +73,6 @@ analytics: true
 		"--config-dir", tmpDir,
 		"--project-id", "flag-project",
 		"--service-id", "flag-service",
-		"--output", "yaml",
 		"--analytics=false",
 		"--debug",
 		"version", // Need a subcommand to execute
@@ -91,9 +90,6 @@ analytics: true
 	if viper.GetString("project_id") != "flag-project" {
 		t.Errorf("Expected Viper project_id 'flag-project', got '%s'", viper.GetString("project_id"))
 	}
-	if viper.GetString("output") != "yaml" {
-		t.Errorf("Expected Viper output 'yaml', got '%s'", viper.GetString("output"))
-	}
 }
 
 func TestFlagBindingWithViper(t *testing.T) {
@@ -101,11 +97,11 @@ func TestFlagBindingWithViper(t *testing.T) {
 
 	// Set environment variable
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_OUTPUT", "json")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-1")
 
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_OUTPUT")
+		os.Unsetenv("TIGER_SERVICE_ID")
 	}()
 
 	// Test 1: Environment variable should be used when no flag is set
@@ -116,8 +112,8 @@ func TestFlagBindingWithViper(t *testing.T) {
 		t.Fatalf("Command execution failed: %v", err)
 	}
 
-	if viper.GetString("output") != "json" {
-		t.Errorf("Expected output 'json' from env var, got '%s'", viper.GetString("output"))
+	if viper.GetString("service_id") != "test-service-1" {
+		t.Errorf("Expected service_id 'test-service-1' from env var, got '%s'", viper.GetString("service_id"))
 	}
 
 	// Reset for next test
@@ -125,14 +121,14 @@ func TestFlagBindingWithViper(t *testing.T) {
 
 	// Test 2: Flag should override environment variable
 	testCmd2 := buildRootCmd()
-	testCmd2.SetArgs([]string{"--output", "table", "version"})
+	testCmd2.SetArgs([]string{"--service-id", "test-service-2", "version"})
 	err = testCmd2.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
 
-	if viper.GetString("output") != "table" {
-		t.Errorf("Expected output 'table' from flag, got '%s'", viper.GetString("output"))
+	if viper.GetString("service_id") != "test-service-2" {
+		t.Errorf("Expected service_id 'test-service-2' from flag, got '%s'", viper.GetString("service_id"))
 	}
 }
 

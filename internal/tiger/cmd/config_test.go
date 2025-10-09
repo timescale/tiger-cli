@@ -79,24 +79,26 @@ password_storage: pgpass
 	lines := strings.Split(output, "\n")
 
 	// Check table output contains all expected key:value lines
-	expectedLines := []string{
-		"  api_url:          https://test.api.com/v1",
-		"  console_url:      https://console.cloud.timescale.com",
-		"  gateway_url:      https://console.cloud.timescale.com/api",
-		"  docs_mcp:         true",
-		"  docs_mcp_url:     https://mcp.tigerdata.com/docs",
-		"  project_id:       test-project",
-		"  service_id:       test-service",
-		"  output:           table",
-		"  analytics:        false",
-		"  password_storage: pgpass",
-		"  debug:            false",
-		"  config_dir:       " + tmpDir,
+	expectedLines := map[string]string{
+		"api_url":          "https://test.api.com/v1",
+		"console_url":      "https://console.cloud.timescale.com",
+		"gateway_url":      "https://console.cloud.timescale.com/api",
+		"docs_mcp":         "true",
+		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
+		"project_id":       "test-project",
+		"service_id":       "test-service",
+		"output":           "table",
+		"analytics":        "false",
+		"password_storage": "pgpass",
+		"debug":            "false",
+		"config_dir":       tmpDir,
 	}
 
-	for _, expectedLine := range expectedLines {
-		if !slices.Contains(lines, expectedLine) {
-			t.Errorf("Output should contain line '%s', got: %s", expectedLine, output)
+	for key, expectedLine := range expectedLines {
+		if !slices.ContainsFunc(lines, func(line string) bool {
+			return strings.Contains(line, key) && strings.Contains(line, expectedLine)
+		}) {
+			t.Errorf("Output should contain line '%s':'%s', got: %s", key, expectedLine, output)
 		}
 	}
 }
@@ -209,11 +211,13 @@ password_storage: keyring
 	}
 }
 
-func TestConfigShow_EmptyValues(t *testing.T) {
+func TestConfigShow_OutputValueUnaffectedByCliArg(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
 
-	// Create minimal config (only defaults)
-	configContent := `output: table
+	// Create config file with table as default output
+	configContent := `api_url: https://test.api.com/v1
+project_id: test-project
+output: table
 analytics: true
 `
 	configFile := config.GetConfigFile(tmpDir)
@@ -221,14 +225,56 @@ analytics: true
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
+	// Test that -o json flag overrides config file setting for output format, but not the config value itself
+	output, err := executeConfigCommand("config", "show", "-o", "json")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	// Should be valid JSON, not table format
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
+	}
+
+	if result["output"] != "table" {
+		t.Errorf("Expected output 'table' in JSON output, got %v", result["output"])
+	}
+}
+
+func TestConfigShow_OutputValueUnaffectedByEnvVar(t *testing.T) {
+	tmpDir, _ := setupConfigTest(t)
+
+	// Create config file with table as default output
+	configContent := `api_url: https://test.api.com/v1
+project_id: test-project
+output: table
+analytics: true
+`
+	configFile := config.GetConfigFile(tmpDir)
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Test that env overrides config file setting for output format, but not the config value itself
+	os.Setenv("TIGER_OUTPUT", "json")
+	defer func() {
+		os.Unsetenv("TIGER_OUTPUT")
+	}()
+
 	output, err := executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
 
-	// Check that empty values show "(not set)"
-	if !strings.Contains(output, "(not set)") {
-		t.Error("Output should contain '(not set)' for empty values")
+	// Should be valid JSON, not table format
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
+	}
+
+	if result["output"] != "table" {
+		t.Errorf("Expected output 'table' in JSON output, got %v", result["output"])
 	}
 }
 
@@ -582,26 +628,6 @@ func TestConfigReset(t *testing.T) {
 	}
 }
 
-func TestValueOrEmpty(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"", "(not set)"},
-		{"value", "value"},
-		{"test-string", "test-string"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := valueOrEmpty(tt.input)
-			if result != tt.expected {
-				t.Errorf("valueOrEmpty(%q) = %q, expected %q", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestConfigCommands_Integration(t *testing.T) {
 	_, _ = setupConfigTest(t)
 
@@ -646,6 +672,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 		t.Fatalf("Failed to show config after unset: %v", err)
 	}
 
+	result = make(map[string]any)
 	json.Unmarshal([]byte(showOutput), &result)
 	if result["project_id"] != "" {
 		t.Errorf("Expected empty project_id after unset, got %v", result["project_id"])

@@ -657,7 +657,7 @@ func TestOutputService_JSON(t *testing.T) {
 	}
 
 	// Verify that initialpassword is NOT in the output
-	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") || strings.Contains(output, "initial_password") {
+	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") || strings.Contains(output, "initial_password") || strings.Contains(output, "password") {
 		t.Errorf("JSON output should not contain initialpassword field, got: %s", output)
 	}
 
@@ -682,6 +682,9 @@ func TestOutputService_JSON(t *testing.T) {
 	}
 	if _, exists := jsonMap["initialpassword"]; exists {
 		t.Error("JSON should not contain initialpassword field")
+	}
+	if _, exists := jsonMap["password"]; exists {
+		t.Error("JSON should not contain password field")
 	}
 }
 
@@ -723,7 +726,7 @@ func TestOutputService_YAML(t *testing.T) {
 	}
 
 	// Verify that initialpassword is NOT in the output
-	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") {
+	if strings.Contains(output, "secret-password-123") || strings.Contains(output, "initialpassword") || strings.Contains(output, "password") {
 		t.Errorf("YAML output should not contain initialpassword field, got: %s", output)
 	}
 
@@ -748,6 +751,9 @@ func TestOutputService_YAML(t *testing.T) {
 	}
 	if _, exists := yamlMap["initialpassword"]; exists {
 		t.Error("YAML should not contain initialpassword field")
+	}
+	if _, exists := yamlMap["password"]; exists {
+		t.Error("YAML should not contain password field")
 	}
 }
 
@@ -861,15 +867,18 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	outputSvc := prepareServiceForOutput(service, false, cmd.ErrOrStderr())
 
 	// Verify that password is removed
-	if outputSvc.Service.InitialPassword != nil {
+	if outputSvc.InitialPassword != nil {
 		t.Error("Expected InitialPassword to be nil when withPassword=false")
+	}
+	if outputSvc.Password != "" {
+		t.Error("Expected Password to be empty when withPassword=false")
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+	if outputSvc.Name == nil || *outputSvc.Name != serviceName {
 		t.Error("Expected name to be preserved")
 	}
 }
@@ -879,11 +888,17 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	serviceID := "svc-12345"
 	serviceName := "test-service"
 	initialPassword := "secret-password-123"
+	serviceHost := "test.tigerdata.com"
+	servicePort := 5432
 
 	service := api.Service{
 		ServiceId:       &serviceID,
 		Name:            &serviceName,
 		InitialPassword: &initialPassword,
+		Endpoint: &api.Endpoint{
+			Host: &serviceHost,
+			Port: &servicePort,
+		},
 	}
 
 	// Mock a cobra command for testing
@@ -896,15 +911,18 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	outputSvc := prepareServiceForOutput(service, true, cmd.ErrOrStderr())
 
 	// Verify that password is preserved
-	if outputSvc.Service.InitialPassword == nil || *outputSvc.Service.InitialPassword != initialPassword {
-		t.Error("Expected InitialPassword to be preserved when withPassword=true")
+	if outputSvc.InitialPassword != nil {
+		t.Error("Expected InitialPassword to be nil when withPassword=true")
+	}
+	if outputSvc.Password == "" || outputSvc.Password != initialPassword {
+		t.Error("Expected Password to be preserved when withPassword=true")
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.Service.ServiceId == nil || *outputSvc.Service.ServiceId != serviceID {
+	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
-	if outputSvc.Service.Name == nil || *outputSvc.Service.Name != serviceName {
+	if outputSvc.Name == nil || *outputSvc.Name != serviceName {
 		t.Error("Expected name to be preserved")
 	}
 }
@@ -944,6 +962,9 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 	for i, service := range sanitized {
 		if service.InitialPassword != nil {
 			t.Errorf("Expected InitialPassword to be nil in sanitized service %d", i)
+		}
+		if service.Password != "" {
+			t.Errorf("Expected Password to be empty in sanitized service %d", i)
 		}
 
 		// Verify that other fields are preserved
