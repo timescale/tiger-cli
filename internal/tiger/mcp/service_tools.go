@@ -79,24 +79,24 @@ func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
 
-// ServiceShowInput represents input for service_show
-type ServiceShowInput struct {
+// ServiceGetInput represents input for service_get
+type ServiceGetInput struct {
 	ServiceID string `json:"service_id"`
 }
 
-func (ServiceShowInput) Schema() *jsonschema.Schema {
-	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
+func (ServiceGetInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceGetInput](nil))
 	setServiceIDSchemaProperties(schema)
 	return schema
 }
 
-// ServiceShowOutput represents output for service_show
-type ServiceShowOutput struct {
+// ServiceGetOutput represents output for service_get
+type ServiceGetOutput struct {
 	Service ServiceDetail `json:"service"`
 }
 
-func (ServiceShowOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceShowOutput](nil))
+func (ServiceGetOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceGetOutput](nil))
 }
 
 // ServiceDetail represents detailed service information
@@ -231,19 +231,19 @@ func (s *Server) registerServiceTools() {
 		},
 	}, s.handleServiceList)
 
-	// service_show
+	// service_get
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "service_show",
-		Title: "Show Service Details",
+		Name:  "service_get",
+		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
 			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
-		InputSchema:  ServiceShowInput{}.Schema(),
-		OutputSchema: ServiceShowOutput{}.Schema(),
+		InputSchema:  ServiceGetInput{}.Schema(),
+		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
-			Title:        "Show Service Details",
+			Title:        "Get Service Details",
 		},
-	}, s.handleServiceShow)
+	}, s.handleServiceGet)
 
 	// service_create
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -327,21 +327,21 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	return nil, output, nil
 }
 
-// handleServiceShow handles the service_show MCP tool
-func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest, input ServiceShowInput) (*mcp.CallToolResult, ServiceShowOutput, error) {
+// handleServiceGet handles the service_get MCP tool
+func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
-		return nil, ServiceShowOutput{}, err
+		return nil, ServiceGetOutput{}, err
 	}
 
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return nil, ServiceShowOutput{}, err
+		return nil, ServiceGetOutput{}, err
 	}
 
-	logging.Debug("MCP: Showing service details",
+	logging.Debug("MCP: Getting service details",
 		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
@@ -351,16 +351,16 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
-		return nil, ServiceShowOutput{}, fmt.Errorf("failed to get service details: %w", err)
+		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return nil, ServiceShowOutput{}, resp.JSON4XX
+		return nil, ServiceGetOutput{}, resp.JSON4XX
 	}
 
 	service := *resp.JSON200
-	output := ServiceShowOutput{
+	output := ServiceGetOutput{
 		Service: s.convertToServiceDetail(service),
 	}
 

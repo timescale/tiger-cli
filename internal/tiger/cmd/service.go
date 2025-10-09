@@ -34,7 +34,7 @@ func buildServiceCmd() *cobra.Command {
 	}
 
 	// Add all subcommands
-	cmd.AddCommand(buildServiceDescribeCmd())
+	cmd.AddCommand(buildServiceGetCmd())
 	cmd.AddCommand(buildServiceListCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
@@ -44,14 +44,15 @@ func buildServiceCmd() *cobra.Command {
 	return cmd
 }
 
-// serviceDescribeCmd represents the describe command under service
-func buildServiceDescribeCmd() *cobra.Command {
+// buildServiceGetCmd represents the get command under service
+func buildServiceGetCmd() *cobra.Command {
 	var withPassword bool
 	var output string
 
 	cmd := &cobra.Command{
-		Use:   "describe [service-id]",
-		Short: "Show detailed information about a service",
+		Use:     "get [service-id]",
+		Aliases: []string{"describe", "show"},
+		Short:   "Show detailed information about a service",
 		Long: `Show detailed information about a specific database service.
 
 The service ID can be provided as an argument or will use the default service
@@ -59,17 +60,17 @@ from your configuration. This command displays comprehensive information about
 the service including configuration, status, endpoints, and resource usage.
 
 Examples:
-  # Describe default service
-  tiger service describe
+  # Get default service details
+  tiger service get
 
-  # Describe specific service
-  tiger service describe svc-12345
+  # Get specific service details
+  tiger service get svc-12345
 
   # Get service details in JSON format
-  tiger service describe svc-12345 --output json
+  tiger service get svc-12345 --output json
 
   # Get service details in YAML format
-  tiger service describe svc-12345 --output yaml`,
+  tiger service get svc-12345 --output yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
