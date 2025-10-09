@@ -15,18 +15,33 @@ import (
 )
 
 type Config struct {
-	APIURL          string `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
-	ConsoleURL      string `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
-	GatewayURL      string `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
-	DocsMCP         bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
-	DocsMCPURL      string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
-	ProjectID       string `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
-	ServiceID       string `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
-	Output          string `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
-	Analytics       bool   `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
-	PasswordStorage string `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
-	Debug           bool   `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
-	ConfigDir       string `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
+	APIURL          string `mapstructure:"api_url" yaml:"api_url"`
+	ConsoleURL      string `mapstructure:"console_url" yaml:"console_url"`
+	GatewayURL      string `mapstructure:"gateway_url" yaml:"gateway_url"`
+	DocsMCP         bool   `mapstructure:"docs_mcp" yaml:"docs_mcp"`
+	DocsMCPURL      string `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
+	ProjectID       string `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID       string `mapstructure:"service_id" yaml:"service_id"`
+	Output          string `mapstructure:"output" yaml:"output"`
+	Analytics       bool   `mapstructure:"analytics" yaml:"analytics"`
+	PasswordStorage string `mapstructure:"password_storage" yaml:"password_storage"`
+	Debug           bool   `mapstructure:"debug" yaml:"debug"`
+	ConfigDir       string `mapstructure:"config_dir" yaml:"-"`
+}
+
+type ConfigOutput struct {
+	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
+	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
+	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
+	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
+	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
+	ProjectID       *string `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
+	ServiceID       *string `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Output          *string `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
+	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
+	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
+	Debug           *bool   `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
+	ConfigDir       *string `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
 }
 
 const (
@@ -97,11 +112,24 @@ func SetupViper(configDir string) error {
 
 func FromViper(v *viper.Viper) (*Config, error) {
 	cfg := &Config{
-		ConfigDir: GetConfigDir(),
+		ConfigDir: filepath.Dir(v.ConfigFileUsed()),
 	}
 
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
+	configDir := filepath.Dir(v.ConfigFileUsed())
+	cfg := &ConfigOutput{
+		ConfigDir: &configDir,
+	}
+
+	if err := v.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
 
 	return cfg, nil

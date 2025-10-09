@@ -88,7 +88,9 @@ password_storage: pgpass
 		"project_id":       "test-project",
 		"service_id":       "test-service",
 		"output":           "table",
+		"analytics":        "false",
 		"password_storage": "pgpass",
+		"debug":            "false",
 		"config_dir":       tmpDir,
 	}
 
@@ -135,9 +137,11 @@ password_storage: none
 		"docs_mcp":         true,
 		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
 		"project_id":       "json-project",
+		"service_id":       "",
 		"output":           "json",
 		"analytics":        true,
 		"password_storage": "none",
+		"debug":            false,
 		"config_dir":       tmpDir,
 	}
 
@@ -187,8 +191,11 @@ password_storage: keyring
 		"docs_mcp":         true,
 		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
 		"project_id":       "yaml-project",
+		"service_id":       "",
 		"output":           "yaml",
+		"analytics":        false,
 		"password_storage": "keyring",
+		"debug":            false,
 		"config_dir":       tmpDir,
 	}
 
@@ -667,7 +674,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 
 	result = make(map[string]any)
 	json.Unmarshal([]byte(showOutput), &result)
-	if result["project_id"] != nil {
+	if result["project_id"] != "" {
 		t.Errorf("Expected empty project_id after unset, got %v", result["project_id"])
 	}
 
