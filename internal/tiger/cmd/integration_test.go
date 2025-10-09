@@ -81,7 +81,7 @@ func executeIntegrationCommand(args ...string) (string, error) {
 }
 
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
-// login -> whoami -> create -> describe -> update-password -> delete -> logout
+// login -> whoami -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
@@ -214,22 +214,22 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("DescribeService", func(t *testing.T) {
+	t.Run("GetService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
 		}
 
-		t.Logf("Describing service: %s", serviceID)
+		t.Logf("Getting service details: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
-			"service", "describe", serviceID,
+			"service", "get", serviceID,
 			"--output", "json",
 		)
 
-		t.Logf("Raw service describe output: %s", output)
+		t.Logf("Raw service get output: %s", output)
 
 		if err != nil {
-			t.Fatalf("Service describe failed: %v\nOutput: %s", err, output)
+			t.Fatalf("Service get failed: %v\nOutput: %s", err, output)
 		}
 
 		// Parse JSON to verify service details
@@ -388,14 +388,14 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		t.Logf("Verifying service %s no longer exists", deletedServiceID)
 
-		// Try to describe the deleted service - should fail
+		// Try to get the deleted service - should fail
 		output, err := executeIntegrationCommand(
-			"service", "describe", deletedServiceID,
+			"service", "get", deletedServiceID,
 		)
 
 		// We expect this to fail since the service should be deleted
 		if err == nil {
-			t.Errorf("Expected service describe to fail for deleted service, but got output: %s", output)
+			t.Errorf("Expected service get to fail for deleted service, but got output: %s", output)
 		}
 
 		// Check that error indicates service not found
@@ -531,8 +531,8 @@ func TestServiceNotFound(t *testing.T) {
 		reason           string
 	}{
 		{
-			name:             "service describe",
-			args:             []string{"service", "describe", nonExistentServiceID},
+			name:             "service get",
+			args:             []string{"service", "get", nonExistentServiceID},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
@@ -703,8 +703,8 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 			args: []string{"service", "list", "--project-id", projectID},
 		},
 		{
-			name: "service describe",
-			args: []string{"service", "describe", "non-existent-service", "--project-id", projectID},
+			name: "service get",
+			args: []string{"service", "get", "non-existent-service", "--project-id", projectID},
 		},
 		{
 			name: "service create",

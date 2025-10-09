@@ -84,7 +84,7 @@ Tiger CLI provides the following commands:
 - `tiger service` - Service lifecycle management
   - `list` - List all services
   - `create` - Create a new service
-  - `describe` - Show detailed service information
+  - `get` - Show detailed service information (aliases: `describe`, `show`)
   - `fork` - Fork an existing service
   - `delete` - Delete a service
   - `update-password` - Update service master password
@@ -162,7 +162,7 @@ The MCP server exposes the following tools to AI assistants:
 
 **Service Management:**
 - `service_list` - List all database services in your project
-- `service_show` - Show detailed information about a specific service
+- `service_get` - Get detailed information about a specific service
 - `service_create` - Create new database services with configurable resources
 - `service_update_password` - Update the master password for a service
 

@@ -73,7 +73,7 @@ For the initial v0 release, implement these essential commands first:
 
 **Core Service Management:**
 - `tiger service list` - List all services
-- `tiger service describe` - Show service details
+- `tiger service get` - Show service details (aliases: `describe`, `show`)
 - `tiger service create` - Create new services
 - `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
@@ -172,7 +172,7 @@ Manage database services.
 
 **Subcommands:**
 - `list`: List all services
-- `describe`: Show service details
+- `get`: Show service details (aliases: `describe`, `show`)
 - `create`: Create a new service
 - `delete`: Delete a service
 - `start`: Start a service
@@ -207,9 +207,11 @@ tiger service list
 tiger services list
 tiger svc list
 
-# Show service details
-tiger service describe svc-12345
-tiger svc describe svc-12345
+# Show service details (all forms work)
+tiger service get svc-12345
+tiger service describe svc-12345  # alias
+tiger service show svc-12345      # alias
+tiger svc get svc-12345
 
 # Create a TimescaleDB service
 tiger service create \
@@ -685,7 +687,7 @@ svc-12345  production-db  running   production
 Errors are returned with descriptive messages and appropriate exit codes:
 
 ```bash
-$ tiger service describe invalid-id
+$ tiger service get invalid-id
 Error: Service 'invalid-id' not found in project 'proj-12345'
 Use 'tiger service list' to see available services.
 ```
@@ -795,7 +797,7 @@ tiger db connection-string svc-12345
 ### Monitoring and Maintenance
 ```bash
 # Check service status
-tiger service describe svc-12345
+tiger service get svc-12345
 
 # Update service password
 tiger service update-password svc-12345 --password new-secure-password
@@ -811,7 +813,7 @@ Commands follow consistent patterns for specifying service IDs:
 **Single-service commands** (verbs acting on one service):
 - Use positional `<service-id>` as the canonical parameter
 - Support `--service-id` flag as an alias/override
-- Examples: `tiger service describe <service-id>`, `tiger db connect <service-id>`
+- Examples: `tiger service get <service-id>`, `tiger db connect <service-id>`
 
 **Global context commands** (acting on other resources with service as secondary):
 - Use `--service-id` flag as the canonical parameter  

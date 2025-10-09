@@ -18,7 +18,7 @@ For the initial v0 release, implement these essential tools first:
 
 **Core Service Management:**
 - `tiger_service_list` - List all services
-- `tiger_service_show` - Show service details  
+- `tiger_service_get` - Get service details
 - `tiger_service_create` - Create new services
 - `tiger_service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `tiger_service_update_password` - Update service master password
@@ -155,11 +155,11 @@ List all database services.
 
 **Returns:** Array of service objects with id, name, status, type, region, and resource information.
 
-#### `tiger_service_show`
-Show details of a specific service.
+#### `tiger_service_get`
+Get details of a specific service.
 
 **Parameters:**
-- `service_id` (string, required): Service ID to show
+- `service_id` (string, required): Service ID to get
 
 **Returns:** Detailed service object with configuration, endpoints, and status.
 
