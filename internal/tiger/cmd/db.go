@@ -325,6 +325,10 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 		return api.Service{}, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
+	if resp.JSON200 == nil {
+		return api.Service{}, fmt.Errorf("empty response from API")
+	}
+
 	return *resp.JSON200, nil
 }
 

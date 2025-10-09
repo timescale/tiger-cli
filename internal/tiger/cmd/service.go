@@ -194,6 +194,12 @@ func buildServiceListCmd() *cobra.Command {
 				return nil
 			}
 
+			if resp.JSON200 == nil {
+				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				return nil
+			}
+
 			// Output services in requested format
 			return outputServices(cmd, services, cfg.Output, withPassword)
 		},
