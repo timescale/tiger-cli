@@ -140,25 +140,14 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
-	switch serviceResp.StatusCode() {
-	case 200:
-		if serviceResp.JSON200 == nil {
-			return nil, DBExecuteQueryOutput{}, fmt.Errorf("empty response from API")
-		}
-	case 401:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("authentication failed: invalid API key")
-	case 403:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("permission denied: insufficient access to service")
-	case 404:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
-	default:
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("API request failed with status %d", serviceResp.StatusCode())
+	if serviceResp.StatusCode() != 200 {
+		return nil, DBExecuteQueryOutput{}, serviceResp.JSON4XX
 	}
 
 	service := *serviceResp.JSON200
 
 	// Build connection string with password
-	connString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		PasswordMode: password.PasswordRequired, // MCP always requires password
@@ -172,7 +161,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	defer cancel()
 
 	// Connect to database
-	conn, err := pgx.Connect(queryCtx, connString)
+	conn, err := pgx.Connect(queryCtx, details.String())
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to connect to database: %w", err)
 	}

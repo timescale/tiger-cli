@@ -18,7 +18,7 @@ For the initial v0 release, implement these essential tools first:
 
 **Core Service Management:**
 - `tiger_service_list` - List all services
-- `tiger_service_show` - Show service details  
+- `tiger_service_get` - Get service details
 - `tiger_service_create` - Create new services
 - `tiger_service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `tiger_service_update_password` - Update service master password
@@ -155,11 +155,11 @@ List all database services.
 
 **Returns:** Array of service objects with id, name, status, type, region, and resource information.
 
-#### `tiger_service_show`
-Show details of a specific service.
+#### `tiger_service_get`
+Get details of a specific service.
 
 **Parameters:**
-- `service_id` (string, required): Service ID to show
+- `service_id` (string, required): Service ID to get
 - `with_password` (boolean, optional): Include password in response and connection string - default: false
 
 **Returns:** Detailed service object with configuration, endpoints, status, and connection string. When `with_password=true`, the response includes the password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
@@ -328,8 +328,8 @@ Execute a SQL query on a service database.
 
 ### High-Availability Management
 
-#### `tiger_ha_show`
-Show current HA configuration for a service.
+#### `tiger_ha_get`
+Get current HA configuration for a service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID
@@ -355,8 +355,8 @@ List all read replica sets for a service.
 
 **Returns:** Array of read replica set objects.
 
-#### `tiger_read_replica_show`
-Show details of a specific read replica set.
+#### `tiger_read_replica_get`
+Get details of a specific read replica set.
 
 **Parameters:**
 - `replica_set_id` (string, required): Replica set ID
@@ -438,11 +438,11 @@ List all Virtual Private Clouds.
 
 **Returns:** Array of VPC objects with id, name, CIDR, and region information.
 
-#### `tiger_vpc_show`
-Show details of a specific VPC.
+#### `tiger_vpc_get`
+Get details of a specific VPC.
 
 **Parameters:**
-- `vpc_id` (string, required): VPC ID to show
+- `vpc_id` (string, required): VPC ID to get
 
 **Returns:** Detailed VPC object with configuration and attached services.
 
@@ -509,8 +509,8 @@ List all peering connections for a VPC.
 
 **Returns:** Array of peering connection objects.
 
-#### `tiger_vpc_peering_show`
-Show details of a specific peering connection.
+#### `tiger_vpc_peering_get`
+Get details of a specific peering connection.
 
 **Parameters:**
 - `vpc_id` (string, required): VPC ID

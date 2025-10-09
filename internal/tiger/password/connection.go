@@ -34,8 +34,8 @@ func GetPasswordMode(required bool) PasswordMode {
 	return PasswordExclude
 }
 
-// ConnectionStringOptions configures how the connection string is built
-type ConnectionStringOptions struct {
+// ConnectionDetailsOptions configures how the connection string is built
+type ConnectionDetailsOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
 	Pooled bool
 
@@ -55,38 +55,17 @@ type ConnectionStringOptions struct {
 	WarnWriter io.Writer
 }
 
-// BuildConnectionString creates a PostgreSQL connection string from service details
-//
-// The function supports various configuration options through ConnectionStringOptions:
-// - Pooled connections (if available on the service)
-// - With or without password embedded in the URI
-// - Custom database role/username
-// - Optional warning output when pooler is unavailable
-//
-// Examples:
-//
-//	// Simple connection string without password (for use with PGPASSWORD or ~/.pgpass)
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: false,
-//	})
-//
-//	// Connection string with password embedded
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//	})
-//
-//	// Pooled connection with warnings
-//	connStr, err := BuildConnectionString(service, ConnectionStringOptions{
-//		Pooled: true,
-//		Role: "tsdbadmin",
-//		WithPassword: true,
-//		WarnWriter: os.Stderr,
-//	})
-func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (string, error) {
+type ConnectionDetails struct {
+	Role     string `json:"role,omitempty" yaml:"role,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+	Host     string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`
+	Database string `json:"database,omitempty" yaml:"database,omitempty"`
+}
+
+func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
 	if service.Endpoint == nil {
-		return "", fmt.Errorf("service endpoint not available")
+		return nil, fmt.Errorf("service endpoint not available")
 	}
 
 	// Use pooler endpoint if requested and available, otherwise use direct endpoint
@@ -102,56 +81,61 @@ func BuildConnectionString(service api.Service, opts ConnectionStringOptions) (s
 	}
 
 	if endpoint.Host == nil {
-		return "", fmt.Errorf("endpoint host not available")
+		return nil, fmt.Errorf("endpoint host not available")
 	}
-	host := *endpoint.Host
 
-	port := 5432 // Default PostgreSQL port
+	details := &ConnectionDetails{
+		Role:     opts.Role,
+		Host:     *endpoint.Host,
+		Port:     5432,   // Default PostgreSQL port
+		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
+	}
 	if endpoint.Port != nil {
-		port = *endpoint.Port
+		details.Port = *endpoint.Port
 	}
 
-	// Database is always "tsdb" for TimescaleDB/PostgreSQL services
-	database := "tsdb"
-
-	// Build connection string in PostgreSQL URI format
-	switch opts.PasswordMode {
-	case PasswordRequired:
-		// Password is required - use InitialPassword if provided, otherwise fetch from storage
+	if opts.PasswordMode == PasswordRequired || opts.PasswordMode == PasswordOptional {
 		var password string
 		if opts.InitialPassword != "" {
 			password = opts.InitialPassword
-		} else {
-			var err error
-			if password, err = GetPassword(service); err != nil {
-				return "", err
+		}
+		if password == "" {
+			storage := GetPasswordStorage()
+			if storedPassword, err := storage.Get(service); err != nil && opts.PasswordMode == PasswordRequired {
+				// Provide specific error messages based on storage type
+				switch storage.(type) {
+				case *NoStorage:
+					return nil, fmt.Errorf("password storage is disabled (--password-storage=none)")
+				case *KeyringStorage:
+					return nil, fmt.Errorf("no password found in keyring for this service")
+				case *PgpassStorage:
+					return nil, fmt.Errorf("no password found in ~/.pgpass for this service")
+				default:
+					return nil, fmt.Errorf("failed to retrieve password: %w", err)
+				}
+			} else {
+				password = storedPassword
 			}
 		}
 
-		// Include password in connection string
-		return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
-	case PasswordOptional:
-		// Try to include password - use InitialPassword if provided, otherwise try fetching from storage
-		var password string
-		if opts.InitialPassword != "" {
-			password = opts.InitialPassword
-		} else {
-			password, _ = GetPassword(service) // Ignore error for optional mode
+		if password == "" && opts.PasswordMode == PasswordRequired {
+			return nil, fmt.Errorf("no password available for service")
 		}
 
-		// Only include password if we have one
-		if password != "" {
-			return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", opts.Role, password, host, port, database), nil
-		} else {
-			// Fall back to connection string without password
-			return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
-		}
-	default: // PasswordExclude
-		// Build connection string without password (default behavior)
-		// Password is handled separately via PGPASSWORD env var or ~/.pgpass file
-		// This ensures credentials are never visible in process arguments
-		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", opts.Role, host, port, database), nil
+		details.Password = password
 	}
+
+	return details, nil
+}
+
+// String creates a PostgreSQL connection string from service details
+func (d *ConnectionDetails) String() string {
+	if d.Password == "" {
+		// Build connection string without password (default behavior)
+		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", d.Role, d.Host, d.Port, d.Database)
+	}
+	// Include password in connection string
+	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", d.Role, d.Password, d.Host, d.Port, d.Database)
 }
 
 // GetPassword fetches the password for the specified service from the

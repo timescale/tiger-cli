@@ -88,7 +88,7 @@ go test ./internal/tiger/cmd -v -run Integration
 ### What Integration Tests Cover
 
 - **Authentication lifecycle**: Login with credentials, verify authentication, logout
-- **Service management**: Create, list, describe, and delete database services
+- **Service management**: Create, list, get, and delete database services
 - **Password management**: Update service passwords with keychain storage
 - **Database connectivity**: Generate connection strings and execute psql commands
 - **Output formats**: Validate JSON, YAML, and table output formats

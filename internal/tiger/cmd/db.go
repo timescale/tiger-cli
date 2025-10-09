@@ -60,7 +60,7 @@ Examples:
 				return err
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
@@ -70,7 +70,7 @@ Examples:
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), connectionString)
+			fmt.Fprintln(cmd.OutOrStdout(), details.String())
 			return nil
 		},
 	}
@@ -137,7 +137,7 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
 				PasswordMode: password.PasswordExclude,
@@ -148,7 +148,7 @@ Examples:
 			}
 
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(connectionString, psqlPath, psqlFlags, service, cmd)
+			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, cmd)
 		},
 	}
 
@@ -201,7 +201,7 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				PasswordMode: password.PasswordOptional,
@@ -217,7 +217,7 @@ Examples:
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), connectionString, dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details.String(), dbTestConnectionTimeout, cmd)
 		},
 	}
 
@@ -292,23 +292,15 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 200:
-		if resp.JSON200 == nil {
-			return api.Service{}, fmt.Errorf("empty response from API")
-		}
-
-		return *resp.JSON200, nil
-
-	case 401:
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-	case 403:
-		return api.Service{}, exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
-	case 404:
-		return api.Service{}, exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-	default:
-		return api.Service{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 200 {
+		return api.Service{}, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
+
+	if resp.JSON200 == nil {
+		return api.Service{}, fmt.Errorf("empty response from API")
+	}
+
+	return *resp.JSON200, nil
 }
 
 // ArgsLenAtDashProvider defines the interface for getting ArgsLenAtDash

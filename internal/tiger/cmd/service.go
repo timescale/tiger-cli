@@ -34,7 +34,7 @@ func buildServiceCmd() *cobra.Command {
 	}
 
 	// Add all subcommands
-	cmd.AddCommand(buildServiceDescribeCmd())
+	cmd.AddCommand(buildServiceGetCmd())
 	cmd.AddCommand(buildServiceListCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
@@ -44,13 +44,15 @@ func buildServiceCmd() *cobra.Command {
 	return cmd
 }
 
-// serviceDescribeCmd represents the describe command under service
-func buildServiceDescribeCmd() *cobra.Command {
+// buildServiceGetCmd represents the get command under service
+func buildServiceGetCmd() *cobra.Command {
 	var withPassword bool
+	var output string
 
 	cmd := &cobra.Command{
-		Use:   "describe [service-id]",
-		Short: "Show detailed information about a service",
+		Use:     "get [service-id]",
+		Aliases: []string{"describe", "show"},
+		Short:   "Show detailed information about a service",
 		Long: `Show detailed information about a specific database service.
 
 The service ID can be provided as an argument or will use the default service
@@ -58,22 +60,27 @@ from your configuration. This command displays comprehensive information about
 the service including configuration, status, endpoints, and resource usage.
 
 Examples:
-  # Describe default service
-  tiger service describe
+  # Get default service details
+  tiger service get
 
-  # Describe specific service
-  tiger service describe svc-12345
+  # Get specific service details
+  tiger service get svc-12345
 
   # Get service details in JSON format
-  tiger service describe svc-12345 --output json
+  tiger service get svc-12345 --output json
 
   # Get service details in YAML format
-  tiger service describe svc-12345 --output yaml`,
+  tiger service get svc-12345 --output yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -117,30 +124,23 @@ Examples:
 			}
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				if resp.JSON200 == nil {
-					return fmt.Errorf("empty response from API")
-				}
-
-				service := *resp.JSON200
-
-				// Output service in requested format
-				return outputService(cmd, service, cfg.Output, withPassword)
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to service"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			if resp.StatusCode() != 200 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+
+			service := *resp.JSON200
+
+			// Output service in requested format
+			return outputService(cmd, service, cfg.Output, withPassword)
 		},
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -148,6 +148,7 @@ Examples:
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
 	var withPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -158,6 +159,11 @@ func buildServiceListCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -191,38 +197,30 @@ func buildServiceListCmd() *cobra.Command {
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				// Success - process services
-				if resp.JSON200 == nil {
-					fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-					fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-					return nil
-				}
-
-				services := *resp.JSON200
-				if len(services) == 0 {
-					fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-					fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-					return nil
-				}
-
-				// Output services in requested format
-				return outputServices(cmd, services, cfg.Output, withPassword)
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to project"))
-			case 404:
-				return fmt.Errorf("project not found")
-			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			if resp.StatusCode() != 200 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			services := *resp.JSON200
+			if len(services) == 0 {
+				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				return nil
+			}
+
+			if resp.JSON200 == nil {
+				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				return nil
+			}
+
+			// Output services in requested format
+			return outputServices(cmd, services, cfg.Output, withPassword)
 		},
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }
@@ -240,6 +238,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createNoSetDefault bool
 	var createFree bool
 	var createWithPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -296,6 +295,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -457,16 +461,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				return result
-			case 400:
-				return fmt.Errorf("invalid request parameters")
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to create services"))
-			case 404:
-				return fmt.Errorf("project not found")
 			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 		},
 	}
@@ -482,7 +478,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createFree, "free", false, "Create a free tier service (limitations apply)")
-	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include initial password in output")
+	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -577,32 +574,20 @@ Examples:
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 200:
-				fallthrough
-			case 204:
-				fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
-
-				// Handle password storage using the configured method
-				// Get the service details for password storage
-				serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-				if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-					handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
-				}
-
-				return nil
-
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to update service password"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-			case 400:
-				return fmt.Errorf("invalid password: %s", *resp.JSON400.Message)
-			default:
-				return fmt.Errorf("API request failed with status %d", resp.StatusCode())
+			if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
+
+			// Handle password storage using the configured method
+			// Get the service details for password storage
+			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+				handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
+			}
+
+			return nil
 		},
 	}
 
@@ -618,8 +603,9 @@ Examples:
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	ConnectionString *string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
-	Password         *string `json:"password,omitempty" yaml:"password,omitempty"`
+	password.ConnectionDetails
+	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
+	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
 }
 
 // Convert to JSON to respect omitempty tags, then unmarshal
@@ -640,50 +626,68 @@ func toJSON(v any) (any, error) {
 func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder := json.NewEncoder(outputWriter)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(outputSvc)
 	case "yaml":
-		encoder := yaml.NewEncoder(cmd.OutOrStdout())
+		encoder := yaml.NewEncoder(outputWriter)
 		encoder.SetIndent(2)
 		jsonMap, err := toJSON(outputSvc)
 		if err != nil {
 			return fmt.Errorf("failed to convert service to map: %w", err)
 		}
 		return encoder.Encode(jsonMap)
+	case "env":
+		return outputServiceEnv(outputSvc, outputWriter)
 	default: // table format (default)
-		return outputServiceTable(cmd, outputSvc)
+		return outputServiceTable(outputSvc, outputWriter)
 	}
 }
 
 // outputServices formats and outputs the services list based on the specified format
 func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
 	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder := json.NewEncoder(outputWriter)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(outputServices)
 	case "yaml":
-		encoder := yaml.NewEncoder(cmd.OutOrStdout())
+		encoder := yaml.NewEncoder(outputWriter)
 		encoder.SetIndent(2)
 		jsonArray, err := toJSON(outputServices)
 		if err != nil {
 			return fmt.Errorf("failed to convert services to map: %w", err)
 		}
 		return encoder.Encode(jsonArray)
+	case "env":
+		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)
-		return outputServicesTable(cmd, outputServices)
+		return outputServicesTable(outputServices, outputWriter)
 	}
 }
 
+// outputServiceEnv outputs service details in environment variable format
+func outputServiceEnv(service OutputService, output io.Writer) error {
+	fmt.Fprintf(output, "PGHOST=%s\n", service.Host)
+	fmt.Fprintf(output, "PGPORT=%d\n", service.Port)
+	fmt.Fprintf(output, "PGDATABASE=%s\n", service.Database)
+	fmt.Fprintf(output, "PGUSER=%s\n", service.Role)
+	if service.Password != "" {
+		fmt.Fprintf(output, "PGPASSWORD=%s\n", service.Password)
+	}
+	return nil
+}
+
 // outputServiceTable outputs detailed service information in a formatted table
-func outputServiceTable(cmd *cobra.Command, service OutputService) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputServiceTable(service OutputService, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
 	// Basic service information
@@ -758,23 +762,24 @@ func outputServiceTable(cmd *cobra.Command, service OutputService) error {
 	}
 
 	// Output password if available
-	if service.Password != nil {
-		table.Append("Password", *service.Password)
-	} else if service.InitialPassword != nil {
-		table.Append("Initial Password", *service.InitialPassword)
+	if service.Password != "" {
+		table.Append("Password", service.Password)
 	}
 
 	// Output connection string if available
-	if service.ConnectionString != nil {
-		table.Append("Connection String", *service.ConnectionString)
+	if service.ConnectionString != "" {
+		table.Append("Connection String", service.ConnectionString)
+	}
+	if service.ConsoleURL != "" {
+		table.Append("Console URL", service.ConsoleURL)
 	}
 
 	return table.Render()
 }
 
 // outputServicesTable outputs services in a formatted table using tablewriter
-func outputServicesTable(cmd *cobra.Command, services []OutputService) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputServicesTable(services []OutputService, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
 	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED", "CONNECTION STRING")
 
 	for _, service := range services {
@@ -785,7 +790,7 @@ func outputServicesTable(cmd *cobra.Command, services []OutputService) error {
 			util.DerefStr(service.ServiceType),
 			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
-			util.Deref(service.ConnectionString),
+			service.ConnectionString,
 		)
 	}
 
@@ -796,27 +801,29 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc := OutputService{
 		Service: service,
 	}
+	outputSvc.InitialPassword = nil
 
-	// Build connection string
-	if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
+	opts := password.ConnectionDetailsOptions{
 		Pooled:          false,
 		Role:            "tsdbadmin",
 		PasswordMode:    password.GetPasswordMode(withPassword),
 		InitialPassword: util.Deref(service.InitialPassword),
 		WarnWriter:      output,
-	}); err == nil {
-		outputSvc.ConnectionString = &connectionString
 	}
 
-	// Remove password if not requested
-	if !withPassword {
-		outputSvc.InitialPassword = nil
-	} else if service.InitialPassword == nil {
-		password, err := password.GetPassword(service)
-		if err != nil {
-			fmt.Fprintf(output, "⚠️  Warning: Failed to retrieve stored password: %v\n", err)
+	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
+		if output != nil {
+			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 		}
-		outputSvc.Password = &password
+	} else {
+		outputSvc.ConnectionDetails = *connectionDetails
+		outputSvc.ConnectionString = connectionDetails.String()
+	}
+
+	// Build console URL
+	if cfg, err := config.Load(); err == nil {
+		url := fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
+		outputSvc.ConsoleURL = url
 	}
 
 	return outputSvc
@@ -1013,27 +1020,20 @@ Examples:
 			}
 
 			// Handle response
-			switch resp.StatusCode() {
-			case 202:
-				fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
-
-				// If not waiting, return early
-				if deleteNoWait {
-					fmt.Fprintln(statusOutput, "💡 Use 'tiger service list' to check deletion status.")
-					return nil
-				}
-
-				// Wait for deletion to complete
-				return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to delete service"))
-			default:
-				return fmt.Errorf("failed to delete service: API request failed with status %d", resp.StatusCode())
+			if resp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if deleteNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service list' to check deletion status.")
+				return nil
+			}
+
+			// Wait for deletion to complete
+			return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
 		},
 	}
 
@@ -1105,6 +1105,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkCPU int
 	var forkMemory int
 	var forkWithPassword bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -1173,6 +1174,11 @@ Examples:
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
 			}
 
 			projectID := cfg.ProjectID
@@ -1284,70 +1290,54 @@ Examples:
 			}
 
 			// Handle API response
-			switch forkResp.StatusCode() {
-			case 202:
-				// Success - service fork accepted
-				if forkResp.JSON202 == nil {
-					fmt.Fprintln(statusOutput, "✅ Fork request accepted!")
-					return nil
-				}
-
-				forkedService := *forkResp.JSON202
-				forkedServiceID := util.DerefStr(forkedService.ServiceId)
-				fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
-				fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
-
-				// Capture initial password from fork response and save it immediately
-				var initialPassword string
-				if forkedService.InitialPassword != nil {
-					initialPassword = *forkedService.InitialPassword
-				}
-
-				// Save password immediately after service fork
-				passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
-
-				// Set as default service unless --no-set-default is used
-				if !forkNoSetDefault {
-					if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
-						// Log warning but don't fail the command
-						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
-					}
-				}
-
-				// Handle wait behavior
-				var result error
-				if forkNoWait {
-					fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
-				} else {
-					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-					forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
-					if result != nil {
-						fmt.Fprintf(statusOutput, "❌ %v\n", result)
-					} else {
-						fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
-						printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
-					}
-				}
-
-				if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
-				}
-
-				return result
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to fork services"))
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, projectID))
-			case 409:
-				return fmt.Errorf("service name '%s' already exists", forkServiceName)
-			case 400:
-				return fmt.Errorf("invalid request parameters")
-			default:
-				return fmt.Errorf("API request failed with status %d", forkResp.StatusCode())
+			if forkResp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
 			}
+
+			// Success - service fork accepted
+			forkedService := *forkResp.JSON202
+			forkedServiceID := util.DerefStr(forkedService.ServiceId)
+			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
+			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
+
+			// Capture initial password from fork response and save it immediately
+			var initialPassword string
+			if forkedService.InitialPassword != nil {
+				initialPassword = *forkedService.InitialPassword
+			}
+
+			// Save password immediately after service fork
+			passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
+
+			// Set as default service unless --no-set-default is used
+			if !forkNoSetDefault {
+				if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
+					// Log warning but don't fail the command
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+				}
+			}
+
+			// Handle wait behavior
+			var result error
+			if forkNoWait {
+				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
+			} else {
+				// Wait for service to be ready
+				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
+				if result != nil {
+					fmt.Fprintf(statusOutput, "❌ %v\n", result)
+				} else {
+					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
+					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
+				}
+			}
+
+			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+			}
+
+			return result
 		},
 	}
 
@@ -1365,7 +1355,8 @@ Examples:
 	// Resource customization flags
 	cmd.Flags().IntVar(&forkCPU, "cpu", 0, "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().IntVar(&forkMemory, "memory", 0, "Memory allocation in gigabytes (inherits from source if not specified)")
-	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include initial password in output")
+	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
 }

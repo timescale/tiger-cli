@@ -46,7 +46,6 @@ analytics: true
 
 ### Global Options
 
-- `-o, --output`: Set output format (json, yaml, table)
 - `--config-dir`: Path to configuration directory
 - `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
@@ -73,7 +72,7 @@ For the initial v0 release, implement these essential commands first:
 
 **Core Service Management:**
 - `tiger service list` - List all services
-- `tiger service describe` - Show service details
+- `tiger service get` - Show service details (aliases: `describe`, `show`)
 - `tiger service create` - Create new services
 - `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
@@ -172,7 +171,7 @@ Manage database services.
 
 **Subcommands:**
 - `list`: List all services
-- `describe`: Show service details
+- `get`: Show service details (aliases: `describe`, `show`)
 - `create`: Create a new service
 - `delete`: Delete a service
 - `start`: Start a service
@@ -207,9 +206,11 @@ tiger service list
 tiger services list
 tiger svc list
 
-# Show service details
-tiger service describe svc-12345
-tiger svc describe svc-12345
+# Show service details (all forms work)
+tiger service get svc-12345
+tiger service describe svc-12345  # alias
+tiger service show svc-12345      # alias
+tiger svc get svc-12345
 
 # Create a TimescaleDB service
 tiger service create \
@@ -440,13 +441,13 @@ The `connect` and `psql` commands support passing additional flags directly to t
 Manage high-availability replicas for fault tolerance.
 
 **Subcommands:**
-- `describe`: Show current HA configuration
+- `get`: Show current HA configuration (aliases: `describe`, `show`)
 - `set`: Set HA configuration level
 
 **Examples:**
 ```bash
 # Show current HA configuration
-tiger ha describe svc-12345
+tiger ha get svc-12345
 
 # Set HA level
 tiger ha set svc-12345 --level none
@@ -471,7 +472,7 @@ Manage read replica sets for scaling read workloads.
 
 **Subcommands:**
 - `list`: List all read replica sets
-- `describe`: Show replica set details
+- `get`: Show replica set details (aliases: `describe`, `show`)
 - `create`: Create a read replica set
 - `delete`: Delete a replica set
 - `resize`: Resize replica set resources
@@ -526,7 +527,7 @@ Manage Virtual Private Clouds.
 
 **Subcommands:**
 - `list`: List all VPCs
-- `describe`: Show VPC details
+- `get`: Show VPC details (aliases: `describe`, `show`)
 - `create`: Create a new VPC
 - `delete`: Delete a VPC
 - `rename`: Rename a VPC
@@ -547,7 +548,7 @@ tiger vpc create \
   --region us-east-1
 
 # Show VPC details
-tiger vpc describe vpc-12345
+tiger vpc get vpc-12345
 
 # Attach/detach services
 tiger vpc attach-service vpc-12345 --service-id svc-67890
@@ -573,7 +574,7 @@ Manage VPC peering connections for a specific VPC.
 
 **Subcommands:**
 - `list`: List all peering connections for a VPC
-- `describe`: Show details of a specific peering connection
+- `get`: Show details of a specific peering connection (aliases: `describe`, `show`)
 - `create`: Create a new peering connection
 - `delete`: Delete a peering connection
 
@@ -583,7 +584,7 @@ Manage VPC peering connections for a specific VPC.
 tiger vpc peering list vpc-12345
 
 # Show details of a specific peering connection
-tiger vpc peering describe vpc-12345 peer-67890
+tiger vpc peering get vpc-12345 peer-67890
 
 # Create a new peering connection
 tiger vpc peering create vpc-12345 \
@@ -685,7 +686,7 @@ svc-12345  production-db  running   production
 Errors are returned with descriptive messages and appropriate exit codes:
 
 ```bash
-$ tiger service describe invalid-id
+$ tiger service get invalid-id
 Error: Service 'invalid-id' not found in project 'proj-12345'
 Use 'tiger service list' to see available services.
 ```
@@ -795,7 +796,7 @@ tiger db connection-string svc-12345
 ### Monitoring and Maintenance
 ```bash
 # Check service status
-tiger service describe svc-12345
+tiger service get svc-12345
 
 # Update service password
 tiger service update-password svc-12345 --password new-secure-password
@@ -811,7 +812,7 @@ Commands follow consistent patterns for specifying service IDs:
 **Single-service commands** (verbs acting on one service):
 - Use positional `<service-id>` as the canonical parameter
 - Support `--service-id` flag as an alias/override
-- Examples: `tiger service describe <service-id>`, `tiger db connect <service-id>`
+- Examples: `tiger service get <service-id>`, `tiger db connect <service-id>`
 
 **Global context commands** (acting on other resources with service as secondary):
 - Use `--service-id` flag as the canonical parameter  

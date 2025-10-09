@@ -5,13 +5,18 @@ import (
 	"strings"
 )
 
-var ValidOutputFormats = []string{"json", "yaml", "table"}
+var validOutputFormats = []string{"json", "yaml", "table"}
+var validOutputFormatsWithEnv = append(validOutputFormats, "env")
 
-func ValidateOutputFormat(format string) error {
-	for _, valid := range ValidOutputFormats {
+func ValidateOutputFormat(format string, allowEnv bool) error {
+	formats := validOutputFormats
+	if allowEnv {
+		formats = validOutputFormatsWithEnv
+	}
+	for _, valid := range formats {
 		if format == valid {
 			return nil
 		}
 	}
-	return fmt.Errorf("invalid output format: %s (must be one of: %s)", format, strings.Join(ValidOutputFormats, ", "))
+	return fmt.Errorf("invalid output format: %s (must be one of: %s)", format, strings.Join(formats, ", "))
 }

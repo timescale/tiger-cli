@@ -79,34 +79,34 @@ func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
 
-// setServiceIDSchemaProperties sets common with_password schema properties
+// setWithPasswordSchemaProperties sets common with_password schema properties
 func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Description = "Whether to include the password in the response and connection string."
 	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
-// ServiceShowInput represents input for service_show
-type ServiceShowInput struct {
+// ServiceGetInput represents input for service_get
+type ServiceGetInput struct {
 	ServiceID    string `json:"service_id"`
 	WithPassword bool   `json:"with_password,omitempty"`
 }
 
-func (ServiceShowInput) Schema() *jsonschema.Schema {
-	schema := util.Must(jsonschema.For[ServiceShowInput](nil))
+func (ServiceGetInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceGetInput](nil))
 	setServiceIDSchemaProperties(schema)
 	setWithPasswordSchemaProperties(schema)
 
 	return schema
 }
 
-// ServiceShowOutput represents output for service_show
-type ServiceShowOutput struct {
+// ServiceGetOutput represents output for service_get
+type ServiceGetOutput struct {
 	Service ServiceDetail `json:"service"`
 }
 
-func (ServiceShowOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceShowOutput](nil))
+func (ServiceGetOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceGetOutput](nil))
 }
 
 // ServiceDetail represents detailed service information
@@ -246,19 +246,19 @@ func (s *Server) registerServiceTools() {
 		},
 	}, s.handleServiceList)
 
-	// service_show
+	// service_get
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:  "service_show",
-		Title: "Show Service Details",
+		Name:  "service_get",
+		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
 			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
-		InputSchema:  ServiceShowInput{}.Schema(),
-		OutputSchema: ServiceShowOutput{}.Schema(),
+		InputSchema:  ServiceGetInput{}.Schema(),
+		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: true,
-			Title:        "Show Service Details",
+			Title:        "Get Service Details",
 		},
-	}, s.handleServiceShow)
+	}, s.handleServiceGet)
 
 	// service_create
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -322,47 +322,41 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 200:
-		if resp.JSON200 == nil {
-			return nil, ServiceListOutput{Services: []ServiceInfo{}}, nil
-		}
-
-		services := *resp.JSON200
-		output := ServiceListOutput{
-			Services: make([]ServiceInfo, len(services)),
-		}
-
-		for i, service := range services {
-			output.Services[i] = s.convertToServiceInfo(service)
-		}
-
-		return nil, output, nil
-
-	case 401:
-		return nil, ServiceListOutput{}, fmt.Errorf("authentication failed: invalid API key")
-	case 403:
-		return nil, ServiceListOutput{}, fmt.Errorf("permission denied: insufficient access to project")
-	default:
-		return nil, ServiceListOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 200 {
+		return nil, ServiceListOutput{}, resp.JSON4XX
 	}
+
+	if resp.JSON200 == nil {
+		return nil, ServiceListOutput{Services: []ServiceInfo{}}, nil
+	}
+
+	services := *resp.JSON200
+	output := ServiceListOutput{
+		Services: make([]ServiceInfo, len(services)),
+	}
+
+	for i, service := range services {
+		output.Services[i] = s.convertToServiceInfo(service)
+	}
+
+	return nil, output, nil
 }
 
-// handleServiceShow handles the service_show MCP tool
-func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest, input ServiceShowInput) (*mcp.CallToolResult, ServiceShowOutput, error) {
+// handleServiceGet handles the service_get MCP tool
+func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
 	// Load config and validate project ID
 	cfg, err := s.loadConfigWithProjectID()
 	if err != nil {
-		return nil, ServiceShowOutput{}, err
+		return nil, ServiceGetOutput{}, err
 	}
 
 	// Create fresh API client with current credentials
 	apiClient, err := s.createAPIClient()
 	if err != nil {
-		return nil, ServiceShowOutput{}, err
+		return nil, ServiceGetOutput{}, err
 	}
 
-	logging.Debug("MCP: Showing service details",
+	logging.Debug("MCP: Getting service details",
 		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
@@ -372,54 +366,42 @@ func (s *Server) handleServiceShow(ctx context.Context, req *mcp.CallToolRequest
 
 	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
-		return nil, ServiceShowOutput{}, fmt.Errorf("failed to get service details: %w", err)
+		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 200:
-		if resp.JSON200 == nil {
-			return nil, ServiceShowOutput{}, fmt.Errorf("empty response from API")
-		}
-
-		service := *resp.JSON200
-		output := ServiceShowOutput{
-			Service: s.convertToServiceDetail(service),
-		}
-
-		// Include password in ServiceDetail if requested
-		// Note: service_show doesn't have access to InitialPassword, so we fetch from storage
-		if input.WithPassword {
-			if passwd, err := password.GetPassword(service); err != nil {
-				logging.Debug("MCP: Failed to retrieve password from storage", zap.Error(err))
-			} else {
-				output.Service.Password = passwd
-			}
-		}
-
-		// Always include connection string in ServiceDetail
-		// Password is embedded in connection string only if with_password=true
-		if connectionString, err := password.BuildConnectionString(service, password.ConnectionStringOptions{
-			Pooled:       false,
-			Role:         "tsdbadmin",
-			PasswordMode: password.GetPasswordMode(input.WithPassword),
-		}); err != nil {
-			logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-		} else {
-			output.Service.ConnectionString = connectionString
-		}
-
-		return nil, output, nil
-
-	case 401:
-		return nil, ServiceShowOutput{}, fmt.Errorf("authentication failed: invalid API key")
-	case 403:
-		return nil, ServiceShowOutput{}, fmt.Errorf("permission denied: insufficient access to service")
-	case 404:
-		return nil, ServiceShowOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
-	default:
-		return nil, ServiceShowOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 200 {
+		return nil, ServiceGetOutput{}, resp.JSON4XX
 	}
+
+	service := *resp.JSON200
+	output := ServiceGetOutput{
+		Service: s.convertToServiceDetail(service),
+	}
+
+	// Include password in ServiceDetail if requested
+	// Note: service_show doesn't have access to InitialPassword, so we fetch from storage
+	if input.WithPassword {
+		if passwd, err := password.GetPassword(service); err != nil {
+			logging.Debug("MCP: Failed to retrieve password from storage", zap.Error(err))
+		} else {
+			output.Service.Password = passwd
+		}
+	}
+
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		PasswordMode: password.GetPasswordMode(input.WithPassword),
+	}); err != nil {
+		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		output.Service.ConnectionString = details.String()
+	}
+
+	return nil, output, nil
 }
 
 // handleServiceCreate handles the service_create MCP tool
@@ -528,83 +510,72 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 202:
-		if resp.JSON202 == nil {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("service creation request accepted but no response data received")
-		}
-
-		service := *resp.JSON202
-		serviceID := util.Deref(service.ServiceId)
-		serviceStatus := util.DerefStr(service.Status)
-
-		output := ServiceCreateOutput{
-			Service: s.convertToServiceDetail(service),
-			Message: "Service creation request accepted. The service may still be provisioning.",
-		}
-
-		// Save password immediately after service creation, before any waiting
-		// This ensures the password is stored even if the wait fails or is interrupted
-		if service.InitialPassword != nil {
-			result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword)
-			output.PasswordStorage = &result
-			if err != nil {
-				logging.Debug("MCP: Password storage failed", zap.Error(err))
-			} else {
-				logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
-			}
-		}
-
-		// Include password in ServiceDetail if requested
-		if input.WithPassword {
-			output.Service.Password = util.Deref(service.InitialPassword)
-		}
-
-		// Always include connection string in ServiceDetail
-		// Password is embedded in connection string only if with_password=true
-		if connectionString, err := password.BuildConnectionString(api.Service(service), password.ConnectionStringOptions{
-			Pooled:          false,
-			Role:            "tsdbadmin",
-			PasswordMode:    password.GetPasswordMode(input.WithPassword),
-			InitialPassword: util.Deref(service.InitialPassword),
-		}); err != nil {
-			logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-		} else {
-			output.Service.ConnectionString = connectionString
-		}
-
-		// Set as default service if requested (defaults to true)
-		if input.SetDefault {
-			if err := cfg.Set("service_id", serviceID); err != nil {
-				// Log warning but don't fail the service creation
-				logging.Debug("MCP: Failed to set service as default", zap.Error(err))
-			} else {
-				logging.Debug("MCP: Set service as default", zap.String("service_id", serviceID))
-			}
-		}
-
-		// If wait is explicitly requested, wait for service to be ready
-		if input.Wait {
-			timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
-
-			output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
-			if err != nil {
-				output.Message = fmt.Sprintf("Error: %s", err.Error())
-			} else {
-				output.Message = "Service created successfully and is ready!"
-			}
-		}
-
-		return nil, output, nil
-	case 400:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("invalid request parameters")
-	case 401:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("authentication failed: invalid API key")
-	case 403:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("permission denied: insufficient access to create services")
-	default:
-		return nil, ServiceCreateOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 202 {
+		return nil, ServiceCreateOutput{}, resp.JSON4XX
 	}
+
+	service := *resp.JSON202
+	serviceID := util.Deref(service.ServiceId)
+	serviceStatus := util.DerefStr(service.Status)
+
+	output := ServiceCreateOutput{
+		Service: s.convertToServiceDetail(service),
+		Message: "Service creation request accepted. The service may still be provisioning.",
+	}
+
+	// Save password immediately after service creation, before any waiting
+	// This ensures the password is stored even if the wait fails or is interrupted
+	if service.InitialPassword != nil {
+		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword)
+		output.PasswordStorage = &result
+		if err != nil {
+			logging.Debug("MCP: Password storage failed", zap.Error(err))
+		} else {
+			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+		}
+	}
+
+	// Include password in ServiceDetail if requested
+	if input.WithPassword {
+		output.Service.Password = util.Deref(service.InitialPassword)
+	}
+
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
+		Pooled:          false,
+		Role:            "tsdbadmin",
+		PasswordMode:    password.GetPasswordMode(input.WithPassword),
+		InitialPassword: util.Deref(service.InitialPassword),
+	}); err != nil {
+		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		output.Service.ConnectionString = details.String()
+	}
+
+	// Set as default service if requested (defaults to true)
+	if input.SetDefault {
+		if err := cfg.Set("service_id", serviceID); err != nil {
+			// Log warning but don't fail the service creation
+			logging.Debug("MCP: Failed to set service as default", zap.Error(err))
+		} else {
+			logging.Debug("MCP: Set service as default", zap.String("service_id", serviceID))
+		}
+	}
+
+	// If wait is explicitly requested, wait for service to be ready
+	if input.Wait {
+		timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
+
+		output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
+		if err != nil {
+			output.Message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			output.Message = "Service created successfully and is ready!"
+		}
+	}
+
+	return nil, output, nil
 }
 
 // handleServiceUpdatePassword handles the service_update_password MCP tool
@@ -640,43 +611,26 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	// Handle API response
-	switch resp.StatusCode() {
-	case 200, 204:
-		output := ServiceUpdatePasswordOutput{
-			Message: "Master password for 'tsdbadmin' user updated successfully",
-		}
-
-		// Get service details for password storage (similar to CLI implementation)
-		serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
-		if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-			// Save the new password using the shared util function
-			result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
-			output.PasswordStorage = &result
-			if err != nil {
-				logging.Debug("MCP: Password storage failed", zap.Error(err))
-			} else {
-				logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
-			}
-		}
-
-		return nil, output, nil
-
-	case 401:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("authentication failed: invalid API key")
-	case 403:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("permission denied: insufficient access to update service password")
-	case 404:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("service '%s' not found in project '%s'", input.ServiceID, cfg.ProjectID)
-	case 400:
-		var errorMsg string
-		if resp.JSON400 != nil && resp.JSON400.Message != nil {
-			errorMsg = *resp.JSON400.Message
-		} else {
-			errorMsg = "Invalid password"
-		}
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("invalid password: %s", errorMsg)
-
-	default:
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("API request failed with status %d", resp.StatusCode())
+	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
 	}
+
+	output := ServiceUpdatePasswordOutput{
+		Message: "Master password for 'tsdbadmin' user updated successfully",
+	}
+
+	// Get service details for password storage (similar to CLI implementation)
+	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+		// Save the new password using the shared util function
+		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
+		output.PasswordStorage = &result
+		if err != nil {
+			logging.Debug("MCP: Password storage failed", zap.Error(err))
+		} else {
+			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+		}
+	}
+
+	return nil, output, nil
 }

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
@@ -13,7 +15,11 @@ import (
 )
 
 func buildConfigShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var output string
+	var noDefaults bool
+	var withEnv bool
+
+	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration",
 		Long:  `Display the current CLI configuration settings`,
@@ -26,16 +32,55 @@ func buildConfigShowCmd() *cobra.Command {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			switch cfg.Output {
+			// Use flag value if provided, otherwise use config value
+			outputFormat := cfg.Output
+			if cmd.Flags().Changed("output") {
+				outputFormat = output
+			}
+
+			configFile, err := cfg.EnsureConfigDir()
+			if err != nil {
+				return err
+			}
+
+			// a new viper, free from env and cli flags
+			v := viper.New()
+			v.SetConfigFile(configFile)
+			if withEnv {
+				config.ApplyEnvOverrides(v)
+			}
+			if !noDefaults {
+				config.ApplyDefaults(v)
+			}
+			if err := config.ReadInConfig(v); err != nil {
+				return err
+			}
+
+			cfgOut, err := config.ForOutputFromViper(v)
+			if err != nil {
+				return err
+			}
+
+			if *cfgOut.ConfigDir == config.GetDefaultConfigDir() {
+				cfgOut.ConfigDir = nil
+			}
+
+			switch outputFormat {
 			case "json":
-				return outputJSON(cfg, cmd)
+				return outputJSON(cfgOut, cmd)
 			case "yaml":
-				return outputYAML(cfg, cmd)
+				return outputYAML(cfgOut, cmd)
 			default:
-				return outputTable(cfg, cmd)
+				return outputTable(cfgOut, cmd)
 			}
 		},
 	}
+
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
+	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
+
+	return cmd
 }
 
 func buildConfigSetCmd() *cobra.Command {
@@ -132,69 +177,56 @@ func buildConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func outputTable(cfg *config.Config, cmd *cobra.Command) error {
-	out := cmd.OutOrStdout()
-	fmt.Fprintln(out, "Current Configuration:")
-	fmt.Fprintf(out, "  api_url:          %s\n", cfg.APIURL)
-	fmt.Fprintf(out, "  console_url:      %s\n", cfg.ConsoleURL)
-	fmt.Fprintf(out, "  gateway_url:      %s\n", cfg.GatewayURL)
-	fmt.Fprintf(out, "  docs_mcp:         %t\n", cfg.DocsMCP)
-	fmt.Fprintf(out, "  docs_mcp_url:     %s\n", cfg.DocsMCPURL)
-	fmt.Fprintf(out, "  project_id:       %s\n", valueOrEmpty(cfg.ProjectID))
-	fmt.Fprintf(out, "  service_id:       %s\n", valueOrEmpty(cfg.ServiceID))
-	fmt.Fprintf(out, "  output:           %s\n", cfg.Output)
-	fmt.Fprintf(out, "  analytics:        %t\n", cfg.Analytics)
-	fmt.Fprintf(out, "  password_storage: %s\n", cfg.PasswordStorage)
-	fmt.Fprintf(out, "  debug:            %t\n", cfg.Debug)
-	fmt.Fprintf(out, "  config_dir:       %s\n", cfg.ConfigDir)
-	return nil
+func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
+	table := tablewriter.NewWriter(cmd.OutOrStdout())
+	table.Header("PROPERTY", "VALUE")
+	if cfg.APIURL != nil {
+		table.Append("api_url", *cfg.APIURL)
+	}
+	if cfg.ConsoleURL != nil {
+		table.Append("console_url", *cfg.ConsoleURL)
+	}
+	if cfg.GatewayURL != nil {
+		table.Append("gateway_url", *cfg.GatewayURL)
+	}
+	if cfg.DocsMCP != nil {
+		table.Append("docs_mcp", fmt.Sprintf("%t", *cfg.DocsMCP))
+	}
+	if cfg.DocsMCPURL != nil {
+		table.Append("docs_mcp_url", *cfg.DocsMCPURL)
+	}
+	if cfg.ProjectID != nil {
+		table.Append("project_id", *cfg.ProjectID)
+	}
+	if cfg.ServiceID != nil {
+		table.Append("service_id", *cfg.ServiceID)
+	}
+	if cfg.Output != nil {
+		table.Append("output", *cfg.Output)
+	}
+	if cfg.Analytics != nil {
+		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
+	}
+	if cfg.PasswordStorage != nil {
+		table.Append("password_storage", *cfg.PasswordStorage)
+	}
+	if cfg.Debug != nil {
+		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
+	}
+	if cfg.ConfigDir != nil {
+		table.Append("config_dir", *cfg.ConfigDir)
+	}
+	return table.Render()
 }
 
-func outputJSON(cfg *config.Config, cmd *cobra.Command) error {
-	data := map[string]interface{}{
-		"api_url":          cfg.APIURL,
-		"console_url":      cfg.ConsoleURL,
-		"gateway_url":      cfg.GatewayURL,
-		"docs_mcp":         cfg.DocsMCP,
-		"docs_mcp_url":     cfg.DocsMCPURL,
-		"project_id":       cfg.ProjectID,
-		"service_id":       cfg.ServiceID,
-		"output":           cfg.Output,
-		"analytics":        cfg.Analytics,
-		"password_storage": cfg.PasswordStorage,
-		"debug":            cfg.Debug,
-		"config_dir":       cfg.ConfigDir,
-	}
-
+func outputJSON(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 	encoder := json.NewEncoder(cmd.OutOrStdout())
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(data)
+	return encoder.Encode(cfg)
 }
 
-func outputYAML(cfg *config.Config, cmd *cobra.Command) error {
-	data := map[string]interface{}{
-		"api_url":          cfg.APIURL,
-		"console_url":      cfg.ConsoleURL,
-		"gateway_url":      cfg.GatewayURL,
-		"docs_mcp":         cfg.DocsMCP,
-		"docs_mcp_url":     cfg.DocsMCPURL,
-		"project_id":       cfg.ProjectID,
-		"service_id":       cfg.ServiceID,
-		"output":           cfg.Output,
-		"analytics":        cfg.Analytics,
-		"password_storage": cfg.PasswordStorage,
-		"debug":            cfg.Debug,
-		"config_dir":       cfg.ConfigDir,
-	}
-
+func outputYAML(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 	encoder := yaml.NewEncoder(cmd.OutOrStdout())
 	defer encoder.Close()
-	return encoder.Encode(data)
-}
-
-func valueOrEmpty(s string) string {
-	if s == "" {
-		return "(not set)"
-	}
-	return s
+	return encoder.Encode(cfg)
 }

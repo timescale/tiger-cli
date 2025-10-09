@@ -12,7 +12,7 @@ The TigerData MCP tools provide useful database management functionality but hav
 ### Recommendations
 - **WHY**: Consistency reduces cognitive load and makes the API more predictable
 - Standardize on snake_case throughout: `get_guide`, `semantic_search_postgres_docs`
-- Use consistent verbs: `service_get` instead of `service_show` for alignment with REST conventions
+- ~~Use consistent verbs: `service_get` instead of `service_show` for alignment with REST conventions~~ ✅ COMPLETED
 
 ## Input Parameters
 
@@ -99,6 +99,7 @@ The TigerData MCP tools provide useful database management functionality but hav
 ### High Priority
 1. Fix parameter type issues in `semanticSearchPostgresDocs`
 2. Standardize naming conventions across all tools
+   - ~~service_get~~ ✅ COMPLETED
 3. Add service deletion capability
 4. ~~Rename timeout to timeout_minutes~~ ✅ COMPLETED
 

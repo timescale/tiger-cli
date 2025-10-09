@@ -150,7 +150,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
   - `root.go` - Root command with global flags and configuration initialization
   - `auth.go` - Authentication commands (login, logout, whoami)
-  - `service.go` - Service management commands (list, create, describe, fork, delete, update-password)
+  - `service.go` - Service management commands (list, create, get, fork, delete, update-password)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
   - `mcp.go` - MCP server commands (install, start)
@@ -160,7 +160,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
   - `server.go` - MCP server initialization, tool registration, and lifecycle management
-  - `service_tools.go` - Service management tools (list, show, create, update-password)
+  - `service_tools.go` - Service management tools (list, get, create, update-password)
   - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
 - **Password Storage**: `internal/tiger/password/` - Secure password storage utilities
@@ -193,7 +193,7 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 **Two Types of Tools:**
 
 1. **Direct Tiger Tools** - Native tools for Tiger operations
-   - `service_tools.go` - Service management (list, show, create, update-password)
+   - `service_tools.go` - Service management (list, get, create, update-password)
    - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
@@ -380,7 +380,7 @@ buildRootCmd() → Complete CLI with all commands and flags
 │   └── buildWhoamiCmd()
 ├── buildServiceCmd()
 │   ├── buildServiceListCmd()
-│   ├── buildServiceDescribeCmd()
+│   ├── buildServiceGetCmd()
 │   ├── buildServiceCreateCmd()
 │   ├── buildServiceForkCmd()
 │   ├── buildServiceDeleteCmd()
@@ -405,7 +405,6 @@ func buildRootCmd() *cobra.Command {
     // Declare ALL flag variables locally within this function
     var configDir string
     var debug bool
-    var output string
     var projectID string
     var serviceID string
     var analytics bool
@@ -429,7 +428,6 @@ func buildRootCmd() *cobra.Command {
     cobra.OnInitialize(initConfigFunc)
     cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
     cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-    cmd.PersistentFlags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
     cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
     cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
     cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
@@ -437,7 +435,6 @@ func buildRootCmd() *cobra.Command {
 
     // Bind flags to viper
     viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-    viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
     // ... bind remaining flags
 
     // Add all subcommands (complete tree building)
