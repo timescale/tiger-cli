@@ -349,14 +349,8 @@ type ServiceId = string
 // VPCId defines model for VPCId.
 type VPCId = string
 
-// BadRequest defines model for BadRequest.
-type BadRequest = Error
-
-// Conflict defines model for Conflict.
-type Conflict = Error
-
-// NotFound defines model for NotFound.
-type NotFound = Error
+// ClientError defines model for ClientError.
+type ClientError = Error
 
 // SuccessMessage defines model for SuccessMessage.
 type SuccessMessage struct {

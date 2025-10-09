@@ -40,6 +40,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VPC'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - VPCs
@@ -60,8 +62,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}:
     get:
@@ -79,8 +81,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - VPCs
@@ -92,8 +94,8 @@ paths:
       responses:
         '204':
           description: VPC deleted successfully.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/rename:
     post:
@@ -117,10 +119,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings:
     get:
@@ -140,8 +140,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Peering'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - VPCs
@@ -163,10 +163,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Peering'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id}:
     get:
@@ -185,8 +183,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Peering'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - VPCs
@@ -199,8 +197,8 @@ paths:
       responses:
         '204':
           description: VPC peering deleted successfully.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services:
     get:
@@ -219,8 +217,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - Services
@@ -241,8 +239,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}:
     get:
@@ -260,8 +258,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - Services
@@ -273,8 +271,8 @@ paths:
       responses:
         '202':
           description: Deletion request has been accepted.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/attachToVPC:
     post:
@@ -294,12 +292,8 @@ paths:
       responses:
         '202':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/detachFromVPC:
     post:
@@ -319,10 +313,8 @@ paths:
       responses:
         '202':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/resize:
     post:
@@ -342,10 +334,8 @@ paths:
       responses:
         '202':
           description: Resize request has been accepted and is in progress.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/enablePooler:
     post:
@@ -359,10 +349,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/disablePooler:
     post:
@@ -376,10 +364,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/forkService:
     post:
@@ -403,8 +389,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/updatePassword:
     post:
@@ -424,10 +410,8 @@ paths:
       responses:
         '204':
           description: Password updated successfully. No content returned.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/setEnvironment:
     post:
@@ -447,10 +431,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/setHA:
     post:
@@ -474,10 +456,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets:
     get:
@@ -497,8 +477,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ReadReplicaSet'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - Read Replica Sets
@@ -520,8 +500,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadReplicaSet'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}:
     delete:
@@ -536,8 +516,8 @@ paths:
       responses:
         '202':
           description: Deletion request has been accepted.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/resize:
     post:
@@ -558,10 +538,8 @@ paths:
       responses:
         '202':
           description: Resize request has been accepted and is in progress.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/enablePooler:
     post:
@@ -576,10 +554,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/disablePooler:
     post:
@@ -594,10 +570,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/setEnvironment:
     post:
@@ -618,10 +592,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
 components:
   parameters:
@@ -1116,20 +1088,8 @@ components:
               message:
                 type: string
                 example: "Action completed successfully."
-    NotFound:
-      description: The specified resource was not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: The request was malformed or invalid.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Conflict:
-      description: The request could not be completed due to a conflict with the current state of the resource.
+    ClientError:
+      description: Client error response (4xx status codes).
       content:
         application/json:
           schema:

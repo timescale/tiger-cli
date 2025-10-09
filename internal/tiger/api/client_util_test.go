@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"go.uber.org/mock/gomock"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -46,9 +47,10 @@ func TestValidateAPIKeyWithClient(t *testing.T) {
 					GetProjectsProjectIdServicesWithResponse(gomock.Any(), "00000000-0000-0000-0000-000000000000").
 					Return(&api.GetProjectsProjectIdServicesResponse{
 						HTTPResponse: &http.Response{StatusCode: 401},
+						JSON4XX:      &api.ClientError{Message: util.Ptr("Invalid or missing authentication credentials")},
 					}, nil)
 			},
-			expectedError: "invalid API key: authentication failed",
+			expectedError: "Invalid or missing authentication credentials",
 		},
 		{
 			name: "invalid API key - 403 response",
@@ -57,9 +59,10 @@ func TestValidateAPIKeyWithClient(t *testing.T) {
 					GetProjectsProjectIdServicesWithResponse(gomock.Any(), "00000000-0000-0000-0000-000000000000").
 					Return(&api.GetProjectsProjectIdServicesResponse{
 						HTTPResponse: &http.Response{StatusCode: 403},
+						JSON4XX:      &api.ClientError{Message: util.Ptr("Invalid or missing authentication credentials")},
 					}, nil)
 			},
-			expectedError: "invalid API key: authentication failed",
+			expectedError: "Invalid or missing authentication credentials",
 		},
 		{
 			name: "unexpected response - 500",
