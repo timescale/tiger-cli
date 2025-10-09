@@ -442,13 +442,13 @@ The `connect` and `psql` commands support passing additional flags directly to t
 Manage high-availability replicas for fault tolerance.
 
 **Subcommands:**
-- `describe`: Show current HA configuration
+- `get`: Show current HA configuration (aliases: `describe`, `show`)
 - `set`: Set HA configuration level
 
 **Examples:**
 ```bash
 # Show current HA configuration
-tiger ha describe svc-12345
+tiger ha get svc-12345
 
 # Set HA level
 tiger ha set svc-12345 --level none
@@ -473,7 +473,7 @@ Manage read replica sets for scaling read workloads.
 
 **Subcommands:**
 - `list`: List all read replica sets
-- `describe`: Show replica set details
+- `get`: Show replica set details (aliases: `describe`, `show`)
 - `create`: Create a read replica set
 - `delete`: Delete a replica set
 - `resize`: Resize replica set resources
@@ -528,7 +528,7 @@ Manage Virtual Private Clouds.
 
 **Subcommands:**
 - `list`: List all VPCs
-- `describe`: Show VPC details
+- `get`: Show VPC details (aliases: `describe`, `show`)
 - `create`: Create a new VPC
 - `delete`: Delete a VPC
 - `rename`: Rename a VPC
@@ -549,7 +549,7 @@ tiger vpc create \
   --region us-east-1
 
 # Show VPC details
-tiger vpc describe vpc-12345
+tiger vpc get vpc-12345
 
 # Attach/detach services
 tiger vpc attach-service vpc-12345 --service-id svc-67890
@@ -575,7 +575,7 @@ Manage VPC peering connections for a specific VPC.
 
 **Subcommands:**
 - `list`: List all peering connections for a VPC
-- `describe`: Show details of a specific peering connection
+- `get`: Show details of a specific peering connection (aliases: `describe`, `show`)
 - `create`: Create a new peering connection
 - `delete`: Delete a peering connection
 
@@ -585,7 +585,7 @@ Manage VPC peering connections for a specific VPC.
 tiger vpc peering list vpc-12345
 
 # Show details of a specific peering connection
-tiger vpc peering describe vpc-12345 peer-67890
+tiger vpc peering get vpc-12345 peer-67890
 
 # Create a new peering connection
 tiger vpc peering create vpc-12345 \

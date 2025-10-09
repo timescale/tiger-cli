@@ -326,8 +326,8 @@ Execute a SQL query on a service database.
 
 ### High-Availability Management
 
-#### `tiger_ha_show`
-Show current HA configuration for a service.
+#### `tiger_ha_get`
+Get current HA configuration for a service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID
@@ -353,8 +353,8 @@ List all read replica sets for a service.
 
 **Returns:** Array of read replica set objects.
 
-#### `tiger_read_replica_show`
-Show details of a specific read replica set.
+#### `tiger_read_replica_get`
+Get details of a specific read replica set.
 
 **Parameters:**
 - `replica_set_id` (string, required): Replica set ID
@@ -436,11 +436,11 @@ List all Virtual Private Clouds.
 
 **Returns:** Array of VPC objects with id, name, CIDR, and region information.
 
-#### `tiger_vpc_show`
-Show details of a specific VPC.
+#### `tiger_vpc_get`
+Get details of a specific VPC.
 
 **Parameters:**
-- `vpc_id` (string, required): VPC ID to show
+- `vpc_id` (string, required): VPC ID to get
 
 **Returns:** Detailed VPC object with configuration and attached services.
 
@@ -507,8 +507,8 @@ List all peering connections for a VPC.
 
 **Returns:** Array of peering connection objects.
 
-#### `tiger_vpc_peering_show`
-Show details of a specific peering connection.
+#### `tiger_vpc_peering_get`
+Get details of a specific peering connection.
 
 **Parameters:**
 - `vpc_id` (string, required): VPC ID
