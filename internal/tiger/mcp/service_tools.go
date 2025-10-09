@@ -379,16 +379,6 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		Service: s.convertToServiceDetail(service),
 	}
 
-	// Include password in ServiceDetail if requested
-	// Note: service_show doesn't have access to InitialPassword, so we fetch from storage
-	if input.WithPassword {
-		if passwd, err := password.GetPassword(service); err != nil {
-			logging.Debug("MCP: Failed to retrieve password from storage", zap.Error(err))
-		} else {
-			output.Service.Password = passwd
-		}
-	}
-
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
 	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
@@ -398,6 +388,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}); err != nil {
 		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
 	} else {
+		output.Service.Password = details.Password
 		output.Service.ConnectionString = details.String()
 	}
 

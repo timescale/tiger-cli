@@ -423,15 +423,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
 				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
 
-				// Capture initial password from creation response and save it immediately
-				var initialPassword string
-				if service.InitialPassword != nil {
-					initialPassword = *service.InitialPassword
-				}
-
 				// Save password immediately after service creation, before any waiting
 				// This ensures users have access even if they interrupt the wait or it fails
-				passwordSaved := handlePasswordSaving(service, initialPassword, statusOutput)
+				passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
@@ -1300,14 +1294,8 @@ Examples:
 			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
-			// Capture initial password from fork response and save it immediately
-			var initialPassword string
-			if forkedService.InitialPassword != nil {
-				initialPassword = *forkedService.InitialPassword
-			}
-
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
+			passwordSaved := handlePasswordSaving(forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is used
 			if !forkNoSetDefault {

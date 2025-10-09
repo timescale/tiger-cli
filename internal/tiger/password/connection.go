@@ -95,34 +95,13 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 	}
 
 	if opts.PasswordMode == PasswordRequired || opts.PasswordMode == PasswordOptional {
-		var password string
 		if opts.InitialPassword != "" {
-			password = opts.InitialPassword
+			details.Password = opts.InitialPassword
+		} else if password, err := GetPassword(service); err != nil && opts.PasswordMode == PasswordRequired {
+			return nil, err
+		} else {
+			details.Password = password
 		}
-		if password == "" {
-			storage := GetPasswordStorage()
-			if storedPassword, err := storage.Get(service); err != nil && opts.PasswordMode == PasswordRequired {
-				// Provide specific error messages based on storage type
-				switch storage.(type) {
-				case *NoStorage:
-					return nil, fmt.Errorf("password storage is disabled (--password-storage=none)")
-				case *KeyringStorage:
-					return nil, fmt.Errorf("no password found in keyring for this service")
-				case *PgpassStorage:
-					return nil, fmt.Errorf("no password found in ~/.pgpass for this service")
-				default:
-					return nil, fmt.Errorf("failed to retrieve password: %w", err)
-				}
-			} else {
-				password = storedPassword
-			}
-		}
-
-		if password == "" && opts.PasswordMode == PasswordRequired {
-			return nil, fmt.Errorf("no password available for service")
-		}
-
-		details.Password = password
 	}
 
 	return details, nil
