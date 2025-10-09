@@ -442,7 +442,10 @@ main() {
     binary_path="$(extract_archive "${archive_name}" "${tmp_dir}" "${platform}")"
 
     # Copy binary to install directory
+    # Remove existing binary first to prevent errors related
+    # to swapping out a currently executing binary
     log_info "Installing to ${install_dir}..."
+    rm -f "${install_dir}/${BINARY_NAME}"
     cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
 
     # Verify installation
