@@ -6,7 +6,7 @@ import (
 )
 
 var validOutputFormats = []string{"json", "yaml", "table"}
-var validOutputFormatsWithEnv = append(append([]string(nil), validOutputFormats...), "env")
+var validOutputFormatsWithEnv = append(validOutputFormats, "env")
 
 func ValidateOutputFormat(format string, allowEnv bool) error {
 	formats := validOutputFormats
