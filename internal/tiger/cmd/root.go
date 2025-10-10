@@ -10,6 +10,8 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
+	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
 func buildRootCmd() *cobra.Command {
@@ -19,6 +21,7 @@ func buildRootCmd() *cobra.Command {
 	var serviceID string
 	var analytics bool
 	var passwordStorage string
+	var skipUpdateCheck bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -33,14 +36,13 @@ tiger auth login
 
 `,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := logging.Init(debug); err != nil {
-				return fmt.Errorf("failed to initialize logging: %w", err)
-			}
-
 			cfg, err := config.Load()
 			if err != nil {
-				logging.Error("failed to load config", zap.Error(err))
-				return err
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			if err := logging.Init(cfg.Debug); err != nil {
+				return fmt.Errorf("failed to initialize logging: %w", err)
 			}
 
 			logging.Debug("CLI initialized",
@@ -48,6 +50,12 @@ tiger auth login
 				zap.String("output", cfg.Output),
 				zap.Bool("debug", cfg.Debug),
 			)
+
+			// Check for updates on any command
+			// Skip check if running the version command (it handles via --check flag)
+			if !skipUpdateCheck && cmd.Name() != "version" {
+				version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), false)
+			}
 
 			return nil
 		},
@@ -74,6 +82,7 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))

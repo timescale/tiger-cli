@@ -131,18 +131,20 @@ password_storage: none
 
 	// Verify ALL JSON keys and their expected values
 	expectedValues := map[string]interface{}{
-		"api_url":          "https://json.api.com/v1",
-		"console_url":      "https://console.cloud.timescale.com",
-		"gateway_url":      "https://console.cloud.timescale.com/api",
-		"docs_mcp":         true,
-		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
-		"project_id":       "json-project",
-		"service_id":       "",
-		"output":           "json",
-		"analytics":        true,
-		"password_storage": "none",
-		"debug":            false,
-		"config_dir":       tmpDir,
+		"api_url":                "https://json.api.com/v1",
+		"console_url":            "https://console.cloud.timescale.com",
+		"gateway_url":            "https://console.cloud.timescale.com/api",
+		"docs_mcp":               true,
+		"docs_mcp_url":           "https://mcp.tigerdata.com/docs",
+		"project_id":             "json-project",
+		"service_id":             "",
+		"output":                 "json",
+		"analytics":              true,
+		"password_storage":       "none",
+		"debug":                  false,
+		"config_dir":             tmpDir,
+		"version_check_url":      "https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt",
+		"version_check_interval": float64(3600), // JSON unmarshals numbers as float64
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -151,9 +153,10 @@ password_storage: none
 		}
 	}
 
-	// Ensure no extra keys are present
-	if len(result) != len(expectedValues) {
-		t.Errorf("Expected %d keys in JSON output, got %d", len(expectedValues), len(result))
+	// Ensure no extra keys are present (excluding version_check_last_time which may vary)
+	// We allow one extra key for version_check_last_time
+	if len(result) > len(expectedValues)+1 {
+		t.Errorf("Expected at most %d keys in JSON output, got %d", len(expectedValues)+1, len(result))
 	}
 }
 
@@ -185,18 +188,20 @@ password_storage: keyring
 
 	// Verify ALL YAML keys and their expected values
 	expectedValues := map[string]interface{}{
-		"api_url":          "https://yaml.api.com/v1",
-		"console_url":      "https://console.cloud.timescale.com",
-		"gateway_url":      "https://console.cloud.timescale.com/api",
-		"docs_mcp":         true,
-		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
-		"project_id":       "yaml-project",
-		"service_id":       "",
-		"output":           "yaml",
-		"analytics":        false,
-		"password_storage": "keyring",
-		"debug":            false,
-		"config_dir":       tmpDir,
+		"api_url":                "https://yaml.api.com/v1",
+		"console_url":            "https://console.cloud.timescale.com",
+		"gateway_url":            "https://console.cloud.timescale.com/api",
+		"docs_mcp":               true,
+		"docs_mcp_url":           "https://mcp.tigerdata.com/docs",
+		"project_id":             "yaml-project",
+		"service_id":             "",
+		"output":                 "yaml",
+		"analytics":              false,
+		"password_storage":       "keyring",
+		"debug":                  false,
+		"config_dir":             tmpDir,
+		"version_check_url":      "https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt",
+		"version_check_interval": 3600,
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -205,9 +210,10 @@ password_storage: keyring
 		}
 	}
 
-	// Ensure no extra keys are present
-	if len(result) != len(expectedValues) {
-		t.Errorf("Expected %d keys in YAML output, got %d", len(expectedValues), len(result))
+	// Ensure no extra keys are present (excluding version_check_last_time which may vary)
+	// We allow one extra key for version_check_last_time
+	if len(result) > len(expectedValues)+1 {
+		t.Errorf("Expected at most %d keys in YAML output, got %d", len(expectedValues)+1, len(result))
 	}
 }
 

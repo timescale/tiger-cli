@@ -217,6 +217,8 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `analytics` - Enable/disable analytics (default: `true`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `debug` - Enable/disable debug logging (default: `false`)
+- `version_check_url` - URL to check for latest version (default: `https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt`)
+- `version_check_interval` - Seconds between version checks, 0 to disable (default: `3600` = 1 hour)
 
 ### Environment Variables
 
@@ -230,6 +232,8 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_ANALYTICS` - Enable/disable analytics
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
 - `TIGER_DEBUG` - Enable/disable debug logging
+- `TIGER_VERSION_CHECK_URL` - URL to check for latest version
+- `TIGER_VERSION_CHECK_INTERVAL` - Seconds between version checks, 0 to disable
 
 ### Global Flags
 
