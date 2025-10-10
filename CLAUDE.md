@@ -326,35 +326,6 @@ The `internal/` directory follows Go conventions to prevent external imports of 
 - See `docs/development.md` for detailed development information including building from source, running integration tests, and project structure details
 - See `README.md` for user-facing documentation on installation, usage, and configuration
 
-### Version Check System
-
-Tiger CLI includes automatic version checking to notify users when updates are available:
-
-**Architecture:**
-- `internal/tiger/version/check.go` - Core version checking logic
-- Runs automatically on every command execution (except `tiger version`)
-- Rate-limited to check at most once per hour (configurable)
-- Detects installation method and suggests appropriate upgrade command
-
-**Installation Method Detection:**
-- Homebrew: Binary path contains `/homebrew/` or `linuxbrew`
-- Debian/Ubuntu: Detected via `dpkg -S`
-- RPM (RHEL/Fedora): Detected via `rpm -qf`
-- Install script: Binary in `~/.local/bin` or `~/bin`
-- Development: Binary in `go-build` temp directory
-- Unknown: Suggests visiting releases page
-
-**Configuration:**
-- `version_check_url` - URL to fetch latest version (default: S3 bucket)
-- `version_check_interval` - Seconds between checks (default: 3600, 0 to disable)
-- `version_check_last_time` - Last check timestamp (managed automatically)
-
-**Example Output:**
-```
-⚠️  A new version of Tiger CLI is available: v1.5.0 (current: v1.4.2)
-   To upgrade: brew upgrade tiger-cli
-```
-
 ## Cobra Usage Display Pattern
 
 When implementing Cobra commands, use this pattern to control when usage information is displayed on errors:
