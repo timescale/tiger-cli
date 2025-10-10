@@ -153,10 +153,10 @@ password_storage: none
 		}
 	}
 
-	// Ensure no extra keys are present (excluding version_check_last_time which may vary)
-	// We allow one extra key for version_check_last_time
-	if len(result) > len(expectedValues)+1 {
-		t.Errorf("Expected at most %d keys in JSON output, got %d", len(expectedValues)+1, len(result))
+	// Ensure no extra keys are present
+	delete(result, "version_check_last_time") // this always changes
+	if len(result) != len(expectedValues) {
+		t.Errorf("Expected %d keys in JSON output, got %d", len(expectedValues), len(result))
 	}
 }
 
@@ -210,10 +210,10 @@ password_storage: keyring
 		}
 	}
 
-	// Ensure no extra keys are present (excluding version_check_last_time which may vary)
-	// We allow one extra key for version_check_last_time
-	if len(result) > len(expectedValues)+1 {
-		t.Errorf("Expected at most %d keys in YAML output, got %d", len(expectedValues)+1, len(result))
+	// Ensure no extra keys are present
+	delete(result, "version_check_last_time") // this always changes
+	if len(result) != len(expectedValues) {
+		t.Errorf("Expected %d keys in YAML output, got %d", len(expectedValues), len(result))
 	}
 }
 
