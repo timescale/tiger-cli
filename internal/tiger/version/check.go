@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/fatih/color"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -82,7 +83,6 @@ func fetchLatestVersion(checkURL string) (string, error) {
 }
 
 // CompareVersions returns true if newVersion is greater than currentVersion
-// This does a simple string comparison after removing the 'v' prefix
 func compareVersions(currentVersion, newVersion string) bool {
 	// Normalize versions by removing 'v' prefix
 	current := strings.TrimPrefix(currentVersion, "v")
@@ -98,9 +98,16 @@ func compareVersions(currentVersion, newVersion string) bool {
 		return false
 	}
 
-	// For simplicity, do string comparison
-	// This works for semantic versioning if we split and compare
-	return latest > current
+	vCurrent, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	vLatest, err := semver.NewVersion(latest)
+	if err != nil {
+		return false
+	}
+
+	return vLatest.GreaterThan(vCurrent)
 }
 
 // DetectInstallMethod determines how Tiger CLI was installed
