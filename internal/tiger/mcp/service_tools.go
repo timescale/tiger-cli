@@ -79,14 +79,24 @@ func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
 
+// setWithPasswordSchemaProperties sets common with_password schema properties
+func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["with_password"].Description = "Whether to include the password in the response and connection string."
+	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
+	schema.Properties["with_password"].Examples = []any{false, true}
+}
+
 // ServiceGetInput represents input for service_get
 type ServiceGetInput struct {
-	ServiceID string `json:"service_id"`
+	ServiceID    string `json:"service_id"`
+	WithPassword bool   `json:"with_password,omitempty"`
 }
 
 func (ServiceGetInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceGetInput](nil))
 	setServiceIDSchemaProperties(schema)
+	setWithPasswordSchemaProperties(schema)
+
 	return schema
 }
 
@@ -101,17 +111,19 @@ func (ServiceGetOutput) Schema() *jsonschema.Schema {
 
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
-	ServiceID      string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
-	Name           string        `json:"name"`
-	Status         string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
-	Type           string        `json:"type"`
-	Region         string        `json:"region"`
-	Created        string        `json:"created,omitempty"`
-	Resources      *ResourceInfo `json:"resources,omitempty"`
-	Replicas       int           `json:"replicas,omitempty" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
-	DirectEndpoint string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
-	PoolerEndpoint string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
-	Paused         bool          `json:"paused"`
+	ServiceID        string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
+	Name             string        `json:"name"`
+	Status           string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Type             string        `json:"type"`
+	Region           string        `json:"region"`
+	Created          string        `json:"created,omitempty"`
+	Resources        *ResourceInfo `json:"resources,omitempty"`
+	Replicas         int           `json:"replicas" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
+	DirectEndpoint   string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
+	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
+	Paused           bool          `json:"paused"`
+	Password         string        `json:"password,omitempty" jsonschema:"Password for tsdbadmin user (only included if with_password=true)"`
+	ConnectionString string        `json:"connection_string" jsonschema:"PostgreSQL connection string (password embedded only if with_password=true)"`
 }
 
 func (ServiceDetail) Schema() *jsonschema.Schema {
@@ -131,6 +143,7 @@ type ServiceCreateInput struct {
 	Wait           bool     `json:"wait,omitempty"`
 	TimeoutMinutes *int     `json:"timeout_minutes,omitempty"`
 	SetDefault     bool     `json:"set_default,omitempty"`
+	WithPassword   bool     `json:"with_password,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -173,6 +186,8 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["set_default"].Description = "Whether to set the newly created service as the default service. When true, the service will be set as the default for future commands."
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
 	schema.Properties["set_default"].Examples = []any{true, false}
+
+	setWithPasswordSchemaProperties(schema)
 
 	return schema
 }
@@ -364,6 +379,19 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		Service: s.convertToServiceDetail(service),
 	}
 
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+		Pooled:       false,
+		Role:         "tsdbadmin",
+		PasswordMode: password.GetPasswordMode(input.WithPassword),
+	}); err != nil {
+		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		output.Service.Password = details.Password
+		output.Service.ConnectionString = details.String()
+	}
+
 	return nil, output, nil
 }
 
@@ -481,12 +509,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	serviceID := util.Deref(service.ServiceId)
 	serviceStatus := util.DerefStr(service.Status)
 
-	// Capture initial password from creation response and save it immediately
-	var initialPassword string
-	if service.InitialPassword != nil {
-		initialPassword = *service.InitialPassword
-	}
-
 	output := ServiceCreateOutput{
 		Service: s.convertToServiceDetail(service),
 		Message: "Service creation request accepted. The service may still be provisioning.",
@@ -494,14 +516,32 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Save password immediately after service creation, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
-	if initialPassword != "" {
-		result, err := password.SavePasswordWithResult(api.Service(service), initialPassword)
+	if service.InitialPassword != nil {
+		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword)
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
 		} else {
 			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
 		}
+	}
+
+	// Include password in ServiceDetail if requested
+	if input.WithPassword {
+		output.Service.Password = util.Deref(service.InitialPassword)
+	}
+
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
+		Pooled:          false,
+		Role:            "tsdbadmin",
+		PasswordMode:    password.GetPasswordMode(input.WithPassword),
+		InitialPassword: util.Deref(service.InitialPassword),
+	}); err != nil {
+		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		output.Service.ConnectionString = details.String()
 	}
 
 	// Set as default service if requested (defaults to true)

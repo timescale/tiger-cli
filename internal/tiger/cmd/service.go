@@ -423,15 +423,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
 				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
 
-				// Capture initial password from creation response and save it immediately
-				var initialPassword string
-				if service.InitialPassword != nil {
-					initialPassword = *service.InitialPassword
-				}
-
 				// Save password immediately after service creation, before any waiting
 				// This ensures users have access even if they interrupt the wait or it fails
-				passwordSaved := handlePasswordSaving(service, initialPassword, statusOutput)
+				passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
 
 				// Set as default service unless --no-set-default is specified
 				if !createNoSetDefault {
@@ -804,16 +798,11 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
-		Pooled:       false,
-		Role:         "tsdbadmin",
-		PasswordMode: password.PasswordExclude,
-		WarnWriter:   output,
-	}
-	if service.InitialPassword != nil {
-		opts.InitialPassword = *service.InitialPassword
-	}
-	if withPassword {
-		opts.PasswordMode = password.PasswordRequired
+		Pooled:          false,
+		Role:            "tsdbadmin",
+		PasswordMode:    password.GetPasswordMode(withPassword),
+		InitialPassword: util.Deref(service.InitialPassword),
+		WarnWriter:      output,
 	}
 
 	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
@@ -826,8 +815,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 
 	// Build console URL
-	cfg, err := config.Load()
-	if err == nil {
+	if cfg, err := config.Load(); err == nil {
 		url := fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
 		outputSvc.ConsoleURL = url
 	}
@@ -1306,14 +1294,8 @@ Examples:
 			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
-			// Capture initial password from fork response and save it immediately
-			var initialPassword string
-			if forkedService.InitialPassword != nil {
-				initialPassword = *forkedService.InitialPassword
-			}
-
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(forkedService, initialPassword, statusOutput)
+			passwordSaved := handlePasswordSaving(forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is used
 			if !forkNoSetDefault {

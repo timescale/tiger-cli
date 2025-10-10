@@ -60,15 +60,10 @@ Examples:
 				return err
 			}
 
-			passwordMode := password.PasswordExclude
-			if dbConnectionStringWithPassword {
-				passwordMode = password.PasswordRequired
-			}
-
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: passwordMode,
+				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -246,30 +241,6 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbTestConnectionCmd())
 
 	return cmd
-}
-
-func getServicePassword(service api.Service) (string, error) {
-	// Get password from storage if requested
-	storage := password.GetPasswordStorage()
-	passwd, err := storage.Get(service)
-	if err != nil {
-		// Provide specific error messages based on storage type
-		switch storage.(type) {
-		case *password.NoStorage:
-			return "", fmt.Errorf("password storage is disabled (--password-storage=none)")
-		case *password.KeyringStorage:
-			return "", fmt.Errorf("no password found in keyring for this service")
-		case *password.PgpassStorage:
-			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
-		default:
-			return "", fmt.Errorf("failed to retrieve password: %w", err)
-		}
-	}
-
-	if passwd == "" {
-		return "", fmt.Errorf("no password available for service")
-	}
-	return passwd, nil
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details

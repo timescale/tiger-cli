@@ -160,8 +160,9 @@ Get details of a specific service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to get
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
 
-**Returns:** Detailed service object with configuration, endpoints, and status.
+**Returns:** Detailed service object with configuration, endpoints, status, and connection string. When `with_password=true`, the response includes the password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
 
 #### `tiger_service_create`
 Create a new database service.
@@ -175,10 +176,11 @@ Create a new database service.
 - `wait` (boolean, optional): Wait for service to be ready - default: false
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
 - `set_default` (boolean, optional): Set the newly created service as the default service for future commands - default: true
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
 
-**Returns:** Service object with creation status and details.
+**Returns:** Service object with creation status, details, and connection string. When `with_password=true`, the response includes the initial password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
 
-**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.).
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
 
 #### `tiger_service_delete`
 Delete a database service.
