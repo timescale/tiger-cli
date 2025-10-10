@@ -507,7 +507,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	service := *resp.JSON202
 	serviceID := util.Deref(service.ServiceId)
-	serviceStatus := util.DerefStr(service.Status)
 
 	output := ServiceCreateOutput{
 		Service: s.convertToServiceDetail(service),
@@ -558,10 +557,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	if input.Wait {
 		timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
 
-		output.Service, err = s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, serviceStatus)
-		if err != nil {
+		if status, err := s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, service.Status); err != nil {
 			output.Message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
+			output.Service.Status = util.DerefStr(status)
 			output.Message = "Service created successfully and is ready!"
 		}
 	}

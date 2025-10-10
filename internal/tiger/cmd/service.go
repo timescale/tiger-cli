@@ -442,7 +442,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, statusOutput)
+					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
 					if result != nil {
 						fmt.Fprintf(statusOutput, "❌ %v\n", result)
 					} else {
@@ -841,14 +841,14 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, output io.Writer) (*api.DeployStatus, error) {
+func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
-	var lastStatus *api.DeployStatus
+	lastStatus := initialStatus
 	for {
 		select {
 		case <-ctx.Done():
@@ -1312,7 +1312,7 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, statusOutput)
+				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
 				if result != nil {
 					fmt.Fprintf(statusOutput, "❌ %v\n", result)
 				} else {
