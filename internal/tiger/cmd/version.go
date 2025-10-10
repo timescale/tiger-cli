@@ -49,6 +49,8 @@ func buildVersionCmd() *cobra.Command {
 				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
+					// Print warning _after_ other output
+					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
 				}
 			}
 
@@ -61,11 +63,11 @@ func buildVersionCmd() *cobra.Command {
 			case "yaml":
 				encoder := yaml.NewEncoder(output)
 				encoder.SetIndent(2)
-				jsonArray, err := toJSON(versionOutput)
-				if err != nil {
+				if jsonArray, err := toJSON(versionOutput); err != nil {
 					return fmt.Errorf("failed to convert version info to map: %w", err)
+				} else {
+					return encoder.Encode(jsonArray)
 				}
-				return encoder.Encode(jsonArray)
 			case "bare":
 				fmt.Fprintln(output, versionOutput.Version)
 				return nil

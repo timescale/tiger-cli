@@ -10,7 +10,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
-	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
@@ -51,16 +50,24 @@ tiger auth login
 				zap.Bool("debug", cfg.Debug),
 			)
 
+			return nil
+		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			// Check for updates on any command
 			// Skip check if running the version command (it handles via --check flag)
 			if !skipUpdateCheck && cmd.Name() != "version" {
-				version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), false)
+				output := cmd.ErrOrStderr()
+				result := version.PerformCheck(cfg, &output, false)
+				version.PrintUpdateWarning(result, cfg, &output)
 			}
 
-			return nil
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
 			logging.Sync()
+			return nil
 		},
 	}
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -207,8 +208,8 @@ func checkForUpdate(cfg *config.Config, output *io.Writer) (*CheckResult, error)
 }
 
 // PrintUpdateWarning prints a warning message to stderr if an update is available
-func printUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writer) {
-	if output == nil {
+func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writer) {
+	if result == nil || output == nil {
 		return
 	}
 	if !result.UpdateAvailable {
@@ -218,9 +219,12 @@ func printUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 		return
 	}
 
-	fmt.Fprintf(*output, "\n⚠️  A new version of Tiger CLI is available: %s (current: %s)\n",
-		result.LatestVersion, result.CurrentVersion)
-	fmt.Fprintf(*output, "   To upgrade: %s\n\n", result.UpdateCommand)
+	fmt.Fprintf(*output, "\n\n%s %s → %s\nTo upgrade: %s\n",
+		color.YellowString("A new release of tiger-cli is available:"),
+		color.CyanString(result.CurrentVersion),
+		color.CyanString(result.LatestVersion),
+		result.UpdateCommand,
+	)
 }
 
 // PerformCheck performs the full version check flow:
@@ -271,9 +275,6 @@ func PerformCheck(cfg *config.Config, output *io.Writer, force bool) *CheckResul
 		}
 		// Don't fail if we can't update the timestamp
 	}
-
-	// Print warning if update available
-	printUpdateWarning(result, cfg, output)
 
 	return result
 }
