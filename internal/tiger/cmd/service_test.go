@@ -1252,7 +1252,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	cmd.SetErr(errBuf)
 
 	// Test waitForServiceReady with very short timeout to trigger timeout quickly
-	_, err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, cmd.ErrOrStderr())
+	_, err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, nil, cmd.ErrOrStderr())
 
 	// Should return an error with ExitTimeout
 	if err == nil {
