@@ -1789,9 +1789,10 @@ func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
 
 	// Set up config with output format explicitly set to "table"
 	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"output":     "table",
+		"api_url":                "http://localhost:9999",
+		"project_id":             "test-project-123",
+		"output":                 "table",
+		"version_check_interval": 0,
 	})
 	if err != nil {
 		t.Fatalf("Failed to setup test config: %v", err)

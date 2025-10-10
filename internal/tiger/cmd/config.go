@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -215,6 +216,15 @@ func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 	}
 	if cfg.ConfigDir != nil {
 		table.Append("config_dir", *cfg.ConfigDir)
+	}
+	if cfg.VersionCheckURL != nil {
+		table.Append("version_check_url", *cfg.VersionCheckURL)
+	}
+	if cfg.VersionCheckInterval != nil {
+		table.Append("version_check_interval", fmt.Sprintf("%d seconds", *cfg.VersionCheckInterval))
+	}
+	if cfg.VersionCheckLastTime != nil {
+		table.Append("version_check_last_time", time.Unix(int64(*cfg.VersionCheckLastTime), 0).Format(time.RFC1123))
 	}
 	return table.Render()
 }
