@@ -127,18 +127,18 @@ func TestGetAllowedCPUMemoryConfigs(t *testing.T) {
 
 	// Verify specific configurations from the spec
 	expectedConfigs := []CPUMemoryConfig{
-		{CPUMillis: 500, MemoryGbs: 2},
-		{CPUMillis: 1000, MemoryGbs: 4},
-		{CPUMillis: 2000, MemoryGbs: 8},
-		{CPUMillis: 4000, MemoryGbs: 16},
-		{CPUMillis: 8000, MemoryGbs: 32},
-		{CPUMillis: 16000, MemoryGbs: 64},
-		{CPUMillis: 32000, MemoryGbs: 128},
+		{CPUMillis: 500, MemoryGBs: 2},
+		{CPUMillis: 1000, MemoryGBs: 4},
+		{CPUMillis: 2000, MemoryGBs: 8},
+		{CPUMillis: 4000, MemoryGBs: 16},
+		{CPUMillis: 8000, MemoryGBs: 32},
+		{CPUMillis: 16000, MemoryGBs: 64},
+		{CPUMillis: 32000, MemoryGBs: 128},
 	}
 
 	for i, expected := range expectedConfigs {
 		if i < len(configs) {
-			if configs[i].CPUMillis != expected.CPUMillis || configs[i].MemoryGbs != expected.MemoryGbs {
+			if configs[i].CPUMillis != expected.CPUMillis || configs[i].MemoryGBs != expected.MemoryGBs {
 				t.Errorf("Config %d: expected %+v, got %+v", i, expected, configs[i])
 			}
 		}
@@ -147,9 +147,9 @@ func TestGetAllowedCPUMemoryConfigs(t *testing.T) {
 
 func TestCPUMemoryConfigs_String(t *testing.T) {
 	configs := CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGbs: 2},
-		{CPUMillis: 1000, MemoryGbs: 4},
-		{CPUMillis: 2000, MemoryGbs: 8},
+		{CPUMillis: 500, MemoryGBs: 2},
+		{CPUMillis: 1000, MemoryGBs: 4},
+		{CPUMillis: 2000, MemoryGBs: 8},
 	}
 
 	result := configs.String()
@@ -162,9 +162,9 @@ func TestCPUMemoryConfigs_String(t *testing.T) {
 
 func TestCPUMemoryConfigs_CPUString(t *testing.T) {
 	configs := CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGbs: 2},
-		{CPUMillis: 1000, MemoryGbs: 4},
-		{CPUMillis: 2000, MemoryGbs: 8},
+		{CPUMillis: 500, MemoryGBs: 2},
+		{CPUMillis: 1000, MemoryGBs: 4},
+		{CPUMillis: 2000, MemoryGBs: 8},
 	}
 
 	result := configs.CPUString()
@@ -177,9 +177,9 @@ func TestCPUMemoryConfigs_CPUString(t *testing.T) {
 
 func TestCPUMemoryConfigs_MemoryString(t *testing.T) {
 	configs := CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGbs: 2},
-		{CPUMillis: 1000, MemoryGbs: 4},
-		{CPUMillis: 2000, MemoryGbs: 8},
+		{CPUMillis: 500, MemoryGBs: 2},
+		{CPUMillis: 1000, MemoryGBs: 4},
+		{CPUMillis: 2000, MemoryGBs: 8},
 	}
 
 	result := configs.MemoryString()

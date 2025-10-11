@@ -2,16 +2,22 @@ package util
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 // CPUMemoryConfig represents an allowed CPU/Memory configuration
 type CPUMemoryConfig struct {
-	CPUMillis int // CPU in millicores
-	MemoryGbs int // Memory in GB
+	Shared    bool // Shared CPU/Memory
+	CPUMillis int  // CPU in millicores
+	MemoryGBs int  // Memory in GB
 }
 
 func (c *CPUMemoryConfig) String() string {
+	if c.Shared {
+		return "shared"
+	}
+
 	cpuCores := float64(c.CPUMillis) / 1000
 	if cpuCores == float64(int(cpuCores)) {
 		return fmt.Sprintf("%.0f CPU/%s", cpuCores, c.MemoryString())
@@ -20,6 +26,10 @@ func (c *CPUMemoryConfig) String() string {
 }
 
 func (c *CPUMemoryConfig) CPUString() string {
+	if c.Shared {
+		return "shared"
+	}
+
 	cpuCores := float64(c.CPUMillis) / 1000
 	if cpuCores == float64(int(cpuCores)) {
 		return fmt.Sprintf("%.0f (%.0fm)", cpuCores, float64(c.CPUMillis))
@@ -28,7 +38,11 @@ func (c *CPUMemoryConfig) CPUString() string {
 }
 
 func (c *CPUMemoryConfig) MemoryString() string {
-	return fmt.Sprintf("%dGB", c.MemoryGbs)
+	if c.Shared {
+		return "shared"
+	}
+
+	return fmt.Sprintf("%dGB", c.MemoryGBs)
 }
 
 type CPUMemoryConfigs []CPUMemoryConfig
@@ -37,13 +51,14 @@ type CPUMemoryConfigs []CPUMemoryConfig
 // TODO: It would be great if we could fetch these from the API instead of hard coding them.
 func GetAllowedCPUMemoryConfigs() CPUMemoryConfigs {
 	return CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGbs: 2},     // 0.5 CPU, 2GB
-		{CPUMillis: 1000, MemoryGbs: 4},    // 1 CPU, 4GB
-		{CPUMillis: 2000, MemoryGbs: 8},    // 2 CPU, 8GB
-		{CPUMillis: 4000, MemoryGbs: 16},   // 4 CPU, 16GB
-		{CPUMillis: 8000, MemoryGbs: 32},   // 8 CPU, 32GB
-		{CPUMillis: 16000, MemoryGbs: 64},  // 16 CPU, 64GB
-		{CPUMillis: 32000, MemoryGbs: 128}, // 32 CPU, 128GB
+		{Shared: true},                     // shared CPU, shared memory
+		{CPUMillis: 500, MemoryGBs: 2},     // 0.5 CPU, 2GB
+		{CPUMillis: 1000, MemoryGBs: 4},    // 1 CPU, 4GB
+		{CPUMillis: 2000, MemoryGBs: 8},    // 2 CPU, 8GB
+		{CPUMillis: 4000, MemoryGBs: 16},   // 4 CPU, 16GB
+		{CPUMillis: 8000, MemoryGBs: 32},   // 8 CPU, 32GB
+		{CPUMillis: 16000, MemoryGBs: 64},  // 16 CPU, 64GB
+		{CPUMillis: 32000, MemoryGBs: 128}, // 32 CPU, 128GB
 	}
 }
 
@@ -80,20 +95,20 @@ func (c CPUMemoryConfigs) MemoryString() string {
 }
 
 // ValidateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic
-func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs int, cpuFlagSet, memoryFlagSet bool) (int, int, error) {
+func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGBs int, cpuFlagSet, memoryFlagSet bool) (int, int, error) {
 	configs := GetAllowedCPUMemoryConfigs()
 
 	// If both CPU and memory were explicitly set, validate they match an allowed configuration
 	if cpuFlagSet && memoryFlagSet {
 		for _, config := range configs {
-			if config.CPUMillis == cpuMillis && config.MemoryGbs == memoryGbs {
-				return cpuMillis, memoryGbs, nil
+			if config.CPUMillis == cpuMillis && config.MemoryGBs == memoryGBs {
+				return cpuMillis, memoryGBs, nil
 			}
 		}
 		// If no exact match, provide helpful error
 		return 0, 0, fmt.Errorf(
 			"invalid CPU/Memory combination: %dm CPU and %dGB memory. Allowed combinations: %s",
-			cpuMillis, memoryGbs, configs,
+			cpuMillis, memoryGBs, configs,
 		)
 	}
 
@@ -101,7 +116,7 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs int, cpuFlagSet, mem
 	if cpuFlagSet && !memoryFlagSet {
 		for _, config := range configs {
 			if config.CPUMillis == cpuMillis {
-				return cpuMillis, config.MemoryGbs, nil
+				return cpuMillis, config.MemoryGBs, nil
 			}
 		}
 		return 0, 0, fmt.Errorf(
@@ -113,13 +128,13 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs int, cpuFlagSet, mem
 	// If only memory was explicitly set, find matching CPU and auto-configure
 	if !cpuFlagSet && memoryFlagSet {
 		for _, config := range configs {
-			if config.MemoryGbs == memoryGbs {
-				return config.CPUMillis, memoryGbs, nil
+			if config.MemoryGBs == memoryGBs {
+				return config.CPUMillis, memoryGBs, nil
 			}
 		}
 		return 0, 0, fmt.Errorf(
 			"invalid memory allocation: %dGB. Allowed memory values: %s",
-			memoryGbs, configs.MemoryString(),
+			memoryGBs, configs.MemoryString(),
 		)
 	}
 
@@ -127,18 +142,23 @@ func ValidateAndNormalizeCPUMemory(cpuMillis int, memoryGbs int, cpuFlagSet, mem
 	return 500, 2, nil
 }
 
-// ParseCPUMemory parses a CPU/Memory combination string (e.g., "2 CPU/8GB") and returns millicores and GB
-func ParseCPUMemory(cpuMemoryStr string) (int, int, error) {
+// ParseCPUMemory parses a CPU/memory combination string (e.g., "2 CPU/8GB")
+// and returns millicores and GB. If "shared" is given, returns "shared" for
+// both CPU and memory.
+func ParseCPUMemory(cpuMemoryStr string) (string, string, error) {
 	// Get allowed configurations
 	configs := GetAllowedCPUMemoryConfigs()
 
 	// Find matching configuration by comparing string representation
 	for _, config := range configs {
 		if config.String() == cpuMemoryStr {
-			return config.CPUMillis, config.MemoryGbs, nil
+			if config.Shared {
+				return "shared", "shared", nil
+			}
+			return strconv.Itoa(config.CPUMillis), strconv.Itoa(config.MemoryGBs), nil
 		}
 	}
 
 	// If no match found, return error with valid options
-	return 0, 0, fmt.Errorf("invalid CPU/Memory combination '%s'. Valid options: %s", cpuMemoryStr, configs.String())
+	return "", "", fmt.Errorf("invalid CPU/Memory combination '%s'. Valid options: %s", cpuMemoryStr, configs.String())
 }

@@ -35,9 +35,9 @@ func AnySlice[T any](in []T) []any {
 }
 
 // ConvertStringSlice converts a slice of strings to another string-like type.
-// Returns nil if the input slice is empty or nil.
+// Returns nil if the input slice is nil.
 func ConvertStringSlice[T ~string](ss []string) []T {
-	if len(ss) == 0 {
+	if ss == nil {
 		return nil
 	}
 
