@@ -80,8 +80,8 @@ type Error struct {
 // ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
 // HA replica count is always set to 0 for forked services.
 type ForkServiceCreate struct {
-	// CpuMillis The initial CPU allocation in milli-cores. If not provided, will inherit from parent service.
-	CpuMillis *int `json:"cpu_millis,omitempty"`
+	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+	CpuMillis *string `json:"cpu_millis,omitempty"`
 
 	// ForkStrategy Strategy for creating the fork:
 	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
@@ -89,11 +89,8 @@ type ForkServiceCreate struct {
 	// - PITR: Point-in-time recovery using target_time
 	ForkStrategy ForkStrategy `json:"fork_strategy"`
 
-	// Free Whether to create a free forked service (if true, cpu_millis and memory_gbs must not be provided)
-	Free *bool `json:"free,omitempty"`
-
-	// MemoryGbs The initial memory allocation in gigabytes. If not provided, will inherit from parent service.
-	MemoryGbs *int `json:"memory_gbs,omitempty"`
+	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 
 	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
 	Name *string `json:"name,omitempty"`
@@ -258,23 +255,22 @@ type Service struct {
 // ServiceCreate defines model for ServiceCreate.
 type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
-	Addons []ServiceCreateAddons `json:"addons"`
+	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
 
-	// CpuMillis The initial CPU allocation in milli-cores.
-	CpuMillis int `json:"cpu_millis"`
+	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
+	CpuMillis *string `json:"cpu_millis,omitempty"`
 
-	// Free Whether to create a free service (if true, addons, replica_count, cpu_millis, and memory_gbs must not be provided)
-	Free *bool `json:"free,omitempty"`
-
-	// MemoryGbs The initial memory allocation in gigabytes.
-	MemoryGbs int `json:"memory_gbs"`
+	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 
 	// Name A human-readable name for the service.
-	Name       string `json:"name"`
-	RegionCode string `json:"region_code"`
+	Name string `json:"name"`
+
+	// RegionCode The region where the service will be created. If not provided, we'll choose the best region for you.
+	RegionCode *string `json:"region_code,omitempty"`
 
 	// ReplicaCount Number of high-availability replicas to create (all replicas are asynchronous by default).
-	ReplicaCount int `json:"replica_count"`
+	ReplicaCount *int `json:"replica_count,omitempty"`
 }
 
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
