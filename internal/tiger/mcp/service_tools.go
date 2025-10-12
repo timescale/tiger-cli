@@ -426,15 +426,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		zap.Int("replicas", input.Replicas),
 	)
 
-	var addOnsPtr *[]api.ServiceCreateAddons
-	if addOns := util.ConvertStringSlice[api.ServiceCreateAddons](input.Addons); addOns != nil {
-		addOnsPtr = &addOns
-	}
-
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
 		Name:         input.Name,
-		Addons:       addOnsPtr,
+		Addons:       util.ConvertStringSlice[api.ServiceCreateAddons](input.Addons),
 		RegionCode:   input.Region,
 		ReplicaCount: &input.Replicas,
 		CpuMillis:    cpuMillis,
