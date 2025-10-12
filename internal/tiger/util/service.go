@@ -13,9 +13,9 @@ func GenerateServiceName() string {
 
 // Addon constants - these match the ServiceCreateAddons from the API
 const (
+	AddonNone       = "none" // Special value for no add-ons
 	AddonTimeSeries = "time-series"
 	AddonAI         = "ai"
-	AddonNone       = "none" // Special value for no add-ons
 )
 
 // ValidAddons returns a slice of all valid add-on values
@@ -42,9 +42,9 @@ func ValidateAddons(addons []string) ([]string, error) {
 		return nil, nil
 	}
 
-	// Check if first element is "none" - if so, return nil (no add-ons)
+	// Check if first element is "none" - if so, return empty list (no add-ons)
 	if len(addons) == 1 && strings.ToLower(addons[0]) == AddonNone {
-		return nil, nil
+		return []string{}, nil
 	}
 
 	var (
@@ -55,7 +55,7 @@ func ValidateAddons(addons []string) ([]string, error) {
 		addon = strings.TrimSpace(addon)
 
 		if !IsValidAddon(addon) {
-			return nil, fmt.Errorf("invalid add-on '%s'. Valid add-ons: %s, or 'none' for no add-ons", addon, strings.Join(ValidAddons(), ", "))
+			return nil, fmt.Errorf("invalid add-on '%s'. Valid add-ons: %s, or 'auto' for automatic selection, or 'none' for no add-ons", addon, strings.Join(ValidAddons(), ", "))
 		}
 		if seen[addon] {
 			continue
