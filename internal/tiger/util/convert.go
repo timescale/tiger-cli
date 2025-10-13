@@ -34,9 +34,9 @@ func AnySlice[T any](in []T) []any {
 	return out
 }
 
-// ConvertStringSlice converts a slice of strings to another string-like type.
-// Returns nil if the input slice is nil.
-func ConvertStringSlice[T ~string](ss []string) []T {
+// ConvertStringSlicePtr converts a slice of strings to a pointer to another
+// string-like type. Returns nil if the input slice is nil.
+func ConvertStringSlicePtr[T ~string](ss []string) *[]T {
 	if ss == nil {
 		return nil
 	}
@@ -45,5 +45,5 @@ func ConvertStringSlice[T ~string](ss []string) []T {
 	for i, s := range ss {
 		out[i] = T(s)
 	}
-	return out
+	return &out
 }

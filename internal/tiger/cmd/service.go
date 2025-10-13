@@ -345,7 +345,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Prepare service creation request
 			serviceCreateReq := api.ServiceCreate{
 				Name:         createServiceName,
-				Addons:       util.ConvertStringSlice[api.ServiceCreateAddons](addons),
+				Addons:       util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),
 				ReplicaCount: &createReplicaCount,
 				CpuMillis:    cpuMillis,
 				MemoryGbs:    memoryGBs,
@@ -654,8 +654,8 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Append("Region", util.Deref(service.RegionCode))
 
 	// Resource information from Resources slice
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0] // Get first resource
+	if service.Resources != nil && len(*service.Resources) > 0 {
+		resource := (*service.Resources)[0] // Get first resource
 		if resource.Spec != nil {
 			if resource.Spec.CpuMillis != nil {
 				cpuCores := float64(*resource.Spec.CpuMillis) / 1000

@@ -219,14 +219,14 @@ type Service struct {
 	Paused *bool `json:"paused,omitempty"`
 
 	// ProjectId The project this service belongs to.
-	ProjectId       *string          `json:"project_id,omitempty"`
-	ReadReplicaSets []ReadReplicaSet `json:"read_replica_sets,omitempty"`
+	ProjectId       *string           `json:"project_id,omitempty"`
+	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
 
 	// RegionCode The cloud region where the service is hosted.
 	RegionCode *string `json:"region_code,omitempty"`
 
 	// Resources List of resources allocated to the service
-	Resources []struct {
+	Resources *[]struct {
 		// Id Resource identifier
 		Id *string `json:"id,omitempty"`
 
@@ -249,13 +249,13 @@ type Service struct {
 	Status      *DeployStatus `json:"status,omitempty"`
 
 	// VpcEndpoint VPC endpoint configuration if available
-	VpcEndpoint map[string]interface{} `json:"vpcEndpoint"`
+	VpcEndpoint *map[string]interface{} `json:"vpcEndpoint"`
 }
 
 // ServiceCreate defines model for ServiceCreate.
 type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
-	Addons []ServiceCreateAddons `json:"addons,omitempty"`
+	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
 
 	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
 	CpuMillis *string `json:"cpu_millis,omitempty"`

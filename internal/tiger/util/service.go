@@ -55,7 +55,7 @@ func ValidateAddons(addons []string) ([]string, error) {
 		addon = strings.TrimSpace(addon)
 
 		if !IsValidAddon(addon) {
-			return nil, fmt.Errorf("invalid add-on '%s'. Valid add-ons: %s, or 'auto' for automatic selection, or 'none' for no add-ons", addon, strings.Join(ValidAddons(), ", "))
+			return nil, fmt.Errorf("invalid add-on '%s'. Valid add-ons: %s, or 'none' for PostgreSQL-only", addon, strings.Join(ValidAddons(), ", "))
 		}
 		if seen[addon] {
 			continue

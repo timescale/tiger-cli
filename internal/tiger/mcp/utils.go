@@ -28,8 +28,8 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 	}
 
 	// Add resource information if available
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0]
+	if service.Resources != nil && len(*service.Resources) > 0 {
+		resource := (*service.Resources)[0]
 		if resource.Spec != nil {
 			info.Resources = &ResourceInfo{}
 
@@ -74,8 +74,8 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 	}
 
 	// Add resource information if available
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0]
+	if service.Resources != nil && len(*service.Resources) > 0 {
+		resource := (*service.Resources)[0]
 		if resource.Spec != nil {
 			detail.Resources = &ResourceInfo{}
 

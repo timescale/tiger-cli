@@ -67,7 +67,7 @@ func TestConvertStringSlice(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ConvertStringSlice[testStringType](tt.input)
+			got := ConvertStringSlicePtr[testStringType](tt.input)
 
 			if tt.wantNil {
 				if got != nil {
