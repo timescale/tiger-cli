@@ -41,29 +41,9 @@ func (c *CPUMemoryConfig) String() string {
 
 	cpuCores := float64(c.CPUMillis) / 1000
 	if cpuCores == float64(int(cpuCores)) {
-		return fmt.Sprintf("%.0f CPU/%s", cpuCores, c.MemoryString())
+		return fmt.Sprintf("%.0f CPU/%d GB", cpuCores, c.MemoryGBs)
 	}
-	return fmt.Sprintf("%.1f CPU/%s", cpuCores, c.MemoryString())
-}
-
-func (c *CPUMemoryConfig) CPUString() string {
-	if c.Shared {
-		return "shared"
-	}
-
-	cpuCores := float64(c.CPUMillis) / 1000
-	if cpuCores == float64(int(cpuCores)) {
-		return fmt.Sprintf("%.0f (%.0fm)", cpuCores, float64(c.CPUMillis))
-	}
-	return fmt.Sprintf("%.1f (%.0fm)", cpuCores, float64(c.CPUMillis))
-}
-
-func (c *CPUMemoryConfig) MemoryString() string {
-	if c.Shared {
-		return "shared"
-	}
-
-	return fmt.Sprintf("%dGB", c.MemoryGBs)
+	return fmt.Sprintf("%.1f CPU/%d GB", cpuCores, c.MemoryGBs)
 }
 
 type CPUMemoryConfigs []CPUMemoryConfig
@@ -94,24 +74,6 @@ func (c CPUMemoryConfigs) Strings() []string {
 // String returns a user-friendly string of allowed CPU/Memory combinations
 func (c CPUMemoryConfigs) String() string {
 	return strings.Join(c.Strings(), ", ")
-}
-
-// String returns a user-friendly string of allowed CPU values
-func (c CPUMemoryConfigs) CPUString() string {
-	cpuValues := make([]string, 0, len(c))
-	for _, config := range c {
-		cpuValues = append(cpuValues, config.CPUString())
-	}
-	return strings.Join(cpuValues, ", ")
-}
-
-// String returns a user-friendly string of allowed memory values
-func (c CPUMemoryConfigs) MemoryString() string {
-	memoryValues := make([]string, 0, len(c))
-	for _, config := range c {
-		memoryValues = append(memoryValues, config.MemoryString())
-	}
-	return strings.Join(memoryValues, ", ")
 }
 
 // ValidateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic

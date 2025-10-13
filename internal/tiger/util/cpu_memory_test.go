@@ -153,37 +153,7 @@ func TestCPUMemoryConfigs_String(t *testing.T) {
 	}
 
 	result := configs.String()
-	expected := "0.5 CPU/2GB, 1 CPU/4GB, 2 CPU/8GB"
-
-	if result != expected {
-		t.Errorf("Expected %q, got %q", expected, result)
-	}
-}
-
-func TestCPUMemoryConfigs_CPUString(t *testing.T) {
-	configs := CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGBs: 2},
-		{CPUMillis: 1000, MemoryGBs: 4},
-		{CPUMillis: 2000, MemoryGBs: 8},
-	}
-
-	result := configs.CPUString()
-	expected := "0.5 (500m), 1 (1000m), 2 (2000m)"
-
-	if result != expected {
-		t.Errorf("Expected %q, got %q", expected, result)
-	}
-}
-
-func TestCPUMemoryConfigs_MemoryString(t *testing.T) {
-	configs := CPUMemoryConfigs{
-		{CPUMillis: 500, MemoryGBs: 2},
-		{CPUMillis: 1000, MemoryGBs: 4},
-		{CPUMillis: 2000, MemoryGBs: 8},
-	}
-
-	result := configs.MemoryString()
-	expected := "2GB, 4GB, 8GB"
+	expected := "0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB"
 
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
