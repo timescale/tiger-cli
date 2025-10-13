@@ -46,7 +46,7 @@ func TestConvertStringSlice(t *testing.T) {
 		{
 			name:    "Empty",
 			input:   []string{},
-			wantNil: true,
+			wantNil: false, // Empty slice returns pointer to empty slice, not nil
 		},
 		{
 			name:    "Nil",
@@ -71,24 +71,27 @@ func TestConvertStringSlice(t *testing.T) {
 
 			if tt.wantNil {
 				if got != nil {
-					t.Errorf("ConvertStringSlice(%v) = %v, want nil", tt.input, got)
+					t.Errorf("ConvertStringSlicePtr(%v) = %v, want nil", tt.input, got)
 				}
 				return
 			}
 
 			if got == nil {
-				t.Errorf("ConvertStringSlice(%v) = nil, want non-nil", tt.input)
+				t.Errorf("ConvertStringSlicePtr(%v) = nil, want non-nil", tt.input)
 				return
 			}
 
-			if len(got) != len(tt.input) {
-				t.Errorf("ConvertStringSlice(%v) length = %d, want %d", tt.input, len(got), len(tt.input))
+			// Dereference the pointer to access the slice
+			gotSlice := *got
+
+			if len(gotSlice) != len(tt.input) {
+				t.Errorf("ConvertStringSlicePtr(%v) length = %d, want %d", tt.input, len(gotSlice), len(tt.input))
 			}
 
 			// Verify the conversion is correct
 			for i, s := range tt.input {
-				if string(got[i]) != s {
-					t.Errorf("ConvertStringSlice(%v)[%d] = %s, want %s", tt.input, i, got[i], s)
+				if string(gotSlice[i]) != s {
+					t.Errorf("ConvertStringSlicePtr(%v)[%d] = %s, want %s", tt.input, i, gotSlice[i], s)
 				}
 			}
 		})
