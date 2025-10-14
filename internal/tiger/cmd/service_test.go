@@ -411,15 +411,6 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 		t.Errorf("Should not fail due to missing name anymore (should auto-generate), got: %v", err)
 	}
 
-	// Test with explicit empty region (should still fail validation)
-	_, err, _ = executeServiceCommand("service", "create", "--name", "test", "--addons", "none", "--region", "")
-	if err == nil {
-		t.Fatal("Expected error when region is empty")
-	}
-	if !strings.Contains(err.Error(), "region") && !strings.Contains(err.Error(), "empty") {
-		t.Errorf("Expected error about empty region, got: %v", err)
-	}
-
 	// Test invalid addon - this should fail validation before making API call
 	_, err, _ = executeServiceCommand("service", "create", "--addons", "invalid-addon", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
@@ -1559,98 +1550,6 @@ func TestServiceCreate_NoSetDefaultFlag(t *testing.T) {
 	}
 }
 
-func TestServiceCreate_FreeFlag(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config with project ID and a mock API URL to prevent network calls
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
-		"project_id": "test-project-123",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
-
-	// Test that --free flag works without other resource flags
-	_, err, _ = executeServiceCommand("service", "create", "--free", "--name", "free-test")
-	// Should fail at network call, not validation
-	if err != nil && strings.Contains(err.Error(), "cannot be specified with --free") {
-		t.Error("Free flag should work without other resource flags")
-	}
-}
-
-func TestServiceCreate_FreeWithIncompatibleFlags(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config with project ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
-
-	// Test cases for incompatible flags with --free
-	testCases := []struct {
-		name        string
-		flags       []string
-		expectError string
-	}{
-		{
-			name:        "free with addons",
-			flags:       []string{"service", "create", "--free", "--addons", "time-series"},
-			expectError: "--addons cannot be specified with --free",
-		},
-		{
-			name:        "free with region",
-			flags:       []string{"service", "create", "--free", "--region", "eu-west-1"},
-			expectError: "--region cannot be specified with --free",
-		},
-		{
-			name:        "free with cpu",
-			flags:       []string{"service", "create", "--free", "--cpu", "1000"},
-			expectError: "--cpu cannot be specified with --free",
-		},
-		{
-			name:        "free with memory",
-			flags:       []string{"service", "create", "--free", "--memory", "4"},
-			expectError: "--memory cannot be specified with --free",
-		},
-		{
-			name:        "free with replicas",
-			flags:       []string{"service", "create", "--free", "--replicas", "1"},
-			expectError: "--replicas cannot be specified with --free",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err, _ := executeServiceCommand(tc.flags...)
-			if err == nil {
-				t.Fatalf("Expected error for %s", tc.name)
-			}
-			if !strings.Contains(err.Error(), tc.expectError) {
-				t.Errorf("Expected error containing '%s', got: %v", tc.expectError, err)
-			}
-		})
-	}
-}
-
 func TestOutputService_FreeTier(t *testing.T) {
 	// Create a test free tier service object with null CPU and memory
 	serviceID := "svc-free-123"
@@ -1776,7 +1675,7 @@ func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
 	// Execute service create with -o json flag
 	// This will fail due to network error (localhost:9999 doesn't exist), but that's OK
 	// We just want to verify that the config file doesn't get the output flag written to it
-	executeServiceCommand("service", "create", "-o", "json", "--free")
+	executeServiceCommand("service", "create", "-o", "json", "--cpu", "shared", "--memory", "shared")
 
 	configMap = parseConfigFile(t, configFile)
 	if outputVal, exists := configMap["output"]; !exists || outputVal != "table" {
