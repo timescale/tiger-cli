@@ -58,8 +58,11 @@ tiger auth login
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			// Check for updates on any command
-			if !skipUpdateCheck {
+			// Skip update check if:
+			// 1. --skip-update-check flag was provided
+			// 2. Running "version --check" (version command handles its own check)
+			isVersionCheck := cmd.Name() == "version" && cmd.Flags().Changed("check")
+			if !skipUpdateCheck && !isVersionCheck {
 				output := cmd.ErrOrStderr()
 				result := version.PerformCheck(cfg, &output, false)
 				version.PrintUpdateWarning(result, cfg, &output)
