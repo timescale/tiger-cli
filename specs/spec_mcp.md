@@ -169,9 +169,9 @@ Create a new database service.
 
 **Parameters:**
 - `name` (string, optional): Service name - auto-generated if not provided
-- `type` (string, optional): Service type (timescaledb, postgres, vector) - default: timescaledb
-- `region` (string, optional): Region code - default: us-east-1
-- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB") - default: "0.5 CPU/2GB"
+- `addons` (array, optional): Addons to enable ("time-series", "ai", or empty array for PostgreSQL-only)
+- `region` (string, optional): Region code
+- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "shared/shared", "0.5 CPU/2GB", "2 CPU/8GB")
 - `replicas` (number, optional): Number of high-availability replicas - default: 0
 - `wait` (boolean, optional): Wait for service to be ready - default: false
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
