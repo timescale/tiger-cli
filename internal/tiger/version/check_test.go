@@ -14,32 +14,32 @@ import (
 func TestShouldCheck(t *testing.T) {
 	tests := []struct {
 		name          string
-		lastCheckTime int64
-		interval      int
+		lastCheckTime time.Time
+		interval      time.Duration
 		want          bool
 	}{
 		{
 			name:          "disabled when interval is 0",
-			lastCheckTime: time.Now().Unix(),
+			lastCheckTime: time.Now(),
 			interval:      0,
 			want:          false,
 		},
 		{
 			name:          "never checked before",
-			lastCheckTime: 0,
-			interval:      3600,
+			lastCheckTime: time.Time{},
+			interval:      time.Hour,
 			want:          true,
 		},
 		{
 			name:          "checked recently",
-			lastCheckTime: time.Now().Unix() - 1800, // 30 minutes ago
-			interval:      3600,                     // 1 hour interval
+			lastCheckTime: time.Now().Add(-30 * time.Minute), // 30 minutes ago
+			interval:      time.Hour,                         // 1 hour interval
 			want:          false,
 		},
 		{
 			name:          "checked long ago",
-			lastCheckTime: time.Now().Unix() - 7200, // 2 hours ago
-			interval:      3600,                     // 1 hour interval
+			lastCheckTime: time.Now().Add(-2 * time.Hour), // 2 hours ago
+			interval:      time.Hour,                      // 1 hour interval
 			want:          true,
 		},
 	}
@@ -360,23 +360,23 @@ func TestPerformCheck_Disabled(t *testing.T) {
 	}
 
 	// Should return immediately without error
-	err := PerformCheck(cfg, nil, false)
-	if err != nil {
-		t.Errorf("PerformCheck() with disabled check returned error: %v", err)
+	result := PerformCheck(cfg, nil, false)
+	if result != nil {
+		t.Errorf("PerformCheck() with disabled check should return nil")
 	}
 }
 
 func TestPerformCheck_TooSoon(t *testing.T) {
 	// Create config with recent check
 	cfg := &config.Config{
-		VersionCheckInterval: 3600,              // 1 hour
-		VersionCheckLastTime: time.Now().Unix(), // Just checked
+		VersionCheckInterval: time.Hour,  // 1 hour
+		VersionCheckLastTime: time.Now(), // Just checked
 		ReleasesURL:          "http://example.com",
 	}
 
 	// Should return immediately without error (and without making HTTP request)
-	err := PerformCheck(cfg, nil, false)
-	if err != nil {
-		t.Errorf("PerformCheck() with recent check returned error: %v", err)
+	result := PerformCheck(cfg, nil, false)
+	if result != nil {
+		t.Errorf("PerformCheck() with recent check should return nil")
 	}
 }

@@ -222,10 +222,10 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 		table.Append("releases_url", *cfg.ReleasesURL)
 	}
 	if cfg.VersionCheckInterval != nil {
-		table.Append("version_check_interval", fmt.Sprintf("%d seconds", *cfg.VersionCheckInterval))
+		table.Append("version_check_interval", cfg.VersionCheckInterval.String())
 	}
 	if cfg.VersionCheckLastTime != nil {
-		table.Append("version_check_last_time", time.Unix(int64(*cfg.VersionCheckLastTime), 0).Format(time.RFC1123))
+		table.Append("version_check_last_time", cfg.VersionCheckLastTime.Format(time.RFC1123))
 	}
 	return table.Render()
 }

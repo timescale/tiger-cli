@@ -144,7 +144,7 @@ password_storage: none
 		"debug":                  false,
 		"config_dir":             tmpDir,
 		"releases_url":           "https://cli.tigerdata.com",
-		"version_check_interval": float64(3600), // JSON unmarshals numbers as float64
+		"version_check_interval": float64(3600000000000), // JSON unmarshals time.Duration as nanoseconds (1 hour = 3600000000000ns)
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -201,7 +201,7 @@ password_storage: keyring
 		"debug":                  false,
 		"config_dir":             tmpDir,
 		"releases_url":           "https://cli.tigerdata.com",
-		"version_check_interval": 3600,
+		"version_check_interval": "1h0m0s", // YAML serializes time.Duration as string
 	}
 
 	for key, expectedValue := range expectedValues {

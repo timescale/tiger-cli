@@ -38,18 +38,17 @@ type CheckResult struct {
 	UpdateCommand   string
 }
 
-// ShouldCheck returns true if enough time has passed since the last check
-func shouldCheck(lastCheckTime int64, interval int) bool {
+// shouldCheck returns true if enough time has passed since the last check
+func shouldCheck(lastCheckTime time.Time, interval time.Duration) bool {
 	if interval == 0 {
 		return false // Version check disabled
 	}
 
-	if lastCheckTime == 0 {
+	if lastCheckTime.IsZero() {
 		return true // Never checked before
 	}
 
-	lastCheck := time.Unix(lastCheckTime, 0)
-	nextCheck := lastCheck.Add(time.Duration(interval) * time.Second)
+	nextCheck := lastCheckTime.Add(interval)
 	return time.Now().After(nextCheck)
 }
 
@@ -266,8 +265,8 @@ func PerformCheck(cfg *config.Config, output *io.Writer, force bool) *CheckResul
 		if cfg.Debug && output != nil {
 			fmt.Fprintf(
 				*output,
-				"Skipping version check (too soon)\n  Last check: %d, Interval: %d seconds\n",
-				cfg.VersionCheckLastTime,
+				"Skipping version check (too soon)\n  Last check: %s, Interval: %s\n",
+				cfg.VersionCheckLastTime.Format(time.RFC3339),
 				cfg.VersionCheckInterval,
 			)
 		}
@@ -288,8 +287,8 @@ func PerformCheck(cfg *config.Config, output *io.Writer, force bool) *CheckResul
 
 	// Update last check time only after successful check
 	// This ensures we retry quickly if the check failed
-	now := time.Now().Unix()
-	if err := cfg.Set("version_check_last_time", fmt.Sprintf("%d", now)); err != nil {
+	now := time.Now()
+	if err := cfg.Set("version_check_last_time", now.Format(time.RFC3339)); err != nil {
 		if cfg.Debug && output != nil {
 			fmt.Fprintf(*output, "Warning: failed to update last check time: %v\n", err)
 		}

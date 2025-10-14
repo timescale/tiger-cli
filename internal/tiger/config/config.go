@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -15,39 +16,39 @@ import (
 )
 
 type Config struct {
-	APIURL               string `mapstructure:"api_url" yaml:"api_url"`
-	ConsoleURL           string `mapstructure:"console_url" yaml:"console_url"`
-	GatewayURL           string `mapstructure:"gateway_url" yaml:"gateway_url"`
-	DocsMCP              bool   `mapstructure:"docs_mcp" yaml:"docs_mcp"`
-	DocsMCPURL           string `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
-	ProjectID            string `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID            string `mapstructure:"service_id" yaml:"service_id"`
-	Output               string `mapstructure:"output" yaml:"output"`
-	Analytics            bool   `mapstructure:"analytics" yaml:"analytics"`
-	PasswordStorage      string `mapstructure:"password_storage" yaml:"password_storage"`
-	Debug                bool   `mapstructure:"debug" yaml:"debug"`
-	ConfigDir            string `mapstructure:"config_dir" yaml:"-"`
-	ReleasesURL          string `mapstructure:"releases_url" yaml:"releases_url"`
-	VersionCheckInterval int    `mapstructure:"version_check_interval" yaml:"version_check_interval"`
-	VersionCheckLastTime int64  `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
+	APIURL               string        `mapstructure:"api_url" yaml:"api_url"`
+	ConsoleURL           string        `mapstructure:"console_url" yaml:"console_url"`
+	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
+	DocsMCP              bool          `mapstructure:"docs_mcp" yaml:"docs_mcp"`
+	DocsMCPURL           string        `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
+	ProjectID            string        `mapstructure:"project_id" yaml:"project_id"`
+	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
+	Output               string        `mapstructure:"output" yaml:"output"`
+	Analytics            bool          `mapstructure:"analytics" yaml:"analytics"`
+	PasswordStorage      string        `mapstructure:"password_storage" yaml:"password_storage"`
+	Debug                bool          `mapstructure:"debug" yaml:"debug"`
+	ConfigDir            string        `mapstructure:"config_dir" yaml:"-"`
+	ReleasesURL          string        `mapstructure:"releases_url" yaml:"releases_url"`
+	VersionCheckInterval time.Duration `mapstructure:"version_check_interval" yaml:"version_check_interval"`
+	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
 }
 
 type ConfigOutput struct {
-	APIURL               *string `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
-	ConsoleURL           *string `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
-	GatewayURL           *string `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
-	DocsMCP              *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
-	DocsMCPURL           *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
-	ProjectID            *string `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
-	ServiceID            *string `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
-	Output               *string `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
-	Analytics            *bool   `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
-	PasswordStorage      *string `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
-	Debug                *bool   `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
-	ConfigDir            *string `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
-	ReleasesURL          *string `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
-	VersionCheckInterval *int    `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
-	VersionCheckLastTime *int64  `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty" yaml:"version_check_last_time,omitempty"`
+	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
+	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
+	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
+	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
+	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
+	ProjectID            *string        `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
+	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	Output               *string        `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
+	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
+	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
+	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
+	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
+	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
+	VersionCheckInterval *time.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
+	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty" yaml:"version_check_last_time,omitempty"`
 }
 
 const (
@@ -61,7 +62,7 @@ const (
 	DefaultPasswordStorage      = "keyring"
 	DefaultDebug                = false
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
-	DefaultVersionCheckInterval = 3600 // 1 hour in seconds (0 to disable)
+	DefaultVersionCheckInterval = time.Hour // 0 to disable
 	ConfigFileName              = "config.yaml"
 )
 
@@ -79,7 +80,7 @@ var defaultValues = map[string]any{
 	"debug":                   DefaultDebug,
 	"releases_url":            DefaultReleasesURL,
 	"version_check_interval":  DefaultVersionCheckInterval,
-	"version_check_last_time": int64(0),
+	"version_check_last_time": time.Time{},
 }
 
 func ApplyDefaults(v *viper.Viper) {
@@ -378,43 +379,47 @@ func (c *Config) updateField(key string, value any) (any, error) {
 
 	case "version_check_interval":
 		switch v := value.(type) {
-		case int:
+		case time.Duration:
 			if v < 0 {
 				return nil, fmt.Errorf("version_check_interval must be non-negative (0 to disable)")
 			}
 			c.VersionCheckInterval = v
 			validated = v
 		case string:
-			i, err := strconv.Atoi(v)
+			// Parse duration string like "1h", "30m", "24h"
+			d, err := time.ParseDuration(v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid version_check_interval value: %s (must be a number)", v)
+				return nil, fmt.Errorf("invalid version_check_interval value: %s (must be a duration like '1h', '30m', etc.)", v)
 			}
-			if i < 0 {
+			if d < 0 {
 				return nil, fmt.Errorf("version_check_interval must be non-negative (0 to disable)")
 			}
-			c.VersionCheckInterval = i
-			validated = i
+			c.VersionCheckInterval = d
+			validated = d
 		default:
-			return nil, fmt.Errorf("version_check_interval must be string or int, got %T", value)
+			return nil, fmt.Errorf("version_check_interval must be string or duration, got %T", value)
 		}
 
 	case "version_check_last_time":
 		switch v := value.(type) {
-		case int64:
+		case time.Time:
 			c.VersionCheckLastTime = v
 			validated = v
-		case int:
-			c.VersionCheckLastTime = int64(v)
-			validated = int64(v)
 		case string:
-			i, err := strconv.ParseInt(v, 10, 64)
+			// Try parsing as RFC3339 first, then as unix timestamp
+			t, err := time.Parse(time.RFC3339, v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid version_check_last_time value: %s (must be a number)", v)
+				// Try parsing as unix timestamp
+				i, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid version_check_last_time value: %s (must be RFC3339 timestamp or unix timestamp)", v)
+				}
+				t = time.Unix(i, 0)
 			}
-			c.VersionCheckLastTime = i
-			validated = i
+			c.VersionCheckLastTime = t
+			validated = t
 		default:
-			return nil, fmt.Errorf("version_check_last_time must be string or int64, got %T", value)
+			return nil, fmt.Errorf("version_check_last_time must be string or time, got %T", value)
 		}
 
 	default:
