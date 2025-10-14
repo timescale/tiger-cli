@@ -259,6 +259,10 @@ func (s *Server) registerServiceTools() {
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.
 
+The default type of service created depends on the user's plan:
+- Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+
 Default behavior: Returns immediately while service provisions in background (recommended).
 Setting wait=true will block for a few minutes until ready - only use if user explicitly needs immediate access.
 timeout_minutes: Wait duration in minutes (only relevant with wait=true).

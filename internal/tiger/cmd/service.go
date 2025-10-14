@@ -244,6 +244,10 @@ func buildServiceCreateCmd() *cobra.Command {
 		Short: "Create a new database service",
 		Long: `Create a new database service in the current project.
 
+The default type of service created depends on your plan:
+- Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+
 By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
