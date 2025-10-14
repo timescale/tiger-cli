@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/cli/safeexec"
 	"github.com/fatih/color"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -110,7 +111,24 @@ func compareVersions(currentVersion, newVersion string) bool {
 	return vLatest.GreaterThan(vCurrent)
 }
 
-// DetectInstallMethod determines how Tiger CLI was installed
+// borrowed from GH cli
+// https://github.com/cli/cli/blob/trunk/internal/ghcmd/cmd.go#L233
+func isUnderHomebrew(binaryPath string) bool {
+	brewExe, err := safeexec.LookPath("brew")
+	if err != nil {
+		return false
+	}
+
+	brewPrefixBytes, err := exec.Command(brewExe, "--prefix").Output()
+	if err != nil {
+		return false
+	}
+
+	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
+	return strings.HasPrefix(binaryPath, brewBinPrefix)
+}
+
+// determines how Tiger CLI was installed
 func detectInstallMethod(binaryPath string) InstallMethod {
 	// Check for development build
 	if strings.Contains(binaryPath, "go-build") {
@@ -118,28 +136,23 @@ func detectInstallMethod(binaryPath string) InstallMethod {
 	}
 
 	// Check for Homebrew installation
-	if strings.Contains(binaryPath, "/homebrew/") ||
-		strings.Contains(binaryPath, "/Homebrew/") ||
-		strings.Contains(binaryPath, "linuxbrew") {
+	lowerPath := strings.ToLower(binaryPath)
+	if isUnderHomebrew(binaryPath) || strings.Contains(lowerPath, "/homebrew/") || strings.Contains(lowerPath, "/linuxbrew/") {
 		return InstallMethodHomebrew
 	}
 
-	// Try to detect via package managers
-	absPath, err := filepath.Abs(binaryPath)
-	if err == nil {
-		// Check if installed via dpkg (Debian/Ubuntu)
-		if runtime.GOOS == "linux" {
-			if output, err := exec.Command("dpkg", "-S", absPath).CombinedOutput(); err == nil {
-				if strings.Contains(string(output), "tiger-cli") {
-					return InstallMethodDeb
-				}
+	// Check if installed via dpkg (Debian/Ubuntu)
+	if runtime.GOOS == "linux" {
+		if output, err := exec.Command("dpkg", "-S", binaryPath).CombinedOutput(); err == nil {
+			if strings.Contains(string(output), "tiger-cli") {
+				return InstallMethodDeb
 			}
+		}
 
-			// Check if installed via rpm (RHEL/Fedora/CentOS)
-			if output, err := exec.Command("rpm", "-qf", absPath).CombinedOutput(); err == nil {
-				if strings.Contains(string(output), "tiger-cli") {
-					return InstallMethodRPM
-				}
+		// Check if installed via rpm (RHEL/Fedora/CentOS)
+		if output, err := exec.Command("rpm", "-qf", binaryPath).CombinedOutput(); err == nil {
+			if strings.Contains(string(output), "tiger-cli") {
+				return InstallMethodRPM
 			}
 		}
 	}
