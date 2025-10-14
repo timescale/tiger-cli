@@ -62,7 +62,7 @@ const (
 	DefaultPasswordStorage      = "keyring"
 	DefaultDebug                = false
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
-	DefaultVersionCheckInterval = time.Hour // 0 to disable
+	DefaultVersionCheckInterval = 24 * time.Hour
 	ConfigFileName              = "config.yaml"
 )
 
