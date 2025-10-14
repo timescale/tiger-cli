@@ -15,6 +15,7 @@ import (
 	"github.com/cli/safeexec"
 	"github.com/fatih/color"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // InstallMethod represents how Tiger CLI was installed
@@ -256,6 +257,20 @@ func PerformCheck(cfg *config.Config, output *io.Writer, force bool) *CheckResul
 	if !force && cfg.VersionCheckInterval == 0 {
 		if cfg.Debug && output != nil {
 			fmt.Fprintln(*output, "Version check is disabled")
+		}
+		return nil
+	}
+
+	if !force && util.IsCI() {
+		if cfg.Debug && output != nil {
+			fmt.Fprintln(*output, "Skipping version check (CI environment detected)")
+		}
+		return nil
+	}
+
+	if !force && !(util.IsTerminal(os.Stderr) && util.IsTerminal(os.Stdout)) {
+		if cfg.Debug && output != nil {
+			fmt.Fprintln(*output, "Skipping version check (non-interactive terminal detected)")
 		}
 		return nil
 	}
