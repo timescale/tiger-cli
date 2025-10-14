@@ -7,7 +7,7 @@ Tiger CLI is the command-line interface for Tiger Cloud. It provides commands fo
 ### Install Script
 
 ```bash
-curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
+curl -fsSL https://cli.tigerdata.com/install.sh | sh
 ```
 
 ### Homebrew (macOS/Linux)

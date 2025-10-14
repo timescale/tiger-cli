@@ -797,7 +797,7 @@ VERSION=1.2.3 && git tag -a v${VERSION} -m "${VERSION}" && git push origin v${VE
 **Publishing Targets:**
 1. **GitHub Releases** - Creates release with binaries for multiple platforms (macOS, Linux, Windows)
 2. **Homebrew Tap** - Updates `timescale/homebrew-tap` with new formula
-3. **S3 Bucket** - Uploads binaries to `tiger-cli-releases.s3.amazonaws.com` for install script
+3. **S3 Bucket** - Uploads binaries to `tiger-cli-releases` S3 bucket (behind `https://cli.tigerdata.com` CloudFront CDN) for install script and Homebrew downloads
 4. **PackageCloud** - Publishes Debian (.deb) and RPM packages to `timescale/tiger-cli` repository
 
 **Build Tool:** Uses [GoReleaser](https://goreleaser.com) to build and publish across all platforms. Configuration is in `.goreleaser.yml`.
