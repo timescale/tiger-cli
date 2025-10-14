@@ -252,7 +252,7 @@ Examples:
   tiger service create
 
   # Create a free TimescaleDB service
-  tiger service create --name free-db --cpu shared --memory shared
+  tiger service create --name free-db --cpu shared
 
   # Create a TimescaleDB service with AI add-ons
   tiger service create --name hybrid-db --addons time-series,ai
