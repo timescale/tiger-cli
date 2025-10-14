@@ -59,8 +59,7 @@ tiger auth login
 			}
 
 			// Check for updates on any command
-			// Skip check if running the version command (it handles via --check flag)
-			if !skipUpdateCheck && cmd.Name() != "version" {
+			if !skipUpdateCheck {
 				output := cmd.ErrOrStderr()
 				result := version.PerformCheck(cfg, &output, false)
 				version.PrintUpdateWarning(result, cfg, &output)
