@@ -90,7 +90,7 @@ blobs:
   - provider: s3
     bucket: tiger-cli-releases
     region: us-east-1
-    directory: "{{ \"\" }}"
+    directory: "{{ \"\" }}" # Can't use an empty string directly or GoReleaser defaults to "{{ .ProjectName }}/{{ .Tag }}"
     extra_files_only: true
     disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
     extra_files:
