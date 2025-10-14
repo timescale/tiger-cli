@@ -112,6 +112,7 @@ project_id: json-project
 output: json
 analytics: true
 password_storage: none
+version_check_interval: 1h
 `
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -201,7 +202,7 @@ password_storage: keyring
 		"debug":                  false,
 		"config_dir":             tmpDir,
 		"releases_url":           "https://cli.tigerdata.com",
-		"version_check_interval": "1h0m0s", // YAML serializes time.Duration as string
+		"version_check_interval": "24h0m0s", // YAML serializes time.Duration as string
 	}
 
 	for key, expectedValue := range expectedValues {
