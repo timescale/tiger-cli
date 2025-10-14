@@ -185,7 +185,7 @@ func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
 		}
 		return "sudo yum update tiger-cli"
 	case InstallMethodInstallSh:
-		return "curl -fsSL " + cfg.ReleasesURL + "/install/install.sh | sh"
+		return "curl -fsSL " + cfg.ReleasesURL + "/install.sh | sh"
 	case InstallMethodDevelopment:
 		return "rebuild from source or install via package manager"
 	default:
@@ -194,7 +194,7 @@ func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
 }
 
 func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer) (*CheckResult, error) {
-	latestVersion, err := fetchLatestVersion(cfg.ReleasesURL + "/install/latest.txt")
+	latestVersion, err := fetchLatestVersion(cfg.ReleasesURL + "/latest.txt")
 	if err != nil {
 		return nil, err
 	}
