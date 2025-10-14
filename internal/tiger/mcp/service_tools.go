@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -136,12 +135,11 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 type ServiceCreateInput struct {
 	Name           string   `json:"name,omitempty"`
 	Addons         []string `json:"addons,omitempty"`
-	Region         string   `json:"region,omitempty"`
-	CPUMemory      string   `json:"cpu_memory,omitempty"`
+	Region         *string  `json:"region,omitempty"`
+	CPUMemory      *string  `json:"cpu_memory,omitempty"`
 	Replicas       int      `json:"replicas,omitempty"`
-	Free           bool     `json:"free,omitempty"`
 	Wait           bool     `json:"wait,omitempty"`
-	TimeoutMinutes *int     `json:"timeout_minutes,omitempty"`
+	TimeoutMinutes int      `json:"timeout_minutes,omitempty"`
 	SetDefault     bool     `json:"set_default,omitempty"`
 	WithPassword   bool     `json:"with_password,omitempty"`
 }
@@ -153,26 +151,21 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
-	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only. Defaults to time-series."
+	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only."
 	schema.Properties["addons"].Items.Enum = []any{util.AddonTimeSeries, util.AddonAI}
 	schema.Properties["addons"].UniqueItems = true
 
-	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance. Defaults to us-east-1."
+	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	cpuMemoryCombinations := util.GetAllowedCPUMemoryConfigs().Strings()
-	schema.Properties["cpu_memory"].Description = fmt.Sprintf("CPU and memory allocation combination. Choose from the available configurations. Defaults to %s", cpuMemoryCombinations[0])
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryCombinations)
+	schema.Properties["cpu_memory"].Description = fmt.Sprintf("CPU and memory allocation combination. Choose from the available configurations.")
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
 	schema.Properties["replicas"].Maximum = util.Ptr(5.0)
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
-
-	schema.Properties["free"].Description = "Create a free service. When true, addons, region, cpu_memory, and replicas cannot be specified."
-	schema.Properties["free"].Default = util.Must(json.Marshal(false))
-	schema.Properties["free"].Examples = []any{false, true}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false and is recommended because service creation can take a few minutes and it's usually better to return immediately. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -265,6 +258,10 @@ func (s *Server) registerServiceTools() {
 		Name:  "service_create",
 		Title: "Create Database Service",
 		Description: `Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.
+
+The default type of service created depends on the user's plan:
+- Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 Default behavior: Returns immediately while service provisions in background (recommended).
 Setting wait=true will block for a few minutes until ready - only use if user explicitly needs immediate access.
@@ -414,81 +411,33 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = util.GenerateServiceName()
 	}
 
-	var cpuMillis, memoryGbs int
-	if input.Free {
-		// Validate free service restrictions
-		if input.Addons != nil {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("addons cannot be specified for free services")
+	var cpuMillis, memoryGBs *string
+	if input.CPUMemory != nil {
+		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(*input.CPUMemory)
+		if err != nil {
+			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
-		if input.Region != "" {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("region cannot be specified for free services")
-		}
-		if input.CPUMemory != "" {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("cpu_memory cannot be specified for free services")
-		}
-		if input.Replicas != 0 {
-			return nil, ServiceCreateOutput{}, fmt.Errorf("replicas cannot be specified for free services")
-		}
-
-		// Set free service defaults (in the future, we might geolocate
-		// the user to the closest free region here)
-		input.Region = "us-east-1"
-	} else {
-		// Set default addons if not provided
-		if input.Addons == nil {
-			input.Addons = []string{util.AddonTimeSeries}
-		} else {
-			// Validate addons for non-free services
-			for _, addon := range input.Addons {
-				if !util.IsValidAddon(addon) {
-					return nil, ServiceCreateOutput{}, fmt.Errorf("invalid addon '%s'. Valid addons: %s", addon, strings.Join(util.ValidAddons(), ", "))
-				}
-			}
-		}
-
-		// Set default region if not provided
-		if input.Region == "" {
-			input.Region = "us-east-1"
-		}
-
-		// Set default CPU/Memory if not provided
-		if input.CPUMemory == "" {
-			config := util.GetAllowedCPUMemoryConfigs()[0] // Default to smallest config (0.5 CPU/2GB)
-			cpuMillis, memoryGbs = config.CPUMillis, config.MemoryGbs
-		} else {
-			// Validate cpu/memory for non-free services
-			cpuMillis, memoryGbs, err = util.ParseCPUMemory(input.CPUMemory)
-			if err != nil {
-				return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
-			}
-		}
-
+		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
 	logging.Debug("MCP: Creating service",
 		zap.String("project_id", cfg.ProjectID),
 		zap.String("name", input.Name),
 		zap.Strings("addons", input.Addons),
-		zap.String("region", input.Region),
-		zap.Int("cpu", cpuMillis),
-		zap.Int("memory", memoryGbs),
+		zap.Stringp("region", input.Region),
+		zap.Stringp("cpu", cpuMillis),
+		zap.Stringp("memory", memoryGBs),
 		zap.Int("replicas", input.Replicas),
-		zap.Bool("free", input.Free),
 	)
 
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
 		Name:         input.Name,
-		Addons:       util.ConvertStringSlice[api.ServiceCreateAddons](input.Addons),
+		Addons:       util.ConvertStringSlicePtr[api.ServiceCreateAddons](input.Addons),
 		RegionCode:   input.Region,
-		ReplicaCount: input.Replicas,
+		ReplicaCount: &input.Replicas,
 		CpuMillis:    cpuMillis,
-		MemoryGbs:    memoryGbs,
-	}
-
-	// Set free flag if specified
-	if input.Free {
-		serviceCreateReq.Free = &input.Free
+		MemoryGbs:    memoryGBs,
 	}
 
 	// Make API call to create service
@@ -555,7 +504,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// If wait is explicitly requested, wait for service to be ready
 	if input.Wait {
-		timeout := time.Duration(*input.TimeoutMinutes) * time.Minute
+		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
 
 		if status, err := s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, service.Status); err != nil {
 			output.Message = fmt.Sprintf("Error: %s", err.Error())

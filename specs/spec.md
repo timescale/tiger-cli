@@ -212,42 +212,34 @@ tiger service describe svc-12345  # alias
 tiger service show svc-12345      # alias
 tiger svc get svc-12345
 
+# Create a free tier service
+tiger service create \
+  --name "free-db" \
+  --cpu shared \
+  --memory shared
+
 # Create a TimescaleDB service
 tiger service create \
   --name "production-db" \
-  --type timescaledb \
-  --region us-east-1 \
-  --cpu 2000m \
-  --memory 8GB \
-  --replicas 2
+  --addons time-series \
+  --cpu 500m \
+  --memory 2GB
 
 # Create a PostgreSQL service (waits for ready by default)
 tiger service create \
   --name "postgres-db" \
-  --type postgres \
-  --region us-east-1 \
-  --cpu 1 \
-  --memory 4GB \
-  --replicas 1
+  --addons none \
+  --cpu 500m \
+  --memory 2GB
 
 # Create service without waiting
 tiger service create \
   --name "quick-service" \
-  --type timescaledb \
-  --region us-east-1 \
-  --cpu 1000m \
-  --memory 2GB \
-  --replicas 1 \
   --no-wait
 
 # Create service with custom timeout
 tiger service create \
   --name "patient-service" \
-  --type postgres \
-  --region us-east-1 \
-  --cpu 2000m \
-  --memory 8GB \
-  --replicas 2 \
   --wait-timeout 60m
 
 # Delete service (with confirmation prompt - will prompt to type service ID)
@@ -297,12 +289,12 @@ tiger service set-default svc-12345
 ```
 
 **Options:**
-- `--name`: Service name (required)
-- `--type`: Service type (timescaledb, postgres, vector) - default: timescaledb
-- `--region`: Region code (required)
-- `--cpu`: CPU allocation - must be from allowed configurations (see below)
-- `--memory`: Memory allocation - must be from allowed configurations (see below)
-- `--replicas`: Number of high-availability replicas (default: 1)
+- `--name`: Service name (auto-generated if not provided)
+- `--addons`: Addons to enable (time-series, ai, or 'none' for PostgreSQL-only)
+- `--region`: Region code
+- `--cpu`: CPU allocation - must be from allowed configurations (see below), or 'shared' for free tier
+- `--memory`: Memory allocation - must be from allowed configurations (see below), or 'shared' for free tier
+- `--replicas`: Number of high-availability replicas (default: 0)
 - `--vpc-id`: VPC ID for attach/detach operations
 - `--set-default`: Set this service as the default service (default: true)
 - `--no-set-default`: Don't set this service as the default service
@@ -323,6 +315,7 @@ Service creation and resizing support the following CPU and memory combinations.
 
 | CPU | Memory |
 |-----|---------|
+| shared | shared |
 | 0.5 | 2GB |
 | 1 | 4GB |
 | 2 | 8GB |
@@ -331,25 +324,28 @@ Service creation and resizing support the following CPU and memory combinations.
 | 16 | 64GB |
 | 32 | 128GB |
 
-CPU can be specified as cores (e.g., "0.5", "1", "2") or millicores (e.g., "500m", "1000m", "2000m").
-Memory must include units (e.g., "2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "128GB").
+CPU must be specified as millicores (e.g., "500", "1000", "2000"), or "shared" for free tier services.
+Memory must be specified as GBs (e.g., "2", "4", "8", "16", "32", "64", "128") or "shared" for free tier services.
 
 **Examples:**
 ```bash
-# Specify both CPU and memory
-tiger service create --name "my-service" --cpu 2 --memory 8GB
+# Create free tier service
+tiger service create --name "free-db" --cpu shared --memory shared
 
-# Specify only CPU (memory will be automatically set to 8GB)
+# Specify both CPU and memory
+tiger service create --name "my-service" --cpu 2 --memory 8
+
+# Specify only CPU (memory will be automatically set to 8)
 tiger service create --name "my-service" --cpu 2
 
 # Specify only memory (CPU will be automatically set to 2)
-tiger service create --name "my-service" --memory 8GB
+tiger service create --name "my-service" --memory 8
 
 # Resize with only CPU
 tiger service resize svc-12345 --cpu 4
 
 # Resize with only memory
-tiger service resize svc-12345 --memory 16GB
+tiger service resize svc-12345 --memory 16
 ```
 
 **Note:** A future command like `tiger service list-types` or `tiger service list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.
