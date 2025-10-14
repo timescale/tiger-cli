@@ -171,6 +171,7 @@ func TestDetectInstallMethod(t *testing.T) {
 }
 
 func TestGetUpdateCommand(t *testing.T) {
+	testUrl := "https://cli.example.com"
 	tests := []struct {
 		name   string
 		method InstallMethod
@@ -194,7 +195,7 @@ func TestGetUpdateCommand(t *testing.T) {
 		{
 			name:   "install.sh",
 			method: InstallMethodInstallSh,
-			want:   "curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh",
+			want:   "curl -fsSL " + testUrl + "/install/install.sh | sh",
 		},
 		{
 			name:   "development",
@@ -208,9 +209,13 @@ func TestGetUpdateCommand(t *testing.T) {
 		},
 	}
 
+	cfg := &config.Config{
+		ReleasesURL: testUrl,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getUpdateCommand(tt.method)
+			got := getUpdateCommand(tt.method, cfg)
 			// For RPM, accept either yum or dnf
 			if tt.method == InstallMethodRPM {
 				if got != "sudo yum update tiger-cli" && got != "sudo dnf update tiger-cli" {
@@ -324,7 +329,7 @@ func TestCheckForUpdate(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		VersionCheckURL: server.URL,
+		ReleasesURL: server.URL,
 	}
 
 	for _, tt := range tests {
@@ -351,7 +356,7 @@ func TestPerformCheck_Disabled(t *testing.T) {
 	// Create config with version check disabled
 	cfg := &config.Config{
 		VersionCheckInterval: 0, // Disabled
-		VersionCheckURL:      "http://example.com/latest.txt",
+		ReleasesURL:          "http://example.com",
 	}
 
 	// Should return immediately without error
@@ -366,7 +371,7 @@ func TestPerformCheck_TooSoon(t *testing.T) {
 	cfg := &config.Config{
 		VersionCheckInterval: 3600,              // 1 hour
 		VersionCheckLastTime: time.Now().Unix(), // Just checked
-		VersionCheckURL:      "http://example.com/latest.txt",
+		ReleasesURL:          "http://example.com",
 	}
 
 	// Should return immediately without error (and without making HTTP request)

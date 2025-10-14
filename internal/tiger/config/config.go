@@ -27,7 +27,7 @@ type Config struct {
 	PasswordStorage      string `mapstructure:"password_storage" yaml:"password_storage"`
 	Debug                bool   `mapstructure:"debug" yaml:"debug"`
 	ConfigDir            string `mapstructure:"config_dir" yaml:"-"`
-	VersionCheckURL      string `mapstructure:"version_check_url" yaml:"version_check_url"`
+	ReleasesURL          string `mapstructure:"releases_url" yaml:"releases_url"`
 	VersionCheckInterval int    `mapstructure:"version_check_interval" yaml:"version_check_interval"`
 	VersionCheckLastTime int64  `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
 }
@@ -45,7 +45,7 @@ type ConfigOutput struct {
 	PasswordStorage      *string `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
 	Debug                *bool   `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
 	ConfigDir            *string `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
-	VersionCheckURL      *string `mapstructure:"version_check_url" json:"version_check_url,omitempty" yaml:"version_check_url,omitempty"`
+	ReleasesURL          *string `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
 	VersionCheckInterval *int    `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
 	VersionCheckLastTime *int64  `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty" yaml:"version_check_last_time,omitempty"`
 }
@@ -60,7 +60,7 @@ const (
 	DefaultAnalytics            = true
 	DefaultPasswordStorage      = "keyring"
 	DefaultDebug                = false
-	DefaultVersionCheckURL      = "https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt"
+	DefaultReleasesURL          = "https://cli.tigerdata.com"
 	DefaultVersionCheckInterval = 3600 // 1 hour in seconds (0 to disable)
 	ConfigFileName              = "config.yaml"
 )
@@ -77,7 +77,7 @@ var defaultValues = map[string]any{
 	"analytics":               DefaultAnalytics,
 	"password_storage":        DefaultPasswordStorage,
 	"debug":                   DefaultDebug,
-	"version_check_url":       DefaultVersionCheckURL,
+	"releases_url":            DefaultReleasesURL,
 	"version_check_interval":  DefaultVersionCheckInterval,
 	"version_check_last_time": int64(0),
 }
@@ -368,12 +368,12 @@ func (c *Config) updateField(key string, value any) (any, error) {
 			return nil, fmt.Errorf("debug must be string or bool, got %T", value)
 		}
 
-	case "version_check_url":
+	case "releases_url":
 		s, ok := value.(string)
 		if !ok {
-			return nil, fmt.Errorf("version_check_url must be string, got %T", value)
+			return nil, fmt.Errorf("releases_url must be string, got %T", value)
 		}
-		c.VersionCheckURL = s
+		c.ReleasesURL = s
 		validated = s
 
 	case "version_check_interval":

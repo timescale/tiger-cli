@@ -185,9 +185,6 @@ Key configuration values:
 - `analytics`: Usage analytics toggle
 - `password_storage`: Password storage method (keyring, pgpass, none)
 - `debug`: Debug logging toggle
-- `version_check_url`: URL to check for latest version
-- `version_check_interval`: Seconds between version checks (0 to disable)
-- `version_check_last_time`: Timestamp of last version check (managed automatically)
 
 ### MCP Server Architecture
 

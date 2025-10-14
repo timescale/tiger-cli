@@ -143,7 +143,7 @@ password_storage: none
 		"password_storage":       "none",
 		"debug":                  false,
 		"config_dir":             tmpDir,
-		"version_check_url":      "https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt",
+		"releases_url":           "https://cli.tigerdata.com",
 		"version_check_interval": float64(3600), // JSON unmarshals numbers as float64
 	}
 
@@ -200,7 +200,7 @@ password_storage: keyring
 		"password_storage":       "keyring",
 		"debug":                  false,
 		"config_dir":             tmpDir,
-		"version_check_url":      "https://tiger-cli-releases.s3.amazonaws.com/install/latest.txt",
+		"releases_url":           "https://cli.tigerdata.com",
 		"version_check_interval": 3600,
 	}
 

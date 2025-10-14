@@ -217,8 +217,8 @@ func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 	if cfg.ConfigDir != nil {
 		table.Append("config_dir", *cfg.ConfigDir)
 	}
-	if cfg.VersionCheckURL != nil {
-		table.Append("version_check_url", *cfg.VersionCheckURL)
+	if cfg.ReleasesURL != nil {
+		table.Append("releases_url", *cfg.ReleasesURL)
 	}
 	if cfg.VersionCheckInterval != nil {
 		table.Append("version_check_interval", fmt.Sprintf("%d seconds", *cfg.VersionCheckInterval))

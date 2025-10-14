@@ -159,7 +159,7 @@ func detectInstallMethod(binaryPath string) InstallMethod {
 }
 
 // GetUpdateCommand returns the command to update Tiger CLI based on the install method
-func getUpdateCommand(method InstallMethod) string {
+func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
 	switch method {
 	case InstallMethodHomebrew:
 		return "brew upgrade tiger-cli"
@@ -172,7 +172,7 @@ func getUpdateCommand(method InstallMethod) string {
 		}
 		return "sudo yum update tiger-cli"
 	case InstallMethodInstallSh:
-		return "curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh"
+		return "curl -fsSL " + cfg.ReleasesURL + "/install/install.sh | sh"
 	case InstallMethodDevelopment:
 		return "rebuild from source or install via package manager"
 	default:
@@ -181,7 +181,7 @@ func getUpdateCommand(method InstallMethod) string {
 }
 
 func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer) (*CheckResult, error) {
-	latestVersion, err := fetchLatestVersion(cfg.VersionCheckURL)
+	latestVersion, err := fetchLatestVersion(cfg.ReleasesURL + "/install/latest.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer
 	}
 
 	installMethod := detectInstallMethod(binaryPath)
-	updateCommand := getUpdateCommand(installMethod)
+	updateCommand := getUpdateCommand(installMethod, cfg)
 
 	return &CheckResult{
 		UpdateAvailable: updateAvailable,
