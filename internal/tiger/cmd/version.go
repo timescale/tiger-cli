@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"runtime"
@@ -11,7 +10,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
-	"gopkg.in/yaml.v3"
 )
 
 type VersionOutput struct {
@@ -57,22 +55,14 @@ func buildVersionCmd() *cobra.Command {
 			output := cmd.OutOrStdout()
 			switch outputFormat {
 			case "json":
-				encoder := json.NewEncoder(output)
-				encoder.SetIndent("", "  ")
-				return encoder.Encode(versionOutput)
+				return util.SerializeToJSON(output, versionOutput)
 			case "yaml":
-				encoder := yaml.NewEncoder(output)
-				encoder.SetIndent(2)
-				if jsonArray, err := toJSON(versionOutput); err != nil {
-					return fmt.Errorf("failed to convert version info to map: %w", err)
-				} else {
-					return encoder.Encode(jsonArray)
-				}
+				return util.SerializeToYAML(output, versionOutput, true)
 			case "bare":
 				fmt.Fprintln(output, versionOutput.Version)
 				return nil
 			default:
-				return outputVersionTable(versionOutput, output)
+				return outputVersionTable(output, versionOutput)
 			}
 		},
 	}
@@ -83,8 +73,8 @@ func buildVersionCmd() *cobra.Command {
 	return cmd
 }
 
-func outputVersionTable(versionOutput VersionOutput, output io.Writer) error {
-	table := tablewriter.NewWriter(output)
+func outputVersionTable(w io.Writer, versionOutput VersionOutput) error {
+	table := tablewriter.NewWriter(w)
 
 	table.Append("Tiger CLI Version", versionOutput.Version)
 	if versionOutput.LatestVersion != "" {

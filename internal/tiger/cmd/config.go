@@ -1,18 +1,18 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func buildConfigShowCmd() *cobra.Command {
@@ -66,13 +66,14 @@ func buildConfigShowCmd() *cobra.Command {
 				cfgOut.ConfigDir = nil
 			}
 
+			output := cmd.OutOrStdout()
 			switch outputFormat {
 			case "json":
-				return outputJSON(cfgOut, cmd)
+				return util.SerializeToJSON(output, cfgOut)
 			case "yaml":
-				return outputYAML(cfgOut, cmd)
+				return util.SerializeToYAML(output, cfgOut, false)
 			default:
-				return outputTable(cfgOut, cmd)
+				return outputTable(output, cfgOut)
 			}
 		},
 	}
@@ -178,8 +179,8 @@ func buildConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
+	table := tablewriter.NewWriter(w)
 	table.Header("PROPERTY", "VALUE")
 	if cfg.APIURL != nil {
 		table.Append("api_url", *cfg.APIURL)
@@ -227,16 +228,4 @@ func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 		table.Append("version_check_last_time", time.Unix(int64(*cfg.VersionCheckLastTime), 0).Format(time.RFC1123))
 	}
 	return table.Render()
-}
-
-func outputJSON(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(cfg)
-}
-
-func outputYAML(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	encoder := yaml.NewEncoder(cmd.OutOrStdout())
-	defer encoder.Close()
-	return encoder.Encode(cfg)
 }
