@@ -67,7 +67,9 @@ func (s *spinner) run() {
 		select {
 		case <-s.ctx.Done():
 			// Clear the line when finished
+			s.lock.Lock()
 			s.clearLine()
+			s.lock.Unlock()
 			return
 		case <-ticker.C:
 			s.render(true)
