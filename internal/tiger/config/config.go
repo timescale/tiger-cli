@@ -17,36 +17,36 @@ import (
 
 type Config struct {
 	APIURL               string        `mapstructure:"api_url" yaml:"api_url"`
+	Analytics            bool          `mapstructure:"analytics" yaml:"analytics"`
+	ConfigDir            string        `mapstructure:"config_dir" yaml:"-"`
 	ConsoleURL           string        `mapstructure:"console_url" yaml:"console_url"`
-	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
+	Debug                bool          `mapstructure:"debug" yaml:"debug"`
 	DocsMCP              bool          `mapstructure:"docs_mcp" yaml:"docs_mcp"`
 	DocsMCPURL           string        `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
-	ProjectID            string        `mapstructure:"project_id" yaml:"project_id"`
-	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
+	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
 	Output               string        `mapstructure:"output" yaml:"output"`
-	Analytics            bool          `mapstructure:"analytics" yaml:"analytics"`
 	PasswordStorage      string        `mapstructure:"password_storage" yaml:"password_storage"`
-	Debug                bool          `mapstructure:"debug" yaml:"debug"`
-	ConfigDir            string        `mapstructure:"config_dir" yaml:"-"`
+	ProjectID            string        `mapstructure:"project_id" yaml:"project_id"`
 	ReleasesURL          string        `mapstructure:"releases_url" yaml:"releases_url"`
+	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
 	VersionCheckInterval time.Duration `mapstructure:"version_check_interval" yaml:"version_check_interval"`
 	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
 }
 
 type ConfigOutput struct {
 	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
+	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
+	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
 	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
-	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
+	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
 	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
 	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
-	ProjectID            *string        `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
-	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
+	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
 	Output               *string        `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
-	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
 	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
-	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
-	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
+	ProjectID            *string        `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
 	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
+	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	VersionCheckInterval *time.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
 	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty" yaml:"version_check_last_time,omitempty"`
 }

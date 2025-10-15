@@ -185,11 +185,17 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.APIURL != nil {
 		table.Append("api_url", *cfg.APIURL)
 	}
+	if cfg.Analytics != nil {
+		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
+	}
+	if cfg.ConfigDir != nil {
+		table.Append("config_dir", *cfg.ConfigDir)
+	}
 	if cfg.ConsoleURL != nil {
 		table.Append("console_url", *cfg.ConsoleURL)
 	}
-	if cfg.GatewayURL != nil {
-		table.Append("gateway_url", *cfg.GatewayURL)
+	if cfg.Debug != nil {
+		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
 	}
 	if cfg.DocsMCP != nil {
 		table.Append("docs_mcp", fmt.Sprintf("%t", *cfg.DocsMCP))
@@ -197,29 +203,23 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.DocsMCPURL != nil {
 		table.Append("docs_mcp_url", *cfg.DocsMCPURL)
 	}
-	if cfg.ProjectID != nil {
-		table.Append("project_id", *cfg.ProjectID)
-	}
-	if cfg.ServiceID != nil {
-		table.Append("service_id", *cfg.ServiceID)
+	if cfg.GatewayURL != nil {
+		table.Append("gateway_url", *cfg.GatewayURL)
 	}
 	if cfg.Output != nil {
 		table.Append("output", *cfg.Output)
 	}
-	if cfg.Analytics != nil {
-		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
-	}
 	if cfg.PasswordStorage != nil {
 		table.Append("password_storage", *cfg.PasswordStorage)
 	}
-	if cfg.Debug != nil {
-		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
-	}
-	if cfg.ConfigDir != nil {
-		table.Append("config_dir", *cfg.ConfigDir)
+	if cfg.ProjectID != nil {
+		table.Append("project_id", *cfg.ProjectID)
 	}
 	if cfg.ReleasesURL != nil {
 		table.Append("releases_url", *cfg.ReleasesURL)
+	}
+	if cfg.ServiceID != nil {
+		table.Append("service_id", *cfg.ServiceID)
 	}
 	if cfg.VersionCheckInterval != nil {
 		table.Append("version_check_interval", cfg.VersionCheckInterval.String())
