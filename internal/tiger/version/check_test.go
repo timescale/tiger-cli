@@ -180,7 +180,7 @@ func TestGetUpdateCommand(t *testing.T) {
 		{
 			name:   "homebrew",
 			method: InstallMethodHomebrew,
-			want:   "brew upgrade tiger-cli",
+			want:   "brew update && brew upgrade tiger-cli",
 		},
 		{
 			name:   "deb",
