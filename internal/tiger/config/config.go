@@ -401,8 +401,12 @@ func (c *Config) updateField(key string, value any) (any, error) {
 		}
 
 	case "version_check_last_time":
+		nowish := time.Now().Add(time.Hour)
 		switch v := value.(type) {
 		case time.Time:
+			if v.After(nowish) {
+				return nil, fmt.Errorf("version_check_last_time cannot be in the future")
+			}
 			c.VersionCheckLastTime = v
 			validated = v
 		case string:
@@ -415,6 +419,9 @@ func (c *Config) updateField(key string, value any) (any, error) {
 					return nil, fmt.Errorf("invalid version_check_last_time value: %s (must be RFC3339 timestamp or unix timestamp)", v)
 				}
 				t = time.Unix(i, 0)
+			}
+			if t.After(nowish) {
+				return nil, fmt.Errorf("version_check_last_time cannot be in the future")
 			}
 			c.VersionCheckLastTime = t
 			validated = t
