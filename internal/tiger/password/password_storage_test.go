@@ -30,7 +30,7 @@ func TestNoStorage_Save(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Save(service, "test-password")
+	err := storage.Save(service, "test-password", "tsdbadmin")
 	if err != nil {
 		t.Errorf("NoStorage.Save() should never return an error, got: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestNoStorage_Get(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, "tsdbadmin")
 	if err == nil {
 		t.Error("NoStorage.Get() should return an error")
 	}
@@ -56,7 +56,7 @@ func TestNoStorage_Remove(t *testing.T) {
 	storage := &NoStorage{}
 	service := createTestService("test-service-123")
 
-	err := storage.Remove(service)
+	err := storage.Remove(service, "tsdbadmin")
 	if err != nil {
 		t.Errorf("NoStorage.Remove() should never return an error, got: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestKeyringStorage_Save_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceId
 
-	err := storage.Save(service, "test-password")
+	err := storage.Save(service, "test-password", "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Save() should return error when ServiceId is nil")
 	}
@@ -83,7 +83,7 @@ func TestKeyringStorage_Save_NoProjectId(t *testing.T) {
 		// No ProjectId
 	}
 
-	err := storage.Save(service, "test-password")
+	err := storage.Save(service, "test-password", "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Save() should return error when ProjectId is nil")
 	}
@@ -92,11 +92,24 @@ func TestKeyringStorage_Save_NoProjectId(t *testing.T) {
 	}
 }
 
+func TestKeyringStorage_Save_NoRole(t *testing.T) {
+	storage := &KeyringStorage{}
+	service := createTestService("test-service-123")
+
+	err := storage.Save(service, "test-password", "")
+	if err == nil {
+		t.Error("KeyringStorage.Save() should return error when role is empty")
+	}
+	if !strings.Contains(err.Error(), "role is required") {
+		t.Errorf("KeyringStorage.Save() should mention role required, got: %v", err)
+	}
+}
+
 func TestKeyringStorage_Get_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceId
 
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Get() should return error when ServiceId is nil")
 	}
@@ -116,7 +129,7 @@ func TestKeyringStorage_Get_NoProjectId(t *testing.T) {
 		// No ProjectId
 	}
 
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Get() should return error when ProjectId is nil")
 	}
@@ -128,11 +141,27 @@ func TestKeyringStorage_Get_NoProjectId(t *testing.T) {
 	}
 }
 
+func TestKeyringStorage_Get_NoRole(t *testing.T) {
+	storage := &KeyringStorage{}
+	service := createTestService("test-service-123")
+
+	password, err := storage.Get(service, "")
+	if err == nil {
+		t.Error("KeyringStorage.Get() should return error when role is empty")
+	}
+	if password != "" {
+		t.Errorf("KeyringStorage.Get() should return empty password on error, got: %s", password)
+	}
+	if !strings.Contains(err.Error(), "role is required") {
+		t.Errorf("KeyringStorage.Get() should mention role required, got: %v", err)
+	}
+}
+
 func TestKeyringStorage_Remove_NoServiceId(t *testing.T) {
 	storage := &KeyringStorage{}
 	service := api.Service{} // No ServiceId
 
-	err := storage.Remove(service)
+	err := storage.Remove(service, "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Remove() should return error when ServiceId is nil")
 	}
@@ -149,12 +178,25 @@ func TestKeyringStorage_Remove_NoProjectId(t *testing.T) {
 		// No ProjectId
 	}
 
-	err := storage.Remove(service)
+	err := storage.Remove(service, "tsdbadmin")
 	if err == nil {
 		t.Error("KeyringStorage.Remove() should return error when ProjectId is nil")
 	}
 	if !strings.Contains(err.Error(), "project ID is required") {
 		t.Errorf("KeyringStorage.Remove() should mention project ID required, got: %v", err)
+	}
+}
+
+func TestKeyringStorage_Remove_NoRole(t *testing.T) {
+	storage := &KeyringStorage{}
+	service := createTestService("test-service-123")
+
+	err := storage.Remove(service, "")
+	if err == nil {
+		t.Error("KeyringStorage.Remove() should return error when role is empty")
+	}
+	if !strings.Contains(err.Error(), "role is required") {
+		t.Errorf("KeyringStorage.Remove() should mention role required, got: %v", err)
 	}
 }
 
@@ -165,12 +207,25 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 		// No Endpoint
 	}
 
-	err := storage.Remove(service)
+	err := storage.Remove(service, "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Remove() should return error when endpoint is nil")
 	}
 	if !strings.Contains(err.Error(), "service endpoint not available") {
 		t.Errorf("PgpassStorage.Remove() should mention endpoint not available, got: %v", err)
+	}
+}
+
+func TestPgpassStorage_Remove_NoRole(t *testing.T) {
+	storage := &PgpassStorage{}
+	service := createTestService("test-service-123")
+
+	err := storage.Remove(service, "")
+	if err == nil {
+		t.Error("PgpassStorage.Remove() should return error when role is empty")
+	}
+	if !strings.Contains(err.Error(), "role is required") {
+		t.Errorf("PgpassStorage.Remove() should mention role required, got: %v", err)
 	}
 }
 
@@ -181,7 +236,7 @@ func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 		// No Endpoint
 	}
 
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Get() should return error when endpoint is nil")
 	}
@@ -190,6 +245,22 @@ func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "service endpoint not available") {
 		t.Errorf("PgpassStorage.Get() should mention endpoint not available, got: %v", err)
+	}
+}
+
+func TestPgpassStorage_Get_NoRole(t *testing.T) {
+	storage := &PgpassStorage{}
+	service := createTestService("test-service-123")
+
+	password, err := storage.Get(service, "")
+	if err == nil {
+		t.Error("PgpassStorage.Get() should return error when role is empty")
+	}
+	if password != "" {
+		t.Errorf("PgpassStorage.Get() should return empty password on error, got: %s", password)
+	}
+	if !strings.Contains(err.Error(), "role is required") {
+		t.Errorf("PgpassStorage.Get() should mention role required, got: %v", err)
 	}
 }
 
@@ -203,7 +274,7 @@ func TestPgpassStorage_Get_NoFile(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")
 
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, "tsdbadmin")
 	if err == nil {
 		t.Error("PgpassStorage.Get() should return error when .pgpass file doesn't exist")
 	}
@@ -246,6 +317,123 @@ func TestGetPasswordStorage(t *testing.T) {
 	}
 }
 
+// Test password storage with different roles
+func TestPasswordStorage_DifferentRoles(t *testing.T) {
+	tests := []struct {
+		name    string
+		storage PasswordStorage
+		setup   func(t *testing.T)
+		cleanup func(t *testing.T, service api.Service, roles []string)
+	}{
+		{
+			name:    "KeyringStorage",
+			storage: &KeyringStorage{},
+			setup: func(t *testing.T) {
+				config.SetTestServiceName(t)
+			},
+			cleanup: func(t *testing.T, service api.Service, roles []string) {
+				storage := &KeyringStorage{}
+				for _, role := range roles {
+					storage.Remove(service, role)
+				}
+			},
+		},
+		{
+			name:    "PgpassStorage",
+			storage: &PgpassStorage{},
+			setup: func(t *testing.T) {
+				tempDir := t.TempDir()
+				originalHome := os.Getenv("HOME")
+				os.Setenv("HOME", tempDir)
+				t.Cleanup(func() {
+					os.Setenv("HOME", originalHome)
+				})
+			},
+		},
+	}
+
+	roles := []struct {
+		role     string
+		password string
+	}{
+		{"tsdbadmin", "admin-password-123"},
+		{"readonly", "readonly-password-456"},
+		{"app_user", "app-password-789"},
+		{"MyAppUser", "mixedcase-password-101"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(t)
+			}
+
+			service := createTestService("role-test-service")
+			roleNames := make([]string, len(roles))
+			for i, r := range roles {
+				roleNames[i] = r.role
+			}
+
+			if tt.cleanup != nil {
+				defer tt.cleanup(t, service, roleNames)
+			}
+
+			// Save passwords for all roles
+			for _, r := range roles {
+				err := tt.storage.Save(service, r.password, r.role)
+				if _, ok := tt.storage.(*NoStorage); ok {
+					continue
+				}
+				if err != nil {
+					t.Skipf("Storage not available: %v", err)
+				}
+			}
+
+			// Verify each role has its own password stored separately
+			for _, r := range roles {
+				retrieved, err := tt.storage.Get(service, r.role)
+				if _, ok := tt.storage.(*NoStorage); ok {
+					if err == nil {
+						t.Error("NoStorage.Get() should always return error")
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("Get(%s) failed: %v", r.role, err)
+				}
+				if retrieved != r.password {
+					t.Errorf("Get(%s) = %q, want %q", r.role, retrieved, r.password)
+				}
+			}
+
+			// Verify removing one role doesn't affect others
+			if _, ok := tt.storage.(*NoStorage); !ok {
+				err := tt.storage.Remove(service, roles[0].role)
+				if err != nil {
+					t.Fatalf("Remove(%s) failed: %v", roles[0].role, err)
+				}
+
+				// First role should be gone
+				_, err = tt.storage.Get(service, roles[0].role)
+				if err == nil {
+					t.Errorf("Get(%s) should fail after removal", roles[0].role)
+				}
+
+				// Other roles should still exist
+				for _, r := range roles[1:] {
+					retrieved, err := tt.storage.Get(service, r.role)
+					if err != nil {
+						t.Errorf("Get(%s) should still work after removing %s: %v", r.role, roles[0].role, err)
+					}
+					if retrieved != r.password {
+						t.Errorf("Get(%s) = %q, want %q", r.role, retrieved, r.password)
+					}
+				}
+			}
+		})
+	}
+}
+
 // Test pgpass storage with a temporary directory
 func TestPgpassStorage_Integration(t *testing.T) {
 	// Create a temporary directory for this test
@@ -259,9 +447,10 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")
 	password := "test-password"
+	role := "tsdbadmin"
 
 	// Test Save
-	err := storage.Save(service, password)
+	err := storage.Save(service, password, role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Save() failed: %v", err)
 	}
@@ -284,7 +473,7 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	}
 
 	// Test Get
-	retrievedPassword, err := storage.Get(service)
+	retrievedPassword, err := storage.Get(service, role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Get() failed: %v", err)
 	}
@@ -293,7 +482,7 @@ func TestPgpassStorage_Integration(t *testing.T) {
 	}
 
 	// Test Remove
-	err = storage.Remove(service)
+	err = storage.Remove(service, role)
 	if err != nil {
 		t.Fatalf("PgpassStorage.Remove() failed: %v", err)
 	}
@@ -431,7 +620,7 @@ func TestPgpassStorage_GetStorageResult_Error(t *testing.T) {
 func TestSavePasswordWithResult_EmptyPassword(t *testing.T) {
 	service := createTestService("test-service-123")
 
-	result, err := SavePasswordWithResult(service, "")
+	result, err := SavePasswordWithResult(service, "", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() with empty password should not return error, got: %v", err)
 	}
@@ -453,7 +642,7 @@ func TestSavePasswordWithResult_WithPassword(t *testing.T) {
 	viper.Set("password_storage", "none")
 	defer viper.Set("password_storage", "")
 
-	result, err := SavePasswordWithResult(service, "test-password")
+	result, err := SavePasswordWithResult(service, "test-password", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() should not return error with NoStorage, got: %v", err)
 	}
@@ -510,16 +699,38 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 	tests := []struct {
 		name        string
 		service     api.Service
+		role        string
 		expected    string
 		expectError bool
 	}{
 		{
-			name: "valid service with both IDs",
+			name: "valid service with both IDs and tsdbadmin role",
 			service: api.Service{
 				ProjectId: util.Ptr("project-123"),
 				ServiceId: util.Ptr("service-456"),
 			},
-			expected:    "password-project-123-service-456",
+			role:        "tsdbadmin",
+			expected:    "password-project-123-service-456-tsdbadmin",
+			expectError: false,
+		},
+		{
+			name: "valid service with both IDs and readonly role",
+			service: api.Service{
+				ProjectId: util.Ptr("project-123"),
+				ServiceId: util.Ptr("service-456"),
+			},
+			role:        "readonly",
+			expected:    "password-project-123-service-456-readonly",
+			expectError: false,
+		},
+		{
+			name: "valid service with both IDs and mixed-case role",
+			service: api.Service{
+				ProjectId: util.Ptr("project-123"),
+				ServiceId: util.Ptr("service-456"),
+			},
+			role:        "MyAppUser",
+			expected:    "password-project-123-service-456-MyAppUser",
 			expectError: false,
 		},
 		{
@@ -527,6 +738,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 			service: api.Service{
 				ProjectId: util.Ptr("project-123"),
 			},
+			role:        "tsdbadmin",
 			expected:    "",
 			expectError: true,
 		},
@@ -535,12 +747,24 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 			service: api.Service{
 				ServiceId: util.Ptr("service-456"),
 			},
+			role:        "tsdbadmin",
 			expected:    "",
 			expectError: true,
 		},
 		{
 			name:        "missing both IDs",
 			service:     api.Service{},
+			role:        "tsdbadmin",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name: "missing role",
+			service: api.Service{
+				ProjectId: util.Ptr("project-123"),
+				ServiceId: util.Ptr("service-456"),
+			},
+			role:        "",
 			expected:    "",
 			expectError: true,
 		},
@@ -548,7 +772,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := buildPasswordKeyringUsername(tt.service)
+			result, err := buildPasswordKeyringUsername(tt.service, tt.role)
 
 			if tt.expectError && err == nil {
 				t.Errorf("buildPasswordKeyringUsername() expected error but got none")
@@ -580,7 +804,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			},
 			cleanup: func(t *testing.T, service api.Service) {
 				storage := &KeyringStorage{}
-				storage.Remove(service) // Ignore errors in cleanup
+				storage.Remove(service, "tsdbadmin") // Ignore errors in cleanup
 			},
 		},
 		{
@@ -615,12 +839,13 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 
 			originalPassword := "original-password-123"
 			newPassword := "new-password-456"
+			role := "tsdbadmin"
 
 			// Save original password
-			err1 := tt.storage.Save(service, originalPassword)
+			err1 := tt.storage.Save(service, originalPassword, role)
 
 			// Save new password (should overwrite)
-			err2 := tt.storage.Save(service, newPassword)
+			err2 := tt.storage.Save(service, newPassword, role)
 
 			// Handle NoStorage specially (always succeeds but doesn't store)
 			if _, ok := tt.storage.(*NoStorage); ok {
@@ -628,7 +853,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 					t.Errorf("NoStorage.Save() should not return error, got first: %v, second: %v", err1, err2)
 				}
 				// NoStorage.Get() always returns error, so we can't test retrieval
-				_, err := tt.storage.Get(service)
+				_, err := tt.storage.Get(service, role)
 				if err == nil {
 					t.Error("NoStorage.Get() should always return error")
 				}
@@ -648,7 +873,7 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			}
 
 			// Get the stored password - should be the new one
-			retrieved, err := tt.storage.Get(service)
+			retrieved, err := tt.storage.Get(service, role)
 			if err != nil {
 				t.Fatalf("Get() failed: %v", err)
 			}

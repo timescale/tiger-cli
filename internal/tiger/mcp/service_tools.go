@@ -466,7 +466,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Save password immediately after service creation, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
 	if service.InitialPassword != nil {
-		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword)
+		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -566,7 +566,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
-		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password)
+		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))

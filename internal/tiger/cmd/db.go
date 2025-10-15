@@ -157,7 +157,7 @@ Examples:
 			}
 
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, cmd)
+			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, dbConnectRole, cmd)
 		},
 	}
 
@@ -339,13 +339,13 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, cmd)
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
 	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
 	// Passwords are passed via PGPASSWORD environment variable (see below)
@@ -363,7 +363,7 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
 	storage := password.GetPasswordStorage()
 	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service); err == nil && password != "" {
+		if password, err := storage.Get(service, role); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
 		}

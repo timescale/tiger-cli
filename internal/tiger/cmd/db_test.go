@@ -271,7 +271,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -301,7 +301,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -335,11 +335,11 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
 	storage := password.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
@@ -349,7 +349,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -391,7 +391,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -964,11 +964,11 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	// Store a test password
 	testPassword := "test-e2e-password-789"
 	storage := password.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
