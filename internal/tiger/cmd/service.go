@@ -811,8 +811,12 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	// Start the spinner
+	spinner := newSpinner(ctx, output, "Service status: %s", util.DerefStr(initialStatus))
+	defer spinner.stop()
 
 	lastStatus := initialStatus
 	for {
@@ -822,12 +826,12 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				fmt.Fprintf(output, "⚠️  Error checking service status: %v\n", err)
+				spinner.update("Service status: error checking status: %v", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				fmt.Fprintf(output, "⚠️  Service not found or error checking status\n")
+				spinner.update("Service status: service not found or error checking status")
 				continue
 			}
 
@@ -835,14 +839,16 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			lastStatus = service.Status
 			status := util.DerefStr(service.Status)
 
+			spinner.update(fmt.Sprintf("Service status: %s", status))
+
 			switch status {
 			case "READY":
+				spinner.stop()
 				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
 				return service.Status, nil
 			case "FAILED", "ERROR":
+				spinner.stop()
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
-			default:
-				fmt.Fprintf(output, "⏳ Service status: %s...\n", status)
 			}
 		}
 	}
@@ -1009,17 +1015,18 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	statusOutput := cmd.ErrOrStderr()
 
-	fmt.Fprintf(statusOutput, "⏳ Waiting for service '%s' to be deleted", serviceID)
+	// Start the spinner
+	spinner := newSpinner(ctx, statusOutput, "Deleting service...")
+	defer spinner.stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(statusOutput, "") // New line after dots
 			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
 		case <-ticker.C:
 			// Check if service still exists
@@ -1029,25 +1036,24 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				fmt.Fprintln(statusOutput, "") // New line after dots
-				return fmt.Errorf("failed to check service status: %w", err)
+				spinner.update("Deleting service... (error checking status)")
+				continue
 			}
 
 			if resp.StatusCode() == 404 {
 				// Service is deleted
-				fmt.Fprintln(statusOutput, "") // New line after dots
+				spinner.stop()
 				fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
 				return nil
 			}
 
 			if resp.StatusCode() == 200 {
 				// Service still exists, continue waiting
-				fmt.Fprint(statusOutput, ".")
+				spinner.update("Deleting service...")
 				continue
 			}
 
 			// Other error
-			fmt.Fprintln(statusOutput, "") // New line after dots
 			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
 		}
 	}
