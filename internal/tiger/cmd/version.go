@@ -67,7 +67,7 @@ func buildVersionCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&checkVersion, "check", false, "Check for the latest version")
+	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table, json, yaml, bare)")
 
 	return cmd
