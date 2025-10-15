@@ -847,7 +847,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			case "FAILED", "ERROR":
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
 			default:
-				spinner.update(fmt.Sprintf("Service status: %s", status))
+				spinner.update("Service status: %s", status)
 			}
 		}
 	}
