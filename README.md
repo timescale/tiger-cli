@@ -171,6 +171,30 @@ The MCP server exposes the following tools to AI assistants:
 
 The MCP server automatically uses your CLI authentication and configuration, so no additional setup is required beyond `tiger auth login`.
 
+#### MCP Security Configuration
+
+You can configure security restrictions for the MCP server's `db_execute_query` tool:
+
+```bash
+# Restrict MCP to specific services (comma-separated service IDs)
+tiger config set mcp_db_execute_service_ids "abc123def4,xyz789ghi0"
+
+# Restrict MCP to specific database roles (comma-separated)
+tiger config set mcp_db_execute_roles "readonly,tsdbadmin"
+
+# Set read-only mode
+# Options: on (always read-only), off (never), auto (read-only for #prod tagged services)
+tiger config set mcp_db_execute_read_only on
+
+# Example: Production-safe configuration
+tiger config set mcp_db_execute_read_only auto  # Read-only for #prod services
+tiger config set mcp_db_execute_roles "readonly" # Only use readonly role
+
+# Example: Development configuration
+tiger config set mcp_db_execute_service_ids "dev-service-id"
+tiger config set mcp_db_execute_read_only off
+```
+
 #### Proxied Tools
 
 In addition to the service management tools listed above, the Tiger MCP server also proxies tools from a remote documentation MCP server. This feature provides AI assistants with semantic search capabilities for PostgreSQL, TimescaleDB, and Tiger Cloud documentation, as well as prompts/guides for various Tiger Cloud features.
@@ -211,6 +235,9 @@ tiger config reset
 All configuration options can be set via `tiger config set <key> <value>`:
 
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
+- `mcp_db_execute_service_ids` - Comma-separated list of service IDs that MCP db_execute_query can run on. Empty means all services allowed (default: empty)
+- `mcp_db_execute_roles` - Comma-separated list of database roles that MCP db_execute_query can connect as. Empty means all roles allowed (default: empty)
+- `mcp_db_execute_read_only` - Controls read-only mode for MCP db_execute_query: `on` (always read-only), `off` (never read-only), or `auto` (read-only for services with #prod tag) (default: `auto`)
 - `project_id` - Default project ID (set via `tiger auth login`)
 - `service_id` - Default service ID
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
@@ -224,6 +251,9 @@ Environment variables override configuration file values. All variables use the 
 
 - `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
+- `TIGER_MCP_DB_EXECUTE_SERVICE_IDS` - Comma-separated list of service IDs for MCP db_execute_query
+- `TIGER_MCP_DB_EXECUTE_ROLES` - Comma-separated list of database roles for MCP db_execute_query
+- `TIGER_MCP_DB_EXECUTE_READ_ONLY` - Read-only mode for MCP db_execute_query: `on`, `off`, or `auto`
 - `TIGER_PROJECT_ID` - Default project ID
 - `TIGER_SERVICE_ID` - Default service ID
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
