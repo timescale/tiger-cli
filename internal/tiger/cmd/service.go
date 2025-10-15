@@ -826,12 +826,12 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				spinner.update("Service status: error checking status: %v", err)
+				spinner.update("Error checking service status: %v", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.update("Service status: service not found or error checking status")
+				spinner.update("Service not found or error checking status")
 				continue
 			}
 
@@ -839,16 +839,15 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 			lastStatus = service.Status
 			status := util.DerefStr(service.Status)
 
-			spinner.update(fmt.Sprintf("Service status: %s", status))
-
 			switch status {
 			case "READY":
 				spinner.stop()
 				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
 				return service.Status, nil
 			case "FAILED", "ERROR":
-				spinner.stop()
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
+			default:
+				spinner.update(fmt.Sprintf("Service status: %s", status))
 			}
 		}
 	}
@@ -1021,7 +1020,7 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	statusOutput := cmd.ErrOrStderr()
 
 	// Start the spinner
-	spinner := newSpinner(ctx, statusOutput, "Deleting service...")
+	spinner := newSpinner(ctx, statusOutput, "Waiting for service '%s' to be deleted", serviceID)
 	defer spinner.stop()
 
 	for {
@@ -1036,8 +1035,7 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				spinner.update("Deleting service... (error checking status)")
-				continue
+				return fmt.Errorf("failed to check service status: %w", err)
 			}
 
 			if resp.StatusCode() == 404 {
@@ -1049,7 +1047,6 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 
 			if resp.StatusCode() == 200 {
 				// Service still exists, continue waiting
-				spinner.update("Deleting service...")
 				continue
 			}
 
