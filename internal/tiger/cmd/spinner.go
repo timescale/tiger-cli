@@ -66,8 +66,8 @@ func (s *spinner) run() {
 	for {
 		select {
 		case <-s.ctx.Done():
-			// Move to the next line when finished
-			fmt.Fprintln(s.output)
+			// Clear the line when finished
+			s.clearLine()
 			return
 		case <-ticker.C:
 			s.render(true)
@@ -79,11 +79,9 @@ func (s *spinner) render(incFrame bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// If outputting to a terminal, clear the previous line
-	if s.tty && s.lastLineLen > 0 {
-		fmt.Fprint(s.output, "\r")
-		fmt.Fprint(s.output, strings.Repeat(" ", s.lastLineLen))
-		fmt.Fprint(s.output, "\r")
+	// Clear the previous line if outputting to a terminal
+	if s.tty {
+		s.clearLine()
 	}
 
 	// Build the spinner line
@@ -104,15 +102,27 @@ func (s *spinner) render(incFrame bool) {
 	}
 }
 
+func (s *spinner) clearLine() {
+	if s.lastLineLen > 0 {
+		fmt.Fprint(s.output, "\r")
+		fmt.Fprint(s.output, strings.Repeat(" ", s.lastLineLen))
+		fmt.Fprint(s.output, "\r")
+	}
+}
+
 func (s *spinner) update(message string, args ...any) {
 	s.lock.Lock()
-	s.message = fmt.Sprintf(message, args...)
+	newMessage := fmt.Sprintf(message, args...)
+	changed := s.message != newMessage
+	s.message = newMessage
 	s.lock.Unlock()
 
-	// Immediately render the updated message. Only increment the spinner frame
-	// if not outputting to a terminal (if outputting to a terminal, the
-	// spinner frame updates on a set schedule via a time.Ticker).
-	s.render(!s.tty)
+	// Immediately render the updated message, if it changed. Only increment
+	// the spinner frame if not outputting to a terminal (if outputting to a
+	// terminal, the spinner frame updates on a schedule via a time.Ticker).
+	if changed {
+		s.render(!s.tty)
+	}
 }
 
 func (s *spinner) stop() {
