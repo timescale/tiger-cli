@@ -359,6 +359,8 @@ Database-specific operations and management.
 - `psql`: Connect to a database (alias for connect)
 - `connection-string`: Get connection string for a service
 - `test-connection`: Test database connectivity
+- `create`: Create database resources (roles, databases, extensions)
+  - `role`: Create a new database role with optional read-only enforcement
 - `save-password`: Save password according to --password-storage setting
 - `remove-password`: Remove password from configured storage location
 
@@ -413,7 +415,80 @@ tiger db save-password svc-12345 --password=your-password --password-storage key
 # Remove password from configured storage
 tiger db remove-password svc-12345
 tiger db remove-password svc-12345 --role readonly
+
+# Create a database role (uses default service, auto-generates random password)
+tiger db create role --name ai_analyst
+
+# Create a role for specific service (positional service ID)
+tiger db create role svc-12345 --name ai_analyst
+
+# Create a read-only role (role-based, permanent enforcement)
+tiger db create role --name ai_analyst --read-only
+
+# Create a read-only role with same grants as another role
+tiger db create role --name ai_analyst --read-only --from app_role
+
+# Create a read-only role inheriting from multiple roles
+tiger db create role --name ai_analyst --read-only --from app_role,readonly_role
+
+# Create a read-only role with statement timeout for safety
+tiger db create role --name ai_analyst --read-only --from app_role --statement-timeout 30s
+
+# Create a role with specific password
+tiger db create role --name ai_analyst --read-only --password my-secure-password
+
+# Create a role with interactive password prompt
+tiger db create role --name ai_analyst --read-only --password
+
+# Create a role with password from environment variable
+export TIGER_NEW_PASSWORD=my-secure-password
+tiger db create role --name ai_analyst --read-only
 ```
+
+**Design Note - Why `--name` is Required:**
+The `create role` command requires an explicit `--name` flag rather than accepting the role name as a positional argument. This prevents a common mistake: if the command accepted the role name positionally like `tiger db create role [service-id] <role-name>`, a user might forget the role name and run `tiger db create role svc-12345`, which would accidentally create a role named "svc-12345" in the default service. By requiring `--name`, the command fails clearly if the role name is omitted, preventing accidental role creation with incorrect names.
+
+**Password Behavior:**
+By default, if neither `--password` flag nor `TIGER_NEW_PASSWORD` environment variable is provided, a secure random password will be automatically generated. The password is saved according to the `--password-storage` setting (keyring, pgpass, or none).
+
+**Options for `create role`:**
+- `--name`: Role name to create (required)
+- `--read-only`: Enable permanent read-only enforcement via `tsdb_admin.read_only_role` setting
+- `--from`: Comma-separated list of roles to inherit grants from (e.g., `app_role,readonly_role`)
+- `--statement-timeout`: Set statement timeout for the role (accepts any duration format: "30s", "5m", etc.)
+- `--password`: Password for the role. If provided without a value, prompts interactively. If not provided, checks `TIGER_NEW_PASSWORD` environment variable, otherwise auto-generates a secure random password.
+
+**Read-Only Mode for AI Agents:**
+The `--read-only` flag enables permanent read-only enforcement at the PostgreSQL level using the `tsdb_admin.read_only_role` extension setting. This is designed to provide safe database access for AI agents and automated tools that need to read production data without risk of modification.
+
+**How Read-Only Enforcement Works:**
+- **Role-based (permanent)**: When `--read-only` is set, the role is configured with `ALTER ROLE <role_name> SET tsdb_admin.read_only_role = true`. This locks `transaction_read_only` to always be on for that role, preventing any write operations regardless of other grants or privileges.
+- **Cannot be disabled**: Once set, the read-only state cannot be changed by the role itself, even with `SET transaction_read_only = false`. Only a superuser can modify the role settings.
+- **Survives reconnection**: The read-only enforcement persists across all connections, connection poolers, and database forks.
+
+**Use Cases:**
+- **AI data analysis**: Give AI agents like Claude Code safe access to production data for analysis without risk of accidental modifications
+- **Schema discovery**: Allow AI coding assistants to explore database structure to write better migrations, without write access
+- **Automated reporting**: Run analytics queries against current production data without forking
+- **Development tools**: Provide read-only access to tools that need to inspect but not modify data
+
+**Combining with `--from` for Safe Table Access:**
+The `--from` flag allows you to create a read-only role that inherits the same table access as your application role:
+
+```bash
+tiger db create role --name ai_analyst --read-only --from app_role
+```
+
+This creates a role that can see all the same tables as `app_role`, but cannot modify any data. The AI agent gets full visibility into your schema while being guaranteed read-only.
+
+**Performance Safety with `--statement-timeout`:**
+Read-only mode prevents data modification but doesn't prevent expensive queries. Combine with `--statement-timeout` to kill queries that run too long:
+
+```bash
+tiger db create role --name ai_analyst --read-only --from app_role --statement-timeout 30s
+```
+
+This provides both data safety (read-only) and performance safety (query timeouts).
 
 **Return Codes for test-connection:**
 The `test-connection` command follows `pg_isready` conventions:
