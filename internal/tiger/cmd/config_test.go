@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -106,6 +107,8 @@ password_storage: pgpass
 func TestConfigShow_JSONOutput(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
 
+	now := time.Now()
+
 	// Create config file with JSON output format
 	configContent := `api_url: https://json.api.com/v1
 project_id: json-project
@@ -113,7 +116,8 @@ output: json
 analytics: true
 password_storage: none
 version_check_interval: 1h
-`
+version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
+
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
@@ -132,20 +136,21 @@ version_check_interval: 1h
 
 	// Verify ALL JSON keys and their expected values
 	expectedValues := map[string]interface{}{
-		"api_url":                "https://json.api.com/v1",
-		"console_url":            "https://console.cloud.timescale.com",
-		"gateway_url":            "https://console.cloud.timescale.com/api",
-		"docs_mcp":               true,
-		"docs_mcp_url":           "https://mcp.tigerdata.com/docs",
-		"project_id":             "json-project",
-		"service_id":             "",
-		"output":                 "json",
-		"analytics":              true,
-		"password_storage":       "none",
-		"debug":                  false,
-		"config_dir":             tmpDir,
-		"releases_url":           "https://cli.tigerdata.com",
-		"version_check_interval": float64(3600000000000), // JSON unmarshals time.Duration as nanoseconds (1 hour = 3600000000000ns)
+		"api_url":                 "https://json.api.com/v1",
+		"console_url":             "https://console.cloud.timescale.com",
+		"gateway_url":             "https://console.cloud.timescale.com/api",
+		"docs_mcp":                true,
+		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
+		"project_id":              "json-project",
+		"service_id":              "",
+		"output":                  "json",
+		"analytics":               true,
+		"password_storage":        "none",
+		"debug":                   false,
+		"config_dir":              tmpDir,
+		"releases_url":            "https://cli.tigerdata.com",
+		"version_check_interval":  float64(3600000000000), // JSON unmarshals time.Duration as nanoseconds (1 hour = 3600000000000ns)
+		"version_check_last_time": now.Format(time.RFC3339),
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -155,7 +160,6 @@ version_check_interval: 1h
 	}
 
 	// Ensure no extra keys are present
-	delete(result, "version_check_last_time") // this always changes
 	if len(result) != len(expectedValues) {
 		t.Errorf("Expected %d keys in JSON output, got %d", len(expectedValues), len(result))
 	}
@@ -164,13 +168,16 @@ version_check_interval: 1h
 func TestConfigShow_YAMLOutput(t *testing.T) {
 	tmpDir, _ := setupConfigTest(t)
 
+	now := time.Now()
+
 	// Create config file with YAML output format
 	configContent := `api_url: https://yaml.api.com/v1
 project_id: yaml-project
 output: yaml
 analytics: false
 password_storage: keyring
-`
+version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
+
 	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
@@ -182,37 +189,46 @@ password_storage: keyring
 	}
 
 	// Parse YAML output
-	var result map[string]interface{}
+	var result map[string]any
 	if err := yaml.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse YAML output: %v", err)
 	}
 
 	// Verify ALL YAML keys and their expected values
-	expectedValues := map[string]interface{}{
-		"api_url":                "https://yaml.api.com/v1",
-		"console_url":            "https://console.cloud.timescale.com",
-		"gateway_url":            "https://console.cloud.timescale.com/api",
-		"docs_mcp":               true,
-		"docs_mcp_url":           "https://mcp.tigerdata.com/docs",
-		"project_id":             "yaml-project",
-		"service_id":             "",
-		"output":                 "yaml",
-		"analytics":              false,
-		"password_storage":       "keyring",
-		"debug":                  false,
-		"config_dir":             tmpDir,
-		"releases_url":           "https://cli.tigerdata.com",
-		"version_check_interval": "24h0m0s", // YAML serializes time.Duration as string
+	expectedValues := map[string]any{
+		"api_url":                 "https://yaml.api.com/v1",
+		"console_url":             "https://console.cloud.timescale.com",
+		"gateway_url":             "https://console.cloud.timescale.com/api",
+		"docs_mcp":                true,
+		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
+		"project_id":              "yaml-project",
+		"service_id":              "",
+		"output":                  "yaml",
+		"analytics":               false,
+		"password_storage":        "keyring",
+		"debug":                   false,
+		"config_dir":              tmpDir,
+		"releases_url":            "https://cli.tigerdata.com",
+		"version_check_interval":  "24h0m0s", // YAML serializes time.Duration as string
+		"version_check_last_time": now,
 	}
 
 	for key, expectedValue := range expectedValues {
-		if result[key] != expectedValue {
-			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
+		switch expectedValue.(type) {
+		case time.Time:
+			// YAML unmarshals time.Time as time.Time type, so we need to compare differently
+			if expectedValue.(time.Time).Format(time.RFC3339) != result[key].(time.Time).Format(time.RFC3339) {
+				t.Errorf("foo Expected %s '%v', got %v", key, expectedValue, result[key])
+			}
+		default:
+			// Other types can be compared directly
+			if result[key] != expectedValue {
+				t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
+			}
 		}
 	}
 
 	// Ensure no extra keys are present
-	delete(result, "version_check_last_time") // this always changes
 	if len(result) != len(expectedValues) {
 		t.Errorf("Expected %d keys in YAML output, got %d", len(expectedValues), len(result))
 	}
