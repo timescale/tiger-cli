@@ -31,7 +31,7 @@ mv tiger /usr/local/bin/
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
 - `TIGER_OUTPUT`: Default output format (json, yaml, table)
 - `TIGER_ANALYTICS`: Enable/disable usage analytics (true/false)
-- `TIGER_NEW_PASSWORD`: Password to use for save-password command (overridden by --password flag)
+- `TIGER_NEW_PASSWORD`: Password to use for save-password command (used when --password flag not provided)
 
 ### Configuration File
 
@@ -398,19 +398,19 @@ tiger db test-connection svc-12345
 tiger db test-connection svc-12345 --timeout 10s
 
 # Save password with explicit value (highest precedence)
-tiger db save-password svc-12345 --password your-password
-tiger db save-password svc-12345 --password your-password --role readonly
+tiger db save-password svc-12345 --password=your-password
+tiger db save-password svc-12345 --password=your-password --role readonly
 
-# Interactive password prompt (when --password flag provided with no value)
-tiger db save-password svc-12345 --password
-
-# Using environment variable (only when --password flag not provided)
+# Using environment variable
 export TIGER_NEW_PASSWORD=your-password
 tiger db save-password svc-12345
 
+# Interactive password prompt (when neither flag nor env var provided)
+tiger db save-password svc-12345
+
 # Save to specific storage location
-tiger db save-password svc-12345 --password your-password --password-storage pgpass
-tiger db save-password svc-12345 --password your-password --password-storage keyring
+tiger db save-password svc-12345 --password=your-password --password-storage pgpass
+tiger db save-password svc-12345 --password=your-password --password-storage keyring
 
 # Remove password from configured storage
 tiger db remove-password svc-12345
@@ -436,7 +436,7 @@ The `connect` and `psql` commands support passing additional flags directly to t
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
-- `--password`: Password to save (for save-password command). When flag is provided with no value, prompts interactively. When flag is not provided at all, uses TIGER_NEW_PASSWORD environment variable if set.
+- `--password`: Password to save (for save-password command). Provide value with `--password=value`. If flag is not provided, uses TIGER_NEW_PASSWORD environment variable if set, otherwise prompts interactively.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
 ### High-Availability Management

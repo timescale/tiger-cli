@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -20,6 +21,9 @@ import (
 var (
 	// getAPIKeyForDB can be overridden for testing
 	getAPIKeyForDB = config.GetAPIKey
+
+	// getServiceDetailsFunc can be overridden for testing
+	getServiceDetailsFunc = getServiceDetails
 )
 
 func buildDbConnectionStringCmd() *cobra.Command {
@@ -241,6 +245,98 @@ Examples:
 	return cmd
 }
 
+func buildDbSavePasswordCmd() *cobra.Command {
+	var dbSavePasswordRole string
+	var dbSavePasswordValue string
+
+	cmd := &cobra.Command{
+		Use:   "save-password [service-id]",
+		Short: "Save password for a database service",
+		Long: `Save a password for a database service to configured password storage.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. The password can be provided via:
+1. --password flag with explicit value (highest precedence)
+2. TIGER_NEW_PASSWORD environment variable
+3. Interactive prompt (if neither provided)
+
+The password will be saved according to your --password-storage setting
+(keyring, pgpass, or none).
+
+Examples:
+  # Save password with explicit value (highest precedence)
+  tiger db save-password svc-12345 --password=your-password
+
+  # Using environment variable
+  export TIGER_NEW_PASSWORD=your-password
+  tiger db save-password svc-12345
+
+  # Interactive password prompt (when neither flag nor env var provided)
+  tiger db save-password svc-12345
+
+  # Save password for custom role
+  tiger db save-password svc-12345 --password=your-password --role readonly
+
+  # Save to specific storage location
+  tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			service, err := getServiceDetailsFunc(cmd, args)
+			if err != nil {
+				return err
+			}
+
+			// Determine password based on precedence:
+			// 1. --password flag with value
+			// 2. TIGER_NEW_PASSWORD environment variable
+			// 3. Interactive prompt
+			var passwordToSave string
+
+			if cmd.Flags().Changed("password") {
+				// --password flag was provided
+				passwordToSave = dbSavePasswordValue
+				if passwordToSave == "" {
+					return fmt.Errorf("password cannot be empty when provided via --password flag")
+				}
+			} else if envPassword := os.Getenv("TIGER_NEW_PASSWORD"); envPassword != "" {
+				// Use environment variable
+				passwordToSave = envPassword
+			} else {
+				// Interactive prompt
+				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
+				scanner := bufio.NewScanner(cmd.InOrStdin())
+				if scanner.Scan() {
+					passwordToSave = scanner.Text()
+				} else {
+					if err := scanner.Err(); err != nil {
+						return fmt.Errorf("failed to read password: %w", err)
+					}
+					return fmt.Errorf("failed to read password: EOF")
+				}
+				if passwordToSave == "" {
+					return fmt.Errorf("password cannot be empty")
+				}
+			}
+
+			// Save password using configured storage
+			storage := password.GetPasswordStorage()
+			err = storage.Save(service, passwordToSave, dbSavePasswordRole)
+			if err != nil {
+				return fmt.Errorf("failed to save password: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Password saved successfully for service %s (role: %s)\n",
+				*service.ServiceId, dbSavePasswordRole)
+			return nil
+		},
+	}
+
+	// Add flags for db save-password command
+	cmd.Flags().StringVar(&dbSavePasswordValue, "password", "", "Password to save")
+	cmd.Flags().StringVar(&dbSavePasswordRole, "role", "tsdbadmin", "Database role/username")
+
+	return cmd
+}
+
 func buildDbCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "db",
@@ -251,6 +347,7 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbConnectionStringCmd())
 	cmd.AddCommand(buildDbConnectCmd())
 	cmd.AddCommand(buildDbTestConnectionCmd())
+	cmd.AddCommand(buildDbSavePasswordCmd())
 
 	return cmd
 }
