@@ -1,17 +1,18 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func buildConfigShowCmd() *cobra.Command {
@@ -65,13 +66,14 @@ func buildConfigShowCmd() *cobra.Command {
 				cfgOut.ConfigDir = nil
 			}
 
+			output := cmd.OutOrStdout()
 			switch outputFormat {
 			case "json":
-				return outputJSON(cfgOut, cmd)
+				return util.SerializeToJSON(output, cfgOut)
 			case "yaml":
-				return outputYAML(cfgOut, cmd)
+				return util.SerializeToYAML(output, cfgOut, false)
 			default:
-				return outputTable(cfgOut, cmd)
+				return outputTable(output, cfgOut)
 			}
 		},
 	}
@@ -177,17 +179,23 @@ func buildConfigCmd() *cobra.Command {
 	return cmd
 }
 
-func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
+func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
+	table := tablewriter.NewWriter(w)
 	table.Header("PROPERTY", "VALUE")
 	if cfg.APIURL != nil {
 		table.Append("api_url", *cfg.APIURL)
 	}
+	if cfg.Analytics != nil {
+		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
+	}
+	if cfg.ConfigDir != nil {
+		table.Append("config_dir", *cfg.ConfigDir)
+	}
 	if cfg.ConsoleURL != nil {
 		table.Append("console_url", *cfg.ConsoleURL)
 	}
-	if cfg.GatewayURL != nil {
-		table.Append("gateway_url", *cfg.GatewayURL)
+	if cfg.Debug != nil {
+		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
 	}
 	if cfg.DocsMCP != nil {
 		table.Append("docs_mcp", fmt.Sprintf("%t", *cfg.DocsMCP))
@@ -195,38 +203,29 @@ func outputTable(cfg *config.ConfigOutput, cmd *cobra.Command) error {
 	if cfg.DocsMCPURL != nil {
 		table.Append("docs_mcp_url", *cfg.DocsMCPURL)
 	}
-	if cfg.ProjectID != nil {
-		table.Append("project_id", *cfg.ProjectID)
-	}
-	if cfg.ServiceID != nil {
-		table.Append("service_id", *cfg.ServiceID)
+	if cfg.GatewayURL != nil {
+		table.Append("gateway_url", *cfg.GatewayURL)
 	}
 	if cfg.Output != nil {
 		table.Append("output", *cfg.Output)
 	}
-	if cfg.Analytics != nil {
-		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
-	}
 	if cfg.PasswordStorage != nil {
 		table.Append("password_storage", *cfg.PasswordStorage)
 	}
-	if cfg.Debug != nil {
-		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
+	if cfg.ProjectID != nil {
+		table.Append("project_id", *cfg.ProjectID)
 	}
-	if cfg.ConfigDir != nil {
-		table.Append("config_dir", *cfg.ConfigDir)
+	if cfg.ReleasesURL != nil {
+		table.Append("releases_url", *cfg.ReleasesURL)
+	}
+	if cfg.ServiceID != nil {
+		table.Append("service_id", *cfg.ServiceID)
+	}
+	if cfg.VersionCheckInterval != nil {
+		table.Append("version_check_interval", cfg.VersionCheckInterval.String())
+	}
+	if cfg.VersionCheckLastTime != nil {
+		table.Append("version_check_last_time", cfg.VersionCheckLastTime.Format(time.RFC1123))
 	}
 	return table.Render()
-}
-
-func outputJSON(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	encoder := json.NewEncoder(cmd.OutOrStdout())
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(cfg)
-}
-
-func outputYAML(cfg *config.ConfigOutput, cmd *cobra.Command) error {
-	encoder := yaml.NewEncoder(cmd.OutOrStdout())
-	defer encoder.Close()
-	return encoder.Encode(cfg)
 }

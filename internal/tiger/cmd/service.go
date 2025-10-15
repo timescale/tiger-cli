@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -568,20 +566,6 @@ type OutputService struct {
 	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
 }
 
-// Convert to JSON to respect omitempty tags, then unmarshal
-func toJSON(v any) (any, error) {
-	jsonBytes, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-
-	var jsonOut any
-	if err := json.Unmarshal(jsonBytes, &jsonOut); err != nil {
-		return nil, err
-	}
-	return jsonOut, nil
-}
-
 // outputService formats and outputs a single service based on the specified format
 func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
 	// Prepare the output service with computed fields
@@ -590,17 +574,9 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(outputWriter)
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(outputSvc)
+		return util.SerializeToJSON(outputWriter, outputSvc)
 	case "yaml":
-		encoder := yaml.NewEncoder(outputWriter)
-		encoder.SetIndent(2)
-		jsonMap, err := toJSON(outputSvc)
-		if err != nil {
-			return fmt.Errorf("failed to convert service to map: %w", err)
-		}
-		return encoder.Encode(jsonMap)
+		return util.SerializeToYAML(outputWriter, outputSvc, true)
 	case "env":
 		return outputServiceEnv(outputSvc, outputWriter)
 	default: // table format (default)
@@ -615,17 +591,9 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string, w
 
 	switch strings.ToLower(format) {
 	case "json":
-		encoder := json.NewEncoder(outputWriter)
-		encoder.SetIndent("", "  ")
-		return encoder.Encode(outputServices)
+		return util.SerializeToJSON(outputWriter, outputServices)
 	case "yaml":
-		encoder := yaml.NewEncoder(outputWriter)
-		encoder.SetIndent(2)
-		jsonArray, err := toJSON(outputServices)
-		if err != nil {
-			return fmt.Errorf("failed to convert services to map: %w", err)
-		}
-		return encoder.Encode(jsonArray)
+		return util.SerializeToYAML(outputWriter, outputServices, true)
 	case "env":
 		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)

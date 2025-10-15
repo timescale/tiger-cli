@@ -10,6 +10,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
 func buildRootCmd() *cobra.Command {
@@ -19,6 +20,7 @@ func buildRootCmd() *cobra.Command {
 	var serviceID string
 	var analytics bool
 	var passwordStorage string
+	var skipUpdateCheck bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -33,14 +35,13 @@ tiger auth login
 
 `,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := logging.Init(debug); err != nil {
-				return fmt.Errorf("failed to initialize logging: %w", err)
-			}
-
 			cfg, err := config.Load()
 			if err != nil {
-				logging.Error("failed to load config", zap.Error(err))
-				return err
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			if err := logging.Init(cfg.Debug); err != nil {
+				return fmt.Errorf("failed to initialize logging: %w", err)
 			}
 
 			logging.Debug("CLI initialized",
@@ -51,8 +52,24 @@ tiger auth login
 
 			return nil
 		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Skip update check if:
+			// 1. --skip-update-check flag was provided
+			// 2. Running "version --check" (version command handles its own check)
+			isVersionCheck := cmd.Name() == "version" && cmd.Flags().Changed("check")
+			if !skipUpdateCheck && !isVersionCheck {
+				output := cmd.ErrOrStderr()
+				result := version.PerformCheck(cfg, &output, false)
+				version.PrintUpdateWarning(result, cfg, &output)
+			}
+
 			logging.Sync()
+			return nil
 		},
 	}
 
@@ -74,6 +91,7 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
