@@ -31,6 +31,7 @@ mv tiger /usr/local/bin/
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
 - `TIGER_OUTPUT`: Default output format (json, yaml, table)
 - `TIGER_ANALYTICS`: Enable/disable usage analytics (true/false)
+- `TIGER_NEW_PASSWORD`: Password to use for save-password command (overridden by --password flag)
 
 ### Configuration File
 
@@ -396,9 +397,16 @@ tiger db test-connection svc-12345
 # Test with custom timeout
 tiger db test-connection svc-12345 --timeout 10s
 
-# Save password (storage location depends on --password-storage flag)
+# Save password with explicit value (highest precedence)
 tiger db save-password svc-12345 --password your-password
 tiger db save-password svc-12345 --password your-password --role readonly
+
+# Interactive password prompt (when --password flag provided with no value)
+tiger db save-password svc-12345 --password
+
+# Using environment variable (only when --password flag not provided)
+export TIGER_NEW_PASSWORD=your-password
+tiger db save-password svc-12345
 
 # Save to specific storage location
 tiger db save-password svc-12345 --password your-password --password-storage pgpass
@@ -428,7 +436,7 @@ The `connect` and `psql` commands support passing additional flags directly to t
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
-- `--password`: Password to save (for save-password command)
+- `--password`: Password to save (for save-password command). When flag is provided with no value, prompts interactively. When flag is not provided at all, uses TIGER_NEW_PASSWORD environment variable if set.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
 ### High-Availability Management
