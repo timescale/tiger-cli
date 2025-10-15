@@ -175,7 +175,7 @@ func detectInstallMethod(binaryPath string) InstallMethod {
 func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
 	switch method {
 	case InstallMethodHomebrew:
-		return "brew upgrade tiger-cli"
+		return "brew update && brew upgrade tiger-cli"
 	case InstallMethodDeb:
 		return "sudo apt update && sudo apt install tiger-cli"
 	case InstallMethodRPM:
