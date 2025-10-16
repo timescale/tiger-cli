@@ -39,6 +39,7 @@ func buildVersionCmd() *cobra.Command {
 				Platform:  fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 			}
 
+			updateAvailable := false
 			if checkVersion {
 				cfg, err := config.Load()
 				if err != nil {
@@ -47,6 +48,7 @@ func buildVersionCmd() *cobra.Command {
 				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
+					updateAvailable = result.UpdateAvailable
 					// Print warning _after_ other output
 					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
 				}
@@ -55,15 +57,26 @@ func buildVersionCmd() *cobra.Command {
 			output := cmd.OutOrStdout()
 			switch outputFormat {
 			case "json":
-				return util.SerializeToJSON(output, versionOutput)
+				if err := util.SerializeToJSON(output, versionOutput); err != nil {
+					return err
+				}
 			case "yaml":
-				return util.SerializeToYAML(output, versionOutput, true)
+				if err := util.SerializeToYAML(output, versionOutput, true); err != nil {
+					return err
+				}
 			case "bare":
 				fmt.Fprintln(output, versionOutput.Version)
-				return nil
 			default:
-				return outputVersionTable(output, versionOutput)
+				if err := outputVersionTable(output, versionOutput); err != nil {
+					return err
+				}
 			}
+			if updateAvailable {
+				cmd.SilenceErrors = true
+				cmd.SilenceUsage = true
+				return exitWithCode(ExitUpdateAvailable, nil)
+			}
+			return nil
 		},
 	}
 
