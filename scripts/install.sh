@@ -380,7 +380,7 @@ verify_installation() {
 
     # Test that the binary is executable and get version
     local installed_version
-    if installed_version=$("${binary_path}" version 2>/dev/null | head -n1 || echo ""); then
+    if installed_version=$("${binary_path}" version -o bare --skip-update-check 2>/dev/null | head -n1 || echo ""); then
         if [ -n "${installed_version}" ]; then
             log_success "Tiger CLI installed successfully!"
             log_success "Version: ${installed_version}"

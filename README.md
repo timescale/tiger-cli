@@ -230,6 +230,8 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_ANALYTICS` - Enable/disable analytics
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
 - `TIGER_DEBUG` - Enable/disable debug logging
+- `TIGER_VERSION_CHECK_URL` - URL to check for latest version
+- `TIGER_VERSION_CHECK_INTERVAL` - Seconds between version checks, 0 to disable
 
 ### Global Flags
 
