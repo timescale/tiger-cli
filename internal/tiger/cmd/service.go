@@ -815,8 +815,8 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := newSpinner(ctx, output, "Service status: %s", util.DerefStr(initialStatus))
-	defer spinner.stop()
+	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
+	defer spinner.Stop()
 
 	lastStatus := initialStatus
 	for {
@@ -826,12 +826,12 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				spinner.update("Error checking service status: %v", err)
+				spinner.Update("Error checking service status: %v", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.update("Service not found or error checking status")
+				spinner.Update("Service not found or error checking status")
 				continue
 			}
 
@@ -841,13 +841,13 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 			switch status {
 			case "READY":
-				spinner.stop()
+				spinner.Stop()
 				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
 				return service.Status, nil
 			case "FAILED", "ERROR":
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
 			default:
-				spinner.update("Service status: %s", status)
+				spinner.Update("Service status: %s", status)
 			}
 		}
 	}
@@ -1020,8 +1020,8 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	statusOutput := cmd.ErrOrStderr()
 
 	// Start the spinner
-	spinner := newSpinner(ctx, statusOutput, "Waiting for service '%s' to be deleted", serviceID)
-	defer spinner.stop()
+	spinner := NewSpinner(statusOutput, "Waiting for service '%s' to be deleted", serviceID)
+	defer spinner.Stop()
 
 	for {
 		select {
@@ -1040,7 +1040,7 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 
 			if resp.StatusCode() == 404 {
 				// Service is deleted
-				spinner.stop()
+				spinner.Stop()
 				fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
 				return nil
 			}

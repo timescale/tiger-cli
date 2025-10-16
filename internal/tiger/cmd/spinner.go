@@ -1,136 +1,126 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"sync"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
 )
 
 // spinnerFrames defines the animation frames for the spinner
 var spinnerFrames = []string{"⢎ ", "⠎⠁", "⠊⠑", "⠈⠱", " ⡱", "⢀⡰", "⢄⡠", "⢆⡀"}
 
-// spinner wraps output to show a nice spinner that updates in place
-type spinner struct {
-	ctx         context.Context
-	cancel      context.CancelFunc
-	done        chan struct{}
-	lock        sync.Mutex
-	output      io.Writer
-	tty         bool
-	message     string
-	frame       int
-	lastLineLen int
+type Spinner struct {
+	// Populated when output is a TTY
+	program *tea.Program
+
+	// Populated when output is not a TTY
+	output io.Writer
+	model  *spinnerModel
 }
 
-func newSpinner(ctx context.Context, output io.Writer, message string, args ...any) *spinner {
-	ctx, cancel := context.WithCancel(ctx)
-	s := &spinner{
-		ctx:     ctx,
-		cancel:  cancel,
-		output:  output,
+func NewSpinner(output io.Writer, message string, args ...any) *Spinner {
+	model := spinnerModel{
 		message: fmt.Sprintf(message, args...),
-		done:    make(chan struct{}),
 	}
 
-	// Check if output is a TTY
-	if f, ok := output.(*os.File); ok {
-		s.tty = term.IsTerminal(int(f.Fd()))
+	// If output is not a TTY, print each message on a new line
+	if !isTerminal(output) {
+		s := &Spinner{
+			output: output,
+			model:  &model,
+		}
+		s.println()
+		return s
 	}
 
-	// Start the spinner animation in a goroutine
-	go s.run()
+	// If output is a TTY, use bubbletea to dynamically update the message
+	program := tea.NewProgram(
+		model,
+		tea.WithOutput(output),
+	)
 
-	return s
+	// Start the program in a goroutine
+	go func() {
+		if _, err := program.Run(); err != nil {
+			fmt.Fprintf(output, "Error displaying output: %s\n", err)
+		}
+	}()
+
+	return &Spinner{
+		program: program,
+	}
 }
 
-func (s *spinner) run() {
-	defer close(s.done)
+func (s *Spinner) Update(message string, args ...any) {
+	message = fmt.Sprintf(message, args...)
+	if s.program != nil {
+		s.program.Send(updateMsg(message))
+	} else if message != s.model.message {
+		s.model.message = message
+		s.model.incFrame()
+		s.println()
+	}
+}
 
-	// Initial render
-	s.render(true)
-
-	// If not outputting to a terminal, do not constantly re-render the spinner
-	if !s.tty {
+func (s *Spinner) Stop() {
+	if s.program == nil {
 		return
 	}
 
-	// Re-render the spinner every 100ms
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-s.ctx.Done():
-			// Clear the line when finished
-			s.lock.Lock()
-			s.clearLine()
-			s.lock.Unlock()
-			return
-		case <-ticker.C:
-			s.render(true)
-		}
-	}
+	s.program.Quit()
+	s.program.Wait()
 }
 
-func (s *spinner) render(incFrame bool) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// Clear the previous line if outputting to a terminal
-	if s.tty {
-		s.clearLine()
-	}
-
-	// Build the spinner line
-	spinnerFrame := spinnerFrames[s.frame]
-	if incFrame {
-		s.frame = (s.frame + 1) % len(spinnerFrames)
-	}
-
-	line := fmt.Sprintf("%s %s", spinnerFrame, s.message)
-	s.lastLineLen = len(line)
-
-	if s.tty {
-		// If outputting to a terminal, write without newline so it stays on the same line
-		fmt.Fprint(s.output, line)
-	} else {
-		// If not outputting to a terminal, write with a newline
-		fmt.Fprintln(s.output, line)
-	}
+func (s *Spinner) println() {
+	fmt.Fprintln(s.output, s.model.View())
 }
 
-func (s *spinner) clearLine() {
-	if s.lastLineLen > 0 {
-		fmt.Fprint(s.output, "\r")
-		fmt.Fprint(s.output, strings.Repeat(" ", s.lastLineLen))
-		fmt.Fprint(s.output, "\r")
+func isTerminal(w io.Writer) bool {
+	if f, ok := w.(*os.File); ok {
+		return term.IsTerminal(int(f.Fd()))
 	}
+	return false
 }
 
-func (s *spinner) update(message string, args ...any) {
-	s.lock.Lock()
-	newMessage := fmt.Sprintf(message, args...)
-	changed := s.message != newMessage
-	s.message = newMessage
-	s.lock.Unlock()
+// Message types for the bubbletea model
+type tickMsg struct{}
+type updateMsg string
 
-	// Immediately render the updated message, if it changed. Only increment
-	// the spinner frame if not outputting to a terminal (if outputting to a
-	// terminal, the spinner frame updates on a schedule via a time.Ticker).
-	if changed {
-		s.render(!s.tty)
-	}
+// spinnerModel is the bubbletea model for the spinner
+type spinnerModel struct {
+	message string
+	frame   int
 }
 
-func (s *spinner) stop() {
-	// Cancel the context to stop the spinner
-	s.cancel()
+func (m spinnerModel) Init() tea.Cmd {
+	return m.tick()
+}
 
-	// Wait for spinner goroutine to finish rendering
-	<-s.done
+func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tickMsg:
+		m.incFrame()
+		return m, m.tick()
+	case updateMsg:
+		m.message = string(msg)
+	}
+	return m, nil
+}
+
+func (m spinnerModel) View() string {
+	return fmt.Sprintf("%s %s", spinnerFrames[m.frame], m.message)
+}
+
+func (m *spinnerModel) incFrame() {
+	m.frame = (m.frame + 1) % len(spinnerFrames)
+}
+
+func (m *spinnerModel) tick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+		return tickMsg{}
+	})
 }
