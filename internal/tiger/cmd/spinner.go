@@ -3,11 +3,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"golang.org/x/term"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // spinnerFrames defines the animation frames for the spinner
@@ -28,19 +27,10 @@ type Spinner struct {
 // message on a new line without animation. The message parameter supports
 // fmt.Sprintf-style formatting with optional args.
 func NewSpinner(output io.Writer, message string, args ...any) *Spinner {
-	if isTerminal(output) {
+	if util.IsTerminal(output) {
 		return newAnimatedSpinner(output, message, args...)
 	}
 	return newManualSpinner(output, message, args...)
-}
-
-// isTerminal is a helper method for detecting whether an [io.Writer] is a
-// terminal.
-func isTerminal(w io.Writer) bool {
-	if f, ok := w.(*os.File); ok {
-		return term.IsTerminal(int(f.Fd()))
-	}
-	return false
 }
 
 func newAnimatedSpinner(output io.Writer, message string, args ...any) *Spinner {

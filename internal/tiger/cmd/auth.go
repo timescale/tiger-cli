@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // validateAPIKeyForLogin can be overridden for testing
@@ -215,7 +215,7 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 // promptForCredentials prompts the user to enter any missing credentials
 func promptForCredentials(consoleURL string, creds credentials) (credentials, error) {
 	// Check if we're in a terminal for interactive input
-	if !term.IsTerminal(int(syscall.Stdin)) {
+	if !util.IsTerminal(os.Stdin) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
 	}
 
@@ -236,7 +236,7 @@ func promptForCredentials(consoleURL string, creds credentials) (credentials, er
 	// Prompt for secret key if missing
 	if creds.secretKey == "" {
 		fmt.Print("Enter your secret key: ")
-		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			return credentials{}, err
 		}

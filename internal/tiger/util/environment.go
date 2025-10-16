@@ -1,14 +1,19 @@
 package util
 
 import (
+	"io"
 	"os"
 
-	"github.com/mattn/go-isatty"
+	"golang.org/x/term"
 )
 
-// IsTerminal determines if a file descriptor is an interactive terminal / TTY.
-func IsTerminal(f *os.File) bool {
-	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+// IsTerminal is a helper method for detecting whether an [io.Writer] is a
+// interactive terminal / TTY.
+func IsTerminal(w io.Writer) bool {
+	if f, ok := w.(*os.File); ok {
+		return term.IsTerminal(int(f.Fd()))
+	}
+	return false
 }
 
 // IsCI determines if the current execution context is within a known CI/CD system.
