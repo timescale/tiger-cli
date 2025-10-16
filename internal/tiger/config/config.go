@@ -24,6 +24,7 @@ type Config struct {
 	DocsMCP              bool          `mapstructure:"docs_mcp" yaml:"docs_mcp"`
 	DocsMCPURL           string        `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
 	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
+	NoColor              bool          `mapstructure:"no_color" yaml:"no_color"`
 	Output               string        `mapstructure:"output" yaml:"output"`
 	PasswordStorage      string        `mapstructure:"password_storage" yaml:"password_storage"`
 	ProjectID            string        `mapstructure:"project_id" yaml:"project_id"`
@@ -42,6 +43,7 @@ type ConfigOutput struct {
 	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
 	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
 	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
+	NoColor              *bool          `mapstructure:"no_color" json:"no_color,omitempty" yaml:"no_color,omitempty"`
 	Output               *string        `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
 	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
 	ProjectID            *string        `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
@@ -57,6 +59,7 @@ const (
 	DefaultGatewayURL           = "https://console.cloud.timescale.com/api"
 	DefaultDocsMCP              = true
 	DefaultDocsMCPURL           = "https://mcp.tigerdata.com/docs"
+	DefaultNoColor              = false
 	DefaultOutput               = "table"
 	DefaultAnalytics            = true
 	DefaultPasswordStorage      = "keyring"
@@ -74,6 +77,7 @@ var defaultValues = map[string]any{
 	"docs_mcp_url":            DefaultDocsMCPURL,
 	"project_id":              "",
 	"service_id":              "",
+	"no_color":                DefaultNoColor,
 	"output":                  DefaultOutput,
 	"analytics":               DefaultAnalytics,
 	"password_storage":        DefaultPasswordStorage,
@@ -314,6 +318,22 @@ func (c *Config) updateField(key string, value any) (any, error) {
 		}
 		c.ServiceID = s
 		validated = s
+
+	case "no_color":
+		switch v := value.(type) {
+		case bool:
+			c.NoColor = v
+			validated = v
+		case string:
+			b, err := setBool("no_color", v)
+			if err != nil {
+				return nil, err
+			}
+			c.NoColor = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("no_color must be string or bool, got %T", value)
+		}
 
 	case "output":
 		s, ok := value.(string)

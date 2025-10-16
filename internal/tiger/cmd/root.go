@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -21,6 +22,7 @@ func buildRootCmd() *cobra.Command {
 	var analytics bool
 	var passwordStorage string
 	var skipUpdateCheck bool
+	var noColor bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -49,6 +51,10 @@ tiger auth login
 				zap.String("output", cfg.Output),
 				zap.Bool("debug", cfg.Debug),
 			)
+
+			if cfg.NoColor {
+				color.NoColor = true
+			}
 
 			return nil
 		},
@@ -92,6 +98,7 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
+	cmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable color output")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
@@ -99,6 +106,7 @@ tiger auth login
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
+	viper.BindPFlag("no_color", cmd.PersistentFlags().Lookup("no-color"))
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:
