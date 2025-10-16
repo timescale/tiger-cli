@@ -403,16 +403,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Handle wait behavior
-				var result error
+				var serviceErr error
 				if createNoWait {
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
-					if result != nil {
-						fmt.Fprintf(statusOutput, "❌ %v\n", result)
+					service.Status, serviceErr = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					if serviceErr != nil {
+						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
+						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
 						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
 					}
 				}
@@ -421,7 +422,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
-				return result
+				// Return error for sake of exit code, but silence it since it was already output above
+				cmd.SilenceErrors = true
+				return serviceErr
 			default:
 				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
@@ -822,7 +825,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -841,8 +844,6 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 			switch status {
 			case "READY":
-				spinner.Stop()
-				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
 				return service.Status, nil
 			case "FAILED", "ERROR":
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
@@ -998,7 +999,13 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
+			if err := waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
+			}
+			return nil
 		},
 	}
 
@@ -1258,15 +1265,15 @@ Examples:
 			}
 
 			// Handle wait behavior
-			var result error
+			var serviceErr error
 			if forkNoWait {
 				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
-				if result != nil {
-					fmt.Fprintf(statusOutput, "❌ %v\n", result)
+				forkedService.Status, serviceErr = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				if serviceErr != nil {
+					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {
 					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
 					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
@@ -1277,7 +1284,9 @@ Examples:
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
-			return result
+			// Return error for sake of exit code, but silence it since it was already output above
+			cmd.SilenceErrors = true
+			return serviceErr
 		},
 	}
 
