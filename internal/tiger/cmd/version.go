@@ -25,12 +25,18 @@ type VersionOutput struct {
 func buildVersionCmd() *cobra.Command {
 	var checkVersion bool
 	var outputFormat string
+	var exitCode bool
 
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if exitCode && !checkVersion {
+				return fmt.Errorf("the --exit-code flag requires --check to be set")
+			}
+
 			versionOutput := VersionOutput{
 				Version:   config.Version,
 				BuildTime: config.BuildTime,
@@ -71,7 +77,7 @@ func buildVersionCmd() *cobra.Command {
 					return err
 				}
 			}
-			if updateAvailable {
+			if updateAvailable && exitCode {
 				cmd.SilenceErrors = true
 				cmd.SilenceUsage = true
 				return exitWithCode(ExitUpdateAvailable, nil)
@@ -82,6 +88,7 @@ func buildVersionCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
 	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table, json, yaml, bare)")
+	cmd.Flags().BoolVar(&exitCode, "exit-code", false, fmt.Sprintf("Exit with code %d if an update is available", ExitUpdateAvailable))
 
 	return cmd
 }
