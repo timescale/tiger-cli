@@ -12,28 +12,31 @@ import (
 // spinnerFrames defines the animation frames for the spinner
 var spinnerFrames = []string{"⢎ ", "⠎⠁", "⠊⠑", "⠈⠱", " ⡱", "⢀⡰", "⢄⡠", "⢆⡀"}
 
-type Spinner struct {
-	// Populated when output is a terminal
-	program *tea.Program
+type Spinner interface {
+	// Update changes the spinner's displayed message.
+	Update(message string, args ...any)
 
-	// Populated when output is not a terminal
-	output io.Writer
-	model  *spinnerModel
+	// Stop terminates the spinner program and waits for it to finish.
+	Stop()
 }
 
 // NewSpinner creates and returns a new [Spinner] for displaying animated
 // status messages. If output is a terminal, it uses bubbletea to dynamically
-// update the spinner in place. If output is not a terminal, it prints each
-// message on a new line without animation. The message parameter supports
-// fmt.Sprintf-style formatting with optional args.
-func NewSpinner(output io.Writer, message string, args ...any) *Spinner {
+// update the spinner and message in place. If output is not a terminal, it
+// prints each message on a new line without animation. The message parameter
+// supports fmt.Sprintf-style formatting with optional args.
+func NewSpinner(output io.Writer, message string, args ...any) Spinner {
 	if util.IsTerminal(output) {
 		return newAnimatedSpinner(output, message, args...)
 	}
 	return newManualSpinner(output, message, args...)
 }
 
-func newAnimatedSpinner(output io.Writer, message string, args ...any) *Spinner {
+type animatedSpinner struct {
+	program *tea.Program
+}
+
+func newAnimatedSpinner(output io.Writer, message string, args ...any) *animatedSpinner {
 	program := tea.NewProgram(
 		spinnerModel{
 			message: fmt.Sprintf(message, args...),
@@ -47,51 +50,54 @@ func newAnimatedSpinner(output io.Writer, message string, args ...any) *Spinner 
 		}
 	}()
 
-	return &Spinner{
+	return &animatedSpinner{
 		program: program,
 	}
 }
 
-func newManualSpinner(output io.Writer, message string, args ...any) *Spinner {
-	s := &Spinner{
+// Update changes the spinner's displayed message and triggers bubbletea to re-render.
+func (s *animatedSpinner) Update(message string, args ...any) {
+	s.program.Send(updateMsg(fmt.Sprintf(message, args...)))
+}
+
+// Stop quits the [tea.Program] and waits for it to finish.
+func (s *animatedSpinner) Stop() {
+	s.program.Quit()
+	s.program.Wait()
+}
+
+type manualSpinner struct {
+	output io.Writer
+	model  *spinnerModel
+}
+
+func newManualSpinner(output io.Writer, message string, args ...any) *manualSpinner {
+	s := &manualSpinner{
 		output: output,
 		model: &spinnerModel{
 			message: fmt.Sprintf(message, args...),
 		},
 	}
-	s.println()
+	s.printLine()
 	return s
 }
 
-// Update changes the spinner's displayed message. If the output is a terminal,
-// the message is updated in place via bubbletea. Otherwise, the message is
-// printed on a new line if it differs from the previous one.
-func (s *Spinner) Update(message string, args ...any) {
+// Update prints the message on a new line if it differs from the previous one.
+func (s *manualSpinner) Update(message string, args ...any) {
 	message = fmt.Sprintf(message, args...)
-	if s.program != nil {
-		s.program.Send(updateMsg(message))
-	} else if message != s.model.message {
-		s.model.message = message
-		s.model.incFrame()
-		s.println()
-	}
-}
-
-// Stop terminates the spinner program and waits for it to finish.
-// This method is a no-op if the output is not a terminal.
-func (s *Spinner) Stop() {
-	if s.program == nil {
+	if message == s.model.message {
 		return
 	}
 
-	s.program.Quit()
-	s.program.Wait()
+	s.model.message = message
+	s.model.incFrame()
+	s.printLine()
 }
 
-// println prints the current state of the model to the configured output on a
-// new line. It is used when the output is not a terminal, and we therefore
-// don't want to write terminal control characters.
-func (s *Spinner) println() {
+// Stop is a no-op for a manual spinner.
+func (s *manualSpinner) Stop() {}
+
+func (s *manualSpinner) printLine() {
 	fmt.Fprintln(s.output, s.model.View())
 }
 
