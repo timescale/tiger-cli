@@ -401,16 +401,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Handle wait behavior
-				var result error
+				var serviceErr error
 				if createNoWait {
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, result = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
-					if result != nil {
-						fmt.Fprintf(statusOutput, "❌ %v\n", result)
+					service.Status, serviceErr = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					if serviceErr != nil {
+						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
+						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
 						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
 					}
 				}
@@ -419,7 +420,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
-				return result
+				// Return error for sake of exit code, but silence it since it was already output above
+				cmd.SilenceErrors = true
+				return serviceErr
 			default:
 				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
@@ -779,23 +782,27 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	// Start the spinner
+	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
+	defer spinner.Stop()
 
 	lastStatus := initialStatus
 	for {
 		select {
 		case <-ctx.Done():
-			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				fmt.Fprintf(output, "⚠️  Error checking service status: %v\n", err)
+				spinner.Update("Error checking service status: %v", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				fmt.Fprintf(output, "⚠️  Service not found or error checking status\n")
+				spinner.Update("Service not found or error checking status")
 				continue
 			}
 
@@ -805,12 +812,11 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 
 			switch status {
 			case "READY":
-				fmt.Fprintf(output, "🎉 Service is ready and running!\n")
 				return service.Status, nil
 			case "FAILED", "ERROR":
 				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
 			default:
-				fmt.Fprintf(output, "⏳ Service status: %s...\n", status)
+				spinner.Update("Service status: %s", status)
 			}
 		}
 	}
@@ -961,7 +967,13 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			return waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd)
+			if err := waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
+			}
+			return nil
 		},
 	}
 
@@ -977,17 +989,18 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	statusOutput := cmd.ErrOrStderr()
 
-	fmt.Fprintf(statusOutput, "⏳ Waiting for service '%s' to be deleted", serviceID)
+	// Start the spinner
+	spinner := NewSpinner(statusOutput, "Waiting for service '%s' to be deleted", serviceID)
+	defer spinner.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintln(statusOutput, "") // New line after dots
 			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
 		case <-ticker.C:
 			// Check if service still exists
@@ -997,25 +1010,22 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				fmt.Fprintln(statusOutput, "") // New line after dots
 				return fmt.Errorf("failed to check service status: %w", err)
 			}
 
 			if resp.StatusCode() == 404 {
 				// Service is deleted
-				fmt.Fprintln(statusOutput, "") // New line after dots
+				spinner.Stop()
 				fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
 				return nil
 			}
 
 			if resp.StatusCode() == 200 {
 				// Service still exists, continue waiting
-				fmt.Fprint(statusOutput, ".")
 				continue
 			}
 
 			// Other error
-			fmt.Fprintln(statusOutput, "") // New line after dots
 			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
 		}
 	}
@@ -1223,15 +1233,15 @@ Examples:
 			}
 
 			// Handle wait behavior
-			var result error
+			var serviceErr error
 			if forkNoWait {
 				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, result = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
-				if result != nil {
-					fmt.Fprintf(statusOutput, "❌ %v\n", result)
+				forkedService.Status, serviceErr = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				if serviceErr != nil {
+					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {
 					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
 					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
@@ -1242,7 +1252,9 @@ Examples:
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
-			return result
+			// Return error for sake of exit code, but silence it since it was already output above
+			cmd.SilenceErrors = true
+			return serviceErr
 		},
 	}
 

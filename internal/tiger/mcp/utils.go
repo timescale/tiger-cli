@@ -137,7 +137,7 @@ func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, project
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	lastStatus := initialStatus
