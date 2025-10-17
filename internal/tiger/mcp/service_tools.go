@@ -383,6 +383,8 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		WithPassword: input.WithPassword,
 	}); err != nil {
 		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else if input.WithPassword && details.Password == "" {
+		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
 	} else {
 		output.Service.Password = details.Password
 		output.Service.ConnectionString = details.String()
