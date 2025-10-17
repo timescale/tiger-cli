@@ -195,7 +195,7 @@ func TestGetUpdateCommand(t *testing.T) {
 		{
 			name:   "install.sh",
 			method: InstallMethodInstallSh,
-			want:   "curl -fsSL " + testUrl + "/install.sh | sh",
+			want:   "curl -fsSL " + testUrl + " | sh",
 		},
 		{
 			name:   "development",
