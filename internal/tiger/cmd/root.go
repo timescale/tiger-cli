@@ -23,7 +23,6 @@ func buildRootCmd() *cobra.Command {
 	var passwordStorage string
 	var skipUpdateCheck bool
 	var colorFlag bool
-	var noColorFlag bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -53,9 +52,6 @@ tiger auth login
 				zap.Bool("debug", cfg.Debug),
 			)
 
-			if noColorFlag && cmd.Flag("no-color").Changed {
-				cfg.UpdateField("color", false)
-			}
 			if !cfg.Color {
 				color.NoColor = true
 			}
@@ -103,9 +99,6 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
-	cmd.PersistentFlags().MarkHidden("color")
-	cmd.PersistentFlags().BoolVar(&noColorFlag, "no-color", false, "disable colored output")
-	cmd.MarkFlagsMutuallyExclusive("color", "no-color")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
