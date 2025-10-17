@@ -12,6 +12,7 @@ const (
 	ExitPermissionDenied    = 5 // Permission denied
 	ExitServiceNotFound     = 6 // Service not found
 	ExitUpdateAvailable     = 7 // Update available
+	ExitMultipleMatches     = 8 // Multiple resources match
 )
 
 // exitCodeError creates an error that will cause the program to exit with the specified code
