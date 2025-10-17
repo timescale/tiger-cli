@@ -173,12 +173,14 @@ func buildStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			if _, _, err := config.GetCredentials(); err != nil {
+			_, projectID, err := config.GetCredentials()
+			if err != nil {
 				return err
 			}
 
 			// TODO: Make API call to get token information
 			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
+			fmt.Fprintf(cmd.OutOrStdout(), "Project ID: %s\n", projectID)
 
 			return nil
 		},

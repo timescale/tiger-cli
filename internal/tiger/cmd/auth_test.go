@@ -575,7 +575,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status failed with file storage: %v", err)
 	}
-	if output != "Logged in (API key stored)\n" {
+	if output != "Logged in (API key stored)\nProject ID: test-project-fallback\n" {
 		t.Errorf("Unexpected status output: '%s'", output)
 	}
 
@@ -657,7 +657,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 		t.Fatalf("Status failed: %v", err)
 	}
 
-	if output != "Logged in (API key stored)\n" {
+	if output != "Logged in (API key stored)\nProject ID: test-project-789\n" {
 		t.Errorf("Unexpected output: '%s' (len=%d)", output, len(output))
 	}
 }
