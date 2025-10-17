@@ -140,7 +140,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
-		PasswordMode: password.PasswordExclude,
+		WithPassword: false,
 		WarnWriter:   errBuf,
 	})
 
@@ -811,7 +811,7 @@ func TestBuildConnectionString(t *testing.T) {
 			result, err := password.GetConnectionDetails(tc.service, password.ConnectionDetailsOptions{
 				Pooled:       tc.pooled,
 				Role:         tc.role,
-				PasswordMode: password.PasswordExclude,
+				WithPassword: false,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 
@@ -989,7 +989,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: password.PasswordExclude,
+		WithPassword: false,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {
@@ -1011,7 +1011,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: password.PasswordRequired,
+		WithPassword: true,
 		WarnWriter:   cmd.ErrOrStderr(),
 	})
 	if err != nil {

@@ -737,7 +737,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	opts := password.ConnectionDetailsOptions{
 		Pooled:          false,
 		Role:            "tsdbadmin",
-		PasswordMode:    password.GetPasswordMode(withPassword),
+		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 		WarnWriter:      output,
 	}

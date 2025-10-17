@@ -7,33 +7,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
 
-// PasswordMode determines how passwords are handled in connection strings
-type PasswordMode int
-
-const (
-	// PasswordExclude means don't include password in connection string (default)
-	// Connection will rely on PGPASSWORD env var or ~/.pgpass file
-	PasswordExclude PasswordMode = iota
-
-	// PasswordRequired means include password in connection string, return error if unavailable
-	// Used when user explicitly requests --with-password flag
-	PasswordRequired
-
-	// PasswordOptional means include password if available, but don't error if unavailable
-	// Used for connection testing and psql launching where we want best-effort password inclusion
-	PasswordOptional
-)
-
-// GetPasswordMode is a helper function for getting a [PasswordMode] from a
-// boolean. It only ever returns [PasswordRequired]/[PasswordExcluded]. If you
-// need [PasswordOptional], do not use this function.
-func GetPasswordMode(required bool) PasswordMode {
-	if required {
-		return PasswordRequired
-	}
-	return PasswordExclude
-}
-
 // ConnectionDetailsOptions configures how the connection string is built
 type ConnectionDetailsOptions struct {
 	// Pooled determines whether to use the pooler endpoint (if available)
@@ -42,11 +15,11 @@ type ConnectionDetailsOptions struct {
 	// Role is the database role/username to use (e.g., "tsdbadmin")
 	Role string
 
-	// PasswordMode determines how passwords are handled
-	PasswordMode PasswordMode
+	// WithPassword determines whether to include the password in the output
+	WithPassword bool
 
 	// InitialPassword is an optional password to use directly (e.g., from service creation response)
-	// If provided and PasswordMode is PasswordRequired or PasswordOptional, this password will be used
+	// If provided and WithPassword is true, this password will be used
 	// instead of fetching from password storage. This is useful when password_storage=none.
 	InitialPassword string
 
@@ -94,12 +67,10 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		details.Port = *endpoint.Port
 	}
 
-	if opts.PasswordMode == PasswordRequired || opts.PasswordMode == PasswordOptional {
+	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			details.Password = opts.InitialPassword
-		} else if password, err := GetPassword(service); err != nil && opts.PasswordMode == PasswordRequired {
-			return nil, err
-		} else {
+		} else if password, err := GetPassword(service); err == nil {
 			details.Password = password
 		}
 	}

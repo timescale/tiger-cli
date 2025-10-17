@@ -63,11 +63,15 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
+				WithPassword: dbConnectionStringWithPassword,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			if dbConnectionStringWithPassword && details.Password == "" {
+				return fmt.Errorf("password not available to include in connection string")
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -140,7 +144,7 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectPooled,
 				Role:         dbConnectRole,
-				PasswordMode: password.PasswordExclude,
+				WithPassword: false,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -204,7 +208,7 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				PasswordMode: password.PasswordOptional,
+				WithPassword: true,
 				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
@@ -310,7 +314,7 @@ type ArgsLenAtDashProvider interface {
 
 // separateServiceAndPsqlArgs separates service arguments from psql flags using Cobra's ArgsLenAtDash
 func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]string, []string) {
-	serviceArgs := []string{}
+	var serviceArgs []string
 	psqlFlags := []string{}
 
 	argsLenAtDash := cmd.ArgsLenAtDash()

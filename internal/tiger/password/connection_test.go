@@ -33,7 +33,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -49,7 +49,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "readonly",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -65,7 +65,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 			expectError:    false,
@@ -87,7 +87,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
 			expectError:    false,
@@ -104,7 +104,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       true,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 				WarnWriter:   new(bytes.Buffer), // Enable warnings
 			},
 			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
@@ -119,7 +119,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectError: true,
 		},
@@ -134,7 +134,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			opts: ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin",
-				PasswordMode: PasswordExclude,
+				WithPassword: false,
 			},
 			expectError: true,
 		},
@@ -221,7 +221,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 	result := details.String()
 
@@ -273,7 +273,7 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 	result := details.String()
 
@@ -313,20 +313,23 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 		},
 	}
 
-	_, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
-	if err == nil {
-		t.Fatal("Expected error when password storage is disabled, but got none")
+	if err != nil {
+		t.Fatal("Expected no error when password storage is disabled, but got one")
 	}
 
-	// Verify we get the expected error message
-	expectedError := "password storage is disabled (--password-storage=none)"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	if result.Password != "" {
+		t.Errorf("Expected no password in connection details, but got: %s", result.Password)
+	}
+
+	expectedString := "postgresql://tsdbadmin@test-host.com:5432/tsdb?sslmode=require"
+	if result.String() != expectedString {
+		t.Errorf("Expected connection string %q, got %q", expectedString, result.String())
 	}
 }
 
@@ -353,20 +356,23 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 		},
 	}
 
-	_, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
-	if err == nil {
-		t.Fatal("Expected error when no password is available, but got none")
+	if err != nil {
+		t.Fatal("Expected no error when no password is available, but got one")
 	}
 
-	// Verify we get the expected error message
-	expectedError := "no password found in keyring for this service"
-	if !strings.Contains(err.Error(), expectedError) {
-		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
+	if result.Password != "" {
+		t.Errorf("Expected no password in connection details, but got: %s", result.Password)
+	}
+
+	expectedString := "postgresql://tsdbadmin@test-host.com:5432/tsdb?sslmode=require"
+	if result.String() != expectedString {
+		t.Errorf("Expected connection string %q, got %q", expectedString, result.String())
 	}
 }
 
@@ -391,7 +397,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	_, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordRequired,
+		WithPassword: true,
 	})
 
 	if err == nil {
@@ -422,7 +428,7 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Pooled:       true,
 		Role:         "tsdbadmin",
-		PasswordMode: PasswordExclude,
+		WithPassword: false,
 		WarnWriter:   warnBuf,
 	})
 	connectionString := details.String()

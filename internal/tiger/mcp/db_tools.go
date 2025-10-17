@@ -150,7 +150,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
-		PasswordMode: password.PasswordRequired, // MCP always requires password
+		WithPassword: true,
 	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)
