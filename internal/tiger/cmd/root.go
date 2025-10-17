@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -21,6 +22,7 @@ func buildRootCmd() *cobra.Command {
 	var analytics bool
 	var passwordStorage string
 	var skipUpdateCheck bool
+	var colorFlag bool
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -50,6 +52,10 @@ tiger auth login
 				zap.Bool("debug", cfg.Debug),
 			)
 
+			if !cfg.Color {
+				color.NoColor = true
+			}
+
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
@@ -61,7 +67,7 @@ tiger auth login
 			// Skip update check if:
 			// 1. --skip-update-check flag was provided
 			// 2. Running "version --check" (version command handles its own check)
-			isVersionCheck := cmd.Name() == "version" && cmd.Flags().Changed("check")
+			isVersionCheck := cmd.Name() == "version" && cmd.Flag("check").Changed
 			if !skipUpdateCheck && !isVersionCheck {
 				output := cmd.ErrOrStderr()
 				result := version.PerformCheck(cfg, &output, false)
@@ -92,6 +98,7 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
+	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
@@ -99,6 +106,7 @@ tiger auth login
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
+	viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color"))
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:

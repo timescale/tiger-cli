@@ -239,6 +239,12 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 		return
 	}
 
+	// need to set color.NoColor correctly for the `output` (stderr)
+	if cfg.Color && util.IsTerminal(*output) {
+		original := color.NoColor
+		defer func() { color.NoColor = original }()
+		color.NoColor = false
+	}
 	fmt.Fprintf(*output, "\n\n%s %s → %s\nTo upgrade: %s\n",
 		color.YellowString("A new release of tiger-cli is available:"),
 		color.CyanString(result.CurrentVersion),
