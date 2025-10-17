@@ -117,7 +117,7 @@ Examples:
 				}
 			}
 
-			// Combine the keys in the format "public:secret" for validation
+			// Combine the keys in the format "public:secret" for storage
 			apiKey := fmt.Sprintf("%s:%s", creds.publicKey, creds.secretKey)
 
 			// Validate the API key by making a test API call
