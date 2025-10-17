@@ -583,13 +583,13 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
 
-	// Test whoami with file-only storage
-	output, err = executeAuthCommand("auth", "whoami")
+	// Test status with file-only storage
+	output, err = executeAuthCommand("auth", "status")
 	if err != nil {
-		t.Fatalf("Whoami failed with file storage: %v", err)
+		t.Fatalf("Status failed with file storage: %v", err)
 	}
 	if output != "Logged in (API key stored)\n" {
-		t.Errorf("Unexpected whoami output: '%s'", output)
+		t.Errorf("Unexpected status output: '%s'", output)
 	}
 
 	// Test logout with file-only storage
@@ -666,7 +666,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 }
 
-func TestAuthWhoami_LoggedIn(t *testing.T) {
+func TestAuthStatus_LoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
 	// Store API key first
@@ -675,10 +675,10 @@ func TestAuthWhoami_LoggedIn(t *testing.T) {
 		t.Fatalf("Failed to store API key: %v", err)
 	}
 
-	// Execute whoami command
-	output, err := executeAuthCommand("auth", "whoami")
+	// Execute status command
+	output, err := executeAuthCommand("auth", "status")
 	if err != nil {
-		t.Fatalf("Whoami failed: %v", err)
+		t.Fatalf("Status failed: %v", err)
 	}
 
 	if output != "Logged in (API key stored)\n" {
@@ -686,13 +686,13 @@ func TestAuthWhoami_LoggedIn(t *testing.T) {
 	}
 }
 
-func TestAuthWhoami_NotLoggedIn(t *testing.T) {
+func TestAuthStatus_NotLoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
-	// Execute whoami command without being logged in
-	_, err := executeAuthCommand("auth", "whoami")
+	// Execute status command without being logged in
+	_, err := executeAuthCommand("auth", "status")
 	if err == nil {
-		t.Fatal("Expected whoami to fail when not logged in")
+		t.Fatal("Expected status to fail when not logged in")
 	}
 
 	// Error should indicate not logged in

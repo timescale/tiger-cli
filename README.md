@@ -80,7 +80,7 @@ Tiger CLI provides the following commands:
 - `tiger auth` - Authentication management
   - `login` - Log in to your Tiger account
   - `logout` - Log out from your Tiger account
-  - `whoami` - Show current authentication status
+  - `status` - Show current authentication status
 - `tiger service` - Service lifecycle management
   - `list` - List all services
   - `create` - Create a new service

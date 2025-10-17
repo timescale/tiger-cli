@@ -171,11 +171,11 @@ func buildLogoutCmd() *cobra.Command {
 	}
 }
 
-func buildWhoamiCmd() *cobra.Command {
+func buildStatusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "whoami",
-		Short: "Show current user information",
-		Long:  `Show information about the currently authenticated user.`,
+		Use:   "status",
+		Short: "Show current auth information",
+		Long:  `Show information about the currently authenticated token.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -183,7 +183,7 @@ func buildWhoamiCmd() *cobra.Command {
 				return err
 			}
 
-			// TODO: Make API call to get user information
+			// TODO: Make API call to get token information
 			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
 
 			return nil
@@ -200,7 +200,7 @@ func buildAuthCmd() *cobra.Command {
 
 	cmd.AddCommand(buildLoginCmd())
 	cmd.AddCommand(buildLogoutCmd())
-	cmd.AddCommand(buildWhoamiCmd())
+	cmd.AddCommand(buildStatusCmd())
 
 	return cmd
 }

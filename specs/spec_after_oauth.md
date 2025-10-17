@@ -10,7 +10,7 @@ Manage authentication and credentials with OAuth support.
 **Subcommands:**
 - `login`: Authenticate with TigerData Cloud (OAuth flow)
 - `logout`: Remove stored credentials
-- `whoami`: Show current user information
+- `status`: Show current user information
 - `token`: Manage API tokens
 
 **Examples:**
@@ -21,8 +21,8 @@ tiger auth login
 # Web-based OAuth authentication
 tiger auth login --web
 
-# Show current user
-tiger auth whoami
+# Show current token status
+tiger auth status
 
 # Logout and clear credentials
 tiger auth logout

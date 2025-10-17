@@ -68,7 +68,7 @@ For the initial v0 release, implement these essential commands first:
 **Authentication:**
 - `tiger auth login` - Token-based authentication
 - `tiger auth logout` - Remove stored credentials
-- `tiger auth whoami` - Show current user
+- `tiger auth status` - Show current user
 
 **Core Service Management:**
 - `tiger service list` - List all services
@@ -105,7 +105,7 @@ Manage authentication and credentials (token-based only).
 **Subcommands:**
 - `login`: Authenticate with API token
 - `logout`: Remove stored credentials
-- `whoami`: Show current user information
+- `status`: Show current user information
 
 **Examples:**
 ```bash
@@ -125,7 +125,7 @@ tiger auth login
 tiger auth login
 
 # Show current user
-tiger auth whoami
+tiger auth status
 
 # Logout
 tiger auth logout

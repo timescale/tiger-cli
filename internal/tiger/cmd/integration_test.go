@@ -81,7 +81,7 @@ func executeIntegrationCommand(args ...string) (string, error) {
 }
 
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
-// login -> whoami -> create -> get -> update-password -> delete -> logout
+// login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
 	config.SetTestServiceName(t)
 	// Check for required environment variables
@@ -148,12 +148,12 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Login successful")
 	})
 
-	t.Run("WhoAmI", func(t *testing.T) {
+	t.Run("Status", func(t *testing.T) {
 		t.Logf("Verifying authentication status")
 
-		output, err := executeIntegrationCommand("auth", "whoami")
+		output, err := executeIntegrationCommand("auth", "status")
 		if err != nil {
-			t.Fatalf("WhoAmI failed: %v\nOutput: %s", err, output)
+			t.Fatalf("Status failed: %v\nOutput: %s", err, output)
 		}
 
 		// Should not say "Not logged in"
@@ -433,10 +433,10 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("VerifyLoggedOut", func(t *testing.T) {
 		t.Logf("Verifying we're logged out")
 
-		output, err := executeIntegrationCommand("auth", "whoami")
+		output, err := executeIntegrationCommand("auth", "status")
 		// This should either fail or say "Not logged in"
 		if err == nil && !strings.Contains(output, "Not logged in") {
-			t.Errorf("Expected to be logged out, but whoami succeeded: %s", output)
+			t.Errorf("Expected to be logged out, but status succeeded: %s", output)
 		}
 
 		t.Logf("Verified logged out status")
