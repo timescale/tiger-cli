@@ -34,6 +34,7 @@ func buildServiceCmd() *cobra.Command {
 	// Add all subcommands
 	cmd.AddCommand(buildServiceGetCmd())
 	cmd.AddCommand(buildServiceListCmd())
+	cmd.AddCommand(buildServiceFindCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
@@ -143,6 +144,49 @@ Examples:
 	return cmd
 }
 
+// fetchAllServices fetches all services for a project, handling authentication and common errors
+func fetchAllServices(cmd *cobra.Command, cfg *config.Config) ([]api.Service, error) {
+	projectID := cfg.ProjectID
+	if projectID == "" {
+		return nil, fmt.Errorf("project ID is required. Set it using login with --project-id")
+	}
+
+	// Get API key for authentication
+	apiKey, err := getAPIKeyForService()
+	if err != nil {
+		return nil, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient(apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	// Make API call to list services
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list services: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 200 {
+		return nil, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {
+		statusOutput := cmd.ErrOrStderr()
+		fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+		fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+		return []api.Service{}, nil
+	}
+
+	return *resp.JSON200, nil
+}
+
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
 	var output string
@@ -163,51 +207,16 @@ func buildServiceListCmd() *cobra.Command {
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Fetch all services using shared function
+			services, err := fetchAllServices(cmd, cfg)
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return err
 			}
 
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
-			}
-
-			// Make API call to list services
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
-			if err != nil {
-				return fmt.Errorf("failed to list services: %w", err)
-			}
-
-			statusOutput := cmd.ErrOrStderr()
-
-			// Handle API response
-			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			services := *resp.JSON200
+			// If no services, fetchAllServices already printed the message
 			if len(services) == 0 {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-				return nil
-			}
-
-			if resp.JSON200 == nil {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
 				return nil
 			}
 
@@ -217,6 +226,87 @@ func buildServiceListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+
+	return cmd
+}
+
+// buildServiceFindCmd represents the find command under service
+func buildServiceFindCmd() *cobra.Command {
+	var output string
+	var withPassword bool
+
+	cmd := &cobra.Command{
+		Use:   "find <name>",
+		Short: "Find services by name",
+		Long: `Find database services in the current project by name.
+
+Searches for services with an exact name match. If exactly one service matches,
+displays detailed information like 'tiger service get'. If multiple services match,
+displays a list like 'tiger service list'.
+
+Examples:
+  # Find a service by name
+  tiger service find my-production-db
+
+  # Find with JSON output
+  tiger service find my-db --output json`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			searchName := args[0]
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
+			}
+
+			cmd.SilenceUsage = true
+
+			// Fetch all services using shared function
+			services, err := fetchAllServices(cmd, cfg)
+			if err != nil {
+				return err
+			}
+
+			// If no services, fetchAllServices already printed the message
+			if len(services) == 0 {
+				return exitWithCode(ExitGeneralError, fmt.Errorf("you have no services"))
+			}
+
+			// Filter services by exact name match
+			var matches []api.Service
+			for _, service := range services {
+				if service.Name != nil && *service.Name == searchName {
+					matches = append(matches, service)
+				}
+			}
+
+			// Handle no matches
+			if len(matches) == 0 {
+				return exitWithCode(ExitGeneralError, fmt.Errorf("no services found with name '%s'", searchName))
+			}
+
+			if len(matches) > 1 {
+				// Multiple matches - output like 'service list'
+				if err := outputServices(cmd, matches, cfg.Output); err != nil {
+					return err
+				}
+				cmd.SilenceErrors = true
+				return exitWithCode(ExitMultipleMatches, nil)
+			}
+
+			// Single match - output like 'service get'
+			return outputService(cmd, matches[0], cfg.Output, withPassword, true)
+		},
+	}
+
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 
 	return cmd
 }
