@@ -712,7 +712,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 // outputServicesTable outputs services in a formatted table using tablewriter
 func outputServicesTable(services []OutputService, output io.Writer) error {
 	table := tablewriter.NewWriter(output)
-	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED", "CONNECTION STRING")
+	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
 
 	for _, service := range services {
 		table.Append(
@@ -722,7 +722,6 @@ func outputServicesTable(services []OutputService, output io.Writer) error {
 			util.DerefStr(service.ServiceType),
 			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
-			service.ConnectionString,
 		)
 	}
 
