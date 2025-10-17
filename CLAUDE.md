@@ -149,7 +149,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
 - **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
   - `root.go` - Root command with global flags and configuration initialization
-  - `auth.go` - Authentication commands (login, logout, whoami)
+  - `auth.go` - Authentication commands (login, logout, status)
   - `service.go` - Service management commands (list, create, get, fork, delete, update-password)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
@@ -377,7 +377,7 @@ buildRootCmd() → Complete CLI with all commands and flags
 ├── buildAuthCmd()
 │   ├── buildLoginCmd()
 │   ├── buildLogoutCmd()
-│   └── buildWhoamiCmd()
+│   └── buildStatusCmd()
 ├── buildServiceCmd()
 │   ├── buildServiceListCmd()
 │   ├── buildServiceGetCmd()
