@@ -9,7 +9,7 @@
 # and downloads the appropriate binary for your system.
 #
 # Usage:
-#   curl -fsSL https://cli.tigerdata.com/install.sh | sh
+#   curl -fsSL https://cli.tigerdata.com | sh
 #
 # Environment Variables (all optional):
 #   VERSION           - Specific version to install (e.g., "v1.2.3")
