@@ -53,6 +53,8 @@ func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
 		// Add API key to Authorization header
 		encodedKey := base64.StdEncoding.EncodeToString([]byte(apiKey))
 		req.Header.Set("Authorization", "Basic "+encodedKey)
+		// Add User-Agent header to identify CLI version
+		req.Header.Set("User-Agent", fmt.Sprintf("tiger-cli/%s", config.Version))
 		return nil
 	}))
 

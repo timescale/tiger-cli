@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 // We currently use a few GraphQL endpoints as part of the OAuth login flow,
@@ -151,6 +153,7 @@ func makeGraphQLRequest[T any](queryURL, accessToken, query string, variables ma
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	req.Header.Set("User-Agent", fmt.Sprintf("tiger-cli/%s", config.Version))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
