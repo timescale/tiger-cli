@@ -103,8 +103,9 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
+	cmd.PersistentFlags().MarkHidden("color")
 	cmd.PersistentFlags().BoolVar(&noColorFlag, "no-color", false, "disable colored output")
-	cmd.PersistentFlags().MarkHidden("no-color")
+	cmd.MarkFlagsMutuallyExclusive("color", "no-color")
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
