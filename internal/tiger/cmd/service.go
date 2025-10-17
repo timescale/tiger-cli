@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	// getAPIKeyForService can be overridden for testing
-	getAPIKeyForService = config.GetAPIKey
+	// getCredentialsForService can be overridden for testing
+	getCredentialsForService = config.GetCredentials
 )
 
 // buildServiceCmd creates the main service command with all subcommands
@@ -81,11 +81,6 @@ Examples:
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -100,10 +95,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -164,17 +159,12 @@ func buildServiceListCmd() *cobra.Command {
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -300,11 +290,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
@@ -332,10 +317,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -481,11 +466,6 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -506,10 +486,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -907,20 +887,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get project ID from config
-			cfg, err := config.Load()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			if cfg.ProjectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
-			// Get API key
-			apiKey, err := getAPIKeyForService()
-			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			statusOutput := cmd.ErrOrStderr()
@@ -946,7 +916,7 @@ Examples:
 			// Make the delete request
 			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
@@ -967,7 +937,7 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			if err := waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+			if err := waitForServiceDeletion(client, projectID, serviceID, deleteWaitTimeout, cmd); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
@@ -1119,11 +1089,6 @@ Examples:
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine source service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -1138,10 +1103,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client

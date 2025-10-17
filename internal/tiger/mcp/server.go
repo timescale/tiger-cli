@@ -70,33 +70,28 @@ func (s *Server) registerTools(ctx context.Context) {
 	logging.Info("MCP tools registered successfully")
 }
 
-// createAPIClient loads fresh config and creates a new API client for each tool call
-func (s *Server) createAPIClient() (*api.ClientWithResponses, error) {
-	// Get fresh API key
-	apiKey, err := config.GetAPIKey()
+// createAPIClient creates a new API client and returns it with the project ID
+func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
+	// Get credentials (API key + project ID)
+	apiKey, projectID, err := config.GetCredentials()
 	if err != nil {
-		return nil, fmt.Errorf("authentication required: %w", err)
+		return nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
 	}
 
 	// Create API client with fresh credentials
 	apiClient, err := api.NewTigerClient(apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create API client: %w", err)
+		return nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return apiClient, nil
+	return apiClient, projectID, nil
 }
 
-// loadConfigWithProjectID loads fresh config and validates that project ID is set
-func (s *Server) loadConfigWithProjectID() (*config.Config, error) {
-	// Load fresh config
+// loadConfig loads fresh config
+func (s *Server) loadConfig() (*config.Config, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	if cfg.ProjectID == "" {
-		return nil, fmt.Errorf("project ID is required. Please run 'tiger auth login'")
 	}
 	return cfg, nil
 }

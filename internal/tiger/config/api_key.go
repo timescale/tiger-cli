@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,8 +14,14 @@ import (
 // Keyring parameters
 const (
 	keyringServiceName = "tiger-cli"
-	keyringUsername    = "api-key"
+	keyringUsername    = "credentials"
 )
+
+// storedCredentials represents the JSON structure for stored credentials
+type storedCredentials struct {
+	APIKey    string `json:"api_key"`
+	ProjectID string `json:"project_id"`
+}
 
 // testServiceNameOverride allows tests to override the service name for isolation
 var testServiceNameOverride string
@@ -46,37 +53,63 @@ func SetTestServiceName(t *testing.T) {
 	})
 }
 
-// storeAPIKey stores the API key using keyring with file fallback
-func StoreAPIKey(apiKey string) error {
+// StoreCredentials stores the API key (public:secret) and project ID together
+// The credentials are stored as JSON with api_key and project_id fields
+func StoreCredentials(apiKey, projectID string) error {
+	creds := storedCredentials{
+		APIKey:    apiKey,
+		ProjectID: projectID,
+	}
+
+	credentialsJSON, err := json.Marshal(creds)
+	if err != nil {
+		return fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
 	// Try keyring first
-	if err := StoreAPIKeyToKeyring(apiKey); err == nil {
+	if err := storeToKeyring(string(credentialsJSON)); err == nil {
 		return nil
 	}
 
 	// Fallback to file storage
-	return StoreAPIKeyToFile(apiKey)
+	return storeToFile(string(credentialsJSON))
 }
 
-func StoreAPIKeyToKeyring(apiKey string) error {
-	return keyring.Set(GetServiceName(), keyringUsername, apiKey)
+// StoreCredentialsToFile stores credentials to file (test helper)
+func StoreCredentialsToFile(apiKey, projectID string) error {
+	creds := storedCredentials{
+		APIKey:    apiKey,
+		ProjectID: projectID,
+	}
+
+	credentialsJSON, err := json.Marshal(creds)
+	if err != nil {
+		return fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
+	return storeToFile(string(credentialsJSON))
 }
 
-// StoreAPIKeyToFile stores API key to ~/.config/tiger/api-key with restricted permissions
-func StoreAPIKeyToFile(apiKey string) error {
+func storeToKeyring(credentials string) error {
+	return keyring.Set(GetServiceName(), keyringUsername, credentials)
+}
+
+// storeToFile stores credentials to ~/.config/tiger/credentials with restricted permissions
+func storeToFile(credentials string) error {
 	configDir := GetConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
-	file, err := os.OpenFile(apiKeyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
+	file, err := os.OpenFile(credentialsFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create API key file: %w", err)
+		return fmt.Errorf("failed to create credentials file: %w", err)
 	}
 	defer file.Close()
 
-	if _, err := file.WriteString(apiKey); err != nil {
-		return fmt.Errorf("failed to write API key to file: %w", err)
+	if _, err := file.WriteString(credentials); err != nil {
+		return fmt.Errorf("failed to write credentials to file: %w", err)
 	}
 
 	if err := file.Close(); err != nil {
@@ -88,68 +121,84 @@ func StoreAPIKeyToFile(apiKey string) error {
 
 var ErrNotLoggedIn = errors.New("not logged in")
 
-// GetAPIKey retrieves the API key from keyring or file fallback
-func GetAPIKey() (string, error) {
+// GetCredentials retrieves the API key and project ID from storage
+// Returns (apiKey, projectID, error) where apiKey is in "publicKey:secretKey" format
+func GetCredentials() (string, string, error) {
 	// Try keyring first
-	apiKey, err := GetAPIKeyFromKeyring()
-	if err == nil && apiKey != "" {
-		return apiKey, nil
+	if apiKey, projectId, err := getCredentialsFromKeyring(); err == nil {
+		return apiKey, projectId, nil
 	}
 
 	// Fallback to file storage
-	return GetAPIKeyFromFile()
+	return getCredentialsFromFile()
 }
 
-func GetAPIKeyFromKeyring() (string, error) {
-	return keyring.Get(GetServiceName(), keyringUsername)
-}
-
-// GetAPIKeyFromFile retrieves API key from ~/.config/tiger/api-key
-func GetAPIKeyFromFile() (string, error) {
-	configDir := GetConfigDir()
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
-
-	data, err := os.ReadFile(apiKeyFile)
+// getCredentialsFromKeyring gets credentials from keyring.
+func getCredentialsFromKeyring() (string, string, error) {
+	combined, err := keyring.Get(GetServiceName(), keyringUsername)
 	if err != nil {
-		// If the file does not exist, treat as not logged in
-		if os.IsNotExist(err) {
-			return "", ErrNotLoggedIn
-		}
-		return "", fmt.Errorf("failed to read API key file: %w", err)
+		return "", "", err
 	}
-
-	apiKey := strings.TrimSpace(string(data))
-
-	// If file exists but is empty, treat as not logged in
-	if apiKey == "" {
-		return "", ErrNotLoggedIn
-	}
-
-	return apiKey, nil
+	return parseCredentials(combined)
 }
 
-// RemoveAPIKey removes the API key from keyring and file fallback
-func RemoveAPIKey() error {
-	RemoveAPIKeyFromKeyring()
-
-	// Remove from file fallback
-	return RemoveAPIKeyFromFile()
-}
-
-func RemoveAPIKeyFromKeyring() error {
-	// Try to remove from keyring (ignore errors as it might not exist)
-	return keyring.Delete(GetServiceName(), keyringUsername)
-}
-
-// RemoveAPIKeyFromFile removes the API key file
-func RemoveAPIKeyFromFile() error {
+// getCredentialsFromFile retrieves credentials from file
+func getCredentialsFromFile() (string, string, error) {
 	configDir := GetConfigDir()
-	apiKeyFile := fmt.Sprintf("%s/api-key", configDir)
+	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
 
-	err := os.Remove(apiKeyFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove API key file: %w", err)
+	data, err := os.ReadFile(credentialsFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "", ErrNotLoggedIn
+		}
+		return "", "", fmt.Errorf("failed to read credentials file: %w", err)
 	}
 
+	credentials := strings.TrimSpace(string(data))
+	if credentials == "" {
+		return "", "", ErrNotLoggedIn
+	}
+
+	return parseCredentials(credentials)
+}
+
+// parseCredentials parses the stored credentials from JSON format
+// Returns (apiKey, projectID, error) where apiKey is in "publicKey:secretKey" format
+func parseCredentials(combined string) (string, string, error) {
+	var creds storedCredentials
+	if err := json.Unmarshal([]byte(combined), &creds); err != nil {
+		return "", "", fmt.Errorf("failed to parse credentials: %w", err)
+	}
+
+	if creds.APIKey == "" {
+		return "", "", fmt.Errorf("API key not found in stored credentials")
+	}
+	if creds.ProjectID == "" {
+		return "", "", fmt.Errorf("project ID not found in stored credentials")
+	}
+
+	return creds.APIKey, creds.ProjectID, nil
+}
+
+// RemoveCredentials removes stored credentials from keyring and file fallback
+func RemoveCredentials() error {
+	// Remove from keyring (ignore errors as it might not exist)
+	removeCredentialsFromKeyring()
+	return removeCredentialsFile()
+}
+
+// removeCredentialsFromKeyring removes credentials from keyring (test helper)
+func removeCredentialsFromKeyring() {
+	keyring.Delete(GetServiceName(), keyringUsername)
+}
+
+// removeCredentialsFile removes credentials file
+func removeCredentialsFile() error {
+	configDir := GetConfigDir()
+	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
+	if err := os.Remove(credentialsFile); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove credentials file: %w", err)
+	}
 	return nil
 }

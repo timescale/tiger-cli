@@ -62,7 +62,6 @@ func TestConfigShow_TableOutput(t *testing.T) {
 
 	// Create config file with test data
 	configContent := `api_url: https://test.api.com/v1
-project_id: test-project
 service_id: test-service
 output: table
 analytics: false
@@ -86,7 +85,6 @@ password_storage: pgpass
 		"gateway_url":      "https://console.cloud.timescale.com/api",
 		"docs_mcp":         "true",
 		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
-		"project_id":       "test-project",
 		"service_id":       "test-service",
 		"output":           "table",
 		"analytics":        "false",
@@ -111,7 +109,6 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 
 	// Create config file with JSON output format
 	configContent := `api_url: https://json.api.com/v1
-project_id: json-project
 output: json
 analytics: true
 password_storage: none
@@ -141,7 +138,6 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		"gateway_url":             "https://console.cloud.timescale.com/api",
 		"docs_mcp":                true,
 		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
-		"project_id":              "json-project",
 		"service_id":              "",
 		"output":                  "json",
 		"analytics":               true,
@@ -172,7 +168,6 @@ func TestConfigShow_YAMLOutput(t *testing.T) {
 
 	// Create config file with YAML output format
 	configContent := `api_url: https://yaml.api.com/v1
-project_id: yaml-project
 output: yaml
 analytics: false
 password_storage: keyring
@@ -201,7 +196,6 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		"gateway_url":             "https://console.cloud.timescale.com/api",
 		"docs_mcp":                true,
 		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
-		"project_id":              "yaml-project",
 		"service_id":              "",
 		"output":                  "yaml",
 		"analytics":               false,
@@ -270,7 +264,6 @@ func TestConfigShow_OutputValueUnaffectedByEnvVar(t *testing.T) {
 
 	// Create config file with table as default output
 	configContent := `api_url: https://test.api.com/v1
-project_id: test-project
 output: table
 analytics: true
 `
@@ -318,7 +311,6 @@ func TestConfigShow_ConfigDirFlag(t *testing.T) {
 
 	// Create a config file with test data in the specified directory
 	configContent := `api_url: https://flag-test.api.com/v1
-project_id: flag-test-project
 output: json
 analytics: false
 `
@@ -339,9 +331,6 @@ analytics: false
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
 
-	if result["project_id"] != "flag-test-project" {
-		t.Errorf("Expected project_id 'flag-test-project', got %v", result["project_id"])
-	}
 	if result["api_url"] != "https://flag-test.api.com/v1" {
 		t.Errorf("Expected api_url 'https://flag-test.api.com/v1', got %v", result["api_url"])
 	}
@@ -359,7 +348,6 @@ func TestConfigSet_ValidValues(t *testing.T) {
 		expectedOutput string
 	}{
 		{"api_url", "https://new.api.com/v1", "Set api_url = https://new.api.com/v1"},
-		{"project_id", "new-project", "Set project_id = new-project"},
 		{"service_id", "new-service", "Set service_id = new-service"},
 		{"output", "json", "Set output = json"},
 		{"analytics", "false", "Set analytics = false"},
@@ -390,10 +378,6 @@ func TestConfigSet_ValidValues(t *testing.T) {
 			case "api_url":
 				if cfg.APIURL != tt.value {
 					t.Errorf("Expected APIURL %s, got %s", tt.value, cfg.APIURL)
-				}
-			case "project_id":
-				if cfg.ProjectID != tt.value {
-					t.Errorf("Expected ProjectID %s, got %s", tt.value, cfg.ProjectID)
 				}
 			case "service_id":
 				if cfg.ServiceID != tt.value {
@@ -486,7 +470,7 @@ func TestConfigSet_ConfigDirFlag(t *testing.T) {
 	})
 
 	// Execute config set with --config-dir flag
-	if _, err := executeConfigCommand("--config-dir", tmpDir, "config", "set", "project_id", "flag-set-project"); err != nil {
+	if _, err := executeConfigCommand("--config-dir", tmpDir, "config", "set", "service_id", "flag-set-service"); err != nil {
 		t.Fatalf("Config set command failed: %v", err)
 	}
 
@@ -502,8 +486,8 @@ func TestConfigSet_ConfigDirFlag(t *testing.T) {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
 
-	if !strings.Contains(string(content), "project_id: flag-set-project") {
-		t.Errorf("Config file should contain 'project_id: flag-set-project', got: %s", string(content))
+	if !strings.Contains(string(content), "service_id: flag-set-service") {
+		t.Errorf("Config file should contain 'service_id: flag-set-service', got: %s", string(content))
 	}
 }
 
@@ -516,7 +500,6 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	cfg.Set("project_id", "test-project")
 	cfg.Set("service_id", "test-service")
 	cfg.Set("output", "json")
 	cfg.Set("password_storage", "pgpass")
@@ -525,7 +508,6 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 		key            string
 		expectedOutput string
 	}{
-		{"project_id", "Unset project_id"},
 		{"service_id", "Unset service_id"},
 		{"output", "Unset output"},
 		{"password_storage", "Unset password_storage"},
@@ -550,10 +532,6 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 
 			// Check the value was unset correctly
 			switch tt.key {
-			case "project_id":
-				if cfg.ProjectID != "" {
-					t.Errorf("Expected empty ProjectID, got %s", cfg.ProjectID)
-				}
 			case "service_id":
 				if cfg.ServiceID != "" {
 					t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
@@ -611,7 +589,6 @@ func TestConfigReset(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	cfg.Set("project_id", "custom-project")
 	cfg.Set("service_id", "custom-service")
 	cfg.Set("output", "json")
 	cfg.Set("analytics", "false")
@@ -631,12 +608,7 @@ func TestConfigReset(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// ProjectID should be preserved
-	if cfg.ProjectID != "custom-project" {
-		t.Errorf("Expected ProjectID %s, got %s", "custom-project", cfg.ProjectID)
-	}
-
-	// Verify all other values were reset to defaults
+	// Verify all values were reset to defaults
 	if cfg.APIURL != config.DefaultAPIURL {
 		t.Errorf("Expected default APIURL %s, got %s", config.DefaultAPIURL, cfg.APIURL)
 	}
@@ -657,9 +629,9 @@ func TestConfigCommands_Integration(t *testing.T) {
 	// Test full workflow: set -> show -> unset -> reset
 
 	// 1. Set some values
-	_, err := executeConfigCommand("config", "set", "project_id", "integration-test")
+	_, err := executeConfigCommand("config", "set", "service_id", "integration-test")
 	if err != nil {
-		t.Fatalf("Failed to set project_id: %v", err)
+		t.Fatalf("Failed to set service_id: %v", err)
 	}
 
 	_, err = executeConfigCommand("config", "set", "output", "json")
@@ -679,17 +651,17 @@ func TestConfigCommands_Integration(t *testing.T) {
 		t.Fatalf("Expected JSON output, got: %s", showOutput)
 	}
 
-	if result["project_id"] != "integration-test" {
-		t.Errorf("Expected project_id 'integration-test', got %v", result["project_id"])
+	if result["service_id"] != "integration-test" {
+		t.Errorf("Expected service_id 'integration-test', got %v", result["service_id"])
 	}
 
-	// 3. Unset project_id
-	_, err = executeConfigCommand("config", "unset", "project_id")
+	// 3. Unset service_id
+	_, err = executeConfigCommand("config", "unset", "service_id")
 	if err != nil {
-		t.Fatalf("Failed to unset project_id: %v", err)
+		t.Fatalf("Failed to unset service_id: %v", err)
 	}
 
-	// 4. Verify project_id was unset
+	// 4. Verify service_id was unset
 	showOutput, err = executeConfigCommand("config", "show")
 	if err != nil {
 		t.Fatalf("Failed to show config after unset: %v", err)
@@ -697,8 +669,8 @@ func TestConfigCommands_Integration(t *testing.T) {
 
 	result = make(map[string]any)
 	json.Unmarshal([]byte(showOutput), &result)
-	if result["project_id"] != "" {
-		t.Errorf("Expected empty project_id after unset, got %v", result["project_id"])
+	if result["service_id"] != "" {
+		t.Errorf("Expected empty service_id after unset, got %v", result["service_id"])
 	}
 
 	// 5. Reset all config

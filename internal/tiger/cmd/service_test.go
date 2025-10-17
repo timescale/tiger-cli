@@ -66,21 +66,20 @@ func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
 func TestServiceList_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and API URL
+	// Set up config with API URL
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service list command
 	_, err, _ = executeServiceCommand("service", "list")
@@ -188,10 +187,9 @@ func TestOutputServices_Table(t *testing.T) {
 func TestServiceFork_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "source-service-123",
 	})
 	if err != nil {
@@ -199,11 +197,11 @@ func TestServiceFork_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with required timing flag
 	_, err, _ = executeServiceCommand("service", "fork", "--now")
@@ -219,21 +217,20 @@ func TestServiceFork_NoAuth(t *testing.T) {
 func TestServiceFork_NoSourceService(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID but no service ID
+	// Set up config without service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication success
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command without providing service ID but with timing flag
 	_, err, _ = executeServiceCommand("service", "fork", "--now")
@@ -249,10 +246,9 @@ func TestServiceFork_NoSourceService(t *testing.T) {
 func TestServiceFork_NoTimingFlag(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "source-service-123",
 	})
 	if err != nil {
@@ -260,11 +256,11 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command without any timing flag
 	_, err, _ = executeServiceCommand("service", "fork", "source-service-123")
@@ -280,10 +276,9 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 func TestServiceFork_MultipleTiming(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "source-service-123",
 	})
 	if err != nil {
@@ -291,11 +286,11 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with multiple timing flags
 	_, err, _ = executeServiceCommand("service", "fork", "source-service-123", "--now", "--last-snapshot")
@@ -311,10 +306,9 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "source-service-123",
 	})
 	if err != nil {
@@ -322,11 +316,11 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with invalid timestamp
 	_, err, _ = executeServiceCommand("service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
@@ -342,10 +336,9 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "source-service-123",
 	})
 	if err != nil {
@@ -353,11 +346,11 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Test with invalid CPU/memory combination (this would fail at API call stage)
 	// Since we don't want to make real API calls, we expect the command to fail during validation
@@ -387,21 +380,20 @@ func TestFormatTimePtr(t *testing.T) {
 func TestServiceCreate_ValidationErrors(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and a mock API URL to prevent network calls
+	// Set up config with a mock API URL to prevent network calls
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
-		"project_id": "test-project-123",
+		"api_url": "http://localhost:9999", // Use a local URL that will fail fast
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Test with no name (should auto-generate) - this should now work without error
 	// Just test that it doesn't fail due to missing name
@@ -424,21 +416,20 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 func TestServiceCreate_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and API URL
+	// Set up config with API URL
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service create command with valid parameters (name will be auto-generated)
 	_, err, _ = executeServiceCommand("service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
@@ -490,21 +481,20 @@ func createTestServices() []api.Service {
 func TestAutoGeneratedServiceName(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and a mock API URL to prevent network calls
+	// Set up config with a mock API URL to prevent network calls
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
-		"project_id": "test-project-123",
+		"api_url": "http://localhost:9999", // Use a local URL that will fail fast
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Test that service name is auto-generated when not provided
 	// We expect this to fail at the API call stage, not at validation
@@ -562,11 +552,11 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service get command without service ID
 	_, err, _ = executeServiceCommand("service", "get")
@@ -582,10 +572,9 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 func TestServiceGet_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -593,11 +582,11 @@ func TestServiceGet_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service get command
 	_, err, _ = executeServiceCommand("service", "get")
@@ -981,11 +970,11 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command without service ID
 	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
@@ -1001,10 +990,9 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -1012,11 +1000,11 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command without password
 	_, err, _ = executeServiceCommand("service", "update-password")
@@ -1032,10 +1020,9 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -1043,11 +1030,11 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command
 	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
@@ -1063,10 +1050,9 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID
+	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "http://localhost:9999", // Use a local URL that will fail fast
-		"project_id": "test-project-123",
 		"service_id": "test-service-456",
 	})
 	if err != nil {
@@ -1074,11 +1060,11 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Set environment variable BEFORE creating command (like root test does)
 	originalEnv := os.Getenv("TIGER_NEW_PASSWORD")
@@ -1113,21 +1099,20 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID to get past initial validation
+	// Set up config to get past initial validation
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Use local URL that will fail fast
-		"project_id": "test-project-123",
+		"api_url": "http://localhost:9999", // Use local URL that will fail fast
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	testCases := []struct {
 		name          string
@@ -1215,19 +1200,18 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Non-existent server to force timeout
-		"project_id": "test-project-123",
+		"api_url": "http://localhost:9999", // Non-existent server to force timeout
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Create API client
 	client, err := api.NewTigerClient("test-api-key")
@@ -1316,10 +1300,9 @@ func TestServiceCommandAliases(t *testing.T) {
 func TestServiceDelete_NoServiceID(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID
+	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
@@ -1339,21 +1322,20 @@ func TestServiceDelete_NoServiceID(t *testing.T) {
 func TestServiceDelete_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID
+	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service delete command
 	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
@@ -1366,53 +1348,23 @@ func TestServiceDelete_NoAuth(t *testing.T) {
 	}
 }
 
-func TestServiceDelete_NoProjectID(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config without project ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url": "https://api.tigerdata.com/public/v1",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
-	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
-
-	// Execute service delete command
-	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
-	if err == nil {
-		t.Fatal("Expected error when no project ID is configured")
-	}
-
-	if !strings.Contains(err.Error(), "project ID is required") {
-		t.Errorf("Expected project ID error, got: %v", err)
-	}
-}
-
 func TestServiceDelete_WithConfirmFlag(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config with project ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999", // Non-existent server for testing
-		"project_id": "test-project-123",
+		"api_url": "http://localhost:9999", // Non-existent server for testing
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service delete command with --confirm flag
 	// This should fail due to network error (which is expected in tests)
@@ -1433,21 +1385,20 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 
 	tmpDir := setupServiceTest(t)
 
-	// Set up config with project ID
+	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
@@ -1507,11 +1458,11 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1650,9 +1601,8 @@ func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
 
 	// Set up config with default output format (table)
 	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"output":     "table", // Explicitly set default
+		"api_url": "http://localhost:9999",
+		"output":  "table", // Explicitly set default
 	})
 	if err != nil {
 		t.Fatalf("Failed to setup test config: %v", err)
@@ -1666,11 +1616,11 @@ func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service create with -o json flag
 	// This will fail due to network error (localhost:9999 doesn't exist), but that's OK
@@ -1689,7 +1639,6 @@ func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
 	// Set up config with output format explicitly set to "table"
 	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":                "http://localhost:9999",
-		"project_id":             "test-project-123",
 		"output":                 "table",
 		"version_check_interval": 0,
 	})
@@ -1699,11 +1648,11 @@ func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
 	configFile := cfg.GetConfigFile()
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForService
-	getAPIKeyForService = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForService = originalGetAPIKey }()
+	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Store original config file content
 	originalConfigBytes, err := os.ReadFile(configFile)

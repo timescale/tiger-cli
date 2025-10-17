@@ -16,7 +16,6 @@ import (
 func buildRootCmd() *cobra.Command {
 	var configDir string
 	var debug bool
-	var projectID string
 	var serviceID string
 	var analytics bool
 	var passwordStorage string
@@ -87,7 +86,6 @@ tiger auth login
 	// Add persistent flags
 	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
 	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
 	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
@@ -95,7 +93,6 @@ tiger auth login
 
 	// Bind flags to viper
 	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("project_id", cmd.PersistentFlags().Lookup("project-id"))
 	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
 	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
 	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))

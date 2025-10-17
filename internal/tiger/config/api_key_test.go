@@ -6,14 +6,11 @@ import (
 	"testing"
 )
 
-func setupAPIKeyTest(t *testing.T) string {
+func setupCredentialTest(t *testing.T) string {
 	t.Helper()
 
 	// Use a unique service name for this test to avoid conflicts
 	SetTestServiceName(t)
-
-	// Clean up any existing keyring entries before test
-	RemoveAPIKeyFromKeyring()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-api-key-test-*")
@@ -23,13 +20,17 @@ func setupAPIKeyTest(t *testing.T) string {
 
 	// Reset viper completely and set up with test directory
 	// This ensures proper test isolation by resetting all viper state
+	// MUST be done before RemoveCredentials() so it uses the test directory!
 	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
+	// Clean up any existing credentials in the test directory
+	RemoveCredentials()
+
 	t.Cleanup(func() {
-		// Clean up keyring entries
-		RemoveAPIKeyFromKeyring()
+		// Clean up credentials
+		RemoveCredentials()
 
 		// Reset global config to ensure test isolation
 		ResetGlobalConfig()
@@ -41,18 +42,19 @@ func setupAPIKeyTest(t *testing.T) string {
 	return tmpDir
 }
 
-func TestStoreAPIKeyToFile(t *testing.T) {
-	tmpDir := setupAPIKeyTest(t)
+func TestStoreCredentialsToFile(t *testing.T) {
+	tmpDir := setupCredentialTest(t)
 
-	if err := StoreAPIKeyToFile("file-test-key"); err != nil {
-		t.Fatalf("Failed to store API key to file: %v", err)
+	// Store credentials in new JSON format
+	if err := StoreCredentialsToFile("public:secret", "project123"); err != nil {
+		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
-	// Verify file exists and has correct permissions
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	info, err := os.Stat(apiKeyFile)
+	// Verify file exists and has correct permissions (now stored as "credentials")
+	credentialsFile := filepath.Join(tmpDir, "credentials")
+	info, err := os.Stat(credentialsFile)
 	if err != nil {
-		t.Fatalf("API key file should exist: %v", err)
+		t.Fatalf("Credentials file should exist: %v", err)
 	}
 
 	// Check file permissions (should be 0600)
@@ -60,45 +62,51 @@ func TestStoreAPIKeyToFile(t *testing.T) {
 		t.Errorf("Expected file permissions 0600, got %o", info.Mode().Perm())
 	}
 
-	// Verify file content
-	data, err := os.ReadFile(apiKeyFile)
+	// Verify file content is valid JSON
+	data, err := os.ReadFile(credentialsFile)
 	if err != nil {
-		t.Fatalf("Failed to read API key file: %v", err)
+		t.Fatalf("Failed to read credentials file: %v", err)
 	}
 
-	if string(data) != "file-test-key" {
-		t.Errorf("Expected 'file-test-key', got '%s'", string(data))
+	expectedJSON := `{"api_key":"public:secret","project_id":"project123"}`
+	if string(data) != expectedJSON {
+		t.Errorf("Expected '%s', got '%s'", expectedJSON, string(data))
 	}
 }
 
-func TestGetAPIKeyFromFile(t *testing.T) {
-	tmpDir := setupAPIKeyTest(t)
+func TestGetCredentialsFromFile(t *testing.T) {
+	tmpDir := setupCredentialTest(t)
 
-	// Write API key to file
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	if err := os.WriteFile(apiKeyFile, []byte("file-get-test-key"), 0600); err != nil {
-		t.Fatalf("Failed to write test API key file: %v", err)
+	// Write credentials to file in JSON format
+	credentialsFile := filepath.Join(tmpDir, "credentials")
+	jsonData := `{"api_key":"public:secret","project_id":"project456"}`
+	if err := os.WriteFile(credentialsFile, []byte(jsonData), 0600); err != nil {
+		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 
-	// Get API key - should get from file since keyring is empty
+	// Get credentials - should get from file since keyring is empty
 	// (each test uses a unique keyring service name)
-	apiKey, err := GetAPIKey()
+	apiKey, projectID, err := GetCredentials()
 	if err != nil {
-		t.Fatalf("Failed to get API key from file: %v", err)
+		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
 
-	if apiKey != "file-get-test-key" {
-		t.Errorf("Expected 'file-get-test-key', got '%s'", apiKey)
+	// Should return combined API key (publicKey:secretKey) and project ID
+	if apiKey != "public:secret" {
+		t.Errorf("Expected API key 'public:secret', got '%s'", apiKey)
+	}
+	if projectID != "project456" {
+		t.Errorf("Expected project ID 'project456', got '%s'", projectID)
 	}
 }
 
-func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
-	setupAPIKeyTest(t)
+func TestGetCredentialsFromFile_NotExists(t *testing.T) {
+	setupCredentialTest(t)
 
-	// Try to get API key when file doesn't exist
-	_, err := GetAPIKey()
+	// Try to get credentials when file doesn't exist
+	_, _, err := GetCredentials()
 	if err == nil {
-		t.Fatal("Expected error when API key file doesn't exist")
+		t.Fatal("Expected error when credentials file doesn't exist")
 	}
 
 	if err.Error() != "not logged in" {
@@ -106,31 +114,31 @@ func TestGetAPIKeyFromFile_NotExists(t *testing.T) {
 	}
 }
 
-func TestRemoveAPIKeyFromFile(t *testing.T) {
-	tmpDir := setupAPIKeyTest(t)
+func TestRemoveCredentialsFromFile(t *testing.T) {
+	tmpDir := setupCredentialTest(t)
 
-	// Write API key to file
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	if err := os.WriteFile(apiKeyFile, []byte("remove-test-key"), 0600); err != nil {
-		t.Fatalf("Failed to write test API key file: %v", err)
+	// Write credentials to file
+	credentialsFile := filepath.Join(tmpDir, "credentials")
+	if err := os.WriteFile(credentialsFile, []byte(`{"api_key":"test:key","project_id":"test-proj"}`), 0600); err != nil {
+		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 
-	// Remove API key file
-	if err := RemoveAPIKeyFromFile(); err != nil {
-		t.Fatalf("Failed to remove API key file: %v", err)
+	// Remove credentials file
+	if err := RemoveCredentials(); err != nil {
+		t.Fatalf("Failed to remove credentials file: %v", err)
 	}
 
 	// Verify file is removed
-	if _, err := os.Stat(apiKeyFile); !os.IsNotExist(err) {
-		t.Fatal("API key file should be removed")
+	if _, err := os.Stat(credentialsFile); !os.IsNotExist(err) {
+		t.Fatal("Credentials file should be removed")
 	}
 }
 
-func TestRemoveAPIKeyFromFile_NotExists(t *testing.T) {
-	setupAPIKeyTest(t)
+func TestRemoveCredentialsFromFile_NotExists(t *testing.T) {
+	setupCredentialTest(t)
 
-	// Try to remove API key file when it doesn't exist (should not error)
-	if err := RemoveAPIKeyFromFile(); err != nil {
+	// Try to remove credentials file when it doesn't exist (should not error)
+	if err := RemoveCredentials(); err != nil {
 		t.Fatalf("Should not error when removing non-existent file: %v", err)
 	}
 }
