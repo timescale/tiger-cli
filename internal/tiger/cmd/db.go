@@ -63,11 +63,18 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
-				WarnWriter:   cmd.ErrOrStderr(),
+				WithPassword: dbConnectionStringWithPassword,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			if dbConnectionStringWithPassword && details.Password == "" {
+				return fmt.Errorf("password not available to include in connection string")
+			}
+
+			if dbConnectionStringPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -111,7 +118,7 @@ Examples:
   tiger db connect svc-12345
   tiger db psql svc-12345
 
-  # Connect using connection pooler (if available)
+  # Connect using connection pooler
   tiger db connect svc-12345 --pooled
   tiger db psql svc-12345 --pooled
 
@@ -138,13 +145,15 @@ Examples:
 			}
 
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-				Pooled:       dbConnectPooled,
-				Role:         dbConnectRole,
-				PasswordMode: password.PasswordExclude,
-				WarnWriter:   cmd.ErrOrStderr(),
+				Pooled: dbConnectPooled,
+				Role:   dbConnectRole,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			if dbConnectPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
 			}
 
 			// Launch psql with additional flags
@@ -204,11 +213,14 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				PasswordMode: password.PasswordOptional,
-				WarnWriter:   cmd.ErrOrStderr(),
+				WithPassword: true,
 			})
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
+			}
+
+			if dbTestConnectionPooled && !details.IsPooler {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
@@ -310,7 +322,7 @@ type ArgsLenAtDashProvider interface {
 
 // separateServiceAndPsqlArgs separates service arguments from psql flags using Cobra's ArgsLenAtDash
 func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]string, []string) {
-	serviceArgs := []string{}
+	var serviceArgs []string
 	psqlFlags := []string{}
 
 	argsLenAtDash := cmd.ArgsLenAtDash()

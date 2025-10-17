@@ -379,11 +379,12 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
 	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Pooled:       false,
 		Role:         "tsdbadmin",
-		PasswordMode: password.GetPasswordMode(input.WithPassword),
+		WithPassword: input.WithPassword,
 	}); err != nil {
 		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else if input.WithPassword && details.Password == "" {
+		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
 	} else {
 		output.Service.Password = details.Password
 		output.Service.ConnectionString = details.String()
@@ -482,13 +483,16 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
 	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
-		Pooled:          false,
 		Role:            "tsdbadmin",
-		PasswordMode:    password.GetPasswordMode(input.WithPassword),
+		WithPassword:    input.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 	}); err != nil {
 		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
 	} else {
+		if input.WithPassword && details.Password == "" {
+			// This should not happen since we have InitialPassword, but check just in case
+			logging.Error("MCP: Requested password but password not available")
+		}
 		output.Service.ConnectionString = details.String()
 	}
 

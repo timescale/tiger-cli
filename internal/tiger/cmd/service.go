@@ -133,7 +133,7 @@ Examples:
 			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword)
+			return outputService(cmd, service, cfg.Output, withPassword, true)
 		},
 	}
 
@@ -145,7 +145,6 @@ Examples:
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
-	var withPassword bool
 	var output string
 
 	cmd := &cobra.Command{
@@ -213,11 +212,10 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output, withPassword)
+			return outputServices(cmd, services, cfg.Output)
 		},
 	}
 
-	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
@@ -416,7 +414,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					}
 				}
 
-				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
+				if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
@@ -570,9 +568,12 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
+func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	if strict && withPassword && outputSvc.Password == "" {
+		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceId))
+	}
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -588,8 +589,8 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
-	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -735,11 +736,9 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
-		Pooled:          false,
 		Role:            "tsdbadmin",
-		PasswordMode:    password.GetPasswordMode(withPassword),
+		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
-		WarnWriter:      output,
 	}
 
 	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
@@ -761,10 +760,10 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, withPassword bool, output io.Writer) []OutputService {
+func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, withPassword, output)
+		prepared[i] = prepareServiceForOutput(service, false, output)
 	}
 	return prepared
 }
@@ -1248,7 +1247,7 @@ Examples:
 				}
 			}
 
-			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
