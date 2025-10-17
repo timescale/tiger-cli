@@ -820,6 +820,12 @@ components:
       - TIMESCALEDB
       - POSTGRES
       - VECTOR
+    EnvironmentTag:
+        type: string
+        enum:
+        - DEV
+        - PROD
+        description: The environment tag for the service.
     ForkStrategy:
       type: string
       enum:
@@ -925,6 +931,10 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
           example: "4"
+        environmentTag:
+          $ref: '#/components/schemas/EnvironmentTag'
+          description: The environment tag for the service, 'DEV' by default.
+          default: DEV
     ForkServiceCreate:
       type: object
       required:
@@ -950,6 +960,10 @@ components:
           format: date-time
           description: Target time for point-in-time recovery. Required when fork_strategy is PITR.
           example: "2024-01-01T00:00:00Z"
+        environmentTag:
+          $ref: '#/components/schemas/EnvironmentTag'
+          description: The environment tag for the forked service, 'DEV' by default.
+          default: DEV
       description: |
         Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
         HA replica count is always set to 0 for forked services.

@@ -22,6 +22,12 @@ const (
 	UPGRADING   DeployStatus = "UPGRADING"
 )
 
+// Defines values for EnvironmentTag.
+const (
+	EnvironmentTagDEV  EnvironmentTag = "DEV"
+	EnvironmentTagPROD EnvironmentTag = "PROD"
+)
+
 // Defines values for ForkStrategy.
 const (
 	LASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
@@ -53,8 +59,8 @@ const (
 
 // Defines values for SetEnvironmentInputEnvironment.
 const (
-	DEV  SetEnvironmentInputEnvironment = "DEV"
-	PROD SetEnvironmentInputEnvironment = "PROD"
+	SetEnvironmentInputEnvironmentDEV  SetEnvironmentInputEnvironment = "DEV"
+	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
 
 // ConnectionPooler defines model for ConnectionPooler.
@@ -71,6 +77,9 @@ type Endpoint struct {
 	Port *int    `json:"port,omitempty"`
 }
 
+// EnvironmentTag The environment tag for the service.
+type EnvironmentTag string
+
 // Error defines model for Error.
 type Error struct {
 	Code    *string `json:"code,omitempty"`
@@ -82,6 +91,9 @@ type Error struct {
 type ForkServiceCreate struct {
 	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
 	CpuMillis *string `json:"cpu_millis,omitempty"`
+
+	// EnvironmentTag The environment tag for the service.
+	EnvironmentTag *EnvironmentTag `json:"environmentTag,omitempty"`
 
 	// ForkStrategy Strategy for creating the fork:
 	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
@@ -259,6 +271,9 @@ type ServiceCreate struct {
 
 	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
 	CpuMillis *string `json:"cpu_millis,omitempty"`
+
+	// EnvironmentTag The environment tag for the service.
+	EnvironmentTag *EnvironmentTag `json:"environmentTag,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
 	MemoryGbs *string `json:"memory_gbs,omitempty"`
