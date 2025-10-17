@@ -735,7 +735,6 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
-		Pooled:          false,
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),

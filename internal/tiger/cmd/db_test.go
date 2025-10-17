@@ -138,10 +138,9 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 
 	// Request pooled connection when pooler is not available
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Pooled:       true,
-		Role:         "tsdbadmin",
-		WithPassword: false,
-		WarnWriter:   errBuf,
+		Pooled:     true,
+		Role:       "tsdbadmin",
+		WarnWriter: errBuf,
 	})
 
 	if err != nil {
@@ -809,10 +808,9 @@ func TestBuildConnectionString(t *testing.T) {
 			cmd.SetErr(errBuf)
 
 			result, err := password.GetConnectionDetails(tc.service, password.ConnectionDetailsOptions{
-				Pooled:       tc.pooled,
-				Role:         tc.role,
-				WithPassword: false,
-				WarnWriter:   cmd.ErrOrStderr(),
+				Pooled:     tc.pooled,
+				Role:       tc.role,
+				WarnWriter: cmd.ErrOrStderr(),
 			})
 
 			if tc.expectError {
@@ -987,10 +985,8 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	// Test connection string without password (default behavior)
 	cmd := &cobra.Command{}
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Pooled:       false,
-		Role:         "tsdbadmin",
-		WithPassword: false,
-		WarnWriter:   cmd.ErrOrStderr(),
+		Role:       "tsdbadmin",
+		WarnWriter: cmd.ErrOrStderr(),
 	})
 	if err != nil {
 		t.Fatalf("GetConnectionDetails failed: %v", err)
@@ -1009,7 +1005,6 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Test connection string with password (simulating --with-password flag)
 	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Pooled:       false,
 		Role:         "tsdbadmin",
 		WithPassword: true,
 		WarnWriter:   cmd.ErrOrStderr(),

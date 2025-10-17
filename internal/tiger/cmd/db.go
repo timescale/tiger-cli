@@ -142,10 +142,9 @@ Examples:
 			}
 
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-				Pooled:       dbConnectPooled,
-				Role:         dbConnectRole,
-				WithPassword: false,
-				WarnWriter:   cmd.ErrOrStderr(),
+				Pooled:     dbConnectPooled,
+				Role:       dbConnectRole,
+				WarnWriter: cmd.ErrOrStderr(),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)

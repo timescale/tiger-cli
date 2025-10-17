@@ -379,7 +379,6 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
 	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Pooled:       false,
 		Role:         "tsdbadmin",
 		WithPassword: input.WithPassword,
 	}); err != nil {
@@ -482,7 +481,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
 	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
-		Pooled:          false,
 		Role:            "tsdbadmin",
 		WithPassword:    input.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
