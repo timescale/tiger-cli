@@ -240,7 +240,7 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 	}
 
 	// need to set color.NoColor correctly for the `output` (stderr)
-	if !cfg.NoColor && util.IsTerminal(*output) {
+	if cfg.Color && util.IsTerminal(*output) {
 		original := color.NoColor
 		defer func() { color.NoColor = original }()
 		color.NoColor = false
