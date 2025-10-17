@@ -11,6 +11,7 @@ const (
 	ExitAuthenticationError = 4 // Authentication error
 	ExitPermissionDenied    = 5 // Permission denied
 	ExitServiceNotFound     = 6 // Service not found
+	ExitUpdateAvailable     = 7 // Update available
 )
 
 // exitCodeError creates an error that will cause the program to exit with the specified code
