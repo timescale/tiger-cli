@@ -87,15 +87,6 @@ func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
 	return apiClient, projectID, nil
 }
 
-// loadConfig loads fresh config
-func (s *Server) loadConfig() (*config.Config, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-	return cfg, nil
-}
-
 // Close gracefully shuts down the MCP server and all proxy connections
 func (s *Server) Close() error {
 	logging.Debug("Closing MCP server and proxy connections")
