@@ -133,7 +133,7 @@ Examples:
 			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword)
+			return outputService(cmd, service, cfg.Output, withPassword, true)
 		},
 	}
 
@@ -414,7 +414,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					}
 				}
 
-				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
+				if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
@@ -568,9 +568,12 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
+func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	if strict && withPassword && outputSvc.Password == "" {
+		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceId))
+	}
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -736,7 +739,6 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
-		WarnWriter:      output,
 	}
 
 	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
@@ -1245,7 +1247,7 @@ Examples:
 				}
 			}
 
-			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 

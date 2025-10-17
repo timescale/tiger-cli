@@ -64,7 +64,6 @@ Examples:
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
-				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
@@ -72,6 +71,10 @@ Examples:
 
 			if dbConnectionStringWithPassword && details.Password == "" {
 				return fmt.Errorf("password not available to include in connection string")
+			}
+
+			if dbConnectionStringPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -115,7 +118,7 @@ Examples:
   tiger db connect svc-12345
   tiger db psql svc-12345
 
-  # Connect using connection pooler (if available)
+  # Connect using connection pooler
   tiger db connect svc-12345 --pooled
   tiger db psql svc-12345 --pooled
 
@@ -142,12 +145,15 @@ Examples:
 			}
 
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-				Pooled:     dbConnectPooled,
-				Role:       dbConnectRole,
-				WarnWriter: cmd.ErrOrStderr(),
+				Pooled: dbConnectPooled,
+				Role:   dbConnectRole,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			if dbConnectPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
 			}
 
 			// Launch psql with additional flags
@@ -208,10 +214,13 @@ Examples:
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
-				WarnWriter:   cmd.ErrOrStderr(),
 			})
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
+			}
+
+			if dbTestConnectionPooled && !details.IsPooler {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)

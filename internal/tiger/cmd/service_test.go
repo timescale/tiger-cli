@@ -636,7 +636,7 @@ func TestOutputService_JSON(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test JSON output
-	err := outputService(cmd, service, "json", false)
+	err := outputService(cmd, service, "json", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -705,7 +705,7 @@ func TestOutputService_YAML(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test YAML output
-	err := outputService(cmd, service, "yaml", false)
+	err := outputService(cmd, service, "yaml", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -805,7 +805,7 @@ func TestOutputService_Table(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table", false)
+	err := outputService(cmd, service, "table", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1604,7 +1604,7 @@ func TestOutputService_FreeTier(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table", false)
+	err := outputService(cmd, service, "table", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

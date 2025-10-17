@@ -1,7 +1,6 @@
 package password
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -20,7 +19,6 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 		opts           ConnectionDetailsOptions
 		expectedString string
 		expectError    bool
-		expectWarning  bool
 	}{
 		{
 			name: "Basic connection string without password",
@@ -91,12 +89,10 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 				ConnectionPooler: nil, // No pooler available
 			},
 			opts: ConnectionDetailsOptions{
-				Pooled:     true,
-				Role:       "tsdbadmin",
-				WarnWriter: new(bytes.Buffer), // Enable warnings
+				Pooled: true,
+				Role:   "tsdbadmin",
 			},
 			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectWarning:  true, // Should warn about pooler not available
 		},
 		{
 			name: "Error when no endpoint available",
@@ -125,15 +121,6 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// If expecting a warning, create a buffer for WarnWriter
-			var warnBuf *bytes.Buffer
-			if tc.expectWarning && tc.opts.WarnWriter == nil {
-				warnBuf = new(bytes.Buffer)
-				tc.opts.WarnWriter = warnBuf
-			} else if !tc.expectWarning && tc.opts.WarnWriter != nil {
-				warnBuf = tc.opts.WarnWriter.(*bytes.Buffer)
-			}
-
 			result, err := GetConnectionDetails(tc.service, tc.opts)
 
 			if tc.expectError {
@@ -153,17 +140,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			}
 
 			// Check for warning message
-			if warnBuf != nil {
-				stderrOutput := warnBuf.String()
-				if tc.expectWarning {
-					if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
-						t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
-					}
-				} else {
-					if stderrOutput != "" {
-						t.Errorf("Expected no warning, but got: %q", stderrOutput)
-					}
-				}
+			if tc.opts.Pooled && tc.service.ConnectionPooler == nil && result.IsPooler {
+				t.Errorf("Expected IsPooler to be false when pooler is unavailable, but got true")
 			}
 		})
 	}
@@ -399,14 +377,10 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 		ConnectionPooler: nil, // No pooler available
 	}
 
-	// Create a buffer to capture warnings
-	warnBuf := new(bytes.Buffer)
-
 	// Request pooled connection when pooler is not available
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
-		Pooled:     true,
-		Role:       "tsdbadmin",
-		WarnWriter: warnBuf,
+		Pooled: true,
+		Role:   "tsdbadmin",
 	})
 	connectionString := details.String()
 
@@ -420,14 +394,7 @@ func TestBuildConnectionString_PoolerWarning(t *testing.T) {
 		t.Errorf("Expected connection string %q, got %q", expectedString, connectionString)
 	}
 
-	// Should have warning message
-	stderrOutput := warnBuf.String()
-	if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
-		t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
-	}
-
-	// Verify the warning mentions using direct connection
-	if !strings.Contains(stderrOutput, "using direct connection") {
-		t.Errorf("Expected warning to mention direct connection fallback, but got: %q", stderrOutput)
+	if details.IsPooler {
+		t.Errorf("Expected IsPooler to be false when pooler is unavailable, but got true")
 	}
 }

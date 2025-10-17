@@ -2,7 +2,6 @@ package password
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
@@ -22,10 +21,6 @@ type ConnectionDetailsOptions struct {
 	// If provided and WithPassword is true, this password will be used
 	// instead of fetching from password storage. This is useful when password_storage=none.
 	InitialPassword string
-
-	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
-	// If nil, warnings are suppressed
-	WarnWriter io.Writer
 }
 
 type ConnectionDetails struct {
@@ -34,6 +29,7 @@ type ConnectionDetails struct {
 	Host     string `json:"host,omitempty" yaml:"host,omitempty"`
 	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`
 	Database string `json:"database,omitempty" yaml:"database,omitempty"`
+	IsPooler bool   `json:"is_pooler,omitempty" yaml:"is_pooler,omitempty"`
 }
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
@@ -43,13 +39,12 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 
 	// Use pooler endpoint if requested and available, otherwise use direct endpoint
 	var endpoint *api.Endpoint
+	isPooler := false
 	if opts.Pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
 		endpoint = service.ConnectionPooler.Endpoint
+		isPooler = true
 	} else {
-		// If pooled was requested but no pooler is available, warn if writer is provided
-		if opts.Pooled && opts.WarnWriter != nil {
-			fmt.Fprintf(opts.WarnWriter, "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
-		}
+		// If pooled was requested but no pooler is available, fall back to direct connection
 		endpoint = service.Endpoint
 	}
 
@@ -62,6 +57,7 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		Host:     *endpoint.Host,
 		Port:     5432,   // Default PostgreSQL port
 		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
+		IsPooler: isPooler,
 	}
 	if endpoint.Port != nil {
 		details.Port = *endpoint.Port

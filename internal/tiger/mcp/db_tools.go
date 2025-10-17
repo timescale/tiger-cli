@@ -155,6 +155,9 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)
 	}
+	if input.Pooled && !details.IsPooler {
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("connection pooler not available for service %s", input.ServiceID)
+	}
 
 	// Create query context with timeout
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
