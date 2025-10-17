@@ -23,9 +23,6 @@ mv tiger /usr/local/bin/
 
 ### Environment Variables
 
-- `TIGER_PUBLIC_KEY`: TigerData public key for authentication
-- `TIGER_SECRET_KEY`: TigerData secret key for authentication
-- `TIGER_PROJECT_ID`: Default project ID to use
 - `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
 - `TIGER_SERVICE_ID`: Default service ID to use
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
@@ -38,7 +35,6 @@ Location: `~/.config/tiger/config.yaml`
 
 ```yaml
 api_url: https://api.tigerdata.com/public/v1
-project_id: your-default-project-id
 service_id: your-default-service-id
 output: table
 analytics: true
@@ -47,7 +43,6 @@ analytics: true
 ### Global Options
 
 - `--config-dir`: Path to configuration directory
-- `--project-id`: Specify project ID
 - `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
 - `--analytics`: Toggle analytics collection
 - `--password-storage`: Password storage method (keyring, pgpass, none) (default: keyring)
@@ -105,7 +100,7 @@ Manage authentication and credentials (token-based only).
 **Subcommands:**
 - `login`: Authenticate with API token
 - `logout`: Remove stored credentials
-- `status`: Show current user information
+- `status`: Show current authentication status and project ID
 
 **Examples:**
 ```bash
@@ -117,14 +112,14 @@ tiger auth login --project-id proj-123
 
 # Login with credentials from environment variables
 export TIGER_PUBLIC_KEY="your-public-key"
-export TIGER_SECRET_KEY="your-secret-key"  
+export TIGER_SECRET_KEY="your-secret-key"
 export TIGER_PROJECT_ID="proj-123"
 tiger auth login
 
 # Interactive login (will prompt for any missing credentials)
 tiger auth login
 
-# Show current user
+# Show current authentication status and project ID
 tiger auth status
 
 # Logout
@@ -132,30 +127,29 @@ tiger auth logout
 ```
 
 **Authentication Methods:**
-1. `--public-key` and `--secret-key` flags: Provide public and secret keys directly
-2. `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` environment variables
-3. `TIGER_PROJECT_ID` environment variable for project ID
-4. Interactive prompt for any missing credentials (requires TTY)
+1. `--public-key`, `--secret-key`, and `--project-id` flags: Provide public key, secret key, and project ID directly
+2. `TIGER_PUBLIC_KEY`, `TIGER_SECRET_KEY`, and `TIGER_PROJECT_ID` environment variables
+3. Interactive prompt for any missing credentials (requires TTY)
 
 **Login Process:**
 When using `tiger auth login`, the CLI will:
 1. Prompt for any missing credentials (public key, secret key, project ID) if not provided via flags or environment variables
-2. Combine the public and secret keys into format `<public key>:<secret key>` for internal storage
+2. Combine the public and secret keys into format `<public key>:<secret key>`
 3. Validate the combined API key by making a test API call
-4. Store the combined API key securely using system keyring or file fallback
-5. Store the project ID in `~/.config/tiger/config.yaml` as the default project
+4. Store credentials (API key + project ID) securely as JSON in system keyring or file fallback
 
 **Project ID Requirement:**
 Project ID is required during login. The CLI will:
 - Use `--project-id` flag if provided
-- Use `TIGER_PROJECT_ID` environment variable if flag not provided  
-- Prompt interactively for project ID if neither flag nor environment variable is set
-- Fail with an error in non-interactive environments (no TTY) if project ID is missing
+- Prompt interactively for project ID if flag not provided
+- Fail with an error in non-interactive environments (no TTY) if project ID is not provided via flag
 
-**API Key Storage:**
-The combined API key (`<public key>:<secret key>`) is stored securely using:
-1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)  
-2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/api-key` with restricted file permissions (600)
+**Credentials Storage:**
+Credentials are stored as a JSON object containing both the API key (`<public key>:<secret key>`) and project ID:
+1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/credentials` with restricted file permissions (600)
+
+Use `tiger auth status` to view your current authentication status and project ID.
 
 **Options:**
 - `--public-key`: Public key for authentication
@@ -624,9 +618,6 @@ Manage CLI configuration.
 ```bash
 # Show config
 tiger config show
-
-# Set default project
-tiger config set project_id proj-12345
 
 # Set default service
 tiger config set service_id svc-12345

@@ -569,8 +569,8 @@ Common error codes:
 
 - The MCP server is embedded within the Tiger CLI binary
 - Shares the same API client library and configuration system as the CLI
-- Uses the CLI's stored authentication (keyring or file-based)
-- Inherits the CLI's project and service defaults from configuration
+- Uses the CLI's stored authentication (keyring or file-based credentials)
+- Inherits the CLI's project ID from stored credentials and service ID from configuration
 - Implements proper graceful shutdown and signal handling
 - Uses structured logging compatible with the CLI logging system
 - All tools are idempotent where possible

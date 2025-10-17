@@ -179,7 +179,6 @@ Key configuration values:
 - `gateway_url`: Tiger Gateway URL
 - `docs_mcp`: Enable/disable proxied docs MCP tools
 - `docs_mcp_url`: URL for docs MCP server
-- `project_id`: Default project ID
 - `service_id`: Default service ID
 - `output`: Output format (json, yaml, table)
 - `analytics`: Usage analytics toggle
@@ -271,7 +270,6 @@ Global flags available on all commands:
 - `--config-dir`: Path to configuration directory
 - `--debug`: Enable debug logging
 - `--output/-o`: Set output format
-- `--project-id`: Override project ID
 - `--service-id`: Override service ID
 - `--analytics`: Toggle analytics
 - `--password-storage`: Password storage method
@@ -405,7 +403,6 @@ func buildRootCmd() *cobra.Command {
     // Declare ALL flag variables locally within this function
     var configDir string
     var debug bool
-    var projectID string
     var serviceID string
     var analytics bool
     var passwordStorage string
@@ -428,7 +425,6 @@ func buildRootCmd() *cobra.Command {
     cobra.OnInitialize(initConfigFunc)
     cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
     cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-    cmd.PersistentFlags().StringVar(&projectID, "project-id", "", "project ID")
     cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
     cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
     cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
