@@ -650,6 +650,7 @@ tiger config reset
 - `4`: Authentication error
 - `5`: Permission denied
 - `6`: Service not found
+- `7`: Update available (for explicit `version --check`)
 
 ## Output Formats
 
