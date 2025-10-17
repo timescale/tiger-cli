@@ -145,7 +145,6 @@ Examples:
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
-	var withPassword bool
 	var output string
 
 	cmd := &cobra.Command{
@@ -213,11 +212,10 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output, withPassword)
+			return outputServices(cmd, services, cfg.Output)
 		},
 	}
 
-	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
@@ -588,8 +586,8 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
-	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -760,10 +758,10 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, withPassword bool, output io.Writer) []OutputService {
+func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, withPassword, output)
+		prepared[i] = prepareServiceForOutput(service, false, output)
 	}
 	return prepared
 }
