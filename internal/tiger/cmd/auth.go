@@ -168,8 +168,8 @@ func buildLogoutCmd() *cobra.Command {
 func buildStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Show current auth information",
-		Long:  `Show information about the currently authenticated token.`,
+		Short: "Show current authentication status and project ID",
+		Long:  "Displays whether you are logged in and shows your currently configured project ID.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
