@@ -271,7 +271,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -301,7 +301,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -335,11 +335,11 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
 	storage := password.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
@@ -349,7 +349,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -391,7 +391,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -964,11 +964,11 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	// Store a test password
 	testPassword := "test-e2e-password-789"
 	storage := password.GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
@@ -1007,5 +1007,486 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	// Verify connection string with password contains the password
 	if !strings.Contains(connectionStringWithPassword, testPassword) {
 		t.Errorf("Connection string with password should contain '%s', but it doesn't: %s", testPassword, connectionStringWithPassword)
+	}
+}
+
+func TestDBSavePassword_ExplicitPassword(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-save-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-save-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "explicit-password-123"
+
+	// Execute save-password with explicit password
+	output, err := executeDBCommand("db", "save-password", "--password="+testPassword)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+	if !strings.Contains(output, serviceID) {
+		t.Errorf("Expected service ID in output, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-env-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-env-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Set environment variable
+	testPassword := "env-password-456"
+	os.Setenv("TIGER_NEW_PASSWORD", testPassword)
+	defer os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Execute save-password without --password flag (should use env var)
+	output, err := executeDBCommand("db", "save-password")
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with env var, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_InteractivePrompt(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-interactive-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-interactive-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Make sure TIGER_NEW_PASSWORD is not set
+	os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Prepare the password input
+	testPassword := "interactive-password-999"
+
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+
+	// Mock password reading to return our test password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return []byte(testPassword), nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+
+	// Execute save-password without --password flag or env var
+	output, err := executeDBCommand("db", "save-password")
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with interactive input, got error: %v", err)
+	}
+
+	// Verify the prompt was shown
+	if !strings.Contains(output, "Enter password:") {
+		t.Errorf("Expected password prompt, got: %s", output)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-empty-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-empty-test"
+	projectID := "test-project-123"
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Make sure TIGER_NEW_PASSWORD is not set
+	os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+
+	// Mock password reading to return empty password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return []byte(""), nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+
+	// Execute the command
+	_, err = executeDBCommand("db", "save-password")
+	if err == nil {
+		t.Fatal("Expected error when user provides empty password interactively")
+	}
+
+	// Verify the error message
+	if !strings.Contains(err.Error(), "password cannot be empty") {
+		t.Errorf("Expected 'password cannot be empty' error, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_CustomRole(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-role-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-role-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "readonly-password-789"
+	customRole := "readonly"
+
+	// Execute with custom role
+	output, err := executeDBCommand("db", "save-password", "--password="+testPassword, "--role", customRole)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with custom role, got error: %v", err)
+	}
+
+	// Verify success message shows the custom role
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+	if !strings.Contains(output, customRole) {
+		t.Errorf("Expected role %q in output, got: %s", customRole, output)
+	}
+
+	// Verify password was saved for the custom role
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, customRole)
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
+	}
+	defer storage.Remove(mockService, customRole)
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+
+	// Verify that tsdbadmin role doesn't have this password
+	_, err = storage.Get(mockService, "tsdbadmin")
+	if err == nil {
+		t.Error("Expected error when retrieving password for different role, but got none")
+	}
+}
+
+func TestDBSavePassword_NoServiceID(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config with project ID but no default service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// No need to mock since it should fail before reaching getServiceDetailsFunc
+
+	// Execute save-password without service ID
+	_, err = executeDBCommand("db", "save-password", "--password=test-password")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided or configured")
+	}
+
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_NoAuth(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config with project ID and service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication failure
+	originalGetAPIKey := getAPIKeyForDB
+	getAPIKeyForDB = func() (string, error) {
+		return "", fmt.Errorf("not logged in")
+	}
+	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+
+	// Execute save-password command
+	_, err = executeDBCommand("db", "save-password", "--password=test-password")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_PgpassStorage(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-pgpass-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service with endpoint (required for pgpass)
+	serviceID := "svc-pgpass-test"
+	projectID := "test-project-123"
+	host := "pgpass-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "pgpass-password-101"
+
+	// Execute with pgpass storage
+	output, err := executeDBCommand("db", "save-password", "--password="+testPassword)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with pgpass, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was saved in pgpass storage
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
 	}
 }

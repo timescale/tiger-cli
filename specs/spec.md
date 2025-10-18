@@ -396,13 +396,20 @@ tiger db test-connection svc-12345
 # Test with custom timeout
 tiger db test-connection svc-12345 --timeout 10s
 
-# Save password (storage location depends on --password-storage flag)
-tiger db save-password svc-12345 --password your-password
-tiger db save-password svc-12345 --password your-password --role readonly
+# Save password with explicit value (highest precedence)
+tiger db save-password svc-12345 --password=your-password
+tiger db save-password svc-12345 --password=your-password --role readonly
+
+# Using environment variable
+export TIGER_NEW_PASSWORD=your-password
+tiger db save-password svc-12345
+
+# Interactive password prompt (when neither flag nor env var provided)
+tiger db save-password svc-12345
 
 # Save to specific storage location
-tiger db save-password svc-12345 --password your-password --password-storage pgpass
-tiger db save-password svc-12345 --password your-password --password-storage keyring
+tiger db save-password svc-12345 --password=your-password --password-storage pgpass
+tiger db save-password svc-12345 --password=your-password --password-storage keyring
 
 # Remove password from configured storage
 tiger db remove-password svc-12345
@@ -422,13 +429,19 @@ The `connect` and `psql` commands automatically handle authentication using:
 2. `PGPASSWORD` environment variable
 3. Interactive password prompt (if neither above is available)
 
+**Password Input for save-password:**
+The `save-password` command accepts passwords through three methods (in order of precedence):
+1. `--password` flag with explicit value (highest precedence)
+2. `TIGER_NEW_PASSWORD` environment variable
+3. Interactive prompt (if neither provided and stdin is a TTY)
+
 **Advanced psql Usage:**
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
-- `--password`: Password to save (for save-password command)
+- `--password`: Password to save (for save-password command). Provide value with `--password=value`. If flag is not provided, uses TIGER_NEW_PASSWORD environment variable if set, otherwise prompts interactively.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
 ### High-Availability Management

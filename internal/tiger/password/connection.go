@@ -66,7 +66,7 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			details.Password = opts.InitialPassword
-		} else if password, err := GetPassword(service); err == nil {
+		} else if password, err := GetPassword(service, opts.Role); err == nil {
 			details.Password = password
 		}
 	}
@@ -87,9 +87,9 @@ func (d *ConnectionDetails) String() string {
 // GetPassword fetches the password for the specified service from the
 // configured password storage mechanism. It returns an error if it fails to
 // find the password.
-func GetPassword(service api.Service) (string, error) {
+func GetPassword(service api.Service, role string) (string, error) {
 	storage := GetPasswordStorage()
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, role)
 	if err != nil {
 		// Provide specific error messages based on storage type
 		switch storage.(type) {

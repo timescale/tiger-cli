@@ -172,12 +172,13 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-keyring-123"
+	role := "tsdbadmin"
 	storage := GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, role) // Clean up after test
 
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
@@ -223,12 +224,13 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 
 	// Store a test password in pgpass
 	testPassword := "test-password-pgpass-456"
+	role := "tsdbadmin"
 	storage := GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	err := storage.Save(service, testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, role) // Clean up after test
 
 	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
