@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -12,10 +11,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
@@ -24,6 +25,16 @@ var (
 
 	// getServiceDetailsFunc can be overridden for testing
 	getServiceDetailsFunc = getServiceDetails
+
+	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
+	checkStdinIsTTY = func() bool {
+		return util.IsTerminal(os.Stdin)
+	}
+
+	// readPasswordFromTerminal can be overridden for testing to inject password input
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return term.ReadPassword(fd)
+	}
 )
 
 func buildDbConnectionStringCmd() *cobra.Command {
@@ -301,17 +312,18 @@ Examples:
 				// Use environment variable
 				passwordToSave = envPassword
 			} else {
-				// Interactive prompt
-				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
-				scanner := bufio.NewScanner(cmd.InOrStdin())
-				if scanner.Scan() {
-					passwordToSave = scanner.Text()
-				} else {
-					if err := scanner.Err(); err != nil {
-						return fmt.Errorf("failed to read password: %w", err)
-					}
-					return fmt.Errorf("failed to read password: EOF")
+				// Interactive prompt - check if we're in a terminal
+				if !checkStdinIsTTY() {
+					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
+
+				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
+				bytePassword, err := readPasswordFromTerminal(int(os.Stdin.Fd()))
+				if err != nil {
+					return fmt.Errorf("failed to read password: %w", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout()) // Print newline after hidden input
+				passwordToSave = string(bytePassword)
 				if passwordToSave == "" {
 					return fmt.Errorf("password cannot be empty")
 				}
@@ -319,19 +331,18 @@ Examples:
 
 			// Save password using configured storage
 			storage := password.GetPasswordStorage()
-			err = storage.Save(service, passwordToSave, dbSavePasswordRole)
-			if err != nil {
+			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Password saved successfully for service %s (role: %s)\n",
+			fmt.Fprintf(cmd.ErrOrStderr(), "Password saved successfully for service %s (role: %s)\n",
 				*service.ServiceId, dbSavePasswordRole)
 			return nil
 		},
 	}
 
 	// Add flags for db save-password command
-	cmd.Flags().StringVar(&dbSavePasswordValue, "password", "", "Password to save")
+	cmd.Flags().StringVarP(&dbSavePasswordValue, "password", "p", "", "Password to save")
 	cmd.Flags().StringVar(&dbSavePasswordRole, "role", "tsdbadmin", "Database role/username")
 
 	return cmd

@@ -31,7 +31,6 @@ mv tiger /usr/local/bin/
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
 - `TIGER_OUTPUT`: Default output format (json, yaml, table)
 - `TIGER_ANALYTICS`: Enable/disable usage analytics (true/false)
-- `TIGER_NEW_PASSWORD`: Password to use for save-password command (used when --password flag not provided)
 
 ### Configuration File
 
@@ -429,6 +428,12 @@ The `connect` and `psql` commands automatically handle authentication using:
 1. Stored password from configured storage method (keyring, ~/.pgpass file, or none based on --password-storage setting)
 2. `PGPASSWORD` environment variable
 3. Interactive password prompt (if neither above is available)
+
+**Password Input for save-password:**
+The `save-password` command accepts passwords through three methods (in order of precedence):
+1. `--password` flag with explicit value (highest precedence)
+2. `TIGER_NEW_PASSWORD` environment variable
+3. Interactive prompt (if neither provided and stdin is a TTY)
 
 **Advanced psql Usage:**
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.

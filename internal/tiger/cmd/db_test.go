@@ -1193,23 +1193,26 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 
 	// Prepare the password input
 	testPassword := "interactive-password-999"
-	inputReader := strings.NewReader(testPassword + "\n")
 
-	// Build the command with custom stdin
-	testRoot := buildRootCmd()
-	buf := new(bytes.Buffer)
-	testRoot.SetOut(buf)
-	testRoot.SetErr(buf)
-	testRoot.SetIn(inputReader)                       // Use our reader as stdin
-	testRoot.SetArgs([]string{"db", "save-password"}) // No --password flag and no env var
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
 
-	// Execute the command
-	err = testRoot.Execute()
+	// Mock password reading to return our test password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return []byte(testPassword), nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+
+	// Execute save-password without --password flag or env var
+	output, err := executeDBCommand("db", "save-password")
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed with interactive input, got error: %v", err)
 	}
-
-	output := buf.String()
 
 	// Verify the prompt was shown
 	if !strings.Contains(output, "Enter password:") {
@@ -1264,19 +1267,22 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	// Make sure TIGER_NEW_PASSWORD is not set
 	os.Unsetenv("TIGER_NEW_PASSWORD")
 
-	// Prepare empty input (just a newline)
-	inputReader := strings.NewReader("\n")
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
 
-	// Build the command with custom stdin
-	testRoot := buildRootCmd()
-	buf := new(bytes.Buffer)
-	testRoot.SetOut(buf)
-	testRoot.SetErr(buf)
-	testRoot.SetIn(inputReader)                       // Use our reader as stdin
-	testRoot.SetArgs([]string{"db", "save-password"}) // No --password flag or env var
+	// Mock password reading to return empty password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return []byte(""), nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
 
 	// Execute the command
-	err = testRoot.Execute()
+	_, err = executeDBCommand("db", "save-password")
 	if err == nil {
 		t.Fatal("Expected error when user provides empty password interactively")
 	}
