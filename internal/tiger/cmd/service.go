@@ -320,7 +320,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("replica count must be non-negative (--replicas)")
 			}
 
-			// Validate environment tag
+			// Validate and normalize environment tag (case-insensitive)
+			createEnvironment = strings.ToUpper(createEnvironment)
 			if createEnvironment != "DEV" && createEnvironment != "PROD" {
 				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", createEnvironment)
 			}
@@ -1123,7 +1124,8 @@ Examples:
 				return fmt.Errorf("can only specify one of --now, --last-snapshot or --to-timestamp")
 			}
 
-			// Validate environment tag
+			// Validate and normalize environment tag (case-insensitive)
+			forkEnvironment = strings.ToUpper(forkEnvironment)
 			if forkEnvironment != "DEV" && forkEnvironment != "PROD" {
 				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", forkEnvironment)
 			}

@@ -93,7 +93,7 @@ type ForkServiceCreate struct {
 	CpuMillis *string `json:"cpu_millis,omitempty"`
 
 	// EnvironmentTag The environment tag for the service.
-	EnvironmentTag *EnvironmentTag `json:"environmentTag,omitempty"`
+	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
 
 	// ForkStrategy Strategy for creating the fork:
 	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
@@ -273,7 +273,7 @@ type ServiceCreate struct {
 	CpuMillis *string `json:"cpu_millis,omitempty"`
 
 	// EnvironmentTag The environment tag for the service.
-	EnvironmentTag *EnvironmentTag `json:"environmentTag,omitempty"`
+	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
 	MemoryGbs *string `json:"memory_gbs,omitempty"`

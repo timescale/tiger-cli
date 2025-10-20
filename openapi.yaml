@@ -931,7 +931,7 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
           example: "4"
-        environmentTag:
+        environment_tag:
           $ref: '#/components/schemas/EnvironmentTag'
           description: The environment tag for the service, 'DEV' by default.
           default: DEV
@@ -960,7 +960,7 @@ components:
           format: date-time
           description: Target time for point-in-time recovery. Required when fork_strategy is PITR.
           example: "2024-01-01T00:00:00Z"
-        environmentTag:
+        environment_tag:
           $ref: '#/components/schemas/EnvironmentTag'
           description: The environment tag for the forked service, 'DEV' by default.
           default: DEV
