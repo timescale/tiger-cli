@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	// getAPIKeyForDB can be overridden for testing
-	getAPIKeyForDB = config.GetAPIKey
+	// getCredentialsForDB can be overridden for testing
+	getCredentialsForDB = config.GetCredentials
 
 	// getServiceDetailsFunc can be overridden for testing
 	getServiceDetailsFunc = getServiceDetails
@@ -371,11 +371,6 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	projectID := cfg.ProjectID
-	if projectID == "" {
-		return api.Service{}, fmt.Errorf("project ID is required. Set it using login with --project-id")
-	}
-
 	// Determine service ID
 	var serviceID string
 	if len(args) > 0 {
@@ -390,10 +385,10 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 
 	cmd.SilenceUsage = true
 
-	// Get API key for authentication
-	apiKey, err := getAPIKeyForDB()
+	// Get API key and project ID for authentication
+	apiKey, projectID, err := getCredentialsForDB()
 	if err != nil {
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 	}
 
 	// Create API client

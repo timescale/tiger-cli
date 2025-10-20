@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -295,25 +296,19 @@ WARNING: Creates billable resources.`,
 
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
-	// Load config and validate project ID
-	cfg, err := s.loadConfigWithProjectID()
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}
 
-	// Create fresh API client with current credentials
-	apiClient, err := s.createAPIClient()
-	if err != nil {
-		return nil, ServiceListOutput{}, err
-	}
-
-	logging.Debug("MCP: Listing services", zap.String("project_id", cfg.ProjectID))
+	logging.Debug("MCP: Listing services", zap.String("project_id", projectID))
 
 	// Make API call to list services
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
+	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}
@@ -341,27 +336,21 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceGet handles the service_get MCP tool
 func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
-	// Load config and validate project ID
-	cfg, err := s.loadConfigWithProjectID()
-	if err != nil {
-		return nil, ServiceGetOutput{}, err
-	}
-
-	// Create fresh API client with current credentials
-	apiClient, err := s.createAPIClient()
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
 
 	logging.Debug("MCP: Getting service details",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -395,14 +384,14 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 // handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
-	// Load config and validate project ID
-	cfg, err := s.loadConfigWithProjectID()
+	// Load config
+	cfg, err := config.Load()
 	if err != nil {
-		return nil, ServiceCreateOutput{}, err
+		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Create fresh API client with current credentials
-	apiClient, err := s.createAPIClient()
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
@@ -422,7 +411,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	logging.Debug("MCP: Creating service",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("name", input.Name),
 		zap.Strings("addons", input.Addons),
 		zap.Stringp("region", input.Region),
@@ -445,7 +434,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID, serviceCreateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -510,7 +499,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	if input.Wait {
 		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
 
-		if status, err := s.waitForServiceReady(apiClient, cfg.ProjectID, serviceID, timeout, service.Status); err != nil {
+		if status, err := s.waitForServiceReady(apiClient, projectID, serviceID, timeout, service.Status); err != nil {
 			output.Message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
 			output.Service.Status = util.DerefStr(status)
@@ -523,20 +512,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 // handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
-	// Load config and validate project ID
-	cfg, err := s.loadConfigWithProjectID()
-	if err != nil {
-		return nil, ServiceUpdatePasswordOutput{}, err
-	}
-
-	// Create fresh API client with current credentials
-	apiClient, err := s.createAPIClient()
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	logging.Debug("MCP: Updating service password",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Prepare password update request
@@ -548,7 +531,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -563,7 +546,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	// Get service details for password storage (similar to CLI implementation)
-	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
 		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")

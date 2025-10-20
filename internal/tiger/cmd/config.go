@@ -215,9 +215,6 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.PasswordStorage != nil {
 		table.Append("password_storage", *cfg.PasswordStorage)
 	}
-	if cfg.ProjectID != nil {
-		table.Append("project_id", *cfg.ProjectID)
-	}
 	if cfg.ReleasesURL != nil {
 		table.Append("releases_url", *cfg.ReleasesURL)
 	}

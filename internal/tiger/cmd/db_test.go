@@ -62,21 +62,20 @@ func executeDBCommand(args ...string) (string, error) {
 func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
+	// Set up config with no default service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command without service ID
 	_, err = executeDBCommand("db", "connection-string")
@@ -92,10 +91,9 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 func TestDBConnectionString_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -103,11 +101,11 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command
 	_, err = executeDBCommand("db", "connection-string")
@@ -157,21 +155,20 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 func TestDBConnect_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
+	// Set up config with no default service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command without service ID
 	_, err = executeDBCommand("db", "connect")
@@ -187,10 +184,9 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 func TestDBConnect_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -198,11 +194,11 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command
 	_, err = executeDBCommand("db", "connect")
@@ -221,7 +217,6 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -229,11 +224,11 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Test that psql alias works the same as connect
 	_, err1 := executeDBCommand("db", "connect")
@@ -499,21 +494,20 @@ func equalStringSlices(a, b []string) bool {
 func TestDBTestConnection_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
+	// Set up config with no default service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
+		"api_url": "https://api.tigerdata.com/public/v1",
 	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command without service ID
 	_, err = executeDBCommand("db", "test-connection")
@@ -529,10 +523,9 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 func TestDBTestConnection_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
+	// Set up config with service ID
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
 		"service_id": "svc-12345",
 	})
 	if err != nil {
@@ -540,11 +533,11 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command
 	_, err = executeDBCommand("db", "test-connection")
@@ -885,7 +878,6 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			// Set up config
 			_, err := config.UseTestConfig(tmpDir, map[string]any{
 				"api_url":    "http://localhost:9999", // Non-existent server
-				"project_id": "test-project-123",
 				"service_id": "svc-12345",
 			})
 			if err != nil {
@@ -893,11 +885,11 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			}
 
 			// Mock authentication
-			originalGetAPIKey := getAPIKeyForDB
-			getAPIKeyForDB = func() (string, error) {
-				return "test-api-key", nil
+			originalGetCredentials := getCredentialsForDB
+			getCredentialsForDB = func() (string, string, error) {
+				return "test-api-key", "test-project-123", nil
 			}
-			defer func() { getAPIKeyForDB = originalGetAPIKey }()
+			defer func() { getCredentialsForDB = originalGetCredentials }()
 
 			// Execute db test-connection command with timeout flag
 			_, err = executeDBCommand("db", "test-connection", "--timeout", tc.timeoutFlag)
@@ -1408,11 +1400,11 @@ func TestDBSavePassword_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute save-password command
 	_, err = executeDBCommand("db", "save-password", "--password=test-password")

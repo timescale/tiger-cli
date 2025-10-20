@@ -27,7 +27,6 @@ type Config struct {
 	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
 	Output               string        `mapstructure:"output" yaml:"output"`
 	PasswordStorage      string        `mapstructure:"password_storage" yaml:"password_storage"`
-	ProjectID            string        `mapstructure:"project_id" yaml:"project_id"`
 	ReleasesURL          string        `mapstructure:"releases_url" yaml:"releases_url"`
 	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
 	VersionCheckInterval time.Duration `mapstructure:"version_check_interval" yaml:"version_check_interval"`
@@ -47,7 +46,6 @@ type ConfigOutput struct {
 	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
 	Output               *string        `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
 	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
-	ProjectID            *string        `mapstructure:"project_id" json:"project_id,omitempty" yaml:"project_id,omitempty"`
 	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
 	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
 	VersionCheckInterval *time.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
@@ -81,7 +79,6 @@ var defaultValues = map[string]any{
 	"gateway_url":             DefaultGatewayURL,
 	"output":                  DefaultOutput,
 	"password_storage":        DefaultPasswordStorage,
-	"project_id":              "",
 	"releases_url":            DefaultReleasesURL,
 	"service_id":              "",
 	"version_check_interval":  DefaultVersionCheckInterval,
@@ -305,14 +302,6 @@ func (c *Config) UpdateField(key string, value any) (any, error) {
 		c.DocsMCPURL = s
 		validated = s
 
-	case "project_id":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("project_id must be string, got %T", value)
-		}
-		c.ProjectID = s
-		validated = s
-
 	case "service_id":
 		s, ok := value.(string)
 		if !ok {
@@ -511,18 +500,12 @@ func (c *Config) Reset() error {
 	v := viper.New()
 	v.SetConfigFile(configFile)
 
-	// Preserve the project id, as this is part of the auth scheme
-	v.Set("project_id", c.ProjectID)
-
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
 
 	// Apply all defaults to the current global viper state
 	for key, value := range defaultValues {
-		if key == "project_id" {
-			continue
-		}
 		if _, err := c.UpdateField(key, value); err != nil {
 			return err
 		}
@@ -540,7 +523,7 @@ func (c *Config) GetConfigFile() string {
 }
 
 // TODO: This function is currently used to get the directory that the API
-// key fallback file should be stored in (see api_key.go). But ideally, those
+// key fallback file should be stored in (see credentials.go). But ideally, those
 // functions would take a Config struct and use the ConfigDir field instead.
 func GetConfigDir() string {
 	return filepath.Dir(viper.ConfigFileUsed())

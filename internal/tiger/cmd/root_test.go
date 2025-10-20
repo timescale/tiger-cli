@@ -71,7 +71,6 @@ analytics: true
 	// Set CLI flags (these should take precedence)
 	args := []string{
 		"--config-dir", tmpDir,
-		"--project-id", "flag-project",
 		"--service-id", "flag-service",
 		"--analytics=false",
 		"--debug",
@@ -87,8 +86,8 @@ analytics: true
 	}
 
 	// Verify Viper reflects the CLI flag values (highest precedence)
-	if viper.GetString("project_id") != "flag-project" {
-		t.Errorf("Expected Viper project_id 'flag-project', got '%s'", viper.GetString("project_id"))
+	if viper.GetString("service_id") != "flag-service" {
+		t.Errorf("Expected Viper service_id 'flag-service', got '%s'", viper.GetString("service_id"))
 	}
 }
 
