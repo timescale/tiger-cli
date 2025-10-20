@@ -126,17 +126,11 @@ Examples:
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
 
-			// Store the API key securely
-			if err := config.StoreAPIKey(apiKey); err != nil {
-				return fmt.Errorf("failed to store API key: %w", err)
+			// Store the credentials (API key + project ID) together securely
+			if err := config.StoreCredentials(apiKey, creds.projectID); err != nil {
+				return fmt.Errorf("failed to store credentials: %w", err)
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged in and stored API key")
-
-			// Store project ID in config if provided
-			if err := storeProjectID(creds.projectID); err != nil {
-				return fmt.Errorf("failed to store project ID: %w", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Set default project ID to: %s\n", creds.projectID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", creds.projectID)
 
 			// Show helpful next steps
 			fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
@@ -161,8 +155,8 @@ func buildLogoutCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			if err := config.RemoveAPIKey(); err != nil {
-				return fmt.Errorf("failed to remove API key: %w", err)
+			if err := config.RemoveCredentials(); err != nil {
+				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged out and removed stored credentials")
@@ -174,17 +168,19 @@ func buildLogoutCmd() *cobra.Command {
 func buildStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Show current auth information",
-		Long:  `Show information about the currently authenticated token.`,
+		Short: "Show current authentication status and project ID",
+		Long:  "Displays whether you are logged in and shows your currently configured project ID.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			if _, err := config.GetAPIKey(); err != nil {
+			_, projectID, err := config.GetCredentials()
+			if err != nil {
 				return err
 			}
 
 			// TODO: Make API call to get token information
 			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
+			fmt.Fprintf(cmd.OutOrStdout(), "Project ID: %s\n", projectID)
 
 			return nil
 		},
@@ -255,14 +251,4 @@ func promptForCredentials(consoleURL string, creds credentials) (credentials, er
 	}
 
 	return creds, nil
-}
-
-// storeProjectID stores the project ID in the configuration file
-func storeProjectID(projectID string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	return cfg.Set("project_id", projectID)
 }

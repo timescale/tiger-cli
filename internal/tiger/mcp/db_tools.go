@@ -111,14 +111,8 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 
 // handleDBExecuteQuery handles the tiger_db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
-	// Load config and validate project ID
-	cfg, err := s.loadConfigWithProjectID()
-	if err != nil {
-		return nil, DBExecuteQueryOutput{}, err
-	}
-
-	// Create fresh API client with current credentials
-	apiClient, err := s.createAPIClient()
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -127,7 +121,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
 
 	logging.Debug("MCP: Executing database query",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
@@ -135,7 +129,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// Get service details to construct connection string
-	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -150,10 +144,13 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
-		PasswordMode: password.PasswordRequired, // MCP always requires password
+		WithPassword: true,
 	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)
+	}
+	if input.Pooled && !details.IsPooler {
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("connection pooler not available for service %s", input.ServiceID)
 	}
 
 	// Create query context with timeout

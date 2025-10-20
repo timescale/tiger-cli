@@ -206,14 +206,14 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.GatewayURL != nil {
 		table.Append("gateway_url", *cfg.GatewayURL)
 	}
+	if cfg.Color != nil {
+		table.Append("color", fmt.Sprintf("%t", *cfg.Color))
+	}
 	if cfg.Output != nil {
 		table.Append("output", *cfg.Output)
 	}
 	if cfg.PasswordStorage != nil {
 		table.Append("password_storage", *cfg.PasswordStorage)
-	}
-	if cfg.ProjectID != nil {
-		table.Append("project_id", *cfg.ProjectID)
 	}
 	if cfg.ReleasesURL != nil {
 		table.Append("releases_url", *cfg.ReleasesURL)

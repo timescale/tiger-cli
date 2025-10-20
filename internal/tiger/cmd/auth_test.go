@@ -32,27 +32,29 @@ func setupAuthTest(t *testing.T) string {
 		return nil
 	}
 
-	// Aggressively clean up any existing keyring entries before starting
-	// Uses a test-specific keyring entry.
-	config.RemoveAPIKeyFromKeyring()
-
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Set temporary config directory
+	// Set TIGER_CONFIG_DIR environment variable so that when commands execute
+	// and reinitialize viper, they use the test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
 	// Reset global config and viper to ensure test isolation
+	// This ensures proper test isolation by resetting all viper state
+	// MUST be done before RemoveCredentials() so it uses the test directory!
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
+	// Clean up any existing test credentials
+	config.RemoveCredentials()
+
 	t.Cleanup(func() {
-		// Clean up test keyring
-		config.RemoveAPIKeyFromKeyring()
+		// Clean up test credentials
+		config.RemoveCredentials()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
 		validateAPIKeyForLogin = originalValidator // Restore original validator
@@ -82,7 +84,7 @@ func executeAuthCommand(args ...string) (string, error) {
 }
 
 func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
-	tmpDir := setupAuthTest(t)
+	setupAuthTest(t)
 
 	// Execute login command with public and secret key flags and project ID
 	output, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-123")
@@ -90,38 +92,26 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-123\n" + nextStepsMessage
+	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-123)\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Verify API key was stored (try keyring first, then file fallback)
+	// Verify credentials were stored (try keyring first, then file fallback)
 	// The combined key should be in format "public:secret"
 	expectedAPIKey := "test-public-key:test-secret-key"
-	apiKey, err := config.GetAPIKeyFromKeyring()
+	expectedProjectID := "test-project-123"
+
+	apiKey, projectID, err := config.GetCredentials()
 	if err != nil {
-		// Keyring failed, check file fallback
-		apiKeyFile := filepath.Join(tmpDir, "api-key")
-		data, err := os.ReadFile(apiKeyFile)
-		if err != nil {
-			t.Fatalf("API key not stored in keyring or file: %v", err)
-		}
-		if string(data) != expectedAPIKey {
-			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, string(data))
-		}
-	} else {
-		if apiKey != expectedAPIKey {
-			t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
-		}
+		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
 
-	// Verify project ID was stored in config
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
+	if apiKey != expectedAPIKey {
+		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 	}
-	if cfg.ProjectID != "test-project-123" {
-		t.Errorf("Expected project ID 'test-project-123', got '%s'", cfg.ProjectID)
+	if projectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, projectID)
 	}
 }
 
@@ -141,9 +131,9 @@ func TestAuthLogin_KeyFlags_NoProjectID(t *testing.T) {
 		t.Errorf("Expected error to contain %q, got: %v", expectedErrorMsg, err)
 	}
 
-	// Verify no API key was stored since login failed
-	if _, err = config.GetAPIKey(); err == nil {
-		t.Error("API key should not be stored when login fails")
+	// Verify no credentials were stored since login failed
+	if _, _, err = config.GetCredentials(); err == nil {
+		t.Error("Credentials should not be stored when login fails")
 	}
 }
 
@@ -164,19 +154,23 @@ func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: env-project-id\n" + nextStepsMessage
+	expectedOutput := "Validating API key...\nSuccessfully logged in (project: env-project-id)\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Verify API key was stored (should be combined format)
+	// Verify credentials were stored
 	expectedAPIKey := "env-public-key:env-secret-key"
-	storedKey, err := config.GetAPIKey()
+	expectedProjectID := "env-project-id"
+	storedKey, storedProjectID, err := config.GetCredentials()
 	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
+		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 }
 
@@ -195,19 +189,23 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-456\n" + nextStepsMessage
+	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-456)\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Verify API key was stored (should be combined format)
+	// Verify credentials were stored
 	expectedAPIKey := "env-public-key:env-secret-key"
-	storedKey, err := config.GetAPIKey()
+	expectedProjectID := "test-project-456"
+	storedKey, storedProjectID, err := config.GetCredentials()
 	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
+		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 }
 
@@ -447,8 +445,8 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
-		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-123\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
+		`Successfully logged in \(project: project-123\)\n`+
+		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -458,25 +456,18 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	// Verify API key was stored
-	storedKey, err := config.GetAPIKey()
-	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
-	}
-
-	// Expected API key is "test-access-key:test-secret-key"
+	// Verify credentials were stored
 	expectedAPIKey := "test-access-key:test-secret-key"
+	expectedProjectID := "project-123"
+	storedKey, storedProjectID, err := config.GetCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
-
-	// Verify project ID was stored in config
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	if cfg.ProjectID != "project-123" {
-		t.Errorf("Expected project ID 'project-123', got '%s'", cfg.ProjectID)
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 }
 
@@ -510,8 +501,8 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
 		`Opening browser for authentication\.\.\.\n`+
 		`Validating API key\.\.\.\n`+
-		`Successfully logged in and stored API key\n`+
-		`Set default project ID to: project-789\n`+regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
+		`Successfully logged in \(project: project-789\)\n`+
+		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
 	if err != nil {
@@ -521,25 +512,18 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	// Verify API key was stored
-	storedKey, err := config.GetAPIKey()
-	if err != nil {
-		t.Fatalf("Failed to get stored API key: %v", err)
-	}
-
-	// Expected API key is "test-access-key:test-secret-key"
+	// Verify credentials were stored (should be the third project - project-789)
 	expectedAPIKey := "test-access-key:test-secret-key"
+	expectedProjectID := "project-789"
+	storedKey, storedProjectID, err := config.GetCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
-
-	// Verify project ID was stored in config (should be the third project - project-789)
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-	if cfg.ProjectID != "project-789" {
-		t.Errorf("Expected project ID 'project-789', got '%s'", cfg.ProjectID)
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 }
 
@@ -556,31 +540,34 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-fallback\n" + nextStepsMessage
+	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-fallback)\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
 	// Force test file storage scenario by directly checking file
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
+	credentialsFile := filepath.Join(tmpDir, "credentials")
 
-	// If keyring worked, manually create file scenario by removing keyring and adding file
-	config.RemoveAPIKeyFromKeyring()
+	// If keyring worked, manually create file scenario by clearing all credentials and adding to file
+	config.RemoveCredentials()
 
-	// Store to file manually to simulate fallback (combined format)
+	// Store to file manually to simulate fallback
 	expectedAPIKey := "fallback-public:fallback-secret"
-	err = config.StoreAPIKeyToFile(expectedAPIKey)
-	if err != nil {
-		t.Fatalf("Failed to store API key to file: %v", err)
+	expectedProjectID := "test-project-fallback"
+	if err := config.StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
+		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
 	// Verify file storage works
-	storedKey, err := config.GetAPIKey()
+	storedKey, storedProjectID, err := config.GetCredentials()
 	if err != nil {
-		t.Fatalf("Failed to get API key from file fallback: %v", err)
+		t.Fatalf("Failed to get credentials from file fallback: %v", err)
 	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 
 	// Test status with file-only storage
@@ -588,7 +575,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status failed with file storage: %v", err)
 	}
-	if output != "Logged in (API key stored)\n" {
+	if output != "Logged in (API key stored)\nProject ID: test-project-fallback\n" {
 		t.Errorf("Unexpected status output: '%s'", output)
 	}
 
@@ -602,17 +589,14 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	}
 
 	// Verify file was removed
-	if _, err := os.Stat(apiKeyFile); !os.IsNotExist(err) {
-		t.Error("API key file should be removed after logout")
+	if _, err := os.Stat(credentialsFile); !os.IsNotExist(err) {
+		t.Error("Credentials file should be removed after logout")
 	}
 }
 
 // TestAuthLogin_EnvironmentVariable_FileOnly tests env var login when only file storage is available
 func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-
-	// Clear any keyring entries to force file-only storage
-	config.RemoveAPIKeyFromKeyring()
+	setupAuthTest(t)
 
 	// Set environment variables for public key, secret key, and project ID
 	os.Setenv("TIGER_PUBLIC_KEY", "env-file-public")
@@ -628,51 +612,43 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in and stored API key\nSet default project ID to: test-project-env-file\n" + nextStepsMessage
+	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-env-file)\n" + nextStepsMessage
 	if output != expectedOutput {
 		t.Errorf("Unexpected output: '%s'", output)
 	}
 
-	// Clear keyring again to ensure we're testing file-only retrieval
-	config.RemoveAPIKeyFromKeyring()
+	// Clear all credentials to ensure we're testing file-only retrieval
+	config.RemoveCredentials()
 
-	// Verify API key was stored in file (since keyring is cleared)
+	// Verify credentials were stored in file (since we'll manually write to file only)
 	expectedAPIKey := "env-file-public:env-file-secret"
-	apiKeyFile := filepath.Join(tmpDir, "api-key")
-	data, err := os.ReadFile(apiKeyFile)
-	if err != nil {
-		// If file doesn't exist, the keyring might have worked, so manually ensure file storage
-		err = config.StoreAPIKeyToFile(expectedAPIKey)
-		if err != nil {
-			t.Fatalf("Failed to store API key to file: %v", err)
-		}
-		data, err = os.ReadFile(apiKeyFile)
-		if err != nil {
-			t.Fatalf("API key file should exist: %v", err)
-		}
+	expectedProjectID := "test-project-env-file"
+
+	// Store to file manually to simulate fallback scenario
+	if err := config.StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
+		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
-	if string(data) != expectedAPIKey {
-		t.Errorf("Expected API key '%s' in file, got '%s'", expectedAPIKey, string(data))
-	}
-
-	// Verify getAPIKey works with file-only storage
-	storedKey, err := config.GetAPIKey()
+	// Verify getCredentials works with file-only storage
+	storedKey, storedProjectID, err := config.GetCredentials()
 	if err != nil {
-		t.Fatalf("Failed to get API key from file: %v", err)
+		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	}
+	if storedProjectID != expectedProjectID {
+		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
 	}
 }
 
 func TestAuthStatus_LoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
-	// Store API key first
-	err := config.StoreAPIKey("test-api-key-789")
+	// Store credentials first
+	err := config.StoreCredentials("test-api-key-789", "test-project-789")
 	if err != nil {
-		t.Fatalf("Failed to store API key: %v", err)
+		t.Fatalf("Failed to store credentials: %v", err)
 	}
 
 	// Execute status command
@@ -681,7 +657,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 		t.Fatalf("Status failed: %v", err)
 	}
 
-	if output != "Logged in (API key stored)\n" {
+	if output != "Logged in (API key stored)\nProject ID: test-project-789\n" {
 		t.Errorf("Unexpected output: '%s' (len=%d)", output, len(output))
 	}
 }
@@ -704,16 +680,16 @@ func TestAuthStatus_NotLoggedIn(t *testing.T) {
 func TestAuthLogout_Success(t *testing.T) {
 	setupAuthTest(t)
 
-	// Store API key first
-	err := config.StoreAPIKey("test-api-key-logout")
+	// Store credentials first
+	err := config.StoreCredentials("test-api-key-logout", "test-project-logout")
 	if err != nil {
-		t.Fatalf("Failed to store API key: %v", err)
+		t.Fatalf("Failed to store credentials: %v", err)
 	}
 
-	// Verify API key is stored
-	_, err = config.GetAPIKey()
+	// Verify credentials are stored
+	_, _, err = config.GetCredentials()
 	if err != nil {
-		t.Fatalf("API key should be stored: %v", err)
+		t.Fatalf("Credentials should be stored: %v", err)
 	}
 
 	// Execute logout command
@@ -726,9 +702,9 @@ func TestAuthLogout_Success(t *testing.T) {
 		t.Errorf("Unexpected output: '%s' (len=%d)", output, len(output))
 	}
 
-	// Verify API key is removed
-	_, err = config.GetAPIKey()
+	// Verify credentials are removed
+	_, _, err = config.GetCredentials()
 	if err == nil {
-		t.Fatal("API key should be removed after logout")
+		t.Fatal("Credentials should be removed after logout")
 	}
 }

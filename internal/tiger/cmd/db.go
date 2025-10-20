@@ -11,15 +11,30 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
-	// getAPIKeyForDB can be overridden for testing
-	getAPIKeyForDB = config.GetAPIKey
+	// getCredentialsForDB can be overridden for testing
+	getCredentialsForDB = config.GetCredentials
+
+	// getServiceDetailsFunc can be overridden for testing
+	getServiceDetailsFunc = getServiceDetails
+
+	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
+	checkStdinIsTTY = func() bool {
+		return util.IsTerminal(os.Stdin)
+	}
+
+	// readPasswordFromTerminal can be overridden for testing to inject password input
+	readPasswordFromTerminal = func(fd int) ([]byte, error) {
+		return term.ReadPassword(fd)
+	}
 )
 
 func buildDbConnectionStringCmd() *cobra.Command {
@@ -63,11 +78,18 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
-				PasswordMode: password.GetPasswordMode(dbConnectionStringWithPassword),
-				WarnWriter:   cmd.ErrOrStderr(),
+				WithPassword: dbConnectionStringWithPassword,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
+			}
+
+			if dbConnectionStringWithPassword && details.Password == "" {
+				return fmt.Errorf("password not available to include in connection string")
+			}
+
+			if dbConnectionStringPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -111,7 +133,7 @@ Examples:
   tiger db connect svc-12345
   tiger db psql svc-12345
 
-  # Connect using connection pooler (if available)
+  # Connect using connection pooler
   tiger db connect svc-12345 --pooled
   tiger db psql svc-12345 --pooled
 
@@ -138,17 +160,19 @@ Examples:
 			}
 
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-				Pooled:       dbConnectPooled,
-				Role:         dbConnectRole,
-				PasswordMode: password.PasswordExclude,
-				WarnWriter:   cmd.ErrOrStderr(),
+				Pooled: dbConnectPooled,
+				Role:   dbConnectRole,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
 			}
 
+			if dbConnectPooled && !details.IsPooler {
+				return fmt.Errorf("connection pooler not available for this service")
+			}
+
 			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, cmd)
+			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, dbConnectRole, cmd)
 		},
 	}
 
@@ -204,11 +228,14 @@ Examples:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
-				PasswordMode: password.PasswordOptional,
-				WarnWriter:   cmd.ErrOrStderr(),
+				WithPassword: true,
 			})
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
+			}
+
+			if dbTestConnectionPooled && !details.IsPooler {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
@@ -229,6 +256,98 @@ Examples:
 	return cmd
 }
 
+func buildDbSavePasswordCmd() *cobra.Command {
+	var dbSavePasswordRole string
+	var dbSavePasswordValue string
+
+	cmd := &cobra.Command{
+		Use:   "save-password [service-id]",
+		Short: "Save password for a database service",
+		Long: `Save a password for a database service to configured password storage.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. The password can be provided via:
+1. --password flag with explicit value (highest precedence)
+2. TIGER_NEW_PASSWORD environment variable
+3. Interactive prompt (if neither provided)
+
+The password will be saved according to your --password-storage setting
+(keyring, pgpass, or none).
+
+Examples:
+  # Save password with explicit value (highest precedence)
+  tiger db save-password svc-12345 --password=your-password
+
+  # Using environment variable
+  export TIGER_NEW_PASSWORD=your-password
+  tiger db save-password svc-12345
+
+  # Interactive password prompt (when neither flag nor env var provided)
+  tiger db save-password svc-12345
+
+  # Save password for custom role
+  tiger db save-password svc-12345 --password=your-password --role readonly
+
+  # Save to specific storage location
+  tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			service, err := getServiceDetailsFunc(cmd, args)
+			if err != nil {
+				return err
+			}
+
+			// Determine password based on precedence:
+			// 1. --password flag with value
+			// 2. TIGER_NEW_PASSWORD environment variable
+			// 3. Interactive prompt
+			var passwordToSave string
+
+			if cmd.Flags().Changed("password") {
+				// --password flag was provided
+				passwordToSave = dbSavePasswordValue
+				if passwordToSave == "" {
+					return fmt.Errorf("password cannot be empty when provided via --password flag")
+				}
+			} else if envPassword := os.Getenv("TIGER_NEW_PASSWORD"); envPassword != "" {
+				// Use environment variable
+				passwordToSave = envPassword
+			} else {
+				// Interactive prompt - check if we're in a terminal
+				if !checkStdinIsTTY() {
+					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
+				}
+
+				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
+				bytePassword, err := readPasswordFromTerminal(int(os.Stdin.Fd()))
+				if err != nil {
+					return fmt.Errorf("failed to read password: %w", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout()) // Print newline after hidden input
+				passwordToSave = string(bytePassword)
+				if passwordToSave == "" {
+					return fmt.Errorf("password cannot be empty")
+				}
+			}
+
+			// Save password using configured storage
+			storage := password.GetPasswordStorage()
+			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
+				return fmt.Errorf("failed to save password: %w", err)
+			}
+
+			fmt.Fprintf(cmd.ErrOrStderr(), "Password saved successfully for service %s (role: %s)\n",
+				*service.ServiceId, dbSavePasswordRole)
+			return nil
+		},
+	}
+
+	// Add flags for db save-password command
+	cmd.Flags().StringVarP(&dbSavePasswordValue, "password", "p", "", "Password to save")
+	cmd.Flags().StringVar(&dbSavePasswordRole, "role", "tsdbadmin", "Database role/username")
+
+	return cmd
+}
+
 func buildDbCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "db",
@@ -239,6 +358,7 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbConnectionStringCmd())
 	cmd.AddCommand(buildDbConnectCmd())
 	cmd.AddCommand(buildDbTestConnectionCmd())
+	cmd.AddCommand(buildDbSavePasswordCmd())
 
 	return cmd
 }
@@ -249,11 +369,6 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	projectID := cfg.ProjectID
-	if projectID == "" {
-		return api.Service{}, fmt.Errorf("project ID is required. Set it using login with --project-id")
 	}
 
 	// Determine service ID
@@ -270,10 +385,10 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 
 	cmd.SilenceUsage = true
 
-	// Get API key for authentication
-	apiKey, err := getAPIKeyForDB()
+	// Get API key and project ID for authentication
+	apiKey, projectID, err := getCredentialsForDB()
 	if err != nil {
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 	}
 
 	// Create API client
@@ -310,7 +425,7 @@ type ArgsLenAtDashProvider interface {
 
 // separateServiceAndPsqlArgs separates service arguments from psql flags using Cobra's ArgsLenAtDash
 func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]string, []string) {
-	serviceArgs := []string{}
+	var serviceArgs []string
 	psqlFlags := []string{}
 
 	argsLenAtDash := cmd.ArgsLenAtDash()
@@ -327,13 +442,13 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 }
 
 // launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, cmd)
+func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) *exec.Cmd {
 	// Build command arguments: connection string first, then additional flags
 	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
 	// Passwords are passed via PGPASSWORD environment variable (see below)
@@ -351,7 +466,7 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
 	storage := password.GetPasswordStorage()
 	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service); err == nil && password != "" {
+		if password, err := storage.Get(service, role); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
 		}

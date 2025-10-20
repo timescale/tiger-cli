@@ -80,7 +80,7 @@ Tiger CLI provides the following commands:
 - `tiger auth` - Authentication management
   - `login` - Log in to your Tiger account
   - `logout` - Log out from your Tiger account
-  - `status` - Show current authentication status
+  - `status` - Show current authentication status and project ID
 - `tiger service` - Service lifecycle management
   - `list` - List all services
   - `create` - Create a new service
@@ -211,7 +211,6 @@ tiger config reset
 All configuration options can be set via `tiger config set <key> <value>`:
 
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
-- `project_id` - Default project ID (set via `tiger auth login`)
 - `service_id` - Default service ID
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `analytics` - Enable/disable analytics (default: `true`)
@@ -224,7 +223,6 @@ Environment variables override configuration file values. All variables use the 
 
 - `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
-- `TIGER_PROJECT_ID` - Default project ID
 - `TIGER_SERVICE_ID` - Default service ID
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_ANALYTICS` - Enable/disable analytics
@@ -238,7 +236,6 @@ Environment variables override configuration file values. All variables use the 
 These flags are available on all commands and take precedence over both environment variables and configuration file values:
 
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
-- `--project-id <id>` - Specify project ID
 - `--service-id <id>` - Specify service ID
 - `--analytics` - Enable/disable analytics
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`

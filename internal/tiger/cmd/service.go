@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	// getAPIKeyForService can be overridden for testing
-	getAPIKeyForService = config.GetAPIKey
+	// getCredentialsForService can be overridden for testing
+	getCredentialsForService = config.GetCredentials
 )
 
 // buildServiceCmd creates the main service command with all subcommands
@@ -81,11 +81,6 @@ Examples:
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -100,10 +95,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -133,7 +128,7 @@ Examples:
 			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword)
+			return outputService(cmd, service, cfg.Output, withPassword, true)
 		},
 	}
 
@@ -145,7 +140,6 @@ Examples:
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd() *cobra.Command {
-	var withPassword bool
 	var output string
 
 	cmd := &cobra.Command{
@@ -164,17 +158,12 @@ func buildServiceListCmd() *cobra.Command {
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -213,11 +202,10 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output, withPassword)
+			return outputServices(cmd, services, cfg.Output)
 		},
 	}
 
-	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include passwords in output")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
@@ -301,11 +289,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
@@ -339,10 +322,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -425,7 +408,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					}
 				}
 
-				if err := outputService(cmd, service, cfg.Output, createWithPassword); err != nil {
+				if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 				}
 
@@ -491,11 +474,6 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -516,10 +494,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -580,9 +558,12 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool) error {
+func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	if strict && withPassword && outputSvc.Password == "" {
+		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceId))
+	}
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -598,8 +579,8 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string, withPassword bool) error {
-	outputServices := prepareServicesForOutput(services, withPassword, cmd.ErrOrStderr())
+func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -726,7 +707,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 // outputServicesTable outputs services in a formatted table using tablewriter
 func outputServicesTable(services []OutputService, output io.Writer) error {
 	table := tablewriter.NewWriter(output)
-	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED", "CONNECTION STRING")
+	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
 
 	for _, service := range services {
 		table.Append(
@@ -736,7 +717,6 @@ func outputServicesTable(services []OutputService, output io.Writer) error {
 			util.DerefStr(service.ServiceType),
 			util.Deref(service.RegionCode),
 			formatTimePtr(service.Created),
-			service.ConnectionString,
 		)
 	}
 
@@ -750,11 +730,9 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	outputSvc.InitialPassword = nil
 
 	opts := password.ConnectionDetailsOptions{
-		Pooled:          false,
 		Role:            "tsdbadmin",
-		PasswordMode:    password.GetPasswordMode(withPassword),
+		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
-		WarnWriter:      output,
 	}
 
 	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
@@ -776,10 +754,10 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, withPassword bool, output io.Writer) []OutputService {
+func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, withPassword, output)
+		prepared[i] = prepareServiceForOutput(service, false, output)
 	}
 	return prepared
 }
@@ -843,7 +821,7 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := password.SavePasswordWithResult(service, initialPassword)
+	result, _ := password.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password
@@ -922,20 +900,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get project ID from config
-			cfg, err := config.Load()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			if cfg.ProjectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
-			// Get API key
-			apiKey, err := getAPIKeyForService()
-			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			statusOutput := cmd.ErrOrStderr()
@@ -961,7 +929,7 @@ Examples:
 			// Make the delete request
 			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
@@ -982,7 +950,7 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			if err := waitForServiceDeletion(client, cfg.ProjectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+			if err := waitForServiceDeletion(client, projectID, serviceID, deleteWaitTimeout, cmd); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
@@ -1141,11 +1109,6 @@ Examples:
 				cfg.Output = output
 			}
 
-			projectID := cfg.ProjectID
-			if projectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Determine source service ID
 			var serviceID string
 			if len(args) > 0 {
@@ -1160,10 +1123,10 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key for authentication
-			apiKey, err := getAPIKeyForService()
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -1272,7 +1235,7 @@ Examples:
 				}
 			}
 
-			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword); err != nil {
+			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
