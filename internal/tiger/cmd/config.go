@@ -206,6 +206,9 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.GatewayURL != nil {
 		table.Append("gateway_url", *cfg.GatewayURL)
 	}
+	if cfg.Color != nil {
+		table.Append("color", fmt.Sprintf("%t", *cfg.Color))
+	}
 	if cfg.Output != nil {
 		table.Append("output", *cfg.Output)
 	}

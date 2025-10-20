@@ -2,37 +2,9 @@ package password
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
-
-// PasswordMode determines how passwords are handled in connection strings
-type PasswordMode int
-
-const (
-	// PasswordExclude means don't include password in connection string (default)
-	// Connection will rely on PGPASSWORD env var or ~/.pgpass file
-	PasswordExclude PasswordMode = iota
-
-	// PasswordRequired means include password in connection string, return error if unavailable
-	// Used when user explicitly requests --with-password flag
-	PasswordRequired
-
-	// PasswordOptional means include password if available, but don't error if unavailable
-	// Used for connection testing and psql launching where we want best-effort password inclusion
-	PasswordOptional
-)
-
-// GetPasswordMode is a helper function for getting a [PasswordMode] from a
-// boolean. It only ever returns [PasswordRequired]/[PasswordExcluded]. If you
-// need [PasswordOptional], do not use this function.
-func GetPasswordMode(required bool) PasswordMode {
-	if required {
-		return PasswordRequired
-	}
-	return PasswordExclude
-}
 
 // ConnectionDetailsOptions configures how the connection string is built
 type ConnectionDetailsOptions struct {
@@ -42,17 +14,13 @@ type ConnectionDetailsOptions struct {
 	// Role is the database role/username to use (e.g., "tsdbadmin")
 	Role string
 
-	// PasswordMode determines how passwords are handled
-	PasswordMode PasswordMode
+	// WithPassword determines whether to include the password in the output
+	WithPassword bool
 
 	// InitialPassword is an optional password to use directly (e.g., from service creation response)
-	// If provided and PasswordMode is PasswordRequired or PasswordOptional, this password will be used
+	// If provided and WithPassword is true, this password will be used
 	// instead of fetching from password storage. This is useful when password_storage=none.
 	InitialPassword string
-
-	// WarnWriter is an optional writer for warning messages (e.g., when pooler is requested but not available)
-	// If nil, warnings are suppressed
-	WarnWriter io.Writer
 }
 
 type ConnectionDetails struct {
@@ -61,6 +29,7 @@ type ConnectionDetails struct {
 	Host     string `json:"host,omitempty" yaml:"host,omitempty"`
 	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`
 	Database string `json:"database,omitempty" yaml:"database,omitempty"`
+	IsPooler bool   `json:"is_pooler,omitempty" yaml:"is_pooler,omitempty"`
 }
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
@@ -70,13 +39,12 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 
 	// Use pooler endpoint if requested and available, otherwise use direct endpoint
 	var endpoint *api.Endpoint
+	isPooler := false
 	if opts.Pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
 		endpoint = service.ConnectionPooler.Endpoint
+		isPooler = true
 	} else {
-		// If pooled was requested but no pooler is available, warn if writer is provided
-		if opts.Pooled && opts.WarnWriter != nil {
-			fmt.Fprintf(opts.WarnWriter, "⚠️  Warning: Connection pooler not available for this service, using direct connection\n")
-		}
+		// If pooled was requested but no pooler is available, fall back to direct connection
 		endpoint = service.Endpoint
 	}
 
@@ -89,17 +57,16 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		Host:     *endpoint.Host,
 		Port:     5432,   // Default PostgreSQL port
 		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
+		IsPooler: isPooler,
 	}
 	if endpoint.Port != nil {
 		details.Port = *endpoint.Port
 	}
 
-	if opts.PasswordMode == PasswordRequired || opts.PasswordMode == PasswordOptional {
+	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			details.Password = opts.InitialPassword
-		} else if password, err := GetPassword(service); err != nil && opts.PasswordMode == PasswordRequired {
-			return nil, err
-		} else {
+		} else if password, err := GetPassword(service, opts.Role); err == nil {
 			details.Password = password
 		}
 	}
@@ -120,9 +87,9 @@ func (d *ConnectionDetails) String() string {
 // GetPassword fetches the password for the specified service from the
 // configured password storage mechanism. It returns an error if it fails to
 // find the password.
-func GetPassword(service api.Service) (string, error) {
+func GetPassword(service api.Service, role string) (string, error) {
 	storage := GetPasswordStorage()
-	password, err := storage.Get(service)
+	password, err := storage.Get(service, role)
 	if err != nil {
 		// Provide specific error messages based on storage type
 		switch storage.(type) {

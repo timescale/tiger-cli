@@ -18,6 +18,7 @@ import (
 type Config struct {
 	APIURL               string        `mapstructure:"api_url" yaml:"api_url"`
 	Analytics            bool          `mapstructure:"analytics" yaml:"analytics"`
+	Color                bool          `mapstructure:"color" yaml:"color"`
 	ConfigDir            string        `mapstructure:"config_dir" yaml:"-"`
 	ConsoleURL           string        `mapstructure:"console_url" yaml:"console_url"`
 	Debug                bool          `mapstructure:"debug" yaml:"debug"`
@@ -30,11 +31,13 @@ type Config struct {
 	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
 	VersionCheckInterval time.Duration `mapstructure:"version_check_interval" yaml:"version_check_interval"`
 	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
+	viper                *viper.Viper  `mapstructure:"-" yaml:"-"`
 }
 
 type ConfigOutput struct {
 	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
 	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
+	Color                *bool          `mapstructure:"color" json:"color,omitempty" yaml:"color,omitempty"`
 	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
 	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
 	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
@@ -50,32 +53,34 @@ type ConfigOutput struct {
 }
 
 const (
+	ConfigFileName              = "config.yaml"
 	DefaultAPIURL               = "https://console.cloud.timescale.com/public/api/v1"
+	DefaultAnalytics            = true
+	DefaultColor                = true
 	DefaultConsoleURL           = "https://console.cloud.timescale.com"
-	DefaultGatewayURL           = "https://console.cloud.timescale.com/api"
+	DefaultDebug                = false
 	DefaultDocsMCP              = true
 	DefaultDocsMCPURL           = "https://mcp.tigerdata.com/docs"
+	DefaultGatewayURL           = "https://console.cloud.timescale.com/api"
 	DefaultOutput               = "table"
-	DefaultAnalytics            = true
 	DefaultPasswordStorage      = "keyring"
-	DefaultDebug                = false
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
 	DefaultVersionCheckInterval = 24 * time.Hour
-	ConfigFileName              = "config.yaml"
 )
 
 var defaultValues = map[string]any{
+	"analytics":               DefaultAnalytics,
 	"api_url":                 DefaultAPIURL,
+	"color":                   DefaultColor,
 	"console_url":             DefaultConsoleURL,
-	"gateway_url":             DefaultGatewayURL,
+	"debug":                   DefaultDebug,
 	"docs_mcp":                DefaultDocsMCP,
 	"docs_mcp_url":            DefaultDocsMCPURL,
-	"service_id":              "",
+	"gateway_url":             DefaultGatewayURL,
 	"output":                  DefaultOutput,
-	"analytics":               DefaultAnalytics,
 	"password_storage":        DefaultPasswordStorage,
-	"debug":                   DefaultDebug,
 	"releases_url":            DefaultReleasesURL,
+	"service_id":              "",
 	"version_check_interval":  DefaultVersionCheckInterval,
 	"version_check_last_time": time.Time{},
 }
@@ -122,6 +127,7 @@ func SetupViper(configDir string) error {
 func FromViper(v *viper.Viper) (*Config, error) {
 	cfg := &Config{
 		ConfigDir: filepath.Dir(v.ConfigFileUsed()),
+		viper:     v,
 	}
 
 	if err := v.Unmarshal(cfg); err != nil {
@@ -210,7 +216,7 @@ func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
 
 func (c *Config) Set(key, value string) error {
 	// Validate and update the field
-	validated, err := c.updateField(key, value)
+	validated, err := c.UpdateField(key, value)
 	if err != nil {
 		return err
 	}
@@ -241,10 +247,10 @@ func setBool(key, val string) (bool, error) {
 	return b, nil
 }
 
-// updateField updates the field in the Config struct corresponding to the given key.
+// UpdateField updates the field in the Config struct corresponding to the given key.
 // It accepts either a string (from user input) or a typed value (string/bool from defaults).
 // The function validates the value and updates both the struct field and viper state.
-func (c *Config) updateField(key string, value any) (any, error) {
+func (c *Config) UpdateField(key string, value any) (any, error) {
 	var validated any
 
 	switch key {
@@ -303,6 +309,22 @@ func (c *Config) updateField(key string, value any) (any, error) {
 		}
 		c.ServiceID = s
 		validated = s
+
+	case "color":
+		switch v := value.(type) {
+		case bool:
+			c.Color = v
+			validated = v
+		case string:
+			b, err := setBool("color", v)
+			if err != nil {
+				return nil, err
+			}
+			c.Color = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("color must be string or bool, got %T", value)
+		}
 
 	case "output":
 		s, ok := value.(string)
@@ -422,7 +444,11 @@ func (c *Config) updateField(key string, value any) (any, error) {
 		return nil, fmt.Errorf("unknown configuration key: %s", key)
 	}
 
-	viper.Set(key, validated)
+	if c.viper == nil {
+		viper.Set(key, validated)
+	} else {
+		c.viper.Set(key, validated)
+	}
 	return validated, nil
 }
 
@@ -454,7 +480,7 @@ func (c *Config) Unset(key string) error {
 
 	// Apply the default to the current global viper state
 	if def, ok := defaultValues[key]; ok {
-		if _, err := c.updateField(key, def); err != nil {
+		if _, err := c.UpdateField(key, def); err != nil {
 			return err
 		}
 	}
@@ -480,7 +506,7 @@ func (c *Config) Reset() error {
 
 	// Apply all defaults to the current global viper state
 	for key, value := range defaultValues {
-		if _, err := c.updateField(key, value); err != nil {
+		if _, err := c.UpdateField(key, value); err != nil {
 			return err
 		}
 	}
