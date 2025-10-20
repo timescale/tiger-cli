@@ -497,7 +497,7 @@ func (c *Config) GetConfigFile() string {
 }
 
 // TODO: This function is currently used to get the directory that the API
-// key fallback file should be stored in (see api_key.go). But ideally, those
+// key fallback file should be stored in (see credentials.go). But ideally, those
 // functions would take a Config struct and use the ConfigDir field instead.
 func GetConfigDir() string {
 	return filepath.Dir(viper.ConfigFileUsed())

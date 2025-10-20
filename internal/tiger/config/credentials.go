@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/zalando/go-keyring"
@@ -52,6 +53,11 @@ func SetTestServiceName(t *testing.T) {
 	})
 }
 
+func getCredentialsFileName() string {
+	configDir := GetConfigDir()
+	return fmt.Sprintf("%s/credentials", configDir)
+}
+
 // StoreCredentials stores the API key (public:secret) and project ID together
 // The credentials are stored as JSON with api_key and project_id fields
 func StoreCredentials(apiKey, projectID string) error {
@@ -95,12 +101,11 @@ func storeToKeyring(credentials string) error {
 
 // storeToFile stores credentials to ~/.config/tiger/credentials with restricted permissions
 func storeToFile(credentials string) error {
-	configDir := GetConfigDir()
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	credentialsFile := getCredentialsFileName()
+	if err := os.MkdirAll(filepath.Dir(credentialsFile), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
 	file, err := os.OpenFile(credentialsFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create credentials file: %w", err)
@@ -143,9 +148,7 @@ func getCredentialsFromKeyring() (string, string, error) {
 
 // getCredentialsFromFile retrieves credentials from file
 func getCredentialsFromFile() (string, string, error) {
-	configDir := GetConfigDir()
-	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
-
+	credentialsFile := getCredentialsFileName()
 	data, err := os.ReadFile(credentialsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -194,8 +197,7 @@ func removeCredentialsFromKeyring() {
 
 // removeCredentialsFile removes credentials file
 func removeCredentialsFile() error {
-	configDir := GetConfigDir()
-	credentialsFile := fmt.Sprintf("%s/credentials", configDir)
+	credentialsFile := getCredentialsFileName()
 	if err := os.Remove(credentialsFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove credentials file: %w", err)
 	}
