@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/zalando/go-keyring"
@@ -155,7 +154,7 @@ func getCredentialsFromFile() (string, string, error) {
 		return "", "", fmt.Errorf("failed to read credentials file: %w", err)
 	}
 
-	credentials := strings.TrimSpace(string(data))
+	credentials := string(data)
 	if credentials == "" {
 		return "", "", ErrNotLoggedIn
 	}
