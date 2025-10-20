@@ -4,6 +4,8 @@ Tiger CLI is the command-line interface for Tiger Cloud. It provides commands fo
 
 ## Installation
 
+Multiple installation methods are provided. Choose your preferred method from the options below. If you aren't sure, use the first one!
+
 ### Install Script
 
 ```bash
