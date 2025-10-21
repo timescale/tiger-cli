@@ -14,11 +14,12 @@ import (
 
 func TestBuildConnectionString_Basic(t *testing.T) {
 	testCases := []struct {
-		name           string
-		service        api.Service
-		opts           ConnectionDetailsOptions
-		expectedString string
-		expectError    bool
+		name             string
+		service          api.Service
+		opts             ConnectionDetailsOptions
+		expectedString   string
+		expectedIsPooler bool
+		expectError      bool
 	}{
 		{
 			name: "Basic connection string without password",
@@ -47,17 +48,23 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
 		},
 		{
-			name: "Connection string with default port",
+			name: "Direct connection when pooler is available",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: nil, // Should use default 5432
+					Host: util.Ptr("direct-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+				ConnectionPooler: &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{
+						Host: util.Ptr("pooler-host.tigerdata.com"),
+						Port: util.Ptr(6432),
+					},
 				},
 			},
 			opts: ConnectionDetailsOptions{
 				Role: "tsdbadmin",
 			},
-			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
+			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
 		},
 		{
 			name: "Pooled connection string",
@@ -77,7 +84,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 				Pooled: true,
 				Role:   "tsdbadmin",
 			},
-			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
+			expectedString:   "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
+			expectedIsPooler: true,
 		},
 		{
 			name: "Pooled connection fallback to direct when pooler unavailable",
@@ -117,6 +125,45 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "Error when host is empty",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr(""),
+					Port: util.Ptr(5432),
+				},
+			},
+			opts: ConnectionDetailsOptions{
+				Role: "tsdbadmin",
+			},
+			expectError: true,
+		},
+		{
+			name: "Error when no port available",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: nil,
+				},
+			},
+			opts: ConnectionDetailsOptions{
+				Role: "tsdbadmin",
+			},
+			expectError: true,
+		},
+		{
+			name: "Error when port is zero",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(0),
+				},
+			},
+			opts: ConnectionDetailsOptions{
+				Role: "tsdbadmin",
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -139,9 +186,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result.String())
 			}
 
-			// Check for warning message
-			if tc.opts.Pooled && tc.service.ConnectionPooler == nil && result.IsPooler {
-				t.Errorf("Expected IsPooler to be false when pooler is unavailable, but got true")
+			if result.IsPooler != tc.expectedIsPooler {
+				t.Errorf("Expected IsPooler to be %v, got %v", tc.expectedIsPooler, result.IsPooler)
 			}
 		})
 	}
@@ -366,37 +412,5 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	expectedError := "service endpoint not available"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
-	}
-}
-
-func TestBuildConnectionString_PoolerWarning(t *testing.T) {
-	// Service without connection pooler
-	service := api.Service{
-		Endpoint: &api.Endpoint{
-			Host: util.Ptr("test-host.tigerdata.com"),
-			Port: util.Ptr(5432),
-		},
-		ConnectionPooler: nil, // No pooler available
-	}
-
-	// Request pooled connection when pooler is not available
-	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
-		Pooled: true,
-		Role:   "tsdbadmin",
-	})
-	connectionString := details.String()
-
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// Should return direct connection string
-	expectedString := "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require"
-	if connectionString != expectedString {
-		t.Errorf("Expected connection string %q, got %q", expectedString, connectionString)
-	}
-
-	if details.IsPooler {
-		t.Errorf("Expected IsPooler to be false when pooler is unavailable, but got true")
 	}
 }
