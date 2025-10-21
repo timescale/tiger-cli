@@ -52,15 +52,16 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		return nil, fmt.Errorf("endpoint host not available")
 	}
 
+	if endpoint.Port == nil || *endpoint.Port == 0 {
+		return nil, fmt.Errorf("endpoint port not available")
+	}
+
 	details := &ConnectionDetails{
 		Role:     opts.Role,
 		Host:     *endpoint.Host,
-		Port:     5432,   // Default PostgreSQL port
+		Port:     *endpoint.Port,
 		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
 		IsPooler: isPooler,
-	}
-	if endpoint.Port != nil {
-		details.Port = *endpoint.Port
 	}
 
 	if opts.WithPassword {
