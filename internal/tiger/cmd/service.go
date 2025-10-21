@@ -223,6 +223,7 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createWaitTimeout time.Duration
 	var createNoSetDefault bool
 	var createWithPassword bool
+	var createEnvironment string
 	var output string
 
 	cmd := &cobra.Command{
@@ -302,6 +303,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("replica count must be non-negative (--replicas)")
 			}
 
+			// Validate and normalize environment tag (case-insensitive)
+			createEnvironment = strings.ToUpper(createEnvironment)
+			if createEnvironment != "DEV" && createEnvironment != "PROD" {
+				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", createEnvironment)
+			}
+
 			// Validate and normalize CPU/Memory configuration
 			cpuMillis, memoryGBs, err := util.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
 			if err != nil {
@@ -328,12 +335,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Prepare service creation request
+			environmentTag := api.EnvironmentTag(createEnvironment)
 			serviceCreateReq := api.ServiceCreate{
-				Name:         createServiceName,
-				Addons:       util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),
-				ReplicaCount: &createReplicaCount,
-				CpuMillis:    cpuMillis,
-				MemoryGbs:    memoryGBs,
+				Name:           createServiceName,
+				Addons:         util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),
+				ReplicaCount:   &createReplicaCount,
+				CpuMillis:      cpuMillis,
+				MemoryGbs:      memoryGBs,
+				EnvironmentTag: &environmentTag,
 			}
 
 			if createRegionCode != "" {
@@ -419,6 +428,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&createCpuMillis, "cpu", "", "CPU allocation in millicores or 'shared'")
 	cmd.Flags().StringVar(&createMemoryGBs, "memory", "", "Memory allocation in gigabytes or 'shared'")
 	cmd.Flags().IntVar(&createReplicaCount, "replicas", 0, "Number of high-availability replicas")
+	cmd.Flags().StringVar(&createEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
@@ -608,6 +618,11 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Append("Status", util.DerefStr(service.Status))
 	table.Append("Type", util.DerefStr(service.ServiceType))
 	table.Append("Region", util.Deref(service.RegionCode))
+
+	// Environment tag
+	if service.Metadata != nil && service.Metadata.Environment != nil {
+		table.Append("Environment", *service.Metadata.Environment)
+	}
 
 	// Resource information from Resources slice
 	if service.Resources != nil && len(*service.Resources) > 0 {
@@ -1011,6 +1026,7 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkCPU string
 	var forkMemory string
 	var forkWithPassword bool
+	var forkEnvironment string
 	var output string
 
 	cmd := &cobra.Command{
@@ -1074,6 +1090,12 @@ Examples:
 			}
 			if timingFlagsSet > 1 {
 				return fmt.Errorf("can only specify one of --now, --last-snapshot or --to-timestamp")
+			}
+
+			// Validate and normalize environment tag (case-insensitive)
+			forkEnvironment = strings.ToUpper(forkEnvironment)
+			if forkEnvironment != "DEV" && forkEnvironment != "PROD" {
+				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", forkEnvironment)
 			}
 
 			// Get config
@@ -1155,11 +1177,13 @@ Examples:
 			fmt.Fprintf(statusOutput, "🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
 
 			// Create ForkServiceCreate request
+			environmentTag := api.EnvironmentTag(forkEnvironment)
 			forkReq := api.ForkServiceCreate{
-				ForkStrategy: forkStrategy,
-				TargetTime:   targetTime,
-				CpuMillis:    cpuMillis,
-				MemoryGbs:    memoryGBs,
+				ForkStrategy:   forkStrategy,
+				TargetTime:     targetTime,
+				CpuMillis:      cpuMillis,
+				MemoryGbs:      memoryGBs,
+				EnvironmentTag: &environmentTag,
 			}
 
 			// Only set optional fields if flags were provided
@@ -1235,6 +1259,7 @@ Examples:
 	// Resource customization flags
 	cmd.Flags().StringVar(&forkCPU, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
+	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 

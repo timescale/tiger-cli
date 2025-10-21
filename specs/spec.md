@@ -335,6 +335,11 @@ tiger service create --name "my-service" --cpu 2
 # Specify only memory (CPU will be automatically set to 2)
 tiger service create --name "my-service" --memory 8
 
+# Creates a production service with 4 CPU and 16GB memory
+tiger service create --name "prod-db" --cpu 4 --memory 16 --environment PROD
+
+```bash
+
 # Resize with only CPU
 tiger service resize svc-12345 --cpu 4
 
@@ -780,6 +785,7 @@ tiger service create \
   --cpu 2 \
   --memory 8GB \
   --replicas 2
+  --environment PROD
 ```
 
 ### Database Operations
