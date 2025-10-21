@@ -37,6 +37,12 @@ jobs:
           eval $(echo 'test' | gnome-keyring-daemon --start --components=secrets)
           echo "GNOME_KEYRING_CONTROL=$GNOME_KEYRING_CONTROL" >> $GITHUB_ENV
 
+      - name: ShellCheck
+        run: shellcheck scripts/install.sh
+
+      - name: Mod
+        run: go mod tidy --diff
+
       - name: Build
         run: go build ./...
 
@@ -46,14 +52,11 @@ jobs:
       - name: Test
         run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
 
-      - name: Generate Coverage Report
+      - name: Generate coverage report
         run: go tool cover -html=coverage.out -o=coverage.html
 
-      - name: Upload Coverage Report
+      - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage.html
           path: coverage.html
-
-      - name: ShellCheck
-        run: shellcheck scripts/install.sh
