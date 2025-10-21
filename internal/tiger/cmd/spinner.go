@@ -41,7 +41,9 @@ func newAnimatedSpinner(output io.Writer, message string, args ...any) *animated
 		spinnerModel{
 			message: fmt.Sprintf(message, args...),
 		},
+		tea.WithInput(nil),
 		tea.WithOutput(output),
+		tea.WithoutSignalHandler(),
 	)
 
 	go func() {
