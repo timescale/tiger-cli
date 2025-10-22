@@ -27,7 +27,7 @@ func setupAuthTest(t *testing.T) string {
 
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
-	validateAPIKeyForLogin = func(apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(cfg *config.Config, apiKey, projectID string) error {
 		// Always return success for testing
 		return nil
 	}

@@ -128,7 +128,7 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
 // Returns the final ServiceDetail with current state and any error that occurred
-func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, initialStatus *api.DeployStatus) (*api.DeployStatus, error) {
+func (s *Server) waitForServiceReady(apiClient *api.TigerClient, projectID, serviceID string, timeout time.Duration, initialStatus *api.DeployStatus) (*api.DeployStatus, error) {
 	logging.Debug("MCP: Waiting for service to be ready",
 		zap.String("service_id", serviceID),
 		zap.Duration("timeout", timeout),

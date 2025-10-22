@@ -138,7 +138,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	defer server.Close()
 
 	// Setup test config with the test server URL
-	_, err := config.UseTestConfig(t.TempDir(), map[string]any{
+	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
 		"api_url": server.URL,
 	})
 	if err != nil {
@@ -146,7 +146,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	}
 
 	// Create a new Tiger client
-	client, err := api.NewTigerClient("test-api-key")
+	client, err := api.NewTigerClient(cfg, "test-api-key", "test-project-id")
 	if err != nil {
 		t.Fatalf("Failed to create Tiger client: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestNewTigerClientAuthorizationHeader(t *testing.T) {
 	defer server.Close()
 
 	// Setup test config with the test server URL
-	_, err := config.UseTestConfig(t.TempDir(), map[string]any{
+	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
 		"api_url": server.URL,
 	})
 	if err != nil {
@@ -193,7 +193,7 @@ func TestNewTigerClientAuthorizationHeader(t *testing.T) {
 
 	// Create a new Tiger client with a test API key
 	apiKey := "test-api-key:test-secret-key"
-	client, err := api.NewTigerClient(apiKey)
+	client, err := api.NewTigerClient(cfg, apiKey, "test-project-id")
 	if err != nil {
 		t.Fatalf("Failed to create Tiger client: %v", err)
 	}

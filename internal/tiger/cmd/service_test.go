@@ -1199,7 +1199,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
+	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url": "http://localhost:9999", // Non-existent server to force timeout
 	})
 	if err != nil {
@@ -1214,7 +1214,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Create API client
-	client, err := api.NewTigerClient("test-api-key")
+	client, err := api.NewTigerClient(cfg, "test-api-key", "test-project-123")
 	if err != nil {
 		t.Fatalf("Failed to create API client: %v", err)
 	}

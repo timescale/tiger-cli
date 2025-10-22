@@ -71,7 +71,13 @@ func (s *Server) registerTools(ctx context.Context) {
 }
 
 // createAPIClient creates a new API client and returns it with the project ID
-func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
+func (s *Server) createAPIClient() (*api.TigerClient, string, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Get credentials (API key + project ID)
 	apiKey, projectID, err := config.GetCredentials()
 	if err != nil {
@@ -79,7 +85,7 @@ func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
 	}
 
 	// Create API client with fresh credentials
-	apiClient, err := api.NewTigerClient(apiKey)
+	apiClient, err := api.NewTigerClient(cfg, apiKey, projectID)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}

@@ -102,7 +102,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -167,7 +167,7 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -329,7 +329,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -501,7 +501,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -771,7 +771,7 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
+func waitForServiceReady(client *api.TigerClient, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
@@ -900,6 +900,12 @@ Examples:
 
 			cmd.SilenceUsage = true
 
+			// Load config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
@@ -921,7 +927,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -968,7 +974,7 @@ Examples:
 }
 
 // waitForServiceDeletion waits for a service to be fully deleted
-func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
+func waitForServiceDeletion(client *api.TigerClient, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -1130,7 +1136,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
