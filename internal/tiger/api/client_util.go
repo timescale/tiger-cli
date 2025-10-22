@@ -135,7 +135,7 @@ func (e *Error) Error() string {
 // It automatically includes common properties like ProjectID, OS, and architecture.
 // Events are only sent if analytics is enabled in the config, otherwise they are skipped.
 // This method uses the global logger from the logging package.
-func (c *TigerClient) Track(ctx context.Context, event string, properties map[string]interface{}) error {
+func (c *TigerClient) Track(ctx context.Context, event string, properties map[string]any) error {
 	logger := logging.GetLogger()
 
 	// Check if analytics is disabled
@@ -147,14 +147,12 @@ func (c *TigerClient) Track(ctx context.Context, event string, properties map[st
 	}
 
 	// Build properties map with common properties
-	allProperties := make(map[string]interface{})
-
-	// Add common properties
-	if c.ProjectID != "" {
-		allProperties["project_id"] = c.ProjectID
+	allProperties := map[string]any{
+		"project_id": c.ProjectID,
+		"version":    config.Version,
+		"os":         runtime.GOOS,
+		"arch":       runtime.GOARCH,
 	}
-	allProperties["os"] = runtime.GOOS
-	allProperties["arch"] = runtime.GOARCH
 
 	// Merge in user-provided properties (they can override common properties if needed)
 	for k, v := range properties {
@@ -177,7 +175,7 @@ func (c *TigerClient) Track(ctx context.Context, event string, properties map[st
 	// Check if the API layer skipped the event
 	if resp.JSON200 != nil && resp.JSON200.Status != nil && *resp.JSON200.Status == "skipped" {
 		if c.Config.Debug && logger != nil {
-			logger.Debug("Analytics event skipped (by API)", zap.String("event", event))
+			logger.Debug("Analytics event skipped by API", zap.String("event", event))
 		}
 	}
 
