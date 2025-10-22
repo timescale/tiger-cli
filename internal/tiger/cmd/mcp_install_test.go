@@ -725,7 +725,7 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 		err := addTigerMCPServerViaCLI(clientCfg)
 		// We expect this to fail since the command doesn't exist, but it shows we got past validation
 		assert.Error(t, err, "should error when command execution fails")
-		assert.Contains(t, err.Error(), "failed to run Test Client CLI command", "error should mention CLI command failure")
+		assert.Contains(t, err.Error(), "failed to run Test Client installation command", "error should mention installation command failure")
 	})
 
 	t.Run("handles client config with single command", func(t *testing.T) {
