@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -388,6 +389,10 @@ func (l *oauthLogin) createCredentials(accessToken, projectID string) (credentia
 	// Create a PAT record for this project
 	patRecord, err := l.graphql.createPATRecord(accessToken, projectID, l.buildPATName(user))
 	if err != nil {
+		// Check if error is about reaching maximum token limit
+		if strings.Contains(err.Error(), "reached maximum token limit for project") {
+			return credentials{}, fmt.Errorf("failed to create API key: %w\n\nYou can delete existing API keys at: https://console.cloud.timescale.com/dashboard/settings", err)
+		}
 		return credentials{}, fmt.Errorf("failed to create PAT record: %w", err)
 	}
 
