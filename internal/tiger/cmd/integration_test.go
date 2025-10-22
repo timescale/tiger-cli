@@ -1176,23 +1176,23 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "service list",
-			args: []string{"service", "list", "--project-id", projectID},
+			args: []string{"service", "list"},
 		},
 		{
 			name: "service get",
-			args: []string{"service", "get", "non-existent-service", "--project-id", projectID},
+			args: []string{"service", "get", "non-existent-service"},
 		},
 		{
 			name: "service create",
-			args: []string{"service", "create", "--name", "test-service", "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "create", "--name", "test-service", "--no-wait"},
 		},
 		{
 			name: "service update-password",
-			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--project-id", projectID},
+			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass"},
 		},
 		{
 			name: "service delete",
-			args: []string{"service", "delete", "non-existent-service", "--confirm", "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "delete", "non-existent-service", "--confirm", "--no-wait"},
 		},
 	}
 
@@ -1203,17 +1203,17 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "db connection-string",
-			args: []string{"db", "connection-string", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "connection-string", "non-existent-service"},
 		},
 		{
 			name: "db connect",
-			args: []string{"db", "connect", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "connect", "non-existent-service"},
 		},
 		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
 		// for authentication issues, not ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
-			args: []string{"db", "test-connection", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "test-connection", "non-existent-service"},
 		},
 	}
 
