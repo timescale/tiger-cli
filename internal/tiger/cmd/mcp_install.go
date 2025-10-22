@@ -468,7 +468,11 @@ func addTigerMCPServerViaCLI(clientCfg *clientConfig) error {
 	// Capture output
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to run %s CLI command: %w\nOutput: %s", clientCfg.Name, err, string(output))
+		command := strings.Join(installCommand, " ")
+		if string(output) != "" {
+			return fmt.Errorf("failed to run %s installation command: %w\nCommand: %s\nOutput: %s", clientCfg.Name, err, command, string(output))
+		}
+		return fmt.Errorf("failed to run %s installation command: %w\nCommand: %s", clientCfg.Name, err, command)
 	}
 
 	logging.Info("Successfully added Tiger MCP server via CLI",
