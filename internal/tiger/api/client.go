@@ -203,6 +203,11 @@ type ClientInterface interface {
 	PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostProjectsProjectIdVpcsVpcIdRename(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostTrackWithBody request with any body
+	PostTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostTrack(ctx context.Context, body PostTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetProjectsProjectIdServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -711,6 +716,30 @@ func (c *Client) PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx context.Contex
 
 func (c *Client) PostProjectsProjectIdVpcsVpcIdRename(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostProjectsProjectIdVpcsVpcIdRenameRequest(c.Server, projectId, vpcId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrackRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostTrack(ctx context.Context, body PostTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrackRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2113,6 +2142,46 @@ func NewPostProjectsProjectIdVpcsVpcIdRenameRequestWithBody(server string, proje
 	return req, nil
 }
 
+// NewPostTrackRequest calls the generic PostTrack builder with application/json body
+func NewPostTrackRequest(server string, body PostTrackJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostTrackRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostTrackRequestWithBody generates requests for PostTrack with any type of body
+func NewPostTrackRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/track")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -2270,6 +2339,11 @@ type ClientWithResponsesInterface interface {
 	PostProjectsProjectIdVpcsVpcIdRenameWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error)
 
 	PostProjectsProjectIdVpcsVpcIdRenameWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error)
+
+	// PostTrackWithBodyWithResponse request with any body
+	PostTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrackResponse, error)
+
+	PostTrackWithResponse(ctx context.Context, body PostTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrackResponse, error)
 }
 
 type GetProjectsProjectIdServicesResponse struct {
@@ -2932,6 +3006,31 @@ func (r PostProjectsProjectIdVpcsVpcIdRenameResponse) StatusCode() int {
 	return 0
 }
 
+type PostTrackResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Status *string `json:"status,omitempty"`
+	}
+	JSON4XX *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r PostTrackResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostTrackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // GetProjectsProjectIdServicesWithResponse request returning *GetProjectsProjectIdServicesResponse
 func (c *ClientWithResponses) GetProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesResponse, error) {
 	rsp, err := c.GetProjectsProjectIdServices(ctx, projectId, reqEditors...)
@@ -3303,6 +3402,23 @@ func (c *ClientWithResponses) PostProjectsProjectIdVpcsVpcIdRenameWithResponse(c
 		return nil, err
 	}
 	return ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp)
+}
+
+// PostTrackWithBodyWithResponse request with arbitrary body returning *PostTrackResponse
+func (c *ClientWithResponses) PostTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrackResponse, error) {
+	rsp, err := c.PostTrackWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrackResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostTrackWithResponse(ctx context.Context, body PostTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrackResponse, error) {
+	rsp, err := c.PostTrack(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrackResponse(rsp)
 }
 
 // ParseGetProjectsProjectIdServicesResponse parses an HTTP response from a GetProjectsProjectIdServicesWithResponse call
@@ -4196,6 +4312,41 @@ func ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp *http.Response) (*Pos
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest VPC
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostTrackResponse parses an HTTP response from a PostTrackWithResponse call
+func ParsePostTrackResponse(rsp *http.Response) (*PostTrackResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostTrackResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Status *string `json:"status,omitempty"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
