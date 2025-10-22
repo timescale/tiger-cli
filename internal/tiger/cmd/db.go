@@ -391,23 +391,71 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 	}
 	defer tx.Rollback(ctx)
 
-	// Build and execute CREATE ROLE statement
-	// Fail if password contains a single quote (we don't support escaping)
-	if strings.Contains(rolePassword, "'") {
-		return fmt.Errorf("password cannot contain single quotes")
-	}
-	// Wrap password in single quotes for SQL literal
-	quotedPassword := "'" + rolePassword + "'"
-	createSQL := buildCreateRoleSQL(roleName, quotedPassword, fromRoles)
-	if _, err := tx.Exec(ctx, createSQL); err != nil {
-		return fmt.Errorf("failed to create role: %w", err)
+	// Check if tsdbadmin is in the fromRoles list
+	hasTsdbadmin := false
+	var otherRoles []string
+	for _, role := range fromRoles {
+		if role == "tsdbadmin" {
+			hasTsdbadmin = true
+		} else {
+			otherRoles = append(otherRoles, role)
+		}
 	}
 
-	// Configure read-only mode if requested
-	if readOnly {
-		alterSQL := buildReadOnlyAlterSQL(roleName)
-		if _, err := tx.Exec(ctx, alterSQL); err != nil {
-			return fmt.Errorf("failed to configure read-only mode: %w", err)
+	// If tsdbadmin is requested, use special TimescaleDB Cloud functions
+	if hasTsdbadmin {
+		// Enforce read-only requirement when inheriting from tsdbadmin
+		if !readOnly {
+			return fmt.Errorf("roles inheriting from tsdbadmin must be read-only (use --read-only flag)")
+		}
+
+		// Cannot set statement_timeout on roles created with create_bare_readonly_role
+		// due to permission restrictions on altering special roles
+		if statementTimeout > 0 {
+			return fmt.Errorf("cannot use --statement-timeout with --from tsdbadmin (permission denied to alter special roles)")
+		}
+
+		// Use timescale_functions.create_bare_readonly_role to create the role
+		// This function creates a read-only role that can inherit tsdbadmin privileges
+		if _, err := tx.Exec(ctx, "SELECT timescale_functions.create_bare_readonly_role($1, $2)",
+			roleName, rolePassword); err != nil {
+			return fmt.Errorf("failed to create role with create_bare_readonly_role: %w", err)
+		}
+
+		// Grant tsdbadmin privileges using the special function
+		if _, err := tx.Exec(ctx, "SELECT timescale_functions.grant_tsdbadmin_to_role($1)",
+			roleName); err != nil {
+			return fmt.Errorf("failed to grant tsdbadmin privileges: %w", err)
+		}
+	} else {
+		// Use standard CREATE ROLE for non-tsdbadmin cases
+		// Fail if password contains a single quote (we don't support escaping)
+		if strings.Contains(rolePassword, "'") {
+			return fmt.Errorf("password cannot contain single quotes")
+		}
+		// Wrap password in single quotes for SQL literal
+		quotedPassword := "'" + rolePassword + "'"
+		createSQL := buildCreateRoleSQL(roleName, quotedPassword, fromRoles)
+		if _, err := tx.Exec(ctx, createSQL); err != nil {
+			return fmt.Errorf("failed to create role: %w", err)
+		}
+
+		// Configure read-only mode if requested
+		if readOnly {
+			alterSQL := buildReadOnlyAlterSQL(roleName)
+			if _, err := tx.Exec(ctx, alterSQL); err != nil {
+				return fmt.Errorf("failed to configure read-only mode: %w", err)
+			}
+		}
+	}
+
+	// Grant any other roles (besides tsdbadmin) if specified
+	for _, role := range otherRoles {
+		grantSQL := fmt.Sprintf("GRANT %s TO %s",
+			pgx.Identifier{role}.Sanitize(),
+			pgx.Identifier{roleName}.Sanitize())
+		if _, err := tx.Exec(ctx, grantSQL); err != nil {
+			return fmt.Errorf("failed to grant role %s: %w", role, err)
 		}
 	}
 
@@ -615,8 +663,7 @@ GUCs (PostgreSQL Configuration Parameters) That May Be Set:
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
-				PasswordMode: password.PasswordOptional,
-				WarnWriter:   cmd.ErrOrStderr(),
+				WithPassword: true,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)

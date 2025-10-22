@@ -15,12 +15,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
-// skipFromTsdbadminTests controls whether to skip tests that use --from=tsdbadmin.
-// These tests currently fail due to PostgreSQL permission restrictions:
-// tsdbadmin doesn't have ADMIN OPTION on itself, so it can't grant itself to other roles.
-// Set to false to see the actual failures, or true to skip with warning.
-const skipFromTsdbadminTests = true
-
 // setupIntegrationTest sets up isolated test environment with temporary config directory
 func setupIntegrationTest(t *testing.T) string {
 	t.Helper()
@@ -454,10 +448,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	})
 
 	t.Run("CreateRole_WithInheritedGrants", func(t *testing.T) {
-		if skipFromTsdbadminTests {
-			t.Skip("⚠️  Skipping --from=tsdbadmin test: tsdbadmin doesn't have ADMIN OPTION on itself, so it can't grant itself to other roles. This is a known limitation that needs to be fixed.")
-		}
-
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
 		}
@@ -465,12 +455,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		roleName := fmt.Sprintf("integration_test_role_grants_%d", time.Now().Unix())
 		createdRoles = append(createdRoles, roleName)
 
-		t.Logf("Creating role with inherited grants from tsdbadmin: %s", roleName)
+		t.Logf("Creating read-only role with inherited grants from tsdbadmin: %s", roleName)
 
 		output, err := executeIntegrationCommand(
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--from", "tsdbadmin",
+			"--read-only",  // Required when inheriting from tsdbadmin
 			"--output", "json",
 		)
 
@@ -497,7 +488,12 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
 		}
 
-		t.Logf("✅ Successfully created role with inherited grants: %s", roleName)
+		// Verify read_only flag in output (required for tsdbadmin inheritance)
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		t.Logf("✅ Successfully created read-only role with inherited grants: %s", roleName)
 	})
 
 	t.Run("CreateRole_ReadOnly", func(t *testing.T) {
@@ -714,10 +710,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	})
 
 	t.Run("CreateRole_AllOptions", func(t *testing.T) {
-		if skipFromTsdbadminTests {
-			t.Skip("⚠️  Skipping --from=tsdbadmin test: tsdbadmin doesn't have ADMIN OPTION on itself, so it can't grant itself to other roles. This is a known limitation that needs to be fixed.")
-		}
-
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
 		}
@@ -726,15 +718,15 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		password := fmt.Sprintf("test-password-all-%d", time.Now().Unix())
 		createdRoles = append(createdRoles, roleName)
 
-		t.Logf("Creating role with all options: %s", roleName)
+		t.Logf("Creating role with all valid options (tsdbadmin + read-only): %s", roleName)
 
+		// Note: --statement-timeout cannot be used with --from tsdbadmin due to permission restrictions
 		output, err := executeIntegrationCommand(
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--password", password,
 			"--from", "tsdbadmin",
 			"--read-only",
-			"--statement-timeout", "1m",
 			"--output", "json",
 		)
 
@@ -755,11 +747,17 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
 			t.Errorf("Expected read_only=true, got: %v", result["read_only"])
 		}
-		if result["statement_timeout"] != "1m0s" {
-			t.Errorf("Expected statement_timeout=1m0s, got: %v", result["statement_timeout"])
+		// Note: statement_timeout not checked as it cannot be set with --from tsdbadmin
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != "tsdbadmin" {
+			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
 		}
 
-		t.Logf("✅ Successfully created role with all options: %s", roleName)
+		t.Logf("✅ Successfully created role with all valid options: %s", roleName)
 	})
 
 	t.Run("CreateRole_VerifyRolesExist", func(t *testing.T) {

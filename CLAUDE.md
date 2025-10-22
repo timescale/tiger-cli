@@ -38,6 +38,29 @@ go run ./cmd/tiger --help
 ```
 
 ### Integration Testing
+
+#### Using the Test Script (Recommended)
+```bash
+# Run all integration tests
+./scripts/test-integration.sh
+
+# Run specific test pattern
+./scripts/test-integration.sh CreateRole
+
+# Run with verbose output
+./scripts/test-integration.sh -v CreateRole
+
+# Run specific test
+./scripts/test-integration.sh CreateRole_WithInheritedGrants
+```
+
+The script automatically:
+- Loads environment variables from `.env` file
+- Builds the tiger CLI binary
+- Runs the specified integration tests
+- Provides colored output for better readability
+
+#### Manual Testing
 ```bash
 # Run all tests (integration tests will skip without credentials)
 go test ./...
