@@ -660,6 +660,7 @@ tiger config reset
 - `5`: Permission denied
 - `6`: Service not found
 - `7`: Update available (for explicit `version --check`)
+- `8`: Multiple matches found (e.g., ambiguous service name)
 
 ## Output Formats
 

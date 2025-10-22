@@ -20,6 +20,10 @@ import (
 var (
 	// getCredentialsForService can be overridden for testing
 	getCredentialsForService = config.GetCredentials
+	// fetchAllServicesFunc can be overridden for testing
+	fetchAllServicesFunc = fetchAllServices
+	// fetchServiceFunc can be overridden for testing
+	fetchServiceFunc = fetchService
 )
 
 // buildServiceCmd creates the main service command with all subcommands
@@ -42,6 +46,77 @@ func buildServiceCmd() *cobra.Command {
 	return cmd
 }
 
+// getProjectApiClient retrieves the API client and project ID, handling authentication errors
+func getProjectApiClient() (*api.ClientWithResponses, string, error) {
+	apiKey, projectID, err := getCredentialsForService()
+	if err != nil {
+		return nil, "", exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient(apiKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create API client: %w", err)
+	}
+	return client, projectID, nil
+}
+
+// fetchAllServices fetches all services for a project, handling authentication and response errors
+func fetchAllServices() ([]api.Service, error) {
+	client, projectID, err := getProjectApiClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Make API call to list services
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list services: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 200 {
+		return nil, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {
+		return []api.Service{}, nil
+	}
+
+	return *resp.JSON200, nil
+}
+
+// fetchService fetches a specific service by ID, handling authentication and response errors
+func fetchService(serviceID string) (*api.Service, error) {
+	client, projectID, err := getProjectApiClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Make API call to get service details
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service details: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 200 {
+		return nil, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("empty response from API")
+	}
+
+	return resp.JSON200, nil
+}
+
 // buildServiceGetCmd represents the get command under service
 func buildServiceGetCmd() *cobra.Command {
 	var withPassword bool
@@ -53,22 +128,28 @@ func buildServiceGetCmd() *cobra.Command {
 		Short:   "Show detailed information about a service",
 		Long: `Show detailed information about a specific database service.
 
-The service ID can be provided as an argument or will use the default service
+The service ID or name can be provided as an argument or will use the default service
 from your configuration. This command displays comprehensive information about
 the service including configuration, status, endpoints, and resource usage.
+
+If the provided name is ambiguous and matches multiple services, an error message will
+list the matching services, and the process will exit with code ` + fmt.Sprintf("%d", ExitMultipleMatches) + `.
 
 Examples:
   # Get default service details
   tiger service get
 
-  # Get specific service details
-  tiger service get svc-12345
+  # Get specific service details by ID
+  tiger service get b0ysmfnr0y
+
+  # Get specific service details by name
+  tiger service get my-service
 
   # Get service details in JSON format
-  tiger service get svc-12345 --output json
+  tiger service get my-service -o json
 
   # Get service details in YAML format
-  tiger service get svc-12345 --output yaml`,
+  tiger service get my-service -o yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -76,59 +157,68 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
+			idArg := ""
+			if len(args) > 0 {
+				idArg = args[0]
+			}
+
+			if idArg == "" && cfg.ServiceID == "" {
+				return fmt.Errorf("target service was not specified. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
 			// Use flag value if provided, otherwise use config value
 			if cmd.Flags().Changed("output") {
 				cfg.Output = output
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
+			var service *api.Service
+			if idArg == "" {
+				service, err = fetchServiceFunc(cfg.ServiceID)
+				if err != nil {
+					return err
+				}
 			} else {
-				serviceID = cfg.ServiceID
+				services, err := fetchAllServicesFunc()
+				if err != nil {
+					return err
+				}
+
+				if len(services) == 0 {
+					return exitWithCode(ExitGeneralError, fmt.Errorf("you have no services"))
+				}
+
+				// Filter services by exact name or id match
+				var matches []api.Service
+				for _, service := range services {
+					if (service.ServiceId != nil && *service.ServiceId == idArg) || (service.Name != nil && *service.Name == idArg) {
+						matches = append(matches, service)
+					}
+				}
+
+				// Handle no matches
+				if len(matches) == 0 {
+					return exitWithCode(ExitServiceNotFound, fmt.Errorf("no services found matching '%s'", idArg))
+				}
+
+				if len(matches) > 1 {
+					// Multiple matches - output like 'service list' as error
+					if err := outputServices(cmd, matches, cfg.Output); err != nil {
+						return err
+					}
+					return exitWithCode(ExitMultipleMatches, fmt.Errorf("multiple services found matching '%s'", idArg))
+				}
+				service = &matches[0]
 			}
 
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			if service == nil {
+				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service not found"))
 			}
-
-			cmd.SilenceUsage = true
-
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
-			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
-			}
-
-			// Make API call to get service details
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				return fmt.Errorf("failed to get service details: %w", err)
-			}
-
-			// Handle API response
-			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-
-			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword, true)
+			return outputService(cmd, *service, cfg.Output, withPassword, true)
 		},
 	}
 
@@ -160,45 +250,18 @@ func buildServiceListCmd() *cobra.Command {
 
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
+			// Fetch all services using shared function
+			services, err := fetchAllServicesFunc()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return err
 			}
 
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
-			}
-
-			// Make API call to list services
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
-			if err != nil {
-				return fmt.Errorf("failed to list services: %w", err)
-			}
-
-			statusOutput := cmd.ErrOrStderr()
-
-			// Handle API response
-			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			services := *resp.JSON200
 			if len(services) == 0 {
+				statusOutput := cmd.ErrOrStderr()
 				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-				return nil
-			}
-
-			if resp.JSON200 == nil {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
-				return nil
+				cmd.SilenceErrors = true
+				return exitWithCode(ExitGeneralError, nil)
 			}
 
 			// Output services in requested format
@@ -322,16 +385,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
+			client, projectID, err := getProjectApiClient()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return err
 			}
 
 			// Prepare service creation request
@@ -494,16 +550,9 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
+			client, projectID, err := getProjectApiClient()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return err
 			}
 
 			// Prepare password update request
@@ -900,10 +949,9 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
+			client, projectID, err := getProjectApiClient()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return err
 			}
 
 			statusOutput := cmd.ErrOrStderr()
@@ -918,12 +966,6 @@ Examples:
 					fmt.Fprintln(statusOutput, "❌ Delete operation cancelled.")
 					return nil
 				}
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Make the delete request
@@ -1123,16 +1165,9 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
+			client, projectID, err := getProjectApiClient()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return err
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

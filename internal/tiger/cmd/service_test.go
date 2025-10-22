@@ -564,7 +564,7 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
 
-	if !strings.Contains(err.Error(), "service ID is required") {
+	if !strings.Contains(err.Error(), "target service was not specified") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
 	}
 }
@@ -596,6 +596,347 @@ func TestServiceGet_NoAuth(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestServiceGet_ByName_SingleMatch(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForService = originalGetCredentials }()
+
+	// Mock fetchAllServices to return test services
+	originalFetchAllServices := fetchAllServicesFunc
+	fetchAllServicesFunc = func() ([]api.Service, error) {
+		serviceID1 := "svc-match-123"
+		serviceName1 := "my-production-db"
+		serviceID2 := "svc-other-456"
+		serviceName2 := "other-service"
+		region := "us-east-1"
+		status := api.READY
+		serviceType := api.TIMESCALEDB
+		created := time.Now()
+		cpuMillis := 2000
+		memoryGbs := 8
+
+		return []api.Service{
+			{
+				ServiceId:   &serviceID1,
+				Name:        &serviceName1,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+				Resources: &[]struct {
+					Id   *string `json:"id,omitempty"`
+					Spec *struct {
+						CpuMillis  *int    `json:"cpu_millis,omitempty"`
+						MemoryGbs  *int    `json:"memory_gbs,omitempty"`
+						VolumeType *string `json:"volume_type,omitempty"`
+					} `json:"spec,omitempty"`
+				}{
+					{
+						Spec: &struct {
+							CpuMillis  *int    `json:"cpu_millis,omitempty"`
+							MemoryGbs  *int    `json:"memory_gbs,omitempty"`
+							VolumeType *string `json:"volume_type,omitempty"`
+						}{
+							CpuMillis: &cpuMillis,
+							MemoryGbs: &memoryGbs,
+						},
+					},
+				},
+			},
+			{
+				ServiceId:   &serviceID2,
+				Name:        &serviceName2,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+		}, nil
+	}
+	defer func() { fetchAllServicesFunc = originalFetchAllServices }()
+
+	// Execute service get by name (single match)
+	output, err, _ := executeServiceCommand("service", "get", "my-production-db")
+	if err != nil {
+		t.Fatalf("Expected success for single name match, got error: %v", err)
+	}
+
+	// Verify detailed output format (like service get by ID)
+	expectedContents := []string{
+		"svc-match-123",
+		"my-production-db",
+		"READY",
+		"TIMESCALEDB",
+		"us-east-1",
+		"2 cores (2000m)",
+		"8 GB",
+	}
+
+	for _, content := range expectedContents {
+		if !strings.Contains(output, content) {
+			t.Errorf("Expected output to contain %q, got: %s", content, output)
+		}
+	}
+
+	// Verify it's using detailed format (PROPERTY/VALUE headers)
+	if !strings.Contains(output, "PROPERTY") || !strings.Contains(output, "VALUE") {
+		t.Errorf("Single name match should use detailed table format, got: %s", output)
+	}
+}
+
+func TestServiceGet_ByName_MultipleMatches(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForService = originalGetCredentials }()
+
+	// Mock fetchAllServices to return services with duplicate names
+	originalFetchAllServices := fetchAllServicesFunc
+	fetchAllServicesFunc = func() ([]api.Service, error) {
+		serviceID1 := "svc-dup1-123"
+		serviceID2 := "svc-dup2-456"
+		duplicateName := "duplicate-service"
+		region := "us-east-1"
+		status := api.READY
+		serviceType := api.TIMESCALEDB
+		created := time.Now()
+
+		return []api.Service{
+			{
+				ServiceId:   &serviceID1,
+				Name:        &duplicateName,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+			{
+				ServiceId:   &serviceID2,
+				Name:        &duplicateName,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+		}, nil
+	}
+	defer func() { fetchAllServicesFunc = originalFetchAllServices }()
+
+	// Execute service get by name (multiple matches)
+	output, err, _ := executeServiceCommand("service", "get", "duplicate-service")
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("Expected error for multiple matches")
+	}
+
+	// Verify error is about multiple matches
+	if !strings.Contains(err.Error(), "multiple services found") {
+		t.Errorf("Expected 'multiple services found' error, got: %v", err)
+	}
+
+	// Verify exit code is ExitMultipleMatches
+	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+		if exitErr.ExitCode() != ExitMultipleMatches {
+			t.Errorf("Expected exit code %d, got %d", ExitMultipleMatches, exitErr.ExitCode())
+		}
+	} else {
+		t.Error("Expected exitCodeError with ExitMultipleMatches code")
+	}
+
+	// Verify both services are shown in output
+	if !strings.Contains(output, "svc-dup1-123") {
+		t.Errorf("Expected output to contain first service ID")
+	}
+	if !strings.Contains(output, "svc-dup2-456") {
+		t.Errorf("Expected output to contain second service ID")
+	}
+	if !strings.Contains(output, "duplicate-service") {
+		t.Errorf("Expected output to contain duplicate name")
+	}
+
+	// Verify it's using list format (SERVICE ID, NAME headers)
+	if !strings.Contains(output, "SERVICE ID") || !strings.Contains(output, "NAME") {
+		t.Errorf("Multiple matches should use list table format, got: %s", output)
+	}
+}
+
+func TestServiceGet_ByName_NoMatch(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForService = originalGetCredentials }()
+
+	// Mock fetchAllServices to return services that don't match
+	originalFetchAllServices := fetchAllServicesFunc
+	fetchAllServicesFunc = func() ([]api.Service, error) {
+		serviceID1 := "svc-one-123"
+		serviceName1 := "service-one"
+		serviceID2 := "svc-two-456"
+		serviceName2 := "service-two"
+		region := "us-east-1"
+		status := api.READY
+		serviceType := api.TIMESCALEDB
+		created := time.Now()
+
+		return []api.Service{
+			{
+				ServiceId:   &serviceID1,
+				Name:        &serviceName1,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+			{
+				ServiceId:   &serviceID2,
+				Name:        &serviceName2,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+		}, nil
+	}
+	defer func() { fetchAllServicesFunc = originalFetchAllServices }()
+
+	// Execute service get by name (no matches)
+	_, err, _ = executeServiceCommand("service", "get", "non-existent-service")
+
+	// Should return an error
+	if err == nil {
+		t.Fatal("Expected error for no matches")
+	}
+
+	// Verify error is about service not found
+	if !strings.Contains(err.Error(), "no services found matching") {
+		t.Errorf("Expected 'no services found matching' error, got: %v", err)
+	}
+
+	// Verify exit code is ExitServiceNotFound
+	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+		if exitErr.ExitCode() != ExitServiceNotFound {
+			t.Errorf("Expected exit code %d, got %d", ExitServiceNotFound, exitErr.ExitCode())
+		}
+	} else {
+		t.Error("Expected exitCodeError with ExitServiceNotFound code")
+	}
+}
+
+func TestServiceGet_ByID_WithSameNameExists(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication
+	originalGetCredentials := getCredentialsForService
+	getCredentialsForService = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForService = originalGetCredentials }()
+
+	// Mock fetchAllServices - edge case where service ID matches another service's name
+	originalFetchAllServices := fetchAllServicesFunc
+	fetchAllServicesFunc = func() ([]api.Service, error) {
+		serviceID1 := "svc-12345"
+		serviceName1 := "my-service"
+		serviceID2 := "svc-67890"
+		serviceName2 := serviceID1 // Name that matches the first service's ID
+		region := "us-east-1"
+		status := api.READY
+		serviceType := api.TIMESCALEDB
+		created := time.Now()
+
+		return []api.Service{
+			{
+				ServiceId:   &serviceID1,
+				Name:        &serviceName1,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+			{
+				ServiceId:   &serviceID2,
+				Name:        &serviceName2,
+				RegionCode:  &region,
+				Status:      &status,
+				ServiceType: &serviceType,
+				Created:     &created,
+			},
+		}, nil
+	}
+	defer func() { fetchAllServicesFunc = originalFetchAllServices }()
+
+	// Execute service get with "svc-12345" - matches service 1 by ID and service 2 by name
+	output, err, _ := executeServiceCommand("service", "get", "svc-12345")
+
+	// Should return an error for multiple matches
+	if err == nil {
+		t.Fatal("Expected error for multiple matches (ID + name collision)")
+	}
+
+	// Verify error is about multiple matches
+	if !strings.Contains(err.Error(), "multiple services found") {
+		t.Errorf("Expected 'multiple services found' error, got: %v", err)
+	}
+
+	// Verify both services are shown (one matched by ID, one by name)
+	if !strings.Contains(output, "svc-12345") || !strings.Contains(output, "svc-67890") {
+		t.Errorf("Expected output to show both services, got: %s", output)
+	}
+
+	// Verify exit code is ExitMultipleMatches
+	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+		if exitErr.ExitCode() != ExitMultipleMatches {
+			t.Errorf("Expected exit code %d, got %d", ExitMultipleMatches, exitErr.ExitCode())
+		}
 	}
 }
 
