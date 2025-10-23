@@ -355,27 +355,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("✅ psql command with updated password succeeded")
 	})
 
-	// Track created roles for cleanup - must capture serviceID since it gets cleared later
+	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)
 	var createdRoles []string
-	cleanupRoles := func() {
-		// Clean up all created roles - use captured serviceID
-		capturedServiceID := serviceID
-		if capturedServiceID == "" {
-			t.Logf("Warning: No service ID available for role cleanup")
-			return
-		}
-		for _, roleName := range createdRoles {
-			t.Logf("Cleaning up role: %s", roleName)
-			// Use psql to drop the role - best effort cleanup
-			_, err := executeIntegrationCommand(
-				"db", "psql", capturedServiceID,
-				"--", "-c", fmt.Sprintf("DROP ROLE IF EXISTS %s;", roleName),
-			)
-			if err != nil {
-				t.Logf("Warning: Failed to cleanup role %s: %v", roleName, err)
-			}
-		}
-	}
 
 	t.Run("CreateRole_Basic", func(t *testing.T) {
 		if serviceID == "" {
@@ -461,7 +442,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--from", "tsdbadmin",
-			"--read-only",  // Required when inheriting from tsdbadmin
+			"--read-only", // Required when inheriting from tsdbadmin
 			"--output", "json",
 		)
 
@@ -829,9 +810,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Skip("No service ID available for deletion")
 		}
 
-		// Clean up roles before deleting the service
-		cleanupRoles()
-
 		t.Logf("Deleting service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
@@ -956,8 +934,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	return ""
 }
 
-// TestServiceNotFound tests that commands requiring service ID fail with correct exit code for non-existent services
-func TestServiceNotFound(t *testing.T) {
+// TestServiceNotFoundIntegration tests that commands requiring service ID fail with correct exit code for non-existent services
+func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
@@ -1046,9 +1024,13 @@ func TestServiceNotFound(t *testing.T) {
 				return
 			}
 
-			// Verify error message contains "not found"
-			if !strings.Contains(err.Error(), "not found") {
-				t.Errorf("Expected 'not found' error message for %s, got: %v", tc.name, err)
+			// Verify error message indicates service doesn't exist (API returns various messages)
+			errorMsg := strings.ToLower(err.Error())
+			if !strings.Contains(errorMsg, "not found") &&
+			   !strings.Contains(errorMsg, "no entries") &&
+			   !strings.Contains(errorMsg, "no service") &&
+			   !strings.Contains(errorMsg, "could not be found") {
+				t.Errorf("Expected error message indicating service doesn't exist for %s, got: %v", tc.name, err)
 			}
 
 			// Verify correct exit code

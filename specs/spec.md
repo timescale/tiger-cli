@@ -469,6 +469,9 @@ The `--read-only` flag enables permanent read-only enforcement at the PostgreSQL
 - **Automated reporting**: Run analytics queries against current production data without forking
 - **Development tools**: Provide read-only access to tools that need to inspect but not modify data
 
+**Default Permissions (No `--from` Flag):**
+When `--from` is not specified, the role is created with only LOGIN and PASSWORD privileges. The role will have no table or schema permissions by default - it can connect to the database but cannot access any tables, schemas, or other database objects. You would need to manually grant permissions using PostgreSQL GRANT commands, or use the `--from` flag to inherit permissions from existing roles.
+
 **Combining with `--from` for Safe Table Access:**
 The `--from` flag allows you to create a read-only role that inherits the same table access as your application role:
 

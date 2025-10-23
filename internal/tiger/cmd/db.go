@@ -427,6 +427,17 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 			roleName); err != nil {
 			return fmt.Errorf("failed to grant tsdbadmin privileges: %w", err)
 		}
+
+		// Grant any other roles (besides tsdbadmin) if specified
+		// This is necessary because the special functions don't support IN ROLE clause
+		for _, role := range otherRoles {
+			grantSQL := fmt.Sprintf("GRANT %s TO %s",
+				pgx.Identifier{role}.Sanitize(),
+				pgx.Identifier{roleName}.Sanitize())
+			if _, err := tx.Exec(ctx, grantSQL); err != nil {
+				return fmt.Errorf("failed to grant role %s: %w", role, err)
+			}
+		}
 	} else {
 		// Use standard CREATE ROLE for non-tsdbadmin cases
 		// Fail if password contains a single quote (we don't support escaping)
@@ -435,6 +446,7 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 		}
 		// Wrap password in single quotes for SQL literal
 		quotedPassword := "'" + rolePassword + "'"
+		// IN ROLE clause handles all role grants, so no need for separate GRANT statements
 		createSQL := buildCreateRoleSQL(roleName, quotedPassword, fromRoles)
 		if _, err := tx.Exec(ctx, createSQL); err != nil {
 			return fmt.Errorf("failed to create role: %w", err)
@@ -446,16 +458,6 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 			if _, err := tx.Exec(ctx, alterSQL); err != nil {
 				return fmt.Errorf("failed to configure read-only mode: %w", err)
 			}
-		}
-	}
-
-	// Grant any other roles (besides tsdbadmin) if specified
-	for _, role := range otherRoles {
-		grantSQL := fmt.Sprintf("GRANT %s TO %s",
-			pgx.Identifier{role}.Sanitize(),
-			pgx.Identifier{roleName}.Sanitize())
-		if _, err := tx.Exec(ctx, grantSQL); err != nil {
-			return fmt.Errorf("failed to grant role %s: %w", role, err)
 		}
 	}
 
@@ -563,7 +565,7 @@ func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, 
 func buildDbCreateRoleCmd() *cobra.Command {
 	var roleName string
 	var readOnly bool
-	var fromRoles string
+	var fromRoles []string
 	var statementTimeout time.Duration
 	var passwordFlag string
 	var output string
@@ -603,7 +605,7 @@ Examples:
   tiger db create role --name ai_analyst --read-only --from app_role
 
   # Create a read-only role inheriting from multiple roles
-  tiger db create role --name ai_analyst --read-only --from app_role,readonly_role
+  tiger db create role --name ai_analyst --read-only --from app_role --from readonly_role
 
   # Create a read-only role with statement timeout
   tiger db create role --name ai_analyst --read-only --statement-timeout 30s
@@ -612,8 +614,7 @@ Examples:
   tiger db create role --name ai_analyst --password=my-secure-password
 
   # Create a role with password from environment variable
-  export TIGER_NEW_PASSWORD=my-secure-password
-  tiger db create role --name ai_analyst
+  TIGER_NEW_PASSWORD=my-secure-password tiger db create role --name ai_analyst
 
 Technical Details:
 This command executes PostgreSQL statements in a transaction to create and configure the role.
@@ -623,7 +624,7 @@ CREATE ROLE Options Used:
   - PASSWORD: Always set (from flag, env var, or auto-generated)
   - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
 
-GUCs (PostgreSQL Configuration Parameters) That May Be Set:
+PostgreSQL Configuration Parameters That May Be Set:
   - tsdb_admin.read_only_role: Set to 'true' when --read-only flag is used
     (enforces permanent read-only mode for the role)
   - statement_timeout: Set when --statement-timeout flag is provided
@@ -679,19 +680,8 @@ GUCs (PostgreSQL Configuration Parameters) That May Be Set:
 			}
 			defer conn.Close(ctx)
 
-			// Parse from roles
-			var fromRolesList []string
-			if fromRoles != "" {
-				for _, role := range strings.Split(fromRoles, ",") {
-					role = strings.TrimSpace(role)
-					if role != "" {
-						fromRolesList = append(fromRolesList, role)
-					}
-				}
-			}
-
 			// Create the role with all options in a transaction
-			if err := createRoleWithOptions(ctx, conn, roleName, rolePassword, readOnly, statementTimeout, fromRolesList); err != nil {
+			if err := createRoleWithOptions(ctx, conn, roleName, rolePassword, readOnly, statementTimeout, fromRoles); err != nil {
 				return fmt.Errorf("failed to create role: %w", err)
 			}
 
@@ -704,14 +694,14 @@ GUCs (PostgreSQL Configuration Parameters) That May Be Set:
 			}
 
 			// Output result in requested format
-			return outputCreateRoleResult(cmd, roleName, readOnly, statementTimeout, fromRolesList, cfg.Output)
+			return outputCreateRoleResult(cmd, roleName, readOnly, statementTimeout, fromRoles, cfg.Output)
 		},
 	}
 
 	// Add flags
 	cmd.Flags().StringVar(&roleName, "name", "", "Role name to create (required)")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Enable permanent read-only enforcement via tsdb_admin.read_only_role")
-	cmd.Flags().StringVar(&fromRoles, "from", "", "Comma-separated list of roles to inherit grants from (e.g., app_role,readonly_role)")
+	cmd.Flags().StringSliceVar(&fromRoles, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&passwordFlag, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")

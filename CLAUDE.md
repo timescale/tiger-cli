@@ -41,24 +41,27 @@ go run ./cmd/tiger --help
 
 #### Using the Test Script (Recommended)
 ```bash
-# Run all integration tests
+# Run all integration tests (default pattern: Integration)
 ./scripts/test-integration.sh
 
-# Run specific test pattern
-./scripts/test-integration.sh CreateRole
-
 # Run with verbose output
-./scripts/test-integration.sh -v CreateRole
+./scripts/test-integration.sh -v
 
-# Run specific test
-./scripts/test-integration.sh CreateRole_WithInheritedGrants
+# Run specific test pattern (overrides default)
+./scripts/test-integration.sh -run CreateRole
+
+# Run with custom timeout
+./scripts/test-integration.sh -timeout 10m
+
+# Combine flags (any go test flags are supported)
+./scripts/test-integration.sh -v -run CreateRole_WithInheritedGrants -timeout 5m
 ```
 
 The script automatically:
 - Loads environment variables from `.env` file
 - Builds the tiger CLI binary
-- Runs the specified integration tests
-- Provides colored output for better readability
+- Runs tests matching "Integration" pattern by default
+- Passes all arguments through to `go test` (supports all standard go test flags)
 
 #### Manual Testing
 ```bash
