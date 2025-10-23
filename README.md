@@ -2,21 +2,6 @@
 
 Tiger CLI is the command-line interface for Tiger Cloud. It provides commands for managing and querying database services, as well as an integrated Model Context Protocol (MCP) server for use with AI assistants.
 
-## What Makes This Different
-
-Most database MCP servers are thin API wrappers. Ours teaches AI how to think in Postgres.
-
-The Tiger MCP server gives your AI assistant instant access to:
-- **35 years of Postgres expertise** through production-tested prompt templates written by senior engineers
-- **Versioned PostgreSQL documentation** (15-18) and TimescaleDB docs via hybrid search
-- **Auto-discovered best practices** - just ask to design a schema and it knows what you need
-
-No prompt engineering required. No manual doc lookups. Just ask, and get production-ready Postgres code that follows modern best practices: proper ID strategies, correct data types, case-insensitive indexes, and optimized performance patterns.
-
-While other Postgres companies built MCP servers as API wrappers, we built one that prevents the schema mistakes that cause expensive migrations six months later.
-
-**[Read more about how prompt templates make this possible →](https://www.tigerdata.com/blog/free-postgres-mcp-prompt-templates)**
-
 ## Installation
 
 Multiple installation methods are provided. Choose your preferred method from the options below. If you aren't sure, use the first one!
