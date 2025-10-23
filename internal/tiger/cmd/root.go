@@ -1,8 +1,9 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -14,7 +15,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
-func buildRootCmd() *cobra.Command {
+func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 	var configDir string
 	var debug bool
 	var serviceID string
@@ -36,6 +37,8 @@ tiger auth login
 
 `,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SetContext(ctx)
+
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -82,8 +85,7 @@ tiger auth login
 	initConfigFunc := func() {
 		configDirFlag := cmd.PersistentFlags().Lookup("config-dir")
 		if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up config: %v\n", err)
-			os.Exit(1)
+			panic(fmt.Errorf("error setting up config: %w", err))
 		}
 	}
 
@@ -99,11 +101,16 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
 
 	// Bind flags to viper
-	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
-	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
-	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
-	viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color"))
+	err := errors.Join(
+		viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug")),
+		viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id")),
+		viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics")),
+		viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage")),
+		viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color")),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind flags: %w", err)
+	}
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:
@@ -120,17 +127,14 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
-	return cmd
+	return cmd, nil
 }
 
-func Execute() {
-	rootCmd := buildRootCmd()
-	err := rootCmd.Execute()
+func Execute(ctx context.Context) error {
+	rootCmd, err := buildRootCmd(ctx)
 	if err != nil {
-		// Check if it's a custom exit code error
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(exitErr.ExitCode())
-		}
-		os.Exit(1)
+		return err
 	}
+
+	return rootCmd.Execute()
 }

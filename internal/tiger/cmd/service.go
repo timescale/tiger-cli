@@ -108,7 +108,7 @@ Examples:
 			}
 
 			// Make API call to get service details
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
@@ -173,7 +173,7 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Make API call to list services
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
@@ -350,7 +350,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Make API call to create service
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// All status messages go to stderr
@@ -399,7 +399,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					service.Status, serviceErr = waitForServiceReady(ctx, client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
 					if serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
@@ -512,7 +512,7 @@ Examples:
 			}
 
 			// Make API call to update password
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
@@ -771,8 +771,8 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
+func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
+	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -928,7 +928,7 @@ Examples:
 
 			// Make the delete request
 			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
-				context.Background(),
+				cmd.Context(),
 				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
@@ -969,7 +969,7 @@ Examples:
 
 // waitForServiceDeletion waits for a service to be fully deleted
 func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -1135,7 +1135,7 @@ Examples:
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
@@ -1226,7 +1226,7 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				forkedService.Status, serviceErr = waitForServiceReady(ctx, client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
 				if serviceErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {

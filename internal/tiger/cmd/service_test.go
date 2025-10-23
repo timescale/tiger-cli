@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -48,18 +49,21 @@ func setupServiceTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeServiceCommand(args ...string) (string, error, *cobra.Command) {
+func executeServiceCommand(ctx context.Context, args ...string) (string, error, *cobra.Command) {
 	// No need to reset any flags - we build fresh commands with local variables
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err, nil
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err, testRoot
 }
 
@@ -82,7 +86,7 @@ func TestServiceList_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service list command
-	_, err, _ = executeServiceCommand("service", "list")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "list")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -204,7 +208,7 @@ func TestServiceFork_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with required timing flag
-	_, err, _ = executeServiceCommand("service", "fork", "--now")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -233,7 +237,7 @@ func TestServiceFork_NoSourceService(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command without providing service ID but with timing flag
-	_, err, _ = executeServiceCommand("service", "fork", "--now")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
 	if err == nil {
 		t.Fatal("Expected error when no service ID provided")
 	}
@@ -263,7 +267,7 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command without any timing flag
-	_, err, _ = executeServiceCommand("service", "fork", "source-service-123")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123")
 	if err == nil {
 		t.Fatal("Expected error when no timing flag provided")
 	}
@@ -293,7 +297,7 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with multiple timing flags
-	_, err, _ = executeServiceCommand("service", "fork", "source-service-123", "--now", "--last-snapshot")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--last-snapshot")
 	if err == nil {
 		t.Fatal("Expected error when multiple timing flags provided")
 	}
@@ -323,7 +327,7 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service fork command with invalid timestamp
-	_, err, _ = executeServiceCommand("service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
 	if err == nil {
 		t.Fatal("Expected error when invalid timestamp provided")
 	}
@@ -354,7 +358,7 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 
 	// Test with invalid CPU/memory combination (this would fail at API call stage)
 	// Since we don't want to make real API calls, we expect the command to fail during validation
-	_, err, _ = executeServiceCommand("service", "fork", "source-service-123", "--now", "--cpu", "999", "--memory", "1")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--cpu", "999", "--memory", "1")
 
 	// This test is mainly to ensure the flags are parsed correctly
 	// The actual validation happens later in the process when we have source service details
@@ -397,14 +401,14 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 
 	// Test with no name (should auto-generate) - this should now work without error
 	// Just test that it doesn't fail due to missing name
-	_, err, _ = executeServiceCommand("service", "create", "--addons", "none", "--region", "us-east-1")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "create", "--addons", "none", "--region", "us-east-1")
 	// This should fail due to network/API call, not due to missing name
 	if err != nil && (strings.Contains(err.Error(), "name") && strings.Contains(err.Error(), "required")) {
 		t.Errorf("Should not fail due to missing name anymore (should auto-generate), got: %v", err)
 	}
 
 	// Test invalid addon - this should fail validation before making API call
-	_, err, _ = executeServiceCommand("service", "create", "--addons", "invalid-addon", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "create", "--addons", "invalid-addon", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
 		t.Fatal("Expected error when addon is invalid")
 	}
@@ -432,7 +436,7 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service create command with valid parameters (name will be auto-generated)
-	_, err, _ = executeServiceCommand("service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -499,7 +503,7 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 	// Test that service name is auto-generated when not provided
 	// We expect this to fail at the API call stage, not at validation
 	var rootCmd *cobra.Command
-	_, err, rootCmd = executeServiceCommand("service", "create", "--addons", "none", "--region", "us-east-1")
+	_, err, rootCmd = executeServiceCommand(t.Context(), "service", "create", "--addons", "none", "--region", "us-east-1")
 
 	// The command should not fail due to missing service name
 	if err != nil && strings.Contains(err.Error(), "service name is required") {
@@ -559,7 +563,7 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service get command without service ID
-	_, err, _ = executeServiceCommand("service", "get")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -589,7 +593,7 @@ func TestServiceGet_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service get command
-	_, err, _ = executeServiceCommand("service", "get")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -977,7 +981,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command without service ID
-	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1007,7 +1011,7 @@ func TestServiceUpdatePassword_NoPassword(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command without password
-	_, err, _ = executeServiceCommand("service", "update-password")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password")
 	if err == nil {
 		t.Fatal("Expected error when no password is provided")
 	}
@@ -1037,7 +1041,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service update-password command
-	_, err, _ = executeServiceCommand("service", "update-password", "--new-password", "new-password")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1078,7 +1082,7 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	}()
 
 	// Execute command without --password flag (should use environment variable)
-	_, err, _ = executeServiceCommand("service", "update-password", "test-service-456")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "test-service-456")
 
 	// Should fail with network error (not password missing error) since we have password from env
 	if err == nil {
@@ -1169,7 +1173,7 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Execute service create with specific wait-timeout
-			_, err, _ := executeServiceCommand("service", "create",
+			_, err, _ := executeServiceCommand(t.Context(), "service", "create",
 				"--name", "test-service",
 				"--addons", "none",
 				"--region", "us-east-1",
@@ -1227,7 +1231,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	cmd.SetErr(errBuf)
 
 	// Test waitForServiceReady with very short timeout to trigger timeout quickly
-	_, err = waitForServiceReady(client, "test-project-123", "svc-12345", 100*time.Millisecond, nil, cmd.ErrOrStderr())
+	_, err = waitForServiceReady(t.Context(), client, "test-project-123", "svc-12345", 100*time.Millisecond, nil, cmd.ErrOrStderr())
 
 	// Should return an error with ExitTimeout
 	if err == nil {
@@ -1256,7 +1260,10 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 
 func TestServiceCommandAliases(t *testing.T) {
 	// Build a fresh root command to test aliases
-	rootCmd := buildRootCmd()
+	rootCmd, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 
 	// Test that 'service' command exists
 	serviceCmd, _, err := rootCmd.Find([]string{"service"})
@@ -1309,7 +1316,7 @@ func TestServiceDelete_NoServiceID(t *testing.T) {
 	}
 
 	// Execute service delete command without service ID
-	_, err, _ = executeServiceCommand("service", "delete")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "delete")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided")
 	}
@@ -1338,7 +1345,7 @@ func TestServiceDelete_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Execute service delete command
-	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1368,7 +1375,7 @@ func TestServiceDelete_WithConfirmFlag(t *testing.T) {
 
 	// Execute service delete command with --confirm flag
 	// This should fail due to network error (which is expected in tests)
-	_, err, _ = executeServiceCommand("service", "delete", "svc-12345", "--confirm")
+	_, err, _ = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
 	if err == nil {
 		t.Fatal("Expected error due to network failure, but got none")
 	}
@@ -1402,7 +1409,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
-	output, err, _ := executeServiceCommand("service", "delete", "svc-12345")
+	output, err, _ := executeServiceCommand(t.Context(), "service", "delete", "svc-12345")
 
 	// Should either fail due to stdin read error or show cancellation message
 	// The exact behavior depends on the test environment
@@ -1413,7 +1420,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 
 func TestServiceDelete_HelpOutput(t *testing.T) {
 	// Test that the help output contains expected information
-	output, err, _ := executeServiceCommand("service", "delete", "--help")
+	output, err, _ := executeServiceCommand(t.Context(), "service", "delete", "--help")
 	if err != nil {
 		t.Fatalf("Help command should not fail: %v", err)
 	}
@@ -1468,7 +1475,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// All these should fail due to network (which is expected)
 			// but they should NOT fail due to flag parsing errors
-			_, err, _ := executeServiceCommand(tc.args...)
+			_, err, _ := executeServiceCommand(t.Context(), tc.args...)
 
 			// Should fail with network error, not flag parsing error
 			if err != nil && strings.Contains(err.Error(), "flag") {
@@ -1480,7 +1487,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 
 func TestServiceCreate_NoSetDefaultFlag(t *testing.T) {
 	// Test that the --no-set-default flag is recognized and doesn't cause parsing errors
-	output, err, _ := executeServiceCommand("service", "create", "--help")
+	output, err, _ := executeServiceCommand(t.Context(), "service", "create", "--help")
 	if err != nil {
 		t.Fatalf("Help command should not fail: %v", err)
 	}
@@ -1625,7 +1632,7 @@ func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
 	// Execute service create with -o json flag
 	// This will fail due to network error (localhost:9999 doesn't exist), but that's OK
 	// We just want to verify that the config file doesn't get the output flag written to it
-	executeServiceCommand("service", "create", "-o", "json", "--cpu", "shared", "--memory", "shared")
+	_, _, _ = executeServiceCommand(t.Context(), "service", "create", "-o", "json", "--cpu", "shared", "--memory", "shared")
 
 	configMap = parseConfigFile(t, configFile)
 	if outputVal, exists := configMap["output"]; !exists || outputVal != "table" {
@@ -1661,7 +1668,7 @@ func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
 	}
 
 	// Execute service list with -o json flag (will fail due to no mock API, but that's OK)
-	executeServiceCommand("service", "list", "-o", "json")
+	_, _, _ = executeServiceCommand(t.Context(), "service", "list", "-o", "json")
 
 	// Read the config file again
 	newConfigBytes, err := os.ReadFile(configFile)

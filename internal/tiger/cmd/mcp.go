@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -211,7 +208,7 @@ func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
 	// Setup graceful shutdown handling
-	ctx, stop := signalContext(ctx)
+	ctx, stop := watchContext(ctx)
 	defer stop()
 
 	// Create MCP server
@@ -238,7 +235,7 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
 	// Setup graceful shutdown handling
-	ctx, stop := signalContext(ctx)
+	ctx, stop := watchContext(ctx)
 	defer stop()
 
 	// Create MCP server
@@ -312,27 +309,16 @@ func getListener(host string, startPort int) (net.Listener, int, error) {
 	return nil, 0, fmt.Errorf("no available port found in range %d-%d", startPort, startPort+99)
 }
 
-// signalContext sets up graceful shutdown handling and returns a context and
+// watchContext sets up graceful shutdown handling and returns a context and
 // cleanup function. This is nearly identical to [signal.NotifyContext], except
 // that it logs a message when a signal is received.
-func signalContext(parent context.Context) (context.Context, context.CancelFunc) {
+func watchContext(parent context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		select {
-		case sig := <-sigChan:
-			logging.Info("Received interrupt signal, shutting down MCP server...",
-				zap.Stringer("signal", sig),
-			)
-			cancel()
-		case <-ctx.Done():
-		}
+		<-ctx.Done()
+		logging.Info("Received interrupt signal, shutting down MCP server...")
 	}()
 
-	return ctx, func() {
-		cancel()
-		signal.Stop(sigChan)
-	}
+	return ctx, func() { cancel() }
 }

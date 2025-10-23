@@ -46,16 +46,19 @@ func setupDBTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeDBCommand(args ...string) (string, error) {
+func executeDBCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
@@ -78,7 +81,7 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command without service ID
-	_, err = executeDBCommand("db", "connection-string")
+	_, err = executeDBCommand(t.Context(), "db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -108,7 +111,7 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command
-	_, err = executeDBCommand("db", "connection-string")
+	_, err = executeDBCommand(t.Context(), "db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -171,7 +174,7 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command without service ID
-	_, err = executeDBCommand("db", "connect")
+	_, err = executeDBCommand(t.Context(), "db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -201,7 +204,7 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command
-	_, err = executeDBCommand("db", "connect")
+	_, err = executeDBCommand(t.Context(), "db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -231,8 +234,8 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Test that psql alias works the same as connect
-	_, err1 := executeDBCommand("db", "connect")
-	_, err2 := executeDBCommand("db", "psql")
+	_, err1 := executeDBCommand(t.Context(), "db", "connect")
+	_, err2 := executeDBCommand(t.Context(), "db", "psql")
 
 	// Both should behave identically (both will fail due to network/psql not found, but with same error pattern)
 	if err1 == nil || err2 == nil {
@@ -510,7 +513,7 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command without service ID
-	_, err = executeDBCommand("db", "test-connection")
+	_, err = executeDBCommand(t.Context(), "db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -540,7 +543,7 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command
-	_, err = executeDBCommand("db", "test-connection")
+	_, err = executeDBCommand(t.Context(), "db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -743,7 +746,7 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			defer func() { getCredentialsForDB = originalGetCredentials }()
 
 			// Execute db test-connection command with timeout flag
-			_, err = executeDBCommand("db", "test-connection", "--timeout", tc.timeoutFlag)
+			_, err = executeDBCommand(t.Context(), "db", "test-connection", "--timeout", tc.timeoutFlag)
 
 			if !tc.expectError {
 				if err != nil {
@@ -896,7 +899,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	testPassword := "explicit-password-123"
 
 	// Execute save-password with explicit password
-	output, err := executeDBCommand("db", "save-password", "--password="+testPassword)
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed, got error: %v", err)
 	}
@@ -968,7 +971,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	defer os.Unsetenv("TIGER_NEW_PASSWORD")
 
 	// Execute save-password without --password flag (should use env var)
-	output, err := executeDBCommand("db", "save-password")
+	output, err := executeDBCommand(t.Context(), "db", "save-password")
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed with env var, got error: %v", err)
 	}
@@ -1052,7 +1055,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
 
 	// Execute save-password without --password flag or env var
-	output, err := executeDBCommand("db", "save-password")
+	output, err := executeDBCommand(t.Context(), "db", "save-password")
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed with interactive input, got error: %v", err)
 	}
@@ -1125,7 +1128,7 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
 
 	// Execute the command
-	_, err = executeDBCommand("db", "save-password")
+	_, err = executeDBCommand(t.Context(), "db", "save-password")
 	if err == nil {
 		t.Fatal("Expected error when user provides empty password interactively")
 	}
@@ -1180,7 +1183,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	customRole := "readonly"
 
 	// Execute with custom role
-	output, err := executeDBCommand("db", "save-password", "--password="+testPassword, "--role", customRole)
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword, "--role", customRole)
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed with custom role, got error: %v", err)
 	}
@@ -1227,7 +1230,7 @@ func TestDBSavePassword_NoServiceID(t *testing.T) {
 	// No need to mock since it should fail before reaching getServiceDetailsFunc
 
 	// Execute save-password without service ID
-	_, err = executeDBCommand("db", "save-password", "--password=test-password")
+	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -1258,7 +1261,7 @@ func TestDBSavePassword_NoAuth(t *testing.T) {
 	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute save-password command
-	_, err = executeDBCommand("db", "save-password", "--password=test-password")
+	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -1311,7 +1314,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	testPassword := "pgpass-password-101"
 
 	// Execute with pgpass storage
-	output, err := executeDBCommand("db", "save-password", "--password="+testPassword)
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
 	if err != nil {
 		t.Fatalf("Expected save-password to succeed with pgpass, got error: %v", err)
 	}
