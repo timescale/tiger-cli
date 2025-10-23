@@ -39,6 +39,12 @@ tiger auth login
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
 
+			// Setup configuration initialization
+			configDirFlag := cmd.Flags().Lookup("config-dir")
+			if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
+				return fmt.Errorf("error setting up config: %w", err)
+			}
+
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -80,16 +86,6 @@ tiger auth login
 			return nil
 		},
 	}
-
-	// Setup configuration initialization
-	initConfigFunc := func() {
-		configDirFlag := cmd.PersistentFlags().Lookup("config-dir")
-		if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
-			panic(fmt.Errorf("error setting up config: %w", err))
-		}
-	}
-
-	cobra.OnInitialize(initConfigFunc)
 
 	// Add persistent flags
 	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
