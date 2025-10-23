@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -786,7 +787,14 @@ func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, p
 	for {
 		select {
 		case <-ctx.Done():
-			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			case errors.Is(ctx.Err(), context.Canceled):
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be provisioning"))
+			default:
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be provisioning: %w", ctx.Err()))
+			}
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -984,7 +992,14 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			case errors.Is(ctx.Err(), context.Canceled):
+				return exitWithCode(ExitTimeout, fmt.Errorf("canceled waiting for service '%s' to be deleted", serviceID))
+			default:
+				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be deleting: %w", ctx.Err()))
+			}
 		case <-ticker.C:
 			// Check if service still exists
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
