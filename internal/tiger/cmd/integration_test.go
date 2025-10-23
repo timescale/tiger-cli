@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -39,7 +41,10 @@ func setupIntegrationTest(t *testing.T) string {
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
 		// to avoid circular dependencies during setup
-		rootCmd := buildRootCmd()
+		rootCmd, err := buildRootCmd(t.Context())
+		if err != nil {
+			t.Fatalf("Failed to build root command during setup: %v", err)
+		}
 		rootCmd.SetArgs([]string{"config", "set", "api_url", apiURL})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("Failed to set integration API URL during setup: %v", err)
@@ -59,7 +64,7 @@ func setupIntegrationTest(t *testing.T) string {
 }
 
 // executeIntegrationCommand executes a CLI command for integration testing
-func executeIntegrationCommand(args ...string) (string, error) {
+func executeIntegrationCommand(ctx context.Context, args ...string) (string, error) {
 	// Reset both global config and viper before each command execution
 	// This ensures fresh config loading with proper flag precedence
 	config.ResetGlobalConfig()
@@ -69,14 +74,17 @@ func executeIntegrationCommand(args ...string) (string, error) {
 	viper.AutomaticEnv()
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
@@ -104,7 +112,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -116,6 +124,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Logf("Cleaning up service: %s", serviceID)
 			// Best effort cleanup - don't fail the test if cleanup fails
 			_, err := executeIntegrationCommand(
+				t.Context(),
 				"service", "delete", serviceID,
 				"--confirm",
 				"--wait-timeout", "5m",
@@ -130,6 +139,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
@@ -151,7 +161,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("Status", func(t *testing.T) {
 		t.Logf("Verifying authentication status")
 
-		output, err := executeIntegrationCommand("auth", "status")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "status")
 		if err != nil {
 			t.Fatalf("Status failed: %v\nOutput: %s", err, output)
 		}
@@ -168,6 +178,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating service: %s", serviceName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "create",
 			"--name", serviceName,
 			"--wait-timeout", "15m", // Longer timeout for integration tests
@@ -197,6 +208,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Listing services to verify creation")
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "list",
 			"--output", "json",
 		)
@@ -223,6 +235,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Getting service details: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "get", serviceID,
 			"--output", "json",
 		)
@@ -264,6 +277,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Testing psql command with original password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as original_password_test;",
 		)
@@ -290,6 +304,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Updating password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "update-password", serviceID,
 			"--new-password", newPassword,
 			"--password-storage", "keychain", // Save to keychain for psql test
@@ -313,7 +328,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Getting connection string for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
-			"db", "connection-string", serviceID,
+			t.Context(), "db", "connection-string", serviceID,
 		)
 
 		if err != nil {
@@ -339,6 +354,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Testing psql command with updated password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as updated_password_test;",
 		)
@@ -369,6 +385,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating basic role: %s", roleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--output", "json",
@@ -404,6 +421,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating role with explicit password: %s", roleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--password", password,
@@ -439,6 +457,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating read-only role with inherited grants from tsdbadmin: %s", roleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--from", "tsdbadmin",
@@ -488,6 +507,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating read-only role: %s", roleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--read-only",
@@ -523,6 +543,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating role with statement timeout: %s", roleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--statement-timeout", "30s",
@@ -561,6 +582,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating base role with write privileges: %s", baseRoleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", baseRoleName,
 			"--password", basePassword,
@@ -574,6 +596,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Grant CREATE privilege on public schema to base role
 		t.Logf("Granting CREATE privilege to %s", baseRoleName)
 		_, err = executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--", "-c", fmt.Sprintf("GRANT CREATE ON SCHEMA public TO %s;", baseRoleName),
 		)
@@ -587,6 +610,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Create table and insert data
 		_, err = executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--role", baseRoleName,
 			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT, data TEXT);", tableName),
@@ -596,6 +620,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		_, err = executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--role", baseRoleName,
 			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (1, 'test data');", tableName),
@@ -613,6 +638,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating read-only role with inheritance from %s: %s", baseRoleName, readOnlyRoleName)
 
 		output, err = executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", readOnlyRoleName,
 			"--password", readOnlyPassword,
@@ -647,6 +673,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Step 4: Verify read-only role can READ the data
 		t.Logf("Verifying read-only role can read data from %s", tableName)
 		readOutput, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--role", readOnlyRoleName,
 			"--", "-c", fmt.Sprintf("SELECT * FROM %s;", tableName),
@@ -663,6 +690,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Step 5: Verify read-only role CANNOT WRITE
 		t.Logf("Verifying read-only role cannot write to %s", tableName)
 		writeOutput, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--role", readOnlyRoleName,
 			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (2, 'should fail');", tableName),
@@ -682,6 +710,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Step 6: Clean up - drop the table
 		t.Logf("Cleaning up table %s", tableName)
 		_, _ = executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--role", baseRoleName,
 			"--", "-c", fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName),
@@ -703,6 +732,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Note: --statement-timeout cannot be used with --from tsdbadmin due to permission restrictions
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", roleName,
 			"--password", password,
@@ -755,6 +785,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		for _, roleName := range createdRoles {
 			output, err := executeIntegrationCommand(
+				t.Context(),
 				"db", "psql", serviceID,
 				"--", "-c", fmt.Sprintf("SELECT rolname FROM pg_roles WHERE rolname = '%s';", roleName),
 			)
@@ -788,6 +819,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Attempting to create duplicate role: %s", duplicateRoleName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "create", "role", serviceID,
 			"--name", duplicateRoleName,
 		)
@@ -813,6 +845,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Deleting service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "delete", serviceID,
 			"--confirm",
 			"--wait-timeout", "10m",
@@ -841,6 +874,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Try to get the deleted service - should fail
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "get", deletedServiceID,
 		)
 
@@ -867,7 +901,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("Logout", func(t *testing.T) {
 		t.Logf("Logging out")
 
-		output, err := executeIntegrationCommand("auth", "logout")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
 		}
@@ -883,7 +917,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("VerifyLoggedOut", func(t *testing.T) {
 		t.Logf("Verifying we're logged out")
 
-		output, err := executeIntegrationCommand("auth", "status")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "status")
 		// This should either fail or say "Not logged in"
 		if err == nil && !strings.Contains(output, "Not logged in") {
 			t.Errorf("Expected to be logged out, but status succeeded: %s", output)
@@ -953,7 +987,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -961,6 +995,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 
 	// Login first
 	output, err := executeIntegrationCommand(
+		t.Context(),
 		"auth", "login",
 		"--public-key", publicKey,
 		"--secret-key", secretKey,
@@ -1017,7 +1052,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			if err == nil {
 				t.Errorf("Expected %s to fail for non-existent service, but got output: %s", tc.name, output)
@@ -1027,9 +1062,9 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 			// Verify error message indicates service doesn't exist (API returns various messages)
 			errorMsg := strings.ToLower(err.Error())
 			if !strings.Contains(errorMsg, "not found") &&
-			   !strings.Contains(errorMsg, "no entries") &&
-			   !strings.Contains(errorMsg, "no service") &&
-			   !strings.Contains(errorMsg, "could not be found") {
+				!strings.Contains(errorMsg, "no entries") &&
+				!strings.Contains(errorMsg, "no service") &&
+				!strings.Contains(errorMsg, "could not be found") {
 				t.Errorf("Expected error message indicating service doesn't exist for %s, got: %v", tc.name, err)
 			}
 
@@ -1075,7 +1110,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -1085,6 +1120,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 		t.Logf("Logging in for database tests")
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
@@ -1102,6 +1138,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 		t.Logf("Testing database connection for service: %s", existingServiceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "test-connection", existingServiceID,
 			"--timeout", "30s",
 		)
@@ -1134,14 +1171,14 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	t.Logf("Using temporary config directory: %s", tmpDir)
 
 	// Make sure we're logged out (this should always succeed or be a no-op)
-	_, _ = executeIntegrationCommand("auth", "logout")
+	_, _ = executeIntegrationCommand(t.Context(), "auth", "logout")
 
 	// Log in with invalid credentials to trigger authentication errors (401 response from server)
 	invalidPublicKey := "invalid-public-key"
 	invalidSecretKey := "invalid-secret-key"
 
 	// Login with invalid credentials (this should succeed locally but fail on API calls)
-	loginOutput, loginErr := executeIntegrationCommand("auth", "login",
+	loginOutput, loginErr := executeIntegrationCommand(t.Context(), "auth", "login",
 		"--public-key", invalidPublicKey,
 		"--secret-key", invalidSecretKey,
 		"--project-id", projectID)
@@ -1202,7 +1239,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Test all service commands
 	for _, tc := range serviceCommands {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			// Should fail with authentication error
 			if err == nil {
@@ -1231,7 +1268,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Test all db commands
 	for _, tc := range dbCommands {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			// Should fail with authentication error
 			if err == nil {
