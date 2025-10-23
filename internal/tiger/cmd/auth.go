@@ -97,7 +97,7 @@ Examples:
 					out: cmd.OutOrStdout(),
 				}
 
-				creds, err = l.loginWithOAuth()
+				creds, err = l.loginWithOAuth(cmd.Context())
 				if err != nil {
 					return err
 				}

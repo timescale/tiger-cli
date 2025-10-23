@@ -39,21 +39,21 @@ type oauthLogin struct {
 	out        io.Writer
 }
 
-func (l *oauthLogin) loginWithOAuth() (credentials, error) {
+func (l *oauthLogin) loginWithOAuth(ctx context.Context) (credentials, error) {
 	// Get a user access token via OAuth
-	accessToken, err := l.getAccessToken()
+	accessToken, err := l.getAccessToken(ctx)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to authenticate via OAuth: %w", err)
 	}
 
 	// Get the user's project ID (with interactive selection if needed)
-	projectID, err := l.selectProjectID(accessToken)
+	projectID, err := l.selectProjectID(ctx, accessToken)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to select project: %w", err)
 	}
 
 	// Create API key for the selected project
-	creds, err := l.createCredentials(accessToken, projectID)
+	creds, err := l.createCredentials(ctx, accessToken, projectID)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to create credentials: %w", err)
 	}
@@ -61,7 +61,7 @@ func (l *oauthLogin) loginWithOAuth() (credentials, error) {
 	return creds, nil
 }
 
-func (l *oauthLogin) getAccessToken() (string, error) {
+func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
 	// Generate PKCE parameters
 	codeVerifier := oauth2.GenerateVerifier()
 
@@ -96,6 +96,8 @@ func (l *oauthLogin) getAccessToken() (string, error) {
 		return result.accessToken, result.err
 	case <-time.After(5 * time.Minute):
 		return "", fmt.Errorf("authorization timeout - no callback received within 5 minutes")
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
 }
 
@@ -210,7 +212,7 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange authorization code for tokens
-	token, err := c.oauthCfg.Exchange(context.Background(), code, oauth2.VerifierOption(c.codeVerifier))
+	token, err := c.oauthCfg.Exchange(r.Context(), code, oauth2.VerifierOption(c.codeVerifier))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Failed to exchange authorization code for tokens")
@@ -249,9 +251,9 @@ func openBrowserImpl(url string) error {
 }
 
 // selectProjectID prompts the user to select a project if multiple are available
-func (l *oauthLogin) selectProjectID(accessToken string) (string, error) {
+func (l *oauthLogin) selectProjectID(ctx context.Context, accessToken string) (string, error) {
 	// First, get the list of projects the user has access to
-	projects, err := l.graphql.getUserProjects(accessToken)
+	projects, err := l.graphql.getUserProjects(ctx, accessToken)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
@@ -379,15 +381,15 @@ func (m projectSelectModel) View() string {
 
 // createCredentials creates client credentials (i.e. a PAT record) for the
 // selected project
-func (l *oauthLogin) createCredentials(accessToken, projectID string) (credentials, error) {
+func (l *oauthLogin) createCredentials(ctx context.Context, accessToken, projectID string) (credentials, error) {
 	// Get user information for PAT name
-	user, err := l.graphql.getUser(accessToken)
+	user, err := l.graphql.getUser(ctx, accessToken)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to get user info: %w", err)
 	}
 
 	// Create a PAT record for this project
-	patRecord, err := l.graphql.createPATRecord(accessToken, projectID, l.buildPATName(user))
+	patRecord, err := l.graphql.createPATRecord(ctx, accessToken, projectID, l.buildPATName(user))
 	if err != nil {
 		// Check if error is about reaching maximum token limit
 		if strings.Contains(err.Error(), "reached maximum token limit for project") {
