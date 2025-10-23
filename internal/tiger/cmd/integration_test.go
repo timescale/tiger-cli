@@ -355,6 +355,456 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("✅ psql command with updated password succeeded")
 	})
 
+	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)
+	var createdRoles []string
+
+	t.Run("CreateRole_Basic", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating basic role: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name in output
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		t.Logf("✅ Successfully created basic role: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithExplicitPassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_pwd_%d", time.Now().Unix())
+		password := fmt.Sprintf("test-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with explicit password: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--password", password,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with password failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		t.Logf("✅ Successfully created role with explicit password: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithInheritedGrants", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_grants_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating read-only role with inherited grants from tsdbadmin: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--from", "tsdbadmin",
+			"--read-only", // Required when inheriting from tsdbadmin
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with --from failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != "tsdbadmin" {
+			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
+		}
+
+		// Verify read_only flag in output (required for tsdbadmin inheritance)
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		t.Logf("✅ Successfully created read-only role with inherited grants: %s", roleName)
+	})
+
+	t.Run("CreateRole_ReadOnly", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_readonly_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating read-only role: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create read-only role failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify read_only flag in output
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		t.Logf("✅ Successfully created read-only role: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithStatementTimeout", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_timeout_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with statement timeout: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--statement-timeout", "30s",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with statement timeout failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify statement_timeout in output
+		if result["statement_timeout"] != "30s" {
+			t.Errorf("Expected statement_timeout=30s in output, got: %v", result["statement_timeout"])
+		}
+
+		t.Logf("✅ Successfully created role with statement timeout: %s", roleName)
+	})
+
+	t.Run("CreateRole_ReadOnlyWithInheritance", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		// Step 1: Create a base role with write privileges
+		// (tsdbadmin automatically gets ADMIN OPTION on roles it creates)
+		baseRoleName := fmt.Sprintf("integration_test_base_role_%d", time.Now().Unix())
+		basePassword := fmt.Sprintf("base-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, baseRoleName)
+
+		t.Logf("Creating base role with write privileges: %s", baseRoleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", baseRoleName,
+			"--password", basePassword,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create base role: %v\nOutput: %s", err, output)
+		}
+
+		// Grant CREATE privilege on public schema to base role
+		t.Logf("Granting CREATE privilege to %s", baseRoleName)
+		_, err = executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--", "-c", fmt.Sprintf("GRANT CREATE ON SCHEMA public TO %s;", baseRoleName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to grant CREATE privilege: %v", err)
+		}
+
+		// Step 2: Use base role to create a table and insert data
+		tableName := fmt.Sprintf("test_table_%d", time.Now().Unix())
+		t.Logf("Creating table %s and inserting data as %s", tableName, baseRoleName)
+
+		// Create table and insert data
+		_, err = executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT, data TEXT);", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create table: %v", err)
+		}
+
+		_, err = executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (1, 'test data');", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to insert data: %v", err)
+		}
+
+		// Step 3: Create read-only role that inherits from base role
+		// (tsdbadmin can grant base_role since it has ADMIN OPTION)
+		readOnlyRoleName := fmt.Sprintf("integration_test_readonly_inherited_%d", time.Now().Unix())
+		readOnlyPassword := fmt.Sprintf("readonly-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, readOnlyRoleName)
+
+		t.Logf("Creating read-only role with inheritance from %s: %s", baseRoleName, readOnlyRoleName)
+
+		output, err = executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", readOnlyRoleName,
+			"--password", readOnlyPassword,
+			"--from", baseRoleName,
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create read-only role with inheritance: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify read_only flag in output
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != baseRoleName {
+			t.Errorf("Expected from_roles to contain '%s', got: %v", baseRoleName, fromRoles)
+		}
+
+		// Step 4: Verify read-only role can READ the data
+		t.Logf("Verifying read-only role can read data from %s", tableName)
+		readOutput, err := executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--role", readOnlyRoleName,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s;", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Read-only role failed to read data: %v\nOutput: %s", err, readOutput)
+		}
+
+		if !strings.Contains(readOutput, "test data") {
+			t.Errorf("Expected to read 'test data' from table, got: %s", readOutput)
+		}
+		t.Logf("✅ Read-only role successfully read data")
+
+		// Step 5: Verify read-only role CANNOT WRITE
+		t.Logf("Verifying read-only role cannot write to %s", tableName)
+		writeOutput, err := executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--role", readOnlyRoleName,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (2, 'should fail');", tableName),
+		)
+
+		// We EXPECT this to fail
+		if err == nil {
+			t.Errorf("Read-only role should NOT be able to write, but succeeded: %s", writeOutput)
+		} else {
+			// Verify it failed due to read-only enforcement
+			if !strings.Contains(writeOutput, "read-only") && !strings.Contains(writeOutput, "permission denied") {
+				t.Logf("Warning: Write failed but error message unexpected: %s", writeOutput)
+			}
+			t.Logf("✅ Read-only role correctly prevented from writing")
+		}
+
+		// Step 6: Clean up - drop the table
+		t.Logf("Cleaning up table %s", tableName)
+		_, _ = executeIntegrationCommand(
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName),
+		)
+
+		t.Logf("✅ Successfully verified read-only role with inheritance")
+	})
+
+	t.Run("CreateRole_AllOptions", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_all_%d", time.Now().Unix())
+		password := fmt.Sprintf("test-password-all-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with all valid options (tsdbadmin + read-only): %s", roleName)
+
+		// Note: --statement-timeout cannot be used with --from tsdbadmin due to permission restrictions
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--password", password,
+			"--from", "tsdbadmin",
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with all options failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all options in output
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s, got: %v", roleName, result["role_name"])
+		}
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true, got: %v", result["read_only"])
+		}
+		// Note: statement_timeout not checked as it cannot be set with --from tsdbadmin
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != "tsdbadmin" {
+			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
+		}
+
+		t.Logf("✅ Successfully created role with all valid options: %s", roleName)
+	})
+
+	t.Run("CreateRole_VerifyRolesExist", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		if len(createdRoles) == 0 {
+			t.Skip("No roles created to verify")
+		}
+
+		// Verify all created roles exist by querying pg_roles
+		t.Logf("Verifying created roles exist in database")
+
+		for _, roleName := range createdRoles {
+			output, err := executeIntegrationCommand(
+				"db", "psql", serviceID,
+				"--", "-c", fmt.Sprintf("SELECT rolname FROM pg_roles WHERE rolname = '%s';", roleName),
+			)
+
+			if err != nil {
+				t.Errorf("Failed to verify role %s exists: %v\nOutput: %s", roleName, err, output)
+				continue
+			}
+
+			// Verify role name appears in output
+			if !strings.Contains(output, roleName) {
+				t.Errorf("Role %s not found in pg_roles query output: %s", roleName, output)
+			} else {
+				t.Logf("✅ Verified role exists in database: %s", roleName)
+			}
+		}
+	})
+
+	t.Run("CreateRole_DuplicateName", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		if len(createdRoles) == 0 {
+			t.Skip("No roles created to test duplicate")
+		}
+
+		// Try to create a role with the same name as the first created role
+		duplicateRoleName := createdRoles[0]
+
+		t.Logf("Attempting to create duplicate role: %s", duplicateRoleName)
+
+		output, err := executeIntegrationCommand(
+			"db", "create", "role", serviceID,
+			"--name", duplicateRoleName,
+		)
+
+		// This should fail with a role already exists error
+		if err == nil {
+			t.Errorf("Expected duplicate role creation to fail, but got output: %s", output)
+		} else {
+			// Verify error message indicates role already exists
+			if !strings.Contains(err.Error(), "already exists") && !strings.Contains(output, "already exists") {
+				t.Logf("Note: Error message may not contain 'already exists': %v\nOutput: %s", err, output)
+			} else {
+				t.Logf("✅ Duplicate role creation correctly failed")
+			}
+		}
+	})
+
 	t.Run("DeleteService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available for deletion")
@@ -484,8 +934,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	return ""
 }
 
-// TestServiceNotFound tests that commands requiring service ID fail with correct exit code for non-existent services
-func TestServiceNotFound(t *testing.T) {
+// TestServiceNotFoundIntegration tests that commands requiring service ID fail with correct exit code for non-existent services
+func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
@@ -574,9 +1024,13 @@ func TestServiceNotFound(t *testing.T) {
 				return
 			}
 
-			// Verify error message contains "not found"
-			if !strings.Contains(err.Error(), "not found") {
-				t.Errorf("Expected 'not found' error message for %s, got: %v", tc.name, err)
+			// Verify error message indicates service doesn't exist (API returns various messages)
+			errorMsg := strings.ToLower(err.Error())
+			if !strings.Contains(errorMsg, "not found") &&
+			   !strings.Contains(errorMsg, "no entries") &&
+			   !strings.Contains(errorMsg, "no service") &&
+			   !strings.Contains(errorMsg, "could not be found") {
+				t.Errorf("Expected error message indicating service doesn't exist for %s, got: %v", tc.name, err)
 			}
 
 			// Verify correct exit code
@@ -704,23 +1158,23 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "service list",
-			args: []string{"service", "list", "--project-id", projectID},
+			args: []string{"service", "list"},
 		},
 		{
 			name: "service get",
-			args: []string{"service", "get", "non-existent-service", "--project-id", projectID},
+			args: []string{"service", "get", "non-existent-service"},
 		},
 		{
 			name: "service create",
-			args: []string{"service", "create", "--name", "test-service", "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "create", "--name", "test-service", "--no-wait"},
 		},
 		{
 			name: "service update-password",
-			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--project-id", projectID},
+			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass"},
 		},
 		{
 			name: "service delete",
-			args: []string{"service", "delete", "non-existent-service", "--confirm", "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "delete", "non-existent-service", "--confirm", "--no-wait"},
 		},
 	}
 
@@ -731,17 +1185,17 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "db connection-string",
-			args: []string{"db", "connection-string", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "connection-string", "non-existent-service"},
 		},
 		{
 			name: "db connect",
-			args: []string{"db", "connect", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "connect", "non-existent-service"},
 		},
 		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
 		// for authentication issues, not ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
-			args: []string{"db", "test-connection", "non-existent-service", "--project-id", projectID},
+			args: []string{"db", "test-connection", "non-existent-service"},
 		},
 	}
 

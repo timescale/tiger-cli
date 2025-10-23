@@ -38,6 +38,32 @@ go run ./cmd/tiger --help
 ```
 
 ### Integration Testing
+
+#### Using the Test Script (Recommended)
+```bash
+# Run all integration tests (default pattern: Integration)
+./scripts/test-integration.sh
+
+# Run with verbose output
+./scripts/test-integration.sh -v
+
+# Run specific test pattern (overrides default)
+./scripts/test-integration.sh -run CreateRole
+
+# Run with custom timeout
+./scripts/test-integration.sh -timeout 10m
+
+# Combine flags (any go test flags are supported)
+./scripts/test-integration.sh -v -run CreateRole_WithInheritedGrants -timeout 5m
+```
+
+The script automatically:
+- Loads environment variables from `.env` file
+- Builds the tiger CLI binary
+- Runs tests matching "Integration" pattern by default
+- Passes all arguments through to `go test` (supports all standard go test flags)
+
+#### Manual Testing
 ```bash
 # Run all tests (integration tests will skip without credentials)
 go test ./...
