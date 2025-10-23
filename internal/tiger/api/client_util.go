@@ -66,18 +66,18 @@ func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
 }
 
 // ValidateAPIKey validates the API key by making a test API call
-func ValidateAPIKey(apiKey string, projectID string) error {
+func ValidateAPIKey(ctx context.Context, apiKey string, projectID string) error {
 	client, err := NewTigerClient(apiKey)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	return ValidateAPIKeyWithClient(client, projectID)
+	return ValidateAPIKeyWithClient(ctx, client, projectID)
 }
 
 // ValidateAPIKeyWithClient validates the API key using the provided client interface
-func ValidateAPIKeyWithClient(client ClientWithResponsesInterface, projectID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func ValidateAPIKeyWithClient(ctx context.Context, client ClientWithResponsesInterface, projectID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// Use provided project ID if available, otherwise use a dummy one

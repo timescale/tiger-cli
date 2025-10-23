@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	originalValidator := validateAPIKeyForLogin
 
 	// Mock the validator to return an error
-	validateAPIKeyForLogin = func(apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, apiKey, projectID string) error {
 		return errors.New("invalid API key: authentication failed")
 	}
 
@@ -77,7 +78,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	originalValidator := validateAPIKeyForLogin
 
 	// Mock the validator to return success
-	validateAPIKeyForLogin = func(apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, apiKey, projectID string) error {
 		return nil // Success
 	}
 

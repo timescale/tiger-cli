@@ -122,7 +122,7 @@ Examples:
 
 			// Validate the API key by making a test API call
 			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-			if err := validateAPIKeyForLogin(apiKey, creds.projectID); err != nil {
+			if err := validateAPIKeyForLogin(cmd.Context(), apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
 

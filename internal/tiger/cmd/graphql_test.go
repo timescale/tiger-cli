@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +38,7 @@ func TestGraphQLUserAgent(t *testing.T) {
 	}
 
 	// Make a request
-	_, err := client.getUser("test-access-token")
+	_, err := client.getUser(context.Background(), "test-access-token")
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -57,19 +58,19 @@ func TestGraphQLUserAgentInAllRequests(t *testing.T) {
 		{
 			name: "getUserProjects",
 			requestFunc: func(c *GraphQLClient, token string) (interface{}, error) {
-				return c.getUserProjects(token)
+				return c.getUserProjects(context.Background(), token)
 			},
 		},
 		{
 			name: "getUser",
 			requestFunc: func(c *GraphQLClient, token string) (interface{}, error) {
-				return c.getUser(token)
+				return c.getUser(context.Background(), token)
 			},
 		},
 		{
 			name: "createPATRecord",
 			requestFunc: func(c *GraphQLClient, token string) (interface{}, error) {
-				return c.createPATRecord(token, "test-project-id", "test-pat-name")
+				return c.createPATRecord(context.Background(), token, "test-project-id", "test-pat-name")
 			},
 		},
 	}
