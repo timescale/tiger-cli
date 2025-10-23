@@ -35,8 +35,12 @@ var (
 	}
 
 	// readPasswordFromTerminal can be overridden for testing to inject password input
-	readPasswordFromTerminal = func(fd int) ([]byte, error) {
-		return term.ReadPassword(fd)
+	readPasswordFromTerminal = func() (string, error) {
+		val, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", err
+		}
+		return string(val), nil
 	}
 )
 
@@ -321,12 +325,11 @@ Examples:
 				}
 
 				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
-				bytePassword, err := readPasswordFromTerminal(int(os.Stdin.Fd()))
+				passwordToSave, err = readString(cmd.Context(), readPasswordFromTerminal)
 				if err != nil {
 					return fmt.Errorf("failed to read password: %w", err)
 				}
 				fmt.Fprintln(cmd.OutOrStdout()) // Print newline after hidden input
-				passwordToSave = string(bytePassword)
 				if passwordToSave == "" {
 					return fmt.Errorf("password cannot be empty")
 				}

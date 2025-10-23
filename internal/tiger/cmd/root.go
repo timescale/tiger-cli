@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -133,4 +134,32 @@ func Execute(ctx context.Context) error {
 	}
 
 	return rootCmd.Execute()
+}
+
+func readString(ctx context.Context, readFn func() (string, error)) (string, error) {
+	valCh := make(chan string)
+	errCh := make(chan error)
+	defer func() { close(valCh); close(errCh) }()
+	go func() {
+		val, err := readFn()
+		if err != nil {
+			errCh <- err
+			return
+		}
+		select {
+		case <-ctx.Done(): // don't return an empty value if the context is already canceled
+			return
+		default:
+		}
+		valCh <- val
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case err := <-errCh:
+		return "", err
+	case val := <-valCh:
+		return strings.TrimSpace(val), nil
+	}
 }

@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -920,8 +922,13 @@ Examples:
 			if !deleteConfirm {
 				fmt.Fprintf(statusOutput, "Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
 				fmt.Fprintf(statusOutput, "Type the service ID '%s' to confirm: ", serviceID)
-				var confirmation string
-				fmt.Scanln(&confirmation)
+				confirmation, err := readString(cmd.Context(), func() (string, error) {
+					reader := bufio.NewReader(os.Stdin)
+					return reader.ReadString('\n')
+				})
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
 				if confirmation != serviceID {
 					fmt.Fprintln(statusOutput, "❌ Delete operation cancelled.")
 					return nil

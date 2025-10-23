@@ -1049,8 +1049,8 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 
 	// Mock password reading to return our test password
 	originalReadPasswordFromTerminal := readPasswordFromTerminal
-	readPasswordFromTerminal = func(fd int) ([]byte, error) {
-		return []byte(testPassword), nil
+	readPasswordFromTerminal = func() (string, error) {
+		return testPassword, nil
 	}
 	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
 
@@ -1122,8 +1122,8 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 
 	// Mock password reading to return empty password
 	originalReadPasswordFromTerminal := readPasswordFromTerminal
-	readPasswordFromTerminal = func(fd int) ([]byte, error) {
-		return []byte(""), nil
+	readPasswordFromTerminal = func() (string, error) {
+		return "", nil
 	}
 	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
 
