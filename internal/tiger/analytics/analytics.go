@@ -146,18 +146,14 @@ func (a *Analytics) Identify(event string, options ...Option) {
 
 	// Check if analytics is disabled
 	if !a.config.Analytics {
-		if a.config.Debug {
-			logger.Debug("Analytics identify skipped (analytics disabled)")
-		}
+		logger.Debug("Analytics identify skipped (analytics disabled)")
 		return
 	}
 
 	// Check for cases where the client was not initialized
 	// (e.g. because API credentials are not available)
 	if a.client == nil {
-		if a.config.Debug {
-			logger.Debug("Analytics identify skipped (client not initialized)")
-		}
+		logger.Debug("Analytics identify skipped (client not initialized)")
 		return
 	}
 
@@ -173,18 +169,16 @@ func (a *Analytics) Identify(event string, options ...Option) {
 	})
 	if err != nil {
 		// Log error but don't fail the operation - analytics should never block user actions
-		if a.config.Debug {
-			logger.Debug("Failed to send analytics identify", zap.Error(err))
-		}
+		logger.Debug("Failed to send analytics identify", zap.Error(err))
 		return
 	}
 
-	// Check if the API layer skipped the event
-	if resp.JSON200 != nil && resp.JSON200.Status != nil && *resp.JSON200.Status == "skipped" {
-		if a.config.Debug {
-			logger.Debug("Analytics identify skipped (by API)")
-		}
+	if resp.JSON200 == nil || resp.JSON200.Status == nil {
+		logger.Debug("Failed to retrieve response from analytics endpoint")
+		return
 	}
+
+	logger.Debug("Analytics identify sent", zap.String("status", *resp.JSON200.Status))
 }
 
 // Track sends an analytics event with the provided event name and properties.
@@ -214,18 +208,14 @@ func (a *Analytics) Track(event string, options ...Option) {
 
 	// Check if analytics is disabled
 	if !a.config.Analytics {
-		if a.config.Debug {
-			logger.Debug("Analytics event skipped (analytics disabled)")
-		}
+		logger.Debug("Analytics event skipped (analytics disabled)")
 		return
 	}
 
 	// Check for cases where the client was not initialized
 	// (e.g. because API credentials are not available)
 	if a.client == nil {
-		if a.config.Debug {
-			logger.Debug("Analytics event skipped (client not initialized)")
-		}
+		logger.Debug("Analytics event skipped (client not initialized)")
 		return
 	}
 
@@ -242,16 +232,14 @@ func (a *Analytics) Track(event string, options ...Option) {
 	})
 	if err != nil {
 		// Log error but don't fail the operation - analytics should never block user actions
-		if a.config.Debug {
-			logger.Debug("Failed to send analytics event", zap.Error(err))
-		}
+		logger.Debug("Failed to send analytics event", zap.Error(err))
 		return
 	}
 
-	// Check if the API layer skipped the event
-	if resp.JSON200 != nil && resp.JSON200.Status != nil && *resp.JSON200.Status == "skipped" {
-		if a.config.Debug {
-			logger.Debug("Analytics event skipped (by API)")
-		}
+	if resp.JSON200 == nil || resp.JSON200.Status == nil {
+		logger.Debug("Failed to retrieve response from analytics endpoint")
+		return
 	}
+
+	logger.Debug("Analytics event sent", zap.String("status", *resp.JSON200.Status))
 }
