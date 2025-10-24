@@ -7,6 +7,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -30,7 +31,16 @@ func buildVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+			cmd.SilenceUsage = true
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			versionOutput := VersionOutput{
 				Version:   config.Version,
 				BuildTime: config.BuildTime,
@@ -41,10 +51,6 @@ func buildVersionCmd() *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
-				cfg, err := config.Load()
-				if err != nil {
-					return fmt.Errorf("Error loading config: %w", err)
-				}
 				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
@@ -53,6 +59,16 @@ func buildVersionCmd() *cobra.Command {
 					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
 				}
 			}
+
+			// Track analytics
+			client := api.TryInitTigerClient(cfg)
+			defer func() {
+				client.TrackErr("cli_version", runErr, map[string]any{
+					"check":   checkVersion,
+					"output":  outputFormat,
+					"version": config.Version,
+				})
+			}()
 
 			output := cmd.OutOrStdout()
 			switch outputFormat {

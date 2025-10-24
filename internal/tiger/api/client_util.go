@@ -74,6 +74,101 @@ func NewTigerClient(cfg *config.Config, apiKey string, projectID string) (*Tiger
 	}, nil
 }
 
+// TryInitTigerClient tries to load credentials and initialize a [TigerClient].
+// It returns nil if credentials do not exist or it otherwise fails to create a
+// new client. This function is intended to be used when the caller does not
+// need an API client to function, but would use one if available (e.g. to
+// track analytics events).
+func TryInitTigerClient(cfg *config.Config) *TigerClient {
+	apiKey, projectID, err := config.GetCredentials()
+	if err != nil {
+		return nil
+	}
+
+	client, err := NewTigerClient(cfg, apiKey, projectID)
+	if err != nil {
+		return nil
+	}
+
+	return client
+}
+
+// Track sends an analytics event with the provided event name and properties.
+// It automatically includes common properties like ProjectID, OS, and
+// architecture. Events are only sent if the client is initialized and
+// analytics are enabled in the config, otherwise they are skipped.
+func (c *TigerClient) Track(event string, properties map[string]any) {
+	logger := logging.GetLogger().With(
+		zap.String("event", event),
+		zap.Any("properties", properties),
+	)
+
+	// Check for cases where the client was not initialized
+	// (e.g. because API credentials are not available)
+	if c == nil {
+		if c.Config.Debug {
+			logger.Debug("Analytics event skipped (client not initialized)")
+		}
+		return
+	}
+
+	// Check if analytics is disabled
+	if !c.Config.Analytics {
+		if c.Config.Debug {
+			logger.Debug("Analytics event skipped (analytics disabled)")
+		}
+		return
+	}
+
+	// Build properties map with common properties
+	allProperties := map[string]any{
+		"project_id": c.ProjectID,
+		"version":    config.Version,
+		"os":         runtime.GOOS,
+		"arch":       runtime.GOARCH,
+	}
+
+	// Merge in user-provided properties (they can override common properties if needed)
+	for k, v := range properties {
+		allProperties[k] = v
+	}
+
+	// Send the event
+	// NOTE: We intentionally use context.Background() here so we can
+	// track analytics events even if a command times out or is canceled.
+	resp, err := c.PostTrackWithResponse(context.Background(), PostTrackJSONRequestBody{
+		Event:      event,
+		Properties: &allProperties,
+	})
+	if err != nil {
+		// Log error but don't fail the operation - analytics should never block user actions
+		if c.Config.Debug {
+			logger.Debug("Failed to send analytics event", zap.Error(err))
+		}
+		return
+	}
+
+	// Check if the API layer skipped the event
+	if resp.JSON200 != nil && resp.JSON200.Status != nil && *resp.JSON200.Status == "skipped" {
+		if c.Config.Debug {
+			logger.Debug("Analytics event skipped by API")
+		}
+	}
+}
+
+func (c *TigerClient) TrackErr(event string, err error, properties map[string]any) {
+	if properties == nil {
+		properties = map[string]any{}
+	}
+	if err == nil {
+		properties["success"] = true
+	} else {
+		properties["success"] = false
+		properties["error"] = err.Error()
+	}
+	c.Track(event, properties)
+}
+
 // ValidateAPIKey validates the API key by making a test API call
 func ValidateAPIKey(cfg *config.Config, apiKey string, projectID string) error {
 	client, err := NewTigerClient(cfg, apiKey, projectID)
@@ -129,55 +224,4 @@ func (e *Error) Error() string {
 		return *e.Message
 	}
 	return "unknown error"
-}
-
-// Track sends an analytics event with the provided event name and properties.
-// It automatically includes common properties like ProjectID, OS, and architecture.
-// Events are only sent if analytics is enabled in the config, otherwise they are skipped.
-// This method uses the global logger from the logging package.
-func (c *TigerClient) Track(ctx context.Context, event string, properties map[string]any) error {
-	logger := logging.GetLogger()
-
-	// Check if analytics is disabled
-	if !c.Config.Analytics {
-		if c.Config.Debug && logger != nil {
-			logger.Debug("Analytics event skipped (analytics disabled)", zap.String("event", event))
-		}
-		return nil
-	}
-
-	// Build properties map with common properties
-	allProperties := map[string]any{
-		"project_id": c.ProjectID,
-		"version":    config.Version,
-		"os":         runtime.GOOS,
-		"arch":       runtime.GOARCH,
-	}
-
-	// Merge in user-provided properties (they can override common properties if needed)
-	for k, v := range properties {
-		allProperties[k] = v
-	}
-
-	// Send the event
-	resp, err := c.PostTrackWithResponse(ctx, PostTrackJSONRequestBody{
-		Event:      event,
-		Properties: &allProperties,
-	})
-	if err != nil {
-		// Log error but don't fail the operation - analytics should never block user actions
-		if c.Config.Debug && logger != nil {
-			logger.Debug("Failed to send analytics event", zap.String("event", event), zap.Error(err))
-		}
-		return nil
-	}
-
-	// Check if the API layer skipped the event
-	if resp.JSON200 != nil && resp.JSON200.Status != nil && *resp.JSON200.Status == "skipped" {
-		if c.Config.Debug && logger != nil {
-			logger.Debug("Analytics event skipped by API", zap.String("event", event))
-		}
-	}
-
-	return nil
 }

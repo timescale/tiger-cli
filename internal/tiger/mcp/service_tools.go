@@ -295,7 +295,7 @@ WARNING: Creates billable resources.`,
 }
 
 // handleServiceList handles the service_list MCP tool
-func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
+func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (result *mcp.CallToolResult, output ServiceListOutput, runErr error) {
 	// Create fresh API client and get project ID
 	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
@@ -307,6 +307,14 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	// Make API call to list services
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+
+	// Track analytics
+	var serviceCount int
+	defer func() {
+		apiClient.TrackErr("mcp_service_list", runErr, map[string]any{
+			"service_count": serviceCount,
+		})
+	}()
 
 	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
 	if err != nil {
@@ -323,7 +331,8 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	services := *resp.JSON200
-	output := ServiceListOutput{
+	serviceCount = len(services)
+	output = ServiceListOutput{
 		Services: make([]ServiceInfo, len(services)),
 	}
 
@@ -335,7 +344,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 }
 
 // handleServiceGet handles the service_get MCP tool
-func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
+func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (result *mcp.CallToolResult, output ServiceGetOutput, runErr error) {
 	// Create fresh API client and get project ID
 	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
@@ -350,6 +359,13 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
+	// Track analytics
+	defer func() {
+		apiClient.TrackErr("mcp_service_get", runErr, map[string]any{
+			"service_id": input.ServiceID,
+		})
+	}()
+
 	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
@@ -361,7 +377,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	service := *resp.JSON200
-	output := ServiceGetOutput{
+	output = ServiceGetOutput{
 		Service: s.convertToServiceDetail(service),
 	}
 
@@ -383,7 +399,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 }
 
 // handleServiceCreate handles the service_create MCP tool
-func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
+func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (result *mcp.CallToolResult, output ServiceCreateOutput, runErr error) {
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
@@ -434,6 +450,31 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
+	// Track analytics
+	var serviceID string
+	defer func() {
+		props := map[string]any{
+			"name":     input.Name,
+			"replicas": input.Replicas,
+		}
+		if serviceID != "" {
+			props["service_id"] = serviceID
+		}
+		if input.Region != nil {
+			props["region"] = *input.Region
+		}
+		if cpuMillis != nil {
+			props["cpu_millis"] = *cpuMillis
+		}
+		if memoryGBs != nil {
+			props["memory_gbs"] = *memoryGBs
+		}
+		if len(input.Addons) > 0 {
+			props["addons"] = input.Addons
+		}
+		apiClient.TrackErr("mcp_service_create", runErr, props)
+	}()
+
 	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
@@ -445,9 +486,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	service := *resp.JSON202
-	serviceID := util.Deref(service.ServiceId)
+	serviceID = util.Deref(service.ServiceId)
 
-	output := ServiceCreateOutput{
+	output = ServiceCreateOutput{
 		Service: s.convertToServiceDetail(service),
 		Message: "Service creation request accepted. The service may still be provisioning.",
 	}
@@ -511,7 +552,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 }
 
 // handleServiceUpdatePassword handles the service_update_password MCP tool
-func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
+func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (result *mcp.CallToolResult, output ServiceUpdatePasswordOutput, runErr error) {
 	// Create fresh API client and get project ID
 	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
@@ -521,6 +562,13 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	logging.Debug("MCP: Updating service password",
 		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
+
+	// Track analytics
+	defer func() {
+		apiClient.TrackErr("mcp_service_update_password", runErr, map[string]any{
+			"service_id": input.ServiceID,
+		})
+	}()
 
 	// Prepare password update request
 	updateReq := api.UpdatePasswordInput{
@@ -541,7 +589,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
 	}
 
-	output := ServiceUpdatePasswordOutput{
+	output = ServiceUpdatePasswordOutput{
 		Message: "Master password for 'tsdbadmin' user updated successfully",
 	}
 

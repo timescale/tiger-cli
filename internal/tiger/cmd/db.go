@@ -23,9 +23,6 @@ var (
 	// getCredentialsForDB can be overridden for testing
 	getCredentialsForDB = config.GetCredentials
 
-	// getServiceDetailsFunc can be overridden for testing
-	getServiceDetailsFunc = getServiceDetails
-
 	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
 	checkStdinIsTTY = func() bool {
 		return util.IsTerminal(os.Stdin)
@@ -69,8 +66,51 @@ Examples:
 
   # Get connection string with password included (less secure)
   tiger db connection-string svc-12345 --with-password`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Determine service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForDB()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Track analytics
+			defer func() {
+				client.TrackErr("cli_db_connection_string", runErr, map[string]any{
+					"service_id":    serviceID,
+					"pooled":        dbConnectionStringPooled,
+					"with_password": dbConnectionStringWithPassword,
+				})
+			}()
+
+			// Fetch service details
+			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -144,19 +184,61 @@ Examples:
   # Pass additional flags to psql (use -- to separate)
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			service, err := getServiceDetails(cmd, serviceArgs)
+			// Get config
+			cfg, err := config.Load()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to load config: %w", err)
 			}
+
+			// Determine service ID
+			var serviceID string
+			if len(serviceArgs) > 0 {
+				serviceID = serviceArgs[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForDB()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Track analytics
+			defer func() {
+				client.TrackErr("cli_db_connect", runErr, map[string]any{
+					"service_id": serviceID,
+					"pooled":     dbConnectPooled,
+				})
+			}()
 
 			// Check if psql is available
 			psqlPath, err := exec.LookPath("psql")
 			if err != nil {
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
+			}
+
+			// Fetch service details
+			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			if err != nil {
+				return err
 			}
 
 			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
@@ -218,8 +300,51 @@ Examples:
 
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to load config: %w", err))
+			}
+
+			// Determine service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'"))
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForDB()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			if err != nil {
+				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to create API client: %w", err))
+			}
+
+			// Track analytics
+			defer func() {
+				client.TrackErr("cli_db_test_connection", runErr, map[string]any{
+					"service_id": serviceID,
+					"pooled":     dbTestConnectionPooled,
+					"timeout":    dbTestConnectionTimeout.String(),
+				})
+			}()
+
+			// Fetch service details
+			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, err)
 			}
@@ -290,8 +415,49 @@ Examples:
 
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetailsFunc(cmd, args)
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Determine service ID
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := getCredentialsForDB()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Track analytics
+			defer func() {
+				client.TrackErr("cli_db_save_password", runErr, map[string]any{
+					"service_id": serviceID,
+				})
+			}()
+
+			// Fetch service details
+			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -363,42 +529,9 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-// getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
-	// Get config
-	cfg, err := config.Load()
-	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Determine service ID
-	var serviceID string
-	if len(args) > 0 {
-		serviceID = args[0]
-	} else {
-		serviceID = cfg.ServiceID
-	}
-
-	if serviceID == "" {
-		return api.Service{}, fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-	}
-
-	cmd.SilenceUsage = true
-
-	// Get API key and project ID for authentication
-	apiKey, projectID, err := getCredentialsForDB()
-	if err != nil {
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-	}
-
-	// Create API client
-	client, err := api.NewTigerClient(cfg, apiKey, projectID)
-	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to create API client: %w", err)
-	}
-
-	// Fetch service details
-	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+// getServiceDetails is a helper that fetches service details using the provided client
+func getServiceDetails(ctx context.Context, client *api.TigerClient, projectID string, serviceID string) (api.Service, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)

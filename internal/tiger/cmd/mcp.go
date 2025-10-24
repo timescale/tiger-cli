@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/mcp"
 )
@@ -87,13 +89,20 @@ Examples:
   tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
 		Args:      cobra.MaximumNArgs(1),
 		ValidArgs: getValidEditorNames(),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			cmd.SilenceUsage = true
 
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			var clientName string
+			var interactive bool
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
-				var err error
+				interactive = true
 				clientName, err = selectClientInteractively(cmd.OutOrStdout())
 				if err != nil {
 					return fmt.Errorf("failed to select client: %w", err)
@@ -104,6 +113,20 @@ Examples:
 			} else {
 				clientName = args[0]
 			}
+
+			// Track analytics
+			client := api.TryInitTigerClient(cfg)
+			defer func() {
+				props := map[string]any{
+					"client":      clientName,
+					"interactive": interactive,
+					"no_backup":   noBackup,
+				}
+				if configPath != "" {
+					props["custom_path"] = true
+				}
+				client.TrackErr("cli_mcp_install", runErr, props)
+			}()
 
 			return installMCPForClient(clientName, !noBackup, configPath)
 		},
@@ -207,8 +230,22 @@ Examples:
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context) error {
+func startStdioServer(ctx context.Context) (runErr error) {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
+
+	// Get config
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Track analytics
+	client := api.TryInitTigerClient(cfg)
+	defer func() {
+		client.TrackErr("cli_mcp_start", runErr, map[string]any{
+			"transport": "stdio",
+		})
+	}()
 
 	// Setup graceful shutdown handling
 	ctx, stop := signalContext(ctx)
@@ -234,8 +271,22 @@ func startStdioServer(ctx context.Context) error {
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, host string, port int) error {
+func startHTTPServer(ctx context.Context, host string, port int) (runErr error) {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
+
+	// Get config
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Track analytics
+	client := api.TryInitTigerClient(cfg)
+	defer func() {
+		client.TrackErr("cli_mcp_start", runErr, map[string]any{
+			"transport": "http",
+		})
+	}()
 
 	// Setup graceful shutdown handling
 	ctx, stop := signalContext(ctx)

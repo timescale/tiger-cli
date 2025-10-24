@@ -110,7 +110,7 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 }
 
 // handleDBExecuteQuery handles the tiger_db_execute_query MCP tool
-func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
+func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (result *mcp.CallToolResult, output DBExecuteQueryOutput, runErr error) {
 	// Create fresh API client and get project ID
 	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
@@ -127,6 +127,17 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.String("role", input.Role),
 		zap.Bool("pooled", input.Pooled),
 	)
+
+	// Track analytics
+	var rowsAffected int64
+	defer func() {
+		apiClient.TrackErr("mcp_db_execute_query", runErr, map[string]any{
+			"service_id":    input.ServiceID,
+			"pooled":        input.Pooled,
+			"timeout":       timeout.String(),
+			"rows_affected": rowsAffected,
+		})
+	}()
 
 	// Get service details to construct connection string
 	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
@@ -204,10 +215,12 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("error during row iteration: %w", rows.Err())
 	}
 
-	output := DBExecuteQueryOutput{
+	rowsAffected = rows.CommandTag().RowsAffected()
+
+	output = DBExecuteQueryOutput{
 		Columns:       columns,
 		Rows:          resultRows,
-		RowsAffected:  rows.CommandTag().RowsAffected(),
+		RowsAffected:  rowsAffected,
 		ExecutionTime: time.Since(startTime).String(),
 	}
 
