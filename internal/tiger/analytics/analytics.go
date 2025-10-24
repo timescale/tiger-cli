@@ -188,6 +188,7 @@ func (a *Analytics) Identify(event string, options ...Option) {
 func (a *Analytics) Track(event string, options ...Option) {
 	// Create properties map with default/common properties
 	properties := map[string]any{
+		"source":  "cli",
 		"version": config.Version,
 		"os":      runtime.GOOS,
 		"arch":    runtime.GOARCH,
