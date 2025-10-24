@@ -50,8 +50,9 @@ func buildDbConnectionStringCmd() *cobra.Command {
 	var dbConnectionStringWithPassword bool
 
 	cmd := &cobra.Command{
-		Use:   "connection-string [service-id]",
-		Short: "Get connection string for a service",
+		Use:               "connection-string [service-id]",
+		Short:             "Get connection string for a service",
+		ValidArgsFunction: serviceIDCompletion,
 		Long: `Get a PostgreSQL connection string for connecting to a database service.
 
 The service ID can be provided as an argument or will use the default service
@@ -117,9 +118,10 @@ func buildDbConnectCmd() *cobra.Command {
 	var dbConnectRole string
 
 	cmd := &cobra.Command{
-		Use:     "connect [service-id]",
-		Aliases: []string{"psql"},
-		Short:   "Connect to a database",
+		Use:               "connect [service-id]",
+		Aliases:           []string{"psql"},
+		Short:             "Connect to a database",
+		ValidArgsFunction: serviceIDCompletion,
 		Long: `Connect to a database service using psql client.
 
 The service ID can be provided as an argument or will use the default service
@@ -196,8 +198,9 @@ func buildDbTestConnectionCmd() *cobra.Command {
 	var dbTestConnectionRole string
 
 	cmd := &cobra.Command{
-		Use:   "test-connection [service-id]",
-		Short: "Test database connectivity",
+		Use:               "test-connection [service-id]",
+		Short:             "Test database connectivity",
+		ValidArgsFunction: serviceIDCompletion,
 		Long: `Test database connectivity to a service.
 
 The service ID can be provided as an argument or will use the default service
@@ -268,8 +271,9 @@ func buildDbSavePasswordCmd() *cobra.Command {
 	var dbSavePasswordValue string
 
 	cmd := &cobra.Command{
-		Use:   "save-password [service-id]",
-		Short: "Save password for a database service",
+		Use:               "save-password [service-id]",
+		Short:             "Save password for a database service",
+		ValidArgsFunction: serviceIDCompletion,
 		Long: `Save a password for a database service to configured password storage.
 
 The service ID can be provided as an argument or will use the default service
@@ -574,8 +578,9 @@ func buildDbCreateRoleCmd() *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
-		Use:   "role [service-id]",
-		Short: "Create a new database role",
+		Use:               "role [service-id]",
+		Short:             "Create a new database role",
+		ValidArgsFunction: serviceIDCompletion,
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service ID can be provided as an argument or will use the default service
