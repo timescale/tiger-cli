@@ -547,10 +547,8 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	// Track analytics
 	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		// NOTE: We intentionally do not track the entire input, to avoid
-		// capturing the password.
 		a.Track("Call service_update_password tool",
-			analytics.Property("service_id", input.ServiceID),
+			analytics.Fields(input, "password"), // Ignore password field
 			analytics.Error(runErr),
 		)
 	}()
