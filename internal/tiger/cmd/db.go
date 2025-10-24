@@ -86,15 +86,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true
@@ -207,15 +201,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(serviceArgs) > 0 {
-				serviceID = serviceArgs[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, serviceArgs)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true
@@ -322,15 +310,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'"))
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true
@@ -438,15 +420,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true
@@ -821,15 +797,9 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true

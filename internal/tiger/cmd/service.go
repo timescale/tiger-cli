@@ -89,15 +89,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			// Get API key and project ID for authentication
@@ -514,15 +508,9 @@ Examples:
 			}
 
 			// Determine service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			// Get password from flag or environment variable via viper
@@ -1194,15 +1182,9 @@ Examples:
 			}
 
 			// Determine source service ID
-			var serviceID string
-			if len(args) > 0 {
-				serviceID = args[0]
-			} else {
-				serviceID = cfg.ServiceID
-			}
-
-			if serviceID == "" {
-				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
 			}
 
 			cmd.SilenceUsage = true
@@ -1360,4 +1342,19 @@ Examples:
 	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
 
 	return cmd
+}
+
+func getServiceID(cfg *config.Config, args []string) (string, error) {
+	var serviceID string
+	if len(args) > 0 {
+		serviceID = args[0]
+	} else {
+		serviceID = cfg.ServiceID
+	}
+
+	if serviceID == "" {
+		return "", fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+	}
+
+	return serviceID, nil
 }
