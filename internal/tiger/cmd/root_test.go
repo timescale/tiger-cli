@@ -28,9 +28,13 @@ func setupTestCommand(t *testing.T) (string, func()) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
+	// Disable analytics for root tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
+		os.Unsetenv("TIGER_ANALYTICS")
 		config.ResetGlobalConfig()
 	}
 

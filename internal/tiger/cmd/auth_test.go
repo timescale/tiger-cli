@@ -43,6 +43,9 @@ func setupAuthTest(t *testing.T) string {
 	// and reinitialize viper, they use the test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for auth tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	// This ensures proper test isolation by resetting all viper state
 	// MUST be done before RemoveCredentials() so it uses the test directory!
@@ -62,8 +65,9 @@ func setupAuthTest(t *testing.T) string {
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)
 		os.Remove(configFile)
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})

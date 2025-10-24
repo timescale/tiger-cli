@@ -30,6 +30,9 @@ func setupServiceTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for service tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
 
@@ -40,8 +43,9 @@ func setupServiceTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
