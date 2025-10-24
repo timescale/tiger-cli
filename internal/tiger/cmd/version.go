@@ -64,7 +64,7 @@ func buildVersionCmd() *cobra.Command {
 			a := analytics.TryInit(cfg)
 			defer func() {
 				a.Track("Run tiger version",
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.NonZero("latest_version", versionOutput.LatestVersion),
 					analytics.Error(runErr),
 				)

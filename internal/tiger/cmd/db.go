@@ -113,7 +113,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger db connection-string",
 					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -235,7 +235,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger db connect",
 					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -350,7 +350,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger db test-connection",
 					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -464,11 +464,9 @@ Examples:
 			// Track analytics
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				// NOTE: We intentionally do not track the entire flag set, to
-				// avoid capturing the password
 				a.Track("Run tiger db save-password",
 					analytics.Property("service_id", serviceID),
-					analytics.Flag(cmd.LocalFlags().Lookup("role")),
+					analytics.FlagSet(cmd.Flags(), "password"), // Ignore password flag
 					analytics.Error(runErr),
 				)
 			}()
@@ -849,15 +847,9 @@ PostgreSQL Configuration Parameters That May Be Set:
 			// Track analytics
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				// NOTE: We intentionally do not track the entire flag set, to
-				// avoid capturing the password
 				a.Track("Run tiger db create role",
 					analytics.Property("service_id", serviceID),
-					analytics.Flag(cmd.LocalFlags().Lookup("name")),
-					analytics.Flag(cmd.LocalFlags().Lookup("read-only")),
-					analytics.Flag(cmd.LocalFlags().Lookup("from")),
-					analytics.Flag(cmd.LocalFlags().Lookup("statement-timeout")),
-					analytics.Flag(cmd.LocalFlags().Lookup("output")),
+					analytics.FlagSet(cmd.Flags(), "password"), // Ignore password flag
 					analytics.Error(runErr),
 				)
 			}()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -87,12 +88,14 @@ func NonZero[T comparable](key string, value T) Option {
 
 var flagNameReplacer = strings.NewReplacer("-", "_")
 
-func FlagSet(flagSet *pflag.FlagSet) Option {
+func FlagSet(flagSet *pflag.FlagSet, ignore ...string) Option {
 	return func(properties map[string]any) {
-		// NOTE: Visit only iterates through flags that have been set
 		flagSet.Visit(func(flag *pflag.Flag) {
+			if slices.Contains(ignore, flag.Name) {
+				return
+			}
 			key := flagNameReplacer.Replace(flag.Name)
-			properties[key] = flag.Value
+			properties[key] = flag.Value.String()
 		})
 	}
 }
@@ -103,7 +106,7 @@ func Flag(flag *pflag.Flag) Option {
 			return
 		}
 		key := flagNameReplacer.Replace(flag.Name)
-		properties[key] = flag.Value
+		properties[key] = flag.Value.String()
 	}
 }
 

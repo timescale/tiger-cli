@@ -117,7 +117,7 @@ Examples:
 				a.Track("Run tiger mcp install",
 					analytics.Property("client", clientName),
 					analytics.Property("interactive", interactive),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -156,7 +156,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context())
+			return startStdioServer(cmd.Context(), cmd)
 		},
 	}
 
@@ -180,7 +180,7 @@ Examples:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context())
+			return startStdioServer(cmd.Context(), cmd)
 		},
 	}
 }
@@ -212,7 +212,7 @@ Examples:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startHTTPServer(cmd.Context(), httpHost, httpPort)
+			return startHTTPServer(cmd.Context(), cmd, httpHost, httpPort)
 		},
 	}
 
@@ -224,7 +224,7 @@ Examples:
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context) (runErr error) {
+func startStdioServer(ctx context.Context, cmd *cobra.Command) (runErr error) {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
 	// Get config
@@ -238,6 +238,7 @@ func startStdioServer(ctx context.Context) (runErr error) {
 	defer func() {
 		a.Track("Run tiger mcp start",
 			analytics.Property("transport", "stdio"),
+			analytics.FlagSet(cmd.Flags()),
 			analytics.Error(runErr),
 		)
 	}()
@@ -262,7 +263,7 @@ func startStdioServer(ctx context.Context) (runErr error) {
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, host string, port int) (runErr error) {
+func startHTTPServer(ctx context.Context, cmd *cobra.Command, host string, port int) (runErr error) {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
 	// Get config
@@ -276,6 +277,7 @@ func startHTTPServer(ctx context.Context, host string, port int) (runErr error) 
 	defer func() {
 		a.Track("Run tiger mcp start",
 			analytics.Property("transport", "http"),
+			analytics.FlagSet(cmd.Flags()),
 			analytics.Error(runErr),
 		)
 	}()

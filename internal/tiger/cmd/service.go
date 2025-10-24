@@ -117,7 +117,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger service get",
 					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -192,7 +192,7 @@ func buildServiceListCmd() *cobra.Command {
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
 				a.Track("Run tiger service list",
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -365,9 +365,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			var serviceID string
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
+				cmd.DebugFlags()
 				a.Track("Run tiger service create",
 					analytics.NonZero("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -559,6 +560,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger service update-password",
 					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.Flags(), "new-password"), // Ignore new-password flag
 					analytics.Error(runErr),
 				)
 			}()
@@ -997,7 +999,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger service delete",
 					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -1234,7 +1236,7 @@ Examples:
 				a.Track("Run tiger service fork",
 					analytics.Property("service_id", serviceID),
 					analytics.NonZero("forked_service_id", forkedServiceID),
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()

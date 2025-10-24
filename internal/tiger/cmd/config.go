@@ -44,7 +44,7 @@ func buildConfigShowCmd() *cobra.Command {
 			a := analytics.TryInit(cfg)
 			defer func() {
 				a.Track("Run tiger config show",
-					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -116,6 +116,7 @@ func buildConfigSetCmd() *cobra.Command {
 			defer func() {
 				a.Track("Run tiger config set",
 					analytics.Property("key", key),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -152,6 +153,7 @@ func buildConfigUnsetCmd() *cobra.Command {
 			defer func() {
 				a.Track("Run tiger config unset",
 					analytics.Property("key", key),
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -185,6 +187,7 @@ func buildConfigResetCmd() *cobra.Command {
 			a := analytics.TryInit(cfg)
 			defer func() {
 				a.Track("Run tiger config reset",
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()

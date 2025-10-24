@@ -143,6 +143,7 @@ Examples:
 			defer func() {
 				a.Track("Run tiger auth login",
 					analytics.Property("method", loginMethod),
+					analytics.FlagSet(cmd.Flags(), "public-key", "secret-key", "project-id"), // Ignore credentials flags
 					analytics.Error(runErr),
 				)
 			}()
@@ -186,6 +187,7 @@ func buildLogoutCmd() *cobra.Command {
 			a := analytics.TryInit(cfg)
 			defer func() {
 				a.Track("Run tiger auth logout",
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -230,6 +232,7 @@ func buildStatusCmd() *cobra.Command {
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
 				a.Track("Run tiger auth status",
+					analytics.FlagSet(cmd.Flags()),
 					analytics.Error(runErr),
 				)
 			}()
