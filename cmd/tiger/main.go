@@ -50,7 +50,7 @@ func notifyContext(parent context.Context) (context.Context, context.CancelFunc)
 	go func() {
 		select {
 		case sig := <-sigChan:
-			logging.Info("Received interrupt signal", zap.Stringer("signal", sig))
+			logging.Info("Received interrupt signal, press control-C again to exit", zap.Stringer("signal", sig))
 			signal.Stop(sigChan) // Restore default signal handling behavior
 			cancel()
 		case <-ctx.Done():

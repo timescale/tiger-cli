@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -277,10 +276,8 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	<-ctx.Done()
 
 	// Shutdown server gracefully
-	logging.Info("Shutting down HTTP server...")
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+	logging.Info("Gracefully shutting down HTTP server..., press control-C twice to immediately shutdown")
+	if err := httpServer.Shutdown(context.Background()); err != nil {
 		return fmt.Errorf("failed to shut down HTTP server: %w", err)
 	}
 
