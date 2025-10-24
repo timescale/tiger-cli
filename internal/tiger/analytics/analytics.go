@@ -58,7 +58,7 @@ func Property(key string, value any) Option {
 	}
 }
 
-func Fields(s any) Option {
+func Fields(s any, ignore ...string) Option {
 	return func(properties map[string]any) {
 		out, err := json.Marshal(s)
 		if err != nil {
@@ -71,6 +71,9 @@ func Fields(s any) Option {
 		}
 
 		for key, value := range fields {
+			if slices.Contains(ignore, key) {
+				continue
+			}
 			properties[key] = value
 		}
 	}

@@ -133,13 +133,8 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	var rowsAffected int64
 	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		// NOTE: We intentionally do not track the entire input, to avoid
-		// capturing the query and parameters, which can be sensitive
 		a.Track("Call db_execute_query tool",
-			analytics.Property("service_id", input.ServiceID),
-			analytics.Property("timeout_seconds", input.TimeoutSeconds),
-			analytics.Property("role", input.Role),
-			analytics.Property("pooled", input.Pooled),
+			analytics.Fields(input, "query", "parameters"), // Ignore query and parameters, which could be sensitive
 			analytics.Property("rows_affected", rowsAffected),
 			analytics.Error(runErr),
 		)
