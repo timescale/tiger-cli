@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	originalValidator := validateAPIKeyForLogin
 
 	// Mock the validator to return an error
-	validateAPIKeyForLogin = func(cfg *config.Config, apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
 		return errors.New("invalid API key: authentication failed")
 	}
 
@@ -42,7 +43,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	defer config.RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should fail validation
-	output, err := executeAuthCommand("auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret", "--project-id", "test-project-invalid")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret", "--project-id", "test-project-invalid")
 	if err == nil {
 		t.Fatal("Expected login to fail with invalid keys, but it succeeded")
 	}
@@ -77,7 +78,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	originalValidator := validateAPIKeyForLogin
 
 	// Mock the validator to return success
-	validateAPIKeyForLogin = func(cfg *config.Config, apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
 		return nil // Success
 	}
 
@@ -96,7 +97,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	defer config.RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should succeed
-	output, err := executeAuthCommand("auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret", "--project-id", "test-project-valid")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret", "--project-id", "test-project-valid")
 	if err != nil {
 		t.Fatalf("Expected login to succeed with valid keys, got error: %v", err)
 	}

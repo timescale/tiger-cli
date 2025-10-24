@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +28,7 @@ func setupAuthTest(t *testing.T) string {
 
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
-	validateAPIKeyForLogin = func(cfg *config.Config, apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
 		// Always return success for testing
 		return nil
 	}
@@ -70,16 +71,19 @@ func setupAuthTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeAuthCommand(args ...string) (string, error) {
+func executeAuthCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
@@ -87,7 +91,7 @@ func TestAuthLogin_KeyAndProjectIDFlags(t *testing.T) {
 	setupAuthTest(t)
 
 	// Execute login command with public and secret key flags and project ID
-	output, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-123")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key", "--project-id", "test-project-123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -120,7 +124,7 @@ func TestAuthLogin_KeyFlags_NoProjectID(t *testing.T) {
 
 	// Execute login command with only public and secret key flags (no project ID)
 	// This should fail since project ID is now required
-	_, err := executeAuthCommand("auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
+	_, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
 	if err == nil {
 		t.Fatal("Expected login to fail without project ID, but it succeeded")
 	}
@@ -149,7 +153,7 @@ func TestAuthLogin_KeyAndProjectIDEnvironmentVariables(t *testing.T) {
 	defer os.Unsetenv("TIGER_PROJECT_ID")
 
 	// Execute login command with project ID flag but using env vars for keys
-	output, err := executeAuthCommand("auth", "login")
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -184,7 +188,7 @@ func TestAuthLogin_KeyEnvironmentVariables_ProjectIDFlag(t *testing.T) {
 	defer os.Unsetenv("TIGER_SECRET_KEY")
 
 	// Execute login command with project ID flag but using env vars for keys
-	output, err := executeAuthCommand("auth", "login", "--project-id", "test-project-456")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "test-project-456")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -434,7 +438,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	}, "project-123")
 
 	// Execute login command - the mocked openBrowser will handle the callback automatically
-	output, err := executeAuthCommand("auth", "login")
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
 
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
@@ -491,7 +495,7 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	}
 
 	// Execute login command - both mocked functions will handle OAuth flow and project selection
-	output, err := executeAuthCommand("auth", "login")
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
 
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
@@ -535,7 +539,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	// by ensuring the API key gets stored to file when keyring might not be available
 
 	// Execute login command with public and secret key flags and project ID
-	output, err := executeAuthCommand("auth", "login", "--public-key", "fallback-public", "--secret-key", "fallback-secret", "--project-id", "test-project-fallback")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "fallback-public", "--secret-key", "fallback-secret", "--project-id", "test-project-fallback")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -571,7 +575,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	}
 
 	// Test status with file-only storage
-	output, err = executeAuthCommand("auth", "status")
+	output, err = executeAuthCommand(t.Context(), "auth", "status")
 	if err != nil {
 		t.Fatalf("Status failed with file storage: %v", err)
 	}
@@ -580,7 +584,7 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	}
 
 	// Test logout with file-only storage
-	output, err = executeAuthCommand("auth", "logout")
+	output, err = executeAuthCommand(t.Context(), "auth", "logout")
 	if err != nil {
 		t.Fatalf("Logout failed with file storage: %v", err)
 	}
@@ -607,7 +611,7 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	defer os.Unsetenv("TIGER_PROJECT_ID")
 
 	// Execute login command without any flags (all from env vars)
-	output, err := executeAuthCommand("auth", "login")
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -652,7 +656,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	}
 
 	// Execute status command
-	output, err := executeAuthCommand("auth", "status")
+	output, err := executeAuthCommand(t.Context(), "auth", "status")
 	if err != nil {
 		t.Fatalf("Status failed: %v", err)
 	}
@@ -666,7 +670,7 @@ func TestAuthStatus_NotLoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
 	// Execute status command without being logged in
-	_, err := executeAuthCommand("auth", "status")
+	_, err := executeAuthCommand(t.Context(), "auth", "status")
 	if err == nil {
 		t.Fatal("Expected status to fail when not logged in")
 	}
@@ -693,7 +697,7 @@ func TestAuthLogout_Success(t *testing.T) {
 	}
 
 	// Execute logout command
-	output, err := executeAuthCommand("auth", "logout")
+	output, err := executeAuthCommand(t.Context(), "auth", "logout")
 	if err != nil {
 		t.Fatalf("Logout failed: %v", err)
 	}

@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -100,14 +100,14 @@ Examples:
 					out: cmd.ErrOrStderr(),
 				}
 
-				creds, err = l.loginWithOAuth()
+				creds, err = l.loginWithOAuth(cmd.Context())
 				if err != nil {
 					return err
 				}
 			} else if creds.publicKey == "" || creds.secretKey == "" || creds.projectID == "" {
 				// If some credentials were provided, prompt for missing ones
 				loginMethod = "interactive"
-				creds, err = promptForCredentials(cfg.ConsoleURL, creds)
+				creds, err = promptForCredentials(cmd.Context(), cfg.ConsoleURL, creds)
 				if err != nil {
 					return fmt.Errorf("failed to get credentials: %w", err)
 				}
@@ -129,7 +129,7 @@ Examples:
 
 			// Validate the API key by making a test API call
 			fmt.Fprintln(cmd.ErrOrStderr(), "Validating API key...")
-			if err := validateAPIKeyForLogin(cfg, apiKey, creds.projectID); err != nil {
+			if err := validateAPIKeyForLogin(cmd.Context(), cfg, apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
 
@@ -265,7 +265,7 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 }
 
 // promptForCredentials prompts the user to enter any missing credentials
-func promptForCredentials(consoleURL string, creds credentials) (credentials, error) {
+func promptForCredentials(ctx context.Context, consoleURL string, creds credentials) (credentials, error) {
 	// Check if we're in a terminal for interactive input
 	if !util.IsTerminal(os.Stdin) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key, --project-id) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY, TIGER_PROJECT_ID)")
@@ -278,32 +278,35 @@ func promptForCredentials(consoleURL string, creds credentials) (credentials, er
 	// Prompt for public key if missing
 	if creds.publicKey == "" {
 		fmt.Print("Enter your public key: ")
-		publicKey, err := reader.ReadString('\n')
+		publicKey, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
 		if err != nil {
 			return credentials{}, err
 		}
-		creds.publicKey = strings.TrimSpace(publicKey)
+		creds.publicKey = publicKey
 	}
 
 	// Prompt for secret key if missing
 	if creds.secretKey == "" {
 		fmt.Print("Enter your secret key: ")
-		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+		password, err := readString(ctx, func() (string, error) {
+			val, err := term.ReadPassword(int(os.Stdin.Fd()))
+			return string(val), err
+		})
 		if err != nil {
 			return credentials{}, err
 		}
 		fmt.Println() // Print newline after hidden input
-		creds.secretKey = strings.TrimSpace(string(bytePassword))
+		creds.secretKey = password
 	}
 
 	// Prompt for project ID if missing
 	if creds.projectID == "" {
 		fmt.Print("Enter your project ID: ")
-		projectID, err := reader.ReadString('\n')
+		projectID, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
 		if err != nil {
 			return credentials{}, err
 		}
-		creds.projectID = strings.TrimSpace(projectID)
+		creds.projectID = projectID
 	}
 
 	return creds, nil

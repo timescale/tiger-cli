@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"slices"
@@ -44,16 +45,19 @@ func setupConfigTest(t *testing.T) (string, func()) {
 	return tmpDir, cleanup
 }
 
-func executeConfigCommand(args ...string) (string, error) {
+func executeConfigCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
@@ -72,7 +76,7 @@ password_storage: pgpass
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	output, err := executeConfigCommand("config", "show")
+	output, err := executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -120,7 +124,7 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	output, err := executeConfigCommand("config", "show")
+	output, err := executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -179,7 +183,7 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	output, err := executeConfigCommand("config", "show")
+	output, err := executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -245,7 +249,7 @@ analytics: true
 	}
 
 	// Test that -o json flag overrides config file setting for output format, but not the config value itself
-	output, err := executeConfigCommand("config", "show", "-o", "json")
+	output, err := executeConfigCommand(t.Context(), "config", "show", "-o", "json")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -280,7 +284,7 @@ analytics: true
 		os.Unsetenv("TIGER_OUTPUT")
 	}()
 
-	output, err := executeConfigCommand("config", "show")
+	output, err := executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -322,7 +326,7 @@ analytics: false
 	}
 
 	// Execute config show with --config-dir flag
-	output, err := executeConfigCommand("--config-dir", tmpDir, "config", "show")
+	output, err := executeConfigCommand(t.Context(), "--config-dir", tmpDir, "config", "show")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -360,7 +364,7 @@ func TestConfigSet_ValidValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
-			output, err := executeConfigCommand("config", "set", tt.key, tt.value)
+			output, err := executeConfigCommand(t.Context(), "config", "set", tt.key, tt.value)
 			if err != nil {
 				t.Fatalf("Command failed: %v", err)
 			}
@@ -422,7 +426,7 @@ func TestConfigSet_InvalidValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
-			_, err := executeConfigCommand("config", "set", tt.key, tt.value)
+			_, err := executeConfigCommand(t.Context(), "config", "set", tt.key, tt.value)
 			if err == nil {
 				t.Error("Expected command to fail, but it succeeded")
 			}
@@ -438,19 +442,19 @@ func TestConfigSet_WrongArgs(t *testing.T) {
 	_, _ = setupConfigTest(t)
 
 	// Test with no arguments
-	_, err := executeConfigCommand("config", "set")
+	_, err := executeConfigCommand(t.Context(), "config", "set")
 	if err == nil {
 		t.Error("Expected command to fail with no arguments")
 	}
 
 	// Test with one argument
-	_, err = executeConfigCommand("config", "set", "key")
+	_, err = executeConfigCommand(t.Context(), "config", "set", "key")
 	if err == nil {
 		t.Error("Expected command to fail with only one argument")
 	}
 
 	// Test with too many arguments
-	_, err = executeConfigCommand("config", "set", "key", "value", "extra")
+	_, err = executeConfigCommand(t.Context(), "config", "set", "key", "value", "extra")
 	if err == nil {
 		t.Error("Expected command to fail with too many arguments")
 	}
@@ -472,7 +476,7 @@ func TestConfigSet_ConfigDirFlag(t *testing.T) {
 	})
 
 	// Execute config set with --config-dir flag
-	if _, err := executeConfigCommand("--config-dir", tmpDir, "config", "set", "service_id", "flag-set-service"); err != nil {
+	if _, err := executeConfigCommand(t.Context(), "--config-dir", tmpDir, "config", "set", "service_id", "flag-set-service"); err != nil {
 		t.Fatalf("Config set command failed: %v", err)
 	}
 
@@ -517,7 +521,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.key, func(t *testing.T) {
-			output, err := executeConfigCommand("config", "unset", tt.key)
+			output, err := executeConfigCommand(t.Context(), "config", "unset", tt.key)
 			if err != nil {
 				t.Fatalf("Command failed: %v", err)
 			}
@@ -556,7 +560,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 func TestConfigUnset_InvalidKey(t *testing.T) {
 	_, _ = setupConfigTest(t)
 
-	_, err := executeConfigCommand("config", "unset", "unknown_key")
+	_, err := executeConfigCommand(t.Context(), "config", "unset", "unknown_key")
 	if err == nil {
 		t.Error("Expected command to fail with unknown key")
 	}
@@ -570,13 +574,13 @@ func TestConfigUnset_WrongArgs(t *testing.T) {
 	_, _ = setupConfigTest(t)
 
 	// Test with no arguments
-	_, err := executeConfigCommand("config", "unset")
+	_, err := executeConfigCommand(t.Context(), "config", "unset")
 	if err == nil {
 		t.Error("Expected command to fail with no arguments")
 	}
 
 	// Test with too many arguments
-	_, err = executeConfigCommand("config", "unset", "key", "extra")
+	_, err = executeConfigCommand(t.Context(), "config", "unset", "key", "extra")
 	if err == nil {
 		t.Error("Expected command to fail with too many arguments")
 	}
@@ -596,7 +600,7 @@ func TestConfigReset(t *testing.T) {
 	cfg.Set("analytics", "false")
 
 	// Execute reset command
-	output, err := executeConfigCommand("config", "reset")
+	output, err := executeConfigCommand(t.Context(), "config", "reset")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -631,18 +635,18 @@ func TestConfigCommands_Integration(t *testing.T) {
 	// Test full workflow: set -> show -> unset -> reset
 
 	// 1. Set some values
-	_, err := executeConfigCommand("config", "set", "service_id", "integration-test")
+	_, err := executeConfigCommand(t.Context(), "config", "set", "service_id", "integration-test")
 	if err != nil {
 		t.Fatalf("Failed to set service_id: %v", err)
 	}
 
-	_, err = executeConfigCommand("config", "set", "output", "json")
+	_, err = executeConfigCommand(t.Context(), "config", "set", "output", "json")
 	if err != nil {
 		t.Fatalf("Failed to set output: %v", err)
 	}
 
 	// 2. Show config in JSON format (should use the output format we just set)
-	showOutput, err := executeConfigCommand("config", "show")
+	showOutput, err := executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Failed to show config: %v", err)
 	}
@@ -658,13 +662,13 @@ func TestConfigCommands_Integration(t *testing.T) {
 	}
 
 	// 3. Unset service_id
-	_, err = executeConfigCommand("config", "unset", "service_id")
+	_, err = executeConfigCommand(t.Context(), "config", "unset", "service_id")
 	if err != nil {
 		t.Fatalf("Failed to unset service_id: %v", err)
 	}
 
 	// 4. Verify service_id was unset
-	showOutput, err = executeConfigCommand("config", "show")
+	showOutput, err = executeConfigCommand(t.Context(), "config", "show")
 	if err != nil {
 		t.Fatalf("Failed to show config after unset: %v", err)
 	}
@@ -676,7 +680,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 	}
 
 	// 5. Reset all config
-	_, err = executeConfigCommand("config", "reset")
+	_, err = executeConfigCommand(t.Context(), "config", "reset")
 	if err != nil {
 		t.Fatalf("Failed to reset config: %v", err)
 	}
@@ -699,7 +703,7 @@ func TestConfigSet_OutputDoesPersist(t *testing.T) {
 	configFile := config.GetConfigFile(tmpDir)
 
 	// Execute config set to explicitly set output to json
-	_, err := executeConfigCommand("config", "set", "output", "json")
+	_, err := executeConfigCommand(t.Context(), "config", "set", "output", "json")
 	if err != nil {
 		t.Fatalf("Failed to set output to json: %v", err)
 	}
@@ -731,7 +735,7 @@ func TestConfigSet_OutputDoesPersist(t *testing.T) {
 	}
 
 	// Now test that setting it to a different value updates the file
-	_, err = executeConfigCommand("config", "set", "output", "yaml")
+	_, err = executeConfigCommand(t.Context(), "config", "set", "output", "yaml")
 	if err != nil {
 		t.Fatalf("Failed to set output to yaml: %v", err)
 	}

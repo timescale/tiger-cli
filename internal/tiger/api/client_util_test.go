@@ -95,7 +95,7 @@ func TestValidateAPIKeyWithClient(t *testing.T) {
 			mockClient := mocks.NewMockClientWithResponsesInterface(ctrl)
 			tt.setupMock(mockClient)
 
-			err := api.ValidateAPIKeyWithClient(mockClient, "")
+			err := api.ValidateAPIKeyWithClient(context.Background(), mockClient, "")
 
 			if tt.expectedError == "" {
 				if err != nil {

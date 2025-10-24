@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -14,7 +16,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
-func buildRootCmd() *cobra.Command {
+func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 	var configDir string
 	var debug bool
 	var serviceID string
@@ -36,6 +38,14 @@ tiger auth login
 
 `,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SetContext(ctx)
+
+			// Setup configuration initialization
+			configDirFlag := cmd.Flags().Lookup("config-dir")
+			if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
+				return fmt.Errorf("error setting up config: %w", err)
+			}
+
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
@@ -78,17 +88,6 @@ tiger auth login
 		},
 	}
 
-	// Setup configuration initialization
-	initConfigFunc := func() {
-		configDirFlag := cmd.PersistentFlags().Lookup("config-dir")
-		if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting up config: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	cobra.OnInitialize(initConfigFunc)
-
 	// Add persistent flags
 	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
@@ -99,11 +98,16 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
 
 	// Bind flags to viper
-	viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id"))
-	viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics"))
-	viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage"))
-	viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color"))
+	err := errors.Join(
+		viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug")),
+		viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id")),
+		viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics")),
+		viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage")),
+		viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color")),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind flags: %w", err)
+	}
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:
@@ -120,17 +124,42 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
-	return cmd
+	return cmd, nil
 }
 
-func Execute() {
-	rootCmd := buildRootCmd()
-	err := rootCmd.Execute()
+func Execute(ctx context.Context) error {
+	rootCmd, err := buildRootCmd(ctx)
 	if err != nil {
-		// Check if it's a custom exit code error
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(exitErr.ExitCode())
+		return err
+	}
+
+	return rootCmd.Execute()
+}
+
+func readString(ctx context.Context, readFn func() (string, error)) (string, error) {
+	valCh := make(chan string)
+	errCh := make(chan error)
+	defer func() { close(valCh); close(errCh) }()
+	go func() {
+		val, err := readFn()
+		if err != nil {
+			errCh <- err
+			return
 		}
-		os.Exit(1)
+		select {
+		case <-ctx.Done(): // don't return an empty value if the context is already canceled
+			return
+		default:
+		}
+		valCh <- val
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case err := <-errCh:
+		return "", err
+	case val := <-valCh:
+		return strings.TrimSpace(val), nil
 	}
 }

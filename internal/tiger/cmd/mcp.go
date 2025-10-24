@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -245,10 +242,6 @@ func startStdioServer(ctx context.Context) (runErr error) {
 		)
 	}()
 
-	// Setup graceful shutdown handling
-	ctx, stop := signalContext(ctx)
-	defer stop()
-
 	// Create MCP server
 	server, err := mcp.NewServer(ctx)
 	if err != nil {
@@ -286,10 +279,6 @@ func startHTTPServer(ctx context.Context, host string, port int) (runErr error) 
 			analytics.Error(runErr),
 		)
 	}()
-
-	// Setup graceful shutdown handling
-	ctx, stop := signalContext(ctx)
-	defer stop()
 
 	// Create MCP server
 	server, err := mcp.NewServer(ctx)
@@ -335,10 +324,9 @@ func startHTTPServer(ctx context.Context, host string, port int) (runErr error) 
 	// is idempotent and safe to call multiple times, so it's okay that it's
 	// called here and via the deferred call above.
 	<-ctx.Done()
-	stop()
 
 	// Shutdown server gracefully
-	logging.Info("Shutting down HTTP server...")
+	logging.Info("Gracefully shutting down HTTP server..., press control-C twice to immediately shutdown")
 	if err := httpServer.Shutdown(context.Background()); err != nil {
 		return fmt.Errorf("failed to shut down HTTP server: %w", err)
 	}
@@ -360,29 +348,4 @@ func getListener(host string, startPort int) (net.Listener, int, error) {
 		}
 	}
 	return nil, 0, fmt.Errorf("no available port found in range %d-%d", startPort, startPort+99)
-}
-
-// signalContext sets up graceful shutdown handling and returns a context and
-// cleanup function. This is nearly identical to [signal.NotifyContext], except
-// that it logs a message when a signal is received.
-func signalContext(parent context.Context) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(parent)
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		select {
-		case sig := <-sigChan:
-			logging.Info("Received interrupt signal, shutting down MCP server...",
-				zap.Stringer("signal", sig),
-			)
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-
-	return ctx, func() {
-		cancel()
-		signal.Stop(sigChan)
-	}
 }

@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -120,7 +123,7 @@ Examples:
 			}()
 
 			// Make API call to get service details
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
@@ -195,7 +198,7 @@ func buildServiceListCmd() *cobra.Command {
 			}()
 
 			// Make API call to list services
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
@@ -385,7 +388,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Make API call to create service
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// All status messages go to stderr
@@ -434,7 +437,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					service.Status, serviceErr = waitForServiceReady(ctx, client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
 					if serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
@@ -548,7 +551,7 @@ Examples:
 			}
 
 			// Make API call to update password
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// Track analytics
@@ -816,8 +819,8 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
+func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
+	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -831,7 +834,14 @@ func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID s
 	for {
 		select {
 		case <-ctx.Done():
-			return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
+			case errors.Is(ctx.Err(), context.Canceled):
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be provisioning"))
+			default:
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be provisioning: %w", ctx.Err()))
+			}
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
@@ -963,8 +973,13 @@ Examples:
 			if !deleteConfirm {
 				fmt.Fprintf(statusOutput, "Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
 				fmt.Fprintf(statusOutput, "Type the service ID '%s' to confirm: ", serviceID)
-				var confirmation string
-				fmt.Scanln(&confirmation)
+				confirmation, err := readString(cmd.Context(), func() (string, error) {
+					reader := bufio.NewReader(os.Stdin)
+					return reader.ReadString('\n')
+				})
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
 				if confirmation != serviceID {
 					fmt.Fprintln(statusOutput, "❌ Delete operation cancelled.")
 					return nil
@@ -989,7 +1004,7 @@ Examples:
 
 			// Make the delete request
 			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
-				context.Background(),
+				cmd.Context(),
 				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
@@ -1030,7 +1045,7 @@ Examples:
 
 // waitForServiceDeletion waits for a service to be fully deleted
 func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -1045,7 +1060,14 @@ func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, s
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
+			case errors.Is(ctx.Err(), context.Canceled):
+				return exitWithCode(ExitTimeout, fmt.Errorf("canceled waiting for service '%s' to be deleted", serviceID))
+			default:
+				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be deleting: %w", ctx.Err()))
+			}
 		case <-ticker.C:
 			// Check if service still exists
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
@@ -1196,7 +1218,7 @@ Examples:
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
@@ -1299,7 +1321,7 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				forkedService.Status, serviceErr = waitForServiceReady(ctx, client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
 				if serviceErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {

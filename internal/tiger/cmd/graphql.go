@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,7 +42,7 @@ type Project struct {
 }
 
 // getUserProjects fetches the list of projects the user has access to
-func (c *GraphQLClient) getUserProjects(accessToken string) ([]Project, error) {
+func (c *GraphQLClient) getUserProjects(ctx context.Context, accessToken string) ([]Project, error) {
 	query := `
 		query GetAllProjects {
 			getAllProjects {
@@ -51,7 +52,7 @@ func (c *GraphQLClient) getUserProjects(accessToken string) ([]Project, error) {
 		}
 	`
 
-	response, err := makeGraphQLRequest[GetAllProjectsData](c.URL, accessToken, query, nil)
+	response, err := makeGraphQLRequest[GetAllProjectsData](ctx, c.URL, accessToken, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ type User struct {
 }
 
 // getUser fetches the current user's information
-func (c *GraphQLClient) getUser(accessToken string) (*User, error) {
+func (c *GraphQLClient) getUser(ctx context.Context, accessToken string) (*User, error) {
 	query := `
 		query GetUser {
 			getUser {
@@ -83,7 +84,7 @@ func (c *GraphQLClient) getUser(accessToken string) (*User, error) {
 		}
 	`
 
-	response, err := makeGraphQLRequest[GetUserData](c.URL, accessToken, query, nil)
+	response, err := makeGraphQLRequest[GetUserData](ctx, c.URL, accessToken, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +106,7 @@ type PATRecordResponse struct {
 }
 
 // createPATRecord creates a new PAT record for the given project
-func (c *GraphQLClient) createPATRecord(accessToken, projectID, patName string) (*PATRecordResponse, error) {
+func (c *GraphQLClient) createPATRecord(ctx context.Context, accessToken, projectID, patName string) (*PATRecordResponse, error) {
 	query := `
 		mutation CreatePATRecord($input: CreatePATRecordInput!) {
 			createPATRecord(createPATRecordInput: $input) {
@@ -124,7 +125,7 @@ func (c *GraphQLClient) createPATRecord(accessToken, projectID, patName string) 
 		},
 	}
 
-	response, err := makeGraphQLRequest[CreatePATRecordData](c.URL, accessToken, query, variables)
+	response, err := makeGraphQLRequest[CreatePATRecordData](ctx, c.URL, accessToken, query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (c *GraphQLClient) createPATRecord(accessToken, projectID, patName string) 
 }
 
 // makeGraphQLRequest makes a GraphQL request to the API
-func makeGraphQLRequest[T any](queryURL, accessToken, query string, variables map[string]any) (*T, error) {
+func makeGraphQLRequest[T any](ctx context.Context, queryURL, accessToken, query string, variables map[string]any) (*T, error) {
 	requestBody := map[string]any{
 		"query": query,
 	}
@@ -146,7 +147,7 @@ func makeGraphQLRequest[T any](queryURL, accessToken, query string, variables ma
 		return nil, fmt.Errorf("failed to marshal GraphQL request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", queryURL, strings.NewReader(string(jsonBody)))
+	req, err := http.NewRequestWithContext(ctx, "POST", queryURL, strings.NewReader(string(jsonBody)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

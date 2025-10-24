@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -66,7 +67,10 @@ analytics: true
 	}()
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 
 	// Set CLI flags (these should take precedence)
 	args := []string{
@@ -80,7 +84,7 @@ analytics: true
 	testCmd.SetArgs(args)
 
 	// Execute the command to trigger PersistentPreRunE
-	err := testCmd.Execute()
+	err = testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
@@ -104,9 +108,12 @@ func TestFlagBindingWithViper(t *testing.T) {
 	}()
 
 	// Test 1: Environment variable should be used when no flag is set
-	testCmd1 := buildRootCmd()
+	testCmd1, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 	testCmd1.SetArgs([]string{"version"}) // Need a subcommand
-	err := testCmd1.Execute()
+	err = testCmd1.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
@@ -119,7 +126,10 @@ func TestFlagBindingWithViper(t *testing.T) {
 	config.ResetGlobalConfig()
 
 	// Test 2: Flag should override environment variable
-	testCmd2 := buildRootCmd()
+	testCmd2, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 	testCmd2.SetArgs([]string{"--service-id", "test-service-2", "version"})
 	err = testCmd2.Execute()
 	if err != nil {
@@ -149,11 +159,14 @@ analytics: false
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 
 	// Execute with config file specified
 	testCmd.SetArgs([]string{"--config-dir", tmpDir, "version"})
-	err := testCmd.Execute()
+	err = testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
