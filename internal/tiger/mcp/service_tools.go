@@ -12,7 +12,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
-	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -402,12 +401,6 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 // handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (result *mcp.CallToolResult, output ServiceCreateOutput, runErr error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
 	// Create fresh API client and get project ID
 	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
