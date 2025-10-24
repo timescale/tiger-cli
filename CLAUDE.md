@@ -166,6 +166,253 @@ After making changes to commands, tools, configuration, or flags, always check a
 
 Keep these files in sync with the actual implementation. When adding a new flag, config option, or command, update all relevant documentation files.
 
+### Analytics Tracking
+
+Tiger CLI tracks usage analytics to help improve the product. Follow these patterns when adding analytics tracking to commands and tools.
+
+#### Initialization Patterns
+
+**For CLI Commands:**
+
+When you already have an API client (most commands), use `analytics.New()`:
+
+```go
+// Create API client
+client, err := api.NewTigerClient(cfg, apiKey)
+if err != nil {
+    return fmt.Errorf("failed to create API client: %w", err)
+}
+
+// Initialize analytics with existing client
+a := analytics.New(cfg, client, projectID)
+```
+
+When you don't have an API client yet (e.g., config commands, version), use `analytics.TryInit()`:
+
+```go
+// TryInit creates a client if credentials are available,
+// otherwise returns an instance that silently skips tracking
+a := analytics.TryInit(cfg)
+```
+
+**For MCP Tools:**
+
+MCP tools already have a client from `initToolCall()`, so always use `analytics.New()`:
+
+```go
+cfg, apiClient, projectID, err := s.initToolCall()
+if err != nil {
+    return nil, Output{}, err
+}
+
+a := analytics.New(cfg, apiClient, projectID)
+```
+
+#### Event Naming Conventions
+
+**CLI Commands:** Use the pattern `"Run tiger <command> <subcommand>"`
+
+```go
+a.Track("Run tiger service list", ...)
+a.Track("Run tiger service create", ...)
+a.Track("Run tiger db connection-string", ...)
+a.Track("Run tiger auth login", ...)
+```
+
+**MCP Tools:** Use the pattern `"Call <tool_name> tool"`
+
+```go
+a.Track("Call service_list tool", ...)
+a.Track("Call service_create tool", ...)
+a.Track("Call db_execute_query tool", ...)
+```
+
+#### Error Tracking with Named Return Values
+
+Always use a **named return value** (`runErr error`) and track it in a deferred function. This ensures errors are captured even when returning early:
+
+```go
+RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+    // Initialize analytics
+    a := analytics.New(cfg, client, projectID)
+    defer func() {
+        a.Track("Run tiger service get",
+            analytics.Property("service_id", serviceID),
+            analytics.Error(runErr),  // Captures the error
+        )
+    }()
+
+    // Command implementation
+    if err != nil {
+        return err  // runErr captures this
+    }
+
+    return nil
+}
+```
+
+For MCP tools:
+
+```go
+func (s *Server) handleServiceGet(...) (result *mcp.CallToolResult, output ServiceGetOutput, runErr error) {
+    a := analytics.New(cfg, apiClient, projectID)
+    defer func() {
+        a.Track("Call service_get tool",
+            analytics.Error(runErr),
+        )
+    }()
+
+    // Tool implementation
+}
+```
+
+#### Tracking Properties
+
+**Common Patterns:**
+
+1. **Track specific values** - Use `analytics.Property()` for individual values:
+```go
+analytics.Property("service_id", serviceID)
+analytics.Property("method", loginMethod)
+analytics.Property("rows_affected", rowsAffected)
+```
+
+2. **Track all user-provided flags** - Use `analytics.FlagSet()`:
+```go
+// Track all flags the user explicitly set
+analytics.FlagSet(cmd.Flags())
+
+// Track flags, excluding sensitive ones
+analytics.FlagSet(cmd.Flags(), "public-key", "secret-key", "project-id")
+```
+
+3. **Track struct fields** - Use `analytics.Fields()` for structured data:
+```go
+// Track all fields from input struct
+analytics.Fields(input)
+
+// Track fields, excluding sensitive ones
+analytics.Fields(input, "query", "parameters", "password")
+```
+
+4. **Track optional values** - Use `analytics.NonZero()` to only track non-zero values:
+```go
+var serviceID string
+// ... later serviceID might be set ...
+analytics.NonZero("service_id", serviceID)  // Only tracked if serviceID != ""
+```
+
+#### Excluding Sensitive Data
+
+**CRITICAL:** Always exclude sensitive data from analytics. Common sensitive fields:
+
+- **Credentials:** `public-key`, `secret-key`, `api-key`, `password`
+- **User Data:** `query`, `parameters` (SQL queries may contain sensitive info)
+- **IDs that might be sensitive:** Only exclude if they contain user data
+
+**Examples:**
+
+```go
+// Exclude credential flags
+analytics.FlagSet(cmd.Flags(), "public-key", "secret-key", "project-id")
+
+// Exclude query and parameters (may contain sensitive user data)
+analytics.Fields(input, "query", "parameters")
+```
+
+#### Complete Examples
+
+**CLI Command Example:**
+
+```go
+RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+    cmd.SilenceUsage = true
+
+    // Get credentials and create client
+    apiKey, projectID, err := getCredentialsForService()
+    if err != nil {
+        return exitWithCode(ExitAuthenticationError, err)
+    }
+
+    client, err := api.NewTigerClient(cfg, apiKey)
+    if err != nil {
+        return fmt.Errorf("failed to create API client: %w", err)
+    }
+
+    // Track analytics with named return value
+    var serviceID string
+    a := analytics.New(cfg, client, projectID)
+    defer func() {
+        a.Track("Run tiger service create",
+            analytics.NonZero("service_id", serviceID),  // Only if created
+            analytics.FlagSet(cmd.Flags()),              // All user flags
+            analytics.Error(runErr),                      // Success/failure
+        )
+    }()
+
+    // Command implementation...
+    service, err := createService(...)
+    if err != nil {
+        return err
+    }
+
+    serviceID = service.ID  // Set for analytics
+    return nil
+}
+```
+
+**MCP Tool Example:**
+
+```go
+func (s *Server) handleDBExecuteQuery(...) (result *mcp.CallToolResult, output DBExecuteQueryOutput, runErr error) {
+    cfg, apiClient, projectID, err := s.initToolCall()
+    if err != nil {
+        return nil, DBExecuteQueryOutput{}, err
+    }
+
+    // Track analytics
+    var rowsAffected int64
+    a := analytics.New(cfg, apiClient, projectID)
+    defer func() {
+        a.Track("Call db_execute_query tool",
+            analytics.Fields(input, "query", "parameters"), // Exclude sensitive SQL
+            analytics.Property("rows_affected", rowsAffected),
+            analytics.Error(runErr),
+        )
+    }()
+
+    // Tool implementation...
+    result, err := executeQuery(...)
+    if err != nil {
+        return nil, DBExecuteQueryOutput{}, err
+    }
+
+    rowsAffected = result.RowsAffected
+    return nil, output, nil
+}
+```
+
+#### Analytics Option Reference
+
+See `internal/tiger/analytics/analytics.go` for detailed documentation of all Option functions:
+
+- **`Property(key, value)`** - Add a single key-value pair
+- **`Fields(struct, ignore...)`** - Extract all fields from a struct (excluding specified ones)
+- **`NonZero(key, value)`** - Only add property if value is non-zero
+- **`FlagSet(flagSet, ignore...)`** - Add all explicitly set flags (excluding specified ones)
+- **`Flag(flag)`** - Add a single flag if explicitly set
+- **`Error(err)`** - Add success/error status and error message
+
+#### Best Practices Summary
+
+1. ✅ **Use named return values** (`runErr error`) to capture errors in deferred analytics calls
+2. ✅ **Track in defer** - Use `defer func()` so analytics are sent even on early returns
+3. ✅ **Exclude sensitive data** - Never track credentials, passwords, or user data like SQL queries
+4. ✅ **Follow naming conventions** - CLI: "Run tiger ...", MCP: "Call ... tool"
+5. ✅ **Use TryInit for commands without clients** - Config, version, and other non-authenticated commands
+6. ✅ **Use New for commands with clients** - Service, db, and authenticated commands
+7. ✅ **Track optional results** - Use `analytics.NonZero()` for values set during execution (e.g., created IDs)
+
 ## Architecture Overview
 
 Tiger CLI is a Go-based command-line interface for managing Tiger, the modern database cloud. The architecture follows standard Go CLI patterns using Cobra and Viper.
