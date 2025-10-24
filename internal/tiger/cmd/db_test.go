@@ -22,6 +22,9 @@ import (
 func setupDBTest(t *testing.T) string {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-db-test-*")
 	if err != nil {
@@ -891,10 +894,17 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	testPassword := "explicit-password-123"
 
@@ -960,10 +970,17 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Set environment variable
 	testPassword := "env-password-456"
@@ -1029,10 +1046,17 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Make sure TIGER_NEW_PASSWORD is not set
 	os.Unsetenv("TIGER_NEW_PASSWORD")
@@ -1105,10 +1129,17 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Make sure TIGER_NEW_PASSWORD is not set
 	os.Unsetenv("TIGER_NEW_PASSWORD")
@@ -1174,10 +1205,17 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	testPassword := "readonly-password-789"
 	customRole := "readonly"
@@ -1306,10 +1344,17 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Mock getCredentialsForDB to avoid auth errors
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", projectID, nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	testPassword := "pgpass-password-101"
 

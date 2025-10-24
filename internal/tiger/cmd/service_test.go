@@ -1218,7 +1218,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Create API client
-	client, err := api.NewTigerClient(cfg, "test-api-key", "test-project-123")
+	client, err := api.NewTigerClient(cfg, "test-api-key")
 	if err != nil {
 		t.Fatalf("Failed to create API client: %v", err)
 	}

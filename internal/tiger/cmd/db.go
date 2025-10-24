@@ -27,6 +27,9 @@ var (
 	// getCredentialsForDB can be overridden for testing
 	getCredentialsForDB = config.GetCredentials
 
+	// getServiceDetailsFunc can be overridden for testing
+	getServiceDetailsFunc = getServiceDetails
+
 	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
 	checkStdinIsTTY = func() bool {
 		return util.IsTerminal(os.Stdin)
@@ -119,7 +122,7 @@ Examples:
 			}()
 
 			// Fetch service details
-			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -246,7 +249,7 @@ Examples:
 			}
 
 			// Fetch service details
-			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -355,7 +358,7 @@ Examples:
 			}()
 
 			// Fetch service details
-			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, err)
 			}
@@ -471,7 +474,7 @@ Examples:
 			}()
 
 			// Fetch service details
-			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -865,7 +868,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Get service details
-			service, err := getServiceDetails(cmd.Context(), client, projectID, serviceID)
+			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}

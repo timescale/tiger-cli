@@ -146,7 +146,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	}
 
 	// Create a new Tiger client
-	client, err := api.NewTigerClient(cfg, "test-api-key", "test-project-id")
+	client, err := api.NewTigerClient(cfg, "test-api-key")
 	if err != nil {
 		t.Fatalf("Failed to create Tiger client: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestNewTigerClientAuthorizationHeader(t *testing.T) {
 
 	// Create a new Tiger client with a test API key
 	apiKey := "test-api-key:test-secret-key"
-	client, err := api.NewTigerClient(cfg, apiKey, "test-project-id")
+	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
 		t.Fatalf("Failed to create Tiger client: %v", err)
 	}

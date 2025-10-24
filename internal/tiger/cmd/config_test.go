@@ -18,6 +18,9 @@ import (
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
 	if err != nil {
