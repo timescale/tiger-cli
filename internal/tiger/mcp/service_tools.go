@@ -458,7 +458,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	defer func() {
 		a.Track("Call service_create tool",
 			analytics.Fields(input),
-			analytics.Property("service_id", serviceID),
+			analytics.NonZero("service_id", serviceID),
 			analytics.Error(runErr),
 		)
 	}()
@@ -554,8 +554,8 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	// Track analytics
 	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		// NOTE: We intentionally do not track all of the input fields here, to
-		// avoid capturing the password
+		// NOTE: We intentionally do not track the entire input, to avoid
+		// capturing the password.
 		a.Track("Call service_update_password tool",
 			analytics.Property("service_id", input.ServiceID),
 			analytics.Error(runErr),

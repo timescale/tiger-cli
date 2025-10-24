@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -56,8 +57,6 @@ func Property(key string, value any) Option {
 	}
 }
 
-// NOTE: The passed in argument must be a struct or map,
-// or this function is a no-op.
 func Fields(s any) Option {
 	return func(properties map[string]any) {
 		out, err := json.Marshal(s)
@@ -156,10 +155,14 @@ func (a *Analytics) Identify(event string, options ...Option) {
 		return
 	}
 
+	// Set a 5 second timeout for tracking analytics events. We intentionally
+	// use context.Background() here so we can track events even if a command
+	// times out or is canceled.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Send the event
-	// NOTE: We intentionally use context.Background() here so we can
-	// track analytics events even if a command times out or is canceled.
-	resp, err := a.client.PostAnalyticsIdentifyWithResponse(context.Background(), api.PostAnalyticsIdentifyJSONRequestBody{
+	resp, err := a.client.PostAnalyticsIdentifyWithResponse(ctx, api.PostAnalyticsIdentifyJSONRequestBody{
 		Properties: &properties,
 	})
 	if err != nil {
@@ -220,10 +223,14 @@ func (a *Analytics) Track(event string, options ...Option) {
 		return
 	}
 
+	// Set a 5 second timeout for tracking analytics events. We intentionally
+	// use context.Background() here so we can track events even if a command
+	// times out or is canceled.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Send the event
-	// NOTE: We intentionally use context.Background() here so we can
-	// track analytics events even if a command times out or is canceled.
-	resp, err := a.client.PostAnalyticsTrackWithResponse(context.Background(), api.PostAnalyticsTrackJSONRequestBody{
+	resp, err := a.client.PostAnalyticsTrackWithResponse(ctx, api.PostAnalyticsTrackJSONRequestBody{
 		Event:      event,
 		Properties: &properties,
 	})
