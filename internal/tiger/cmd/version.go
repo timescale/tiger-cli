@@ -7,7 +7,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -61,13 +61,13 @@ func buildVersionCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_version", runErr, map[string]any{
-					"check":   checkVersion,
-					"output":  outputFormat,
-					"version": config.Version,
-				})
+				a.Track("Run tiger version",
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.NonZero("latest_version", versionOutput.LatestVersion),
+					analytics.Error(runErr),
+				)
 			}()
 
 			output := cmd.OutOrStdout()

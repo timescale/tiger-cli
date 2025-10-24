@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
@@ -103,16 +104,19 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_service_get", runErr, map[string]any{
-					"service_id": serviceID,
-				})
+				a.Track("Run tiger service get",
+					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Make API call to get service details
@@ -176,17 +180,18 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
-			var serviceCount int
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_service_list", runErr, map[string]any{
-					"service_count": serviceCount,
-				})
+				a.Track("Run tiger service list",
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Make API call to list services
@@ -206,7 +211,6 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			services := *resp.JSON200
-			serviceCount = len(services)
 
 			if len(services) == 0 {
 				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
@@ -349,36 +353,20 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
-			var createdServiceID string
+			var serviceID string
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				props := map[string]any{
-					"name":        createServiceName,
-					"replicas":    createReplicaCount,
-					"environment": createEnvironment,
-					"no_wait":     createNoWait,
-				}
-				if createdServiceID != "" {
-					props["service_id"] = createdServiceID
-				}
-				if createRegionCode != "" {
-					props["region"] = createRegionCode
-				}
-				if createCpuMillis != "" {
-					props["cpu_millis"] = createCpuMillis
-				}
-				if createMemoryGBs != "" {
-					props["memory_gbs"] = createMemoryGBs
-				}
-				if len(addons) > 0 {
-					props["addons"] = addons
-				}
-				client.TrackErr("cli_service_create", runErr, props)
+				a.Track("Run tiger service create",
+					analytics.NonZero("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Prepare service creation request
@@ -423,8 +411,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				service := *resp.JSON202
-				serviceID := util.Deref(service.ServiceId)
-				createdServiceID = serviceID // Capture for analytics
+				serviceID = util.Deref(service.ServiceId)
 				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
 				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
 
@@ -550,7 +537,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -565,10 +552,12 @@ Examples:
 			defer cancel()
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_service_update_password", runErr, map[string]any{
-					"service_id": serviceID,
-				})
+				a.Track("Run tiger service update-password",
+					analytics.Property("service_id", serviceID),
+					analytics.Error(runErr),
+				)
 			}()
 
 			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
@@ -827,7 +816,7 @@ func formatTimePtr(t *time.Time) string {
 }
 
 // waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(client *api.TigerClient, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
+func waitForServiceReady(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
 	defer cancel()
 
@@ -983,17 +972,19 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_service_delete", runErr, map[string]any{
-					"service_id": serviceID,
-					"no_wait":    deleteNoWait,
-				})
+				a.Track("Run tiger service delete",
+					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Make the delete request
@@ -1038,7 +1029,7 @@ Examples:
 }
 
 // waitForServiceDeletion waits for a service to be fully deleted
-func waitForServiceDeletion(client *api.TigerClient, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
+func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -1200,7 +1191,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -1216,33 +1207,14 @@ Examples:
 
 			// Track analytics
 			var forkedServiceID string
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				props := map[string]any{
-					"source_id":      serviceID,
-					"environment":    forkEnvironment,
-					"no_wait":        forkNoWait,
-					"no_set_default": forkNoSetDefault,
-				}
-				if forkedServiceID != "" {
-					props["service_id"] = forkedServiceID
-				}
-				if forkServiceName != "" {
-					props["name"] = forkServiceName
-				}
-				if forkNow {
-					props["strategy"] = "now"
-				} else if forkLastSnapshot {
-					props["strategy"] = "last_snapshot"
-				} else if toTimestampSet {
-					props["strategy"] = "pitr"
-				}
-				if cpuMillis != nil {
-					props["cpu_millis"] = *cpuMillis
-				}
-				if memoryGBs != nil {
-					props["memory_gbs"] = *memoryGBs
-				}
-				client.TrackErr("cli_service_fork", runErr, props)
+				a.Track("Run tiger service fork",
+					analytics.Property("service_id", serviceID),
+					analytics.NonZero("forked_service_id", forkedServiceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Determine fork strategy and target time

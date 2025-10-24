@@ -10,6 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
@@ -297,7 +298,7 @@ WARNING: Creates billable resources.`,
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (result *mcp.CallToolResult, output ServiceListOutput, runErr error) {
 	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}
@@ -309,11 +310,11 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	defer cancel()
 
 	// Track analytics
-	var serviceCount int
+	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		apiClient.TrackErr("mcp_service_list", runErr, map[string]any{
-			"service_count": serviceCount,
-		})
+		a.Track("Call service_list tool",
+			analytics.Error(runErr),
+		)
 	}()
 
 	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
@@ -331,7 +332,6 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	services := *resp.JSON200
-	serviceCount = len(services)
 	output = ServiceListOutput{
 		Services: make([]ServiceInfo, len(services)),
 	}
@@ -346,7 +346,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 // handleServiceGet handles the service_get MCP tool
 func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (result *mcp.CallToolResult, output ServiceGetOutput, runErr error) {
 	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
@@ -360,10 +360,12 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	defer cancel()
 
 	// Track analytics
+	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		apiClient.TrackErr("mcp_service_get", runErr, map[string]any{
-			"service_id": input.ServiceID,
-		})
+		a.Track("Call service_get tool",
+			analytics.Fields(input),
+			analytics.Error(runErr),
+		)
 	}()
 
 	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
@@ -407,7 +409,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
@@ -452,27 +454,13 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Track analytics
 	var serviceID string
+	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		props := map[string]any{
-			"name":     input.Name,
-			"replicas": input.Replicas,
-		}
-		if serviceID != "" {
-			props["service_id"] = serviceID
-		}
-		if input.Region != nil {
-			props["region"] = *input.Region
-		}
-		if cpuMillis != nil {
-			props["cpu_millis"] = *cpuMillis
-		}
-		if memoryGBs != nil {
-			props["memory_gbs"] = *memoryGBs
-		}
-		if len(input.Addons) > 0 {
-			props["addons"] = input.Addons
-		}
-		apiClient.TrackErr("mcp_service_create", runErr, props)
+		a.Track("Call service_create tool",
+			analytics.Fields(input),
+			analytics.Property("service_id", serviceID),
+			analytics.Error(runErr),
+		)
 	}()
 
 	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
@@ -554,7 +542,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 // handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (result *mcp.CallToolResult, output ServiceUpdatePasswordOutput, runErr error) {
 	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
@@ -564,10 +552,14 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		zap.String("service_id", input.ServiceID))
 
 	// Track analytics
+	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		apiClient.TrackErr("mcp_service_update_password", runErr, map[string]any{
-			"service_id": input.ServiceID,
-		})
+		// NOTE: We intentionally do not track all of the input fields here, to
+		// avoid capturing the password
+		a.Track("Call service_update_password tool",
+			analytics.Property("service_id", input.ServiceID),
+			analytics.Error(runErr),
+		)
 	}()
 
 	// Prepare password update request

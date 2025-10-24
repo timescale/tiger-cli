@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -112,7 +113,7 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 // handleDBExecuteQuery handles the tiger_db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (result *mcp.CallToolResult, output DBExecuteQueryOutput, runErr error) {
 	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	cfg, apiClient, projectID, err := s.initToolCall()
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -130,13 +131,18 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	// Track analytics
 	var rowsAffected int64
+	a := analytics.New(cfg, apiClient, projectID)
 	defer func() {
-		apiClient.TrackErr("mcp_db_execute_query", runErr, map[string]any{
-			"service_id":    input.ServiceID,
-			"pooled":        input.Pooled,
-			"timeout":       timeout.String(),
-			"rows_affected": rowsAffected,
-		})
+		// NOTE: We intentionally do not track all of the input fields here, to
+		// avoid capturing the query and parameters, which can be sensitive
+		a.Track("Call db_execute_query tool",
+			analytics.Property("service_id", input.ServiceID),
+			analytics.Property("timeout_seconds", input.TimeoutSeconds),
+			analytics.Property("role", input.Role),
+			analytics.Property("pooled", input.Pooled),
+			analytics.Property("rows_affected", rowsAffected),
+			analytics.Error(runErr),
+		)
 	}()
 
 	// Get service details to construct connection string
@@ -216,7 +222,6 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	rowsAffected = rows.CommandTag().RowsAffected()
-
 	output = DBExecuteQueryOutput{
 		Columns:       columns,
 		Rows:          resultRows,

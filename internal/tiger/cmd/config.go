@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -41,13 +41,12 @@ func buildConfigShowCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_config_show", runErr, map[string]any{
-					"format":      outputFormat,
-					"no_defaults": noDefaults,
-					"with_env":    withEnv,
-				})
+				a.Track("Run tiger config show",
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			configFile, err := cfg.EnsureConfigDir()
@@ -113,11 +112,12 @@ func buildConfigSetCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_config_set", runErr, map[string]any{
-					"key": key,
-				})
+				a.Track("Run tiger config set",
+					analytics.Property("key", key),
+					analytics.Error(runErr),
+				)
 			}()
 
 			if err := cfg.Set(key, value); err != nil {
@@ -148,11 +148,12 @@ func buildConfigUnsetCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_config_unset", runErr, map[string]any{
-					"key": key,
-				})
+				a.Track("Run tiger config unset",
+					analytics.Property("key", key),
+					analytics.Error(runErr),
+				)
 			}()
 
 			if err := cfg.Unset(key); err != nil {
@@ -181,9 +182,11 @@ func buildConfigResetCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_config_reset", runErr, nil)
+				a.Track("Run tiger config reset",
+					analytics.Error(runErr),
+				)
 			}()
 
 			if err := cfg.Reset(); err != nil {

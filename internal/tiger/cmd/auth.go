@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -133,15 +134,17 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, creds.projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
+			a := analytics.New(cfg, client, creds.projectID)
 			defer func() {
-				client.TrackErr("cli_auth_login", runErr, map[string]any{
-					"method": loginMethod,
-				})
+				a.Track("Run tiger auth login",
+					analytics.Property("method", loginMethod),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Store the credentials (API key + project ID) together securely
@@ -180,9 +183,11 @@ func buildLogoutCmd() *cobra.Command {
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				client.TrackErr("cli_auth_logout", runErr, nil)
+				a.Track("Run tiger auth logout",
+					analytics.Error(runErr),
+				)
 			}()
 
 			if err := config.RemoveCredentials(); err != nil {
@@ -216,14 +221,17 @@ func buildStatusCmd() *cobra.Command {
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_auth_status", runErr, nil)
+				a.Track("Run tiger auth status",
+					analytics.Error(runErr),
+				)
 			}()
 
 			// TODO: Make API call to get token information

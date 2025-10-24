@@ -360,6 +360,12 @@ type ServiceId = string
 // VPCId defines model for VPCId.
 type VPCId = string
 
+// AnalyticsResponse defines model for AnalyticsResponse.
+type AnalyticsResponse struct {
+	// Status Status of the analytics operation
+	Status *string `json:"status,omitempty"`
+}
+
 // ClientError defines model for ClientError.
 type ClientError = Error
 
@@ -368,14 +374,26 @@ type SuccessMessage struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// PostTrackJSONBody defines parameters for PostTrack.
-type PostTrackJSONBody struct {
+// PostAnalyticsIdentifyJSONBody defines parameters for PostAnalyticsIdentify.
+type PostAnalyticsIdentifyJSONBody struct {
+	// Properties Optional map of arbitrary properties associated with the user
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// PostAnalyticsTrackJSONBody defines parameters for PostAnalyticsTrack.
+type PostAnalyticsTrackJSONBody struct {
 	// Event The name of the event to track
 	Event string `json:"event"`
 
 	// Properties Optional map of arbitrary properties associated with the event
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
+
+// PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.
+type PostAnalyticsIdentifyJSONRequestBody PostAnalyticsIdentifyJSONBody
+
+// PostAnalyticsTrackJSONRequestBody defines body for PostAnalyticsTrack for application/json ContentType.
+type PostAnalyticsTrackJSONRequestBody PostAnalyticsTrackJSONBody
 
 // PostProjectsProjectIdServicesJSONRequestBody defines body for PostProjectsProjectIdServices for application/json ContentType.
 type PostProjectsProjectIdServicesJSONRequestBody = ServiceCreate
@@ -418,6 +436,3 @@ type PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody = PeeringCreate
 
 // PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody defines body for PostProjectsProjectIdVpcsVpcIdRename for application/json ContentType.
 type PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody = VPCRename
-
-// PostTrackJSONRequestBody defines body for PostTrack for application/json ContentType.
-type PostTrackJSONRequestBody PostTrackJSONBody

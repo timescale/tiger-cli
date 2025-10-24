@@ -302,6 +302,86 @@ func (mr *MockClientInterfaceMockRecorder) GetProjectsProjectIdVpcsVpcIdPeerings
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId", reflect.TypeOf((*MockClientInterface)(nil).GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId), varargs...)
 }
 
+// PostAnalyticsIdentify mocks base method.
+func (m *MockClientInterface) PostAnalyticsIdentify(ctx context.Context, body api.PostAnalyticsIdentifyJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsIdentify", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsIdentify indicates an expected call of PostAnalyticsIdentify.
+func (mr *MockClientInterfaceMockRecorder) PostAnalyticsIdentify(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsIdentify", reflect.TypeOf((*MockClientInterface)(nil).PostAnalyticsIdentify), varargs...)
+}
+
+// PostAnalyticsIdentifyWithBody mocks base method.
+func (m *MockClientInterface) PostAnalyticsIdentifyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsIdentifyWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsIdentifyWithBody indicates an expected call of PostAnalyticsIdentifyWithBody.
+func (mr *MockClientInterfaceMockRecorder) PostAnalyticsIdentifyWithBody(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsIdentifyWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostAnalyticsIdentifyWithBody), varargs...)
+}
+
+// PostAnalyticsTrack mocks base method.
+func (m *MockClientInterface) PostAnalyticsTrack(ctx context.Context, body api.PostAnalyticsTrackJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsTrack", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsTrack indicates an expected call of PostAnalyticsTrack.
+func (mr *MockClientInterfaceMockRecorder) PostAnalyticsTrack(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsTrack", reflect.TypeOf((*MockClientInterface)(nil).PostAnalyticsTrack), varargs...)
+}
+
+// PostAnalyticsTrackWithBody mocks base method.
+func (m *MockClientInterface) PostAnalyticsTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsTrackWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsTrackWithBody indicates an expected call of PostAnalyticsTrackWithBody.
+func (mr *MockClientInterfaceMockRecorder) PostAnalyticsTrackWithBody(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsTrackWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostAnalyticsTrackWithBody), varargs...)
+}
+
 // PostProjectsProjectIdServices mocks base method.
 func (m *MockClientInterface) PostProjectsProjectIdServices(ctx context.Context, projectId api.ProjectId, body api.PostProjectsProjectIdServicesJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -942,46 +1022,6 @@ func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdVpcsWithBody(ctx
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdVpcsWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdVpcsWithBody), varargs...)
 }
 
-// PostTrack mocks base method.
-func (m *MockClientInterface) PostTrack(ctx context.Context, body api.PostTrackJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "PostTrack", varargs...)
-	ret0, _ := ret[0].(*http.Response)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PostTrack indicates an expected call of PostTrack.
-func (mr *MockClientInterfaceMockRecorder) PostTrack(ctx, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostTrack", reflect.TypeOf((*MockClientInterface)(nil).PostTrack), varargs...)
-}
-
-// PostTrackWithBody mocks base method.
-func (m *MockClientInterface) PostTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, contentType, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "PostTrackWithBody", varargs...)
-	ret0, _ := ret[0].(*http.Response)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PostTrackWithBody indicates an expected call of PostTrackWithBody.
-func (mr *MockClientInterfaceMockRecorder) PostTrackWithBody(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, contentType, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostTrackWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostTrackWithBody), varargs...)
-}
-
 // MockClientWithResponsesInterface is a mock of ClientWithResponsesInterface interface.
 type MockClientWithResponsesInterface struct {
 	ctrl     *gomock.Controller
@@ -1224,6 +1264,86 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectsProjectIdVpcs
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdVpcsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectsProjectIdVpcsWithResponse), varargs...)
+}
+
+// PostAnalyticsIdentifyWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostAnalyticsIdentifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PostAnalyticsIdentifyResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsIdentifyWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostAnalyticsIdentifyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsIdentifyWithBodyWithResponse indicates an expected call of PostAnalyticsIdentifyWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostAnalyticsIdentifyWithBodyWithResponse(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsIdentifyWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostAnalyticsIdentifyWithBodyWithResponse), varargs...)
+}
+
+// PostAnalyticsIdentifyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostAnalyticsIdentifyWithResponse(ctx context.Context, body api.PostAnalyticsIdentifyJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PostAnalyticsIdentifyResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsIdentifyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostAnalyticsIdentifyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsIdentifyWithResponse indicates an expected call of PostAnalyticsIdentifyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostAnalyticsIdentifyWithResponse(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsIdentifyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostAnalyticsIdentifyWithResponse), varargs...)
+}
+
+// PostAnalyticsTrackWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostAnalyticsTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PostAnalyticsTrackResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsTrackWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostAnalyticsTrackResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsTrackWithBodyWithResponse indicates an expected call of PostAnalyticsTrackWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostAnalyticsTrackWithBodyWithResponse(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsTrackWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostAnalyticsTrackWithBodyWithResponse), varargs...)
+}
+
+// PostAnalyticsTrackWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostAnalyticsTrackWithResponse(ctx context.Context, body api.PostAnalyticsTrackJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PostAnalyticsTrackResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostAnalyticsTrackWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostAnalyticsTrackResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostAnalyticsTrackWithResponse indicates an expected call of PostAnalyticsTrackWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostAnalyticsTrackWithResponse(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostAnalyticsTrackWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostAnalyticsTrackWithResponse), varargs...)
 }
 
 // PostProjectsProjectIdServicesServiceIdAttachToVPCWithBodyWithResponse mocks base method.
@@ -1864,44 +1984,4 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdVpc
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdVpcsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdVpcsWithResponse), varargs...)
-}
-
-// PostTrackWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) PostTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PostTrackResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, contentType, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "PostTrackWithBodyWithResponse", varargs...)
-	ret0, _ := ret[0].(*api.PostTrackResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PostTrackWithBodyWithResponse indicates an expected call of PostTrackWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) PostTrackWithBodyWithResponse(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, contentType, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostTrackWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostTrackWithBodyWithResponse), varargs...)
-}
-
-// PostTrackWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) PostTrackWithResponse(ctx context.Context, body api.PostTrackJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PostTrackResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "PostTrackWithResponse", varargs...)
-	ret0, _ := ret[0].(*api.PostTrackResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PostTrackWithResponse indicates an expected call of PostTrackWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) PostTrackWithResponse(ctx, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostTrackWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostTrackWithResponse), varargs...)
 }

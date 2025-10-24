@@ -70,27 +70,28 @@ func (s *Server) registerTools(ctx context.Context) {
 	logging.Info("MCP tools registered successfully")
 }
 
-// createAPIClient creates a new API client and returns it with the project ID
-func (s *Server) createAPIClient() (*api.TigerClient, string, error) {
+// initToolCall loads the config and credentials, creates a new API client, and
+// returns the config, client, and projectID.
+func (s *Server) initToolCall() (*config.Config, *api.ClientWithResponses, string, error) {
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to load config: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get credentials (API key + project ID)
 	apiKey, projectID, err := config.GetCredentials()
 	if err != nil {
-		return nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
+		return nil, nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
 	}
 
 	// Create API client with fresh credentials
-	apiClient, err := api.NewTigerClient(cfg, apiKey, projectID)
+	apiClient, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create API client: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return apiClient, projectID, nil
+	return cfg, apiClient, projectID, nil
 }
 
 // Close gracefully shuts down the MCP server and all proxy connections

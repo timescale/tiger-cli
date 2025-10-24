@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
@@ -95,18 +96,19 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_db_connection_string", runErr, map[string]any{
-					"service_id":    serviceID,
-					"pooled":        dbConnectionStringPooled,
-					"with_password": dbConnectionStringWithPassword,
-				})
+				a.Track("Run tiger db connection-string",
+					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Fetch service details
@@ -216,17 +218,19 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_db_connect", runErr, map[string]any{
-					"service_id": serviceID,
-					"pooled":     dbConnectPooled,
-				})
+				a.Track("Run tiger db connect",
+					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Check if psql is available
@@ -329,18 +333,19 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to create API client: %w", err))
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_db_test_connection", runErr, map[string]any{
-					"service_id": serviceID,
-					"pooled":     dbTestConnectionPooled,
-					"timeout":    dbTestConnectionTimeout.String(),
-				})
+				a.Track("Run tiger db test-connection",
+					analytics.Property("service_id", serviceID),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Fetch service details
@@ -444,16 +449,21 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey, projectID)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Track analytics
+			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				client.TrackErr("cli_db_save_password", runErr, map[string]any{
-					"service_id": serviceID,
-				})
+				// NOTE: We intentionally do not track the entire flag set, to
+				// avoid capturing the password
+				a.Track("Run tiger db save-password",
+					analytics.Property("service_id", serviceID),
+					analytics.Flag(cmd.LocalFlags().Lookup("role")),
+					analytics.Error(runErr),
+				)
 			}()
 
 			// Fetch service details
@@ -530,7 +540,7 @@ func buildDbCmd() *cobra.Command {
 }
 
 // getServiceDetails is a helper that fetches service details using the provided client
-func getServiceDetails(ctx context.Context, client *api.TigerClient, projectID string, serviceID string) (api.Service, error) {
+func getServiceDetails(ctx context.Context, client *api.ClientWithResponses, projectID string, serviceID string) (api.Service, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 

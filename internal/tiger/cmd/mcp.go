@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/mcp"
@@ -115,17 +115,14 @@ Examples:
 			}
 
 			// Track analytics
-			client := api.TryInitTigerClient(cfg)
+			a := analytics.TryInit(cfg)
 			defer func() {
-				props := map[string]any{
-					"client":      clientName,
-					"interactive": interactive,
-					"no_backup":   noBackup,
-				}
-				if configPath != "" {
-					props["custom_path"] = true
-				}
-				client.TrackErr("cli_mcp_install", runErr, props)
+				a.Track("Run tiger mcp install",
+					analytics.Property("client", clientName),
+					analytics.Property("interactive", interactive),
+					analytics.FlagSet(cmd.LocalFlags()),
+					analytics.Error(runErr),
+				)
 			}()
 
 			return installMCPForClient(clientName, !noBackup, configPath)
@@ -240,11 +237,12 @@ func startStdioServer(ctx context.Context) (runErr error) {
 	}
 
 	// Track analytics
-	client := api.TryInitTigerClient(cfg)
+	a := analytics.TryInit(cfg)
 	defer func() {
-		client.TrackErr("cli_mcp_start", runErr, map[string]any{
-			"transport": "stdio",
-		})
+		a.Track("Run tiger mcp start",
+			analytics.Property("transport", "stdio"),
+			analytics.Error(runErr),
+		)
 	}()
 
 	// Setup graceful shutdown handling
@@ -281,11 +279,12 @@ func startHTTPServer(ctx context.Context, host string, port int) (runErr error) 
 	}
 
 	// Track analytics
-	client := api.TryInitTigerClient(cfg)
+	a := analytics.TryInit(cfg)
 	defer func() {
-		client.TrackErr("cli_mcp_start", runErr, map[string]any{
-			"transport": "http",
-		})
+		a.Track("Run tiger mcp start",
+			analytics.Property("transport", "http"),
+			analytics.Error(runErr),
+		)
 	}()
 
 	// Setup graceful shutdown handling
