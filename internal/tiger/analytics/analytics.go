@@ -50,14 +50,41 @@ func TryInit(cfg *config.Config) *Analytics {
 	return New(cfg, client, projectID)
 }
 
+// Option is a function that modifies analytics event properties. Options are
+// passed to Track and Identify methods to customize the data sent with events.
 type Option func(properties map[string]any)
 
+// Property creates an Option that adds a single key-value pair to the event
+// properties. This is useful for adding custom analytics data that isn't
+// covered by other Option functions.
 func Property(key string, value any) Option {
 	return func(properties map[string]any) {
 		properties[key] = value
 	}
 }
 
+// NonZero creates an Option that adds a property only if the value is not the
+// zero value for its type. This is useful for optional parameters where you
+// only want to track them when they're explicitly set.
+//
+// For example, NonZero("timeout", 0) won't add the property, but
+// NonZero("timeout", 30) will add timeout: 30.
+func NonZero[T comparable](key string, value T) Option {
+	return func(properties map[string]any) {
+		var zero T
+		if value == zero {
+			return
+		}
+		properties[key] = value
+	}
+}
+
+// Fields creates an Option that extracts all exported fields from a struct
+// and adds them as properties. This uses JSON marshaling to convert the struct
+// to key-value pairs. Fields specified in the ignore list are skipped.
+//
+// This is useful for including structured data like MCP tool call arguments in
+// analytics events without manually specifying each field.
 func Fields(s any, ignore ...string) Option {
 	return func(properties map[string]any) {
 		out, err := json.Marshal(s)
@@ -79,18 +106,15 @@ func Fields(s any, ignore ...string) Option {
 	}
 }
 
-func NonZero[T comparable](key string, value T) Option {
-	return func(properties map[string]any) {
-		var zero T
-		if value == zero {
-			return
-		}
-		properties[key] = value
-	}
-}
-
+// flagNameReplacer converts flag names from kebab-case to snake_case for
+// consistent property naming in analytics events.
 var flagNameReplacer = strings.NewReplacer("-", "_")
 
+// FlagSet creates an Option that adds all flags that were explicitly set by
+// the user (via Visit). Flag names are converted from kebab-case to snake_case
+// (e.g., "no-wait" becomes "no_wait"). Flags in the ignore list are skipped.
+//
+// This is useful for tracking which flags users actually use when running commands.
 func FlagSet(flagSet *pflag.FlagSet, ignore ...string) Option {
 	return func(properties map[string]any) {
 		flagSet.Visit(func(flag *pflag.Flag) {
@@ -103,6 +127,11 @@ func FlagSet(flagSet *pflag.FlagSet, ignore ...string) Option {
 	}
 }
 
+// Flag creates an Option that adds a single flag's value if it was explicitly
+// set by the user. The flag name is converted from kebab-case to snake_case.
+//
+// This is useful when you only want to track specific flags rather than all
+// flags in a flag set.
 func Flag(flag *pflag.Flag) Option {
 	return func(properties map[string]any) {
 		if !flag.Changed {
@@ -113,6 +142,12 @@ func Flag(flag *pflag.Flag) Option {
 	}
 }
 
+// Error creates an Option that adds success and error information to event
+// properties. If err is nil, sets success: true. If err is not nil, sets
+// success: false and includes the error message.
+//
+// This is commonly used at the end of command execution to track whether
+// operations succeeded or failed, and what errors occurred.
 func Error(err error) Option {
 	return func(properties map[string]any) {
 		if err != nil {
