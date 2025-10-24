@@ -365,7 +365,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			var serviceID string
 			a := analytics.New(cfg, client, projectID)
 			defer func() {
-				cmd.DebugFlags()
 				a.Track("Run tiger service create",
 					analytics.NonZero("service_id", serviceID),
 					analytics.FlagSet(cmd.Flags()),
