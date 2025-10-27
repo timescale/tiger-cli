@@ -4,10 +4,11 @@ version: 2
 
 project_name: tiger-cli
 
-# Create VERSION file before building
+# Create VERSION file and generate completions before building
 before:
   hooks:
     - sh -c 'echo "{{ .Tag }}" > latest.txt'
+    - ./scripts/completions.sh
 
 builds:
   - main: ./cmd/tiger
@@ -102,7 +103,6 @@ blobs:
 # Homebrew cask configuration
 homebrew_casks:
   - name: tiger-cli
-
     repository:
       owner: timescale
       name: homebrew-tap
@@ -124,6 +124,11 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tiger"]
           end
+    # Shell completions
+    completions:
+      bash: "completions/tiger.bash"
+      zsh: "completions/tiger.zsh"
+      fish: "completions/tiger.fish"
     # Optional: Add caveats for user instructions
     caveats: |
       Tiger CLI has been installed successfully!
