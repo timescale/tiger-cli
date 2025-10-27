@@ -233,21 +233,19 @@ func (c *oauthCallback) sendError(err error) {
 }
 
 func openBrowserImpl(url string) error {
-	var cmd string
-	var args []string
+	var cmd *exec.Cmd
 
-	// TODO: Do all of these work correctly?
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
+		// Escape '&' so cmd.exe doesn't treat it as a command separator
+		cmd = exec.Command("cmd", "/c", "start", strings.ReplaceAll(url, "&", "^&"))
 	case "darwin":
-		cmd = "open"
+		cmd = exec.Command("open", url)
 	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
+		cmd = exec.Command("xdg-open", url)
 	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
+
+	return cmd.Start()
 }
 
 // selectProjectID prompts the user to select a project if multiple are available
