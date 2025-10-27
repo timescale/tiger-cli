@@ -51,6 +51,7 @@ archives:
       - README.md
       - LICENSE
       - NOTICE
+      - src: completions/*
 
 # Linux package configuration (APT, RPM, etc.)
 nfpms:
