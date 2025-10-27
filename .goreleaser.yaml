@@ -69,6 +69,23 @@ nfpms:
     bindir: /usr/bin
     priority: extra
     file_name_template: "{{ .ConventionalFileName }}"
+    contents:
+      # Shell completions
+      - src: ./completions/tiger.bash
+        dst: /usr/share/bash-completion/completions/tiger
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./completions/tiger.fish
+        dst: /usr/share/fish/vendor_completions.d/tiger.fish
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: ./completions/tiger.zsh
+        dst: /usr/share/zsh/vendor-completions/_tiger
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
     rpm:
       group: Unspecified
     deb:
