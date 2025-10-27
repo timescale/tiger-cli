@@ -1,7 +1,7 @@
-# TigerData MCP Feedback
+# Tiger MCP Feedback
 
 ## Overall Assessment
-The TigerData MCP tools provide useful database management functionality but have several areas for improvement in naming consistency, parameter documentation, and descriptions.
+The Tiger MCP tools provide useful database management functionality but have several areas for improvement in naming consistency, parameter documentation, and descriptions.
 
 ## Tool Names
 

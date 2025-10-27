@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Naming Guidelines
+
+When writing or updating documentation, code comments, CLI output, error messages, or any other user-facing text, use these official naming conventions:
+
+### Official Names
+
+- **Company Name**: "Tiger Data" (two words, with space)
+- **Cloud Platform**: "Tiger Cloud" (NOT "TigerData Cloud" or "TigerData Cloud Platform")
+- **CLI Tool**: "Tiger CLI"
+- **MCP Server**: "Tiger MCP"
+- **API References**: "Tiger Cloud API" (NOT "TigerData API")
+
+### Examples
+
+✅ **Correct Usage:**
+- "Tiger CLI is a command-line interface for managing Tiger Cloud platform resources."
+- "Authenticate with Tiger Cloud API"
+- "List all database services in your Tiger Cloud project."
+- "The Tiger MCP server provides programmatic access to Tiger Cloud."
+
+❌ **Incorrect Usage:**
+- ~~"TigerData Cloud Platform"~~ → Use "Tiger Cloud platform"
+- ~~"TigerData API"~~ → Use "Tiger Cloud API"
+- ~~"TigerData project"~~ → Use "Tiger Cloud project"
+- ~~"TigerData MCP"~~ → Use "Tiger MCP"
+
 ## Development Commands
 
 ### Building
@@ -435,7 +461,7 @@ func buildRootCmd() *cobra.Command {
 
     cmd := &cobra.Command{
         Use:   "tiger",
-        Short: "Tiger CLI - TigerData Cloud Platform command-line interface",
+        Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
         Long:  `Complete CLI description...`,
         PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
             // Use local flag variables in scope

@@ -31,7 +31,7 @@ func buildServiceCmd() *cobra.Command {
 		Use:     "service",
 		Aliases: []string{"services", "svc"},
 		Short:   "Manage database services",
-		Long:    `Manage database services within TigerData Cloud Platform.`,
+		Long:    `Manage database services within Tiger Cloud platform.`,
 	}
 
 	// Add all subcommands

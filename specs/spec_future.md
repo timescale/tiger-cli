@@ -7,7 +7,7 @@ This document contains specifications for features that should be considered for
 **Note: Current API keys are scoped to a single project. Multi-project support will be added once API keys support multiple projects.**
 
 #### `tiger projects`
-Manage TigerData projects.
+Manage Tiger Cloud projects.
 
 **Subcommands:**
 - `list`: List all projects
@@ -34,7 +34,7 @@ tiger projects set-default proj-12345
 ### Project Creation and Deletion
 
 #### `tiger projects create`
-Create a new TigerData project.
+Create a new Tiger Cloud project.
 
 **Arguments:**
 - `--name`: Project name (required)
@@ -52,7 +52,7 @@ tiger projects create --name "My Project" --description "Production database"
 ---
 
 #### `tiger projects delete`
-Delete a TigerData project.
+Delete a Tiger Cloud project.
 
 **Arguments:**
 - `project-id`: Project ID to delete (required)

@@ -97,7 +97,7 @@ func (s *Server) registerDatabaseTools() {
 		Title: "Execute SQL Query",
 		Description: `Execute a single SQL query against a service database.
 
-This tool connects to a PostgreSQL database service in TigerData Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata. Multi-statement queries are not supported.
+This tool connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata. Multi-statement queries are not supported.
 
 WARNING: Use with caution - this tool can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),

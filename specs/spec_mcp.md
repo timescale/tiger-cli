@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Tiger MCP (Model Context Protocol) Server provides programmatic access to TigerData Cloud Platform resources through Claude and other AI assistants. It mirrors the functionality of the Tiger CLI and is integrated directly into the CLI binary for seamless operation.
+The Tiger MCP (Model Context Protocol) Server provides programmatic access to Tiger Cloud platform resources through Claude and other AI assistants. It mirrors the functionality of the Tiger CLI and is integrated directly into the CLI binary for seamless operation.
 
 The MCP server is written in Go and launched via the Tiger CLI, sharing the same authentication, configuration, and API client.
 
@@ -563,7 +563,7 @@ Common error codes:
 - `RESOURCE_CONFLICT`: Resource is in a state that prevents the operation
 - `VALIDATION_ERROR`: Invalid parameters provided
 - `TIMEOUT_ERROR`: Operation timed out
-- `SERVICE_UNAVAILABLE`: TigerData API is temporarily unavailable
+- `SERVICE_UNAVAILABLE`: Tiger Cloud API is temporarily unavailable
 
 ## Implementation Notes
 

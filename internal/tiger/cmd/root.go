@@ -27,8 +27,8 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
-		Short: "Tiger CLI - TigerData Cloud Platform command-line interface",
-		Long: `Tiger CLI is a command-line interface for managing TigerData Cloud Platform resources.
+		Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
+		Long: `Tiger CLI is a command-line interface for managing Tiger Cloud platform resources.
 Built as a single Go binary, it provides comprehensive tools for managing database services,
 VPCs, replicas, and related infrastructure components.
 
