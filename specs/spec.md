@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `tiger` CLI is a command-line interface for managing TigerData Cloud Platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
+The `tiger` CLI is a command-line interface for managing Tiger Cloud platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
 
 ## Installation
 
@@ -23,7 +23,7 @@ mv tiger /usr/local/bin/
 
 ### Environment Variables
 
-- `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
+- `TIGER_API_URL`: Base URL for Tiger Cloud API (default: https://api.tigerdata.com/public/v1)
 - `TIGER_SERVICE_ID`: Default service ID to use
 - `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
 - `TIGER_OUTPUT`: Default output format (json, yaml, table)

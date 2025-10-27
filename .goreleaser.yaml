@@ -55,12 +55,12 @@ archives:
 nfpms:
   - id: packages
     package_name: tiger-cli
-    vendor: Timescale, Inc., d/b/a TigerData
+    vendor: Timescale, Inc., d/b/a Tiger Data
     homepage: https://github.com/timescale/tiger-cli
-    maintainer: TigerData <support@tigerdata.com>
+    maintainer: Tiger Data <support@tigerdata.com>
     description: |-
-      Tiger CLI - TigerData Cloud Platform CLI
-      Command-line interface for managing TigerData Cloud Platform resources
+      Tiger CLI - Tiger Cloud Platform CLI
+      Command-line interface for managing Tiger Cloud platform resources
     license: Apache-2.0
     formats:
       - deb
@@ -109,8 +109,8 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/timescale/tiger-cli
     description: |-
-      Tiger CLI - TigerData Cloud Platform CLI
-      Command-line interface for managing TigerData Cloud Platform resources
+      Tiger CLI - Tiger Cloud Platform CLI
+      Command-line interface for managing Tiger Cloud platform resources
     binary: tiger
     license: Apache-2.0
     skip_upload: auto # Skips prerelease builds
