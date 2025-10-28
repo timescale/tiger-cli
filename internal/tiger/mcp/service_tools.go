@@ -137,7 +137,7 @@ type ServiceCreateInput struct {
 	Name           string   `json:"name,omitempty"`
 	Addons         []string `json:"addons,omitempty"`
 	Region         *string  `json:"region,omitempty"`
-	CPUMemory      *string  `json:"cpu_memory,omitempty"`
+	CPUMemory      string   `json:"cpu_memory,omitempty"`
 	Replicas       int      `json:"replicas,omitempty"`
 	Wait           bool     `json:"wait,omitempty"`
 	TimeoutMinutes int      `json:"timeout_minutes,omitempty"`
@@ -159,7 +159,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	schema.Properties["cpu_memory"].Description = fmt.Sprintf("CPU and memory allocation combination. Choose from the available configurations.")
+	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
@@ -195,6 +195,67 @@ type ServiceCreateOutput struct {
 
 func (ServiceCreateOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
+}
+
+// ServiceForkInput represents input for service_fork
+type ServiceForkInput struct {
+	ServiceID      string           `json:"service_id"`
+	Name           string           `json:"name,omitempty"`
+	ForkStrategy   api.ForkStrategy `json:"fork_strategy"`
+	TargetTime     *time.Time       `json:"target_time,omitempty"`
+	CPUMemory      string           `json:"cpu_memory,omitempty"`
+	Wait           bool             `json:"wait,omitempty"`
+	TimeoutMinutes int              `json:"timeout_minutes,omitempty"`
+	SetDefault     bool             `json:"set_default,omitempty"`
+	WithPassword   bool             `json:"with_password,omitempty"`
+}
+
+func (ServiceForkInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceForkInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["name"].Description = "Human-readable name for the forked service (auto-generated if not provided)"
+	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
+	schema.Properties["name"].Examples = []any{"my-forked-db", "prod-fork-test", "backup-db"}
+
+	schema.Properties["fork_strategy"].Description = "Fork strategy: 'NOW' creates fork at current state, 'LAST_SNAPSHOT' uses last existing snapshot (faster), 'PITR' allows point-in-time recovery to specific timestamp (requires target_time parameter)"
+	schema.Properties["fork_strategy"].Enum = []any{api.NOW, api.LASTSNAPSHOT, api.PITR}
+	schema.Properties["fork_strategy"].Examples = []any{api.NOW, api.LASTSNAPSHOT}
+
+	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format, e.g., '2025-01-15T10:30:00Z'). Only used when fork_strategy is 'PITR'."
+	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
+
+	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+
+	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false and is recommended because forking can take several minutes. ONLY set to true if the user explicitly needs to use the forked service immediately to continue the same conversation."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for forked service to be ready. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(30))
+	schema.Properties["timeout_minutes"].Examples = []any{15, 30, 60}
+
+	schema.Properties["set_default"].Description = "Whether to set the newly forked service as the default service. When true, the forked service will be set as the default for future commands."
+	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
+	schema.Properties["set_default"].Examples = []any{true, false}
+
+	setWithPasswordSchemaProperties(schema)
+
+	return schema
+}
+
+// ServiceForkOutput represents output for service_fork
+type ServiceForkOutput struct {
+	Service         ServiceDetail                   `json:"service"`
+	Message         string                          `json:"message"`
+	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+}
+
+func (ServiceForkOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceForkOutput](nil))
 }
 
 // ServiceUpdatePasswordInput represents input for service_update_password
@@ -273,10 +334,40 @@ WARNING: Creates billable resources.`,
 		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
-			IdempotentHint:  false,           // Creating with same name would fail
+			IdempotentHint:  false,           // Creating with same name creates multiple services (name is not unique)
 			Title:           "Create Database Service",
 		},
 	}, s.handleServiceCreate)
+
+	// service_fork
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_fork",
+		Title: "Fork Database Service",
+		Description: `Fork an existing database service to create a new independent copy.
+
+You must specify a fork strategy:
+- 'NOW': Fork at the current database state (creates new snapshot or uses WAL replay)
+- 'LAST_SNAPSHOT': Fork at the last existing snapshot (faster fork)
+- 'PITR': Fork at a specific point in time (point-in-time recovery)
+
+By default:
+- Name will be auto-generated as '{source-service-name}-fork'
+- CPU and memory will be inherited from the source service
+- The forked service will be set as the default service
+
+Default behavior: Returns immediately while service provisions in background (recommended).
+Setting wait=true will block for several minutes until ready - only use if user explicitly needs immediate access.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).
+
+WARNING: Creates billable resources.`,
+		InputSchema:  ServiceForkInput{}.Schema(),
+		OutputSchema: ServiceForkOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
+			IdempotentHint:  false,           // Forking same service multiple times creates multiple forks
+			Title:           "Fork Database Service",
+		},
+	}, s.handleServiceFork)
 
 	// service_update_password
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -402,8 +493,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	var cpuMillis, memoryGBs *string
-	if input.CPUMemory != nil {
-		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(*input.CPUMemory)
+	if input.CPUMemory != "" {
+		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -504,6 +595,144 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		} else {
 			output.Service.Status = util.DerefStr(status)
 			output.Message = "Service created successfully and is ready!"
+		}
+	}
+
+	return nil, output, nil
+}
+
+// handleServiceFork handles the service_fork MCP tool
+func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest, input ServiceForkInput) (*mcp.CallToolResult, ServiceForkOutput, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, ServiceForkOutput{}, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceForkOutput{}, err
+	}
+
+	// Validate fork strategy and target_time relationship
+	switch input.ForkStrategy {
+	case api.PITR:
+		if input.TargetTime == nil {
+			return nil, ServiceForkOutput{}, fmt.Errorf("target_time is required when fork_strategy is 'PITR'")
+		}
+	default:
+		if input.TargetTime != nil {
+			return nil, ServiceForkOutput{}, fmt.Errorf("target_time cannot be specified when fork_strategy is not 'PITR'")
+		}
+	}
+
+	// Parse CPU/Memory configuration if provided
+	var cpuMillis, memoryGBs *string
+	if input.CPUMemory != "" {
+		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
+		if err != nil {
+			return nil, ServiceForkOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
+		}
+		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
+	}
+
+	logging.Debug("MCP: Forking service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID),
+		zap.String("name", input.Name),
+		zap.String("fork_strategy", string(input.ForkStrategy)),
+		zap.Stringp("cpu", cpuMillis),
+		zap.Stringp("memory", memoryGBs),
+	)
+
+	// Prepare service fork request
+	forkReq := api.ForkServiceCreate{
+		ForkStrategy: input.ForkStrategy,
+		TargetTime:   input.TargetTime,
+		CpuMillis:    cpuMillis,
+		MemoryGbs:    memoryGBs,
+	}
+
+	// Only set name if provided
+	if input.Name != "" {
+		forkReq.Name = &input.Name
+	}
+
+	// Make API call to fork service
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq)
+	if err != nil {
+		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceForkOutput{}, resp.JSON4XX
+	}
+
+	service := *resp.JSON202
+	serviceID := util.Deref(service.ServiceId)
+
+	output := ServiceForkOutput{
+		Service: s.convertToServiceDetail(service),
+		Message: "Service fork request accepted. The forked service may still be provisioning.",
+	}
+
+	// Save password immediately after service fork, before any waiting
+	// This ensures the password is stored even if the wait fails or is interrupted
+	if service.InitialPassword != nil {
+		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		output.PasswordStorage = &result
+		if err != nil {
+			logging.Debug("MCP: Password storage failed", zap.Error(err))
+		} else {
+			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+		}
+	}
+
+	// Include password in ServiceDetail if requested
+	if input.WithPassword {
+		output.Service.Password = util.Deref(service.InitialPassword)
+	}
+
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    input.WithPassword,
+		InitialPassword: util.Deref(service.InitialPassword),
+	}); err != nil {
+		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		if input.WithPassword && details.Password == "" {
+			// This should not happen since we have InitialPassword, but check just in case
+			logging.Error("MCP: Requested password but password not available")
+		}
+		output.Service.ConnectionString = details.String()
+	}
+
+	// Set as default service if requested (defaults to true)
+	if input.SetDefault {
+		if err := cfg.Set("service_id", serviceID); err != nil {
+			// Log warning but don't fail the service fork
+			logging.Debug("MCP: Failed to set service as default", zap.Error(err))
+		} else {
+			logging.Debug("MCP: Set service as default", zap.String("service_id", serviceID))
+		}
+	}
+
+	// If wait is explicitly requested, wait for service to be ready
+	if input.Wait {
+		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
+
+		if status, err := s.waitForServiceReady(apiClient, projectID, serviceID, timeout, service.Status); err != nil {
+			output.Message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			output.Service.Status = util.DerefStr(status)
+			output.Message = "Service forked successfully and is ready!"
 		}
 	}
 
