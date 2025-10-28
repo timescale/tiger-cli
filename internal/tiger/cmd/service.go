@@ -403,7 +403,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(ctx, client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					service.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
 					if serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
@@ -1252,7 +1252,7 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(ctx, client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				forkedService.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
 				if serviceErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {
