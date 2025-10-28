@@ -166,6 +166,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_list` - List all database services in your project
 - `service_get` - Get detailed information about a specific service
 - `service_create` - Create new database services with configurable resources
+- `service_fork` - Fork an existing database service to create an independent copy
 - `service_update_password` - Update the master password for a service
 
 **Database Operations:**

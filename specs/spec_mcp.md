@@ -20,6 +20,7 @@ For the initial v0 release, implement these essential tools first:
 - `tiger_service_list` - List all services
 - `tiger_service_get` - Get service details
 - `tiger_service_create` - Create new services
+- `tiger_service_fork` - Fork existing services
 - `tiger_service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `tiger_service_update_password` - Update service master password
 
@@ -181,6 +182,29 @@ Create a new database service.
 **Returns:** Service object with creation status, details, and connection string. When `with_password=true`, the response includes the initial password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
 
 **Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
+
+#### `tiger_service_fork`
+Fork an existing database service to create a new independent copy.
+
+**Parameters:**
+- `service_id` (string, required): Source service ID to fork
+- `fork_strategy` (string, required): Fork strategy - must be one of:
+  - `"NOW"`: Fork at the current database state (creates new snapshot or uses WAL replay)
+  - `"LAST_SNAPSHOT"`: Fork at the last existing snapshot (faster fork)
+  - `"PITR"`: Fork at a specific point in time (point-in-time recovery)
+- `target_time` (string, optional): Target timestamp for point-in-time recovery in RFC3339 format (e.g., "2025-01-15T10:30:00Z"). Required when `fork_strategy` is `"PITR"`, forbidden otherwise.
+- `name` (string, optional): Name for the forked service - auto-generated if not provided
+- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB"). If not specified, inherits from source service.
+- `wait` (boolean, optional): Wait for forked service to be ready - default: false
+- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 30
+- `set_default` (boolean, optional): Set the forked service as the default service for future commands - default: true
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
+
+**Returns:** Forked service object with creation status, details, and connection string. When `with_password=true`, the response includes the initial password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
+
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
+
+**Warning:** Creates billable resources.
 
 #### `tiger_service_delete`
 Delete a database service.
