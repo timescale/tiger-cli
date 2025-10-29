@@ -3,8 +3,10 @@ package analytics
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -180,7 +182,7 @@ func (a *Analytics) Identify(event string, options ...Option) {
 	)
 
 	// Check if analytics is disabled
-	if !a.config.Analytics {
+	if !a.enabled() {
 		logger.Debug("Analytics identify skipped (analytics disabled)")
 		return
 	}
@@ -243,7 +245,7 @@ func (a *Analytics) Track(event string, options ...Option) {
 	)
 
 	// Check if analytics is disabled
-	if !a.config.Analytics {
+	if !a.enabled() {
 		logger.Debug("Analytics event skipped (analytics disabled)")
 		return
 	}
@@ -278,4 +280,19 @@ func (a *Analytics) Track(event string, options ...Option) {
 	}
 
 	logger.Debug("Analytics event sent", zap.String("status", *resp.JSON200.Status))
+}
+
+func (a *Analytics) enabled() bool {
+	if envVarIsTrue("DO_NOT_TRACK") ||
+		envVarIsTrue("NO_TELEMETRY") ||
+		envVarIsTrue("DISABLE_TELEMETRY") {
+		return false
+	}
+
+	return a.config.Analytics
+}
+
+func envVarIsTrue(envVar string) bool {
+	b, _ := strconv.ParseBool(os.Getenv(envVar))
+	return b
 }
