@@ -87,11 +87,17 @@ nfpms:
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
+    recommends:
+      - postgresql-client
     rpm:
       group: Unspecified
     deb:
       lintian_overrides:
         - statically-linked-binary
+    overrides:
+      rpm:
+        recommends:
+          - postgresql
 
 
 # S3 Blob Storage Configuration
@@ -129,11 +135,13 @@ homebrew_casks:
     description: |-
       Tiger CLI - Tiger Cloud Platform CLI
       Command-line interface for managing Tiger Cloud platform resources
-    binary: tiger
+    binaries: [tiger]
     license: Apache-2.0
     skip_upload: auto # Skips prerelease builds
     url:
       template: "https://cli.tigerdata.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
+    dependencies:
+      - formula: postgresql@18
     hooks:
       # TODO: Sign and notarize instead of removing quarantine bit
       # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
