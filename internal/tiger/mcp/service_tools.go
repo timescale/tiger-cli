@@ -230,7 +230,7 @@ func (s *Server) registerServiceTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_list",
 		Title: "List Database Services",
-		Description: "List all database services in current TigerData project. " +
+		Description: "List all database services in your Tiger Cloud project. " +
 			"Returns services with status, type, region, and resource allocation.",
 		InputSchema:  ServiceListInput{}.Schema(),
 		OutputSchema: ServiceListOutput{}.Schema(),
@@ -258,7 +258,7 @@ func (s *Server) registerServiceTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "service_create",
 		Title: "Create Database Service",
-		Description: `Create a new database service in TigerData Cloud with specified type, compute resources, region, and HA options.
+		Description: `Create a new database service in Tiger Cloud with specified type, compute resources, region, and HA options.
 
 The default type of service created depends on the user's plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons

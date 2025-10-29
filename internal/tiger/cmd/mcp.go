@@ -23,7 +23,7 @@ func buildMCPCmd() *cobra.Command {
 		Short: "Tiger Model Context Protocol (MCP) server",
 		Long: `Tiger Model Context Protocol (MCP) server for AI assistant integration.
 
-The MCP server provides programmatic access to TigerData Cloud Platform resources
+The MCP server provides programmatic access to Tiger Cloud platform resources
 through Claude and other AI assistants. It exposes Tiger CLI functionality as MCP
 tools that can be called by AI agents.
 
@@ -140,7 +140,7 @@ func buildMCPStartCmd() *cobra.Command {
 		Short: "Start the Tiger MCP server",
 		Long: `Start the Tiger Model Context Protocol (MCP) server for AI assistant integration.
 
-The MCP server provides programmatic access to TigerData Cloud Platform resources
+The MCP server provides programmatic access to Tiger Cloud platform resources
 through Claude and other AI assistants. By default, it uses stdio transport.
 
 Examples:

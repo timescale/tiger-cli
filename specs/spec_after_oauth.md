@@ -8,7 +8,7 @@
 Manage authentication and credentials with OAuth support.
 
 **Subcommands:**
-- `login`: Authenticate with TigerData Cloud (OAuth flow)
+- `login`: Authenticate with Tiger Cloud (OAuth flow)
 - `logout`: Remove stored credentials
 - `status`: Show current user information
 - `token`: Manage API tokens
@@ -29,7 +29,7 @@ tiger auth logout
 ```
 
 **OAuth Flow:**
-1. `tiger auth login` opens browser to TigerData OAuth page
+1. `tiger auth login` opens browser to Tiger Cloud OAuth page
 2. User authenticates and grants permissions
 3. CLI receives JWT token and stores it securely
 4. Subsequent commands use the stored JWT token for authentication

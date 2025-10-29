@@ -77,7 +77,7 @@ func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to create local server: %w", err)
 	}
 	defer func() {
-		if err := server.Close(); err != nil {
+		if err := server.server.Shutdown(ctx); err != nil {
 			fmt.Fprintf(l.out, "Failed to close local server: %s\n", err)
 		}
 	}()
@@ -110,7 +110,6 @@ func (l *oauthLogin) generateRandomState(length int) (string, error) {
 }
 
 type oauthServer struct {
-	listener   net.Listener
 	server     *http.Server
 	oauthCfg   oauth2.Config
 	resultChan <-chan oauthResult
@@ -162,24 +161,9 @@ func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oaut
 
 	return &oauthServer{
 		server:     server,
-		listener:   listener,
 		oauthCfg:   oauthCfg,
 		resultChan: resultChan,
 	}, nil
-}
-
-func (s *oauthServer) Close() error {
-	cls := func(closer io.Closer) error {
-		if err := closer.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			return err
-		}
-		return nil
-	}
-
-	return errors.Join(
-		cls(s.server),
-		cls(s.listener),
-	)
 }
 
 type oauthCallback struct {
@@ -233,21 +217,19 @@ func (c *oauthCallback) sendError(err error) {
 }
 
 func openBrowserImpl(url string) error {
-	var cmd string
-	var args []string
+	var cmd *exec.Cmd
 
-	// TODO: Do all of these work correctly?
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
+		// Escape '&' so cmd.exe doesn't treat it as a command separator
+		cmd = exec.Command("cmd", "/c", "start", strings.ReplaceAll(url, "&", "^&"))
 	case "darwin":
-		cmd = "open"
+		cmd = exec.Command("open", url)
 	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
+		cmd = exec.Command("xdg-open", url)
 	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
+
+	return cmd.Start()
 }
 
 // selectProjectID prompts the user to select a project if multiple are available

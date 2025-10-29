@@ -32,7 +32,7 @@ func buildServiceCmd() *cobra.Command {
 		Use:     "service",
 		Aliases: []string{"services", "svc"},
 		Short:   "Manage database services",
-		Long:    `Manage database services within TigerData Cloud Platform.`,
+		Long:    `Manage database services within Tiger Cloud platform.`,
 	}
 
 	// Add all subcommands
@@ -73,10 +73,10 @@ Examples:
 
   # Get service details in YAML format
   tiger service get svc-12345 --output yaml`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			cmd.SilenceUsage = true
-
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -431,7 +431,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(ctx, client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					service.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
 					if serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
@@ -499,7 +499,8 @@ Examples:
 
   # Update password without saving (using global flag)
   tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			// Get config
 			cfg, err := config.Load()
@@ -935,6 +936,8 @@ Examples:
 
   # Delete service with custom wait timeout
   tiger service delete svc-12345 --wait-timeout 15m`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			// Require explicit service ID for safety
 			if len(args) < 1 {
@@ -1142,7 +1145,8 @@ Examples:
 
   # Fork with custom wait timeout
   tiger service fork svc-12345 --now --wait-timeout 45m`,
-		Args: cobra.MaximumNArgs(1),
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -1304,7 +1308,7 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(ctx, client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
+				forkedService.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
 				if serviceErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {
@@ -1357,4 +1361,59 @@ func getServiceID(cfg *config.Config, args []string) (string, error) {
 	}
 
 	return serviceID, nil
+}
+
+func serviceIDCompletion(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	services, err := listServices(cmd)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	results := make([]string, 0, len(services))
+	for _, service := range services {
+		if service.ServiceId != nil && strings.HasPrefix(*service.ServiceId, toComplete) {
+			results = append(results, cobra.CompletionWithDesc(*service.ServiceId, *service.Name))
+		}
+	}
+	return results, cobra.ShellCompDirectiveNoFileComp
+}
+
+func listServices(cmd *cobra.Command) ([]api.Service, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Get API key and project ID for authentication
+	apiKey, projectID, err := getCredentialsForService()
+	if err != nil {
+		return nil, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient(cfg, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	// Make API call to list services
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list services: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 200 {
+		return nil, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {
+		return []api.Service{}, nil
+	}
+
+	return *resp.JSON200, nil
 }

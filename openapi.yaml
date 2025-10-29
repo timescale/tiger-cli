@@ -1,20 +1,20 @@
 openapi: 3.0.3
 info:
-  title: TigerData Cloud API
+  title: Tiger Cloud API
   description: |
-    A RESTful API for TigerData Cloud Platform.
+    A RESTful API for Tiger Cloud platform.
   version: 1.0.0
   license:
     name: Proprietary
     url: https://www.tigerdata.com/legal/terms
   contact:
-    name: TigerData Support
+    name: Tiger Data Support
     url: https://www.tigerdata.com/contact
 servers:
   - url: http://localhost:8080
     description: Local development server
   - url: https://api.tigerdata.com/public/v1
-    description: API server for TigerData Cloud
+    description: API server for Tiger Cloud
 
 tags:
   - name: VPCs

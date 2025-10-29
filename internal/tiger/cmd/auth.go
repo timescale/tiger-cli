@@ -37,8 +37,8 @@ func buildLoginCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authenticate with TigerData API",
-		Long: `Authenticate with TigerData API using predefined keys or an interactive OAuth flow
+		Short: "Authenticate with Tiger Cloud API",
+		Long: `Authenticate with Tiger Cloud API using predefined keys or an interactive OAuth flow
 
 By default, the command will launch an interactive OAuth flow in your browser to create new API keys.
 The OAuth flow will:
@@ -253,7 +253,7 @@ func buildAuthCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Manage authentication and credentials",
-		Long:  `Manage authentication and credentials for TigerData Cloud Platform.`,
+		Long:  `Manage authentication and credentials for Tiger Cloud platform.`,
 	}
 
 	cmd.AddCommand(buildLoginCmd())
