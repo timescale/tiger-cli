@@ -326,7 +326,7 @@ The default type of service created depends on the user's plan:
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 Default behavior: Returns immediately while service provisions in background (recommended).
-Setting wait=true will block for a few minutes until ready - only use if user explicitly needs immediate access.
+Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
 timeout_minutes: Wait duration in minutes (only relevant with wait=true).
 
 WARNING: Creates billable resources.`,
@@ -356,7 +356,7 @@ By default:
 - The forked service will be set as the default service
 
 Default behavior: Returns immediately while service provisions in background (recommended).
-Setting wait=true will block for several minutes until ready - only use if user explicitly needs immediate access.
+Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
 timeout_minutes: Wait duration in minutes (only relevant with wait=true).
 
 WARNING: Creates billable resources.`,
