@@ -348,7 +348,7 @@ WARNING: Creates billable resources.`,
 You must specify a fork strategy:
 - 'NOW': Fork at the current database state (creates new snapshot or uses WAL replay)
 - 'LAST_SNAPSHOT': Fork at the last existing snapshot (faster fork)
-- 'PITR': Fork at a specific point in time (point-in-time recovery)
+- 'PITR': Fork at a specific point in time (requires target_time parameter)
 
 By default:
 - Name will be auto-generated as '{source-service-name}-fork'
