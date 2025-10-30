@@ -236,7 +236,7 @@ Key configuration values:
 - `gateway_url`: Tiger Gateway URL
 - `output`: Output format (json, yaml, table)
 - `password_storage`: Password storage method (keyring, pgpass, none)
-- `release_url`: URL for CLI downloads and install script
+- `releases_url`: URL for CLI downloads and install script
 - `service_id`: Default service ID
 - `version_check_interval`: How often the CLI will check for new versions, 0 to disable
 - `version_check_last_time`: The last time the CLI checked for a new version
