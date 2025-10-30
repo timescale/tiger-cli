@@ -226,16 +226,20 @@ The CLI uses a layered configuration approach:
 4. Command-line flags (highest precedence)
 
 Key configuration values:
-- `api_url`: Tiger API endpoint
-- `console_url`: Tiger Console URL
-- `gateway_url`: Tiger Gateway URL
-- `docs_mcp`: Enable/disable proxied docs MCP tools
-- `docs_mcp_url`: URL for docs MCP server
-- `service_id`: Default service ID
-- `output`: Output format (json, yaml, table)
 - `analytics`: Usage analytics toggle
-- `password_storage`: Password storage method (keyring, pgpass, none)
+- `api_url`: Tiger API endpoint
+- `color`: Enable/disable colored output
+- `console_url`: Tiger Console URL
 - `debug`: Debug logging toggle
+- `docs_mcp_url`: URL for docs MCP server
+- `docs_mcp`: Enable/disable proxied docs MCP tools
+- `gateway_url`: Tiger Gateway URL
+- `output`: Output format (json, yaml, table)
+- `password_storage`: Password storage method (keyring, pgpass, none)
+- `release_url`: URL for CLI downloads and install script
+- `service_id`: Default service ID
+- `version_check_interval`: How often the CLI will check for new versions, 0 to disable
+- `version_check_last_time`: The last time the CLI checked for a new version
 
 ### MCP Server Architecture
 
@@ -319,12 +323,13 @@ Two-mode logging system using zap:
 - **Debug mode**: Full development logging with colors and debug level
 
 Global flags available on all commands:
+- `--analytics`: Toggle analytics
+- `--color`: Enable/disable colored output
 - `--config-dir`: Path to configuration directory
 - `--debug`: Enable debug logging
-- `--output/-o`: Set output format
-- `--service-id`: Override service ID
-- `--analytics`: Toggle analytics
 - `--password-storage`: Password storage method
+- `--service-id`: Override service ID
+- `--skip-update-check`: Skip checking for updates on startup
 
 ### Dependencies
 
