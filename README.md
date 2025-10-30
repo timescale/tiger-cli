@@ -213,36 +213,40 @@ tiger config reset
 
 All configuration options can be set via `tiger config set <key> <value>`:
 
-- `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
-- `service_id` - Default service ID
-- `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `analytics` - Enable/disable analytics (default: `true`)
-- `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
+- `color` - Enable/disable colored output (default: `true`)
 - `debug` - Enable/disable debug logging (default: `false`)
+- `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
+- `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
+- `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
+- `service_id` - Default service ID
+- `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: `24h`)
 
 ### Environment Variables
 
 Environment variables override configuration file values. All variables use the `TIGER_` prefix:
 
-- `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
-- `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
-- `TIGER_SERVICE_ID` - Default service ID
-- `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_ANALYTICS` - Enable/disable analytics
-- `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_COLOR` - Enable/disable colored output
+- `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
 - `TIGER_DEBUG` - Enable/disable debug logging
-- `TIGER_VERSION_CHECK_URL` - URL to check for latest version
-- `TIGER_VERSION_CHECK_INTERVAL` - Seconds between version checks, 0 to disable
+- `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
+- `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
+- `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_SERVICE_ID` - Default service ID
+- `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
 
 ### Global Flags
 
 These flags are available on all commands and take precedence over both environment variables and configuration file values:
 
-- `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
-- `--service-id <id>` - Specify service ID
 - `--analytics` - Enable/disable analytics
-- `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
+- `--color` - Enable/disable colored output
+- `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--debug` - Enable/disable debug logging
+- `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
+- `--service-id <id>` - Specify service ID
+- `--skip-update-check` - Skip checking for updates on startup (default: `false`)
 - `-h, --help` - Show help information
 
 ## Contributing

@@ -23,15 +23,34 @@ mv tiger /usr/local/bin/
 
 ### Environment Variables
 
-- `TIGER_API_URL`: Base URL for Tiger Cloud API (default: https://api.tigerdata.com/public/v1)
-- `TIGER_SERVICE_ID`: Default service ID to use
-- `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
-- `TIGER_OUTPUT`: Default output format (json, yaml, table)
-- `TIGER_ANALYTICS`: Enable/disable usage analytics (true/false)
+Environment variables override configuration file values. All variables use the `TIGER_` prefix:
+
+- `TIGER_ANALYTICS` - Enable/disable analytics
+- `TIGER_COLOR` - Enable/disable colored output
+- `TIGER_CONFIG_DIR` - Path to configuration directory (default: ~/.config/tiger)
+- `TIGER_DEBUG` - Enable/disable debug logging
+- `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
+- `TIGER_OUTPUT` - Output format: json, yaml, or table
+- `TIGER_PASSWORD_STORAGE` - Password storage method: keyring, pgpass, or none
+- `TIGER_SERVICE_ID` - Default service ID
+- `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
 
 ### Configuration File
 
 Location: `~/.config/tiger/config.yaml`
+
+All configuration options can be set via `tiger config set <key> <value>`:
+
+- `analytics` - Enable/disable analytics (default: true)
+- `color` - Enable/disable colored output (default: true)
+- `debug` - Enable/disable debug logging (default: false)
+- `docs_mcp` - Enable/disable docs MCP proxy (default: true)
+- `output` - Output format: json, yaml, or table (default: table)
+- `password_storage` - Password storage method: keyring, pgpass, or none (default: keyring)
+- `service_id` - Default service ID
+- `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: 24h)
+
+#### Example
 
 ```yaml
 api_url: https://api.tigerdata.com/public/v1
@@ -40,15 +59,18 @@ output: table
 analytics: true
 ```
 
-### Global Options
+### Global Flags
 
-- `--config-dir`: Path to configuration directory
-- `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
-- `--analytics`: Toggle analytics collection
-- `--password-storage`: Password storage method (keyring, pgpass, none) (default: keyring)
-- `-v, --version`: Show CLI version
-- `-h, --help`: Show help information
-- `--debug`: Enable debug logging
+These flags are available on all commands and take precedence over both environment variables and configuration file values:
+
+- `--analytics` - Enable/disable analytics
+- `--color` - Enable/disable colored output
+- `--config-dir <path>` - Path to configuration directory (default: ~/.config/tiger)
+- `--debug` - Enable/disable debug logging
+- `--password-storage <method>` - Password storage method: keyring, pgpass, or none
+- `--service-id <id>` - Specify service ID
+- `--skip-update-check` - Skip checking for updates on startup (default: false)
+- `-h, --help` - Show help information
 
 ## Command Structure
 
