@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -68,7 +69,8 @@ Examples:
   export TIGER_SECRET_KEY="your-secret-key"
   export TIGER_PROJECT_ID="proj-123"
   tiger auth login`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			cmd.SilenceUsage = true
 
 			// Get config
@@ -85,8 +87,10 @@ Examples:
 				projectID: flagOrEnvVar(flags.projectID, "TIGER_PROJECT_ID"),
 			}
 
+			var loginMethod string
 			if creds.publicKey == "" && creds.secretKey == "" && creds.projectID == "" {
 				// If no credentials were provided, start interactive OAuth login flow
+				loginMethod = "oauth"
 				l := &oauthLogin{
 					authURL:    cfg.ConsoleURL + "/oauth/authorize",
 					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
@@ -94,7 +98,7 @@ Examples:
 					graphql: &GraphQLClient{
 						URL: cfg.GatewayURL + "/query",
 					},
-					out: cmd.OutOrStdout(),
+					out: cmd.ErrOrStderr(),
 				}
 
 				creds, err = l.loginWithOAuth(cmd.Context())
@@ -103,6 +107,7 @@ Examples:
 				}
 			} else if creds.publicKey == "" || creds.secretKey == "" || creds.projectID == "" {
 				// If some credentials were provided, prompt for missing ones
+				loginMethod = "interactive"
 				creds, err = promptForCredentials(cmd.Context(), cfg.ConsoleURL, creds)
 				if err != nil {
 					return fmt.Errorf("failed to get credentials: %w", err)
@@ -115,25 +120,43 @@ Examples:
 				if creds.projectID == "" {
 					return fmt.Errorf("project ID is required")
 				}
+			} else {
+				// All credentials provided via flags/env
+				loginMethod = "flags"
 			}
 
 			// Combine the keys in the format "public:secret" for storage
 			apiKey := fmt.Sprintf("%s:%s", creds.publicKey, creds.secretKey)
 
 			// Validate the API key by making a test API call
-			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-			if err := validateAPIKeyForLogin(cmd.Context(), apiKey, creds.projectID); err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Validating API key...")
+			if err := validateAPIKeyForLogin(cmd.Context(), cfg, apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			a := analytics.New(cfg, client, creds.projectID)
+			defer func() {
+				a.Track("Run tiger auth login",
+					analytics.Property("method", loginMethod),
+					analytics.FlagSet(cmd.Flags(), "public-key", "secret-key", "project-id"), // Ignore credentials flags
+					analytics.Error(runErr),
+				)
+			}()
 
 			// Store the credentials (API key + project ID) together securely
 			if err := config.StoreCredentials(apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", creds.projectID)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Successfully logged in (project: %s)\n", creds.projectID)
 
 			// Show helpful next steps
-			fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
+			fmt.Fprint(cmd.ErrOrStderr(), nextStepsMessage)
 
 			return nil
 		},
@@ -152,14 +175,30 @@ func buildLogoutCmd() *cobra.Command {
 		Use:   "logout",
 		Short: "Remove stored credentials",
 		Long:  `Remove stored API key and clear authentication credentials.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			cmd.SilenceUsage = true
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Track analytics
+			a := analytics.TryInit(cfg)
+			defer func() {
+				a.Track("Run tiger auth logout",
+					analytics.FlagSet(cmd.Flags()),
+					analytics.Error(runErr),
+				)
+			}()
 
 			if err := config.RemoveCredentials(); err != nil {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged out and removed stored credentials")
+			fmt.Fprintln(cmd.ErrOrStderr(), "Successfully logged out and removed stored credentials")
 			return nil
 		},
 	}
@@ -170,17 +209,40 @@ func buildStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show current authentication status and project ID",
 		Long:  "Displays whether you are logged in and shows your currently configured project ID.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
 			cmd.SilenceUsage = true
 
-			_, projectID, err := config.GetCredentials()
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Get API key and project ID for authentication
+			apiKey, projectID, err := config.GetCredentials()
 			if err != nil {
 				return err
 			}
 
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Track analytics
+			a := analytics.New(cfg, client, projectID)
+			defer func() {
+				a.Track("Run tiger auth status",
+					analytics.FlagSet(cmd.Flags()),
+					analytics.Error(runErr),
+				)
+			}()
+
 			// TODO: Make API call to get token information
-			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
-			fmt.Fprintf(cmd.OutOrStdout(), "Project ID: %s\n", projectID)
+			fmt.Fprintln(cmd.ErrOrStderr(), "Logged in (API key stored)")
+			fmt.Fprintf(cmd.ErrOrStderr(), "Project ID: %s\n", projectID)
 
 			return nil
 		},

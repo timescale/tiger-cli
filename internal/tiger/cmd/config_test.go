@@ -18,6 +18,9 @@ import (
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
 	if err != nil {
@@ -27,12 +30,16 @@ func setupConfigTest(t *testing.T) (string, func()) {
 	// Set environment variable to use test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for config tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	config.UseTestConfig(tmpDir, map[string]any{})
 
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 
 		// Reset global config in the config package
 		// This is important for test isolation

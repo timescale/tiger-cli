@@ -27,7 +27,7 @@ func setupAuthTest(t *testing.T) string {
 
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKeyForLogin
-	validateAPIKeyForLogin = func(ctx context.Context, apiKey, projectID string) error {
+	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
 		// Always return success for testing
 		return nil
 	}
@@ -41,6 +41,9 @@ func setupAuthTest(t *testing.T) string {
 	// Set TIGER_CONFIG_DIR environment variable so that when commands execute
 	// and reinitialize viper, they use the test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
+	// Disable analytics for auth tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
 
 	// Reset global config and viper to ensure test isolation
 	// This ensures proper test isolation by resetting all viper state
@@ -61,8 +64,9 @@ func setupAuthTest(t *testing.T) string {
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)
 		os.Remove(configFile)
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
