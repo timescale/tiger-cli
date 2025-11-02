@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch: # still allow manual triggering
 
 jobs:
   test:
@@ -50,7 +53,26 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
+        env:
+          TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
+          TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
+          TIGER_PROJECT_ID_INTEGRATION: ${{ secrets.TIGER_PROJECT_ID_INTEGRATION }}
+        run: |
+          # Run all tests with race detection and coverage
+          # Integration tests will skip automatically if secrets are not set
+          go test -race -coverprofile=coverage.out -coverpkg=./... ./...
+          
+          # Run integration tests via script if secrets are available
+          if [ -n "$TIGER_PUBLIC_KEY_INTEGRATION" ] && [ -n "$TIGER_SECRET_KEY_INTEGRATION" ] && [ -n "$TIGER_PROJECT_ID_INTEGRATION" ]; then
+            # Create .env file from secrets so the script can use it
+            cat > .env << EOF
+          TIGER_PUBLIC_KEY_INTEGRATION=$TIGER_PUBLIC_KEY_INTEGRATION
+          TIGER_SECRET_KEY_INTEGRATION=$TIGER_SECRET_KEY_INTEGRATION
+          TIGER_PROJECT_ID_INTEGRATION=$TIGER_PROJECT_ID_INTEGRATION
+          EOF
+            chmod +x scripts/test-integration.sh
+            scripts/test-integration.sh -v
+          fi
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.out -o=coverage.html
