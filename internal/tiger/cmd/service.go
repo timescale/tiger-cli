@@ -148,10 +148,11 @@ func buildServiceListCmd() *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all services",
-		Long:  `List all database services in the current project.`,
-		Args:  cobra.NoArgs,
+		Use:               "list",
+		Short:             "List all services",
+		Long:              `List all database services in the current project.`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -283,7 +284,8 @@ Allowed CPU/Memory Configurations:
   4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -1299,7 +1301,7 @@ Examples:
 func serviceIDCompletion(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	services, err := listServices(cmd)
 	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	results := make([]string, 0, len(services))
