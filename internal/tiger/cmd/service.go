@@ -1280,7 +1280,13 @@ Examples:
 
 	return cmd
 }
-func serviceIDCompletion(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+
+func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Service ID is always first positional argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
 	services, err := listServices(cmd)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
