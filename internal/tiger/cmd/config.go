@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -26,7 +25,7 @@ func buildConfigShowCmd() *cobra.Command {
 		Short: "Show current configuration",
 		Long:  `Display the current CLI configuration settings`,
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
@@ -39,15 +38,6 @@ func buildConfigShowCmd() *cobra.Command {
 			if cmd.Flags().Changed("output") {
 				outputFormat = output
 			}
-
-			// Track analytics
-			a := analytics.TryInit(cfg)
-			defer func() {
-				a.Track("Run tiger config show",
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			configFile, err := cfg.EnsureConfigDir()
 			if err != nil {
@@ -101,7 +91,7 @@ func buildConfigSetCmd() *cobra.Command {
 		Short: "Set configuration value",
 		Long:  `Set a configuration value and save it to ~/.config/tiger/config.yaml`,
 		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 
 			cmd.SilenceUsage = true
@@ -110,16 +100,6 @@ func buildConfigSetCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.TryInit(cfg)
-			defer func() {
-				a.Track("Run tiger config set",
-					analytics.Property("key", key),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			if err := cfg.Set(key, value); err != nil {
 				return fmt.Errorf("failed to set config: %w", err)
@@ -138,7 +118,7 @@ func buildConfigUnsetCmd() *cobra.Command {
 		Short: "Remove configuration value",
 		Long:  `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
 			cmd.SilenceUsage = true
@@ -147,16 +127,6 @@ func buildConfigUnsetCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.TryInit(cfg)
-			defer func() {
-				a.Track("Run tiger config unset",
-					analytics.Property("key", key),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			if err := cfg.Unset(key); err != nil {
 				return fmt.Errorf("failed to unset config: %w", err)
@@ -175,22 +145,13 @@ func buildConfigResetCmd() *cobra.Command {
 		Short: "Reset to defaults",
 		Long:  `Reset all configuration settings to their default values`,
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.TryInit(cfg)
-			defer func() {
-				a.Track("Run tiger config reset",
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			if err := cfg.Reset(); err != nil {
 				return fmt.Errorf("failed to reset config: %w", err)

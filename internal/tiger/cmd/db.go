@@ -16,7 +16,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
@@ -79,7 +78,7 @@ Examples:
   # Get connection string with password included (less secure)
   tiger db connection-string svc-12345 --with-password`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -105,16 +104,6 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger db connection-string",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Fetch service details
 			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
@@ -192,7 +181,7 @@ Examples:
   # Pass additional flags to psql (use -- to separate)
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
@@ -221,16 +210,6 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger db connect",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Check if psql is available
 			psqlPath, err := exec.LookPath("psql")
@@ -305,7 +284,7 @@ Examples:
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -331,16 +310,6 @@ Examples:
 			if err != nil {
 				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to create API client: %w", err))
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger db test-connection",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Fetch service details
 			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
@@ -416,7 +385,7 @@ Examples:
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -442,16 +411,6 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger db save-password",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags(), "password"), // Ignore password flag
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Fetch service details
 			service, err := getServiceDetailsFunc(cmd.Context(), client, projectID, serviceID)
@@ -789,7 +748,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (enforces permanent read-only mode for the role)
   - statement_timeout: Set when --statement-timeout flag is provided
     (kills queries that exceed the specified duration, in milliseconds)`,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
 				return fmt.Errorf("--name is required")
@@ -820,16 +779,6 @@ PostgreSQL Configuration Parameters That May Be Set:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger db create role",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags(), "password"), // Ignore password flag
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Use flag value if provided, otherwise use config value
 			if cmd.Flags().Changed("output") {

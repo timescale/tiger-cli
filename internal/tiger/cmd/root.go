@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -124,7 +126,40 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
+	wrapCommandsWithAnalytics(cmd)
+
 	return cmd, nil
+}
+
+func wrapCommandsWithAnalytics(cmd *cobra.Command) {
+	// Wrap this command's RunE if it exists
+	if cmd.RunE != nil {
+		originalRunE := cmd.RunE
+		cmd.RunE = func(c *cobra.Command, args []string) (err error) {
+			start := time.Now()
+
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			a := analytics.TryInit(cfg)
+			defer func() {
+				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
+					analytics.Property("elapsed", time.Since(start)),
+					analytics.FlagSet(c.Flags(), "password", "new-password", "public-key", "secret-key", "project-id"),
+					analytics.Error(err),
+				)
+			}()
+
+			return originalRunE(c, args)
+		}
+	}
+
+	// Recursively wrap all children
+	for _, child := range cmd.Commands() {
+		wrapCommandsWithAnalytics(child)
+	}
 }
 
 func Execute(ctx context.Context) error {

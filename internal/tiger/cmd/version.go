@@ -7,7 +7,6 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -32,7 +31,7 @@ func buildVersionCmd() *cobra.Command {
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			// Get config
@@ -59,16 +58,6 @@ func buildVersionCmd() *cobra.Command {
 					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
 				}
 			}
-
-			// Track analytics
-			a := analytics.TryInit(cfg)
-			defer func() {
-				a.Track("Run tiger version",
-					analytics.FlagSet(cmd.Flags()),
-					analytics.NonZero("latest_version", versionOutput.LatestVersion),
-					analytics.Error(runErr),
-				)
-			}()
 
 			output := cmd.OutOrStdout()
 			switch outputFormat {

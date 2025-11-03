@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
@@ -75,7 +74,7 @@ Examples:
   tiger service get svc-12345 --output yaml`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			// Get config
 			cfg, err := config.Load()
@@ -105,16 +104,6 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service get",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Make API call to get service details
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
@@ -156,7 +145,7 @@ func buildServiceListCmd() *cobra.Command {
 		Short: "List all services",
 		Long:  `List all database services in the current project.`,
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			// Get config
@@ -181,15 +170,6 @@ func buildServiceListCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service list",
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Make API call to list services
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
@@ -298,7 +278,7 @@ Allowed CPU/Memory Configurations:
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
@@ -355,17 +335,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
-			// Track analytics
-			var serviceID string
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service create",
-					analytics.NonZero("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
-
 			// Prepare service creation request
 			environmentTag := api.EnvironmentTag(createEnvironment)
 			serviceCreateReq := api.ServiceCreate{
@@ -408,7 +377,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				service := *resp.JSON202
-				serviceID = util.Deref(service.ServiceId)
+				serviceID := util.Deref(service.ServiceId)
 				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
 				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
 
@@ -501,7 +470,7 @@ Examples:
   tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -542,16 +511,6 @@ Examples:
 			// Make API call to update password
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service update-password",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags(), "new-password"), // Ignore new-password flag
-					analytics.Error(runErr),
-				)
-			}()
 
 			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
 			if err != nil {
@@ -938,7 +897,7 @@ Examples:
   tiger service delete svc-12345 --wait-timeout 15m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require explicit service ID for safety
 			if len(args) < 1 {
 				return fmt.Errorf("service ID is required")
@@ -983,16 +942,6 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
-
-			// Track analytics
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service delete",
-					analytics.Property("service_id", serviceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
 
 			// Make the delete request
 			resp, err := client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
@@ -1147,7 +1096,7 @@ Examples:
   tiger service fork svc-12345 --now --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
 			if forkNow {
@@ -1214,18 +1163,6 @@ Examples:
 				return err
 			}
 
-			// Track analytics
-			var forkedServiceID string
-			a := analytics.New(cfg, client, projectID)
-			defer func() {
-				a.Track("Run tiger service fork",
-					analytics.Property("service_id", serviceID),
-					analytics.NonZero("forked_service_id", forkedServiceID),
-					analytics.FlagSet(cmd.Flags()),
-					analytics.Error(runErr),
-				)
-			}()
-
 			// Determine fork strategy and target time
 			var forkStrategy api.ForkStrategy
 			var targetTime *time.Time
@@ -1286,7 +1223,7 @@ Examples:
 
 			// Success - service fork accepted
 			forkedService := *forkResp.JSON202
-			forkedServiceID = util.DerefStr(forkedService.ServiceId)
+			forkedServiceID := util.DerefStr(forkedService.ServiceId)
 			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
