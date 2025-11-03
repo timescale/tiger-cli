@@ -233,17 +233,27 @@ The middleware follows these automatic naming conventions:
 
 #### Excluding Sensitive Data
 
-The middleware automatically excludes common sensitive fields:
+The middleware automatically excludes sensitive fields using a centralized ignore list in `internal/tiger/analytics/analytics.go`.
 
-**CLI Commands:** Excludes `password`, `new-password`, `public-key`, `secret-key`, `project-id`
+**Current ignore list:**
+- `password` - User passwords
+- `new_password` - New passwords for updates
+- `public_key` - API public keys
+- `secret_key` - API secret keys
+- `project_id` - Project identifiers
+- `query` - SQL queries (may contain sensitive data)
+- `parameters` - SQL parameters (may contain sensitive data)
 
-**MCP Tools:** Excludes `password`, `query`, `parameters` (SQL queries may contain sensitive info)
+**IMPORTANT:** When adding new commands or MCP tools, review whether they introduce new sensitive flags, input parameters, or positional arguments:
 
-**IMPORTANT:** When adding new commands or MCP tools, review whether they introduce new sensitive flags or input parameters. If so, update the corresponding deny-list in the middleware:
-- For CLI commands: Update the exclude list in `wrapCommandsWithAnalytics()` in `internal/tiger/cmd/root.go:134`
-- For MCP tools: Update the exclude list in `analyticsMiddleware()` in `internal/tiger/mcp/server.go:102`
+1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/tiger/analytics/analytics.go`
+   - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
 
-Common sensitive fields to watch for:
+2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
+   - Refactor to use a flag instead
+   - Add filtering logic in `wrapCommandsWithAnalytics()` in `internal/tiger/cmd/root.go` to sanitize or omit the args from tracking
+
+**Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
 - User data: SQL queries, connection strings, personal information
 - Security-related: Private keys, certificates, encryption keys

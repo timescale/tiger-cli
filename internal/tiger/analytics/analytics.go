@@ -17,9 +17,9 @@ import (
 )
 
 // A list of properties that should never be recorded in analytics events.
-// Typically used to filter flags and MCP tool call parameters from automatic
-// tracking. Note that dashes in flag names are converted to underscores before
-// being checked against this list.
+// Used to filter flags and MCP tool call parameters from automatic tracking.
+// Note that dashes in flag names are converted to underscores before being
+// checked against this list.
 var ignore = []string{
 	"public_key",
 	"secret_key",
