@@ -472,17 +472,11 @@ The CLI uses a layered configuration approach:
 3. Environment variables with `TIGER_` prefix
 4. Command-line flags (highest precedence)
 
-Key configuration values:
-- `api_url`: Tiger API endpoint
-- `console_url`: Tiger Console URL
-- `gateway_url`: Tiger Gateway URL
-- `docs_mcp`: Enable/disable proxied docs MCP tools
-- `docs_mcp_url`: URL for docs MCP server
-- `service_id`: Default service ID
-- `output`: Output format (json, yaml, table)
-- `analytics`: Usage analytics toggle
-- `password_storage`: Password storage method (keyring, pgpass, none)
-- `debug`: Debug logging toggle
+For a complete list of valid configuration options, see `internal/tiger/config/config.go`.
+All configuration options also have corresponding `TIGER_` environment variables.
+
+For a complete list of global command-line flags, see `internal/tiger/cmd/root.go`.
+Note that not all config options have corresponding global flags, and not all global flags correspond to config options.
 
 ### MCP Server Architecture
 
@@ -564,14 +558,6 @@ mcp.AddTool(s.mcpServer, &mcp.Tool{
 Two-mode logging system using zap:
 - **Production mode**: Minimal output, warn level and above, clean formatting
 - **Debug mode**: Full development logging with colors and debug level
-
-Global flags available on all commands:
-- `--config-dir`: Path to configuration directory
-- `--debug`: Enable debug logging
-- `--output/-o`: Set output format
-- `--service-id`: Override service ID
-- `--analytics`: Toggle analytics
-- `--password-storage`: Password storage method
 
 ### Dependencies
 

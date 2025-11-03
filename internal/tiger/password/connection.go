@@ -48,11 +48,11 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		endpoint = service.Endpoint
 	}
 
-	if endpoint.Host == nil || *endpoint.Host == "" {
+	if endpoint == nil || endpoint.Host == nil || *endpoint.Host == "" {
 		return nil, fmt.Errorf("endpoint host not available")
 	}
 
-	if endpoint.Port == nil || *endpoint.Port == 0 {
+	if endpoint == nil || endpoint.Port == nil || *endpoint.Port == 0 {
 		return nil, fmt.Errorf("endpoint port not available")
 	}
 
