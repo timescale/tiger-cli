@@ -134,7 +134,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 				}
 
 				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
-					analytics.Map(args, "password", "query", "parameters"),
+					analytics.Map(args),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(toolErr),
 				)

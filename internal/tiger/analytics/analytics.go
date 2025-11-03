@@ -16,6 +16,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// A list of properties that should never be recorded in analytics events.
+// Typically used to filter flags and MCP tool call parameters from automatic
+// tracking. Note that dashes in flag names are converted to underscores before
+// being checked against this list.
+var ignore = []string{
+	"public_key",
+	"secret_key",
+	"project_id",
+	"password",
+	"new_password",
+	"query",
+	"parameters",
+}
+
 type Analytics struct {
 	config    *config.Config
 	projectID string
@@ -69,7 +83,7 @@ func Property(key string, value any) Option {
 //
 // This is useful for including arbitrary map data (like MCP tool arguments) in
 // analytics events without manually specifying each field.
-func Map(m map[string]any, ignore ...string) Option {
+func Map(m map[string]any) Option {
 	return func(properties map[string]any) {
 		for key, value := range m {
 			if slices.Contains(ignore, key) {
@@ -89,13 +103,13 @@ var flagNameReplacer = strings.NewReplacer("-", "_")
 // (e.g., "no-wait" becomes "no_wait"). Flags in the ignore list are skipped.
 //
 // This is useful for tracking which flags users actually use when running commands.
-func FlagSet(flagSet *pflag.FlagSet, ignore ...string) Option {
+func FlagSet(flagSet *pflag.FlagSet) Option {
 	return func(properties map[string]any) {
 		flagSet.Visit(func(flag *pflag.Flag) {
-			if slices.Contains(ignore, flag.Name) {
+			key := flagNameReplacer.Replace(flag.Name)
+			if slices.Contains(ignore, key) {
 				return
 			}
-			key := flagNameReplacer.Replace(flag.Name)
 			properties[key] = flag.Value.String()
 		})
 	}
