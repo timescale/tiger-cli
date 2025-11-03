@@ -236,7 +236,7 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 }
 
 func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// Config option is always first position argument
+	// Config option is always first positional argument
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
