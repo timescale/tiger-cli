@@ -138,13 +138,19 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 		cmd.RunE = func(c *cobra.Command, args []string) (err error) {
 			start := time.Now()
 
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			a := analytics.TryInit(cfg)
 			defer func() {
+				// Reload config after command to account for config changes
+				// during command (e.g. `tiger config set analytics false`
+				// should not result in an analytics event being sent).
+				cfg, err := config.Load()
+				if err != nil {
+					return
+				}
+
+				// Reload credentials after command to account for credentials
+				// changes during command (e.g. `tiger auth login` should
+				// record an analytics event).
+				a := analytics.TryInit(cfg)
 				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
 					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
