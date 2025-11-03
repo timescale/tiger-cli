@@ -30,6 +30,7 @@ func buildVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			versionOutput := VersionOutput{
 				Version:   config.Version,
