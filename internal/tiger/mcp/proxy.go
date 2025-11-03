@@ -9,7 +9,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
@@ -195,24 +194,10 @@ func (p *ProxyClient) RegisterTools(ctx context.Context, server *mcp.Server) err
 
 // createProxyToolHandler creates a handler function that forwards tool calls to the remote server
 func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
-	return func(ctx context.Context, req *mcp.CallToolRequest) (result *mcp.CallToolResult, runErr error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		logging.Debug("Proxying tool call to remote server",
 			zap.String("tool_name", req.Params.Name),
 		)
-
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-
-		// Track analytics for proxied tool calls
-		a := analytics.TryInit(cfg)
-		defer func() {
-			a.Track(fmt.Sprintf("Call %s tool", req.Params.Name),
-				analytics.Error(runErr),
-			)
-		}()
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
@@ -226,7 +211,7 @@ func (p *ProxyClient) createProxyToolHandler() mcp.ToolHandler {
 		}
 
 		// Call remote tool
-		result, err = p.session.CallTool(ctx, params)
+		result, err := p.session.CallTool(ctx, params)
 		if err != nil {
 			logging.Error("Remote tool call failed",
 				zap.String("tool_name", req.Params.Name),
@@ -332,32 +317,17 @@ func (p *ProxyClient) RegisterResourceTemplates(ctx context.Context, server *mcp
 
 // createProxyResourceHandler creates a handler function that forwards resource reads to the remote server
 func (p *ProxyClient) createProxyResourceHandler() mcp.ResourceHandler {
-	return func(ctx context.Context, req *mcp.ReadResourceRequest) (result *mcp.ReadResourceResult, runErr error) {
+	return func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		logging.Debug("Proxying resource read to remote server",
 			zap.String("resource_uri", req.Params.URI),
 		)
-
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-
-		// Track analytics for proxied resource reads
-		a := analytics.TryInit(cfg)
-		defer func() {
-			a.Track("Read proxied resource",
-				analytics.Property("resource_uri", req.Params.URI),
-				analytics.Error(runErr),
-			)
-		}()
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
 		}
 
 		// Call remote resource
-		result, err = p.session.ReadResource(ctx, req.Params)
+		result, err := p.session.ReadResource(ctx, req.Params)
 		if err != nil {
 			logging.Error("Remote resource read failed",
 				zap.String("resource_uri", req.Params.URI),
@@ -419,31 +389,17 @@ func (p *ProxyClient) RegisterPrompts(ctx context.Context, server *mcp.Server) e
 
 // createProxyPromptHandler creates a handler function that forwards prompt requests to the remote server
 func (p *ProxyClient) createProxyPromptHandler() mcp.PromptHandler {
-	return func(ctx context.Context, req *mcp.GetPromptRequest) (result *mcp.GetPromptResult, runErr error) {
+	return func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		logging.Debug("Proxying prompt request to remote server",
 			zap.String("prompt_name", req.Params.Name),
 		)
-
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-
-		// Track analytics for proxied prompt requests
-		a := analytics.TryInit(cfg)
-		defer func() {
-			a.Track(fmt.Sprintf("Get %s prompt", req.Params.Name),
-				analytics.Error(runErr),
-			)
-		}()
 
 		if p.session == nil {
 			return nil, fmt.Errorf("not connected to remote MCP server")
 		}
 
 		// Call remote prompt
-		result, err = p.session.GetPrompt(ctx, req.Params)
+		result, err := p.session.GetPrompt(ctx, req.Params)
 		if err != nil {
 			logging.Error("Remote prompt request failed",
 				zap.String("prompt_name", req.Params.Name),

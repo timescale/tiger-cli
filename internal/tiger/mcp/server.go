@@ -2,11 +2,14 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
@@ -39,6 +42,9 @@ func NewServer(ctx context.Context) (*Server, error) {
 	// Register all tools (including proxied docs tools)
 	server.registerTools(ctx)
 
+	// Add analytics tracking middleware
+	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
+
 	return server, nil
 }
 
@@ -70,28 +76,75 @@ func (s *Server) registerTools(ctx context.Context) {
 	logging.Info("MCP tools registered successfully")
 }
 
-// initToolCall loads the config and credentials, creates a new API client, and
-// returns the config, client, and projectID.
-func (s *Server) initToolCall() (*config.Config, *api.ClientWithResponses, string, error) {
+// createAPIClient creates a new API client and returns it with the project ID
+func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to load config: %w", err)
+		return nil, "", fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get credentials (API key + project ID)
 	apiKey, projectID, err := config.GetCredentials()
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
+		return nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
 	}
 
 	// Create API client with fresh credentials
 	apiClient, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to create API client: %w", err)
+		return nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return cfg, apiClient, projectID, nil
+	return apiClient, projectID, nil
+}
+
+// analyticsMiddleware tracks analytics for all MCP requests
+func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (result mcp.Result, runErr error) {
+		// Load config for analytics
+		cfg, err := config.Load()
+		if err != nil {
+			// If we can't load config, just skip analytics and continue
+			return next(ctx, method, req)
+		}
+
+		a := analytics.TryInit(cfg)
+
+		switch r := req.(type) {
+		case *mcp.CallToolRequest:
+			// Extract arguments from the tool call
+			var args map[string]any
+			if len(r.Params.Arguments) > 0 {
+				if err := json.Unmarshal(r.Params.Arguments, &args); err != nil {
+					logging.Error("Error unmarshaling tool call arguments", zap.Error(err))
+				}
+			}
+
+			defer func() {
+				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
+					analytics.Map(args, "password", "query", "parameters"),
+					analytics.Error(runErr),
+				)
+			}()
+		case *mcp.ReadResourceRequest:
+			defer func() {
+				a.Track("Read proxied resource",
+					analytics.Property("resource_uri", r.Params.URI),
+					analytics.Error(runErr),
+				)
+			}()
+		case *mcp.GetPromptRequest:
+			defer func() {
+				a.Track(fmt.Sprintf("Get %s prompt", r.Params.Name),
+					analytics.Error(runErr),
+				)
+			}()
+		}
+
+		// Execute the actual handler
+		return next(ctx, method, req)
+	}
 }
 
 // Close gracefully shuts down the MCP server and all proxy connections

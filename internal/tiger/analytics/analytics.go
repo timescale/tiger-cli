@@ -99,7 +99,13 @@ func Fields(s any, ignore ...string) Option {
 			return
 		}
 
-		for key, value := range fields {
+		Map(fields, ignore...)
+	}
+}
+
+func Map(m map[string]any, ignore ...string) Option {
+	return func(properties map[string]any) {
+		for key, value := range m {
 			if slices.Contains(ignore, key) {
 				continue
 			}

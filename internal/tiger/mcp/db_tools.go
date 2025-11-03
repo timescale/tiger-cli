@@ -11,7 +11,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -111,9 +110,9 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 }
 
 // handleDBExecuteQuery handles the tiger_db_execute_query MCP tool
-func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (result *mcp.CallToolResult, output DBExecuteQueryOutput, runErr error) {
+func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
 	// Create fresh API client and get project ID
-	cfg, apiClient, projectID, err := s.initToolCall()
+	apiClient, projectID, err := s.createAPIClient()
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -128,17 +127,6 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.String("role", input.Role),
 		zap.Bool("pooled", input.Pooled),
 	)
-
-	// Track analytics
-	var rowsAffected int64
-	a := analytics.New(cfg, apiClient, projectID)
-	defer func() {
-		a.Track("Call db_execute_query tool",
-			analytics.Fields(input, "query", "parameters"), // Ignore query and parameters, which could be sensitive
-			analytics.Property("rows_affected", rowsAffected),
-			analytics.Error(runErr),
-		)
-	}()
 
 	// Get service details to construct connection string
 	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
@@ -216,11 +204,10 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("error during row iteration: %w", rows.Err())
 	}
 
-	rowsAffected = rows.CommandTag().RowsAffected()
-	output = DBExecuteQueryOutput{
+	output := DBExecuteQueryOutput{
 		Columns:       columns,
 		Rows:          resultRows,
-		RowsAffected:  rowsAffected,
+		RowsAffected:  rows.CommandTag().RowsAffected(),
 		ExecutionTime: time.Since(startTime).String(),
 	}
 
