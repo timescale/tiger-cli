@@ -2,7 +2,6 @@ package analytics
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"runtime"
 	"slices"
@@ -65,44 +64,11 @@ func Property(key string, value any) Option {
 	}
 }
 
-// NonZero creates an Option that adds a property only if the value is not the
-// zero value for its type. This is useful for optional parameters where you
-// only want to track them when they're explicitly set.
+// Map creates an Option that adds all key-value pairs from a map to the event
+// properties. Keys specified in the ignore list are skipped.
 //
-// For example, NonZero("timeout", 0) won't add the property, but
-// NonZero("timeout", 30) will add timeout: 30.
-func NonZero[T comparable](key string, value T) Option {
-	return func(properties map[string]any) {
-		var zero T
-		if value == zero {
-			return
-		}
-		properties[key] = value
-	}
-}
-
-// Fields creates an Option that extracts all exported fields from a struct
-// and adds them as properties. This uses JSON marshaling to convert the struct
-// to key-value pairs. Fields specified in the ignore list are skipped.
-//
-// This is useful for including structured data like MCP tool call arguments in
+// This is useful for including arbitrary map data (like MCP tool arguments) in
 // analytics events without manually specifying each field.
-func Fields(s any, ignore ...string) Option {
-	return func(properties map[string]any) {
-		out, err := json.Marshal(s)
-		if err != nil {
-			return
-		}
-
-		var fields map[string]any
-		if err := json.Unmarshal(out, &fields); err != nil {
-			return
-		}
-
-		Map(fields, ignore...)
-	}
-}
-
 func Map(m map[string]any, ignore ...string) Option {
 	return func(properties map[string]any) {
 		for key, value := range m {
@@ -132,21 +98,6 @@ func FlagSet(flagSet *pflag.FlagSet, ignore ...string) Option {
 			key := flagNameReplacer.Replace(flag.Name)
 			properties[key] = flag.Value.String()
 		})
-	}
-}
-
-// Flag creates an Option that adds a single flag's value if it was explicitly
-// set by the user. The flag name is converted from kebab-case to snake_case.
-//
-// This is useful when you only want to track specific flags rather than all
-// flags in a flag set.
-func Flag(flag *pflag.Flag) Option {
-	return func(properties map[string]any) {
-		if !flag.Changed {
-			return
-		}
-		key := flagNameReplacer.Replace(flag.Name)
-		properties[key] = flag.Value.String()
 	}
 }
 
