@@ -30,16 +30,7 @@ func buildVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
 			versionOutput := VersionOutput{
 				Version:   config.Version,
 				BuildTime: config.BuildTime,
@@ -50,6 +41,10 @@ func buildVersionCmd() *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
+				cfg, err := config.Load()
+				if err != nil {
+					return fmt.Errorf("Error loading config: %w", err)
+				}
 				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable

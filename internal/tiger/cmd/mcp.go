@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/mcp"
 )
@@ -88,15 +87,10 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Get config
-			_, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
 			var clientName string
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
+				var err error
 				clientName, err = selectClientInteractively(cmd.OutOrStdout())
 				if err != nil {
 					return fmt.Errorf("failed to select client: %w", err)
@@ -142,7 +136,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context(), cmd)
+			return startStdioServer(cmd.Context())
 		},
 	}
 
@@ -166,7 +160,7 @@ Examples:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context(), cmd)
+			return startStdioServer(cmd.Context())
 		},
 	}
 }
@@ -198,7 +192,7 @@ Examples:
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startHTTPServer(cmd.Context(), cmd, httpHost, httpPort)
+			return startHTTPServer(cmd.Context(), httpHost, httpPort)
 		},
 	}
 
@@ -210,7 +204,7 @@ Examples:
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context, cmd *cobra.Command) error {
+func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
 	// Create MCP server
@@ -233,7 +227,7 @@ func startStdioServer(ctx context.Context, cmd *cobra.Command) error {
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, cmd *cobra.Command, host string, port int) error {
+func startHTTPServer(ctx context.Context, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
 	// Create MCP server

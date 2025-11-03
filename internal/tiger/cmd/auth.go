@@ -68,7 +68,6 @@ Examples:
   export TIGER_SECRET_KEY="your-secret-key"
   export TIGER_PROJECT_ID="proj-123"
   tiger auth login`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -95,7 +94,7 @@ Examples:
 					graphql: &GraphQLClient{
 						URL: cfg.GatewayURL + "/query",
 					},
-					out: cmd.ErrOrStderr(),
+					out: cmd.OutOrStdout(),
 				}
 
 				creds, err = l.loginWithOAuth(cmd.Context())
@@ -122,7 +121,7 @@ Examples:
 			apiKey := fmt.Sprintf("%s:%s", creds.publicKey, creds.secretKey)
 
 			// Validate the API key by making a test API call
-			fmt.Fprintln(cmd.ErrOrStderr(), "Validating API key...")
+			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
 			if err := validateAPIKeyForLogin(cmd.Context(), cfg, apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
@@ -131,10 +130,10 @@ Examples:
 			if err := config.StoreCredentials(apiKey, creds.projectID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "Successfully logged in (project: %s)\n", creds.projectID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", creds.projectID)
 
 			// Show helpful next steps
-			fmt.Fprint(cmd.ErrOrStderr(), nextStepsMessage)
+			fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
 
 			return nil
 		},
@@ -153,7 +152,6 @@ func buildLogoutCmd() *cobra.Command {
 		Use:   "logout",
 		Short: "Remove stored credentials",
 		Long:  `Remove stored API key and clear authentication credentials.`,
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -161,7 +159,7 @@ func buildLogoutCmd() *cobra.Command {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
-			fmt.Fprintln(cmd.ErrOrStderr(), "Successfully logged out and removed stored credentials")
+			fmt.Fprintln(cmd.OutOrStdout(), "Successfully logged out and removed stored credentials")
 			return nil
 		},
 	}
@@ -172,19 +170,17 @@ func buildStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show current authentication status and project ID",
 		Long:  "Displays whether you are logged in and shows your currently configured project ID.",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Get API key and project ID for authentication
 			_, projectID, err := config.GetCredentials()
 			if err != nil {
 				return err
 			}
 
 			// TODO: Make API call to get token information
-			fmt.Fprintln(cmd.ErrOrStderr(), "Logged in (API key stored)")
-			fmt.Fprintf(cmd.ErrOrStderr(), "Project ID: %s\n", projectID)
+			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
+			fmt.Fprintf(cmd.OutOrStdout(), "Project ID: %s\n", projectID)
 
 			return nil
 		},

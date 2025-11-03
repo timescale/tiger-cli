@@ -72,10 +72,8 @@ Examples:
 
   # Get service details in YAML format
   tiger service get svc-12345 --output yaml`,
-		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -88,10 +86,18 @@ Examples:
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
-			if err != nil {
-				return err
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
 			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+			}
+
+			cmd.SilenceUsage = true
 
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
@@ -144,10 +150,7 @@ func buildServiceListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all services",
 		Long:  `List all database services in the current project.`,
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
@@ -158,6 +161,8 @@ func buildServiceListCmd() *cobra.Command {
 			if cmd.Flags().Changed("output") {
 				cfg.Output = output
 			}
+
+			cmd.SilenceUsage = true
 
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
@@ -188,7 +193,6 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			services := *resp.JSON200
-
 			if len(services) == 0 {
 				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
@@ -277,8 +281,18 @@ Allowed CPU/Memory Configurations:
   4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
+			}
+
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
 				createServiceName = util.GenerateServiceName()
@@ -311,17 +325,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			cmd.SilenceUsage = true
-
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
-			}
 
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
@@ -468,7 +471,6 @@ Examples:
 
   # Update password without saving (using global flag)
   tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
-		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
@@ -478,9 +480,15 @@ Examples:
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
-			if err != nil {
-				return err
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
 			}
 
 			// Get password from flag or environment variable via viper
@@ -895,7 +903,6 @@ Examples:
 
   # Delete service with custom wait timeout
   tiger service delete svc-12345 --wait-timeout 15m`,
-		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require explicit service ID for safety
@@ -1135,9 +1142,15 @@ Examples:
 			}
 
 			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
-			if err != nil {
-				return err
+			var serviceID string
+			if len(args) > 0 {
+				serviceID = args[0]
+			} else {
+				serviceID = cfg.ServiceID
+			}
+
+			if serviceID == "" {
+				return fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
 			}
 
 			cmd.SilenceUsage = true
@@ -1284,22 +1297,6 @@ Examples:
 
 	return cmd
 }
-
-func getServiceID(cfg *config.Config, args []string) (string, error) {
-	var serviceID string
-	if len(args) > 0 {
-		serviceID = args[0]
-	} else {
-		serviceID = cfg.ServiceID
-	}
-
-	if serviceID == "" {
-		return "", fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-	}
-
-	return serviceID, nil
-}
-
 func serviceIDCompletion(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	services, err := listServices(cmd)
 	if err != nil {
