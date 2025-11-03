@@ -146,7 +146,7 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 			a := analytics.TryInit(cfg)
 			defer func() {
 				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
-					analytics.Property("elapsed", time.Since(start)),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags(), "password", "new-password", "public-key", "secret-key", "project-id"),
 					analytics.Error(err),
 				)

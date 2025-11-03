@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
@@ -102,6 +103,8 @@ func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
 // analyticsMiddleware tracks analytics for all MCP requests
 func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (result mcp.Result, runErr error) {
+		start := time.Now()
+
 		// Load config for analytics
 		cfg, err := config.Load()
 		if err != nil {
@@ -124,6 +127,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			defer func() {
 				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
 					analytics.Map(args, "password", "query", "parameters"),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(runErr),
 				)
 			}()
@@ -131,12 +135,14 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			defer func() {
 				a.Track("Read proxied resource",
 					analytics.Property("resource_uri", r.Params.URI),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(runErr),
 				)
 			}()
 		case *mcp.GetPromptRequest:
 			defer func() {
 				a.Track(fmt.Sprintf("Get %s prompt", r.Params.Name),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(runErr),
 				)
 			}()
