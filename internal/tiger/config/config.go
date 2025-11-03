@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -83,6 +85,10 @@ var defaultValues = map[string]any{
 	"service_id":              "",
 	"version_check_interval":  DefaultVersionCheckInterval,
 	"version_check_last_time": time.Time{},
+}
+
+func ValidConfigOptions() iter.Seq[string] {
+	return maps.Keys(defaultValues)
 }
 
 func ApplyDefaults(v *viper.Viper) {

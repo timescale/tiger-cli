@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -92,7 +93,7 @@ func buildConfigSetCmd() *cobra.Command {
 		Short:             "Set configuration value",
 		Long:              `Set a configuration value and save it to ~/.config/tiger/config.yaml`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: cobra.NoFileCompletions,
+		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 
@@ -120,7 +121,7 @@ func buildConfigUnsetCmd() *cobra.Command {
 		Short:             "Remove configuration value",
 		Long:              `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: cobra.NoFileCompletions,
+		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
@@ -232,4 +233,19 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 		table.Append("version_check_last_time", cfg.VersionCheckLastTime.Format(time.RFC1123))
 	}
 	return table.Render()
+}
+
+func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Config option is always first position argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	var results []string
+	for opt := range config.ValidConfigOptions() {
+		if strings.HasPrefix(opt, toComplete) {
+			results = append(results, opt)
+		}
+	}
+	return results, cobra.ShellCompDirectiveNoFileComp
 }
