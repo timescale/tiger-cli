@@ -135,7 +135,7 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 	// Wrap this command's RunE if it exists
 	if cmd.RunE != nil {
 		originalRunE := cmd.RunE
-		cmd.RunE = func(c *cobra.Command, args []string) (err error) {
+		cmd.RunE = func(c *cobra.Command, args []string) (runErr error) {
 			start := time.Now()
 
 			defer func() {
@@ -155,7 +155,7 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags()),
-					analytics.Error(err),
+					analytics.Error(runErr),
 				)
 			}()
 
