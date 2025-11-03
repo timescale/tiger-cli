@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -125,10 +126,17 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			}
 
 			defer func() {
+				toolErr := runErr
+				if callToolResult, ok := result.(*mcp.CallToolResult); ok && callToolResult != nil && callToolResult.IsError && len(callToolResult.Content) > 0 {
+					if textContent, ok := callToolResult.Content[0].(*mcp.TextContent); ok && textContent != nil {
+						toolErr = errors.New(textContent.Text)
+					}
+				}
+
 				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
 					analytics.Map(args, "password", "query", "parameters"),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
-					analytics.Error(runErr),
+					analytics.Error(toolErr),
 				)
 			}()
 		case *mcp.ReadResourceRequest:
