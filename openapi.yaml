@@ -21,8 +21,67 @@ tags:
     description: Manage VPCs and their peering connections.
   - name: Services
     description: Manage services, read replicas, and their associated actions.
+  - name: Analytics
+    description: Track analytics events.
 
 paths:
+  /analytics/identify:
+    post:
+      tags:
+        - Analytics
+      summary: Identify a user
+      description: Identifies a user with optional properties for analytics tracking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the user
+                  example:
+                    email: "user@example.com"
+                    name: "John Doe"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /analytics/track:
+    post:
+      tags:
+        - Analytics
+      summary: Track an analytics event
+      description: Tracks an analytics event with optional properties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: string
+                  description: The name of the event to track
+                  example: service_created
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the event
+                  example:
+                    region: "us-east-1"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/vpcs:
     get:
       tags:
@@ -1071,6 +1130,17 @@ components:
           type: string
 
   responses:
+    AnalyticsResponse:
+      description: Analytics action completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: Status of the analytics operation
+                example: "success"
     SuccessMessage:
       description: The action was completed successfully.
       content:

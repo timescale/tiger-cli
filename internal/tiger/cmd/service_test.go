@@ -21,6 +21,9 @@ import (
 func setupServiceTest(t *testing.T) string {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-service-test-*")
 	if err != nil {
@@ -29,6 +32,9 @@ func setupServiceTest(t *testing.T) string {
 
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
+	// Disable analytics for service tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
@@ -40,8 +46,9 @@ func setupServiceTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -1203,7 +1210,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
+	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url": "http://localhost:9999", // Non-existent server to force timeout
 	})
 	if err != nil {
@@ -1218,7 +1225,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	defer func() { getCredentialsForService = originalGetCredentials }()
 
 	// Create API client
-	client, err := api.NewTigerClient("test-api-key")
+	client, err := api.NewTigerClient(cfg, "test-api-key")
 	if err != nil {
 		t.Fatalf("Failed to create API client: %v", err)
 	}

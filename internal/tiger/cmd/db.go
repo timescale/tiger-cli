@@ -775,7 +775,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	// Create API client
-	client, err := api.NewTigerClient(apiKey)
+	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
 		return api.Service{}, fmt.Errorf("failed to create API client: %w", err)
 	}

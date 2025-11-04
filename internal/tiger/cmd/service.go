@@ -101,7 +101,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -168,7 +168,7 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -332,7 +332,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -500,7 +500,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -908,6 +908,12 @@ Examples:
 
 			cmd.SilenceUsage = true
 
+			// Load config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
@@ -934,7 +940,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -1145,7 +1151,7 @@ Examples:
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -1302,6 +1308,12 @@ func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) (
 }
 
 func listServices(cmd *cobra.Command) ([]api.Service, error) {
+	// Load config
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Get API key and project ID for authentication
 	apiKey, projectID, err := getCredentialsForService()
 	if err != nil {
@@ -1309,7 +1321,7 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	}
 
 	// Create API client
-	client, err := api.NewTigerClient(apiKey)
+	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client: %w", err)
 	}
