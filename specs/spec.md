@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `tiger` CLI is a command-line interface for managing TigerData Cloud Platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
+The `tiger` CLI is a command-line interface for managing Tiger Cloud platform resources. Built as a single Go binary, it provides comprehensive tools for managing database services, VPCs, replicas, and related infrastructure components.
 
 ## Installation
 
@@ -23,40 +23,54 @@ mv tiger /usr/local/bin/
 
 ### Environment Variables
 
-- `TIGER_PUBLIC_KEY`: TigerData public key for authentication
-- `TIGER_SECRET_KEY`: TigerData secret key for authentication
-- `TIGER_PROJECT_ID`: Default project ID to use
-- `TIGER_API_URL`: Base URL for TigerData API (default: https://api.tigerdata.com/public/v1)
-- `TIGER_SERVICE_ID`: Default service ID to use
-- `TIGER_CONFIG_DIR`: Configuration directory (default: ~/.config/tiger)
-- `TIGER_OUTPUT`: Default output format (json, yaml, table)
-- `TIGER_ANALYTICS`: Enable/disable usage analytics (true/false)
+Environment variables override configuration file values. All variables use the `TIGER_` prefix:
+
+- `TIGER_ANALYTICS` - Enable/disable analytics
+- `TIGER_COLOR` - Enable/disable colored output
+- `TIGER_CONFIG_DIR` - Path to configuration directory (default: ~/.config/tiger)
+- `TIGER_DEBUG` - Enable/disable debug logging
+- `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
+- `TIGER_OUTPUT` - Output format: json, yaml, or table
+- `TIGER_PASSWORD_STORAGE` - Password storage method: keyring, pgpass, or none
+- `TIGER_SERVICE_ID` - Default service ID
+- `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
 
 ### Configuration File
 
 Location: `~/.config/tiger/config.yaml`
 
+All configuration options can be set via `tiger config set <key> <value>`:
+
+- `analytics` - Enable/disable analytics (default: true)
+- `color` - Enable/disable colored output (default: true)
+- `debug` - Enable/disable debug logging (default: false)
+- `docs_mcp` - Enable/disable docs MCP proxy (default: true)
+- `output` - Output format: json, yaml, or table (default: table)
+- `password_storage` - Password storage method: keyring, pgpass, or none (default: keyring)
+- `service_id` - Default service ID
+- `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: 24h)
+
+#### Example
+
 ```yaml
 api_url: https://api.tigerdata.com/public/v1
-project_id: your-default-project-id
 service_id: your-default-service-id
 output: table
 analytics: true
 ```
 
-### Global Options
+### Global Flags
 
-- `-o, --output`: Set output format (json, yaml, table)
-- `--config-dir`: Path to configuration directory
-- `--public-key`: Specify TigerData public key for authentication
-- `--secret-key`: Specify TigerData secret key for authentication
-- `--project-id`: Specify project ID
-- `--service-id`: Override default service ID (can also be specified positionally for single-service commands)
-- `--analytics`: Toggle analytics collection
-- `--password-storage`: Password storage method (keyring, pgpass, none) (default: keyring)
-- `-v, --version`: Show CLI version
-- `-h, --help`: Show help information
-- `--debug`: Enable debug logging
+These flags are available on all commands and take precedence over both environment variables and configuration file values:
+
+- `--analytics` - Enable/disable analytics
+- `--color` - Enable/disable colored output
+- `--config-dir <path>` - Path to configuration directory (default: ~/.config/tiger)
+- `--debug` - Enable/disable debug logging
+- `--password-storage <method>` - Password storage method: keyring, pgpass, or none
+- `--service-id <id>` - Specify service ID
+- `--skip-update-check` - Skip checking for updates on startup (default: false)
+- `-h, --help` - Show help information
 
 ## Command Structure
 
@@ -71,11 +85,11 @@ For the initial v0 release, implement these essential commands first:
 **Authentication:**
 - `tiger auth login` - Token-based authentication
 - `tiger auth logout` - Remove stored credentials
-- `tiger auth whoami` - Show current user
+- `tiger auth status` - Show current user
 
 **Core Service Management:**
 - `tiger service list` - List all services
-- `tiger service describe` - Show service details
+- `tiger service get` - Show service details (aliases: `describe`, `show`)
 - `tiger service create` - Create new services
 - `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
@@ -108,7 +122,7 @@ Manage authentication and credentials (token-based only).
 **Subcommands:**
 - `login`: Authenticate with API token
 - `logout`: Remove stored credentials
-- `whoami`: Show current user information
+- `status`: Show current authentication status and project ID
 
 **Examples:**
 ```bash
@@ -120,45 +134,44 @@ tiger auth login --project-id proj-123
 
 # Login with credentials from environment variables
 export TIGER_PUBLIC_KEY="your-public-key"
-export TIGER_SECRET_KEY="your-secret-key"  
+export TIGER_SECRET_KEY="your-secret-key"
 export TIGER_PROJECT_ID="proj-123"
 tiger auth login
 
 # Interactive login (will prompt for any missing credentials)
 tiger auth login
 
-# Show current user
-tiger auth whoami
+# Show current authentication status and project ID
+tiger auth status
 
 # Logout
 tiger auth logout
 ```
 
 **Authentication Methods:**
-1. `--public-key` and `--secret-key` flags: Provide public and secret keys directly
-2. `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` environment variables
-3. `TIGER_PROJECT_ID` environment variable for project ID
-4. Interactive prompt for any missing credentials (requires TTY)
+1. `--public-key`, `--secret-key`, and `--project-id` flags: Provide public key, secret key, and project ID directly
+2. `TIGER_PUBLIC_KEY`, `TIGER_SECRET_KEY`, and `TIGER_PROJECT_ID` environment variables
+3. Interactive prompt for any missing credentials (requires TTY)
 
 **Login Process:**
 When using `tiger auth login`, the CLI will:
 1. Prompt for any missing credentials (public key, secret key, project ID) if not provided via flags or environment variables
-2. Combine the public and secret keys into format `<public key>:<secret key>` for internal storage
+2. Combine the public and secret keys into format `<public key>:<secret key>`
 3. Validate the combined API key by making a test API call
-4. Store the combined API key securely using system keyring or file fallback
-5. Store the project ID in `~/.config/tiger/config.yaml` as the default project
+4. Store credentials (API key + project ID) securely as JSON in system keyring or file fallback
 
 **Project ID Requirement:**
 Project ID is required during login. The CLI will:
 - Use `--project-id` flag if provided
-- Use `TIGER_PROJECT_ID` environment variable if flag not provided  
-- Prompt interactively for project ID if neither flag nor environment variable is set
-- Fail with an error in non-interactive environments (no TTY) if project ID is missing
+- Prompt interactively for project ID if flag not provided
+- Fail with an error in non-interactive environments (no TTY) if project ID is not provided via flag
 
-**API Key Storage:**
-The combined API key (`<public key>:<secret key>`) is stored securely using:
-1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)  
-2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/api-key` with restricted file permissions (600)
+**Credentials Storage:**
+Credentials are stored as a JSON object containing both the API key (`<public key>:<secret key>`) and project ID:
+1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/credentials` with restricted file permissions (600)
+
+Use `tiger auth status` to view your current authentication status and project ID.
 
 **Options:**
 - `--public-key`: Public key for authentication
@@ -174,7 +187,7 @@ Manage database services.
 
 **Subcommands:**
 - `list`: List all services
-- `describe`: Show service details
+- `get`: Show service details (aliases: `describe`, `show`)
 - `create`: Create a new service
 - `delete`: Delete a service
 - `start`: Start a service
@@ -209,46 +222,40 @@ tiger service list
 tiger services list
 tiger svc list
 
-# Show service details
-tiger service describe svc-12345
-tiger svc describe svc-12345
+# Show service details (all forms work)
+tiger service get svc-12345
+tiger service describe svc-12345  # alias
+tiger service show svc-12345      # alias
+tiger svc get svc-12345
+
+# Create a free tier service
+tiger service create \
+  --name "free-db" \
+  --cpu shared \
+  --memory shared
 
 # Create a TimescaleDB service
 tiger service create \
   --name "production-db" \
-  --type timescaledb \
-  --region us-east-1 \
-  --cpu 2000m \
-  --memory 8GB \
-  --replicas 2
+  --addons time-series \
+  --cpu 500m \
+  --memory 2GB
 
 # Create a PostgreSQL service (waits for ready by default)
 tiger service create \
   --name "postgres-db" \
-  --type postgres \
-  --region us-east-1 \
-  --cpu 1 \
-  --memory 4GB \
-  --replicas 1
+  --addons none \
+  --cpu 500m \
+  --memory 2GB
 
 # Create service without waiting
 tiger service create \
   --name "quick-service" \
-  --type timescaledb \
-  --region us-east-1 \
-  --cpu 1000m \
-  --memory 2GB \
-  --replicas 1 \
   --no-wait
 
 # Create service with custom timeout
 tiger service create \
   --name "patient-service" \
-  --type postgres \
-  --region us-east-1 \
-  --cpu 2000m \
-  --memory 8GB \
-  --replicas 2 \
   --wait-timeout 60m
 
 # Delete service (with confirmation prompt - will prompt to type service ID)
@@ -298,12 +305,12 @@ tiger service set-default svc-12345
 ```
 
 **Options:**
-- `--name`: Service name (required)
-- `--type`: Service type (timescaledb, postgres, vector) - default: timescaledb
-- `--region`: Region code (required)
-- `--cpu`: CPU allocation - must be from allowed configurations (see below)
-- `--memory`: Memory allocation - must be from allowed configurations (see below)
-- `--replicas`: Number of high-availability replicas (default: 1)
+- `--name`: Service name (auto-generated if not provided)
+- `--addons`: Addons to enable (time-series, ai, or 'none' for PostgreSQL-only)
+- `--region`: Region code
+- `--cpu`: CPU allocation - must be from allowed configurations (see below), or 'shared' for free tier
+- `--memory`: Memory allocation - must be from allowed configurations (see below), or 'shared' for free tier
+- `--replicas`: Number of high-availability replicas (default: 0)
 - `--vpc-id`: VPC ID for attach/detach operations
 - `--set-default`: Set this service as the default service (default: true)
 - `--no-set-default`: Don't set this service as the default service
@@ -324,6 +331,7 @@ Service creation and resizing support the following CPU and memory combinations.
 
 | CPU | Memory |
 |-----|---------|
+| shared | shared |
 | 0.5 | 2GB |
 | 1 | 4GB |
 | 2 | 8GB |
@@ -332,25 +340,33 @@ Service creation and resizing support the following CPU and memory combinations.
 | 16 | 64GB |
 | 32 | 128GB |
 
-CPU can be specified as cores (e.g., "0.5", "1", "2") or millicores (e.g., "500m", "1000m", "2000m").
-Memory must include units (e.g., "2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "128GB").
+CPU must be specified as millicores (e.g., "500", "1000", "2000"), or "shared" for free tier services.
+Memory must be specified as GBs (e.g., "2", "4", "8", "16", "32", "64", "128") or "shared" for free tier services.
 
 **Examples:**
 ```bash
-# Specify both CPU and memory
-tiger service create --name "my-service" --cpu 2 --memory 8GB
+# Create free tier service
+tiger service create --name "free-db" --cpu shared --memory shared
 
-# Specify only CPU (memory will be automatically set to 8GB)
+# Specify both CPU and memory
+tiger service create --name "my-service" --cpu 2 --memory 8
+
+# Specify only CPU (memory will be automatically set to 8)
 tiger service create --name "my-service" --cpu 2
 
 # Specify only memory (CPU will be automatically set to 2)
-tiger service create --name "my-service" --memory 8GB
+tiger service create --name "my-service" --memory 8
+
+# Creates a production service with 4 CPU and 16GB memory
+tiger service create --name "prod-db" --cpu 4 --memory 16 --environment PROD
+
+```bash
 
 # Resize with only CPU
 tiger service resize svc-12345 --cpu 4
 
 # Resize with only memory
-tiger service resize svc-12345 --memory 16GB
+tiger service resize svc-12345 --memory 16
 ```
 
 **Note:** A future command like `tiger service list-types` or `tiger service list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.
@@ -365,6 +381,8 @@ Database-specific operations and management.
 - `psql`: Connect to a database (alias for connect)
 - `connection-string`: Get connection string for a service
 - `test-connection`: Test database connectivity
+- `create`: Create database resources (roles, databases, extensions)
+  - `role`: Create a new database role with optional read-only enforcement
 - `save-password`: Save password according to --password-storage setting
 - `remove-password`: Remove password from configured storage location
 
@@ -401,18 +419,110 @@ tiger db test-connection svc-12345
 # Test with custom timeout
 tiger db test-connection svc-12345 --timeout 10s
 
-# Save password (storage location depends on --password-storage flag)
-tiger db save-password svc-12345 --password your-password
-tiger db save-password svc-12345 --password your-password --role readonly
+# Save password with explicit value (highest precedence)
+tiger db save-password svc-12345 --password=your-password
+tiger db save-password svc-12345 --password=your-password --role readonly
+
+# Using environment variable
+export TIGER_NEW_PASSWORD=your-password
+tiger db save-password svc-12345
+
+# Interactive password prompt (when neither flag nor env var provided)
+tiger db save-password svc-12345
 
 # Save to specific storage location
-tiger db save-password svc-12345 --password your-password --password-storage pgpass
-tiger db save-password svc-12345 --password your-password --password-storage keyring
+tiger db save-password svc-12345 --password=your-password --password-storage pgpass
+tiger db save-password svc-12345 --password=your-password --password-storage keyring
 
 # Remove password from configured storage
 tiger db remove-password svc-12345
 tiger db remove-password svc-12345 --role readonly
+
+# Create a role with global database access (uses default service, auto-generates password)
+tiger db create role --name ai_analyst --from tsdbadmin
+
+# Create a role for specific service (positional service ID)
+tiger db create role svc-12345 --name ai_analyst
+
+# Create a read-only role (role-based, permanent enforcement)
+tiger db create role --name ai_analyst --read-only
+
+# Create a read-only role with same grants as another role
+tiger db create role --name ai_analyst --read-only --from app_role
+
+# Create a read-only role inheriting from multiple roles
+tiger db create role --name ai_analyst --read-only --from app_role,readonly_role
+
+# Create a read-only role with statement timeout for safety
+tiger db create role --name ai_analyst --read-only --from app_role --statement-timeout 30s
+
+# Create a role with specific password
+tiger db create role --name ai_analyst --read-only --password=my-secure-password
+
+# Create a role with password from environment variable
+export TIGER_NEW_PASSWORD=my-secure-password
+tiger db create role --name ai_analyst --read-only
 ```
+
+**Design Note - Why `--name` is Required:**
+The `create role` command requires an explicit `--name` flag rather than accepting the role name as a positional argument. This prevents a common mistake: if the command accepted the role name positionally like `tiger db create role [service-id] <role-name>`, a user might forget the role name and run `tiger db create role svc-12345`, which would accidentally create a role named "svc-12345" in the default service. By requiring `--name`, the command fails clearly if the role name is omitted, preventing accidental role creation with incorrect names.
+
+**Password Behavior:**
+By default, if neither `--password` flag nor `TIGER_NEW_PASSWORD` environment variable is provided, a secure random password will be automatically generated. The password is saved according to the `--password-storage` setting (keyring, pgpass, or none).
+
+**Options for `create role`:**
+- `--name`: Role name to create (required)
+- `--read-only`: Enable permanent read-only enforcement via `tsdb_admin.read_only_role` setting
+- `--from`: Comma-separated list of roles to inherit grants from (e.g., `app_role,readonly_role`)
+- `--statement-timeout`: Set statement timeout for the role (accepts any duration format: "30s", "5m", etc.)
+- `--password`: Password for the role. If not provided, checks `TIGER_NEW_PASSWORD` environment variable, otherwise auto-generates a secure random password.
+
+**Read-Only Mode for AI Agents:**
+The `--read-only` flag enables permanent read-only enforcement at the PostgreSQL level using the `tsdb_admin.read_only_role` extension setting. This is designed to provide safe database access for AI agents and automated tools that need to read production data without risk of modification.
+
+**How Read-Only Enforcement Works:**
+- **Role-based (permanent)**: When `--read-only` is set, the role is configured with `ALTER ROLE <role_name> SET tsdb_admin.read_only_role = true`. This locks `transaction_read_only` to always be on for that role, preventing any write operations regardless of other grants or privileges.
+- **Cannot be disabled**: Once set, the read-only state cannot be changed by the role itself, even with `SET transaction_read_only = false`. Only a superuser can modify the role settings.
+- **Survives reconnection**: The read-only enforcement persists across all connections, connection poolers, and database forks.
+
+**Use Cases:**
+- **AI data analysis**: Give AI agents like Claude Code safe access to production data for analysis without risk of accidental modifications
+- **Schema discovery**: Allow AI coding assistants to explore database structure to write better migrations, without write access
+- **Automated reporting**: Run analytics queries against current production data without forking
+- **Development tools**: Provide read-only access to tools that need to inspect but not modify data
+
+**Default Permissions (No `--from` Flag):**
+When `--from` is not specified, the role is created with only LOGIN and PASSWORD privileges. The role will have no table or schema permissions by default - it can connect to the database but cannot access any tables, schemas, or other database objects. You would need to manually grant permissions using PostgreSQL GRANT commands, or use the `--from` flag to inherit permissions from existing roles.
+
+**Combining with `--from` for Safe Table Access:**
+The `--from` flag allows you to create a read-only role that inherits the same table access as your application role:
+
+```bash
+tiger db create role --name ai_analyst --read-only --from app_role
+```
+
+This creates a role that can see all the same tables as `app_role`, but cannot modify any data. The AI agent gets full visibility into your schema while being guaranteed read-only.
+
+**Performance Safety with `--statement-timeout`:**
+Read-only mode prevents data modification but doesn't prevent expensive queries. Combine with `--statement-timeout` to kill queries that run too long:
+
+```bash
+tiger db create role --name ai_analyst --read-only --from app_role --statement-timeout 30s
+```
+
+This provides both data safety (read-only) and performance safety (query timeouts).
+
+**Technical Details for `create role`:**
+This command executes PostgreSQL statements in a transaction to create and configure the role.
+
+CREATE ROLE Options Used:
+- `LOGIN`: Always enabled to allow the role to connect
+- `PASSWORD`: Always set (from flag, env var, or auto-generated)
+- `IN ROLE`: Added when `--from` flag is provided to inherit grants from existing roles
+
+GUCs (PostgreSQL Configuration Parameters) That May Be Set:
+- `tsdb_admin.read_only_role`: Set to 'true' when `--read-only` flag is used (enforces permanent read-only mode for the role)
+- `statement_timeout`: Set when `--statement-timeout` flag is provided (kills queries that exceed the specified duration, in milliseconds)
 
 **Return Codes for test-connection:**
 The `test-connection` command follows `pg_isready` conventions:
@@ -427,13 +537,19 @@ The `connect` and `psql` commands automatically handle authentication using:
 2. `PGPASSWORD` environment variable
 3. Interactive password prompt (if neither above is available)
 
+**Password Input for save-password:**
+The `save-password` command accepts passwords through three methods (in order of precedence):
+1. `--password` flag with explicit value (highest precedence)
+2. `TIGER_NEW_PASSWORD` environment variable
+3. Interactive prompt (if neither provided and stdin is a TTY)
+
 **Advanced psql Usage:**
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
-- `--password`: Password to save (for save-password command)
+- `--password`: Password to save (for save-password command). Provide value with `--password=value`. If flag is not provided, uses TIGER_NEW_PASSWORD environment variable if set, otherwise prompts interactively.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
 ### High-Availability Management
@@ -442,13 +558,13 @@ The `connect` and `psql` commands support passing additional flags directly to t
 Manage high-availability replicas for fault tolerance.
 
 **Subcommands:**
-- `describe`: Show current HA configuration
+- `get`: Show current HA configuration (aliases: `describe`, `show`)
 - `set`: Set HA configuration level
 
 **Examples:**
 ```bash
 # Show current HA configuration
-tiger ha describe svc-12345
+tiger ha get svc-12345
 
 # Set HA level
 tiger ha set svc-12345 --level none
@@ -473,7 +589,7 @@ Manage read replica sets for scaling read workloads.
 
 **Subcommands:**
 - `list`: List all read replica sets
-- `describe`: Show replica set details
+- `get`: Show replica set details (aliases: `describe`, `show`)
 - `create`: Create a read replica set
 - `delete`: Delete a replica set
 - `resize`: Resize replica set resources
@@ -528,7 +644,7 @@ Manage Virtual Private Clouds.
 
 **Subcommands:**
 - `list`: List all VPCs
-- `describe`: Show VPC details
+- `get`: Show VPC details (aliases: `describe`, `show`)
 - `create`: Create a new VPC
 - `delete`: Delete a VPC
 - `rename`: Rename a VPC
@@ -549,7 +665,7 @@ tiger vpc create \
   --region us-east-1
 
 # Show VPC details
-tiger vpc describe vpc-12345
+tiger vpc get vpc-12345
 
 # Attach/detach services
 tiger vpc attach-service vpc-12345 --service-id svc-67890
@@ -575,7 +691,7 @@ Manage VPC peering connections for a specific VPC.
 
 **Subcommands:**
 - `list`: List all peering connections for a VPC
-- `describe`: Show details of a specific peering connection
+- `get`: Show details of a specific peering connection (aliases: `describe`, `show`)
 - `create`: Create a new peering connection
 - `delete`: Delete a peering connection
 
@@ -585,7 +701,7 @@ Manage VPC peering connections for a specific VPC.
 tiger vpc peering list vpc-12345
 
 # Show details of a specific peering connection
-tiger vpc peering describe vpc-12345 peer-67890
+tiger vpc peering get vpc-12345 peer-67890
 
 # Create a new peering connection
 tiger vpc peering create vpc-12345 \
@@ -630,9 +746,6 @@ Manage CLI configuration.
 # Show config
 tiger config show
 
-# Set default project
-tiger config set project_id proj-12345
-
 # Set default service
 tiger config set service_id svc-12345
 
@@ -655,6 +768,7 @@ tiger config reset
 - `4`: Authentication error
 - `5`: Permission denied
 - `6`: Service not found
+- `7`: Update available (for explicit `version --check`)
 
 ## Output Formats
 
@@ -687,7 +801,7 @@ svc-12345  production-db  running   production
 Errors are returned with descriptive messages and appropriate exit codes:
 
 ```bash
-$ tiger service describe invalid-id
+$ tiger service get invalid-id
 Error: Service 'invalid-id' not found in project 'proj-12345'
 Use 'tiger service list' to see available services.
 ```
@@ -780,6 +894,7 @@ tiger service create \
   --cpu 2 \
   --memory 8GB \
   --replicas 2
+  --environment PROD
 ```
 
 ### Database Operations
@@ -797,7 +912,7 @@ tiger db connection-string svc-12345
 ### Monitoring and Maintenance
 ```bash
 # Check service status
-tiger service describe svc-12345
+tiger service get svc-12345
 
 # Update service password
 tiger service update-password svc-12345 --password new-secure-password
@@ -813,7 +928,7 @@ Commands follow consistent patterns for specifying service IDs:
 **Single-service commands** (verbs acting on one service):
 - Use positional `<service-id>` as the canonical parameter
 - Support `--service-id` flag as an alias/override
-- Examples: `tiger service describe <service-id>`, `tiger db connect <service-id>`
+- Examples: `tiger service get <service-id>`, `tiger db connect <service-id>`
 
 **Global context commands** (acting on other resources with service as secondary):
 - Use `--service-id` flag as the canonical parameter  

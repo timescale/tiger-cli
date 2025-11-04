@@ -7,11 +7,11 @@ This document contains specifications for features that should be considered for
 **Note: Current API keys are scoped to a single project. Multi-project support will be added once API keys support multiple projects.**
 
 #### `tiger projects`
-Manage TigerData projects.
+Manage Tiger Cloud projects.
 
 **Subcommands:**
 - `list`: List all projects
-- `show`: Show project details
+- `get`: Get project details (aliases: `show`, `describe`)
 - `set-default`: Set default project
 
 **Examples:**
@@ -19,8 +19,8 @@ Manage TigerData projects.
 # List projects
 tiger projects list
 
-# Show project details
-tiger projects show proj-12345
+# Get project details
+tiger projects get proj-12345
 
 # Set default project
 tiger projects set-default proj-12345
@@ -34,7 +34,7 @@ tiger projects set-default proj-12345
 ### Project Creation and Deletion
 
 #### `tiger projects create`
-Create a new TigerData project.
+Create a new Tiger Cloud project.
 
 **Arguments:**
 - `--name`: Project name (required)
@@ -52,7 +52,7 @@ tiger projects create --name "My Project" --description "Production database"
 ---
 
 #### `tiger projects delete`
-Delete a TigerData project.
+Delete a Tiger Cloud project.
 
 **Arguments:**
 - `project-id`: Project ID to delete (required)
@@ -246,7 +246,7 @@ View and manage long-running operations.
 
 **Subcommands:**
 - `list`: List operations
-- `show`: Show operation details
+- `get`: Get operation details (aliases: `show`, `describe`)
 - `cancel`: Cancel operation
 - `logs`: View operation logs
 
@@ -255,8 +255,8 @@ View and manage long-running operations.
 # List operations
 tiger operations list
 
-# Show operation details
-tiger operations show op-12345
+# Get operation details
+tiger operations get op-12345
 
 # View logs
 tiger operations logs op-12345 --follow

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -14,10 +15,15 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/password"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func setupDBTest(t *testing.T) string {
 	t.Helper()
+
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-db-test-*")
@@ -28,16 +34,18 @@ func setupDBTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for DB tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -45,42 +53,42 @@ func setupDBTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeDBCommand(args ...string) (string, error) {
+func executeDBCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
 func TestDBConnectionString_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with no default service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command without service ID
-	_, err = executeDBCommand("db", "connection-string")
+	_, err = executeDBCommand(t.Context(), "db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -93,27 +101,24 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 func TestDBConnectionString_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connection-string command
-	_, err = executeDBCommand("db", "connection-string")
+	_, err = executeDBCommand(t.Context(), "db", "connection-string")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -125,24 +130,22 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 
 func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// This test demonstrates that the warning functionality works
-	// by directly testing the buildConnectionString function
+	// by directly testing the password.GetConnectionDetails function
 
 	// Service without connection pooler
 	service := api.Service{
 		Endpoint: &api.Endpoint{
-			Host: stringPtr("test-host.tigerdata.com"),
-			Port: intPtr(5432),
+			Host: util.Ptr("test-host.tigerdata.com"),
+			Port: util.Ptr(5432),
 		},
 		ConnectionPooler: nil, // No pooler available
 	}
 
-	// Create a test command to capture stderr
-	cmd := &cobra.Command{}
-	errBuf := new(bytes.Buffer)
-	cmd.SetErr(errBuf)
-
 	// Request pooled connection when pooler is not available
-	connectionString, err := buildConnectionString(service, true, "tsdbadmin", cmd)
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+		Pooled: true,
+		Role:   "tsdbadmin",
+	})
 
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -150,45 +153,35 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 
 	// Should return direct connection string
 	expectedString := "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require"
-	if connectionString != expectedString {
-		t.Errorf("Expected connection string %q, got %q", expectedString, connectionString)
+	if details.String() != expectedString {
+		t.Errorf("Expected connection string %q, got %q", expectedString, details.String())
 	}
 
-	// Should have warning message on stderr
-	stderrOutput := errBuf.String()
-	if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
-		t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
-	}
-
-	// Verify the warning mentions using direct connection
-	if !strings.Contains(stderrOutput, "using direct connection") {
-		t.Errorf("Expected warning to mention direct connection fallback, but got: %q", stderrOutput)
+	if details.IsPooler {
+		t.Errorf("Expected IsPooler to be false, got true")
 	}
 }
 
 func TestDBConnect_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with no default service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command without service ID
-	_, err = executeDBCommand("db", "connect")
+	_, err = executeDBCommand(t.Context(), "db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -201,27 +194,24 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 func TestDBConnect_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db connect command
-	_, err = executeDBCommand("db", "connect")
+	_, err = executeDBCommand(t.Context(), "db", "connect")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -235,27 +225,24 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set up config
-	cfg := &config.Config{
-		APIURL:    "http://localhost:9999",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Test that psql alias works the same as connect
-	_, err1 := executeDBCommand("db", "connect")
-	_, err2 := executeDBCommand("db", "psql")
+	_, err1 := executeDBCommand(t.Context(), "db", "connect")
+	_, err2 := executeDBCommand(t.Context(), "db", "psql")
 
 	// Both should behave identically (both will fail due to network/psql not found, but with same error pattern)
 	if err1 == nil || err2 == nil {
@@ -289,7 +276,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -319,7 +306,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, cmd)
+	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -334,6 +321,9 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 }
 
 func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Set keyring as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
 	viper.Set("password_storage", "keyring")
@@ -349,12 +339,12 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := GetPasswordStorage()
-	err := storage.Save(service, testPassword)
+	storage := password.GetPasswordStorage()
+	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
-	defer storage.Remove(service) // Clean up after test
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
@@ -364,7 +354,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -406,7 +396,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -419,85 +409,6 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 				t.Errorf("PGPASSWORD should not be set when using pgpass storage, but found: %s", envVar)
 			}
 		}
-	}
-}
-
-func TestBuildConnectionConfig_KeyringPassword(t *testing.T) {
-	// This test verifies that buildConnectionConfig properly sets password from keyring
-
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service
-	serviceID := "test-connection-config-service"
-	projectID := "test-connection-config-project"
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-	}
-
-	// Store a test password in keyring
-	testPassword := "test-connection-config-password-789"
-	storage := GetPasswordStorage()
-	err := storage.Save(service, testPassword)
-	if err != nil {
-		t.Fatalf("Failed to save test password: %v", err)
-	}
-	defer storage.Remove(service) // Clean up after test
-
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
-
-	// Call the actual production function that builds the config
-	config, err := buildConnectionConfig(connectionString, service)
-
-	if err != nil {
-		t.Fatalf("buildConnectionConfig failed: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("buildConnectionConfig returned nil config")
-	}
-
-	// Verify that the password was set in the config
-	if config.Password != testPassword {
-		t.Errorf("Expected password '%s' to be set in config, but got '%s'", testPassword, config.Password)
-	}
-}
-
-func TestBuildConnectionConfig_PgpassStorage_NoPasswordSet(t *testing.T) {
-	// This test verifies that buildConnectionConfig doesn't set password for pgpass storage
-
-	// Set pgpass as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "pgpass")
-	defer viper.Set("password_storage", originalStorage)
-
-	// Create a test service
-	serviceID := "test-connection-config-pgpass"
-	projectID := "test-connection-config-project"
-	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
-	}
-
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
-
-	// Call the actual production function that builds the config
-	config, err := buildConnectionConfig(connectionString, service)
-
-	if err != nil {
-		t.Fatalf("buildConnectionConfig failed: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("buildConnectionConfig returned nil config")
-	}
-
-	// Verify that no password was set in the config (pgx will check ~/.pgpass automatically)
-	if config.Password != "" {
-		t.Errorf("Expected no password to be set in config for pgpass storage, but got '%s'", config.Password)
 	}
 }
 
@@ -593,26 +504,23 @@ func equalStringSlices(a, b []string) bool {
 func TestDBTestConnection_NoServiceID(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID but no default service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with no default service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url": "https://api.tigerdata.com/public/v1",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "test-api-key", nil
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command without service ID
-	_, err = executeDBCommand("db", "test-connection")
+	_, err = executeDBCommand(t.Context(), "db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -625,27 +533,24 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 func TestDBTestConnection_NoAuth(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
-	// Set up config with project ID and service ID
-	cfg := &config.Config{
-		APIURL:    "https://api.tigerdata.com/public/v1",
-		ProjectID: "test-project-123",
-		ServiceID: "svc-12345",
-		ConfigDir: tmpDir,
-	}
-	err := cfg.Save()
+	// Set up config with service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"service_id": "svc-12345",
+	})
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
 	// Mock authentication failure
-	originalGetAPIKey := getAPIKeyForDB
-	getAPIKeyForDB = func() (string, error) {
-		return "", fmt.Errorf("not logged in")
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getAPIKeyForDB = originalGetAPIKey }()
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
 	// Execute db test-connection command
-	_, err = executeDBCommand("db", "test-connection")
+	_, err = executeDBCommand(t.Context(), "db", "test-connection")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -666,8 +571,8 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 
 	// Test with malformed connection string (should return ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
-	service := api.Service{} // Dummy service for test
-	err := testDatabaseConnection(invalidConnectionString, 1, service, cmd)
+	ctx := context.Background()
+	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
 
 	if err == nil {
 		t.Error("Expected error for invalid connection string")
@@ -695,9 +600,9 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 	// Use a connection string to a non-routable IP to test timeout
 	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
 
-	service := api.Service{} // Dummy service for test
+	ctx := context.Background()
 	start := time.Now()
-	err := testDatabaseConnection(timeoutConnectionString, 1, service, cmd) // 1 second timeout
+	err := testDatabaseConnection(ctx, timeoutConnectionString, 1*time.Second, cmd) // 1 second timeout
 	duration := time.Since(start)
 
 	if err == nil {
@@ -781,161 +686,6 @@ func TestIsConnectionRejected(t *testing.T) {
 	}
 }
 
-func TestBuildConnectionString(t *testing.T) {
-	testCases := []struct {
-		name           string
-		service        api.Service
-		pooled         bool
-		role           string
-		expectedString string
-		expectError    bool
-		expectWarning  bool
-	}{
-		{
-			name: "Basic connection string",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
-					Port: intPtr(5432),
-				},
-			},
-			pooled:         false,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Connection string with custom role",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
-					Port: intPtr(5432),
-				},
-			},
-			pooled:         false,
-			role:           "readonly",
-			expectedString: "postgresql://readonly@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Connection string with default port",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: stringPtr("test-host.tigerdata.com"),
-					Port: nil, // Should use default 5432
-				},
-			},
-			pooled:         false,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Pooled connection string",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: stringPtr("direct-host.tigerdata.com"),
-					Port: intPtr(5432),
-				},
-				ConnectionPooler: &api.ConnectionPooler{
-					Endpoint: &api.Endpoint{
-						Host: stringPtr("pooler-host.tigerdata.com"),
-						Port: intPtr(6432),
-					},
-				},
-			},
-			pooled:         true,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@pooler-host.tigerdata.com:6432/tsdb?sslmode=require",
-			expectError:    false,
-		},
-		{
-			name: "Pooled connection fallback to direct when pooler unavailable",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: stringPtr("direct-host.tigerdata.com"),
-					Port: intPtr(5432),
-				},
-				ConnectionPooler: nil, // No pooler available
-			},
-			pooled:         true,
-			role:           "tsdbadmin",
-			expectedString: "postgresql://tsdbadmin@direct-host.tigerdata.com:5432/tsdb?sslmode=require",
-			expectError:    false,
-			expectWarning:  true, // Should warn about pooler not available
-		},
-		{
-			name: "Error when no endpoint available",
-			service: api.Service{
-				Endpoint: nil,
-			},
-			pooled:      false,
-			role:        "tsdbadmin",
-			expectError: true,
-		},
-		{
-			name: "Error when no host available",
-			service: api.Service{
-				Endpoint: &api.Endpoint{
-					Host: nil,
-					Port: intPtr(5432),
-				},
-			},
-			pooled:      false,
-			role:        "tsdbadmin",
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create a test command to capture stderr output
-			cmd := &cobra.Command{}
-			errBuf := new(bytes.Buffer)
-			cmd.SetErr(errBuf)
-
-			result, err := buildConnectionString(tc.service, tc.pooled, tc.role, cmd)
-
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
-
-			if result != tc.expectedString {
-				t.Errorf("Expected connection string %q, got %q", tc.expectedString, result)
-			}
-
-			// Check for warning message
-			stderrOutput := errBuf.String()
-			if tc.expectWarning {
-				if !strings.Contains(stderrOutput, "Warning: Connection pooler not available") {
-					t.Errorf("Expected warning about pooler not available, but got: %q", stderrOutput)
-				}
-			} else {
-				if stderrOutput != "" {
-					t.Errorf("Expected no warning, but got: %q", stderrOutput)
-				}
-			}
-		})
-	}
-}
-
-// Helper functions for creating pointers
-func stringPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -987,26 +737,23 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			tmpDir := setupDBTest(t)
 
 			// Set up config
-			cfg := &config.Config{
-				APIURL:    "http://localhost:9999", // Non-existent server
-				ProjectID: "test-project-123",
-				ServiceID: "svc-12345",
-				ConfigDir: tmpDir,
-			}
-			err := cfg.Save()
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":    "http://localhost:9999", // Non-existent server
+				"service_id": "svc-12345",
+			})
 			if err != nil {
 				t.Fatalf("Failed to save test config: %v", err)
 			}
 
 			// Mock authentication
-			originalGetAPIKey := getAPIKeyForDB
-			getAPIKeyForDB = func() (string, error) {
-				return "test-api-key", nil
+			originalGetCredentials := getCredentialsForDB
+			getCredentialsForDB = func() (string, string, error) {
+				return "test-api-key", "test-project-123", nil
 			}
-			defer func() { getAPIKeyForDB = originalGetAPIKey }()
+			defer func() { getCredentialsForDB = originalGetCredentials }()
 
 			// Execute db test-connection command with timeout flag
-			_, err = executeDBCommand("db", "test-connection", "--timeout", tc.timeoutFlag)
+			_, err = executeDBCommand(t.Context(), "db", "test-connection", "--timeout", tc.timeoutFlag)
 
 			if !tc.expectError {
 				if err != nil {
@@ -1038,5 +785,561 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDBConnectionString_WithPassword(t *testing.T) {
+	// This test verifies the end-to-end --with-password flag functionality
+	// using direct function testing since full integration would require a real service
+
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Create a test service
+	serviceID := "test-e2e-service"
+	projectID := "test-e2e-project"
+	host := "test-e2e-host.com"
+	port := 5432
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	// Store a test password
+	testPassword := "test-e2e-password-789"
+	storage := password.GetPasswordStorage()
+	err := storage.Save(service, testPassword, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service, "tsdbadmin") // Clean up after test
+
+	// Test connection string without password (default behavior)
+	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+		Role: "tsdbadmin",
+	})
+	if err != nil {
+		t.Fatalf("GetConnectionDetails failed: %v", err)
+	}
+	baseConnectionString := details.String()
+
+	expectedBase := fmt.Sprintf("postgresql://tsdbadmin@%s:%d/tsdb?sslmode=require", host, port)
+	if baseConnectionString != expectedBase {
+		t.Errorf("Expected base connection string '%s', got '%s'", expectedBase, baseConnectionString)
+	}
+
+	// Verify base connection string doesn't contain password
+	if strings.Contains(baseConnectionString, testPassword) {
+		t.Errorf("Base connection string should not contain password, but it does: %s", baseConnectionString)
+	}
+
+	// Test connection string with password (simulating --with-password flag)
+	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+		Role:         "tsdbadmin",
+		WithPassword: true,
+	})
+	if err != nil {
+		t.Fatalf("GetConnectionDetails with password failed: %v", err)
+	}
+	connectionStringWithPassword := details2.String()
+
+	expectedWithPassword := fmt.Sprintf("postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require", testPassword, host, port)
+	if connectionStringWithPassword != expectedWithPassword {
+		t.Errorf("Expected connection string with password '%s', got '%s'", expectedWithPassword, connectionStringWithPassword)
+	}
+
+	// Verify connection string with password contains the password
+	if !strings.Contains(connectionStringWithPassword, testPassword) {
+		t.Errorf("Connection string with password should contain '%s', but it doesn't: %s", testPassword, connectionStringWithPassword)
+	}
+}
+
+func TestDBSavePassword_ExplicitPassword(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-save-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-save-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "explicit-password-123"
+
+	// Execute save-password with explicit password
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+	if !strings.Contains(output, serviceID) {
+		t.Errorf("Expected service ID in output, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-env-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-env-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Set environment variable
+	testPassword := "env-password-456"
+	os.Setenv("TIGER_NEW_PASSWORD", testPassword)
+	defer os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Execute save-password without --password flag (should use env var)
+	output, err := executeDBCommand(t.Context(), "db", "save-password")
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with env var, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_InteractivePrompt(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-interactive-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-interactive-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Make sure TIGER_NEW_PASSWORD is not set
+	os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Prepare the password input
+	testPassword := "interactive-password-999"
+
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+
+	// Mock password reading to return our test password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func() (string, error) {
+		return testPassword, nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+
+	// Execute save-password without --password flag or env var
+	output, err := executeDBCommand(t.Context(), "db", "save-password")
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with interactive input, got error: %v", err)
+	}
+
+	// Verify the prompt was shown
+	if !strings.Contains(output, "Enter password:") {
+		t.Errorf("Expected password prompt, got: %s", output)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was actually saved
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-empty-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-empty-test"
+	projectID := "test-project-123"
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	// Make sure TIGER_NEW_PASSWORD is not set
+	os.Unsetenv("TIGER_NEW_PASSWORD")
+
+	// Mock TTY check to return true (simulate terminal)
+	originalCheckStdinIsTTY := checkStdinIsTTY
+	checkStdinIsTTY = func() bool {
+		return true
+	}
+	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+
+	// Mock password reading to return empty password
+	originalReadPasswordFromTerminal := readPasswordFromTerminal
+	readPasswordFromTerminal = func() (string, error) {
+		return "", nil
+	}
+	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+
+	// Execute the command
+	_, err = executeDBCommand(t.Context(), "db", "save-password")
+	if err == nil {
+		t.Fatal("Expected error when user provides empty password interactively")
+	}
+
+	// Verify the error message
+	if !strings.Contains(err.Error(), "password cannot be empty") {
+		t.Errorf("Expected 'password cannot be empty' error, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_CustomRole(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set keyring as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-role-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service
+	serviceID := "svc-role-test"
+	projectID := "test-project-123"
+	host := "test-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "readonly-password-789"
+	customRole := "readonly"
+
+	// Execute with custom role
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword, "--role", customRole)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with custom role, got error: %v", err)
+	}
+
+	// Verify success message shows the custom role
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+	if !strings.Contains(output, customRole) {
+		t.Errorf("Expected role %q in output, got: %s", customRole, output)
+	}
+
+	// Verify password was saved for the custom role
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, customRole)
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
+	}
+	defer storage.Remove(mockService, customRole)
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+
+	// Verify that tsdbadmin role doesn't have this password
+	_, err = storage.Get(mockService, "tsdbadmin")
+	if err == nil {
+		t.Error("Expected error when retrieving password for different role, but got none")
+	}
+}
+
+func TestDBSavePassword_NoServiceID(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config with project ID but no default service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// No need to mock since it should fail before reaching getServiceDetailsFunc
+
+	// Execute save-password without service ID
+	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
+	if err == nil {
+		t.Fatal("Expected error when no service ID is provided or configured")
+	}
+
+	if !strings.Contains(err.Error(), "service ID is required") {
+		t.Errorf("Expected error about missing service ID, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_NoAuth(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	// Set up config with project ID and service ID
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://api.tigerdata.com/public/v1",
+		"project_id": "test-project-123",
+		"service_id": "svc-12345",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock authentication failure
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "", "", fmt.Errorf("not logged in")
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+
+	// Execute save-password command
+	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
+	if err == nil {
+		t.Fatal("Expected error when not authenticated")
+	}
+
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+func TestDBSavePassword_PgpassStorage(t *testing.T) {
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	// Set pgpass as the password storage method for this test
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "pgpass")
+	defer viper.Set("password_storage", originalStorage)
+
+	// Set up config
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+		"service_id": "svc-pgpass-test",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Mock getServiceDetailsFunc to return a test service with endpoint (required for pgpass)
+	serviceID := "svc-pgpass-test"
+	projectID := "test-project-123"
+	host := "pgpass-host.com"
+	port := 5432
+	mockService := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+		return mockService, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	testPassword := "pgpass-password-101"
+
+	// Execute with pgpass storage
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed with pgpass, got error: %v", err)
+	}
+
+	// Verify success message
+	if !strings.Contains(output, "Password saved successfully") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+
+	// Verify password was saved in pgpass storage
+	storage := password.GetPasswordStorage()
+	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)
+	}
+	defer storage.Remove(mockService, "tsdbadmin")
+
+	if retrievedPassword != testPassword {
+		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
 	}
 }

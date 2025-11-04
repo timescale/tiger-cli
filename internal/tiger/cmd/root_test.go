@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/spf13/viper"
+
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 func TestMain(m *testing.M) {
 	// Clean up any global state before tests
-	viper.Reset()
+	config.ResetGlobalConfig()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -18,16 +19,23 @@ func TestMain(m *testing.M) {
 func setupTestCommand(t *testing.T) (string, func()) {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-test-cmd-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
+	// Disable analytics for root tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
-		viper.Reset()
+		os.Unsetenv("TIGER_ANALYTICS")
+		config.ResetGlobalConfig()
 	}
 
 	t.Cleanup(cleanup)
@@ -45,7 +53,7 @@ service_id: file-service
 output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -66,14 +74,15 @@ analytics: true
 	}()
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 
 	// Set CLI flags (these should take precedence)
 	args := []string{
-		"--config", configFile,
-		"--project-id", "flag-project",
+		"--config-dir", tmpDir,
 		"--service-id", "flag-service",
-		"--output", "yaml",
 		"--analytics=false",
 		"--debug",
 		"version", // Need a subcommand to execute
@@ -82,17 +91,14 @@ analytics: true
 	testCmd.SetArgs(args)
 
 	// Execute the command to trigger PersistentPreRunE
-	err := testCmd.Execute()
+	err = testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
 
 	// Verify Viper reflects the CLI flag values (highest precedence)
-	if viper.GetString("project_id") != "flag-project" {
-		t.Errorf("Expected Viper project_id 'flag-project', got '%s'", viper.GetString("project_id"))
-	}
-	if viper.GetString("output") != "yaml" {
-		t.Errorf("Expected Viper output 'yaml', got '%s'", viper.GetString("output"))
+	if viper.GetString("service_id") != "flag-service" {
+		t.Errorf("Expected Viper service_id 'flag-service', got '%s'", viper.GetString("service_id"))
 	}
 }
 
@@ -101,38 +107,44 @@ func TestFlagBindingWithViper(t *testing.T) {
 
 	// Set environment variable
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_OUTPUT", "json")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-1")
 
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_OUTPUT")
+		os.Unsetenv("TIGER_SERVICE_ID")
 	}()
 
 	// Test 1: Environment variable should be used when no flag is set
-	testCmd1 := buildRootCmd()
+	testCmd1, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 	testCmd1.SetArgs([]string{"version"}) // Need a subcommand
-	err := testCmd1.Execute()
+	err = testCmd1.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
 
-	if viper.GetString("output") != "json" {
-		t.Errorf("Expected output 'json' from env var, got '%s'", viper.GetString("output"))
+	if viper.GetString("service_id") != "test-service-1" {
+		t.Errorf("Expected service_id 'test-service-1' from env var, got '%s'", viper.GetString("service_id"))
 	}
 
 	// Reset for next test
-	viper.Reset()
+	config.ResetGlobalConfig()
 
 	// Test 2: Flag should override environment variable
-	testCmd2 := buildRootCmd()
-	testCmd2.SetArgs([]string{"--output", "table", "version"})
+	testCmd2, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
+	testCmd2.SetArgs([]string{"--service-id", "test-service-2", "version"})
 	err = testCmd2.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}
 
-	if viper.GetString("output") != "table" {
-		t.Errorf("Expected output 'table' from flag, got '%s'", viper.GetString("output"))
+	if viper.GetString("service_id") != "test-service-2" {
+		t.Errorf("Expected service_id 'test-service-2' from flag, got '%s'", viper.GetString("service_id"))
 	}
 }
 
@@ -143,7 +155,7 @@ func TestConfigFilePrecedence(t *testing.T) {
 	configContent := `output: json
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := config.GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -154,11 +166,14 @@ analytics: false
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// Use buildRootCmd() to get a complete root command
-	testCmd := buildRootCmd()
+	testCmd, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
 
 	// Execute with config file specified
-	testCmd.SetArgs([]string{"--config", configFile, "version"})
-	err := testCmd.Execute()
+	testCmd.SetArgs([]string{"--config-dir", tmpDir, "version"})
+	err = testCmd.Execute()
 	if err != nil {
 		t.Fatalf("Command execution failed: %v", err)
 	}

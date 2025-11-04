@@ -3,7 +3,7 @@
 ## Overview
 
 This document outlines the OAuth 2.0 integration for Tiger CLI, providing secure
-authentication with the TigerData Cloud Platform API. The implementation
+authentication with the Tiger Cloud platform API. The implementation
 supports both interactive user authentication and programmatic authentication
 for CI/CD environments.
 

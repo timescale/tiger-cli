@@ -1,34 +1,37 @@
-package cmd
+package password
 
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/zalando/go-keyring"
 )
 
 // getPasswordServiceName returns the service name for password storage
 // Uses the same service name as auth for consistency
 func getPasswordServiceName() string {
-	return getServiceName()
+	return config.GetServiceName()
 }
 
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords
-func buildPasswordKeyringUsername(service api.Service) (string, error) {
+func buildPasswordKeyringUsername(service api.Service, role string) (string, error) {
 	if service.ServiceId == nil {
 		return "", fmt.Errorf("service ID is required")
 	}
 	if service.ProjectId == nil {
 		return "", fmt.Errorf("project ID is required")
 	}
+	if role == "" {
+		return "", fmt.Errorf("role is required")
+	}
 
-	return fmt.Sprintf("password-%s-%s", *service.ProjectId, *service.ServiceId), nil
+	return fmt.Sprintf("password-%s-%s-%s", *service.ProjectId, *service.ServiceId, role), nil
 }
 
 // sanitizeErrorMessage removes sensitive information from error messages
@@ -44,19 +47,26 @@ func sanitizeErrorMessage(err error, password string) string {
 	return errorMsg
 }
 
+// PasswordStorageResult contains the result of password storage operations
+type PasswordStorageResult struct {
+	Success bool   `json:"success"`
+	Method  string `json:"method"`  // "keyring", "pgpass", or "none"
+	Message string `json:"message"` // Human-readable message
+}
+
 // PasswordStorage defines the interface for password storage implementations
 type PasswordStorage interface {
-	Save(service api.Service, password string) error
-	Get(service api.Service) (string, error)
-	Remove(service api.Service) error
-	HandleSaveMessage(err error, password string, output io.Writer)
+	Save(service api.Service, password string, role string) error
+	Get(service api.Service, role string) (string, error)
+	Remove(service api.Service, role string) error
+	GetStorageResult(err error, password string) PasswordStorageResult
 }
 
 // KeyringStorage implements password storage using system keyring
 type KeyringStorage struct{}
 
-func (k *KeyringStorage) Save(service api.Service, password string) error {
-	username, err := buildPasswordKeyringUsername(service)
+func (k *KeyringStorage) Save(service api.Service, password string, role string) error {
+	username, err := buildPasswordKeyringUsername(service, role)
 	if err != nil {
 		return err
 	}
@@ -64,8 +74,8 @@ func (k *KeyringStorage) Save(service api.Service, password string) error {
 	return keyring.Set(getPasswordServiceName(), username, password)
 }
 
-func (k *KeyringStorage) Get(service api.Service) (string, error) {
-	username, err := buildPasswordKeyringUsername(service)
+func (k *KeyringStorage) Get(service api.Service, role string) (string, error) {
+	username, err := buildPasswordKeyringUsername(service, role)
 	if err != nil {
 		return "", err
 	}
@@ -73,8 +83,8 @@ func (k *KeyringStorage) Get(service api.Service) (string, error) {
 	return keyring.Get(getPasswordServiceName(), username)
 }
 
-func (k *KeyringStorage) Remove(service api.Service) error {
-	username, err := buildPasswordKeyringUsername(service)
+func (k *KeyringStorage) Remove(service api.Service, role string) error {
+	username, err := buildPasswordKeyringUsername(service, role)
 	if err != nil {
 		return err
 	}
@@ -82,21 +92,31 @@ func (k *KeyringStorage) Remove(service api.Service) error {
 	return keyring.Delete(getPasswordServiceName(), username)
 }
 
-func (k *KeyringStorage) HandleSaveMessage(err error, password string, output io.Writer) {
+func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordStorageResult {
 	if err != nil {
 		sanitizedErr := sanitizeErrorMessage(err, password)
-		fmt.Fprintf(output, "⚠️  Failed to save password to keyring: %s\n", sanitizedErr)
-	} else {
-		fmt.Fprintf(output, "🔐 Password saved to system keyring for automatic authentication\n")
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "keyring",
+			Message: fmt.Sprintf("Failed to save password to keyring: %s", sanitizedErr),
+		}
+	}
+	return PasswordStorageResult{
+		Success: true,
+		Method:  "keyring",
+		Message: "Password saved to system keyring for automatic authentication",
 	}
 }
 
 // PgpassStorage implements password storage using ~/.pgpass file
 type PgpassStorage struct{}
 
-func (p *PgpassStorage) Save(service api.Service, password string) error {
+func (p *PgpassStorage) Save(service api.Service, password string, role string) error {
 	if service.Endpoint == nil || service.Endpoint.Host == nil {
 		return fmt.Errorf("service endpoint not available")
+	}
+	if role == "" {
+		return fmt.Errorf("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -110,8 +130,8 @@ func (p *PgpassStorage) Save(service api.Service, password string) error {
 	if service.Endpoint.Port != nil {
 		port = fmt.Sprintf("%d", *service.Endpoint.Port)
 	}
-	database := "tsdb"      // TimescaleDB database name
-	username := "tsdbadmin" // default admin user
+	database := "tsdb" // TimescaleDB database name
+	username := role   // Use the provided role as username
 
 	// Remove existing entry first (if it exists)
 	if err := p.removeEntry(pgpassPath, host, port, username); err != nil {
@@ -135,9 +155,12 @@ func (p *PgpassStorage) Save(service api.Service, password string) error {
 	return nil
 }
 
-func (p *PgpassStorage) Get(service api.Service) (string, error) {
+func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
 	if service.Endpoint == nil || service.Endpoint.Host == nil {
 		return "", fmt.Errorf("service endpoint not available")
+	}
+	if role == "" {
+		return "", fmt.Errorf("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -157,7 +180,7 @@ func (p *PgpassStorage) Get(service api.Service) (string, error) {
 	if service.Endpoint.Port != nil {
 		port = fmt.Sprintf("%d", *service.Endpoint.Port)
 	}
-	username := "tsdbadmin"
+	username := role
 
 	// Read and parse .pgpass file
 	content, err := os.ReadFile(pgpassPath)
@@ -186,9 +209,12 @@ func (p *PgpassStorage) Get(service api.Service) (string, error) {
 	return "", fmt.Errorf("no matching entry found in .pgpass file")
 }
 
-func (p *PgpassStorage) Remove(service api.Service) error {
+func (p *PgpassStorage) Remove(service api.Service, role string) error {
 	if service.Endpoint == nil || service.Endpoint.Host == nil {
 		return fmt.Errorf("service endpoint not available")
+	}
+	if role == "" {
+		return fmt.Errorf("role is required")
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -202,7 +228,7 @@ func (p *PgpassStorage) Remove(service api.Service) error {
 	if service.Endpoint.Port != nil {
 		port = fmt.Sprintf("%d", *service.Endpoint.Port)
 	}
-	username := "tsdbadmin"
+	username := role
 
 	return p.removeEntry(pgpassPath, host, port, username)
 }
@@ -265,32 +291,43 @@ func (p *PgpassStorage) removeEntry(pgpassPath, host, port, username string) err
 	return nil
 }
 
-func (p *PgpassStorage) HandleSaveMessage(err error, password string, output io.Writer) {
+func (p *PgpassStorage) GetStorageResult(err error, password string) PasswordStorageResult {
 	if err != nil {
 		sanitizedErr := sanitizeErrorMessage(err, password)
-		fmt.Fprintf(output, "⚠️  Failed to save password to ~/.pgpass: %s\n", sanitizedErr)
-	} else {
-		fmt.Fprintf(output, "🔐 Password saved to ~/.pgpass for automatic authentication\n")
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "pgpass",
+			Message: fmt.Sprintf("Failed to save password to ~/.pgpass: %s", sanitizedErr),
+		}
+	}
+	return PasswordStorageResult{
+		Success: true,
+		Method:  "pgpass",
+		Message: "Password saved to ~/.pgpass for automatic authentication",
 	}
 }
 
 // NoStorage implements no password storage (passwords are not saved)
 type NoStorage struct{}
 
-func (n *NoStorage) Save(service api.Service, password string) error {
+func (n *NoStorage) Save(service api.Service, password string, role string) error {
 	return nil // Do nothing
 }
 
-func (n *NoStorage) Get(service api.Service) (string, error) {
+func (n *NoStorage) Get(service api.Service, role string) (string, error) {
 	return "", fmt.Errorf("password storage disabled")
 }
 
-func (n *NoStorage) Remove(service api.Service) error {
+func (n *NoStorage) Remove(service api.Service, role string) error {
 	return nil // Do nothing
 }
 
-func (n *NoStorage) HandleSaveMessage(err error, password string, output io.Writer) {
-	fmt.Fprintf(output, "💡 Password not saved (--password-storage=none). Make sure to store it securely.\n")
+func (n *NoStorage) GetStorageResult(err error, password string) PasswordStorageResult {
+	return PasswordStorageResult{
+		Success: false, // Not really an error, but password wasn't saved
+		Method:  "none",
+		Message: "Password not saved (--password-storage=none). Make sure to store it securely.",
+	}
 }
 
 // GetPasswordStorage returns the appropriate PasswordStorage implementation based on configuration
@@ -308,15 +345,26 @@ func GetPasswordStorage() PasswordStorage {
 	}
 }
 
-// SavePasswordWithMessages handles saving a password and displaying appropriate messages
-func SavePasswordWithMessages(service api.Service, password string, output io.Writer) error {
+// SavePasswordWithResult handles saving a password and returns both error and result info
+func SavePasswordWithResult(service api.Service, password string, role string) (PasswordStorageResult, error) {
 	if password == "" {
-		return nil
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "none",
+			Message: "No password provided",
+		}, nil
+	}
+	if role == "" {
+		return PasswordStorageResult{
+			Success: false,
+			Method:  "none",
+			Message: "Role is required",
+		}, fmt.Errorf("role is required")
 	}
 
 	storage := GetPasswordStorage()
-	err := storage.Save(service, password)
-	storage.HandleSaveMessage(err, password, output)
+	err := storage.Save(service, password, role)
+	result := storage.GetStorageResult(err, password)
 
-	return err
+	return result, err
 }

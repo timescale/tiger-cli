@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,21 +39,21 @@ type oauthLogin struct {
 	out        io.Writer
 }
 
-func (l *oauthLogin) loginWithOAuth() (credentials, error) {
+func (l *oauthLogin) loginWithOAuth(ctx context.Context) (credentials, error) {
 	// Get a user access token via OAuth
-	accessToken, err := l.getAccessToken()
+	accessToken, err := l.getAccessToken(ctx)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to authenticate via OAuth: %w", err)
 	}
 
 	// Get the user's project ID (with interactive selection if needed)
-	projectID, err := l.selectProjectID(accessToken)
+	projectID, err := l.selectProjectID(ctx, accessToken)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to select project: %w", err)
 	}
 
 	// Create API key for the selected project
-	creds, err := l.createCredentials(accessToken, projectID)
+	creds, err := l.createCredentials(ctx, accessToken, projectID)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to create credentials: %w", err)
 	}
@@ -60,7 +61,7 @@ func (l *oauthLogin) loginWithOAuth() (credentials, error) {
 	return creds, nil
 }
 
-func (l *oauthLogin) getAccessToken() (string, error) {
+func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
 	// Generate PKCE parameters
 	codeVerifier := oauth2.GenerateVerifier()
 
@@ -76,7 +77,7 @@ func (l *oauthLogin) getAccessToken() (string, error) {
 		return "", fmt.Errorf("failed to create local server: %w", err)
 	}
 	defer func() {
-		if err := server.Close(); err != nil {
+		if err := server.server.Shutdown(ctx); err != nil {
 			fmt.Fprintf(l.out, "Failed to close local server: %s\n", err)
 		}
 	}()
@@ -95,6 +96,8 @@ func (l *oauthLogin) getAccessToken() (string, error) {
 		return result.accessToken, result.err
 	case <-time.After(5 * time.Minute):
 		return "", fmt.Errorf("authorization timeout - no callback received within 5 minutes")
+	case <-ctx.Done():
+		return "", ctx.Err()
 	}
 }
 
@@ -107,7 +110,6 @@ func (l *oauthLogin) generateRandomState(length int) (string, error) {
 }
 
 type oauthServer struct {
-	listener   net.Listener
 	server     *http.Server
 	oauthCfg   oauth2.Config
 	resultChan <-chan oauthResult
@@ -159,24 +161,9 @@ func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oaut
 
 	return &oauthServer{
 		server:     server,
-		listener:   listener,
 		oauthCfg:   oauthCfg,
 		resultChan: resultChan,
 	}, nil
-}
-
-func (s *oauthServer) Close() error {
-	cls := func(closer io.Closer) error {
-		if err := closer.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			return err
-		}
-		return nil
-	}
-
-	return errors.Join(
-		cls(s.server),
-		cls(s.listener),
-	)
 }
 
 type oauthCallback struct {
@@ -209,7 +196,7 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange authorization code for tokens
-	token, err := c.oauthCfg.Exchange(context.Background(), code, oauth2.VerifierOption(c.codeVerifier))
+	token, err := c.oauthCfg.Exchange(r.Context(), code, oauth2.VerifierOption(c.codeVerifier))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Failed to exchange authorization code for tokens")
@@ -230,27 +217,25 @@ func (c *oauthCallback) sendError(err error) {
 }
 
 func openBrowserImpl(url string) error {
-	var cmd string
-	var args []string
+	var cmd *exec.Cmd
 
-	// TODO: Do all of these work correctly?
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
+		// Escape '&' so cmd.exe doesn't treat it as a command separator
+		cmd = exec.Command("cmd", "/c", "start", strings.ReplaceAll(url, "&", "^&"))
 	case "darwin":
-		cmd = "open"
+		cmd = exec.Command("open", url)
 	default: // "linux", "freebsd", "openbsd", "netbsd"
-		cmd = "xdg-open"
+		cmd = exec.Command("xdg-open", url)
 	}
-	args = append(args, url)
-	return exec.Command(cmd, args...).Start()
+
+	return cmd.Start()
 }
 
 // selectProjectID prompts the user to select a project if multiple are available
-func (l *oauthLogin) selectProjectID(accessToken string) (string, error) {
+func (l *oauthLogin) selectProjectID(ctx context.Context, accessToken string) (string, error) {
 	// First, get the list of projects the user has access to
-	projects, err := l.graphql.getUserProjects(accessToken)
+	projects, err := l.graphql.getUserProjects(ctx, accessToken)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
@@ -378,16 +363,20 @@ func (m projectSelectModel) View() string {
 
 // createCredentials creates client credentials (i.e. a PAT record) for the
 // selected project
-func (l *oauthLogin) createCredentials(accessToken, projectID string) (credentials, error) {
+func (l *oauthLogin) createCredentials(ctx context.Context, accessToken, projectID string) (credentials, error) {
 	// Get user information for PAT name
-	user, err := l.graphql.getUser(accessToken)
+	user, err := l.graphql.getUser(ctx, accessToken)
 	if err != nil {
 		return credentials{}, fmt.Errorf("failed to get user info: %w", err)
 	}
 
 	// Create a PAT record for this project
-	patRecord, err := l.graphql.createPATRecord(accessToken, projectID, l.buildPATName(user))
+	patRecord, err := l.graphql.createPATRecord(ctx, accessToken, projectID, l.buildPATName(user))
 	if err != nil {
+		// Check if error is about reaching maximum token limit
+		if strings.Contains(err.Error(), "reached maximum token limit for project") {
+			return credentials{}, fmt.Errorf("failed to create API key: %w\n\nYou can delete existing API keys at: https://console.cloud.timescale.com/dashboard/settings", err)
+		}
 		return credentials{}, fmt.Errorf("failed to create PAT record: %w", err)
 	}
 

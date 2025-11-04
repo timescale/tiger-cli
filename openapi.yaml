@@ -1,28 +1,87 @@
 openapi: 3.0.3
 info:
-  title: TigerData Cloud API
+  title: Tiger Cloud API
   description: |
-    A RESTful API for TigerData Cloud Platform.
+    A RESTful API for Tiger Cloud platform.
   version: 1.0.0
   license:
     name: Proprietary
     url: https://www.tigerdata.com/legal/terms
   contact:
-    name: TigerData Support
+    name: Tiger Data Support
     url: https://www.tigerdata.com/contact
 servers:
   - url: http://localhost:8080
     description: Local development server
   - url: https://api.tigerdata.com/public/v1
-    description: API server for TigerData Cloud
+    description: API server for Tiger Cloud
 
 tags:
   - name: VPCs
     description: Manage VPCs and their peering connections.
   - name: Services
     description: Manage services, read replicas, and their associated actions.
+  - name: Analytics
+    description: Track analytics events.
 
 paths:
+  /analytics/identify:
+    post:
+      tags:
+        - Analytics
+      summary: Identify a user
+      description: Identifies a user with optional properties for analytics tracking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the user
+                  example:
+                    email: "user@example.com"
+                    name: "John Doe"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /analytics/track:
+    post:
+      tags:
+        - Analytics
+      summary: Track an analytics event
+      description: Tracks an analytics event with optional properties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: string
+                  description: The name of the event to track
+                  example: service_created
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the event
+                  example:
+                    region: "us-east-1"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/vpcs:
     get:
       tags:
@@ -40,6 +99,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VPC'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - VPCs
@@ -60,8 +121,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}:
     get:
@@ -79,8 +140,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - VPCs
@@ -92,8 +153,8 @@ paths:
       responses:
         '204':
           description: VPC deleted successfully.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/rename:
     post:
@@ -117,10 +178,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VPC'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings:
     get:
@@ -140,8 +199,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Peering'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - VPCs
@@ -163,10 +222,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Peering'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id}:
     get:
@@ -185,8 +242,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Peering'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - VPCs
@@ -199,8 +256,8 @@ paths:
       responses:
         '204':
           description: VPC peering deleted successfully.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services:
     get:
@@ -219,8 +276,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - Services
@@ -241,8 +298,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}:
     get:
@@ -260,8 +317,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     delete:
       tags:
         - Services
@@ -273,8 +330,8 @@ paths:
       responses:
         '202':
           description: Deletion request has been accepted.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/start:
     post:
@@ -336,12 +393,8 @@ paths:
       responses:
         '202':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/detachFromVPC:
     post:
@@ -361,10 +414,8 @@ paths:
       responses:
         '202':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/resize:
     post:
@@ -384,10 +435,8 @@ paths:
       responses:
         '202':
           description: Resize request has been accepted and is in progress.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/enablePooler:
     post:
@@ -401,10 +450,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/disablePooler:
     post:
@@ -418,10 +465,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/forkService:
     post:
@@ -437,7 +482,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForkInput'
+              $ref: '#/components/schemas/ForkServiceCreate'
       responses:
         '202':
           description: Fork request accepted. The response contains the details of the new service being created.
@@ -445,8 +490,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/updatePassword:
     post:
@@ -466,10 +511,8 @@ paths:
       responses:
         '204':
           description: Password updated successfully. No content returned.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/setEnvironment:
     post:
@@ -489,10 +532,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/setHA:
     post:
@@ -516,10 +557,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets:
     get:
@@ -539,8 +578,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ReadReplicaSet'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
     post:
       tags:
         - Read Replica Sets
@@ -562,8 +601,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReadReplicaSet'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}:
     delete:
@@ -578,8 +617,8 @@ paths:
       responses:
         '202':
           description: Deletion request has been accepted.
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/resize:
     post:
@@ -600,10 +639,8 @@ paths:
       responses:
         '202':
           description: Resize request has been accepted and is in progress.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/enablePooler:
     post:
@@ -618,10 +655,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/disablePooler:
     post:
@@ -636,10 +671,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/setEnvironment:
     post:
@@ -660,10 +693,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
 
 components:
   parameters:
@@ -724,7 +755,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCCreate:
       type: object
       required:
@@ -740,7 +771,7 @@ components:
           example: "10.0.0.0/16"
         region_code:
           type: string
-          example: "google-europe-west1"
+          example: "us-east-1"
     VPCRename:
       type: object
       required:
@@ -820,7 +851,7 @@ components:
         region_code:
           type: string
           description: The cloud region where the service is hosted.
-          example: "google-europe-west1"
+          example: "us-east-1"
         service_type:
           $ref: '#/components/schemas/ServiceType'
           description: The type of the service.
@@ -890,6 +921,23 @@ components:
       - TIMESCALEDB
       - POSTGRES
       - VECTOR
+    EnvironmentTag:
+        type: string
+        enum:
+        - DEV
+        - PROD
+        description: The environment tag for the service.
+    ForkStrategy:
+      type: string
+      enum:
+      - LAST_SNAPSHOT
+      - NOW
+      - PITR
+      description: |
+        Strategy for creating the fork:
+        - LAST_SNAPSHOT: Use existing snapshot for fast fork
+        - NOW: Create new snapshot for up-to-date fork
+        - PITR: Point-in-time recovery using target_time
     DeployStatus:
       type: string
       enum:
@@ -938,10 +986,9 @@ components:
           description: CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: Memory allocation in gigabytes.
-          example: 0.5
+          example: 1
         metadata:
           type: object
           description: Additional metadata for the read replica set
@@ -957,36 +1004,70 @@ components:
       type: object
       required:
         - name
-        - service_type
-        - region_code
-        - replica_count
-        - cpu_millis
-        - memory_gbs
       properties:
         name:
           type: string
           description: A human-readable name for the service.
           example: "my-production-db"
-        service_type:
-          $ref: '#/components/schemas/ServiceType'
-          description: The type of the service.
-          default: TIMESCALEDB
+        addons:
+          type: array
+          items:
+            type: string
+            enum: ["time-series", "ai"]
+          description: List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+          example: ["time-series", "ai"]
         region_code:
           type: string
-          example: "google-europe-west1"
+          description: The region where the service will be created. If not provided, we'll choose the best region for you.
+          example: "us-east-1"
         replica_count:
           type: integer
           description: Number of high-availability replicas to create (all replicas are asynchronous by default).
           example: 2
         cpu_millis:
-          type: integer
-          description: The initial CPU allocation in milli-cores.
-          example: 1000
+          type: string
+          description: The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
+          example: "1000"
         memory_gbs:
-          type: number
-          format: float
-          description: The initial memory allocation in gigabytes.
-          example: 4
+          type: string
+          description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
+          example: "4"
+        environment_tag:
+          $ref: '#/components/schemas/EnvironmentTag'
+          description: The environment tag for the service, 'DEV' by default.
+          default: DEV
+    ForkServiceCreate:
+      type: object
+      required:
+        - fork_strategy
+      properties:
+        name:
+          type: string
+          description: A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+          example: "my-production-db-fork"
+        cpu_millis:
+          type: string
+          description: The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+          example: "1000"
+        memory_gbs:
+          type: string
+          description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+          example: "4"
+        fork_strategy:
+          $ref: '#/components/schemas/ForkStrategy'
+          description: Strategy for creating the fork. This field is required.
+        target_time:
+          type: string
+          format: date-time
+          description: Target time for point-in-time recovery. Required when fork_strategy is PITR.
+          example: "2024-01-01T00:00:00Z"
+        environment_tag:
+          $ref: '#/components/schemas/EnvironmentTag'
+          description: The environment tag for the forked service, 'DEV' by default.
+          default: DEV
+      description: |
+        Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
+        HA replica count is always set to 0 for forked services.
     HAReplica:
       type: object
       properties:
@@ -1031,10 +1112,9 @@ components:
           description: The initial CPU allocation in milli-cores.
           example: 250
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The initial memory allocation in gigabytes.
-          example: 0.5
+          example: 1
     ResizeInput:
       type: object
       required:
@@ -1046,23 +1126,13 @@ components:
           description: The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
           example: 1000
         memory_gbs:
-          type: number
-          format: float
+          type: integer
           description: The new memory allocation in gigabytes.
           example: 4
         nodes:
           type: integer
           description: The new number of nodes in the replica set.
           example: 2
-    ForkInput:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          description: The name for the new forked service.
-          example: "forked-customer-db"
     UpdatePasswordInput:
       type: object
       required:
@@ -1102,6 +1172,17 @@ components:
           type: string
 
   responses:
+    AnalyticsResponse:
+      description: Analytics action completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: Status of the analytics operation
+                example: "success"
     SuccessMessage:
       description: The action was completed successfully.
       content:
@@ -1112,20 +1193,8 @@ components:
               message:
                 type: string
                 example: "Action completed successfully."
-    NotFound:
-      description: The specified resource was not found.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: The request was malformed or invalid.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Conflict:
-      description: The request could not be completed due to a conflict with the current state of the resource.
+    ClientError:
+      description: Client error response (4xx status codes).
       content:
         application/json:
           schema:

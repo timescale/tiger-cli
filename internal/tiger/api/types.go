@@ -22,6 +22,19 @@ const (
 	UPGRADING   DeployStatus = "UPGRADING"
 )
 
+// Defines values for EnvironmentTag.
+const (
+	EnvironmentTagDEV  EnvironmentTag = "DEV"
+	EnvironmentTagPROD EnvironmentTag = "PROD"
+)
+
+// Defines values for ForkStrategy.
+const (
+	LASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
+	NOW          ForkStrategy = "NOW"
+	PITR         ForkStrategy = "PITR"
+)
+
 // Defines values for ReadReplicaSetStatus.
 const (
 	ReadReplicaSetStatusActive   ReadReplicaSetStatus = "active"
@@ -29,6 +42,12 @@ const (
 	ReadReplicaSetStatusDeleting ReadReplicaSetStatus = "deleting"
 	ReadReplicaSetStatusError    ReadReplicaSetStatus = "error"
 	ReadReplicaSetStatusResizing ReadReplicaSetStatus = "resizing"
+)
+
+// Defines values for ServiceCreateAddons.
+const (
+	Ai         ServiceCreateAddons = "ai"
+	TimeSeries ServiceCreateAddons = "time-series"
 )
 
 // Defines values for ServiceType.
@@ -40,8 +59,8 @@ const (
 
 // Defines values for SetEnvironmentInputEnvironment.
 const (
-	DEV  SetEnvironmentInputEnvironment = "DEV"
-	PROD SetEnvironmentInputEnvironment = "PROD"
+	SetEnvironmentInputEnvironmentDEV  SetEnvironmentInputEnvironment = "DEV"
+	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
 
 // ConnectionPooler defines model for ConnectionPooler.
@@ -58,16 +77,38 @@ type Endpoint struct {
 	Port *int    `json:"port,omitempty"`
 }
 
+// EnvironmentTag The environment tag for the service.
+type EnvironmentTag string
+
 // Error defines model for Error.
 type Error struct {
 	Code    *string `json:"code,omitempty"`
 	Message *string `json:"message,omitempty"`
 }
 
-// ForkInput defines model for ForkInput.
-type ForkInput struct {
-	// Name The name for the new forked service.
-	Name string `json:"name"`
+// ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
+// HA replica count is always set to 0 for forked services.
+type ForkServiceCreate struct {
+	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+	CpuMillis *string `json:"cpu_millis,omitempty"`
+
+	// EnvironmentTag The environment tag for the service.
+	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
+
+	// ForkStrategy Strategy for creating the fork:
+	// - LAST_SNAPSHOT: Use existing snapshot for fast fork
+	// - NOW: Create new snapshot for up-to-date fork
+	// - PITR: Point-in-time recovery using target_time
+	ForkStrategy ForkStrategy `json:"fork_strategy"`
+
+	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
+
+	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+	Name *string `json:"name,omitempty"`
+
+	// TargetTime Target time for point-in-time recovery. Required when fork_strategy is PITR.
+	TargetTime *time.Time `json:"target_time,omitempty"`
 }
 
 // ForkSpec defines model for ForkSpec.
@@ -76,6 +117,12 @@ type ForkSpec struct {
 	ProjectId *string `json:"project_id,omitempty"`
 	ServiceId *string `json:"service_id,omitempty"`
 }
+
+// ForkStrategy Strategy for creating the fork:
+// - LAST_SNAPSHOT: Use existing snapshot for fast fork
+// - NOW: Create new snapshot for up-to-date fork
+// - PITR: Point-in-time recovery using target_time
+type ForkStrategy string
 
 // HAReplica defines model for HAReplica.
 type HAReplica struct {
@@ -114,7 +161,7 @@ type ReadReplicaSet struct {
 	Id        *string   `json:"id,omitempty"`
 
 	// MemoryGbs Memory allocation in gigabytes.
-	MemoryGbs *float32 `json:"memory_gbs,omitempty"`
+	MemoryGbs *int `json:"memory_gbs,omitempty"`
 
 	// Metadata Additional metadata for the read replica set
 	Metadata *struct {
@@ -137,7 +184,7 @@ type ReadReplicaSetCreate struct {
 	CpuMillis int `json:"cpu_millis"`
 
 	// MemoryGbs The initial memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	MemoryGbs int `json:"memory_gbs"`
 
 	// Name A human-readable name for the read replica.
 	Name string `json:"name"`
@@ -152,7 +199,7 @@ type ResizeInput struct {
 	CpuMillis int `json:"cpu_millis"`
 
 	// MemoryGbs The new memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	MemoryGbs int `json:"memory_gbs"`
 
 	// Nodes The new number of nodes in the replica set.
 	Nodes *int `json:"nodes,omitempty"`
@@ -219,20 +266,30 @@ type Service struct {
 
 // ServiceCreate defines model for ServiceCreate.
 type ServiceCreate struct {
-	// CpuMillis The initial CPU allocation in milli-cores.
-	CpuMillis int `json:"cpu_millis"`
+	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
 
-	// MemoryGbs The initial memory allocation in gigabytes.
-	MemoryGbs float32 `json:"memory_gbs"`
+	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
+	CpuMillis *string `json:"cpu_millis,omitempty"`
+
+	// EnvironmentTag The environment tag for the service.
+	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
+
+	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 
 	// Name A human-readable name for the service.
-	Name       string `json:"name"`
-	RegionCode string `json:"region_code"`
+	Name string `json:"name"`
+
+	// RegionCode The region where the service will be created. If not provided, we'll choose the best region for you.
+	RegionCode *string `json:"region_code,omitempty"`
 
 	// ReplicaCount Number of high-availability replicas to create (all replicas are asynchronous by default).
-	ReplicaCount int         `json:"replica_count"`
-	ServiceType  ServiceType `json:"service_type"`
+	ReplicaCount *int `json:"replica_count,omitempty"`
 }
+
+// ServiceCreateAddons defines model for ServiceCreate.Addons.
+type ServiceCreateAddons string
 
 // ServiceType defines model for ServiceType.
 type ServiceType string
@@ -303,19 +360,40 @@ type ServiceId = string
 // VPCId defines model for VPCId.
 type VPCId = string
 
-// BadRequest defines model for BadRequest.
-type BadRequest = Error
+// AnalyticsResponse defines model for AnalyticsResponse.
+type AnalyticsResponse struct {
+	// Status Status of the analytics operation
+	Status *string `json:"status,omitempty"`
+}
 
-// Conflict defines model for Conflict.
-type Conflict = Error
-
-// NotFound defines model for NotFound.
-type NotFound = Error
+// ClientError defines model for ClientError.
+type ClientError = Error
 
 // SuccessMessage defines model for SuccessMessage.
 type SuccessMessage struct {
 	Message *string `json:"message,omitempty"`
 }
+
+// PostAnalyticsIdentifyJSONBody defines parameters for PostAnalyticsIdentify.
+type PostAnalyticsIdentifyJSONBody struct {
+	// Properties Optional map of arbitrary properties associated with the user
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// PostAnalyticsTrackJSONBody defines parameters for PostAnalyticsTrack.
+type PostAnalyticsTrackJSONBody struct {
+	// Event The name of the event to track
+	Event string `json:"event"`
+
+	// Properties Optional map of arbitrary properties associated with the event
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.
+type PostAnalyticsIdentifyJSONRequestBody PostAnalyticsIdentifyJSONBody
+
+// PostAnalyticsTrackJSONRequestBody defines body for PostAnalyticsTrack for application/json ContentType.
+type PostAnalyticsTrackJSONRequestBody PostAnalyticsTrackJSONBody
 
 // PostProjectsProjectIdServicesJSONRequestBody defines body for PostProjectsProjectIdServices for application/json ContentType.
 type PostProjectsProjectIdServicesJSONRequestBody = ServiceCreate
@@ -327,7 +405,7 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody = ServiceV
 type PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody = ServiceVPCInput
 
 // PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdForkService for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkInput
+type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkServiceCreate
 
 // PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSets for application/json ContentType.
 type PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody = ReadReplicaSetCreate

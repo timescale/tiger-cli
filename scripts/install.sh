@@ -4,12 +4,12 @@
 #
 # Tiger CLI Installation Script
 #
-# This script automatically downloads and installs the latest version of Tiger CLI
-# from S3 releases. It detects your platform (OS and architecture) and downloads
-# the appropriate binary for your system.
+# This script automatically downloads and installs the latest version of Tiger
+# CLI from the release server. It detects your platform (OS and architecture)
+# and downloads the appropriate binary for your system.
 #
 # Usage:
-#   curl -fsSL https://tiger-cli-releases.s3.amazonaws.com/install/install.sh | sh
+#   curl -fsSL https://cli.tigerdata.com | sh
 #
 # Environment Variables (all optional):
 #   VERSION           - Specific version to install (e.g., "v1.2.3")
@@ -34,9 +34,8 @@ set -eu
 REPO_NAME="tiger-cli"
 BINARY_NAME="tiger"
 
-# S3 Configuration (primary download source)
-S3_BUCKET="tiger-cli-releases"
-S3_BASE_URL="https://${S3_BUCKET}.s3.amazonaws.com"
+# Download URL
+DOWNLOAD_BASE_URL="https://cli.tigerdata.com"
 
 # Colors for output
 RED='\033[0;31m'
@@ -175,7 +174,7 @@ download_with_retry() {
     done
 }
 
-# Get version (from VERSION env var or latest from S3)
+# Get version (from VERSION env var or latest from CloudFront)
 get_version() {
     # Use VERSION env var if provided
     if [ -n "${VERSION:-}" ]; then
@@ -184,9 +183,9 @@ get_version() {
         return
     fi
 
-    local url="${S3_BASE_URL}/install/latest.txt"
+    local url="${DOWNLOAD_BASE_URL}/latest.txt"
 
-    # Try to get version from S3 latest.txt file at bucket root
+    # Try to get version from latest.txt file
     local version
     version=$(fetch_with_retry "${url}" "latest version")
 
@@ -286,7 +285,7 @@ verify_checksum() {
     local tmp_dir="$3"
 
     # Construct individual checksum file URL
-    local checksum_url="${S3_BASE_URL}/releases/${version}/${filename}.sha256"
+    local checksum_url="${DOWNLOAD_BASE_URL}/releases/${version}/${filename}.sha256"
     local checksum_file="${tmp_dir}/${filename}.sha256"
 
     # Download checksum file with retry logic
@@ -298,16 +297,16 @@ verify_checksum() {
 
     # Format checksum for validation: "hash  filename"
     local formatted_checksum
-    formatted_checksum=$(printf "%s  %s\n" "$(cat "${checksum_file}" | tr -d '[:space:]')" "${filename}")
+    formatted_checksum=$(printf "%s  %s\n" "$(tr -d '[:space:]' < "${checksum_file}")" "${filename}")
 
     if command -v sha256sum >/dev/null 2>&1; then
-        if ! echo "${formatted_checksum}" | sha256sum -c >/dev/null 2>&1; then
+        if ! echo "${formatted_checksum}" | sha256sum -c - >/dev/null 2>&1; then
             log_error "Checksum validation failed using sha256sum"
             log_error "For security reasons, installation has been aborted"
             exit 1
         fi
     elif command -v shasum >/dev/null 2>&1; then
-        if ! echo "${formatted_checksum}" | shasum -a 256 -c >/dev/null 2>&1; then
+        if ! echo "${formatted_checksum}" | shasum -a 256 -c - >/dev/null 2>&1; then
             log_error "Checksum validation failed using shasum"
             log_error "For security reasons, installation has been aborted"
             exit 1
@@ -327,8 +326,8 @@ download_archive() {
     local tmp_dir="$3"
     local platform="$4"
 
-    # Construct S3 download URL
-    local download_url="${S3_BASE_URL}/releases/${version}/${archive_name}"
+    # Construct download URL
+    local download_url="${DOWNLOAD_BASE_URL}/releases/${version}/${archive_name}"
 
     # Download archive with retry logic
     download_with_retry "${download_url}" "${tmp_dir}/${archive_name}" "Tiger CLI ${version} for ${platform}"
@@ -381,7 +380,7 @@ verify_installation() {
 
     # Test that the binary is executable and get version
     local installed_version
-    if installed_version=$("${binary_path}" version 2>/dev/null | head -n1 || echo ""); then
+    if installed_version=$("${binary_path}" version -o bare --skip-update-check 2>/dev/null | head -n1 || echo ""); then
         if [ -n "${installed_version}" ]; then
             log_success "Tiger CLI installed successfully!"
             log_success "Version: ${installed_version}"
@@ -442,7 +441,10 @@ main() {
     binary_path="$(extract_archive "${archive_name}" "${tmp_dir}" "${platform}")"
 
     # Copy binary to install directory
+    # Remove existing binary first to prevent errors related
+    # to swapping out a currently executing binary
     log_info "Installing to ${install_dir}..."
+    rm -f "${install_dir}/${BINARY_NAME}"
     cp "${binary_path}" "${install_dir}/${BINARY_NAME}"
 
     # Verify installation

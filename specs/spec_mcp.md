@@ -2,9 +2,15 @@
 
 ## Overview
 
-The Tiger MCP (Model Context Protocol) Server provides programmatic access to TigerData Cloud Platform resources through Claude and other AI assistants. It mirrors the functionality of the Tiger CLI and is integrated directly into the CLI binary for seamless operation.
+The Tiger MCP (Model Context Protocol) Server provides programmatic access to Tiger Cloud platform resources through Claude and other AI assistants. It mirrors the functionality of the Tiger CLI and is integrated directly into the CLI binary for seamless operation.
 
 The MCP server is written in Go and launched via the Tiger CLI, sharing the same authentication, configuration, and API client.
+
+## Design Decisions
+
+### Dynamic Configuration Loading
+
+Each MCP tool call dynamically creates the API client and loads configuration at execution time, rather than initializing these once when the MCP server starts. This design ensures that configuration changes (API keys, project IDs, etc.) take effect immediately for subsequent tool calls without requiring users to restart the MCP server or reconnect their AI assistant. Users can run `tiger auth login` to update authentication or `tiger config set` to modify other configuration values and see changes reflected instantly in their AI interactions.
 
 ## v0 Tool Priority
 
@@ -12,8 +18,9 @@ For the initial v0 release, implement these essential tools first:
 
 **Core Service Management:**
 - `tiger_service_list` - List all services
-- `tiger_service_show` - Show service details  
+- `tiger_service_get` - Get service details
 - `tiger_service_create` - Create new services
+- `tiger_service_fork` - Fork existing services
 - `tiger_service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `tiger_service_update_password` - Update service master password
 
@@ -32,16 +39,16 @@ For the initial v0 release, implement these essential tools first:
 
 ## Configuration
 
-### Claude Desktop Configuration
+The recommended approach is to use the `tiger mcp install` command, which automatically configures the Tiger MCP server for your AI assistant. See the CLI MCP Commands section below for details.
 
-Add to `~/.claude_desktop_config.json`:
+Alternatively, for manual configuration, the Tiger MCP server can be added to your AI assistant's configuration file with the following settings:
 
 ```json
 {
   "mcpServers": {
-    "tigerdata": {
+    "tiger": {
       "command": "tiger",
-      "args": ["mcp"]
+      "args": ["mcp", "start"]
     }
   }
 }
@@ -51,11 +58,71 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### CLI MCP Commands
 
-#### `tiger mcp [transport]`
+#### `tiger mcp install <editor>`
+Install and configure the Tiger MCP server for a specific editor or AI assistant. This command automates the configuration process by modifying the appropriate configuration files.
+
+**Supported Editors:**
+- `claude-code`: Configure for Claude Code
+- `cursor`: Configure for Cursor IDE
+- `windsurf`: Configure for Windsurf editor
+- `codex`: Configure for Codex
+- `gemini` or `gemini-cli`: Configure for Gemini CLI
+- `vscode`, `code`, or `vs-code`: Configure for VS Code
+
+**Options:**
+- `--no-backup`: Skip creating backup of existing configuration (default: create backup)
+- `--config-path`: Custom path to configuration file (overrides default locations)
+
+**Examples:**
+```bash
+# Interactive editor selection
+tiger mcp install
+
+# Install for Claude Code
+tiger mcp install claude-code
+
+# Install for Cursor IDE
+tiger mcp install cursor
+
+# Install for Windsurf
+tiger mcp install windsurf
+
+# Install for VS Code
+tiger mcp install vscode
+
+# Install without creating backup
+tiger mcp install claude-code --no-backup
+
+# Use custom configuration file path
+tiger mcp install claude-code --config-path ~/custom/config.json
+```
+
+**Behavior:**
+- Automatically detects the appropriate configuration file location for the specified editor
+- Creates configuration directory if it doesn't exist
+- Creates backup of existing configuration file by default (use `--no-backup` to skip)
+- Merges with existing MCP server configurations (doesn't overwrite other servers)
+- Validates configuration after installation
+- Provides clear success/failure feedback with next steps
+
+**Configuration Format:**
+The command adds the Tiger MCP server configuration using the appropriate format for each editor. Example configuration:
+```json
+{
+  "mcpServers": {
+    "tiger": {
+      "command": "tiger",
+      "args": ["mcp", "start"]
+    }
+  }
+}
+```
+
+#### `tiger mcp start [transport]`
 Start the MCP server with the specified transport. The server runs in the foreground and can be stopped with Ctrl+C.
 
 **Transports:**
-- `stdio` (default): Standard input/output transport for AI assistant integration  
+- `stdio` (default): Standard input/output transport for AI assistant integration
 - `http`: HTTP server transport for web-based integrations
 
 **Options for HTTP transport:**
@@ -65,16 +132,16 @@ Start the MCP server with the specified transport. The server runs in the foregr
 **Examples:**
 ```bash
 # Start MCP server with stdio transport (default)
-tiger mcp
-tiger mcp stdio
+tiger mcp start
+tiger mcp start stdio
 
 # Start HTTP server for web integrations
-tiger mcp http
-tiger mcp http --port 3001
-tiger mcp http --port 8080 --host 0.0.0.0
+tiger mcp start http
+tiger mcp start http --port 3001
+tiger mcp start http --port 8080 --host 0.0.0.0
 ```
 
-**Notes:** 
+**Notes:**
 - The MCP server runs in the foreground and will continue until stopped with Ctrl+C or terminated by the calling process
 - For HTTP transport, the server will print the listening address (including port) on startup for easy connection
 
@@ -89,29 +156,55 @@ List all database services.
 
 **Returns:** Array of service objects with id, name, status, type, region, and resource information.
 
-#### `tiger_service_show`
-Show details of a specific service.
+#### `tiger_service_get`
+Get details of a specific service.
 
 **Parameters:**
-- `service_id` (string, required): Service ID to show
+- `service_id` (string, required): Service ID to get
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
 
-**Returns:** Detailed service object with configuration, endpoints, and status.
+**Returns:** Detailed service object with configuration, endpoints, status, and connection string. When `with_password=true`, the response includes the password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
 
 #### `tiger_service_create`
 Create a new database service.
 
 **Parameters:**
-- `name` (string, required): Service name
-- `type` (string, optional): Service type (timescaledb, postgres, vector) - default: timescaledb
-- `region` (string, required): Region code
-- `cpu` (string, required): CPU allocation - supports cores or millicores (e.g., "2", "2000m")
-- `memory` (string, required): Memory allocation with units (e.g., "8GB", "4096MB")
-- `replicas` (number, optional): Number of high-availability replicas - default: 1
-- `vpc_id` (string, optional): VPC ID to deploy in
-- `wait` (boolean, optional): Wait for service to be ready - default: true
+- `name` (string, optional): Service name - auto-generated if not provided
+- `addons` (array, optional): Addons to enable ("time-series", "ai", or empty array for PostgreSQL-only)
+- `region` (string, optional): Region code
+- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "shared/shared", "0.5 CPU/2GB", "2 CPU/8GB")
+- `replicas` (number, optional): Number of high-availability replicas - default: 0
+- `wait` (boolean, optional): Wait for service to be ready - default: false
 - `timeout` (number, optional): Timeout for waiting in minutes - default: 30
+- `set_default` (boolean, optional): Set the newly created service as the default service for future commands - default: true
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
 
-**Returns:** Service object with creation status and details.
+**Returns:** Service object with creation status, details, and connection string. When `with_password=true`, the response includes the initial password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
+
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
+
+#### `tiger_service_fork`
+Fork an existing database service to create a new independent copy.
+
+**Parameters:**
+- `service_id` (string, required): Source service ID to fork
+- `fork_strategy` (string, required): Fork strategy - must be one of:
+  - `"NOW"`: Fork at the current database state (creates new snapshot or uses WAL replay)
+  - `"LAST_SNAPSHOT"`: Fork at the last existing snapshot (faster fork)
+  - `"PITR"`: Fork at a specific point in time (point-in-time recovery)
+- `target_time` (string, optional): Target timestamp for point-in-time recovery in RFC3339 format (e.g., "2025-01-15T10:30:00Z"). Required when `fork_strategy` is `"PITR"`, forbidden otherwise.
+- `name` (string, optional): Name for the forked service - auto-generated if not provided
+- `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB"). If not specified, inherits from source service.
+- `wait` (boolean, optional): Wait for forked service to be ready - default: false
+- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 30
+- `set_default` (boolean, optional): Set the forked service as the default service for future commands - default: true
+- `with_password` (boolean, optional): Include password in response and connection string - default: false
+
+**Returns:** Forked service object with creation status, details, and connection string. When `with_password=true`, the response includes the initial password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
+
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
+
+**Warning:** Creates billable resources.
 
 #### `tiger_service_delete`
 Delete a database service.
@@ -199,6 +292,8 @@ Update the master password for a service.
 
 **Returns:** Operation status confirmation.
 
+**Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.).
+
 ### Database Operations
 
 #### `tiger_db_connection_string`
@@ -223,29 +318,42 @@ Test database connectivity.
 Execute a SQL query on a service database.
 
 **Parameters:**
-- `service_id` (string, optional): Service ID (uses default if not provided)
+- `service_id` (string, required): Service ID
 - `query` (string, required): SQL query to execute
-- `timeout` (number, optional): Query timeout in seconds (default: 30)
+- `parameters` (array, optional): Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query.
+- `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)
+- `role` (string, optional): Database role/username to connect as (default: tsdbadmin)
+- `pooled` (boolean, optional): Use connection pooling (default: false)
 
-**Returns:** Query results with rows, columns, and execution metadata.
+**Returns:** Query results with rows, columns (including types), rows affected count, and execution metadata.
 
 **Example Response:**
 ```json
 {
-  "columns": ["id", "name", "created_at"],
+  "columns": [
+    {"name": "id", "type": "int4"},
+    {"name": "name", "type": "text"},
+    {"name": "created_at", "type": "timestamptz"}
+  ],
   "rows": [
     [1, "example", "2024-01-01T00:00:00Z"],
     [2, "test", "2024-01-02T00:00:00Z"]
   ],
-  "row_count": 2,
-  "execution_time_ms": 15
+  "rows_affected": 2,
+  "execution_time": "15.2ms"
 }
 ```
 
+**Note:**
+- `rows_affected` returns the number of rows returned for SELECT queries, and the number of rows modified for INSERT/UPDATE/DELETE queries
+- `columns` includes both the column name and PostgreSQL data type for each column
+- Empty `rows` array for commands that don't return rows (INSERT, UPDATE, DELETE, DDL commands)
+- For parity with `tiger db connect` command, supports custom roles and connection pooling
+
 ### High-Availability Management
 
-#### `tiger_ha_show`
-Show current HA configuration for a service.
+#### `tiger_ha_get`
+Get current HA configuration for a service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID
@@ -271,8 +379,8 @@ List all read replica sets for a service.
 
 **Returns:** Array of read replica set objects.
 
-#### `tiger_read_replica_show`
-Show details of a specific read replica set.
+#### `tiger_read_replica_get`
+Get details of a specific read replica set.
 
 **Parameters:**
 - `replica_set_id` (string, required): Replica set ID
@@ -354,11 +462,11 @@ List all Virtual Private Clouds.
 
 **Returns:** Array of VPC objects with id, name, CIDR, and region information.
 
-#### `tiger_vpc_show`
-Show details of a specific VPC.
+#### `tiger_vpc_get`
+Get details of a specific VPC.
 
 **Parameters:**
-- `vpc_id` (string, required): VPC ID to show
+- `vpc_id` (string, required): VPC ID to get
 
 **Returns:** Detailed VPC object with configuration and attached services.
 
@@ -425,8 +533,8 @@ List all peering connections for a VPC.
 
 **Returns:** Array of peering connection objects.
 
-#### `tiger_vpc_peering_show`
-Show details of a specific peering connection.
+#### `tiger_vpc_peering_get`
+Get details of a specific peering connection.
 
 **Parameters:**
 - `vpc_id` (string, required): VPC ID
@@ -479,14 +587,14 @@ Common error codes:
 - `RESOURCE_CONFLICT`: Resource is in a state that prevents the operation
 - `VALIDATION_ERROR`: Invalid parameters provided
 - `TIMEOUT_ERROR`: Operation timed out
-- `SERVICE_UNAVAILABLE`: TigerData API is temporarily unavailable
+- `SERVICE_UNAVAILABLE`: Tiger Cloud API is temporarily unavailable
 
 ## Implementation Notes
 
 - The MCP server is embedded within the Tiger CLI binary
 - Shares the same API client library and configuration system as the CLI
-- Uses the CLI's stored authentication (keyring or file-based)
-- Inherits the CLI's project and service defaults from configuration
+- Uses the CLI's stored authentication (keyring or file-based credentials)
+- Inherits the CLI's project ID from stored credentials and service ID from configuration
 - Implements proper graceful shutdown and signal handling
 - Uses structured logging compatible with the CLI logging system
 - All tools are idempotent where possible

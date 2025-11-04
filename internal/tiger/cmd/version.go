@@ -2,28 +2,102 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
+	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
-// These variables are set at build time via ldflags in the GoReleaser pipeline
-// for production releases. Default values are used for local development builds.
-var Version = "dev"
-var BuildTime = "unknown"
-var GitCommit = "unknown"
+type VersionOutput struct {
+	Version         string `json:"version" yaml:"version"`
+	BuildTime       string `json:"build_time" yaml:"build_time"`
+	GitCommit       string `json:"git_commit" yaml:"git_commit"`
+	GoVersion       string `json:"go_version" yaml:"go_version"`
+	Platform        string `json:"platform" yaml:"platform"`
+	LatestVersion   string `json:"latest_version,omitempty" yaml:"latest_version,omitempty"`
+	UpdateAvailable *bool  `json:"update_available,omitempty" yaml:"update_available,omitempty"`
+}
 
 func buildVersionCmd() *cobra.Command {
-	return &cobra.Command{
+	var checkVersion bool
+	var outputFormat string
+
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show version information",
 		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Tiger CLI %s\n", Version)
-			fmt.Printf("Build time: %s\n", BuildTime)
-			fmt.Printf("Git commit: %s\n", GitCommit)
-			fmt.Printf("Go version: %s\n", runtime.Version())
-			fmt.Printf("Platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			versionOutput := VersionOutput{
+				Version:   config.Version,
+				BuildTime: config.BuildTime,
+				GitCommit: config.GitCommit,
+				GoVersion: runtime.Version(),
+				Platform:  fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+			}
+
+			updateAvailable := false
+			if checkVersion {
+				cfg, err := config.Load()
+				if err != nil {
+					return fmt.Errorf("Error loading config: %w", err)
+				}
+				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
+					versionOutput.LatestVersion = result.LatestVersion
+					versionOutput.UpdateAvailable = &result.UpdateAvailable
+					updateAvailable = result.UpdateAvailable
+					// Print warning _after_ other output
+					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
+				}
+			}
+
+			output := cmd.OutOrStdout()
+			switch outputFormat {
+			case "json":
+				if err := util.SerializeToJSON(output, versionOutput); err != nil {
+					return err
+				}
+			case "yaml":
+				if err := util.SerializeToYAML(output, versionOutput, true); err != nil {
+					return err
+				}
+			case "bare":
+				fmt.Fprintln(output, versionOutput.Version)
+			default:
+				if err := outputVersionTable(output, versionOutput); err != nil {
+					return err
+				}
+			}
+			if updateAvailable {
+				cmd.SilenceErrors = true
+				cmd.SilenceUsage = true
+				return exitWithCode(ExitUpdateAvailable, nil)
+			}
+			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
+	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table, json, yaml, bare)")
+
+	return cmd
+}
+
+func outputVersionTable(w io.Writer, versionOutput VersionOutput) error {
+	table := tablewriter.NewWriter(w)
+
+	table.Append("Tiger CLI Version", versionOutput.Version)
+	if versionOutput.LatestVersion != "" {
+		table.Append("Latest Version", versionOutput.LatestVersion)
+		table.Append("Update Available", fmt.Sprintf("%v", util.Deref(versionOutput.UpdateAvailable)))
+	}
+	table.Append("Build Time", versionOutput.BuildTime)
+	table.Append("Git Commit", versionOutput.GitCommit)
+	table.Append("Go Version", versionOutput.GoVersion)
+	table.Append("Platform", versionOutput.Platform)
+
+	return table.Render()
 }

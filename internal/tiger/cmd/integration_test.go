@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -28,9 +30,11 @@ func setupIntegrationTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for integration tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
@@ -40,7 +44,10 @@ func setupIntegrationTest(t *testing.T) string {
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
 		// to avoid circular dependencies during setup
-		rootCmd := buildRootCmd()
+		rootCmd, err := buildRootCmd(t.Context())
+		if err != nil {
+			t.Fatalf("Failed to build root command during setup: %v", err)
+		}
 		rootCmd.SetArgs([]string{"config", "set", "api_url", apiURL})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("Failed to set integration API URL during setup: %v", err)
@@ -50,9 +57,9 @@ func setupIntegrationTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		viper.Reset()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -61,31 +68,34 @@ func setupIntegrationTest(t *testing.T) string {
 }
 
 // executeIntegrationCommand executes a CLI command for integration testing
-func executeIntegrationCommand(args ...string) (string, error) {
+func executeIntegrationCommand(ctx context.Context, args ...string) (string, error) {
 	// Reset both global config and viper before each command execution
 	// This ensures fresh config loading with proper flag precedence
 	config.ResetGlobalConfig()
-	viper.Reset()
 
 	// Re-establish viper environment configuration after reset
 	viper.SetEnvPrefix("TIGER")
 	viper.AutomaticEnv()
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot := buildRootCmd()
+	testRoot, err := buildRootCmd(ctx)
+	if err != nil {
+		return "", err
+	}
 
 	buf := new(bytes.Buffer)
 	testRoot.SetOut(buf)
 	testRoot.SetErr(buf)
 	testRoot.SetArgs(args)
 
-	err := testRoot.Execute()
+	err = testRoot.Execute()
 	return buf.String(), err
 }
 
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
-// login -> whoami -> create -> describe -> update-password -> delete -> logout
+// login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
+	config.SetTestServiceName(t)
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
@@ -98,7 +108,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	tmpDir := setupIntegrationTest(t)
 	t.Logf("Using temporary config directory: %s", tmpDir)
 
-
 	// Generate unique service name to avoid conflicts
 	serviceName := fmt.Sprintf("integration-test-%d", time.Now().Unix())
 	var serviceID string
@@ -107,7 +116,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -119,6 +128,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Logf("Cleaning up service: %s", serviceID)
 			// Best effort cleanup - don't fail the test if cleanup fails
 			_, err := executeIntegrationCommand(
+				t.Context(),
 				"service", "delete", serviceID,
 				"--confirm",
 				"--wait-timeout", "5m",
@@ -133,6 +143,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
@@ -151,12 +162,12 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Login successful")
 	})
 
-	t.Run("WhoAmI", func(t *testing.T) {
+	t.Run("Status", func(t *testing.T) {
 		t.Logf("Verifying authentication status")
 
-		output, err := executeIntegrationCommand("auth", "whoami")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "status")
 		if err != nil {
-			t.Fatalf("WhoAmI failed: %v\nOutput: %s", err, output)
+			t.Fatalf("Status failed: %v\nOutput: %s", err, output)
 		}
 
 		// Should not say "Not logged in"
@@ -171,6 +182,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Creating service: %s", serviceName)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "create",
 			"--name", serviceName,
 			"--wait-timeout", "15m", // Longer timeout for integration tests
@@ -200,6 +212,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Listing services to verify creation")
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "list",
 			"--output", "json",
 		)
@@ -218,22 +231,23 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("DescribeService", func(t *testing.T) {
+	t.Run("GetService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
 		}
 
-		t.Logf("Describing service: %s", serviceID)
+		t.Logf("Getting service details: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
-			"service", "describe", serviceID,
+			t.Context(),
+			"service", "get", serviceID,
 			"--output", "json",
 		)
 
-		t.Logf("Raw service describe output: %s", output)
+		t.Logf("Raw service get output: %s", output)
 
 		if err != nil {
-			t.Fatalf("Service describe failed: %v\nOutput: %s", err, output)
+			t.Fatalf("Service get failed: %v\nOutput: %s", err, output)
 		}
 
 		// Parse JSON to verify service details
@@ -267,6 +281,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Testing psql command with original password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as original_password_test;",
 		)
@@ -293,6 +308,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Updating password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "update-password", serviceID,
 			"--new-password", newPassword,
 			"--password-storage", "keychain", // Save to keychain for psql test
@@ -316,7 +332,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Getting connection string for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
-			"db", "connection-string", serviceID,
+			t.Context(), "db", "connection-string", serviceID,
 		)
 
 		if err != nil {
@@ -342,6 +358,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Testing psql command with updated password for service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as updated_password_test;",
 		)
@@ -356,6 +373,472 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("✅ psql command with updated password succeeded")
+	})
+
+	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)
+	var createdRoles []string
+
+	t.Run("CreateRole_Basic", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating basic role: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name in output
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		t.Logf("✅ Successfully created basic role: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithExplicitPassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_pwd_%d", time.Now().Unix())
+		password := fmt.Sprintf("test-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with explicit password: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--password", password,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with password failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		t.Logf("✅ Successfully created role with explicit password: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithInheritedGrants", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_grants_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating read-only role with inherited grants from tsdbadmin: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--from", "tsdbadmin",
+			"--read-only", // Required when inheriting from tsdbadmin
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with --from failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify role name
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
+		}
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != "tsdbadmin" {
+			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
+		}
+
+		// Verify read_only flag in output (required for tsdbadmin inheritance)
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		t.Logf("✅ Successfully created read-only role with inherited grants: %s", roleName)
+	})
+
+	t.Run("CreateRole_ReadOnly", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_readonly_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating read-only role: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create read-only role failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify read_only flag in output
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		t.Logf("✅ Successfully created read-only role: %s", roleName)
+	})
+
+	t.Run("CreateRole_WithStatementTimeout", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_timeout_%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with statement timeout: %s", roleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--statement-timeout", "30s",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with statement timeout failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify statement_timeout in output
+		if result["statement_timeout"] != "30s" {
+			t.Errorf("Expected statement_timeout=30s in output, got: %v", result["statement_timeout"])
+		}
+
+		t.Logf("✅ Successfully created role with statement timeout: %s", roleName)
+	})
+
+	t.Run("CreateRole_ReadOnlyWithInheritance", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		// Step 1: Create a base role with write privileges
+		// (tsdbadmin automatically gets ADMIN OPTION on roles it creates)
+		baseRoleName := fmt.Sprintf("integration_test_base_role_%d", time.Now().Unix())
+		basePassword := fmt.Sprintf("base-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, baseRoleName)
+
+		t.Logf("Creating base role with write privileges: %s", baseRoleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", baseRoleName,
+			"--password", basePassword,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create base role: %v\nOutput: %s", err, output)
+		}
+
+		// Grant CREATE privilege on public schema to base role
+		t.Logf("Granting CREATE privilege to %s", baseRoleName)
+		_, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--", "-c", fmt.Sprintf("GRANT CREATE ON SCHEMA public TO %s;", baseRoleName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to grant CREATE privilege: %v", err)
+		}
+
+		// Step 2: Use base role to create a table and insert data
+		tableName := fmt.Sprintf("test_table_%d", time.Now().Unix())
+		t.Logf("Creating table %s and inserting data as %s", tableName, baseRoleName)
+
+		// Create table and insert data
+		_, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT, data TEXT);", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create table: %v", err)
+		}
+
+		_, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (1, 'test data');", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Failed to insert data: %v", err)
+		}
+
+		// Step 3: Create read-only role that inherits from base role
+		// (tsdbadmin can grant base_role since it has ADMIN OPTION)
+		readOnlyRoleName := fmt.Sprintf("integration_test_readonly_inherited_%d", time.Now().Unix())
+		readOnlyPassword := fmt.Sprintf("readonly-password-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, readOnlyRoleName)
+
+		t.Logf("Creating read-only role with inheritance from %s: %s", baseRoleName, readOnlyRoleName)
+
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", readOnlyRoleName,
+			"--password", readOnlyPassword,
+			"--from", baseRoleName,
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create read-only role with inheritance: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify read_only flag in output
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
+		}
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != baseRoleName {
+			t.Errorf("Expected from_roles to contain '%s', got: %v", baseRoleName, fromRoles)
+		}
+
+		// Step 4: Verify read-only role can READ the data
+		t.Logf("Verifying read-only role can read data from %s", tableName)
+		readOutput, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", readOnlyRoleName,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s;", tableName),
+		)
+		if err != nil {
+			t.Fatalf("Read-only role failed to read data: %v\nOutput: %s", err, readOutput)
+		}
+
+		if !strings.Contains(readOutput, "test data") {
+			t.Errorf("Expected to read 'test data' from table, got: %s", readOutput)
+		}
+		t.Logf("✅ Read-only role successfully read data")
+
+		// Step 5: Verify read-only role CANNOT WRITE
+		t.Logf("Verifying read-only role cannot write to %s", tableName)
+		writeOutput, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", readOnlyRoleName,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s VALUES (2, 'should fail');", tableName),
+		)
+
+		// We EXPECT this to fail
+		if err == nil {
+			t.Errorf("Read-only role should NOT be able to write, but succeeded: %s", writeOutput)
+		} else {
+			// Verify it failed due to read-only enforcement
+			if !strings.Contains(writeOutput, "read-only") && !strings.Contains(writeOutput, "permission denied") {
+				t.Logf("Warning: Write failed but error message unexpected: %s", writeOutput)
+			}
+			t.Logf("✅ Read-only role correctly prevented from writing")
+		}
+
+		// Step 6: Clean up - drop the table
+		t.Logf("Cleaning up table %s", tableName)
+		_, _ = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", serviceID,
+			"--role", baseRoleName,
+			"--", "-c", fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName),
+		)
+
+		t.Logf("✅ Successfully verified read-only role with inheritance")
+	})
+
+	t.Run("CreateRole_AllOptions", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		roleName := fmt.Sprintf("integration_test_role_all_%d", time.Now().Unix())
+		password := fmt.Sprintf("test-password-all-%d", time.Now().Unix())
+		createdRoles = append(createdRoles, roleName)
+
+		t.Logf("Creating role with all valid options (tsdbadmin + read-only): %s", roleName)
+
+		// Note: --statement-timeout cannot be used with --from tsdbadmin due to permission restrictions
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", roleName,
+			"--password", password,
+			"--from", "tsdbadmin",
+			"--read-only",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Create role with all options failed: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all options in output
+		if result["role_name"] != roleName {
+			t.Errorf("Expected role_name=%s, got: %v", roleName, result["role_name"])
+		}
+		if readOnly, ok := result["read_only"].(bool); !ok || !readOnly {
+			t.Errorf("Expected read_only=true, got: %v", result["read_only"])
+		}
+		// Note: statement_timeout not checked as it cannot be set with --from tsdbadmin
+
+		// Verify from_roles in output
+		fromRoles, ok := result["from_roles"].([]interface{})
+		if !ok || len(fromRoles) == 0 {
+			t.Error("Expected from_roles in output")
+		} else if fromRoles[0] != "tsdbadmin" {
+			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
+		}
+
+		t.Logf("✅ Successfully created role with all valid options: %s", roleName)
+	})
+
+	t.Run("CreateRole_VerifyRolesExist", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		if len(createdRoles) == 0 {
+			t.Skip("No roles created to verify")
+		}
+
+		// Verify all created roles exist by querying pg_roles
+		t.Logf("Verifying created roles exist in database")
+
+		for _, roleName := range createdRoles {
+			output, err := executeIntegrationCommand(
+				t.Context(),
+				"db", "psql", serviceID,
+				"--", "-c", fmt.Sprintf("SELECT rolname FROM pg_roles WHERE rolname = '%s';", roleName),
+			)
+
+			if err != nil {
+				t.Errorf("Failed to verify role %s exists: %v\nOutput: %s", roleName, err, output)
+				continue
+			}
+
+			// Verify role name appears in output
+			if !strings.Contains(output, roleName) {
+				t.Errorf("Role %s not found in pg_roles query output: %s", roleName, output)
+			} else {
+				t.Logf("✅ Verified role exists in database: %s", roleName)
+			}
+		}
+	})
+
+	t.Run("CreateRole_DuplicateName", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		if len(createdRoles) == 0 {
+			t.Skip("No roles created to test duplicate")
+		}
+
+		// Try to create a role with the same name as the first created role
+		duplicateRoleName := createdRoles[0]
+
+		t.Logf("Attempting to create duplicate role: %s", duplicateRoleName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "create", "role", serviceID,
+			"--name", duplicateRoleName,
+		)
+
+		// This should fail with a role already exists error
+		if err == nil {
+			t.Errorf("Expected duplicate role creation to fail, but got output: %s", output)
+		} else {
+			// Verify error message indicates role already exists
+			if !strings.Contains(err.Error(), "already exists") && !strings.Contains(output, "already exists") {
+				t.Logf("Note: Error message may not contain 'already exists': %v\nOutput: %s", err, output)
+			} else {
+				t.Logf("✅ Duplicate role creation correctly failed")
+			}
+		}
 	})
 
 	t.Run("StopService", func(t *testing.T) {
@@ -380,7 +863,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		} else {
 			// Verify stop success message
 			if !strings.Contains(output, "Stop request accepted") &&
-			   !strings.Contains(output, "stopped successfully") {
+				!strings.Contains(output, "stopped successfully") {
 				t.Errorf("Expected stop success message, got: %s", output)
 			}
 			t.Logf("Service stop completed successfully")
@@ -442,7 +925,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		} else {
 			// Verify start success message
 			if !strings.Contains(output, "Start request accepted") &&
-			   !strings.Contains(output, "ready and running") {
+				!strings.Contains(output, "ready and running") {
 				t.Errorf("Expected start success message, got: %s", output)
 			}
 			t.Logf("Service start completed successfully")
@@ -490,6 +973,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Deleting service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "delete", serviceID,
 			"--confirm",
 			"--wait-timeout", "10m",
@@ -516,19 +1000,20 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		t.Logf("Verifying service %s no longer exists", deletedServiceID)
 
-		// Try to describe the deleted service - should fail
+		// Try to get the deleted service - should fail
 		output, err := executeIntegrationCommand(
-			"service", "describe", deletedServiceID,
+			t.Context(),
+			"service", "get", deletedServiceID,
 		)
 
 		// We expect this to fail since the service should be deleted
 		if err == nil {
-			t.Errorf("Expected service describe to fail for deleted service, but got output: %s", output)
+			t.Errorf("Expected service get to fail for deleted service, but got output: %s", output)
 		}
 
 		// Check that error indicates service not found
-		if !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "404") {
-			t.Errorf("Expected 'not found' error for deleted service, got: %v", err)
+		if !strings.Contains(err.Error(), "no service with that id exists") {
+			t.Errorf("Expected 'no service with that id exists' error for deleted service, got: %v", err)
 		}
 
 		// Check that it returns the correct exit code (this should be required)
@@ -544,7 +1029,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("Logout", func(t *testing.T) {
 		t.Logf("Logging out")
 
-		output, err := executeIntegrationCommand("auth", "logout")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
 		}
@@ -560,10 +1045,10 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	t.Run("VerifyLoggedOut", func(t *testing.T) {
 		t.Logf("Verifying we're logged out")
 
-		output, err := executeIntegrationCommand("auth", "whoami")
+		output, err := executeIntegrationCommand(t.Context(), "auth", "status")
 		// This should either fail or say "Not logged in"
 		if err == nil && !strings.Contains(output, "Not logged in") {
-			t.Errorf("Expected to be logged out, but whoami succeeded: %s", output)
+			t.Errorf("Expected to be logged out, but status succeeded: %s", output)
 		}
 
 		t.Logf("Verified logged out status")
@@ -611,12 +1096,13 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	return ""
 }
 
-// TestServiceNotFound tests that commands requiring service ID fail with correct exit code for non-existent services
-func TestServiceNotFound(t *testing.T) {
+// TestServiceNotFoundIntegration tests that commands requiring service ID fail with correct exit code for non-existent services
+func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	config.SetTestServiceName(t)
 
 	if publicKey == "" || secretKey == "" || projectID == "" {
 		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
@@ -629,7 +1115,7 @@ func TestServiceNotFound(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -637,6 +1123,7 @@ func TestServiceNotFound(t *testing.T) {
 
 	// Login first
 	output, err := executeIntegrationCommand(
+		t.Context(),
 		"auth", "login",
 		"--public-key", publicKey,
 		"--secret-key", secretKey,
@@ -659,8 +1146,8 @@ func TestServiceNotFound(t *testing.T) {
 		reason           string
 	}{
 		{
-			name:             "service describe",
-			args:             []string{"service", "describe", nonExistentServiceID},
+			name:             "service get",
+			args:             []string{"service", "get", nonExistentServiceID},
 			expectedExitCode: ExitServiceNotFound,
 		},
 		{
@@ -703,16 +1190,20 @@ func TestServiceNotFound(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			if err == nil {
 				t.Errorf("Expected %s to fail for non-existent service, but got output: %s", tc.name, output)
 				return
 			}
 
-			// Verify error message contains "not found"
-			if !strings.Contains(err.Error(), "not found") {
-				t.Errorf("Expected 'not found' error message for %s, got: %v", tc.name, err)
+			// Verify error message indicates service doesn't exist (API returns various messages)
+			errorMsg := strings.ToLower(err.Error())
+			if !strings.Contains(errorMsg, "not found") &&
+				!strings.Contains(errorMsg, "no entries") &&
+				!strings.Contains(errorMsg, "no service") &&
+				!strings.Contains(errorMsg, "could not be found") {
+				t.Errorf("Expected error message indicating service doesn't exist for %s, got: %v", tc.name, err)
 			}
 
 			// Verify correct exit code
@@ -740,6 +1231,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
+	config.SetTestServiceName(t)
 
 	if publicKey == "" || secretKey == "" || projectID == "" {
 		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
@@ -756,7 +1248,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
-		_, err := executeIntegrationCommand("auth", "logout")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
 		if err != nil {
 			t.Logf("Warning: Failed to logout: %v", err)
 		}
@@ -766,6 +1258,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 		t.Logf("Logging in for database tests")
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
@@ -783,6 +1276,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 		t.Logf("Testing database connection for service: %s", existingServiceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"db", "test-connection", existingServiceID,
 			"--timeout", "30s",
 		)
@@ -804,6 +1298,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	config.SetTestServiceName(t)
 
 	if publicKey == "" || secretKey == "" || projectID == "" {
 		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
@@ -814,10 +1309,22 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	t.Logf("Using temporary config directory: %s", tmpDir)
 
 	// Make sure we're logged out (this should always succeed or be a no-op)
-	_, _ = executeIntegrationCommand("auth", "logout")
+	_, _ = executeIntegrationCommand(t.Context(), "auth", "logout")
 
-	// Test with invalid API key to trigger authentication errors (401 response from server)
-	invalidAPIKey := "invalid-public-key:invalid-secret-key"
+	// Log in with invalid credentials to trigger authentication errors (401 response from server)
+	invalidPublicKey := "invalid-public-key"
+	invalidSecretKey := "invalid-secret-key"
+
+	// Login with invalid credentials (this should succeed locally but fail on API calls)
+	loginOutput, loginErr := executeIntegrationCommand(t.Context(), "auth", "login",
+		"--public-key", invalidPublicKey,
+		"--secret-key", invalidSecretKey,
+		"--project-id", projectID)
+	if loginErr != nil {
+		t.Logf("Login with invalid credentials failed (expected): %s", loginOutput)
+	} else {
+		t.Fatalf("Cannot test authentication errors: login with invalid credentials succeeded: %v", loginErr)
+	}
 
 	// Test service commands that should return authentication errors
 	serviceCommands := []struct {
@@ -826,23 +1333,23 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "service list",
-			args: []string{"service", "list", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"service", "list"},
 		},
 		{
-			name: "service describe",
-			args: []string{"service", "describe", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			name: "service get",
+			args: []string{"service", "get", "non-existent-service"},
 		},
 		{
 			name: "service create",
-			args: []string{"service", "create", "--name", "test-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "create", "--name", "test-service", "--no-wait"},
 		},
 		{
 			name: "service update-password",
-			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"service", "update-password", "non-existent-service", "--new-password", "test-pass"},
 		},
 		{
 			name: "service delete",
-			args: []string{"service", "delete", "non-existent-service", "--confirm", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "delete", "non-existent-service", "--confirm", "--no-wait"},
 		},
 		{
 			name: "service start",
@@ -861,24 +1368,24 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}{
 		{
 			name: "db connection-string",
-			args: []string{"db", "connection-string", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "connection-string", "non-existent-service"},
 		},
 		{
 			name: "db connect",
-			args: []string{"db", "connect", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "connect", "non-existent-service"},
 		},
 		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
 		// for authentication issues, not ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
-			args: []string{"db", "test-connection", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID},
+			args: []string{"db", "test-connection", "non-existent-service"},
 		},
 	}
 
 	// Test all service commands
 	for _, tc := range serviceCommands {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			// Should fail with authentication error
 			if err == nil {
@@ -907,7 +1414,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Test all db commands
 	for _, tc := range dbCommands {
 		t.Run(tc.name, func(t *testing.T) {
-			output, err := executeIntegrationCommand(tc.args...)
+			output, err := executeIntegrationCommand(t.Context(), tc.args...)
 
 			// Should fail with authentication error
 			if err == nil {

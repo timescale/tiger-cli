@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/viper"
+	"github.com/spf13/pflag"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func TestMain(m *testing.M) {
 	// Reset viper state before each test run
-	viper.Reset()
+	ResetGlobalConfig()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -24,13 +25,13 @@ func setupTestConfig(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-
-	// Clean up Viper state
-	viper.Reset()
+	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
+		t.Fatalf("Failed to setup Viper: %v", err)
+	}
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
-		viper.Reset()
+		ResetGlobalConfig()
 	})
 
 	return tmpDir
@@ -40,8 +41,7 @@ func setupViper(t *testing.T, tmpDir string) {
 	t.Helper()
 
 	// Set up Viper configuration using the shared function
-	configFile := filepath.Join(tmpDir, ConfigFileName)
-	if err := SetupViper(configFile); err != nil {
+	if err := SetupViper(tmpDir); err != nil {
 		t.Fatalf("Failed to setup Viper: %v", err)
 	}
 }
@@ -79,12 +79,11 @@ func TestLoad_FromConfigFile(t *testing.T) {
 
 	// Create config file
 	configContent := `api_url: https://custom.api.com/v1
-project_id: test-project-123
 service_id: test-service-456
 output: json
 analytics: false
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -104,9 +103,6 @@ analytics: false
 	if cfg.APIURL != "https://custom.api.com/v1" {
 		t.Errorf("Expected APIURL https://custom.api.com/v1, got %s", cfg.APIURL)
 	}
-	if cfg.ProjectID != "test-project-123" {
-		t.Errorf("Expected ProjectID test-project-123, got %s", cfg.ProjectID)
-	}
 	if cfg.ServiceID != "test-service-456" {
 		t.Errorf("Expected ServiceID test-service-456, got %s", cfg.ServiceID)
 	}
@@ -124,7 +120,6 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	// Set environment variables
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	os.Setenv("TIGER_API_URL", "https://env.api.com/v1")
-	os.Setenv("TIGER_PROJECT_ID", "env-project-789")
 	os.Setenv("TIGER_SERVICE_ID", "env-service-101")
 	os.Setenv("TIGER_OUTPUT", "yaml")
 	os.Setenv("TIGER_ANALYTICS", "false")
@@ -134,7 +129,6 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_API_URL")
-		os.Unsetenv("TIGER_PROJECT_ID")
 		os.Unsetenv("TIGER_SERVICE_ID")
 		os.Unsetenv("TIGER_OUTPUT")
 		os.Unsetenv("TIGER_ANALYTICS")
@@ -148,9 +142,6 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	// Verify environment values
 	if cfg.APIURL != "https://env.api.com/v1" {
 		t.Errorf("Expected APIURL https://env.api.com/v1, got %s", cfg.APIURL)
-	}
-	if cfg.ProjectID != "env-project-789" {
-		t.Errorf("Expected ProjectID env-project-789, got %s", cfg.ProjectID)
 	}
 	if cfg.ServiceID != "env-service-101" {
 		t.Errorf("Expected ServiceID env-service-101, got %s", cfg.ServiceID)
@@ -168,25 +159,22 @@ func TestLoad_Precedence(t *testing.T) {
 
 	// Create config file with some values
 	configContent := `api_url: https://file.api.com/v1
-project_id: file-project
 output: table
 analytics: true
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
 	// Set environment variables that should override config file
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_PROJECT_ID", "env-project-override")
 	os.Setenv("TIGER_OUTPUT", "json")
 
 	setupViper(t, tmpDir)
 
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_PROJECT_ID")
 		os.Unsetenv("TIGER_OUTPUT")
 	}()
 
@@ -196,9 +184,6 @@ analytics: true
 	}
 
 	// Environment should override config file
-	if cfg.ProjectID != "env-project-override" {
-		t.Errorf("Expected ProjectID env-project-override (env override), got %s", cfg.ProjectID)
-	}
 	if cfg.Output != "json" {
 		t.Errorf("Expected Output json (env override), got %s", cfg.Output)
 	}
@@ -246,22 +231,18 @@ func TestSave(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 	setupViper(t, tmpDir)
 
-	cfg := &Config{
-		APIURL:    "https://test.api.com/v1",
-		ProjectID: "test-project",
-		ServiceID: "test-service",
-		Output:    "json",
-		Analytics: false,
-		ConfigDir: tmpDir,
-	}
-
-	err := cfg.Save()
+	cfg, err := UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "https://test.api.com/v1",
+		"service_id": "test-service",
+		"output":     "json",
+		"analytics":  false,
+	})
 	if err != nil {
-		t.Fatalf("Save() failed: %v", err)
+		t.Fatalf("UseTestConfig() failed: %v", err)
 	}
 
 	// Verify file was created
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
@@ -270,7 +251,7 @@ func TestSave(t *testing.T) {
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	viper.Reset()
+	ResetGlobalConfig()
 
 	// Setup Viper again to read the saved config file
 	setupViper(t, tmpDir)
@@ -282,9 +263,6 @@ func TestSave(t *testing.T) {
 
 	if loadedCfg.APIURL != cfg.APIURL {
 		t.Errorf("Expected APIURL %s, got %s", cfg.APIURL, loadedCfg.APIURL)
-	}
-	if loadedCfg.ProjectID != cfg.ProjectID {
-		t.Errorf("Expected ProjectID %s, got %s", cfg.ProjectID, loadedCfg.ProjectID)
 	}
 	if loadedCfg.ServiceID != cfg.ServiceID {
 		t.Errorf("Expected ServiceID %s, got %s", cfg.ServiceID, loadedCfg.ServiceID)
@@ -319,13 +297,6 @@ func TestSet(t *testing.T) {
 			value: "https://new.api.com/v1",
 			checkFunc: func() bool {
 				return cfg.APIURL == "https://new.api.com/v1"
-			},
-		},
-		{
-			key:   "project_id",
-			value: "new-project-123",
-			checkFunc: func() bool {
-				return cfg.ProjectID == "new-project-123"
 			},
 		},
 		{
@@ -416,7 +387,6 @@ func TestUnset(t *testing.T) {
 
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
-		ProjectID: "custom-project",
 		ServiceID: "custom-service",
 		Output:    "json",
 		Analytics: false,
@@ -432,12 +402,6 @@ func TestUnset(t *testing.T) {
 			key: "api_url",
 			checkFunc: func() bool {
 				return cfg.APIURL == DefaultAPIURL
-			},
-		},
-		{
-			key: "project_id",
-			checkFunc: func() bool {
-				return cfg.ProjectID == ""
 			},
 		},
 		{
@@ -493,7 +457,6 @@ func TestReset(t *testing.T) {
 
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
-		ProjectID: "custom-project",
 		ServiceID: "custom-service",
 		Output:    "json",
 		Analytics: false,
@@ -508,9 +471,6 @@ func TestReset(t *testing.T) {
 	// Verify all values are reset to defaults
 	if cfg.APIURL != DefaultAPIURL {
 		t.Errorf("Expected APIURL %s, got %s", DefaultAPIURL, cfg.APIURL)
-	}
-	if cfg.ProjectID != "" {
-		t.Errorf("Expected empty ProjectID, got %s", cfg.ProjectID)
 	}
 	if cfg.ServiceID != "" {
 		t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
@@ -569,10 +529,9 @@ func TestLoad_ErrorHandling(t *testing.T) {
 
 	// Create invalid YAML config file
 	invalidConfig := `api_url: https://test.api.com/v1
-project_id: test-project
 invalid yaml content [
 `
-	configFile := filepath.Join(tmpDir, ConfigFileName)
+	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(invalidConfig), 0644); err != nil {
 		t.Fatalf("Failed to write invalid config file: %v", err)
 	}
@@ -581,38 +540,74 @@ invalid yaml content [
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// SetupViper should fail with invalid config file
-	err := SetupViper(configFile)
-	if err == nil {
+	if err := SetupViper(tmpDir); err == nil {
 		t.Error("Expected SetupViper() to fail with invalid config file, but it succeeded")
 	}
 }
 
-func TestGetConfigDir(t *testing.T) {
-	// Test with TIGER_CONFIG_DIR environment variable
-	os.Setenv("TIGER_CONFIG_DIR", "/custom/config/path")
-	defer os.Unsetenv("TIGER_CONFIG_DIR")
-
-	dir := GetConfigDir()
-	if dir != "/custom/config/path" {
-		t.Errorf("Expected /custom/config/path, got %s", dir)
-	}
-
-	// Test with tilde expansion
-	os.Setenv("TIGER_CONFIG_DIR", "~/tiger-config")
-	dir = GetConfigDir()
+func TestGetEffectiveConfigDir(t *testing.T) {
 	homeDir, _ := os.UserHomeDir()
-	expected := filepath.Join(homeDir, "tiger-config")
-	if dir != expected {
-		t.Errorf("Expected %s, got %s", expected, dir)
+
+	tests := []struct {
+		name      string
+		envVar    string
+		flagValue string
+		expected  string
+	}{
+		{
+			name:     "default behavior",
+			expected: GetDefaultConfigDir(),
+		},
+		{
+			name:     "env var normal path",
+			envVar:   "/env/config/path",
+			expected: "/env/config/path",
+		},
+		{
+			name:     "env var tilde expansion",
+			envVar:   "~/env/config/path/tiger-config",
+			expected: filepath.Join(homeDir, "/env/config/path/tiger-config"),
+		},
+		{
+			name:      "flag normal path overrides env var",
+			envVar:    "/env/config/path",
+			flagValue: "/flag/config/path",
+			expected:  "/flag/config/path",
+		},
+		{
+			name:      "flag tilde expansion overrides env var",
+			envVar:    "/env/config/path",
+			flagValue: "~/flag/config/path",
+			expected:  filepath.Join(homeDir, "/flag/config/path"),
+		},
 	}
 
-	// Test default behavior
-	os.Unsetenv("TIGER_CONFIG_DIR")
-	dir = GetConfigDir()
-	homeDir, _ = os.UserHomeDir()
-	expected = filepath.Join(homeDir, ".config", "tiger")
-	if dir != expected {
-		t.Errorf("Expected %s, got %s", expected, dir)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clean up env var before each test
+			os.Unsetenv("TIGER_CONFIG_DIR")
+
+			// Set env var if specified
+			if tt.envVar != "" {
+				os.Setenv("TIGER_CONFIG_DIR", tt.envVar)
+				defer os.Unsetenv("TIGER_CONFIG_DIR")
+			}
+
+			// Create mock flag
+			var flagVar string
+			fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			fs.StringVar(&flagVar, "config-dir", "", "config directory")
+			if tt.flagValue != "" {
+				fs.Set("config-dir", tt.flagValue)
+			}
+			flag := fs.Lookup("config-dir")
+
+			// Test the function
+			result := GetEffectiveConfigDir(flag)
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
 	}
 }
 
@@ -632,7 +627,7 @@ func TestExpandPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			result := expandPath(tt.input)
+			result := util.ExpandPath(tt.input)
 			if result != tt.expected {
 				t.Errorf("expandPath(%s) = %s, expected %s", tt.input, result, tt.expected)
 			}
@@ -646,14 +641,11 @@ func TestSave_CreateDirectory(t *testing.T) {
 	// Use non-existent subdirectory
 	configDir := filepath.Join(tmpDir, "nested", "config")
 
-	cfg := &Config{
-		APIURL:    "https://test.api.com/v1",
-		ConfigDir: configDir,
-	}
-
-	err := cfg.Save()
+	_, err := UseTestConfig(configDir, map[string]any{
+		"api_url": "https://test.api.com/v1",
+	})
 	if err != nil {
-		t.Fatalf("Save() failed: %v", err)
+		t.Fatalf("UseTestConfig() failed: %v", err)
 	}
 
 	// Verify directory was created
@@ -662,7 +654,7 @@ func TestSave_CreateDirectory(t *testing.T) {
 	}
 
 	// Verify config file was created
-	configFile := filepath.Join(configDir, ConfigFileName)
+	configFile := GetConfigFile(configDir)
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
@@ -674,10 +666,10 @@ func TestResetGlobalConfig(t *testing.T) {
 
 	// Set environment variable for test
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_PROJECT_ID", "test-project-before-reset")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-before-reset")
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_PROJECT_ID")
+		os.Unsetenv("TIGER_SERVICE_ID")
 	}()
 
 	// Load config first
@@ -687,8 +679,8 @@ func TestResetGlobalConfig(t *testing.T) {
 	}
 
 	// Verify environment was used
-	if cfg1.ProjectID != "test-project-before-reset" {
-		t.Errorf("Expected project ID from env, got %s", cfg1.ProjectID)
+	if cfg1.ServiceID != "test-service-before-reset" {
+		t.Errorf("Expected service ID from env, got %s", cfg1.ServiceID)
 	}
 
 	// Reset global viper state
@@ -698,7 +690,7 @@ func TestResetGlobalConfig(t *testing.T) {
 	setupViper(t, tmpDir)
 
 	// Change env var
-	os.Setenv("TIGER_PROJECT_ID", "test-project-after-reset")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-after-reset")
 
 	// Load again should pick up new env value
 	cfg2, err := Load()
@@ -712,7 +704,7 @@ func TestResetGlobalConfig(t *testing.T) {
 	}
 
 	// Should have new env value
-	if cfg2.ProjectID != "test-project-after-reset" {
-		t.Errorf("Expected new project ID after reset, got %s", cfg2.ProjectID)
+	if cfg2.ServiceID != "test-service-after-reset" {
+		t.Errorf("Expected new service ID after reset, got %s", cfg2.ServiceID)
 	}
 }
