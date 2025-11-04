@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -124,7 +126,47 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
+	wrapCommandsWithAnalytics(cmd)
+
 	return cmd, nil
+}
+
+func wrapCommandsWithAnalytics(cmd *cobra.Command) {
+	// Wrap this command's RunE if it exists
+	if cmd.RunE != nil {
+		originalRunE := cmd.RunE
+		cmd.RunE = func(c *cobra.Command, args []string) (runErr error) {
+			start := time.Now()
+
+			defer func() {
+				// Reload config after command to account for config changes
+				// during command (e.g. `tiger config set analytics false`
+				// should not result in an analytics event being sent).
+				cfg, err := config.Load()
+				if err != nil {
+					return
+				}
+
+				// Reload credentials after command to account for credentials
+				// changes during command (e.g. `tiger auth login` should
+				// record an analytics event).
+				a := analytics.TryInit(cfg)
+				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
+					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
+					analytics.FlagSet(c.Flags()),
+					analytics.Error(runErr),
+				)
+			}()
+
+			return originalRunE(c, args)
+		}
+	}
+
+	// Recursively wrap all children
+	for _, child := range cmd.Commands() {
+		wrapCommandsWithAnalytics(child)
+	}
 }
 
 func Execute(ctx context.Context) error {

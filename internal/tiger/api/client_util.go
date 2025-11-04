@@ -38,13 +38,8 @@ func getHTTPClient() *http.Client {
 	return sharedHTTPClient
 }
 
-// NewTigerClient creates a new API client with the given API key
-func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
+// NewTigerClient creates a new API client with the given config, API key, and project ID
+func NewTigerClient(cfg *config.Config, apiKey string) (*ClientWithResponses, error) {
 	// Use shared HTTP client with resource limits
 	httpClient := getHTTPClient()
 
@@ -66,8 +61,8 @@ func NewTigerClient(apiKey string) (*ClientWithResponses, error) {
 }
 
 // ValidateAPIKey validates the API key by making a test API call
-func ValidateAPIKey(ctx context.Context, apiKey string, projectID string) error {
-	client, err := NewTigerClient(apiKey)
+func ValidateAPIKey(ctx context.Context, cfg *config.Config, apiKey string, projectID string) error {
+	client, err := NewTigerClient(cfg, apiKey)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
