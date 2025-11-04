@@ -3021,8 +3021,7 @@ type PostProjectsProjectIdServicesServiceIdStartResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -3045,8 +3044,7 @@ type PostProjectsProjectIdServicesServiceIdStopResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
-	JSON400      *BadRequest
-	JSON404      *NotFound
+	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
@@ -4403,19 +4401,12 @@ func ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp *http.Response
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -4443,19 +4434,12 @@ func ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp *http.Response)
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
+		response.JSON4XX = &dest
 
 	}
 
