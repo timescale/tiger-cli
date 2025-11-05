@@ -830,26 +830,37 @@ func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, p
 }
 
 // waitForServicePaused polls the service status until it's paused or timeout occurs
-func waitForServicePaused(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, output io.Writer) error {
+func waitForServicePaused(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) error {
 	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
 	defer cancel()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	// Start the spinner
+	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
+	defer spinner.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return exitWithCode(ExitTimeout, fmt.Errorf("❌ wait timeout reached after %v - service may still be stopping", waitTimeout))
+			switch {
+			case errors.Is(ctx.Err(), context.DeadlineExceeded):
+				return exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be stopping", waitTimeout))
+			case errors.Is(ctx.Err(), context.Canceled):
+				return exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be stopping"))
+			default:
+				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be stopping: %w", ctx.Err()))
+			}
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				fmt.Fprintf(output, "⚠️  Error checking service status: %v\n", err)
+				spinner.Update("Error checking service status: %v", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				fmt.Fprintf(output, "⚠️  Service not found or error checking status\n")
+				spinner.Update("Service not found or error checking status")
 				continue
 			}
 
@@ -858,12 +869,11 @@ func waitForServicePaused(ctx context.Context, client *api.ClientWithResponses, 
 
 			switch status {
 			case "PAUSED":
-				fmt.Fprintf(output, "⏹️  Service has been stopped successfully!\n")
 				return nil
 			case "FAILED", "ERROR":
-				return fmt.Errorf("service stop operation failed with status: %s", status)
+				return fmt.Errorf("service failed with status: %s", status)
 			default:
-				fmt.Fprintf(output, "⏳ Service status: %s (stopping)...\n", status)
+				spinner.Update("Service status: %s", status)
 			}
 		}
 	}
@@ -1471,8 +1481,17 @@ Examples:
 			}
 
 			// Wait for service to become ready
-			_, err = waitForServiceReady(cmd.Context(), client, projectID, serviceID, startWaitTimeout, service.Status, statusOutput)
-			return err
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", startWaitTimeout)
+			if _, err := waitForServiceReady(cmd.Context(), client, projectID, serviceID, startWaitTimeout, service.Status, statusOutput); err != nil {
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+
+				// Return error for sake of exit code, but silence it since it was already output above
+				cmd.SilenceErrors = true
+				return err
+			}
+
+			fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+			return nil
 		},
 	}
 
@@ -1548,9 +1567,10 @@ Examples:
 				// TODO: ExitConflict?
 				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+			service := *resp.JSON202
 
 			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "⏹️  Stop request accepted for service '%s'.\n", serviceID)
+			fmt.Fprintf(statusOutput, "⏹️ Stop request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if stopNoWait {
@@ -1559,7 +1579,12 @@ Examples:
 			}
 
 			// Wait for service to become paused
-			return waitForServicePaused(cmd.Context(), client, projectID, serviceID, stopWaitTimeout, statusOutput)
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
+			if err := waitForServicePaused(cmd.Context(), client, projectID, serviceID, stopWaitTimeout, service.Status, statusOutput); err != nil {
+				return err
+			}
+			fmt.Fprintf(statusOutput, "✅ Service has been stopped successfully!\n")
+			return nil
 		},
 	}
 
