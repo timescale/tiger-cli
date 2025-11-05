@@ -1415,8 +1415,10 @@ Examples:
 
   # Start service with custom wait timeout
   tiger service start svc-12345 --wait-timeout 10m`,
+		ValidArgsFunction: serviceIDCompletion,
+		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require explicit service ID
+			// Require explicit service ID for safety
 			if len(args) < 1 {
 				return fmt.Errorf("service ID is required")
 			}
@@ -1502,8 +1504,10 @@ Examples:
 
   # Stop service with custom wait timeout
   tiger service stop svc-12345 --wait-timeout 10m`,
+		ValidArgsFunction: serviceIDCompletion,
+		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require explicit service ID
+			// Require explicit service ID for safety
 			if len(args) < 1 {
 				return fmt.Errorf("service ID is required")
 			}
