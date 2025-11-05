@@ -830,8 +830,8 @@ func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, p
 }
 
 // waitForServicePaused polls the service status until it's paused or timeout occurs
-func waitForServicePaused(client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
+func waitForServicePaused(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, output io.Writer) error {
+	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
 	defer cancel()
 
 	ticker := time.NewTicker(10 * time.Second)
@@ -844,26 +844,26 @@ func waitForServicePaused(client *api.ClientWithResponses, projectID, serviceID 
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Error checking service status: %v\n", err)
+				fmt.Fprintf(output, "⚠️  Error checking service status: %v\n", err)
 				continue
 			}
 
 			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Service not found or error checking status\n")
+				fmt.Fprintf(output, "⚠️  Service not found or error checking status\n")
 				continue
 			}
 
 			service := *resp.JSON200
-			status := formatDeployStatus(service.Status)
+			status := util.DerefStr(service.Status)
 
 			switch status {
 			case "PAUSED":
-				fmt.Fprintf(cmd.OutOrStdout(), "⏹️  Service has been stopped successfully!\n")
+				fmt.Fprintf(output, "⏹️  Service has been stopped successfully!\n")
 				return nil
 			case "FAILED", "ERROR":
 				return fmt.Errorf("service stop operation failed with status: %s", status)
 			default:
-				fmt.Fprintf(cmd.OutOrStdout(), "⏳ Service status: %s (stopping)...\n", status)
+				fmt.Fprintf(output, "⏳ Service status: %s (stopping)...\n", status)
 			}
 		}
 	}
@@ -1430,18 +1430,14 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			if cfg.ProjectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Get API key
-			apiKey, err := getAPIKeyForService()
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -1449,37 +1445,32 @@ Examples:
 			// Make the start request
 			resp, err := client.PostProjectsProjectIdServicesServiceIdStartWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to start service: %w", err)
 			}
 
-			// Handle response
-			switch resp.StatusCode() {
-			case 202:
-				fmt.Fprintf(cmd.OutOrStdout(), "🚀 Start request accepted for service '%s'.\n", serviceID)
-
-				// If not waiting, return early
-				if startNoWait {
-					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service describe' to check service status.")
-					return nil
-				}
-
-				// Wait for service to become ready
-				return waitForServiceReady(client, cfg.ProjectID, serviceID, startWaitTimeout, cmd)
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to start service"))
-			case 409:
-				return exitWithCode(ExitConflict, fmt.Errorf("conflict: service cannot be started in its current state"))
-			default:
-				return fmt.Errorf("unexpected response status: %d", resp.StatusCode())
+			// Handle API response
+			if resp.StatusCode() != 202 {
+				// TODO: ExitConflict?
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+			service := *resp.JSON202
+
+			statusOutput := cmd.ErrOrStderr()
+			fmt.Fprintf(statusOutput, "🚀 Start request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if startNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service describe' to check service status.")
+				return nil
+			}
+
+			// Wait for service to become ready
+			_, err = waitForServiceReady(cmd.Context(), client, projectID, serviceID, startWaitTimeout, service.Status, statusOutput)
+			return err
 		},
 	}
 
@@ -1526,18 +1517,14 @@ Examples:
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			if cfg.ProjectID == "" {
-				return fmt.Errorf("project ID is required. Set it using login with --project-id")
-			}
-
 			// Get API key
-			apiKey, err := getAPIKeyForService()
+			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
 				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
-			client, err := api.NewTigerClient(apiKey)
+			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
 				return fmt.Errorf("failed to create API client: %w", err)
 			}
@@ -1545,37 +1532,30 @@ Examples:
 			// Make the stop request
 			resp, err := client.PostProjectsProjectIdServicesServiceIdStopWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to stop service: %w", err)
 			}
 
-			// Handle response
-			switch resp.StatusCode() {
-			case 202:
-				fmt.Fprintf(cmd.OutOrStdout(), "⏹️  Stop request accepted for service '%s'.\n", serviceID)
-
-				// If not waiting, return early
-				if stopNoWait {
-					fmt.Fprintln(cmd.OutOrStdout(), "💡 Use 'tiger service describe' to check service status.")
-					return nil
-				}
-
-				// Wait for service to become paused
-				return waitForServicePaused(client, cfg.ProjectID, serviceID, stopWaitTimeout, cmd)
-			case 404:
-				return exitWithCode(ExitServiceNotFound, fmt.Errorf("service '%s' not found in project '%s'", serviceID, cfg.ProjectID))
-			case 401:
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication failed: invalid API key"))
-			case 403:
-				return exitWithCode(ExitPermissionDenied, fmt.Errorf("permission denied: insufficient access to stop service"))
-			case 409:
-				return exitWithCode(ExitConflict, fmt.Errorf("conflict: service cannot be stopped in its current state"))
-			default:
-				return fmt.Errorf("unexpected response status: %d", resp.StatusCode())
+			// Handle API response
+			if resp.StatusCode() != 202 {
+				// TODO: ExitConflict?
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			statusOutput := cmd.ErrOrStderr()
+			fmt.Fprintf(statusOutput, "⏹️  Stop request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if stopNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service describe' to check service status.")
+				return nil
+			}
+
+			// Wait for service to become paused
+			return waitForServicePaused(cmd.Context(), client, projectID, serviceID, stopWaitTimeout, statusOutput)
 		},
 	}
 
