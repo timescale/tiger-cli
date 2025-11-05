@@ -196,13 +196,13 @@ func buildServiceListCmd() *cobra.Command {
 
 			services := *resp.JSON200
 			if len(services) == 0 {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🏜️ No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
 				return nil
 			}
 
 			if resp.JSON200 == nil {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
+				fmt.Fprintln(statusOutput, "🏜️ No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
 				return nil
 			}
@@ -405,7 +405,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
+					service.Status, serviceErr = waitForService(cmd.Context(), waitForServiceArgs{
+						client:        client,
+						projectID:     projectID,
+						serviceID:     serviceID,
+						initialStatus: service.Status,
+						condition:     serviceStatus("READY"),
+						output:        statusOutput,
+						timeout:       createWaitTimeout,
+						timeoutMsg:    "service may still be provisioning",
+					})
 					if serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
@@ -1013,13 +1022,22 @@ Examples:
 
 			// If not waiting, return early
 			if startNoWait {
-				fmt.Fprintln(statusOutput, "💡 Use 'tiger service describe' to check service status.")
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become ready
-			fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", startWaitTimeout)
-			if _, err := waitForServiceReady(cmd.Context(), client, projectID, serviceID, startWaitTimeout, service.Status, statusOutput); err != nil {
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
+			if _, err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:        client,
+				projectID:     projectID,
+				serviceID:     serviceID,
+				initialStatus: service.Status,
+				condition:     serviceStatus("READY"),
+				output:        statusOutput,
+				timeout:       startWaitTimeout,
+				timeoutMsg:    "service may still be starting",
+			}); err != nil {
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 
 				// Return error for sake of exit code, but silence it since it was already output above
@@ -1111,13 +1129,22 @@ Examples:
 
 			// If not waiting, return early
 			if stopNoWait {
-				fmt.Fprintln(statusOutput, "💡 Use 'tiger service describe' to check service status.")
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become paused
 			fmt.Fprintf(statusOutput, "⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
-			if err := waitForServicePaused(cmd.Context(), client, projectID, serviceID, stopWaitTimeout, service.Status, statusOutput); err != nil {
+			if _, err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:        client,
+				projectID:     projectID,
+				serviceID:     serviceID,
+				initialStatus: service.Status,
+				condition:     serviceStatus("PAUSED"),
+				output:        statusOutput,
+				timeout:       stopWaitTimeout,
+				timeoutMsg:    "service may still be starting",
+			}); err != nil {
 				return err
 			}
 			fmt.Fprintf(statusOutput, "✅ Service has been stopped successfully!\n")
@@ -1345,8 +1372,16 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
-				if serviceErr != nil {
+				if forkedService.Status, serviceErr = waitForService(cmd.Context(), waitForServiceArgs{
+					client:        client,
+					projectID:     projectID,
+					serviceID:     forkedServiceID,
+					initialStatus: forkedService.Status,
+					condition:     serviceStatus("READY"),
+					output:        statusOutput,
+					timeout:       forkWaitTimeout,
+					timeoutMsg:    "service may still be provisioning",
+				}); serviceErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 				} else {
 					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
@@ -1385,104 +1420,95 @@ Examples:
 	return cmd
 }
 
-// waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
-	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
+type conditionFunc func(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error)
+
+type waitForServiceArgs struct {
+	client        *api.ClientWithResponses
+	projectID     string
+	serviceID     string
+	initialStatus *api.DeployStatus
+	condition     conditionFunc
+	output        io.Writer
+	timeout       time.Duration
+	timeoutMsg    string
+}
+
+var (
+	ErrServiceStatusCheck = errors.New("Error checking service status")
+	ErrServiceNotFound    = errors.New("Service not found")
+)
+
+func waitForService(ctx context.Context, args waitForServiceArgs) (*api.DeployStatus, error) {
+	ctx, cancel := context.WithTimeout(ctx, args.timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
+	spinner := NewSpinner(args.output, "Service status: %s", util.DerefStr(args.initialStatus))
 	defer spinner.Stop()
 
-	lastStatus := initialStatus
+	lastStatus := args.initialStatus
 	for {
 		select {
 		case <-ctx.Done():
 			switch {
 			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
+				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", args.timeout, args.timeoutMsg))
 			case errors.Is(ctx.Err(), context.Canceled):
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be provisioning"))
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - %s", args.timeoutMsg))
 			default:
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be provisioning: %w", ctx.Err()))
+				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - %s: %w", args.timeoutMsg, ctx.Err()))
 			}
 		case <-ticker.C:
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			resp, err := args.client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, args.projectID, args.serviceID)
 			if err != nil {
-				spinner.Update("Error checking service status: %v", err)
+				spinner.Update("%s: %v", ErrServiceStatusCheck, err)
 				continue
 			}
 
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.Update("Service not found or error checking status")
-				continue
+			if resp.StatusCode() == 200 && resp.JSON200 != nil {
+				lastStatus = resp.JSON200.Status
 			}
 
-			service := *resp.JSON200
-			lastStatus = service.Status
-			status := util.DerefStr(service.Status)
-
-			switch status {
-			case "READY":
-				return service.Status, nil
-			case "FAILED", "ERROR":
-				return service.Status, fmt.Errorf("service failed with status: %s", status)
-			default:
-				spinner.Update("Service status: %s", status)
+			if ok, err := args.condition(resp); ok {
+				return lastStatus, err
+			} else if err != nil {
+				spinner.Update(err.Error())
+			} else {
+				spinner.Update("Service status: %s", util.DerefStr(lastStatus))
 			}
 		}
 	}
 }
 
-// waitForServicePaused polls the service status until it's paused or timeout occurs
-func waitForServicePaused(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) error {
-	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
-	defer cancel()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	// Start the spinner
-	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
-	defer spinner.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be stopping", waitTimeout))
-			case errors.Is(ctx.Err(), context.Canceled):
-				return exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be stopping"))
-			default:
-				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be stopping: %w", ctx.Err()))
-			}
-		case <-ticker.C:
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				spinner.Update("Error checking service status: %v", err)
-				continue
+func serviceStatus(targetStatus string) conditionFunc {
+	return func(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error) {
+		switch resp.StatusCode() {
+		case 200:
+			if resp.JSON200 == nil {
+				return true, ErrServiceStatusCheck
 			}
 
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.Update("Service not found or error checking status")
-				continue
-			}
-
-			service := *resp.JSON200
-			status := util.DerefStr(service.Status)
-
+			status := util.DerefStr(resp.JSON200.Status)
 			switch status {
-			case "PAUSED":
-				return nil
+			case targetStatus:
+				return true, nil
 			case "FAILED", "ERROR":
-				return fmt.Errorf("service failed with status: %s", status)
+				return true, fmt.Errorf("service failed with status: %s", status)
 			default:
-				spinner.Update("Service status: %s", status)
+				return false, nil
 			}
+		case 404:
+			// Can happen if user deletes service while it's still provisioning
+			return true, ErrServiceNotFound
+		case 500:
+			// Temporary server errors
+			return false, ErrServiceStatusCheck
+		default:
+			// Unexpected errors
+			return true, ErrServiceStatusCheck
 		}
 	}
 }

@@ -12,7 +12,6 @@ const (
 	ExitPermissionDenied    = 5 // Permission denied
 	ExitServiceNotFound     = 6 // Service not found
 	ExitUpdateAvailable     = 7 // Update available
-	ExitConflict            = 8 // Resource conflict (e.g., service cannot be modified in current state)
 )
 
 // exitCodeError creates an error that will cause the program to exit with the specified code
