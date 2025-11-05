@@ -405,17 +405,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForService(cmd.Context(), waitForServiceArgs{
+					if service.Status, serviceErr = waitForService(cmd.Context(), waitForServiceArgs{
 						client:        client,
 						projectID:     projectID,
 						serviceID:     serviceID,
 						initialStatus: service.Status,
+						message:       statusMessage,
 						condition:     serviceStatus("READY"),
 						output:        statusOutput,
 						timeout:       createWaitTimeout,
 						timeoutMsg:    "service may still be provisioning",
-					})
-					if serviceErr != nil {
+					}); serviceErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
 					} else {
 						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
@@ -933,12 +933,23 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			if err := waitForServiceDeletion(client, projectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+			if _, err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:     client,
+				projectID:  projectID,
+				serviceID:  serviceID,
+				message:    deletionMessage,
+				condition:  serviceDeletion,
+				output:     statusOutput,
+				timeout:    deleteWaitTimeout,
+				timeoutMsg: "service may still be deleting",
+			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
+
+			fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
 			return nil
 		},
 	}
@@ -1032,15 +1043,15 @@ Examples:
 				client:        client,
 				projectID:     projectID,
 				serviceID:     serviceID,
+				message:       statusMessage,
 				initialStatus: service.Status,
 				condition:     serviceStatus("READY"),
 				output:        statusOutput,
 				timeout:       startWaitTimeout,
 				timeoutMsg:    "service may still be starting",
 			}); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
-
-				// Return error for sake of exit code, but silence it since it was already output above
 				cmd.SilenceErrors = true
 				return err
 			}
@@ -1139,14 +1150,19 @@ Examples:
 				client:        client,
 				projectID:     projectID,
 				serviceID:     serviceID,
+				message:       statusMessage,
 				initialStatus: service.Status,
 				condition:     serviceStatus("PAUSED"),
 				output:        statusOutput,
 				timeout:       stopWaitTimeout,
 				timeoutMsg:    "service may still be starting",
 			}); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
 				return err
 			}
+
 			fmt.Fprintf(statusOutput, "✅ Service has been stopped successfully!\n")
 			return nil
 		},
@@ -1376,6 +1392,7 @@ Examples:
 					client:        client,
 					projectID:     projectID,
 					serviceID:     forkedServiceID,
+					message:       statusMessage,
 					initialStatus: forkedService.Status,
 					condition:     serviceStatus("READY"),
 					output:        statusOutput,
@@ -1420,23 +1437,19 @@ Examples:
 	return cmd
 }
 
-type conditionFunc func(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error)
+type waitCondition func(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error)
 
 type waitForServiceArgs struct {
 	client        *api.ClientWithResponses
 	projectID     string
 	serviceID     string
 	initialStatus *api.DeployStatus
-	condition     conditionFunc
+	message       func(serviceID string, status *api.DeployStatus) string
+	condition     waitCondition
 	output        io.Writer
 	timeout       time.Duration
 	timeoutMsg    string
 }
-
-var (
-	ErrServiceStatusCheck = errors.New("Error checking service status")
-	ErrServiceNotFound    = errors.New("Service not found")
-)
 
 func waitForService(ctx context.Context, args waitForServiceArgs) (*api.DeployStatus, error) {
 	ctx, cancel := context.WithTimeout(ctx, args.timeout)
@@ -1446,7 +1459,7 @@ func waitForService(ctx context.Context, args waitForServiceArgs) (*api.DeploySt
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := NewSpinner(args.output, "Service status: %s", util.DerefStr(args.initialStatus))
+	spinner := NewSpinner(args.output, args.message(args.serviceID, args.initialStatus))
 	defer spinner.Stop()
 
 	lastStatus := args.initialStatus
@@ -1457,14 +1470,14 @@ func waitForService(ctx context.Context, args waitForServiceArgs) (*api.DeploySt
 			case errors.Is(ctx.Err(), context.DeadlineExceeded):
 				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", args.timeout, args.timeoutMsg))
 			case errors.Is(ctx.Err(), context.Canceled):
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - %s", args.timeoutMsg))
+				return lastStatus, fmt.Errorf("canceled waiting - %s", args.timeoutMsg)
 			default:
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - %s: %w", args.timeoutMsg, ctx.Err()))
+				return lastStatus, fmt.Errorf("error waiting - %s: %w", args.timeoutMsg, ctx.Err())
 			}
 		case <-ticker.C:
 			resp, err := args.client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, args.projectID, args.serviceID)
 			if err != nil {
-				spinner.Update("%s: %v", ErrServiceStatusCheck, err)
+				spinner.Update("Error checking service status: %s", err)
 				continue
 			}
 
@@ -1475,20 +1488,28 @@ func waitForService(ctx context.Context, args waitForServiceArgs) (*api.DeploySt
 			if ok, err := args.condition(resp); ok {
 				return lastStatus, err
 			} else if err != nil {
-				spinner.Update(err.Error())
+				spinner.Update("Error checking service status: %s", err)
 			} else {
-				spinner.Update("Service status: %s", util.DerefStr(lastStatus))
+				spinner.Update(args.message(args.serviceID, lastStatus))
 			}
 		}
 	}
 }
 
-func serviceStatus(targetStatus string) conditionFunc {
+func statusMessage(serviceID string, status *api.DeployStatus) string {
+	return fmt.Sprintf("Service status: %s", util.DerefStr(status))
+}
+
+func deletionMessage(serviceID string, status *api.DeployStatus) string {
+	return fmt.Sprintf("Waiting for service '%s' to be deleted", serviceID)
+}
+
+func serviceStatus(targetStatus string) waitCondition {
 	return func(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error) {
 		switch resp.StatusCode() {
 		case 200:
 			if resp.JSON200 == nil {
-				return true, ErrServiceStatusCheck
+				return false, errors.New("no response body returned from API")
 			}
 
 			status := util.DerefStr(resp.JSON200.Status)
@@ -1502,68 +1523,22 @@ func serviceStatus(targetStatus string) conditionFunc {
 			}
 		case 404:
 			// Can happen if user deletes service while it's still provisioning
-			return true, ErrServiceNotFound
-		case 500:
-			// Temporary server errors
-			return false, ErrServiceStatusCheck
+			return true, errors.New("service not found")
 		default:
 			// Unexpected errors
-			return true, ErrServiceStatusCheck
+			return false, fmt.Errorf("received %s from API", resp.Status())
 		}
 	}
 }
 
-// waitForServiceDeletion waits for a service to be fully deleted
-func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
-	defer cancel()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	statusOutput := cmd.ErrOrStderr()
-
-	// Start the spinner
-	spinner := NewSpinner(statusOutput, "Waiting for service '%s' to be deleted", serviceID)
-	defer spinner.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
-			case errors.Is(ctx.Err(), context.Canceled):
-				return exitWithCode(ExitTimeout, fmt.Errorf("canceled waiting for service '%s' to be deleted", serviceID))
-			default:
-				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be deleting: %w", ctx.Err()))
-			}
-		case <-ticker.C:
-			// Check if service still exists
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
-				ctx,
-				api.ProjectId(projectID),
-				api.ServiceId(serviceID),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to check service status: %w", err)
-			}
-
-			if resp.StatusCode() == 404 {
-				// Service is deleted
-				spinner.Stop()
-				fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
-				return nil
-			}
-
-			if resp.StatusCode() == 200 {
-				// Service still exists, continue waiting
-				continue
-			}
-
-			// Other error
-			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
-		}
+func serviceDeletion(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error) {
+	switch resp.StatusCode() {
+	case 200:
+		return false, nil
+	case 404:
+		return true, nil
+	default:
+		return true, fmt.Errorf("error checking service status: %s", resp.Status())
 	}
 }
 
