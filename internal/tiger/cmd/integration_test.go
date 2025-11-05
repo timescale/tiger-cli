@@ -849,17 +849,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Stopping service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "stop", serviceID,
 			"--wait-timeout", "10m", // Longer timeout for integration tests
 		)
 
 		if err != nil {
-			// Check if it's a conflict error (service already stopped)
-			if exitErr, ok := err.(interface{ ExitCode() int }); ok && exitErr.ExitCode() == ExitConflict {
-				t.Logf("Service is already stopped (conflict error): %v", err)
-			} else {
-				t.Fatalf("Service stop failed: %v\nOutput: %s", err, output)
-			}
+			t.Fatalf("Service stop failed: %v\nOutput: %s", err, output)
 		} else {
 			// Verify stop success message
 			if !strings.Contains(output, "Stop request accepted") &&
@@ -877,7 +873,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		t.Logf("Verifying service is stopped")
 
-		output, err := executeIntegrationCommand("service", "describe", serviceID, "--output", "json")
+		output, err := executeIntegrationCommand(t.Context(), "service", "describe", serviceID, "--output", "json")
 		if err != nil {
 			t.Fatalf("Failed to describe service after stop: %v\nOutput: %s", err, output)
 		}
@@ -903,6 +899,36 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("StopAlreadyStoppedService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Attempting to stop already-stopped service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "stop", serviceID,
+			"--wait-timeout", "10m",
+		)
+
+		// This should fail with an invalid parameters error (exit code 3)
+		if err == nil {
+			t.Errorf("Expected stop to fail for already-stopped service, but got output: %s", output)
+		} else {
+			// Check that it's an exitCodeError with ExitInvalidParameters
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (ExitInvalidParameters) for already-stopped service, got %d. Error: %s", ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", ExitInvalidParameters)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with ExitInvalidParameters exit code for already-stopped service, got: %v", err)
+			}
+		}
+	})
+
 	t.Run("StartService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")
@@ -911,17 +937,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Starting service: %s", serviceID)
 
 		output, err := executeIntegrationCommand(
+			t.Context(),
 			"service", "start", serviceID,
 			"--wait-timeout", "10m", // Longer timeout for integration tests
 		)
 
 		if err != nil {
-			// Check if it's a conflict error (service already started)
-			if exitErr, ok := err.(interface{ ExitCode() int }); ok && exitErr.ExitCode() == ExitConflict {
-				t.Logf("Service is already started (conflict error): %v", err)
-			} else {
-				t.Fatalf("Service start failed: %v\nOutput: %s", err, output)
-			}
+			t.Fatalf("Service start failed: %v\nOutput: %s", err, output)
 		} else {
 			// Verify start success message
 			if !strings.Contains(output, "Start request accepted") &&
@@ -939,7 +961,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		t.Logf("Verifying service is started")
 
-		output, err := executeIntegrationCommand("service", "describe", serviceID, "--output", "json")
+		output, err := executeIntegrationCommand(t.Context(), "service", "describe", serviceID, "--output", "json")
 		if err != nil {
 			t.Fatalf("Failed to describe service after start: %v\nOutput: %s", err, output)
 		}
@@ -962,6 +984,36 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Logf("Warning: Expected service status to be READY, got %s. This might be expected depending on timing or service state.", status)
 		} else {
 			t.Logf("✅ Service is correctly in READY state")
+		}
+	})
+
+	t.Run("StartAlreadyStartedService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Attempting to start already-started service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "start", serviceID,
+			"--wait-timeout", "10m",
+		)
+
+		// This should fail with an invalid parameters error (exit code 3)
+		if err == nil {
+			t.Errorf("Expected start to fail for already-started service, but got output: %s", output)
+		} else {
+			// Check that it's an exitCodeError with ExitInvalidParameters
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (ExitInvalidParameters) for already-started service, got %d. Error: %s", ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ Start correctly failed with invalid parameters error (exit code %d) for already-started service", ExitInvalidParameters)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with ExitInvalidParameters exit code for already-started service, got: %v", err)
+			}
 		}
 	})
 
@@ -1353,11 +1405,11 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 		},
 		{
 			name: "service start",
-			args: []string{"service", "start", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "start", "non-existent-service", "--no-wait"},
 		},
 		{
 			name: "service stop",
-			args: []string{"service", "stop", "non-existent-service", "--api-key", invalidAPIKey, "--project-id", projectID, "--no-wait"},
+			args: []string{"service", "stop", "non-existent-service", "--no-wait"},
 		},
 	}
 

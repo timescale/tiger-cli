@@ -1237,8 +1237,22 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test waitForServiceReady with very short timeout to trigger timeout quickly
-	_, err = waitForServiceReady(t.Context(), client, "test-project-123", "svc-12345", 100*time.Millisecond, nil, cmd.ErrOrStderr())
+	// Create a service object for the handler
+	service := api.Service{}
+
+	// Test waitForService with very short timeout to trigger timeout quickly
+	err = waitForService(t.Context(), waitForServiceArgs{
+		client:    client,
+		projectID: "test-project-123",
+		serviceID: "svc-12345",
+		handler: &statusWaitHandler{
+			targetStatus: "READY",
+			service:      &service,
+		},
+		output:     cmd.ErrOrStderr(),
+		timeout:    100 * time.Millisecond,
+		timeoutMsg: "service may still be provisioning",
+	})
 
 	// Should return an error with ExitTimeout
 	if err == nil {

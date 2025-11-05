@@ -58,14 +58,14 @@ func waitForService(ctx context.Context, args waitForServiceArgs) error {
 		case <-ticker.C:
 			resp, err := args.client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, args.projectID, args.serviceID)
 			if err != nil {
-				spinner.Update("Error checking service status: %s", err)
+				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
 				continue
 			}
 
 			if done, err := args.handler.check(resp); done {
 				return err
 			} else if err != nil {
-				spinner.Update("Error checking service status: %s", err)
+				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
 				continue
 			}
 
