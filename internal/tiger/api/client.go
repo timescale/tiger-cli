@@ -129,6 +129,27 @@ type ClientInterface interface {
 	// PostProjectsProjectIdServicesServiceIdEnablePooler request
 	PostProjectsProjectIdServicesServiceIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetProjectsProjectIdServicesServiceIdFileimports request
+	GetProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostProjectsProjectIdServicesServiceIdFileimportsWithBody request with any body
+	PostProjectsProjectIdServicesServiceIdFileimportsWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody request with any body
+	PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetProjectsProjectIdServicesServiceIdFileimportsImportId request
+	GetProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody request with any body
+	PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, body PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostProjectsProjectIdServicesServiceIdForkServiceWithBody request with any body
 	PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -385,6 +406,102 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdDisablePooler(ctx context
 
 func (c *Client) PostProjectsProjectIdServicesServiceIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest(c.Server, projectId, serviceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetProjectsProjectIdServicesServiceIdFileimportsRequest(c.Server, projectId, serviceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdFileimportsWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdFileimportsRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdFileimportsRequest(c.Server, projectId, serviceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequest(c.Server, projectId, serviceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetProjectsProjectIdServicesServiceIdFileimportsImportIdRequest(c.Server, projectId, serviceId, importId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequestWithBody(c.Server, projectId, serviceId, importId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, body PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequest(c.Server, projectId, serviceId, importId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1208,6 +1325,398 @@ func NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest(server string,
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetProjectsProjectIdServicesServiceIdFileimportsRequest generates requests for GetProjectsProjectIdServicesServiceIdFileimports
+func NewGetProjectsProjectIdServicesServiceIdFileimportsRequest(server string, projectId ProjectId, serviceId ServiceId, params *GetProjectsProjectIdServicesServiceIdFileimportsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/fileimports", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.First != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "first", runtime.ParamLocationQuery, *params.First); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Last != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "last", runtime.ParamLocationQuery, *params.Last); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.After != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "after", runtime.ParamLocationQuery, *params.After); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Before != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "before", runtime.ParamLocationQuery, *params.Before); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.LabelSelector != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "label_selector", runtime.ParamLocationQuery, *params.LabelSelector); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.States != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "states", runtime.ParamLocationQuery, *params.States); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.S3KeyPrefix != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "s3_key_prefix", runtime.ParamLocationQuery, *params.S3KeyPrefix); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.SourceType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "source_type", runtime.ParamLocationQuery, *params.SourceType); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostProjectsProjectIdServicesServiceIdFileimportsRequest calls the generic PostProjectsProjectIdServicesServiceIdFileimports builder with application/json body
+func NewPostProjectsProjectIdServicesServiceIdFileimportsRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostProjectsProjectIdServicesServiceIdFileimportsRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+}
+
+// NewPostProjectsProjectIdServicesServiceIdFileimportsRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdFileimports with any type of body
+func NewPostProjectsProjectIdServicesServiceIdFileimportsRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/fileimports", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequest calls the generic PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl builder with application/json body
+func NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+}
+
+// NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl with any type of body
+func NewPostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/fileimports/presigned-url", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetProjectsProjectIdServicesServiceIdFileimportsImportIdRequest generates requests for GetProjectsProjectIdServicesServiceIdFileimportsImportId
+func NewGetProjectsProjectIdServicesServiceIdFileimportsImportIdRequest(server string, projectId ProjectId, serviceId ServiceId, importId FileImportId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "import_id", runtime.ParamLocationPath, importId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/fileimports/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequest calls the generic PatchProjectsProjectIdServicesServiceIdFileimportsImportId builder with application/json body
+func NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequest(server string, projectId ProjectId, serviceId ServiceId, importId FileImportId, body PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequestWithBody(server, projectId, serviceId, importId, "application/json", bodyReader)
+}
+
+// NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequestWithBody generates requests for PatchProjectsProjectIdServicesServiceIdFileimportsImportId with any type of body
+func NewPatchProjectsProjectIdServicesServiceIdFileimportsImportIdRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, importId FileImportId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithLocation("simple", false, "import_id", runtime.ParamLocationPath, importId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/fileimports/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2334,6 +2843,27 @@ type ClientWithResponsesInterface interface {
 	// PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse request
 	PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdEnablePoolerResponse, error)
 
+	// GetProjectsProjectIdServicesServiceIdFileimportsWithResponse request
+	GetProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdFileimportsResponse, error)
+
+	// PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse request with any body
+	PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsResponse, error)
+
+	PostProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsResponse, error)
+
+	// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse request with any body
+	PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error)
+
+	PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error)
+
+	// GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse request
+	GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error)
+
+	// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse request with any body
+	PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error)
+
+	PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, body PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error)
+
 	// PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse request with any body
 	PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error)
 
@@ -2643,6 +3173,129 @@ func (r PostProjectsProjectIdServicesServiceIdEnablePoolerResponse) Status() str
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r PostProjectsProjectIdServicesServiceIdEnablePoolerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetProjectsProjectIdServicesServiceIdFileimportsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListFileImportResponse
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProjectsProjectIdServicesServiceIdFileimportsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProjectsProjectIdServicesServiceIdFileimportsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PostProjectsProjectIdServicesServiceIdFileimportsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		// Error Error message if the creation failed.
+		Error *string `json:"error,omitempty"`
+	}
+	JSON4XX *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r PostProjectsProjectIdServicesServiceIdFileimportsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostProjectsProjectIdServicesServiceIdFileimportsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GeneratePresignedURLResponse
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		FileImport FileImport `json:"file_import"`
+	}
+	JSON4XX *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Error Error message if the update failed.
+		Error *string `json:"error,omitempty"`
+	}
+	JSON4XX *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3256,6 +3909,75 @@ func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdEnablePooler
 	return ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp)
 }
 
+// GetProjectsProjectIdServicesServiceIdFileimportsWithResponse request returning *GetProjectsProjectIdServicesServiceIdFileimportsResponse
+func (c *ClientWithResponses) GetProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	rsp, err := c.GetProjectsProjectIdServicesServiceIdFileimports(ctx, projectId, serviceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetProjectsProjectIdServicesServiceIdFileimportsResponse(rsp)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdFileimportsResponse
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdFileimportsWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdFileimportsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdFileimports(ctx, projectId, serviceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdFileimportsResponse(rsp)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error) {
+	rsp, err := c.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl(ctx, projectId, serviceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse(rsp)
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse request returning *GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse
+func (c *ClientWithResponses) GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	rsp, err := c.GetProjectsProjectIdServicesServiceIdFileimportsImportId(ctx, projectId, serviceId, importId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse(rsp)
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse request with arbitrary body returning *PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse
+func (c *ClientWithResponses) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	rsp, err := c.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody(ctx, projectId, serviceId, importId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, importId FileImportId, body PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	rsp, err := c.PatchProjectsProjectIdServicesServiceIdFileimportsImportId(ctx, projectId, serviceId, importId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse(rsp)
+}
+
 // PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdForkServiceResponse
 func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error) {
 	rsp, err := c.PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
@@ -3839,6 +4561,179 @@ func ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp *http.R
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SuccessMessage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetProjectsProjectIdServicesServiceIdFileimportsResponse parses an HTTP response from a GetProjectsProjectIdServicesServiceIdFileimportsWithResponse call
+func ParseGetProjectsProjectIdServicesServiceIdFileimportsResponse(rsp *http.Response) (*GetProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProjectsProjectIdServicesServiceIdFileimportsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListFileImportResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostProjectsProjectIdServicesServiceIdFileimportsResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdFileimportsWithResponse call
+func ParsePostProjectsProjectIdServicesServiceIdFileimportsResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostProjectsProjectIdServicesServiceIdFileimportsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			// Error Error message if the creation failed.
+			Error *string `json:"error,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse call
+func ParsePostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GeneratePresignedURLResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse parses an HTTP response from a GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse call
+func ParseGetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse(rsp *http.Response) (*GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			FileImport FileImport `json:"file_import"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse parses an HTTP response from a PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse call
+func ParsePatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse(rsp *http.Response) (*PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Error Error message if the update failed.
+			Error *string `json:"error,omitempty"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

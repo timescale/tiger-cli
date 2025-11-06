@@ -124,6 +124,7 @@ tiger auth login
 	cmd.AddCommand(buildAuthCmd())
 	cmd.AddCommand(buildServiceCmd())
 	cmd.AddCommand(buildDbCmd())
+	cmd.AddCommand(buildFileImportCmd())
 	cmd.AddCommand(buildMCPCmd())
 
 	wrapCommandsWithAnalytics(cmd)

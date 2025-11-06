@@ -23,6 +23,8 @@ tags:
     description: Manage services, read replicas, and their associated actions.
   - name: Analytics
     description: Track analytics events.
+  - name: File Imports
+    description: Manage file import operations for CSV and Parquet files.
 
 paths:
   /analytics/identify:
@@ -654,6 +656,192 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/fileimports/presigned-url:
+    post:
+      tags:
+        - File Imports
+      summary: Generate Presigned Upload URL
+      description: Generates a presigned S3 URL to upload a file up to 500MB. The file can then be imported using the INTERNAL source type.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneratePresignedURLInput'
+      responses:
+        '200':
+          description: Presigned URL generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratePresignedURLResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/fileimports:
+    get:
+      tags:
+        - File Imports
+      summary: List File Imports
+      description: Retrieves a paginated list of file imports for a specific service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: first
+          in: query
+          description: Number of items to fetch for forward pagination.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            example: 20
+        - name: last
+          in: query
+          description: Number of items to fetch for backward pagination.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            example: 20
+        - name: after
+          in: query
+          description: Cursor for fetching the next page.
+          schema:
+            type: string
+            example: 'eyJpZCI6IjEwMCJ9'
+        - name: before
+          in: query
+          description: Cursor for fetching the previous page.
+          schema:
+            type: string
+            example: 'eyJpZCI6IjIwMCJ9'
+        - name: label_selector
+          in: query
+          description: Filter by label key and value using k8s label selector syntax (e.g., 'source=s3-live-sync,s3-live-sync-id=123').
+          schema:
+            type: string
+            example: 'source=s3-live-sync'
+        - name: states
+          in: query
+          description: |
+            Filter by import states (comma-separated). Valid states are:
+            - IN_QUEUE: Import is queued for processing
+            - RUNNING: Import is currently processing
+            - RETRYING: Import is being retried after a failure
+            - SUCCESS: Import completed successfully
+            - FAILURE: Import failed
+            - CANCELLED: Import was cancelled
+            - PAUSED: Import is paused
+            - SKIPPED: Import was skipped
+          schema:
+            type: string
+            example: 'SUCCESS,FAILURE'
+        - name: s3_key_prefix
+          in: query
+          description: Filter S3 imports by key prefix (e.g., 'data/2024/'). Only affects S3 source imports.
+          schema:
+            type: string
+            example: 'data/2024/'
+        - name: source_type
+          in: query
+          description: Filter by source type for optimized ordering. Supported values are S3, HTTP, INTERNAL.
+          schema:
+            type: string
+            enum: [S3, HTTP, INTERNAL]
+            example: 'S3'
+      responses:
+        '200':
+          description: A paginated list of file imports.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFileImportResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    post:
+      tags:
+        - File Imports
+      summary: Create a File Import
+      description: Creates a new file import operation for importing CSV or Parquet files into a database table.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFileImportInput'
+      responses:
+        '201':
+          description: File import created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message if the creation failed.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/fileimports/{import_id}:
+    get:
+      tags:
+        - File Imports
+      summary: Get a File Import
+      description: Retrieves the details of a specific file import by its ID.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/FileImportId'
+      responses:
+        '200':
+          description: File import details.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - file_import
+                properties:
+                  file_import:
+                    $ref: '#/components/schemas/FileImport'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    patch:
+      tags:
+        - File Imports
+      summary: Update a File Import
+      description: Updates a file import by applying one or more operations such as canceling, retrying, or updating labels.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/FileImportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFileImportInput'
+      responses:
+        '200':
+          description: File import updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message if the update failed.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
 components:
   parameters:
     ProjectId:
@@ -696,6 +884,14 @@ components:
       schema:
         type: string
         example: "1234567890"
+    FileImportId:
+      name: import_id
+      in: path
+      required: true
+      description: The unique identifier of the file import.
+      schema:
+        type: string
+        example: 'import-123abc'
 
   schemas:
     VPC:
@@ -1121,6 +1317,429 @@ components:
           type: string
           description: The ID of the VPC to attach the service to.
           example: "1234567890"
+    FileImportSourceType:
+      type: string
+      enum:
+        - S3
+        - HTTP
+        - INTERNAL
+      description: The type of source for the file import.
+    FileImportS3Source:
+      type: object
+      required:
+        - key
+        - bucket
+      properties:
+        id:
+          type: string
+          description: The identifier for this source (deprecated, not actively used).
+          example: 'source-123'
+        key:
+          type: string
+          description: The S3 object key.
+          example: 'data/2024/sales.csv'
+        bucket:
+          type: string
+          description: The S3 bucket name.
+          example: 'my-data-bucket'
+        role_arn:
+          type: string
+          description: AWS IAM role ARN for accessing the S3 bucket.
+          example: 'arn:aws:iam::123456789012:role/S3AccessRole'
+    FileImportHTTPSource:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: The HTTP(S) URL to download the file from.
+          example: 'https://example.com/data/sales.csv'
+    FileImportInternalSource:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Internal identifier for the uploaded file.
+          example: 'internal-upload-123'
+    FileImportSource:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          $ref: '#/components/schemas/FileImportSourceType'
+        s3:
+          $ref: '#/components/schemas/FileImportS3Source'
+        http:
+          $ref: '#/components/schemas/FileImportHTTPSource'
+        internal:
+          $ref: '#/components/schemas/FileImportInternalSource'
+      description: Source configuration for the file import. Only one of s3, http, or internal should be set based on type.
+    FileImportDefinitionType:
+      type: string
+      enum:
+        - CSV
+        - PARQUET
+      description: The file format type.
+    ColumnMapping:
+      type: object
+      required:
+        - source
+        - destination
+      properties:
+        source:
+          type: string
+          description: Source column name in the original file.
+          example: 'customer_name'
+        destination:
+          type: string
+          description: Destination column name in the target table.
+          example: 'name'
+    FileImportDefinitionCSV:
+      type: object
+      properties:
+        delimiter:
+          type: string
+          description: The delimiter character for CSV files.
+          default: ','
+          example: ','
+        skip_header:
+          type: boolean
+          description: Whether to skip the first row as a header. Required for column_mappings and auto_column_mapping.
+          default: false
+        column_names:
+          type: array
+          items:
+            type: string
+          description: Column names matching the destination table. Mutually exclusive with column_mappings and auto_column_mapping.
+          example: ['id', 'name', 'created_at']
+        column_mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnMapping'
+          description: Mappings from source to destination columns. Requires skip_header=true. Mutually exclusive with column_names and auto_column_mapping.
+        auto_column_mapping:
+          type: boolean
+          description: Automatically map columns by matching header names. Requires skip_header=true. Mutually exclusive with column_names and column_mappings.
+          default: false
+    FileImportDefinitionParquet:
+      type: object
+      properties:
+        column_mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnMapping'
+          description: Mappings from source to destination columns. Mutually exclusive with auto_column_mapping.
+        auto_column_mapping:
+          type: boolean
+          description: Automatically map columns by matching header names. Mutually exclusive with column_mappings.
+          default: false
+    FileImportDefinition:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          $ref: '#/components/schemas/FileImportDefinitionType'
+        csv:
+          $ref: '#/components/schemas/FileImportDefinitionCSV'
+        parquet:
+          $ref: '#/components/schemas/FileImportDefinitionParquet'
+      description: File format definition. Only csv or parquet should be set based on type.
+    TableIdentifier:
+      type: object
+      required:
+        - table_name
+      properties:
+        schema_name:
+          type: string
+          description: PostgreSQL schema name. Defaults to 'public' if not specified.
+          example: 'analytics'
+        table_name:
+          type: string
+          description: PostgreSQL table name.
+          example: 'sales_data'
+    FileImportState:
+      type: string
+      enum:
+        - WAITING_FOR_UPLOAD
+        - IN_QUEUE
+        - RUNNING
+        - RETRYING
+        - SUCCESS
+        - FAILURE
+        - CANCELLED
+        - PAUSED
+        - SKIPPED
+      description: Current state of the file import operation.
+    FileImportStateTimeline:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+          description: Timestamp when this state was entered.
+          example: '2024-01-15T10:30:00Z'
+        state:
+          type: string
+          description: The state that was entered.
+          example: 'SUCCESS'
+        payload:
+          type: object
+          properties:
+            failure_reason:
+              type: string
+              description: Reason for failure, if applicable.
+            retry_at:
+              type: string
+              format: date-time
+              description: Scheduled retry time, if applicable.
+          description: Additional information about the state change.
+    FileImportStateInfo:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          $ref: '#/components/schemas/FileImportState'
+        progress:
+          type: object
+          properties:
+            current:
+              type: integer
+              description: Current progress value.
+              example: 5000
+            total:
+              type: integer
+              description: Total expected value.
+              example: 10000
+            message:
+              type: string
+              description: Human-readable progress message.
+              example: 'Processing rows'
+        failure_reason:
+          type: string
+          description: Detailed failure reason if state is FAILURE.
+          example: 'Invalid data format in row 1234'
+        timelines:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileImportStateTimeline'
+          description: History of state transitions.
+    FileImportLabel:
+      type: object
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+          description: Label key for filtering.
+          example: 'source'
+        value:
+          type: string
+          description: Label value.
+          example: 's3-live-sync'
+    ImportSettings:
+      type: object
+      properties:
+        on_conflict_do_nothing:
+          type: boolean
+          description: Handle conflicts by ignoring conflicting rows.
+          default: false
+    FileImport:
+      type: object
+      required:
+        - service_id
+        - project_id
+        - id
+        - created_at
+        - updated_at
+        - source
+        - definition
+        - table_identifier
+        - state
+        - labels
+        - size
+      properties:
+        service_id:
+          type: string
+          description: Service identifier.
+          example: 'd1k5vk7hf2'
+        project_id:
+          type: string
+          description: Project identifier.
+          example: 'rp1pz7uyae'
+        id:
+          type: string
+          description: Unique file import identifier.
+          example: 'import-123abc'
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: '2024-01-15T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp.
+          example: '2024-01-15T10:30:00Z'
+        source:
+          $ref: '#/components/schemas/FileImportSource'
+        definition:
+          $ref: '#/components/schemas/FileImportDefinition'
+        table_identifier:
+          $ref: '#/components/schemas/TableIdentifier'
+        state:
+          $ref: '#/components/schemas/FileImportStateInfo'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileImportLabel'
+          description: Labels for filtering and organization.
+        size:
+          type: integer
+          description: File size in bytes.
+          example: 1048576
+        settings:
+          $ref: '#/components/schemas/ImportSettings'
+    CreateFileImportInput:
+      type: object
+      required:
+        - id
+        - source
+        - definition
+        - table_identifier
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this file import.
+          example: 'import-123abc'
+        source:
+          $ref: '#/components/schemas/FileImportSource'
+        definition:
+          $ref: '#/components/schemas/FileImportDefinition'
+        table_identifier:
+          $ref: '#/components/schemas/TableIdentifier'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileImportLabel'
+          description: Optional labels for filtering.
+        settings:
+          $ref: '#/components/schemas/ImportSettings'
+    UpdateFileImportRequestType:
+      type: string
+      enum:
+        - cancel
+        - labels
+        - retry
+      description: Type of update operation to perform.
+    UpdateFileImportRequestCancel:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          description: Reason for cancellation.
+          example: 'User requested cancellation'
+    UpdateFileImportRequestLabels:
+      type: object
+      required:
+        - labels
+      properties:
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileImportLabel'
+          description: New labels to set.
+    UpdateFileImportRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          $ref: '#/components/schemas/UpdateFileImportRequestType'
+        cancel:
+          $ref: '#/components/schemas/UpdateFileImportRequestCancel'
+        labels:
+          $ref: '#/components/schemas/UpdateFileImportRequestLabels'
+      description: Update request. Only one of cancel or labels should be set based on type.
+    UpdateFileImportInput:
+      type: object
+      required:
+        - requests
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpdateFileImportRequest'
+          description: List of update operations to perform.
+          minItems: 1
+    PageInfo:
+      type: object
+      required:
+        - has_next_page
+        - has_previous_page
+      properties:
+        end_cursor:
+          type: string
+          description: Cursor for fetching the next page.
+          example: 'eyJpZCI6IjEyMyJ9'
+        start_cursor:
+          type: string
+          description: Cursor for fetching the previous page.
+          example: 'eyJpZCI6IjEwMCJ9'
+        has_next_page:
+          type: boolean
+          description: Whether there is a next page.
+          example: true
+        has_previous_page:
+          type: boolean
+          description: Whether there is a previous page.
+          example: false
+    ListFileImportResponse:
+      type: object
+      required:
+        - file_imports
+        - page_info
+      properties:
+        file_imports:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileImport'
+          description: List of file imports.
+        page_info:
+          $ref: '#/components/schemas/PageInfo'
+    GeneratePresignedURLInput:
+      type: object
+      required:
+        - id
+        - content_length
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the file. This will be used later when creating the file import.
+          example: "my-upload-123"
+        content_length:
+          type: integer
+          description: Exact size of the file to upload in bytes. Must match the Content-Length header during upload.
+          minimum: 1
+          maximum: 524288000
+          example: 1048576
+    GeneratePresignedURLResponse:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: Presigned S3 URL for uploading the file. Valid for a limited time.
+          example: "https://s3.amazonaws.com/bucket/key?X-Amz-Signature=..."
     Error:
       type: object
       properties:
