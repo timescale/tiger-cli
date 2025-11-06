@@ -132,7 +132,8 @@ Examples:
 
   # Start with HTTP transport
   tiger mcp start http`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
@@ -157,7 +158,8 @@ func buildMCPStdioCmd() *cobra.Command {
 Examples:
   # Start with stdio transport
   tiger mcp start stdio`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return startStdioServer(cmd.Context())
@@ -189,7 +191,8 @@ Examples:
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return startHTTPServer(cmd.Context(), httpHost, httpPort)

@@ -27,9 +27,11 @@ func buildVersionCmd() *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show version information",
-		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
+		Use:               "version",
+		Short:             "Show version information",
+		Long:              `Display version, build time, and git commit information for the Tiger CLI`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			versionOutput := VersionOutput{
 				Version:   config.Version,
