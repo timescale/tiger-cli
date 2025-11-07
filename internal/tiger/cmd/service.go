@@ -981,19 +981,19 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion,
 		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require explicit service ID for safety
-			if len(args) < 1 {
-				return fmt.Errorf("service ID is required")
-			}
-			serviceID := args[0]
-
-			cmd.SilenceUsage = true
-
-			// Get project ID from config
+			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
+
+			// Determine source service ID
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
 
 			// Get API key
 			apiKey, projectID, err := getCredentialsForService()
@@ -1088,19 +1088,19 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion,
 		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require explicit service ID for safety
-			if len(args) < 1 {
-				return fmt.Errorf("service ID is required")
-			}
-			serviceID := args[0]
-
-			cmd.SilenceUsage = true
-
-			// Get project ID from config
+			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
+
+			// Determine source service ID
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
 
 			// Get API key
 			apiKey, projectID, err := getCredentialsForService()
