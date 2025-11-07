@@ -1151,7 +1151,7 @@ Examples:
 				},
 				output:     statusOutput,
 				timeout:    stopWaitTimeout,
-				timeoutMsg: "service may still be starting",
+				timeoutMsg: "service may still be stopping",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
