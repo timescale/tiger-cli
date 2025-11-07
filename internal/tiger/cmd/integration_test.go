@@ -1481,7 +1481,37 @@ func TestServiceForkIntegration(t *testing.T) {
 		t.Logf("✅ Source data verified: 3 rows present")
 	})
 
-	t.Run("ForkService", func(t *testing.T) {
+	t.Run("ForkService_LastSnapshot_NoBackupsYet", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Attempting to fork with --last-snapshot (should fail - no backups yet)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		// We expect this to fail
+		if err == nil {
+			t.Errorf("Expected fork with --last-snapshot to fail when no backups exist, but it succeeded")
+		} else {
+			// Verify the error message indicates no backups/snapshots available
+			if !strings.Contains(err.Error(), "doesn't yet have any backups or snapshots available") &&
+				!strings.Contains(output, "doesn't yet have any backups or snapshots available") {
+				t.Errorf("Expected error about no backups/snapshots, got: %v\nOutput: %s", err, output)
+			} else {
+				t.Logf("✅ Fork with --last-snapshot correctly failed: no backups available yet")
+			}
+		}
+	})
+
+	t.Run("ForkService_Now", func(t *testing.T) {
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
 		}
@@ -1611,6 +1641,108 @@ func TestServiceForkIntegration(t *testing.T) {
 		t.Logf("✅ Data independence verified: fork and source are truly independent")
 	})
 
+	t.Run("DeleteForkedService_Now", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --now forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --now forked service deleted successfully")
+	})
+
+	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+		waitDuration := 120 * time.Second
+		t.Logf("Waiting %v for snapshot to become available for --last-snapshot fork...", waitDuration)
+		time.Sleep(waitDuration)
+
+		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from --now fork exists)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		forkedServiceID = extractedServiceID
+		t.Logf("✅ Created --last-snapshot forked service with ID: %s", forkedServiceID)
+	})
+
+	t.Run("VerifyLastSnapshotForkWorks", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Verifying --last-snapshot forked service is functional")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", "SELECT 1 as test;",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query --last-snapshot forked service: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "1") {
+			t.Errorf("Expected to see '1' in query output, got: %s", output)
+		}
+
+		t.Logf("✅ --last-snapshot forked service is functional")
+	})
+
+	t.Run("DeleteForkedService_LastSnapshot", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --last-snapshot forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --last-snapshot forked service deleted successfully")
+	})
+
 	t.Run("DeleteSourceService", func(t *testing.T) {
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
@@ -1632,29 +1764,6 @@ func TestServiceForkIntegration(t *testing.T) {
 		// Clear sourceServiceID so cleanup doesn't try to delete again
 		sourceServiceID = ""
 		t.Logf("✅ Source service deleted successfully")
-	})
-
-	t.Run("DeleteForkedService", func(t *testing.T) {
-		if forkedServiceID == "" {
-			t.Skip("No forked service ID available")
-		}
-
-		t.Logf("Deleting forked service: %s", forkedServiceID)
-
-		output, err := executeIntegrationCommand(
-			t.Context(),
-			"service", "delete", forkedServiceID,
-			"--confirm",
-			"--wait-timeout", "10m",
-		)
-
-		if err != nil {
-			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
-		}
-
-		// Clear forkedServiceID so cleanup doesn't try to delete again
-		forkedServiceID = ""
-		t.Logf("✅ Forked service deleted successfully")
 	})
 
 	t.Run("Logout", func(t *testing.T) {
