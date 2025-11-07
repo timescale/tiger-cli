@@ -1052,7 +1052,7 @@ Examples:
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+			fmt.Fprintf(statusOutput, "✅ Service has been successfully started!\n")
 			return nil
 		},
 	}
@@ -1159,7 +1159,7 @@ Examples:
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "✅ Service has been stopped successfully!\n")
+			fmt.Fprintf(statusOutput, "✅ Service has been successfully stopped!\n")
 			return nil
 		},
 	}
