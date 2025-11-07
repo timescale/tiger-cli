@@ -1024,7 +1024,7 @@ Examples:
 			service := *resp.JSON202
 
 			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "🚀 Start request accepted for service '%s'.\n", serviceID)
+			fmt.Fprintf(statusOutput, "▶️  Start request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if startNoWait {
@@ -1131,7 +1131,7 @@ Examples:
 			service := *resp.JSON202
 
 			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "⏹️ Stop request accepted for service '%s'.\n", serviceID)
+			fmt.Fprintf(statusOutput, "⏹️  Stop request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if stopNoWait {
