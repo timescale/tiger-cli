@@ -737,7 +737,7 @@ func buildDbCreateCmd() *cobra.Command {
 	return cmd
 }
 
-func buildDbUploadCmd() *cobra.Command {
+func buildDbRestoreCmd() *cobra.Command {
 	var (
 		database           string
 		role               string
@@ -757,9 +757,9 @@ func buildDbUploadCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "upload <file-path> [service-id]",
-		Short: "Upload and restore database dumps",
-		Long: `Upload and restore PostgreSQL dumps to a database service.
+		Use:   "restore <file-path> [service-id]",
+		Short: "Restore database from dump file",
+		Long: `Restore a PostgreSQL database from a dump file to a database service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration.
@@ -779,26 +779,26 @@ Cloud-Friendly Defaults:
   - Performs preflight checks before starting restore
 
 Examples:
-  # Upload plain SQL dump to default service
-  tiger db upload backup.sql
+  # Restore plain SQL dump to default service
+  tiger db restore backup.sql
 
-  # Upload to specific service
-  tiger db upload backup.sql svc-12345
+  # Restore to specific service
+  tiger db restore backup.sql svc-12345
 
-  # Upload custom format dump with 4 parallel jobs (faster)
-  tiger db upload backup.dump --jobs 4
+  # Restore custom format dump with 4 parallel jobs (faster)
+  tiger db restore backup.dump --jobs 4
 
   # Read from stdin
-  pg_dump -Fc mydb | tiger db upload - --format custom
+  pg_dump -Fc mydb | tiger db restore - --format custom
 
   # Clean existing objects before restore (DESTRUCTIVE - requires confirmation)
-  tiger db upload backup.sql --clean --if-exists
+  tiger db restore backup.sql --clean --if-exists
 
   # Stop on first error (not recommended for cloud environments)
-  tiger db upload backup.sql --on-error-stop
+  tiger db restore backup.sql --on-error-stop
 
   # Verbose mode for debugging
-  tiger db upload backup.sql --verbose
+  tiger db restore backup.sql --verbose
 
 Note for AI agents: This command may be destructive when used with --clean.
 Always confirm with the user before executing, especially with --clean flag.`,
@@ -912,7 +912,7 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbTestConnectionCmd())
 	cmd.AddCommand(buildDbSavePasswordCmd())
 	cmd.AddCommand(buildDbCreateCmd())
-	cmd.AddCommand(buildDbUploadCmd())
+	cmd.AddCommand(buildDbRestoreCmd())
 
 	return cmd
 }
