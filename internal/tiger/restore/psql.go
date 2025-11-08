@@ -88,7 +88,7 @@ func (r *Restorer) restorePlainSQLWithPsql(ctx context.Context, connStr string, 
 	// Set PGPASSWORD environment variable if using keyring storage
 	storage := password.GetPasswordStorage()
 	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
-		if r.service == nil {
+		if r.service.ServiceId == nil || *r.service.ServiceId == "" {
 			return fmt.Errorf("service is not initialized; cannot retrieve password")
 		}
 		if pwd, err := storage.Get(r.service, r.options.Role); err == nil && pwd != "" {
