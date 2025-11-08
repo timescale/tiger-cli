@@ -80,7 +80,7 @@ func (r *Restorer) buildPgRestoreArgs(connStr string) []string {
 	}
 
 	if r.options.NoPrivileges {
-		args = append(args, "--no-privileges", "--no-acl")
+		args = append(args, "--no-privileges")
 	}
 
 	if r.options.SingleTransaction {
