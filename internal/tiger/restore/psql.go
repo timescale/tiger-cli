@@ -75,7 +75,7 @@ func (r *Restorer) restorePlainSQLWithPsql(ctx context.Context, connStr string, 
 		cmd.Stderr = nil
 	} else {
 		// Default mode: suppress all output (both stdout and stderr)
-		// We're using --on-error-stop=false, so errors are expected and tolerated
+		// Errors are expected and tolerated unless ON_ERROR_STOP=1 is set in the environment
 		// Only show final success/failure summary
 		cmd.Stdout = nil
 		cmd.Stderr = nil
