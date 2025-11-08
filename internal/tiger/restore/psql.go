@@ -28,7 +28,7 @@ func (r *Restorer) restorePlainSQLWithPsql(ctx context.Context, connStr string, 
 		args = append(args, "--set", "ON_ERROR_STOP=1")
 	} else {
 		// When not stopping on errors, add helpful psql variable settings
-		// ON_ERROR_ROLLBACK=interactive rolls back failed statements but continues
+		// ON_ERROR_ROLLBACK=on always rolls back failed statements but continues
 		// This is useful for cloud environments where some objects may already exist
 		args = append(args, "--set", "ON_ERROR_ROLLBACK=on")
 	}
