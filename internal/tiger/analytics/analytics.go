@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"maps"
 	"os"
 	"runtime"
 	"slices"
@@ -137,15 +138,16 @@ func Error(err error) Option {
 // identification is only sent if the client is initialized and analytics are
 // enabled in the config, otherwise it is skipped.
 func (a *Analytics) Identify(event string, options ...Option) {
-	// Create properties map with default/common properties
+	// Create properties map with user-provided properties
 	properties := map[string]any{}
-	if a.projectID != "" {
-		properties["project_id"] = a.projectID
-	}
-
-	// Merge in user-provided properties (they can override common properties if needed)
 	for _, option := range options {
 		option(properties)
+	}
+
+	// Merge in default/common properties, overwriting user-provided properties
+	// if there's a conflict (we always want these properties to be accurate)
+	if a.projectID != "" {
+		properties["project_id"] = a.projectID
 	}
 
 	logger := logging.GetLogger().With(
@@ -194,20 +196,22 @@ func (a *Analytics) Identify(event string, options ...Option) {
 // architecture. Events are only sent if the client is initialized and
 // analytics are enabled in the config, otherwise they are skipped.
 func (a *Analytics) Track(event string, options ...Option) {
-	// Create properties map with default/common properties
-	properties := map[string]any{
-		"source":  "cli",
-		"version": config.Version,
-		"os":      runtime.GOOS,
-		"arch":    runtime.GOARCH,
-	}
-	if a.projectID != "" {
-		properties["project_id"] = a.projectID
-	}
-
-	// Merge in user-provided properties (they can override common properties if needed)
+	// Create properties map with user-provided properties
+	properties := map[string]any{}
 	for _, option := range options {
 		option(properties)
+	}
+
+	// Merge in default/common properties, overwriting user-provided properties
+	// if there's a conflict (we always want these properties to be accurate)
+	maps.Copy(properties, map[string]any{
+		"source":      "cli",
+		"cli_version": config.Version,
+		"os":          runtime.GOOS,
+		"arch":        runtime.GOARCH,
+	})
+	if a.projectID != "" {
+		properties["project_id"] = a.projectID
 	}
 
 	logger := logging.GetLogger().With(

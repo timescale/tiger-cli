@@ -1501,3 +1501,477 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestServiceForkIntegration tests forking a service with --now strategy and validates data is correctly copied
+func TestServiceForkIntegration(t *testing.T) {
+	config.SetTestServiceName(t)
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
+	if publicKey == "" || secretKey == "" || projectID == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Generate unique names to avoid conflicts
+	timestamp := time.Now().Unix()
+	sourceServiceName := fmt.Sprintf("integration-fork-source-%d", timestamp)
+	tableName := fmt.Sprintf("fork_test_data_%d", timestamp)
+
+	var sourceServiceID string
+	var forkedServiceID string
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	// Cleanup function to ensure source service is deleted
+	defer func() {
+		if sourceServiceID != "" {
+			t.Logf("Cleaning up source service: %s", sourceServiceID)
+			_, err := executeIntegrationCommand(
+				t.Context(),
+				"service", "delete", sourceServiceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup source service %s: %v", sourceServiceID, err)
+			}
+		}
+	}()
+
+	// Cleanup function to ensure forked service is deleted
+	defer func() {
+		if forkedServiceID != "" {
+			t.Logf("Cleaning up forked service: %s", forkedServiceID)
+			_, err := executeIntegrationCommand(
+				t.Context(),
+				"service", "delete", forkedServiceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup forked service %s: %v", forkedServiceID, err)
+			}
+		}
+	}()
+
+	t.Run("Login", func(t *testing.T) {
+		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+			"--project-id", projectID,
+		)
+
+		if err != nil {
+			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Login successful")
+	})
+
+	t.Run("CreateSourceService", func(t *testing.T) {
+		t.Logf("Creating source service: %s", sourceServiceName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "create",
+			"--name", sourceServiceName,
+			"--cpu", "shared",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Source service creation failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract source service ID from create output: %s", output)
+		}
+
+		sourceServiceID = extractedServiceID
+		t.Logf("Created source service with ID: %s", sourceServiceID)
+	})
+
+	t.Run("InsertTestData", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Creating test table: %s", tableName)
+
+		// Create table
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT PRIMARY KEY, data TEXT, created_at TIMESTAMP DEFAULT NOW());", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create test table: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Inserting test data into table: %s", tableName)
+
+		// Insert test data
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'test-row-1'), (2, 'test-row-2'), (3, 'test-row-3');", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to insert test data: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("✅ Test data inserted successfully")
+	})
+
+	t.Run("VerifySourceData", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Verifying test data in source service")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query test data: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all three rows are present
+		if !strings.Contains(output, "test-row-1") {
+			t.Errorf("Expected 'test-row-1' in output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-2") {
+			t.Errorf("Expected 'test-row-2' in output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-3") {
+			t.Errorf("Expected 'test-row-3' in output, got: %s", output)
+		}
+
+		t.Logf("✅ Source data verified: 3 rows present")
+	})
+
+	t.Run("ForkService_LastSnapshot_NoBackupsYet", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Attempting to fork with --last-snapshot (should fail - no backups yet)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		// We expect this to fail
+		if err == nil {
+			t.Errorf("Expected fork with --last-snapshot to fail when no backups exist, but it succeeded")
+		} else {
+			// Verify the error message indicates no backups/snapshots available
+			if !strings.Contains(err.Error(), "doesn't yet have any backups or snapshots available") &&
+				!strings.Contains(output, "doesn't yet have any backups or snapshots available") {
+				t.Errorf("Expected error about no backups/snapshots, got: %v\nOutput: %s", err, output)
+			} else {
+				t.Logf("✅ Fork with --last-snapshot correctly failed: no backups available yet")
+			}
+		}
+	})
+
+	t.Run("ForkService_Now", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Forking service: %s with --now strategy", sourceServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--now",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service fork failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		forkedServiceID = extractedServiceID
+		t.Logf("✅ Created forked service with ID: %s", forkedServiceID)
+	})
+
+	t.Run("VerifyForkedData", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Verifying test data in forked service")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query forked service data: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all three rows are present in fork
+		if !strings.Contains(output, "test-row-1") {
+			t.Errorf("Expected 'test-row-1' in forked service output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-2") {
+			t.Errorf("Expected 'test-row-2' in forked service output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-3") {
+			t.Errorf("Expected 'test-row-3' in forked service output, got: %s", output)
+		}
+
+		t.Logf("✅ Forked data verified: 3 rows present matching source")
+	})
+
+	t.Run("VerifyDataIndependence", func(t *testing.T) {
+		if sourceServiceID == "" || forkedServiceID == "" {
+			t.Skip("Source or forked service ID not available")
+		}
+
+		t.Logf("Verifying data independence between source and fork")
+
+		// Insert new data in forked service
+		t.Logf("Inserting new row in forked service")
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (4, 'fork-only-row');", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to insert data in fork: %v\nOutput: %s", err, output)
+		}
+
+		// Verify fork has 4 rows
+		t.Logf("Verifying fork has 4 rows")
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to count rows in fork: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "4") {
+			t.Errorf("Expected 4 rows in fork after insert, got: %s", output)
+		}
+
+		// Verify source still has 3 rows (unchanged)
+		t.Logf("Verifying source still has 3 rows (unchanged)")
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to count rows in source: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "3") {
+			t.Errorf("Expected 3 rows in source (unchanged), got: %s", output)
+		}
+
+		// Verify source doesn't have fork-only row
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s WHERE data = 'fork-only-row';", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query source for fork-only row: %v\nOutput: %s", err, output)
+		}
+
+		// The output should show "0 rows" or similar since the row shouldn't exist
+		if strings.Contains(output, "fork-only-row") {
+			t.Errorf("Source service should not contain fork-only row, but got: %s", output)
+		}
+
+		t.Logf("✅ Data independence verified: fork and source are truly independent")
+	})
+
+	t.Run("DeleteForkedService_Now", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --now forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --now forked service deleted successfully")
+	})
+
+	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+		waitDuration := 120 * time.Second
+		t.Logf("Waiting %v for snapshot to become available for --last-snapshot fork...", waitDuration)
+		time.Sleep(waitDuration)
+
+		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from --now fork exists)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		forkedServiceID = extractedServiceID
+		t.Logf("✅ Created --last-snapshot forked service with ID: %s", forkedServiceID)
+	})
+
+	t.Run("VerifyLastSnapshotForkWorks", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Verifying --last-snapshot forked service is functional")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", "SELECT 1 as test;",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query --last-snapshot forked service: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "1") {
+			t.Errorf("Expected to see '1' in query output, got: %s", output)
+		}
+
+		t.Logf("✅ --last-snapshot forked service is functional")
+	})
+
+	t.Run("DeleteForkedService_LastSnapshot", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --last-snapshot forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --last-snapshot forked service deleted successfully")
+	})
+
+	t.Run("DeleteSourceService", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Deleting source service: %s", sourceServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", sourceServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Source service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear sourceServiceID so cleanup doesn't try to delete again
+		sourceServiceID = ""
+		t.Logf("✅ Source service deleted successfully")
+	})
+
+	t.Run("Logout", func(t *testing.T) {
+		t.Logf("Logging out")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"auth", "logout",
+		)
+
+		if err != nil {
+			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Logout successful")
+	})
+}
