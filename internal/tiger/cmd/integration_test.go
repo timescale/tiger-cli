@@ -893,7 +893,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// The status should be PAUSED for stopped services
 		if status != "PAUSED" {
-			t.Logf("Warning: Expected service status to be PAUSED, got %s. This might be expected depending on timing or service state.", status)
+			t.Logf("Warning: Expected service status to be PAUSED, got %s", status)
 		} else {
 			t.Logf("✅ Service is correctly in PAUSED state")
 		}
@@ -981,7 +981,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// The status should be READY for started services
 		if status != "READY" {
-			t.Logf("Warning: Expected service status to be READY, got %s. This might be expected depending on timing or service state.", status)
+			t.Logf("Warning: Expected service status to be READY, got %s", status)
 		} else {
 			t.Logf("✅ Service is correctly in READY state")
 		}
