@@ -842,6 +842,46 @@ func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdSetHAWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdSetHAWithBody), varargs...)
 }
 
+// PostProjectsProjectIdServicesServiceIdStart mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdStart(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdStart", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdStart indicates an expected call of PostProjectsProjectIdServicesServiceIdStart.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdStart(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdStart", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdStart), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdStop mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdStop(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdStop", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdStop indicates an expected call of PostProjectsProjectIdServicesServiceIdStop.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdStop(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdStop", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdStop), varargs...)
+}
+
 // PostProjectsProjectIdServicesServiceIdUpdatePassword mocks base method.
 func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdUpdatePassword(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -1784,6 +1824,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdSer
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdSetHAWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdSetHAWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdStartWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdStartResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdStartWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdStartResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdStartWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdStartWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdStartWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdStartWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdStopWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdStopResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdStopWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdStopResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdStopWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdStopWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdStopWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdStopWithResponse), varargs...)
 }
 
 // PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse mocks base method.

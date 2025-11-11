@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,6 +38,8 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceListCmd())
 	cmd.AddCommand(buildServiceCreateCmd())
 	cmd.AddCommand(buildServiceDeleteCmd())
+	cmd.AddCommand(buildServiceStartCmd())
+	cmd.AddCommand(buildServiceStopCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 	cmd.AddCommand(buildServiceForkCmd())
 
@@ -396,15 +397,25 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 
 				// Handle wait behavior
-				var serviceErr error
+				var waitErr error
 				if createNoWait {
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
 					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					service.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, serviceID, createWaitTimeout, service.Status, statusOutput)
-					if serviceErr != nil {
-						fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
+					if waitErr = waitForService(cmd.Context(), waitForServiceArgs{
+						client:    client,
+						projectID: projectID,
+						serviceID: serviceID,
+						handler: &statusWaitHandler{
+							targetStatus: "READY",
+							service:      &service,
+						},
+						output:     statusOutput,
+						timeout:    createWaitTimeout,
+						timeoutMsg: "service may still be provisioning",
+					}); waitErr != nil {
+						fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 					} else {
 						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
 						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
@@ -417,7 +428,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 				// Return error for sake of exit code, but silence it since it was already output above
 				cmd.SilenceErrors = true
-				return serviceErr
+				return waitErr
 			default:
 				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
@@ -769,58 +780,6 @@ func formatTimePtr(t *time.Time) string {
 	return t.Format("2006-01-02 15:04")
 }
 
-// waitForServiceReady polls the service status until it's ready or timeout occurs
-func waitForServiceReady(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, initialStatus *api.DeployStatus, output io.Writer) (*api.DeployStatus, error) {
-	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
-	defer cancel()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	// Start the spinner
-	spinner := NewSpinner(output, "Service status: %s", util.DerefStr(initialStatus))
-	defer spinner.Stop()
-
-	lastStatus := initialStatus
-	for {
-		select {
-		case <-ctx.Done():
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return lastStatus, exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - service may still be provisioning", waitTimeout))
-			case errors.Is(ctx.Err(), context.Canceled):
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - service may still be provisioning"))
-			default:
-				return lastStatus, exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be provisioning: %w", ctx.Err()))
-			}
-		case <-ticker.C:
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				spinner.Update("Error checking service status: %v", err)
-				continue
-			}
-
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.Update("Service not found or error checking status")
-				continue
-			}
-
-			service := *resp.JSON200
-			lastStatus = service.Status
-			status := util.DerefStr(service.Status)
-
-			switch status {
-			case "READY":
-				return service.Status, nil
-			case "FAILED", "ERROR":
-				return service.Status, fmt.Errorf("service creation failed with status: %s", status)
-			default:
-				spinner.Update("Service status: %s", status)
-			}
-		}
-	}
-}
-
 // handlePasswordSaving handles saving password using the configured storage
 // method and displaying appropriate messages. Returns true if the password was
 // successfully saved, or false if not.
@@ -969,12 +928,24 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			if err := waitForServiceDeletion(client, projectID, serviceID, deleteWaitTimeout, cmd); err != nil {
+			if err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:    client,
+				projectID: projectID,
+				serviceID: serviceID,
+				handler: &deletionWaitHandler{
+					serviceID: serviceID,
+				},
+				output:     statusOutput,
+				timeout:    deleteWaitTimeout,
+				timeoutMsg: "service may still be deleting",
+			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
+
+			fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
 			return nil
 		},
 	}
@@ -986,58 +957,218 @@ Examples:
 	return cmd
 }
 
-// waitForServiceDeletion waits for a service to be fully deleted
-func waitForServiceDeletion(client *api.ClientWithResponses, projectID string, serviceID string, timeout time.Duration, cmd *cobra.Command) error {
-	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
-	defer cancel()
+// buildServiceStartCmd creates the start subcommand
+func buildServiceStartCmd() *cobra.Command {
+	var startNoWait bool
+	var startWaitTimeout time.Duration
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	cmd := &cobra.Command{
+		Use:   "start [service-id]",
+		Short: "Start a stopped database service",
+		Long: `Start a stopped database service.
 
-	statusOutput := cmd.ErrOrStderr()
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
 
-	// Start the spinner
-	spinner := NewSpinner(statusOutput, "Waiting for service '%s' to be deleted", serviceID)
-	defer spinner.Stop()
+Examples:
+  # Start a service (waits for completion by default)
+  tiger service start svc-12345
 
-	for {
-		select {
-		case <-ctx.Done():
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return exitWithCode(ExitTimeout, fmt.Errorf("timeout waiting for service '%s' to be deleted after %v", serviceID, timeout))
-			case errors.Is(ctx.Err(), context.Canceled):
-				return exitWithCode(ExitTimeout, fmt.Errorf("canceled waiting for service '%s' to be deleted", serviceID))
-			default:
-				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - service may still be deleting: %w", ctx.Err()))
+  # Start service without waiting for completion
+  tiger service start svc-12345 --no-wait
+
+  # Start service with custom wait timeout
+  tiger service start svc-12345 --wait-timeout 10m`,
+		ValidArgsFunction: serviceIDCompletion,
+		Args:              cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
 			}
-		case <-ticker.C:
-			// Check if service still exists
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(
-				ctx,
+
+			// Determine source service ID
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key
+			apiKey, projectID, err := getCredentialsForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make the start request
+			resp, err := client.PostProjectsProjectIdServicesServiceIdStartWithResponse(
+				context.Background(),
 				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to check service status: %w", err)
+				return fmt.Errorf("failed to start service: %w", err)
 			}
 
-			if resp.StatusCode() == 404 {
-				// Service is deleted
-				spinner.Stop()
-				fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
+			// Handle API response
+			if resp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+			service := *resp.JSON202
+
+			statusOutput := cmd.ErrOrStderr()
+			fmt.Fprintf(statusOutput, "▶️  Start request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if startNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
-			if resp.StatusCode() == 200 {
-				// Service still exists, continue waiting
-				continue
+			// Wait for service to become ready
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
+			if err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:    client,
+				projectID: projectID,
+				serviceID: serviceID,
+				handler: &statusWaitHandler{
+					targetStatus: "READY",
+					service:      &service,
+				},
+				output:     statusOutput,
+				timeout:    startWaitTimeout,
+				timeoutMsg: "service may still be starting",
+			}); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
 			}
 
-			// Other error
-			return fmt.Errorf("unexpected response while checking service status: %d", resp.StatusCode())
-		}
+			fmt.Fprintf(statusOutput, "✅ Service has been successfully started!\n")
+			return nil
+		},
 	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&startNoWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&startWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+
+	return cmd
+}
+
+// buildServiceStopCmd creates the stop subcommand
+func buildServiceStopCmd() *cobra.Command {
+	var stopNoWait bool
+	var stopWaitTimeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "stop [service-id]",
+		Short: "Stop a running database service",
+		Long: `Stop a running database service.
+
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+
+Examples:
+  # Stop a service (waits for completion by default)
+  tiger service stop svc-12345
+
+  # Stop service without waiting for completion
+  tiger service stop svc-12345 --no-wait
+
+  # Stop service with custom wait timeout
+  tiger service stop svc-12345 --wait-timeout 10m`,
+		ValidArgsFunction: serviceIDCompletion,
+		Args:              cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Determine source service ID
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get API key
+			apiKey, projectID, err := getCredentialsForService()
+			if err != nil {
+				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+			}
+
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
+
+			// Make the stop request
+			resp, err := client.PostProjectsProjectIdServicesServiceIdStopWithResponse(
+				context.Background(),
+				api.ProjectId(projectID),
+				api.ServiceId(serviceID),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to stop service: %w", err)
+			}
+
+			// Handle API response
+			if resp.StatusCode() != 202 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+			service := *resp.JSON202
+
+			statusOutput := cmd.ErrOrStderr()
+			fmt.Fprintf(statusOutput, "⏹️  Stop request accepted for service '%s'.\n", serviceID)
+
+			// If not waiting, return early
+			if stopNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
+				return nil
+			}
+
+			// Wait for service to become paused
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
+			if err := waitForService(cmd.Context(), waitForServiceArgs{
+				client:    client,
+				projectID: projectID,
+				serviceID: serviceID,
+				handler: &statusWaitHandler{
+					targetStatus: "PAUSED",
+					service:      &service,
+				},
+				output:     statusOutput,
+				timeout:    stopWaitTimeout,
+				timeoutMsg: "service may still be stopping",
+			}); err != nil {
+				// Return error for sake of exit code, but log ourselves for sake of icon
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
+			}
+
+			fmt.Fprintf(statusOutput, "✅ Service has been successfully stopped!\n")
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().BoolVar(&stopNoWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&stopWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+
+	return cmd
 }
 
 // buildServiceForkCmd creates the fork subcommand
@@ -1241,15 +1372,25 @@ Examples:
 			}
 
 			// Handle wait behavior
-			var serviceErr error
+			var waitErr error
 			if forkNoWait {
 				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				forkedService.Status, serviceErr = waitForServiceReady(cmd.Context(), client, projectID, forkedServiceID, forkWaitTimeout, forkedService.Status, statusOutput)
-				if serviceErr != nil {
-					fmt.Fprintf(statusOutput, "❌ Error: %s\n", serviceErr)
+				if waitErr = waitForService(cmd.Context(), waitForServiceArgs{
+					client:    client,
+					projectID: projectID,
+					serviceID: forkedServiceID,
+					handler: &statusWaitHandler{
+						targetStatus: "READY",
+						service:      &forkedService,
+					},
+					output:     statusOutput,
+					timeout:    forkWaitTimeout,
+					timeoutMsg: "service may still be provisioning",
+				}); waitErr != nil {
+					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 				} else {
 					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
 					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
@@ -1262,7 +1403,7 @@ Examples:
 
 			// Return error for sake of exit code, but silence it since it was already output above
 			cmd.SilenceErrors = true
-			return serviceErr
+			return waitErr
 		},
 	}
 

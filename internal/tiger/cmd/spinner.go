@@ -14,7 +14,7 @@ var spinnerFrames = []string{"⢎ ", "⠎⠁", "⠊⠑", "⠈⠱", " ⡱", "⢀�
 
 type Spinner interface {
 	// Update changes the spinner's displayed message.
-	Update(message string, args ...any)
+	Update(message string)
 
 	// Stop terminates the spinner program and waits for it to finish.
 	Stop()
@@ -23,23 +23,22 @@ type Spinner interface {
 // NewSpinner creates and returns a new [Spinner] for displaying animated
 // status messages. If output is a terminal, it uses bubbletea to dynamically
 // update the spinner and message in place. If output is not a terminal, it
-// prints each message on a new line without animation. The message parameter
-// supports fmt.Sprintf-style formatting with optional args.
-func NewSpinner(output io.Writer, message string, args ...any) Spinner {
+// prints each message on a new line without animation.
+func NewSpinner(output io.Writer, message string) Spinner {
 	if util.IsTerminal(output) {
-		return newAnimatedSpinner(output, message, args...)
+		return newAnimatedSpinner(output, message)
 	}
-	return newManualSpinner(output, message, args...)
+	return newManualSpinner(output, message)
 }
 
 type animatedSpinner struct {
 	program *tea.Program
 }
 
-func newAnimatedSpinner(output io.Writer, message string, args ...any) *animatedSpinner {
+func newAnimatedSpinner(output io.Writer, message string) *animatedSpinner {
 	program := tea.NewProgram(
 		spinnerModel{
-			message: fmt.Sprintf(message, args...),
+			message: message,
 		},
 		tea.WithInput(nil),
 		tea.WithOutput(output),
@@ -58,8 +57,8 @@ func newAnimatedSpinner(output io.Writer, message string, args ...any) *animated
 }
 
 // Update changes the spinner's displayed message and triggers bubbletea to re-render.
-func (s *animatedSpinner) Update(message string, args ...any) {
-	s.program.Send(updateMsg(fmt.Sprintf(message, args...)))
+func (s *animatedSpinner) Update(message string) {
+	s.program.Send(updateMsg(message))
 }
 
 // Stop quits the [tea.Program] and waits for it to finish.
@@ -73,11 +72,11 @@ type manualSpinner struct {
 	model  *spinnerModel
 }
 
-func newManualSpinner(output io.Writer, message string, args ...any) *manualSpinner {
+func newManualSpinner(output io.Writer, message string) *manualSpinner {
 	s := &manualSpinner{
 		output: output,
 		model: &spinnerModel{
-			message: fmt.Sprintf(message, args...),
+			message: message,
 		},
 	}
 	s.printLine()
@@ -85,8 +84,7 @@ func newManualSpinner(output io.Writer, message string, args ...any) *manualSpin
 }
 
 // Update prints the message on a new line if it differs from the previous one.
-func (s *manualSpinner) Update(message string, args ...any) {
-	message = fmt.Sprintf(message, args...)
+func (s *manualSpinner) Update(message string) {
 	if message == s.model.message {
 		return
 	}
