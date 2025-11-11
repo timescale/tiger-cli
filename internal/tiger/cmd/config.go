@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -21,10 +22,11 @@ func buildConfigShowCmd() *cobra.Command {
 	var withEnv bool
 
 	cmd := &cobra.Command{
-		Use:   "show",
-		Short: "Show current configuration",
-		Long:  `Display the current CLI configuration settings`,
-		Args:  cobra.NoArgs,
+		Use:               "show",
+		Short:             "Show current configuration",
+		Long:              `Display the current CLI configuration settings`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -87,10 +89,11 @@ func buildConfigShowCmd() *cobra.Command {
 
 func buildConfigSetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "set <key> <value>",
-		Short: "Set configuration value",
-		Long:  `Set a configuration value and save it to ~/.config/tiger/config.yaml`,
-		Args:  cobra.ExactArgs(2),
+		Use:               "set <key> <value>",
+		Short:             "Set configuration value",
+		Long:              `Set a configuration value and save it to ~/.config/tiger/config.yaml`,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 
@@ -114,10 +117,11 @@ func buildConfigSetCmd() *cobra.Command {
 
 func buildConfigUnsetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unset <key>",
-		Short: "Remove configuration value",
-		Long:  `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
-		Args:  cobra.ExactArgs(1),
+		Use:               "unset <key>",
+		Short:             "Remove configuration value",
+		Long:              `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 
@@ -141,10 +145,11 @@ func buildConfigUnsetCmd() *cobra.Command {
 
 func buildConfigResetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "reset",
-		Short: "Reset to defaults",
-		Long:  `Reset all configuration settings to their default values`,
-		Args:  cobra.NoArgs,
+		Use:               "reset",
+		Short:             "Reset to defaults",
+		Long:              `Reset all configuration settings to their default values`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -228,4 +233,19 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 		table.Append("version_check_last_time", cfg.VersionCheckLastTime.Format(time.RFC1123))
 	}
 	return table.Render()
+}
+
+func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Config option is always first positional argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	var results []string
+	for opt := range config.ValidConfigOptions() {
+		if strings.HasPrefix(opt, toComplete) {
+			results = append(results, opt)
+		}
+	}
+	return results, cobra.ShellCompDirectiveNoFileComp
 }

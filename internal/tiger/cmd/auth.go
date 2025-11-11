@@ -68,6 +68,8 @@ Examples:
   export TIGER_SECRET_KEY="your-secret-key"
   export TIGER_PROJECT_ID="proj-123"
   tiger auth login`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -149,9 +151,11 @@ Examples:
 
 func buildLogoutCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "logout",
-		Short: "Remove stored credentials",
-		Long:  `Remove stored API key and clear authentication credentials.`,
+		Use:               "logout",
+		Short:             "Remove stored credentials",
+		Long:              `Remove stored API key and clear authentication credentials.`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
@@ -167,9 +171,11 @@ func buildLogoutCmd() *cobra.Command {
 
 func buildStatusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status",
-		Short: "Show current authentication status and project ID",
-		Long:  "Displays whether you are logged in and shows your currently configured project ID.",
+		Use:               "status",
+		Short:             "Show current authentication status and project ID",
+		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
