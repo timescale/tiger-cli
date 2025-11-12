@@ -234,7 +234,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			service, err := getServiceDetails(cmd, args)
 			if err != nil {
-				return exitWithCode(ExitInvalidParameters, err)
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
@@ -244,16 +244,16 @@ Examples:
 				WithPassword: true,
 			})
 			if err != nil {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
 
 			if dbTestConnectionPooled && !details.IsPooler {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
 			if dbTestConnectionTimeout < 0 {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
 			}
 
 			// Test the connection
@@ -771,7 +771,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	// Get API key and project ID for authentication
 	apiKey, projectID, err := getCredentialsForDB()
 	if err != nil {
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+		return api.Service{}, common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 	}
 
 	// Create API client
@@ -791,7 +791,7 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return api.Service{}, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		return api.Service{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil {
@@ -876,17 +876,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(ExitTimeout, err) // Connection timeout
+			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
+			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
-		return exitWithCode(2, err) // No response to connection attempt
+		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 	defer conn.Close(ctx)
 
@@ -896,17 +896,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(ExitTimeout, err) // Connection timeout
+			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
+			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
-		return exitWithCode(2, err) // No response to connection attempt
+		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 
 	// Connection successful

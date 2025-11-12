@@ -569,7 +569,7 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test with malformed connection string (should return ExitInvalidParameters)
+	// Test with malformed connection string (should return common.ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
 	ctx := context.Background()
 	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
@@ -578,14 +578,14 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 		t.Error("Expected error for invalid connection string")
 	}
 
-	// Should be an exitCodeError
-	if exitErr, ok := err.(exitCodeError); ok {
-		// The exact code depends on where it fails - could be ExitTimeout or ExitInvalidParameters
-		if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+	// Should be an common.ExitCodeError
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		// The exact code depends on where it fails - could be common.ExitTimeout or common.ExitInvalidParameters
+		if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for invalid connection string")
+		t.Error("Expected common.ExitCodeError for invalid connection string")
 	}
 }
 
@@ -614,13 +614,13 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
 
-	// Check exit code (should be ExitTimeout for unreachable)
-	if exitErr, ok := err.(exitCodeError); ok {
-		if exitErr.ExitCode() != ExitTimeout {
-			t.Errorf("Expected exit code %d for timeout, got %d", ExitTimeout, exitErr.ExitCode())
+	// Check exit code (should be common.ExitTimeout for unreachable)
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		if exitErr.ExitCode() != common.ExitTimeout {
+			t.Errorf("Expected exit code %d for timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for timeout")
+		t.Error("Expected common.ExitCodeError for timeout")
 	}
 }
 
@@ -775,13 +775,13 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 
 			// For valid durations that fail due to server unreachable, check exit code
 			if tc.expectedOutput == "" {
-				if exitErr, ok := err.(exitCodeError); ok {
-					// Should be ExitTimeout (no response) or ExitInvalidParameters (invalid params) for network errors
-					if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-						t.Errorf("Expected exit code %d or %d, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+				if exitErr, ok := err.(common.ExitCodeError); ok {
+					// Should be common.ExitTimeout (no response) or common.ExitInvalidParameters (invalid params) for network errors
+					if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+						t.Errorf("Expected exit code %d or %d, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 					}
 				} else {
-					t.Error("Expected exitCodeError")
+					t.Error("Expected common.ExitCodeError")
 				}
 			}
 		})

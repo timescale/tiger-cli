@@ -1,4 +1,4 @@
-package cmd
+package common
 
 import (
 	"fmt"
@@ -21,15 +21,29 @@ type Spinner interface {
 }
 
 // NewSpinner creates and returns a new [Spinner] for displaying animated
-// status messages. If output is a terminal, it uses bubbletea to dynamically
-// update the spinner and message in place. If output is not a terminal, it
-// prints each message on a new line without animation.
+// status messages. If the output is nil or [io.Discard], it returns a no-op
+// spinner. If output is a terminal, it uses bubbletea to dynamically update
+// the spinner and message in place. If output is not a terminal, it prints
+// each message on a new line without animation.
 func NewSpinner(output io.Writer, message string) Spinner {
+	if output == nil || output == io.Discard {
+		return newNopSpinner()
+	}
 	if util.IsTerminal(output) {
 		return newAnimatedSpinner(output, message)
 	}
 	return newManualSpinner(output, message)
 }
+
+type nopSpinner struct{}
+
+func newNopSpinner() nopSpinner {
+	return nopSpinner{}
+}
+
+func (s nopSpinner) Update(message string) {}
+
+func (s nopSpinner) Stop() {}
 
 type animatedSpinner struct {
 	program *tea.Program
