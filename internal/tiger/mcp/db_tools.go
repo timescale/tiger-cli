@@ -11,8 +11,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -141,7 +141,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	service := *serviceResp.JSON200
 
 	// Build connection string with password
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,

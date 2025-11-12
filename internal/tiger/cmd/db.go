@@ -17,8 +17,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -84,7 +84,7 @@ Examples:
 				return err
 			}
 
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
@@ -170,7 +170,7 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled: dbConnectPooled,
 				Role:   dbConnectRole,
 			})
@@ -238,7 +238,7 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
@@ -344,7 +344,7 @@ Examples:
 			}
 
 			// Save password using configured storage
-			storage := password.GetPasswordStorage()
+			storage := common.GetPasswordStorage()
 			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}
@@ -674,7 +674,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -699,7 +699,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := password.SavePasswordWithResult(service, rolePassword, roleName)
+			result, err := common.SavePasswordWithResult(service, rolePassword, roleName)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", result.Message)
 			} else if !result.Success {
@@ -847,8 +847,8 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 
 	// Only set PGPASSWORD for keyring storage method
 	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := password.GetPasswordStorage()
-	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
+	storage := common.GetPasswordStorage()
+	if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
 		if password, err := storage.Get(service, role); err == nil && password != "" {
 			// Set PGPASSWORD environment variable for psql when using keyring
 			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)

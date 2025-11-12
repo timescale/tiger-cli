@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -142,7 +142,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	}
 
 	// Request pooled connection when pooler is not available
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Pooled: true,
 		Role:   "tsdbadmin",
 	})
@@ -339,7 +339,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -816,7 +816,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -824,7 +824,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role: "tsdbadmin",
 	})
 	if err != nil {
@@ -843,7 +843,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test connection string with password (simulating --with-password flag)
-	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details2, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -920,7 +920,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -989,7 +989,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1078,7 +1078,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1204,7 +1204,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	// Verify password was saved for the custom role
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, customRole)
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
@@ -1332,7 +1332,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	// Verify password was saved in pgpass storage
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)

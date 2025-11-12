@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -562,7 +562,7 @@ Examples:
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	password.ConnectionDetails
+	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
 }
@@ -739,13 +739,13 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 	outputSvc.InitialPassword = nil
 
-	opts := password.ConnectionDetailsOptions{
+	opts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 	}
 
-	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(service, opts); err != nil {
 		if output != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 		}
@@ -786,7 +786,7 @@ func formatTimePtr(t *time.Time) string {
 func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := password.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
+	result, _ := common.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password

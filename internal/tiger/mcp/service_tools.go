@@ -11,9 +11,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -188,9 +188,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 
 // ServiceCreateOutput represents output for service_create
 type ServiceCreateOutput struct {
-	Service         ServiceDetail                   `json:"service"`
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Service         ServiceDetail                 `json:"service"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceCreateOutput) Schema() *jsonschema.Schema {
@@ -249,9 +249,9 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 
 // ServiceForkOutput represents output for service_fork
 type ServiceForkOutput struct {
-	Service         ServiceDetail                   `json:"service"`
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Service         ServiceDetail                 `json:"service"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceForkOutput) Schema() *jsonschema.Schema {
@@ -277,8 +277,8 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 
 // ServiceUpdatePasswordOutput represents output for service_update_password
 type ServiceUpdatePasswordOutput struct {
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
@@ -566,7 +566,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: input.WithPassword,
 	}); err != nil {
@@ -654,7 +654,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// Save password immediately after service creation, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
 	if service.InitialPassword != nil {
-		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -670,7 +670,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(api.Service(service), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    input.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
@@ -792,7 +792,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Save password immediately after service fork, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
 	if service.InitialPassword != nil {
-		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -808,7 +808,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(api.Service(service), common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    input.WithPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
@@ -886,7 +886,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
-		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
 		output.PasswordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
