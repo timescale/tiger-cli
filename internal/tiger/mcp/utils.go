@@ -3,7 +3,11 @@ package mcp
 import (
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
+	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -53,7 +57,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 }
 
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
-func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
+func (s *Server) convertToServiceDetail(service api.Service, withPassword bool) ServiceDetail {
 	detail := ServiceDetail{
 		ServiceID: util.Deref(service.ServiceId),
 		Name:      util.Deref(service.Name),
@@ -116,6 +120,29 @@ func (s *Server) convertToServiceDetail(service api.Service) ServiceDetail {
 			port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
 		}
 		detail.PoolerEndpoint = fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port)
+	}
+
+	// Include password in ServiceDetail if requested. Setting it here ensures
+	// it's always set, even if GetConnectionDetails returns an error.
+	if withPassword {
+		// NOTE: This is a no-op if service.InitialPassword is nil or empty
+		detail.Password = util.Deref(service.InitialPassword)
+	}
+
+	// Always include connection string in ServiceDetail
+	// Password is embedded in connection string only if with_password=true
+	if details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+		Role:            "tsdbadmin",
+		WithPassword:    withPassword,
+		InitialPassword: util.Deref(service.InitialPassword),
+	}); err != nil {
+		logging.Error("MCP: Failed to build connection string", zap.Error(err))
+	} else {
+		if withPassword && details.Password == "" {
+			logging.Error("MCP: Requested password but password not available")
+		}
+		detail.ConnectionString = details.String()
+		detail.Password = details.Password
 	}
 
 	return detail

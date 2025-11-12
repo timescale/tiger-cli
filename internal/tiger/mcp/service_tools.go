@@ -559,23 +559,13 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, ServiceGetOutput{}, resp.JSON4XX
 	}
 
-	service := *resp.JSON200
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(service),
+		Service: s.convertToServiceDetail(*resp.JSON200, input.WithPassword),
 	}
 
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
-		Role:         "tsdbadmin",
-		WithPassword: input.WithPassword,
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else if input.WithPassword && details.Password == "" {
+	// Check if password was requested but not available
+	if input.WithPassword && output.Service.Password == "" {
 		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
-	} else {
-		output.Service.Password = details.Password
-		output.Service.ConnectionString = details.String()
 	}
 
 	return nil, output, nil
@@ -691,32 +681,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceCreateOutput{
-		Service:         s.convertToServiceDetail(service),
+		Service:         s.convertToServiceDetail(service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
-	}
-
-	// Include password in ServiceDetail if requested. Setting it here
-	// (instead of relying on the result of GetConnectionDetails) ensures that
-	// it's always set, even if GetConnectionDetails returns an error.
-	if input.WithPassword {
-		output.Service.Password = util.Deref(service.InitialPassword)
-	}
-
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(api.Service(service), common.ConnectionDetailsOptions{
-		Role:            "tsdbadmin",
-		WithPassword:    input.WithPassword,
-		InitialPassword: util.Deref(service.InitialPassword),
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else {
-		if input.WithPassword && details.Password == "" {
-			// This should not happen since we have InitialPassword, but check just in case
-			logging.Error("MCP: Requested password but password not available")
-		}
-		output.Service.ConnectionString = details.String()
 	}
 
 	return nil, output, nil
@@ -842,32 +809,9 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceForkOutput{
-		Service:         s.convertToServiceDetail(service),
+		Service:         s.convertToServiceDetail(service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
-	}
-
-	// Include password in ServiceDetail if requested. Setting it here
-	// (instead of relying on the result of GetConnectionDetails) ensures that
-	// it's always set, even if GetConnectionDetails returns an error.
-	if input.WithPassword {
-		output.Service.Password = util.Deref(service.InitialPassword)
-	}
-
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(api.Service(service), common.ConnectionDetailsOptions{
-		Role:            "tsdbadmin",
-		WithPassword:    input.WithPassword,
-		InitialPassword: util.Deref(service.InitialPassword),
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else {
-		if input.WithPassword && details.Password == "" {
-			// This should not happen since we have InitialPassword, but check just in case
-			logging.Error("MCP: Requested password but password not available")
-		}
-		output.Service.ConnectionString = details.String()
 	}
 
 	return nil, output, nil
@@ -976,7 +920,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceStartOutput{
-		Service: s.convertToServiceDetail(service),
+		Service: s.convertToServiceDetail(service, false),
 		Message: message,
 	}
 
@@ -1033,7 +977,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceStopOutput{
-		Service: s.convertToServiceDetail(service),
+		Service: s.convertToServiceDetail(service, false),
 		Message: message,
 	}
 
