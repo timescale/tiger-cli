@@ -295,11 +295,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
-				createServiceName = util.GenerateServiceName()
+				createServiceName = common.GenerateServiceName()
 			}
 
 			// Validate addons and resources
-			addons, err := util.ValidateAddons(createAddons)
+			addons, err := common.ValidateAddons(createAddons)
 			if err != nil {
 				return err
 			}
@@ -314,7 +314,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := util.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
 			if err != nil {
 				return err
 			}
@@ -437,7 +437,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 	// Add flags
 	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	cmd.Flags().StringSliceVar(&createAddons, "addons", nil, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(util.ValidAddons(), ", ")))
+	cmd.Flags().StringSliceVar(&createAddons, "addons", nil, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(common.ValidAddons(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "", "Region code")
 	cmd.Flags().StringVar(&createCpuMillis, "cpu", "", "CPU allocation in millicores or 'shared'")
 	cmd.Flags().StringVar(&createMemoryGBs, "memory", "", "Memory allocation in gigabytes or 'shared'")
@@ -1291,7 +1291,7 @@ Examples:
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
-			cpuMillis, memoryGBs, err := util.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
 			if err != nil {
 				return err
 			}

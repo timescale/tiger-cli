@@ -153,14 +153,14 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only."
-	schema.Properties["addons"].Items.Enum = []any{util.AddonTimeSeries, util.AddonAI}
+	schema.Properties["addons"].Items.Enum = []any{common.AddonTimeSeries, common.AddonAI}
 	schema.Properties["addons"].UniqueItems = true
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
@@ -227,7 +227,7 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false and is recommended because forking can take several minutes. ONLY set to true if the user explicitly needs to use the forked service immediately to continue the same conversation."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -597,12 +597,12 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Auto-generate service name if not provided
 	if input.Name == "" {
-		input.Name = util.GenerateServiceName()
+		input.Name = common.GenerateServiceName()
 	}
 
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -738,7 +738,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Parse CPU/Memory configuration if provided
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceForkOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
