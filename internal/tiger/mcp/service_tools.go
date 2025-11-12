@@ -311,8 +311,8 @@ func (ServiceStartInput) Schema() *jsonschema.Schema {
 
 // ServiceStartOutput represents output for service_start
 type ServiceStartOutput struct {
-	Service ServiceDetail `json:"service"`
-	Message string        `json:"message"`
+	Status  string `json:"status" jsonschema:"Current service status after start operation"`
+	Message string `json:"message"`
 }
 
 func (ServiceStartOutput) Schema() *jsonschema.Schema {
@@ -345,8 +345,8 @@ func (ServiceStopInput) Schema() *jsonschema.Schema {
 
 // ServiceStopOutput represents output for service_stop
 type ServiceStopOutput struct {
-	Service ServiceDetail `json:"service"`
-	Message string        `json:"message"`
+	Status  string `json:"status" jsonschema:"Current service status after stop operation"`
+	Message string `json:"message"`
 }
 
 func (ServiceStopOutput) Schema() *jsonschema.Schema {
@@ -918,9 +918,9 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		}
 	}
 
-	// Convert service to output format (after wait so status is accurate)
+	// Return status and message (after wait so status is accurate)
 	output := ServiceStartOutput{
-		Service: s.convertToServiceDetail(service, false),
+		Status:  util.DerefStr(service.Status),
 		Message: message,
 	}
 
@@ -975,9 +975,9 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		}
 	}
 
-	// Convert service to output format (after wait so status is accurate)
+	// Return status and message (after wait so status is accurate)
 	output := ServiceStopOutput{
-		Service: s.convertToServiceDetail(service, false),
+		Status:  util.DerefStr(service.Status),
 		Message: message,
 	}
 
