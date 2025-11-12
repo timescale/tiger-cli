@@ -285,6 +285,74 @@ func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
 }
 
+// ServiceStartInput represents input for service_start
+type ServiceStartInput struct {
+	ServiceID      string `json:"service_id"`
+	Wait           bool   `json:"wait,omitempty"`
+	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+}
+
+func (ServiceStartInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceStartInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully started before returning. Default is false and is recommended because starting can take several minutes. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to start. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
+	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
+
+	return schema
+}
+
+// ServiceStartOutput represents output for service_start
+type ServiceStartOutput struct {
+	Service ServiceDetail `json:"service"`
+	Message string        `json:"message"`
+}
+
+func (ServiceStartOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceStartOutput](nil))
+}
+
+// ServiceStopInput represents input for service_stop
+type ServiceStopInput struct {
+	ServiceID      string `json:"service_id"`
+	Wait           bool   `json:"wait,omitempty"`
+	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+}
+
+func (ServiceStopInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceStopInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully stopped before returning. Default is false and is recommended because stopping can take several minutes. ONLY set to true if the user explicitly needs confirmation that the service is stopped to continue the same conversation."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to stop. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
+	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
+
+	return schema
+}
+
+// ServiceStopOutput represents output for service_stop
+type ServiceStopOutput struct {
+	Service ServiceDetail `json:"service"`
+	Message string        `json:"message"`
+}
+
+func (ServiceStopOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceStopOutput](nil))
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools() {
 	// service_list
@@ -383,6 +451,46 @@ WARNING: Creates billable resources.`,
 			Title:           "Update Service Password",
 		},
 	}, s.handleServiceUpdatePassword)
+
+	// service_start
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_start",
+		Title: "Start Database Service",
+		Description: `Start a stopped database service.
+
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
+
+Default behavior: Returns immediately while service starts in background (recommended).
+Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+		InputSchema:  ServiceStartInput{}.Schema(),
+		OutputSchema: ServiceStartOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Changes service state but doesn't destroy data
+			IdempotentHint:  true,            // Starting an already-started service is safe
+			Title:           "Start Database Service",
+		},
+	}, s.handleServiceStart)
+
+	// service_stop
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_stop",
+		Title: "Stop Database Service",
+		Description: `Stop a running database service.
+
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+
+Default behavior: Returns immediately while service stops in background (recommended).
+Setting wait=true will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+		InputSchema:  ServiceStopInput{}.Schema(),
+		OutputSchema: ServiceStopOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Changes service state but doesn't destroy data
+			IdempotentHint:  true,            // Stopping an already-stopped service is safe
+			Title:           "Stop Database Service",
+		},
+	}, s.handleServiceStop)
 }
 
 // handleServiceList handles the service_list MCP tool
@@ -784,6 +892,102 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
 		} else {
 			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+		}
+	}
+
+	return nil, output, nil
+}
+
+// handleServiceStart handles the service_start MCP tool
+func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolRequest, input ServiceStartInput) (*mcp.CallToolResult, ServiceStartOutput, error) {
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceStartOutput{}, err
+	}
+
+	logging.Debug("MCP: Starting service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID))
+
+	// Make API call to start service
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx, projectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceStartOutput{}, resp.JSON4XX
+	}
+
+	service := *resp.JSON202
+
+	output := ServiceStartOutput{
+		Service: s.convertToServiceDetail(service),
+		Message: "Service start request accepted. The service may still be starting.",
+	}
+
+	// If wait is explicitly requested, wait for service to be ready
+	if input.Wait {
+		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
+
+		if status, err := s.waitForServiceReady(apiClient, projectID, input.ServiceID, timeout, service.Status); err != nil {
+			output.Message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			output.Service.Status = util.DerefStr(status)
+			output.Message = "Service started successfully and is ready!"
+		}
+	}
+
+	return nil, output, nil
+}
+
+// handleServiceStop handles the service_stop MCP tool
+func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest, input ServiceStopInput) (*mcp.CallToolResult, ServiceStopOutput, error) {
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceStopOutput{}, err
+	}
+
+	logging.Debug("MCP: Stopping service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID))
+
+	// Make API call to stop service
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx, projectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceStopOutput{}, resp.JSON4XX
+	}
+
+	service := *resp.JSON202
+
+	output := ServiceStopOutput{
+		Service: s.convertToServiceDetail(service),
+		Message: "Service stop request accepted. The service may still be stopping.",
+	}
+
+	// If wait is explicitly requested, wait for service to be paused
+	if input.Wait {
+		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
+
+		if status, err := s.waitForServiceStatus(apiClient, projectID, input.ServiceID, timeout, "PAUSED", service.Status); err != nil {
+			output.Message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			output.Service.Status = util.DerefStr(status)
+			output.Message = "Service stopped successfully!"
 		}
 	}
 

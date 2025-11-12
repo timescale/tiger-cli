@@ -177,3 +177,58 @@ func (s *Server) waitForServiceReady(apiClient *api.ClientWithResponses, project
 		}
 	}
 }
+
+// waitForServiceStatus waits for a service to reach a specific target status
+func (s *Server) waitForServiceStatus(apiClient *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration, targetStatus string, initialStatus *api.DeployStatus) (*api.DeployStatus, error) {
+	logging.Debug("MCP: Waiting for service to reach target status",
+		zap.String("service_id", serviceID),
+		zap.String("target_status", targetStatus),
+		zap.Duration("timeout", timeout),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	lastStatus := initialStatus
+	for {
+		select {
+		case <-ctx.Done():
+			logging.Warn("MCP: Timed out while waiting for service", zap.Error(ctx.Err()))
+			return lastStatus, fmt.Errorf("timeout reached after %v - service may still be transitioning", timeout)
+		case <-ticker.C:
+			resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+			if err != nil {
+				logging.Warn("MCP: Error checking service status", zap.Error(err))
+				continue
+			}
+
+			if resp.StatusCode() != 200 || resp.JSON200 == nil {
+				logging.Warn("MCP: Service not found or error checking status", zap.Int("status_code", resp.StatusCode()))
+				continue
+			}
+
+			service := *resp.JSON200
+			lastStatus = service.Status
+			status := util.DerefStr(service.Status)
+
+			switch status {
+			case targetStatus:
+				logging.Debug("MCP: Service reached target status",
+					zap.String("service_id", serviceID),
+					zap.String("status", status),
+				)
+				return service.Status, nil
+			case "FAILED", "ERROR":
+				return service.Status, fmt.Errorf("service operation failed with status: %s", status)
+			default:
+				logging.Debug("MCP: Service status",
+					zap.String("service_id", serviceID),
+					zap.String("status", status),
+				)
+			}
+		}
+	}
+}
