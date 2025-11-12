@@ -458,7 +458,7 @@ WARNING: Creates billable resources.`,
 		Title: "Start Database Service",
 		Description: `Start a stopped database service.
 
-This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
+This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections.
 
 Default behavior: Returns immediately while service starts in background (recommended).
 Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
@@ -466,8 +466,8 @@ timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
 		InputSchema:  ServiceStartInput{}.Schema(),
 		OutputSchema: ServiceStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: util.Ptr(false), // Changes service state but doesn't destroy data
-			IdempotentHint:  true,            // Starting an already-started service is safe
+			DestructiveHint: util.Ptr(false), // Starting a service cannot really break anything
+			IdempotentHint:  true,            // Starting an already-started service is safe (but returns an error)
 			Title:           "Start Database Service",
 		},
 	}, s.handleServiceStart)
@@ -478,7 +478,7 @@ timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
 		Title: "Stop Database Service",
 		Description: `Stop a running database service.
 
-This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections.
 
 Default behavior: Returns immediately while service stops in background (recommended).
 Setting wait=true will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
@@ -486,8 +486,8 @@ timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
 		InputSchema:  ServiceStopInput{}.Schema(),
 		OutputSchema: ServiceStopOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
-			DestructiveHint: util.Ptr(false), // Changes service state but doesn't destroy data
-			IdempotentHint:  true,            // Stopping an already-stopped service is safe
+			DestructiveHint: util.Ptr(true), // Stopping a service breaks existing connections and could cause app downtime
+			IdempotentHint:  true,           // Stopping an already-stopped service is safe (but returns an error)
 			Title:           "Stop Database Service",
 		},
 	}, s.handleServiceStop)
