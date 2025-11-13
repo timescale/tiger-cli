@@ -129,7 +129,7 @@ homebrew_casks:
     description: |-
       Tiger CLI - Tiger Cloud Platform CLI
       Command-line interface for managing Tiger Cloud platform resources
-    binary: tiger
+    binaries: [ tiger ]
     license: Apache-2.0
     skip_upload: auto # Skips prerelease builds
     url:
