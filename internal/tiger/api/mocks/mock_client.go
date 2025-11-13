@@ -202,6 +202,46 @@ func (mr *MockClientInterfaceMockRecorder) GetProjectsProjectIdServicesServiceId
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdServicesServiceId", reflect.TypeOf((*MockClientInterface)(nil).GetProjectsProjectIdServicesServiceId), varargs...)
 }
 
+// GetProjectsProjectIdServicesServiceIdFileimports mocks base method.
+func (m *MockClientInterface) GetProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, params *api.GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectsProjectIdServicesServiceIdFileimports", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimports indicates an expected call of GetProjectsProjectIdServicesServiceIdFileimports.
+func (mr *MockClientInterfaceMockRecorder) GetProjectsProjectIdServicesServiceIdFileimports(ctx, projectId, serviceId, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdServicesServiceIdFileimports", reflect.TypeOf((*MockClientInterface)(nil).GetProjectsProjectIdServicesServiceIdFileimports), varargs...)
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsImportId mocks base method.
+func (m *MockClientInterface) GetProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectsProjectIdServicesServiceIdFileimportsImportId", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsImportId indicates an expected call of GetProjectsProjectIdServicesServiceIdFileimportsImportId.
+func (mr *MockClientInterfaceMockRecorder) GetProjectsProjectIdServicesServiceIdFileimportsImportId(ctx, projectId, serviceId, importId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdServicesServiceIdFileimportsImportId", reflect.TypeOf((*MockClientInterface)(nil).GetProjectsProjectIdServicesServiceIdFileimportsImportId), varargs...)
+}
+
 // GetProjectsProjectIdServicesServiceIdReplicaSets mocks base method.
 func (m *MockClientInterface) GetProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -300,6 +340,46 @@ func (mr *MockClientInterfaceMockRecorder) GetProjectsProjectIdVpcsVpcIdPeerings
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, vpcId, peeringId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId", reflect.TypeOf((*MockClientInterface)(nil).GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId), varargs...)
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportId mocks base method.
+func (m *MockClientInterface) PatchProjectsProjectIdServicesServiceIdFileimportsImportId(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, body api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PatchProjectsProjectIdServicesServiceIdFileimportsImportId", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportId indicates an expected call of PatchProjectsProjectIdServicesServiceIdFileimportsImportId.
+func (mr *MockClientInterfaceMockRecorder) PatchProjectsProjectIdServicesServiceIdFileimportsImportId(ctx, projectId, serviceId, importId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchProjectsProjectIdServicesServiceIdFileimportsImportId", reflect.TypeOf((*MockClientInterface)(nil).PatchProjectsProjectIdServicesServiceIdFileimportsImportId), varargs...)
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody mocks base method.
+func (m *MockClientInterface) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody indicates an expected call of PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody.
+func (mr *MockClientInterfaceMockRecorder) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody(ctx, projectId, serviceId, importId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody", reflect.TypeOf((*MockClientInterface)(nil).PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBody), varargs...)
 }
 
 // PostAnalyticsIdentify mocks base method.
@@ -520,6 +600,86 @@ func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceI
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdEnablePooler", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdEnablePooler), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimports mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdFileimports(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimports", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimports indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimports.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimports(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimports", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimports), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBody), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithBody mocks base method.
+func (m *MockClientInterface) PostProjectsProjectIdServicesServiceIdFileimportsWithBody(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithBody indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsWithBody.
+func (mr *MockClientInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsWithBody(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsWithBody", reflect.TypeOf((*MockClientInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsWithBody), varargs...)
 }
 
 // PostProjectsProjectIdServicesServiceIdForkService mocks base method.
@@ -1166,6 +1326,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteProjectsProjectIdV
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectsProjectIdVpcsVpcIdWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).DeleteProjectsProjectIdVpcsVpcIdWithResponse), varargs...)
 }
 
+// GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, reqEditors ...api.RequestEditorFn) (*api.GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetProjectsProjectIdServicesServiceIdFileimportsImportIdResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse indicates an expected call of GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx, projectId, serviceId, importId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse), varargs...)
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, params *api.GetProjectsProjectIdServicesServiceIdFileimportsParams, reqEditors ...api.RequestEditorFn) (*api.GetProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, params}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectsProjectIdServicesServiceIdFileimportsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetProjectsProjectIdServicesServiceIdFileimportsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsWithResponse indicates an expected call of GetProjectsProjectIdServicesServiceIdFileimportsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx, projectId, serviceId, params any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, params}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdServicesServiceIdFileimportsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectsProjectIdServicesServiceIdFileimportsWithResponse), varargs...)
+}
+
 // GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse mocks base method.
 func (m *MockClientWithResponsesInterface) GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*api.GetProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
 	m.ctrl.T.Helper()
@@ -1304,6 +1504,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectsProjectIdVpcs
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsProjectIdVpcsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectsProjectIdVpcsWithResponse), varargs...)
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse indicates an expected call of PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse(ctx, projectId, serviceId, importId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithBodyWithResponse), varargs...)
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, importId api.FileImportId, body api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, importId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PatchProjectsProjectIdServicesServiceIdFileimportsImportIdResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse indicates an expected call of PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse(ctx, projectId, serviceId, importId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, importId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PatchProjectsProjectIdServicesServiceIdFileimportsImportIdWithResponse), varargs...)
 }
 
 // PostAnalyticsIdentifyWithBodyWithResponse mocks base method.
@@ -1504,6 +1744,86 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdSer
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithBodyWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdFileimportsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsWithBodyWithResponse), varargs...)
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) PostProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.PostProjectsProjectIdServicesServiceIdFileimportsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PostProjectsProjectIdServicesServiceIdFileimportsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.PostProjectsProjectIdServicesServiceIdFileimportsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PostProjectsProjectIdServicesServiceIdFileimportsWithResponse indicates an expected call of PostProjectsProjectIdServicesServiceIdFileimportsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) PostProjectsProjectIdServicesServiceIdFileimportsWithResponse(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostProjectsProjectIdServicesServiceIdFileimportsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).PostProjectsProjectIdServicesServiceIdFileimportsWithResponse), varargs...)
 }
 
 // PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse mocks base method.

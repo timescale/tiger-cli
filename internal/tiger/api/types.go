@@ -9,23 +9,49 @@ import (
 
 // Defines values for DeployStatus.
 const (
-	CONFIGURING DeployStatus = "CONFIGURING"
-	DELETED     DeployStatus = "DELETED"
-	DELETING    DeployStatus = "DELETING"
-	OPTIMIZING  DeployStatus = "OPTIMIZING"
-	PAUSED      DeployStatus = "PAUSED"
-	PAUSING     DeployStatus = "PAUSING"
-	QUEUED      DeployStatus = "QUEUED"
-	READY       DeployStatus = "READY"
-	RESUMING    DeployStatus = "RESUMING"
-	UNSTABLE    DeployStatus = "UNSTABLE"
-	UPGRADING   DeployStatus = "UPGRADING"
+	DeployStatusCONFIGURING DeployStatus = "CONFIGURING"
+	DeployStatusDELETED     DeployStatus = "DELETED"
+	DeployStatusDELETING    DeployStatus = "DELETING"
+	DeployStatusOPTIMIZING  DeployStatus = "OPTIMIZING"
+	DeployStatusPAUSED      DeployStatus = "PAUSED"
+	DeployStatusPAUSING     DeployStatus = "PAUSING"
+	DeployStatusQUEUED      DeployStatus = "QUEUED"
+	DeployStatusREADY       DeployStatus = "READY"
+	DeployStatusRESUMING    DeployStatus = "RESUMING"
+	DeployStatusUNSTABLE    DeployStatus = "UNSTABLE"
+	DeployStatusUPGRADING   DeployStatus = "UPGRADING"
 )
 
 // Defines values for EnvironmentTag.
 const (
 	EnvironmentTagDEV  EnvironmentTag = "DEV"
 	EnvironmentTagPROD EnvironmentTag = "PROD"
+)
+
+// Defines values for FileImportDefinitionType.
+const (
+	CSV     FileImportDefinitionType = "CSV"
+	PARQUET FileImportDefinitionType = "PARQUET"
+)
+
+// Defines values for FileImportSourceType.
+const (
+	FileImportSourceTypeHTTP     FileImportSourceType = "HTTP"
+	FileImportSourceTypeINTERNAL FileImportSourceType = "INTERNAL"
+	FileImportSourceTypeS3       FileImportSourceType = "S3"
+)
+
+// Defines values for FileImportState.
+const (
+	FileImportStateCANCELLED        FileImportState = "CANCELLED"
+	FileImportStateFAILURE          FileImportState = "FAILURE"
+	FileImportStateINQUEUE          FileImportState = "IN_QUEUE"
+	FileImportStatePAUSED           FileImportState = "PAUSED"
+	FileImportStateRETRYING         FileImportState = "RETRYING"
+	FileImportStateRUNNING          FileImportState = "RUNNING"
+	FileImportStateSKIPPED          FileImportState = "SKIPPED"
+	FileImportStateSUCCESS          FileImportState = "SUCCESS"
+	FileImportStateWAITINGFORUPLOAD FileImportState = "WAITING_FOR_UPLOAD"
 )
 
 // Defines values for ForkStrategy.
@@ -63,9 +89,49 @@ const (
 	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
 
+// Defines values for UpdateFileImportRequestType.
+const (
+	Cancel UpdateFileImportRequestType = "cancel"
+	Labels UpdateFileImportRequestType = "labels"
+	Retry  UpdateFileImportRequestType = "retry"
+)
+
+// Defines values for GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType.
+const (
+	GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceTypeHTTP     GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType = "HTTP"
+	GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceTypeINTERNAL GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType = "INTERNAL"
+	GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceTypeS3       GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType = "S3"
+)
+
+// ColumnMapping defines model for ColumnMapping.
+type ColumnMapping struct {
+	// Destination Destination column name in the target table.
+	Destination string `json:"destination"`
+
+	// Source Source column name in the original file.
+	Source string `json:"source"`
+}
+
 // ConnectionPooler defines model for ConnectionPooler.
 type ConnectionPooler struct {
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
+}
+
+// CreateFileImportInput defines model for CreateFileImportInput.
+type CreateFileImportInput struct {
+	// Definition File format definition. Only csv or parquet should be set based on type.
+	Definition FileImportDefinition `json:"definition"`
+
+	// Id Unique identifier for this file import.
+	Id string `json:"id"`
+
+	// Labels Optional labels for filtering.
+	Labels   *[]FileImportLabel `json:"labels,omitempty"`
+	Settings *ImportSettings    `json:"settings,omitempty"`
+
+	// Source Source configuration for the file import. Only one of s3, http, or internal should be set based on type.
+	Source          FileImportSource `json:"source"`
+	TableIdentifier TableIdentifier  `json:"table_identifier"`
 }
 
 // DeployStatus defines model for DeployStatus.
@@ -84,6 +150,170 @@ type EnvironmentTag string
 type Error struct {
 	Code    *string `json:"code,omitempty"`
 	Message *string `json:"message,omitempty"`
+}
+
+// FileImport defines model for FileImport.
+type FileImport struct {
+	// CreatedAt Creation timestamp.
+	CreatedAt time.Time `json:"created_at"`
+
+	// Definition File format definition. Only csv or parquet should be set based on type.
+	Definition FileImportDefinition `json:"definition"`
+
+	// Id Unique file import identifier.
+	Id string `json:"id"`
+
+	// Labels Labels for filtering and organization.
+	Labels []FileImportLabel `json:"labels"`
+
+	// ProjectId Project identifier.
+	ProjectId string `json:"project_id"`
+
+	// ServiceId Service identifier.
+	ServiceId string          `json:"service_id"`
+	Settings  *ImportSettings `json:"settings,omitempty"`
+
+	// Size File size in bytes.
+	Size int `json:"size"`
+
+	// Source Source configuration for the file import. Only one of s3, http, or internal should be set based on type.
+	Source          FileImportSource    `json:"source"`
+	State           FileImportStateInfo `json:"state"`
+	TableIdentifier TableIdentifier     `json:"table_identifier"`
+
+	// UpdatedAt Last update timestamp.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// FileImportDefinition File format definition. Only csv or parquet should be set based on type.
+type FileImportDefinition struct {
+	Csv     *FileImportDefinitionCSV     `json:"csv,omitempty"`
+	Parquet *FileImportDefinitionParquet `json:"parquet,omitempty"`
+
+	// Type The file format type.
+	Type FileImportDefinitionType `json:"type"`
+}
+
+// FileImportDefinitionCSV defines model for FileImportDefinitionCSV.
+type FileImportDefinitionCSV struct {
+	// AutoColumnMapping Automatically map columns by matching header names. Requires skip_header=true. Mutually exclusive with column_names and column_mappings.
+	AutoColumnMapping *bool `json:"auto_column_mapping,omitempty"`
+
+	// ColumnMappings Mappings from source to destination columns. Requires skip_header=true. Mutually exclusive with column_names and auto_column_mapping.
+	ColumnMappings *[]ColumnMapping `json:"column_mappings,omitempty"`
+
+	// ColumnNames Column names matching the destination table. Mutually exclusive with column_mappings and auto_column_mapping.
+	ColumnNames *[]string `json:"column_names,omitempty"`
+
+	// Delimiter The delimiter character for CSV files.
+	Delimiter *string `json:"delimiter,omitempty"`
+
+	// SkipHeader Whether to skip the first row as a header. Required for column_mappings and auto_column_mapping.
+	SkipHeader *bool `json:"skip_header,omitempty"`
+}
+
+// FileImportDefinitionParquet defines model for FileImportDefinitionParquet.
+type FileImportDefinitionParquet struct {
+	// AutoColumnMapping Automatically map columns by matching header names. Mutually exclusive with column_mappings.
+	AutoColumnMapping *bool `json:"auto_column_mapping,omitempty"`
+
+	// ColumnMappings Mappings from source to destination columns. Mutually exclusive with auto_column_mapping.
+	ColumnMappings *[]ColumnMapping `json:"column_mappings,omitempty"`
+}
+
+// FileImportDefinitionType The file format type.
+type FileImportDefinitionType string
+
+// FileImportHTTPSource defines model for FileImportHTTPSource.
+type FileImportHTTPSource struct {
+	// Url The HTTP(S) URL to download the file from.
+	Url string `json:"url"`
+}
+
+// FileImportInternalSource defines model for FileImportInternalSource.
+type FileImportInternalSource struct {
+	// Id Internal identifier for the uploaded file.
+	Id string `json:"id"`
+}
+
+// FileImportLabel defines model for FileImportLabel.
+type FileImportLabel struct {
+	// Key Label key for filtering.
+	Key string `json:"key"`
+
+	// Value Label value.
+	Value string `json:"value"`
+}
+
+// FileImportS3Source defines model for FileImportS3Source.
+type FileImportS3Source struct {
+	// Bucket The S3 bucket name.
+	Bucket string `json:"bucket"`
+
+	// Id The identifier for this source (deprecated, not actively used).
+	Id *string `json:"id,omitempty"`
+
+	// Key The S3 object key.
+	Key string `json:"key"`
+
+	// RoleArn AWS IAM role ARN for accessing the S3 bucket.
+	RoleArn *string `json:"role_arn,omitempty"`
+}
+
+// FileImportSource Source configuration for the file import. Only one of s3, http, or internal should be set based on type.
+type FileImportSource struct {
+	Http     *FileImportHTTPSource     `json:"http,omitempty"`
+	Internal *FileImportInternalSource `json:"internal,omitempty"`
+	S3       *FileImportS3Source       `json:"s3,omitempty"`
+
+	// Type The type of source for the file import.
+	Type FileImportSourceType `json:"type"`
+}
+
+// FileImportSourceType The type of source for the file import.
+type FileImportSourceType string
+
+// FileImportState Current state of the file import operation.
+type FileImportState string
+
+// FileImportStateInfo defines model for FileImportStateInfo.
+type FileImportStateInfo struct {
+	// FailureReason Detailed failure reason if state is FAILURE.
+	FailureReason *string `json:"failure_reason,omitempty"`
+	Progress      *struct {
+		// Current Current progress value.
+		Current *int `json:"current,omitempty"`
+
+		// Message Human-readable progress message.
+		Message *string `json:"message,omitempty"`
+
+		// Total Total expected value.
+		Total *int `json:"total,omitempty"`
+	} `json:"progress,omitempty"`
+
+	// State Current state of the file import operation.
+	State FileImportState `json:"state"`
+
+	// Timelines History of state transitions.
+	Timelines *[]FileImportStateTimeline `json:"timelines,omitempty"`
+}
+
+// FileImportStateTimeline defines model for FileImportStateTimeline.
+type FileImportStateTimeline struct {
+	// At Timestamp when this state was entered.
+	At *time.Time `json:"at,omitempty"`
+
+	// Payload Additional information about the state change.
+	Payload *struct {
+		// FailureReason Reason for failure, if applicable.
+		FailureReason *string `json:"failure_reason,omitempty"`
+
+		// RetryAt Scheduled retry time, if applicable.
+		RetryAt *time.Time `json:"retry_at,omitempty"`
+	} `json:"payload,omitempty"`
+
+	// State The state that was entered.
+	State *string `json:"state,omitempty"`
 }
 
 // ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
@@ -124,6 +354,21 @@ type ForkSpec struct {
 // - PITR: Point-in-time recovery using target_time
 type ForkStrategy string
 
+// GeneratePresignedURLInput defines model for GeneratePresignedURLInput.
+type GeneratePresignedURLInput struct {
+	// ContentLength Exact size of the file to upload in bytes. Must match the Content-Length header during upload.
+	ContentLength int `json:"content_length"`
+
+	// Id Unique identifier for the file. This will be used later when creating the file import.
+	Id string `json:"id"`
+}
+
+// GeneratePresignedURLResponse defines model for GeneratePresignedURLResponse.
+type GeneratePresignedURLResponse struct {
+	// Url Presigned S3 URL for uploading the file. Valid for a limited time.
+	Url string `json:"url"`
+}
+
 // HAReplica defines model for HAReplica.
 type HAReplica struct {
 	// ReplicaCount Number of high-availability replicas (all replicas are asynchronous by default).
@@ -131,6 +376,34 @@ type HAReplica struct {
 
 	// SyncReplicaCount Number of synchronous high-availability replicas.
 	SyncReplicaCount *int `json:"sync_replica_count,omitempty"`
+}
+
+// ImportSettings defines model for ImportSettings.
+type ImportSettings struct {
+	// OnConflictDoNothing Handle conflicts by ignoring conflicting rows.
+	OnConflictDoNothing *bool `json:"on_conflict_do_nothing,omitempty"`
+}
+
+// ListFileImportResponse defines model for ListFileImportResponse.
+type ListFileImportResponse struct {
+	// FileImports List of file imports.
+	FileImports []FileImport `json:"file_imports"`
+	PageInfo    PageInfo     `json:"page_info"`
+}
+
+// PageInfo defines model for PageInfo.
+type PageInfo struct {
+	// EndCursor Cursor for fetching the next page.
+	EndCursor *string `json:"end_cursor,omitempty"`
+
+	// HasNextPage Whether there is a next page.
+	HasNextPage bool `json:"has_next_page"`
+
+	// HasPreviousPage Whether there is a previous page.
+	HasPreviousPage bool `json:"has_previous_page"`
+
+	// StartCursor Cursor for fetching the previous page.
+	StartCursor *string `json:"start_cursor,omitempty"`
 }
 
 // Peering defines model for Peering.
@@ -318,6 +591,45 @@ type SetHAReplicaInput struct {
 	SyncReplicaCount *int `json:"sync_replica_count,omitempty"`
 }
 
+// TableIdentifier defines model for TableIdentifier.
+type TableIdentifier struct {
+	// SchemaName PostgreSQL schema name. Defaults to 'public' if not specified.
+	SchemaName *string `json:"schema_name,omitempty"`
+
+	// TableName PostgreSQL table name.
+	TableName string `json:"table_name"`
+}
+
+// UpdateFileImportInput defines model for UpdateFileImportInput.
+type UpdateFileImportInput struct {
+	// Requests List of update operations to perform.
+	Requests []UpdateFileImportRequest `json:"requests"`
+}
+
+// UpdateFileImportRequest Update request. Only one of cancel or labels should be set based on type.
+type UpdateFileImportRequest struct {
+	Cancel *UpdateFileImportRequestCancel `json:"cancel,omitempty"`
+	Labels *UpdateFileImportRequestLabels `json:"labels,omitempty"`
+
+	// Type Type of update operation to perform.
+	Type UpdateFileImportRequestType `json:"type"`
+}
+
+// UpdateFileImportRequestCancel defines model for UpdateFileImportRequestCancel.
+type UpdateFileImportRequestCancel struct {
+	// Reason Reason for cancellation.
+	Reason string `json:"reason"`
+}
+
+// UpdateFileImportRequestLabels defines model for UpdateFileImportRequestLabels.
+type UpdateFileImportRequestLabels struct {
+	// Labels New labels to set.
+	Labels []FileImportLabel `json:"labels"`
+}
+
+// UpdateFileImportRequestType Type of update operation to perform.
+type UpdateFileImportRequestType string
+
 // UpdatePasswordInput defines model for UpdatePasswordInput.
 type UpdatePasswordInput struct {
 	// Password The new password.
@@ -344,6 +656,9 @@ type VPCRename struct {
 	// Name The new name for the VPC.
 	Name string `json:"name"`
 }
+
+// FileImportId defines model for FileImportId.
+type FileImportId = string
 
 // PeeringId defines model for PeeringId.
 type PeeringId = string
@@ -389,6 +704,44 @@ type PostAnalyticsTrackJSONBody struct {
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
+// GetProjectsProjectIdServicesServiceIdFileimportsParams defines parameters for GetProjectsProjectIdServicesServiceIdFileimports.
+type GetProjectsProjectIdServicesServiceIdFileimportsParams struct {
+	// First Number of items to fetch for forward pagination.
+	First *int `form:"first,omitempty" json:"first,omitempty"`
+
+	// Last Number of items to fetch for backward pagination.
+	Last *int `form:"last,omitempty" json:"last,omitempty"`
+
+	// After Cursor for fetching the next page.
+	After *string `form:"after,omitempty" json:"after,omitempty"`
+
+	// Before Cursor for fetching the previous page.
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+
+	// LabelSelector Filter by label key and value using k8s label selector syntax (e.g., 'source=s3-live-sync,s3-live-sync-id=123').
+	LabelSelector *string `form:"label_selector,omitempty" json:"label_selector,omitempty"`
+
+	// States Filter by import states (comma-separated). Valid states are:
+	// - IN_QUEUE: Import is queued for processing
+	// - RUNNING: Import is currently processing
+	// - RETRYING: Import is being retried after a failure
+	// - SUCCESS: Import completed successfully
+	// - FAILURE: Import failed
+	// - CANCELLED: Import was cancelled
+	// - PAUSED: Import is paused
+	// - SKIPPED: Import was skipped
+	States *string `form:"states,omitempty" json:"states,omitempty"`
+
+	// S3KeyPrefix Filter S3 imports by key prefix (e.g., 'data/2024/'). Only affects S3 source imports.
+	S3KeyPrefix *string `form:"s3_key_prefix,omitempty" json:"s3_key_prefix,omitempty"`
+
+	// SourceType Filter by source type for optimized ordering. Supported values are S3, HTTP, INTERNAL.
+	SourceType *GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType `form:"source_type,omitempty" json:"source_type,omitempty"`
+}
+
+// GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType defines parameters for GetProjectsProjectIdServicesServiceIdFileimports.
+type GetProjectsProjectIdServicesServiceIdFileimportsParamsSourceType string
+
 // PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.
 type PostAnalyticsIdentifyJSONRequestBody PostAnalyticsIdentifyJSONBody
 
@@ -403,6 +756,15 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody = ServiceV
 
 // PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdDetachFromVPC for application/json ContentType.
 type PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody = ServiceVPCInput
+
+// PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdFileimports for application/json ContentType.
+type PostProjectsProjectIdServicesServiceIdFileimportsJSONRequestBody = CreateFileImportInput
+
+// PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrl for application/json ContentType.
+type PostProjectsProjectIdServicesServiceIdFileimportsPresignedUrlJSONRequestBody = GeneratePresignedURLInput
+
+// PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody defines body for PatchProjectsProjectIdServicesServiceIdFileimportsImportId for application/json ContentType.
+type PatchProjectsProjectIdServicesServiceIdFileimportsImportIdJSONRequestBody = UpdateFileImportInput
 
 // PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdForkService for application/json ContentType.
 type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkServiceCreate
