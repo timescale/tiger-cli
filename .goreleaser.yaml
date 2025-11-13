@@ -151,7 +151,7 @@ homebrew_casks:
     # strings, which causes the homebrew cask to only output the final line.
     # Formatting it in the following way works around it.
     caveats: >
-      Tiger CLI has been installed successfully!\n\nGet started with:\n  tiger auth login\n  tiger mcp install\n\nFor help:\n  tiger --help
+      Tiger CLI has been installed successfully!\n\nGet started with:\n  tiger auth login\n  tiger mcp install\n\nFor help:\n  tiger help
 
 # Checksum configuration - split into individual files for easier validation
 checksum:
