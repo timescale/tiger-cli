@@ -17,20 +17,22 @@ Each MCP tool call dynamically creates the API client and loads configuration at
 For the initial v0 release, implement these essential tools first:
 
 **Core Service Management:**
-- `tiger_service_list` - List all services
-- `tiger_service_get` - Get service details
-- `tiger_service_create` - Create new services
-- `tiger_service_fork` - Fork existing services
-- `tiger_service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
-- `tiger_service_update_password` - Update service master password
+- `service_list` - List all services
+- `service_get` - Get service details
+- `service_create` - Create new services
+- `service_fork` - Fork existing services
+- `service_start` - Start stopped services
+- `service_stop` - Stop running services
+- `service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
+- `service_update_password` - Update service master password
 
 **Database Operations:**
-- `tiger_db_connection_string` - Get connection strings
-- `tiger_db_execute_query` - Execute SQL queries
-- `tiger_db_test_connection` - Test connectivity
+- `db_connection_string` - Get connection strings
+- `db_execute_query` - Execute SQL queries
+- `db_test_connection` - Test connectivity
 
 **Future v1+ Tools:**
-- Service lifecycle (start/stop/restart) - pending API endpoints
+- Service restart - pending API endpoint
 - HA management tools
 - Read replica management
 - Basic VPC management
@@ -149,14 +151,14 @@ tiger mcp start http --port 8080 --host 0.0.0.0
 
 ### Service Management
 
-#### `tiger_service_list`
+#### `service_list`
 List all database services.
 
 **Parameters:** None
 
 **Returns:** Array of service objects with id, name, status, type, region, and resource information.
 
-#### `tiger_service_get`
+#### `service_get`
 Get details of a specific service.
 
 **Parameters:**
@@ -165,7 +167,7 @@ Get details of a specific service.
 
 **Returns:** Detailed service object with configuration, endpoints, status, and connection string. When `with_password=true`, the response includes the password field and the password is embedded in the connection string. When `with_password=false` (default), the connection string is still included but without the password embedded.
 
-#### `tiger_service_create`
+#### `service_create`
 Create a new database service.
 
 **Parameters:**
@@ -183,7 +185,7 @@ Create a new database service.
 
 **Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.), regardless of the `with_password` parameter value.
 
-#### `tiger_service_fork`
+#### `service_fork`
 Fork an existing database service to create a new independent copy.
 
 **Parameters:**
@@ -206,7 +208,7 @@ Fork an existing database service to create a new independent copy.
 
 **Warning:** Creates billable resources.
 
-#### `tiger_service_delete`
+#### `service_delete`
 Delete a database service.
 
 **Parameters:**
@@ -215,23 +217,31 @@ Delete a database service.
 
 **Returns:** Deletion confirmation with operation status.
 
-#### `tiger_service_start`
-Start a stopped service.
+#### `service_start`
+Start a stopped database service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to start
+- `wait` (boolean, optional): Wait for service to be fully started before returning - default: false
+- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 10
 
-**Returns:** Operation status.
+**Returns:** Operation status with current service status and message.
 
-#### `tiger_service_stop`
-Stop a running service.
+**Default behavior:** Returns immediately while service starts in background (recommended). Setting `wait=true` will block until the database is ready - only use if your next steps require connecting to or querying this database.
+
+#### `service_stop`
+Stop a running database service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to stop
+- `wait` (boolean, optional): Wait for service to be fully stopped before returning - default: false
+- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 10
 
-**Returns:** Operation status.
+**Returns:** Operation status with current service status and message.
 
-#### `tiger_service_restart`
+**Default behavior:** Returns immediately while service stops in background (recommended). Setting `wait=true` will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
+
+#### `service_restart`
 Restart a service.
 
 **Parameters:**
@@ -239,7 +249,7 @@ Restart a service.
 
 **Returns:** Operation status.
 
-#### `tiger_service_resize`
+#### `service_resize`
 Resize service resources.
 
 **Parameters:**
@@ -249,7 +259,7 @@ Resize service resources.
 
 **Returns:** Resize operation status.
 
-#### `tiger_service_enable_pooler`
+#### `service_enable_pooler`
 Enable connection pooling for a service.
 
 **Parameters:**
@@ -257,7 +267,7 @@ Enable connection pooling for a service.
 
 **Returns:** Operation status.
 
-#### `tiger_service_disable_pooler`
+#### `service_disable_pooler`
 Disable connection pooling for a service.
 
 **Parameters:**
@@ -265,7 +275,7 @@ Disable connection pooling for a service.
 
 **Returns:** Operation status.
 
-#### `tiger_service_attach_vpc`
+#### `service_attach_vpc`
 Attach a service to a VPC.
 
 **Parameters:**
@@ -274,7 +284,7 @@ Attach a service to a VPC.
 
 **Returns:** Operation status.
 
-#### `tiger_service_detach_vpc`
+#### `service_detach_vpc`
 Detach a service from a VPC.
 
 **Parameters:**
@@ -283,7 +293,7 @@ Detach a service from a VPC.
 
 **Returns:** Operation status.
 
-#### `tiger_service_update_password`
+#### `service_update_password`
 Update the master password for a service.
 
 **Parameters:**
@@ -296,7 +306,7 @@ Update the master password for a service.
 
 ### Database Operations
 
-#### `tiger_db_connection_string`
+#### `db_connection_string`
 Get connection string for a service.
 
 **Parameters:**
@@ -306,7 +316,7 @@ Get connection string for a service.
 
 **Returns:** Connection string for the database.
 
-#### `tiger_db_test_connection`
+#### `db_test_connection`
 Test database connectivity.
 
 **Parameters:**
@@ -314,7 +324,7 @@ Test database connectivity.
 
 **Returns:** Connection test results with status and latency information.
 
-#### `tiger_db_execute_query`
+#### `db_execute_query`
 Execute a SQL query on a service database.
 
 **Parameters:**
@@ -352,7 +362,7 @@ Execute a SQL query on a service database.
 
 ### High-Availability Management
 
-#### `tiger_ha_get`
+#### `ha_get`
 Get current HA configuration for a service.
 
 **Parameters:**
@@ -360,7 +370,7 @@ Get current HA configuration for a service.
 
 **Returns:** Current HA configuration with replica counts and levels.
 
-#### `tiger_ha_set`
+#### `ha_set`
 Set HA configuration level for a service.
 
 **Parameters:**
@@ -371,7 +381,7 @@ Set HA configuration level for a service.
 
 ### Read Replica Sets Management
 
-#### `tiger_read_replica_list`
+#### `read_replica_list`
 List all read replica sets for a service.
 
 **Parameters:**
@@ -379,7 +389,7 @@ List all read replica sets for a service.
 
 **Returns:** Array of read replica set objects.
 
-#### `tiger_read_replica_get`
+#### `read_replica_get`
 Get details of a specific read replica set.
 
 **Parameters:**
@@ -387,7 +397,7 @@ Get details of a specific read replica set.
 
 **Returns:** Detailed replica set object.
 
-#### `tiger_read_replica_create`
+#### `read_replica_create`
 Create a new read replica set.
 
 **Parameters:**
@@ -400,7 +410,7 @@ Create a new read replica set.
 
 **Returns:** Replica set creation status and details.
 
-#### `tiger_read_replica_delete`
+#### `read_replica_delete`
 Delete a read replica set.
 
 **Parameters:**
@@ -408,7 +418,7 @@ Delete a read replica set.
 
 **Returns:** Deletion confirmation.
 
-#### `tiger_read_replica_resize`
+#### `read_replica_resize`
 Resize a read replica set.
 
 **Parameters:**
@@ -419,7 +429,7 @@ Resize a read replica set.
 
 **Returns:** Resize operation status.
 
-#### `tiger_read_replica_enable_pooler`
+#### `read_replica_enable_pooler`
 Enable connection pooler for a read replica set.
 
 **Parameters:**
@@ -427,7 +437,7 @@ Enable connection pooler for a read replica set.
 
 **Returns:** Operation status.
 
-#### `tiger_read_replica_disable_pooler`
+#### `read_replica_disable_pooler`
 Disable connection pooler for a read replica set.
 
 **Parameters:**
@@ -435,7 +445,7 @@ Disable connection pooler for a read replica set.
 
 **Returns:** Operation status.
 
-#### `tiger_read_replica_attach_vpc`
+#### `read_replica_attach_vpc`
 Attach a read replica set to a VPC.
 
 **Parameters:**
@@ -444,7 +454,7 @@ Attach a read replica set to a VPC.
 
 **Returns:** Operation status.
 
-#### `tiger_read_replica_detach_vpc`
+#### `read_replica_detach_vpc`
 Detach a read replica set from a VPC.
 
 **Parameters:**
@@ -455,14 +465,14 @@ Detach a read replica set from a VPC.
 
 ### VPC Management
 
-#### `tiger_vpc_list`
+#### `vpc_list`
 List all Virtual Private Clouds.
 
 **Parameters:** None
 
 **Returns:** Array of VPC objects with id, name, CIDR, and region information.
 
-#### `tiger_vpc_get`
+#### `vpc_get`
 Get details of a specific VPC.
 
 **Parameters:**
@@ -470,7 +480,7 @@ Get details of a specific VPC.
 
 **Returns:** Detailed VPC object with configuration and attached services.
 
-#### `tiger_vpc_create`
+#### `vpc_create`
 Create a new VPC.
 
 **Parameters:**
@@ -480,7 +490,7 @@ Create a new VPC.
 
 **Returns:** VPC creation status and details.
 
-#### `tiger_vpc_delete`
+#### `vpc_delete`
 Delete a VPC.
 
 **Parameters:**
@@ -488,7 +498,7 @@ Delete a VPC.
 
 **Returns:** Deletion confirmation.
 
-#### `tiger_vpc_rename`
+#### `vpc_rename`
 Rename a VPC.
 
 **Parameters:**
@@ -497,7 +507,7 @@ Rename a VPC.
 
 **Returns:** Rename operation status.
 
-#### `tiger_vpc_list_services`
+#### `vpc_list_services`
 List services attached to a VPC.
 
 **Parameters:**
@@ -505,7 +515,7 @@ List services attached to a VPC.
 
 **Returns:** Array of services attached to the VPC.
 
-#### `tiger_vpc_attach_service`
+#### `vpc_attach_service`
 Attach a service to a VPC.
 
 **Parameters:**
@@ -514,7 +524,7 @@ Attach a service to a VPC.
 
 **Returns:** Operation status.
 
-#### `tiger_vpc_detach_service`
+#### `vpc_detach_service`
 Detach a service from a VPC.
 
 **Parameters:**
@@ -525,7 +535,7 @@ Detach a service from a VPC.
 
 ### VPC Peering Management
 
-#### `tiger_vpc_peering_list`
+#### `vpc_peering_list`
 List all peering connections for a VPC.
 
 **Parameters:**
@@ -533,7 +543,7 @@ List all peering connections for a VPC.
 
 **Returns:** Array of peering connection objects.
 
-#### `tiger_vpc_peering_get`
+#### `vpc_peering_get`
 Get details of a specific peering connection.
 
 **Parameters:**
@@ -542,7 +552,7 @@ Get details of a specific peering connection.
 
 **Returns:** Detailed peering connection object.
 
-#### `tiger_vpc_peering_create`
+#### `vpc_peering_create`
 Create a new VPC peering connection.
 
 **Parameters:**
@@ -553,7 +563,7 @@ Create a new VPC peering connection.
 
 **Returns:** Peering connection creation status and details.
 
-#### `tiger_vpc_peering_delete`
+#### `vpc_peering_delete`
 Delete a VPC peering connection.
 
 **Parameters:**

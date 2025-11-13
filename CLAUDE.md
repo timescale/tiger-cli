@@ -171,14 +171,14 @@ func processData(cfg *config.Config) {
 When implementing or updating functionality:
 
 1. **Keep CLI commands and MCP tools in sync** - When updating a CLI command, check if there's a corresponding MCP tool and apply the same changes to keep them aligned. Examples:
-   - `tiger service list` command → `tiger_service_list` MCP tool
-   - `tiger service create` command → `tiger_service_create` MCP tool
+   - `tiger service list` command → `service_list` MCP tool
+   - `tiger service create` command → `service_create` MCP tool
 
 2. **Check for intentional differences** - Some discrepancies between CLI and MCP are intentional (e.g., different default behaviors, different output formats). Before making changes to sync them, ask whether the difference is intentional. Document intentional differences in code comments.
 
 3. **Share code between CLI and MCP** - Code that needs to be used by both CLI commands and MCP tools should be moved to a shared package (not in `internal/tiger/cmd` or `internal/tiger/mcp`). Current examples:
-   - `internal/tiger/util/` - Shared utility functions
-   - `internal/tiger/password/` - Password storage logic used by both CLI and MCP
+   - `internal/tiger/common/` - Shared business logic, password storage, wait operations, error handling, and other utilities that have dependencies on config/api packages
+   - `internal/tiger/util/` - Small utility functions with minimal dependencies (formatting, validation, etc.)
    - `internal/tiger/api/` - API client used by both
 
 ### Documentation Synchronization
@@ -268,7 +268,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
   - `root.go` - Root command with global flags and configuration initialization
   - `auth.go` - Authentication commands (login, logout, status)
-  - `service.go` - Service management commands (list, create, get, fork, delete, update-password)
+  - `service.go` - Service management commands (list, create, get, fork, start, stop, delete, update-password)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
   - `mcp.go` - MCP server commands (install, start)
@@ -278,10 +278,15 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
   - `server.go` - MCP server initialization, tool registration, and lifecycle management
-  - `service_tools.go` - Service management tools (list, get, create, update-password)
+  - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, update-password)
   - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
-- **Password Storage**: `internal/tiger/password/` - Secure password storage utilities
+- **Common Package**: `internal/tiger/common/` - Shared business logic used by both CLI and MCP
+  - Password storage utilities (keyring, pgpass, validation)
+  - Wait operations and polling logic (WaitForService)
+  - Error handling and exit code utilities
+  - Service detail conversion helpers
+- **Utilities**: `internal/tiger/util/` - Small utility functions with minimal dependencies
 
 ### Configuration System
 
@@ -304,7 +309,7 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 **Two Types of Tools:**
 
 1. **Direct Tiger Tools** - Native tools for Tiger operations
-   - `service_tools.go` - Service management (list, get, create, update-password)
+   - `service_tools.go` - Service management (list, get, create, fork, start, stop, update-password)
    - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
@@ -351,7 +356,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 3. **Register tool with enhanced schema**:
 ```go
 mcp.AddTool(s.mcpServer, &mcp.Tool{
-    Name:        "tiger_service_create",
+    Name:        "service_create",
     Description: `Detailed multi-line description...`,
     InputSchema: ServiceCreateInput{}.Schema(),  // Uses our enhanced schema
 }, s.handleServiceCreate)
@@ -400,9 +405,9 @@ tiger-cli/
 │   ├── config/             # Configuration management
 │   ├── logging/            # Structured logging utilities
 │   ├── mcp/                # MCP server implementation
-│   ├── password/           # Password storage utilities
+│   ├── common/             # Shared business logic (password storage, wait ops, error handling)
 │   ├── cmd/                # CLI commands (Cobra)
-│   └── util/               # Shared utilities
+│   └── util/               # Small utility functions with minimal dependencies
 ├── docs/                   # Documentation
 │   └── development.md      # Development guide (building, testing, contributing)
 ├── specs/                  # CLI specifications and API documentation
@@ -485,6 +490,8 @@ buildRootCmd() → Complete CLI with all commands and flags
 │   ├── buildServiceGetCmd()
 │   ├── buildServiceCreateCmd()
 │   ├── buildServiceForkCmd()
+│   ├── buildServiceStartCmd()
+│   ├── buildServiceStopCmd()
 │   ├── buildServiceDeleteCmd()
 │   └── buildServiceUpdatePasswordCmd()
 ├── buildDbCmd()

@@ -16,7 +16,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// DBExecuteQueryInput represents input for tiger_db_execute_query
+// DBExecuteQueryInput represents input for db_execute_query
 type DBExecuteQueryInput struct {
 	ServiceID      string `json:"service_id"`
 	Query          string `json:"query"`
@@ -60,7 +60,7 @@ type DBExecuteQueryColumn struct {
 	Type string `json:"type"`
 }
 
-// DBExecuteQueryOutput represents output for tiger_db_execute_query
+// DBExecuteQueryOutput represents output for db_execute_query
 type DBExecuteQueryOutput struct {
 	Columns       []DBExecuteQueryColumn `json:"columns,omitempty"`
 	Rows          [][]any                `json:"rows,omitempty"`
@@ -109,7 +109,7 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 	}, s.handleDBExecuteQuery)
 }
 
-// handleDBExecuteQuery handles the tiger_db_execute_query MCP tool
+// handleDBExecuteQuery handles the db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
 	// Create fresh API client and get project ID
 	apiClient, projectID, err := s.createAPIClient()
