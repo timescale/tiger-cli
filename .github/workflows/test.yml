@@ -57,10 +57,7 @@ jobs:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
           TIGER_PROJECT_ID_INTEGRATION: ${{ secrets.TIGER_PROJECT_ID_INTEGRATION }}
-        run: |
-          # Run all tests with race detection and coverage
-          # Integration tests will skip automatically if secrets are not set
-          go test -race -coverprofile=coverage.out -coverpkg=./... ./...
+        run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.out -o=coverage.html
