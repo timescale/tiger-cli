@@ -147,15 +147,11 @@ homebrew_casks:
       bash: "completions/tiger.bash"
       zsh: "completions/tiger.zsh"
       fish: "completions/tiger.fish"
-    # Optional: Add caveats for user instructions
-    caveats: |
-      Tiger CLI has been installed successfully!
-
-      Get started with:
-        tiger auth login
-
-      For help:
-        tiger --help
+    # NOTE: There is a bug in GoReleaser when caveats contain normal multiline
+    # strings, which causes the homebrew cask to only output the final line.
+    # Formatting it in the following way works around it.
+    caveats: >
+      Tiger CLI has been installed successfully!\n\nGet started with:\n\ttiger auth login\n\ttiger mcp install\n\nFor help:\n\ttiger --help
 
 # Checksum configuration - split into individual files for easier validation
 checksum:
