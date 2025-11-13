@@ -620,10 +620,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to create service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(createCtx, projectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -748,10 +748,10 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to fork service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(forkCtx, projectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}
@@ -883,10 +883,10 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to start service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx, projectID, input.ServiceID)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStartWithResponse(startCtx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
 	}
@@ -940,10 +940,10 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx, projectID, input.ServiceID)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStopWithResponse(stopCtx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
 	}
