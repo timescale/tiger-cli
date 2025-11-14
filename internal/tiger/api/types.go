@@ -5,6 +5,8 @@ package api
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for DeployStatus.
@@ -62,6 +64,33 @@ const (
 	SetEnvironmentInputEnvironmentDEV  SetEnvironmentInputEnvironment = "DEV"
 	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
+
+// AuthInfo defines model for AuthInfo.
+type AuthInfo struct {
+	// AccessKey The access key of the client credentials
+	AccessKey string `json:"access_key"`
+
+	// Created When the client credentials were created
+	Created time.Time `json:"created"`
+
+	// IssuingUserEmail The email of the user who created the client credentials
+	IssuingUserEmail openapi_types.Email `json:"issuing_user_email"`
+
+	// IssuingUserId The ID of the user who created the client credentials
+	IssuingUserId string `json:"issuing_user_id"`
+
+	// IssuingUserName The name of the user who created the client credentials
+	IssuingUserName string `json:"issuing_user_name"`
+
+	// Name The name of the client credentials
+	Name string `json:"name"`
+
+	// ProjectId The project ID the client credentials belong to
+	ProjectId string `json:"project_id"`
+
+	// ProjectName The name of the project
+	ProjectName string `json:"project_name"`
+}
 
 // ConnectionPooler defines model for ConnectionPooler.
 type ConnectionPooler struct {

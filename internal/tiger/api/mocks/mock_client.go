@@ -162,6 +162,26 @@ func (mr *MockClientInterfaceMockRecorder) DeleteProjectsProjectIdVpcsVpcIdPeeri
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId", reflect.TypeOf((*MockClientInterface)(nil).DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId), varargs...)
 }
 
+// GetAuthInfo mocks base method.
+func (m *MockClientInterface) GetAuthInfo(ctx context.Context, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetAuthInfo", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAuthInfo indicates an expected call of GetAuthInfo.
+func (mr *MockClientInterfaceMockRecorder) GetAuthInfo(ctx any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfo", reflect.TypeOf((*MockClientInterface)(nil).GetAuthInfo), varargs...)
+}
+
 // GetProjectsProjectIdServices mocks base method.
 func (m *MockClientInterface) GetProjectsProjectIdServices(ctx context.Context, projectId api.ProjectId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -1164,6 +1184,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteProjectsProjectIdV
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, vpcId}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectsProjectIdVpcsVpcIdWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).DeleteProjectsProjectIdVpcsVpcIdWithResponse), varargs...)
+}
+
+// GetAuthInfoWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetAuthInfoWithResponse(ctx context.Context, reqEditors ...api.RequestEditorFn) (*api.GetAuthInfoResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetAuthInfoWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetAuthInfoResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAuthInfoWithResponse indicates an expected call of GetAuthInfoWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetAuthInfoWithResponse(ctx any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfoWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetAuthInfoWithResponse), varargs...)
 }
 
 // GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse mocks base method.

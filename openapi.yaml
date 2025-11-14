@@ -17,6 +17,8 @@ servers:
     description: API server for Tiger Cloud
 
 tags:
+  - name: Auth
+    description: Authentication and authorization information.
   - name: VPCs
     description: Manage VPCs and their peering connections.
   - name: Services
@@ -25,6 +27,22 @@ tags:
     description: Track analytics events.
 
 paths:
+  /auth/info:
+    get:
+      tags:
+        - Auth
+      summary: Get Authentication Info
+      description: Returns information about the authentication credentials being used to access the API
+      responses:
+        '200':
+          description: Authentication information retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthInfo'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /analytics/identify:
     post:
       tags:
@@ -736,6 +754,52 @@ components:
         example: "1234567890"
 
   schemas:
+    AuthInfo:
+      type: object
+      required:
+        - access_key
+        - name
+        - project_id
+        - project_name
+        - created
+        - issuing_user_id
+        - issuing_user_name
+        - issuing_user_email
+      properties:
+        access_key:
+          type: string
+          description: The access key of the client credentials
+          example: "tskey_abc123"
+        name:
+          type: string
+          description: The name of the client credentials
+          example: "my-production-token"
+        project_id:
+          type: string
+          description: The project ID the client credentials belong to
+          example: "rp1pz7uyae"
+        project_name:
+          type: string
+          description: The name of the project
+          example: "My Production Project"
+        created:
+          type: string
+          format: date-time
+          description: When the client credentials were created
+          example: "2024-01-15T10:30:00Z"
+        issuing_user_id:
+          type: string
+          description: The ID of the user who created the client credentials
+          example: "user123"
+        issuing_user_name:
+          type: string
+          description: The name of the user who created the client credentials
+          example: "John Doe"
+        issuing_user_email:
+          type: string
+          format: email
+          description: The email of the user who created the client credentials
+          example: "john.doe@example.com"
     VPC:
       type: object
       properties:
