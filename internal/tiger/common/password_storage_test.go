@@ -1,4 +1,4 @@
-package password
+package common
 
 import (
 	"fmt"
@@ -292,11 +292,11 @@ func TestGetPasswordStorage(t *testing.T) {
 		storageMethod string
 		expectedType  string
 	}{
-		{"keyring", "keyring", "*password.KeyringStorage"},
-		{"pgpass", "pgpass", "*password.PgpassStorage"},
-		{"none", "none", "*password.NoStorage"},
-		{"default", "", "*password.KeyringStorage"},        // Default case
-		{"invalid", "invalid", "*password.KeyringStorage"}, // Falls back to default
+		{"keyring", "keyring", "*common.KeyringStorage"},
+		{"pgpass", "pgpass", "*common.PgpassStorage"},
+		{"none", "none", "*common.NoStorage"},
+		{"default", "", "*common.KeyringStorage"},        // Default case
+		{"invalid", "invalid", "*common.KeyringStorage"}, // Falls back to default
 	}
 
 	for _, tt := range tests {

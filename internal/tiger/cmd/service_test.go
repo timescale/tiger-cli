@@ -15,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -123,7 +124,7 @@ func TestOutputServices_JSON(t *testing.T) {
 	// Verify JSON is valid
 	var result []api.Service
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid JSON output: %v", err)
+		t.Fatalf("Invalid JSON Output: %v", err)
 	}
 
 	if len(result) != len(services) {
@@ -151,7 +152,7 @@ func TestOutputServices_YAML(t *testing.T) {
 	// Verify YAML is valid
 	var result []api.Service
 	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid YAML output: %v", err)
+		t.Fatalf("Invalid YAML Output: %v", err)
 	}
 
 	if len(result) != len(services) {
@@ -1227,7 +1228,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	// Create API client
 	client, err := api.NewTigerClient(cfg, "test-api-key")
 	if err != nil {
-		t.Fatalf("Failed to create API client: %v", err)
+		t.Fatalf("Failed to create API Client: %v", err)
 	}
 
 	// Create a test command
@@ -1240,30 +1241,30 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	// Create a service object for the handler
 	service := api.Service{}
 
-	// Test waitForService with very short timeout to trigger timeout quickly
-	err = waitForService(t.Context(), waitForServiceArgs{
-		client:    client,
-		projectID: "test-project-123",
-		serviceID: "svc-12345",
-		handler: &statusWaitHandler{
-			targetStatus: "READY",
-			service:      &service,
+	// Test common.WaitForService with very short timeout to trigger timeout quickly
+	err = common.WaitForService(t.Context(), common.WaitForServiceArgs{
+		Client:    client,
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		Handler: &common.StatusWaitHandler{
+			TargetStatus: "READY",
+			Service:      &service,
 		},
-		output:     cmd.ErrOrStderr(),
-		timeout:    100 * time.Millisecond,
-		timeoutMsg: "service may still be provisioning",
+		Output:     cmd.ErrOrStderr(),
+		Timeout:    100 * time.Millisecond,
+		TimeoutMsg: "service may still be provisioning",
 	})
 
-	// Should return an error with ExitTimeout
+	// Should return an error with common.ExitTimeout
 	if err == nil {
 		t.Error("Expected error for timeout, but got none")
 		return
 	}
 
-	// Check that it's an exitCodeError with ExitTimeout
+	// Check that it's an exitCodeError with common.ExitTimeout
 	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != ExitTimeout {
-			t.Errorf("Expected exit code %d for wait timeout, got %d", ExitTimeout, exitErr.ExitCode())
+		if exitErr.ExitCode() != common.ExitTimeout {
+			t.Errorf("Expected exit code %d for wait timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for wait timeout")

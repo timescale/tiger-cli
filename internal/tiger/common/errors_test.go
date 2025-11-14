@@ -1,4 +1,4 @@
-package cmd
+package common
 
 import (
 	"fmt"
@@ -6,25 +6,25 @@ import (
 )
 
 func TestExitCodeError(t *testing.T) {
-	// Test the exitCodeError type
+	// Test the ExitCodeError type
 	originalErr := fmt.Errorf("test error")
-	exitErr := exitWithCode(42, originalErr)
+	exitErr := ExitWithCode(42, originalErr)
 
 	if exitErr.Error() != "test error" {
 		t.Errorf("Expected error message 'test error', got '%s'", exitErr.Error())
 	}
 
-	if exitCodeErr, ok := exitErr.(exitCodeError); ok {
+	if exitCodeErr, ok := exitErr.(ExitCodeError); ok {
 		if exitCodeErr.ExitCode() != 42 {
 			t.Errorf("Expected exit code 42, got %d", exitCodeErr.ExitCode())
 		}
 	} else {
-		t.Error("exitWithCode should return exitCodeError")
+		t.Error("ExitWithCode should return ExitCodeError")
 	}
 }
 
 func TestExitCodeError_NilError(t *testing.T) {
-	exitErr := exitWithCode(1, nil)
+	exitErr := ExitWithCode(1, nil)
 
 	if exitErr.Error() != "" {
 		t.Errorf("Expected empty error message for nil error, got '%s'", exitErr.Error())
@@ -35,13 +35,13 @@ func TestExitCodeError_NilError(t *testing.T) {
 			t.Errorf("Expected exit code 1, got %d", exitCodeErr.ExitCode())
 		}
 	} else {
-		t.Error("exitWithCode should return exitCodeError")
+		t.Error("ExitWithCode should return ExitCodeError")
 	}
 }
 
 func TestExitAuthenticationError(t *testing.T) {
 	originalErr := fmt.Errorf("authentication failed: invalid API key")
-	exitErr := exitWithCode(ExitAuthenticationError, originalErr)
+	exitErr := ExitWithCode(ExitAuthenticationError, originalErr)
 
 	if exitErr.Error() != "authentication failed: invalid API key" {
 		t.Errorf("Expected error message 'authentication failed: invalid API key', got '%s'", exitErr.Error())
@@ -55,13 +55,13 @@ func TestExitAuthenticationError(t *testing.T) {
 			t.Errorf("Expected exit code 4 for authentication error, got %d", exitCodeErr.ExitCode())
 		}
 	} else {
-		t.Error("exitWithCode should return exitCodeError with ExitCode method")
+		t.Error("ExitWithCode should return ExitCodeError with ExitCode method")
 	}
 }
 
 func TestExitPermissionDenied(t *testing.T) {
 	originalErr := fmt.Errorf("permission denied: insufficient access to service")
-	exitErr := exitWithCode(ExitPermissionDenied, originalErr)
+	exitErr := ExitWithCode(ExitPermissionDenied, originalErr)
 
 	if exitErr.Error() != "permission denied: insufficient access to service" {
 		t.Errorf("Expected error message 'permission denied: insufficient access to service', got '%s'", exitErr.Error())
@@ -75,6 +75,6 @@ func TestExitPermissionDenied(t *testing.T) {
 			t.Errorf("Expected exit code 5 for permission denied, got %d", exitCodeErr.ExitCode())
 		}
 	} else {
-		t.Error("exitWithCode should return exitCodeError with ExitCode method")
+		t.Error("ExitWithCode should return ExitCodeError with ExitCode method")
 	}
 }

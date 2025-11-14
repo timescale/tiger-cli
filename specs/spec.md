@@ -91,6 +91,8 @@ For the initial v0 release, implement these essential commands first:
 - `tiger service list` - List all services
 - `tiger service get` - Show service details (aliases: `describe`, `show`)
 - `tiger service create` - Create new services
+- `tiger service start` - Start stopped services
+- `tiger service stop` - Stop running services
 - `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
 
@@ -104,7 +106,7 @@ For the initial v0 release, implement these essential commands first:
 - `tiger config set` - Set configuration values
 
 **Future v1+ Commands:**
-- Service lifecycle (start/stop/restart) - pending API endpoints
+- Service restart - pending API endpoint
 - HA management commands
 - Read replica management
 - VPC management and peering

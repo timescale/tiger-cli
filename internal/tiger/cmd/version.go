@@ -7,6 +7,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -76,7 +77,7 @@ func buildVersionCmd() *cobra.Command {
 			if updateAvailable {
 				cmd.SilenceErrors = true
 				cmd.SilenceUsage = true
-				return exitWithCode(ExitUpdateAvailable, nil)
+				return common.ExitWithCode(common.ExitUpdateAvailable, nil)
 			}
 			return nil
 		},
