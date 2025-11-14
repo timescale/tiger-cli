@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -170,7 +174,9 @@ func buildLogoutCmd() *cobra.Command {
 }
 
 func buildStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	var output string
+
+	cmd := &cobra.Command{
 		Use:               "status",
 		Short:             "Show current authentication status and project ID",
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
@@ -179,18 +185,56 @@ func buildStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			_, projectID, err := config.GetCredentials()
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Use flag value if provided, otherwise use config value
+			if cmd.Flags().Changed("output") {
+				cfg.Output = output
+			}
+
+			apiKey, projectID, err := config.GetCredentials()
 			if err != nil {
 				return err
 			}
 
-			// TODO: Make API call to get token information
-			fmt.Fprintln(cmd.OutOrStdout(), "Logged in (API key stored)")
-			fmt.Fprintf(cmd.OutOrStdout(), "Project ID: %s\n", projectID)
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create API client: %w", err)
+			}
 
-			return nil
+			// Make API call to get auth information
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
+
+			resp, err := client.GetAuthInfoWithResponse(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get auth information: %w", err)
+			}
+
+			// Handle API response
+			if resp.StatusCode() != 200 {
+				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+
+			authInfo := *resp.JSON200
+
+			// Output auth info in requested format
+			return outputAuthInfo(cmd, authInfo, projectID, cfg.Output)
 		},
 	}
+
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+
+	return cmd
 }
 
 func buildAuthCmd() *cobra.Command {
@@ -205,6 +249,49 @@ func buildAuthCmd() *cobra.Command {
 	cmd.AddCommand(buildStatusCmd())
 
 	return cmd
+}
+
+// outputAuthInfo formats and outputs authentication information based on the specified format
+func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, projectID string, format string) error {
+	outputWriter := cmd.OutOrStdout()
+
+	// Create a struct that includes both AuthInfo and ProjectID for output
+	type AuthStatus struct {
+		api.AuthInfo
+		ProjectID string `json:"project_id" yaml:"project_id"`
+	}
+
+	authStatus := AuthStatus{
+		AuthInfo:  authInfo,
+		ProjectID: projectID,
+	}
+
+	switch strings.ToLower(format) {
+	case "json":
+		return util.SerializeToJSON(outputWriter, authStatus)
+	case "yaml":
+		return util.SerializeToYAML(outputWriter, authStatus, true)
+	default: // table format (default)
+		return outputAuthInfoTable(authStatus, outputWriter)
+	}
+}
+
+// outputAuthInfoTable outputs authentication information in a formatted table
+func outputAuthInfoTable(authStatus struct {
+	api.AuthInfo
+	ProjectID string `json:"project_id" yaml:"project_id"`
+}, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("PROPERTY", "VALUE")
+
+	table.Append("Status", "Logged in")
+	table.Append("Project ID", authStatus.ProjectID)
+	table.Append("Access Key", authStatus.AccessKey)
+	table.Append("Name", authStatus.Name)
+	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authStatus.IssuingUserName, authStatus.IssuingUserEmail))
+	table.Append("Created", authStatus.Created.Format("2006-01-02 15:04:05 MST"))
+
+	return table.Render()
 }
 
 func flagOrEnvVar(flagVal, envVarName string) string {
