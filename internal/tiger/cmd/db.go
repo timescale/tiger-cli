@@ -19,6 +19,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/password"
+	"github.com/timescale/tiger-cli/internal/tiger/restore"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -736,6 +737,169 @@ func buildDbCreateCmd() *cobra.Command {
 	return cmd
 }
 
+func buildDbRestoreCmd() *cobra.Command {
+	var (
+		database           string
+		role               string
+		format             string
+		clean              bool
+		ifExists           bool
+		noOwner            bool
+		noPrivileges       bool
+		timescaledbHooks   bool
+		noTimescaledbHooks bool
+		confirm            bool
+		onErrorStop        bool
+		singleTransaction  bool
+		quiet              bool
+		verbose            bool
+		jobs               int
+	)
+
+	cmd := &cobra.Command{
+		Use:   "restore <file-path> [service-id]",
+		Short: "Restore database from dump file",
+		Long: `Restore a PostgreSQL database from a dump file to a database service.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration.
+
+Supports multiple dump formats:
+  - Plain SQL (.sql, .sql.gz) - Restored using psql
+  - Custom format (.dump, .custom) - Restored using pg_restore
+  - Tar format (.tar) - Restored using pg_restore
+  - Directory format - Restored using pg_restore
+
+For TimescaleDB databases, automatically detects and runs pre_restore() and
+post_restore() hooks for optimal hypertable restoration.
+
+Cloud-Friendly Defaults:
+  - Continues past benign errors (like "already exists") by default
+  - Uses --no-owner and --no-privileges for custom/tar/directory formats
+  - Performs preflight checks before starting restore
+
+Examples:
+  # Restore plain SQL dump to default service
+  tiger db restore backup.sql
+
+  # Restore to specific service
+  tiger db restore backup.sql svc-12345
+
+  # Restore custom format dump with 4 parallel jobs (faster)
+  tiger db restore backup.dump --jobs 4
+
+  # Read from stdin
+  pg_dump -Fc mydb | tiger db restore - --format custom
+
+  # Clean existing objects before restore (DESTRUCTIVE - requires confirmation)
+  tiger db restore backup.sql --clean --if-exists
+
+  # Stop on first error (not recommended for cloud environments)
+  tiger db restore backup.sql --on-error-stop
+
+  # Verbose mode for debugging
+  tiger db restore backup.sql --verbose
+
+Note for AI agents: This command may be destructive when used with --clean.
+Always confirm with the user before executing, especially with --clean flag.`,
+		Args: cobra.RangeArgs(1, 2),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			// First arg is file path
+			if len(args) == 0 {
+				return nil, cobra.ShellCompDirectiveFilterFileExt
+			}
+			// Second arg is service ID
+			return serviceIDCompletion(cmd, args, toComplete)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate args - first arg is file path, optional second arg is service ID
+			if len(args) == 0 {
+				return fmt.Errorf("file path is required (use '-' for stdin)")
+			}
+			filePath := args[0]
+
+			// Determine service ID from args or config
+			var serviceArgs []string
+			if len(args) > 1 {
+				serviceArgs = args[1:]
+			}
+
+			cmd.SilenceUsage = true
+
+			// Load config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Get service ID using standard helper
+			serviceID, err := getServiceID(cfg, serviceArgs)
+			if err != nil {
+				return err
+			}
+
+			// Build restore options
+			opts := &restore.Options{
+				ServiceID:          serviceID,
+				Database:           database,
+				Role:               role,
+				FilePath:           filePath,
+				Format:             format,
+				Clean:              clean,
+				IfExists:           ifExists,
+				NoOwner:            noOwner,
+				NoPrivileges:       noPrivileges,
+				TimescaleDBHooks:   timescaledbHooks,
+				NoTimescaleDBHooks: noTimescaledbHooks,
+				Confirm:            confirm,
+				OnErrorStop:        onErrorStop,
+				SingleTransaction:  singleTransaction,
+				Quiet:              quiet,
+				Verbose:            verbose,
+				Jobs:               jobs,
+				Output:             cmd.OutOrStdout(),
+				Errors:             cmd.ErrOrStderr(),
+			}
+
+			// Execute restore
+			restorer := restore.NewRestorer(cfg, opts)
+			return restorer.Execute(cmd.Context())
+		},
+	}
+
+	// Connection flags
+	cmd.Flags().StringVarP(&database, "database", "d", "", "Target database name (defaults to tsdb)")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
+
+	// Format flags
+	cmd.Flags().StringVar(&format, "format", "", "Dump format: plain, custom, directory, tar (auto-detected if not specified)")
+
+	// Restore options
+	cmd.Flags().BoolVar(&clean, "clean", false, "Drop database objects before recreating (DESTRUCTIVE)")
+	cmd.Flags().BoolVar(&ifExists, "if-exists", false, "Use IF EXISTS when dropping objects (use with --clean)")
+	cmd.Flags().BoolVar(&noOwner, "no-owner", true, "Skip restoration of object ownership (recommended for cloud)")
+	cmd.Flags().BoolVar(&noPrivileges, "no-privileges", true, "Skip restoration of access privileges (recommended for cloud)")
+
+	// TimescaleDB hooks
+	cmd.Flags().BoolVar(&timescaledbHooks, "timescaledb-hooks", false, "Force enable TimescaleDB pre/post restore hooks")
+	cmd.Flags().BoolVar(&noTimescaledbHooks, "no-timescaledb-hooks", false, "Disable TimescaleDB hooks (even if detected)")
+	cmd.MarkFlagsMutuallyExclusive("timescaledb-hooks", "no-timescaledb-hooks")
+
+	// Safety
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompts (for automation)")
+	cmd.Flags().BoolVar(&onErrorStop, "on-error-stop", false, "Stop on first error (default: continue past errors like 'already exists')")
+	cmd.Flags().BoolVar(&singleTransaction, "single-transaction", false, "Wrap restore in a single transaction (slower but safer)")
+
+	// Output
+	cmd.Flags().BoolVar(&quiet, "quiet", false, "Suppress progress output")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed restore process")
+
+	// Performance
+	cmd.Flags().IntVarP(&jobs, "jobs", "j", 1, "Parallel restore jobs (for custom/directory/tar formats only)")
+
+	return cmd
+}
+
 func buildDbCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "db",
@@ -748,6 +912,7 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbTestConnectionCmd())
 	cmd.AddCommand(buildDbSavePasswordCmd())
 	cmd.AddCommand(buildDbCreateCmd())
+	cmd.AddCommand(buildDbRestoreCmd())
 
 	return cmd
 }
