@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -58,51 +57,6 @@ func NewTigerClient(cfg *config.Config, apiKey string) (*ClientWithResponses, er
 	}
 
 	return client, nil
-}
-
-// ValidateAPIKey validates the API key by making a test API call
-func ValidateAPIKey(ctx context.Context, cfg *config.Config, apiKey string, projectID string) error {
-	client, err := NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	return ValidateAPIKeyWithClient(ctx, client, projectID)
-}
-
-// ValidateAPIKeyWithClient validates the API key using the provided client interface
-func ValidateAPIKeyWithClient(ctx context.Context, client ClientWithResponsesInterface, projectID string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Use provided project ID if available, otherwise use a dummy one
-	targetProjectID := projectID
-	if targetProjectID == "" {
-		// Use a dummy project ID for validation when none is provided
-		targetProjectID = "00000000-0000-0000-0000-000000000000"
-	}
-
-	// Try to call a simple endpoint
-	// The API should return 401/403 for invalid API key, and 404 for non-existent project
-	resp, err := client.GetProjectsProjectIdServicesWithResponse(ctx, targetProjectID)
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
-
-	// Check the response status
-	if resp.StatusCode() != 200 {
-		if resp.StatusCode() == 404 {
-			// Project not found, but API key is valid
-			return nil
-		}
-		if resp.JSON4XX != nil {
-			return resp.JSON4XX
-		} else {
-			return errors.New("unexpected API response: 500")
-		}
-	} else {
-		return nil
-	}
 }
 
 // Error implements the error interface for the Error type.

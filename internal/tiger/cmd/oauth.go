@@ -383,7 +383,6 @@ func (l *oauthLogin) createCredentials(ctx context.Context, accessToken, project
 	return credentials{
 		publicKey: patRecord.ClientCredentials.AccessKey,
 		secretKey: patRecord.ClientCredentials.SecretKey,
-		projectID: projectID,
 	}, nil
 }
 

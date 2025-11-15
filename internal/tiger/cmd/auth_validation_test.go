@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -21,15 +22,15 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
-	originalValidator := validateAPIKeyForLogin
+	originalValidator := validateAndGetAuthInfo
 
 	// Mock the validator to return an error
-	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
-		return errors.New("invalid API key: authentication failed")
+	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+		return nil, errors.New("invalid API key: authentication failed")
 	}
 
 	defer func() {
-		validateAPIKeyForLogin = originalValidator
+		validateAndGetAuthInfo = originalValidator
 	}()
 
 	// Initialize viper with test directory BEFORE calling RemoveCredentials()
@@ -43,7 +44,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	defer config.RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should fail validation
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret", "--project-id", "test-project-invalid")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret")
 	if err == nil {
 		t.Fatal("Expected login to fail with invalid keys, but it succeeded")
 	}
@@ -75,15 +76,18 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
-	originalValidator := validateAPIKeyForLogin
+	originalValidator := validateAndGetAuthInfo
 
 	// Mock the validator to return success
-	validateAPIKeyForLogin = func(ctx context.Context, cfg *config.Config, apiKey, projectID string) error {
-		return nil // Success
+	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+		return &api.AuthInfo{
+			ProjectId: "test-project-valid",
+			AccessKey: "test-access-key",
+		}, nil // Success
 	}
 
 	defer func() {
-		validateAPIKeyForLogin = originalValidator
+		validateAndGetAuthInfo = originalValidator
 	}()
 
 	// Initialize viper with test directory BEFORE calling RemoveCredentials()
@@ -97,7 +101,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	defer config.RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should succeed
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret", "--project-id", "test-project-valid")
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret")
 	if err != nil {
 		t.Fatalf("Expected login to succeed with valid keys, got error: %v", err)
 	}
