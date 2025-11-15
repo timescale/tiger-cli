@@ -19,6 +19,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
 
 func setupAuthTest(t *testing.T) string {
@@ -683,6 +684,11 @@ func TestAuthLogout_Success(t *testing.T) {
 }
 
 func TestValidateAndGetAuthInfo(t *testing.T) {
+	// Initialize logger for analytics code
+	if err := logging.Init(false); err != nil {
+		t.Fatalf("Failed to initialize logging: %v", err)
+	}
+
 	tests := []struct {
 		name              string
 		setupServer       func() *httptest.Server
@@ -694,21 +700,28 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 			name: "valid API key - returns auth info",
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.Path != "/auth/info" {
-						t.Errorf("Expected path /auth/info, got %s", r.URL.Path)
+					if r.URL.Path == "/auth/info" {
+						authInfo := api.AuthInfo{
+							PublicKey:        "test-access-key",
+							ProjectId:        "proj-12345",
+							Name:             "Test Credentials",
+							IssuingUserName:  "Test User",
+							IssuingUserEmail: "test@example.com",
+							IssuingUserId:    "user-123",
+							Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+						}
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						json.NewEncoder(w).Encode(authInfo)
+					} else if r.URL.Path == "/analytics/identify" {
+						// Analytics identify endpoint (called after auth info)
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(`{"status": "success"}`))
+					} else {
+						t.Errorf("Unexpected path: %s", r.URL.Path)
+						w.WriteHeader(http.StatusNotFound)
 					}
-					authInfo := api.AuthInfo{
-						PublicKey:        "test-access-key",
-						ProjectId:        "proj-12345",
-						Name:             "Test Credentials",
-						IssuingUserName:  "Test User",
-						IssuingUserEmail: "test@example.com",
-						IssuingUserId:    "user-123",
-						Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
-					}
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(authInfo)
 				}))
 			},
 			expectedProjectID: "proj-12345",

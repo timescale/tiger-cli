@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
@@ -342,5 +343,14 @@ func validateAndGetAuthInfoImpl(ctx context.Context, cfg *config.Config, apiKey 
 		return nil, fmt.Errorf("empty response from API")
 	}
 
-	return resp.JSON200, nil
+	authInfo := resp.JSON200
+
+	// Identify the user with analytics
+	a := analytics.New(cfg, client, authInfo.ProjectId)
+	a.Identify(
+		analytics.Property("userId", authInfo.IssuingUserId),
+		analytics.Property("email", authInfo.IssuingUserEmail),
+	)
+
+	return authInfo, nil
 }
