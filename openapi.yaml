@@ -757,7 +757,7 @@ components:
     AuthInfo:
       type: object
       required:
-        - access_key
+        - public_key
         - name
         - project_id
         - project_name
@@ -766,9 +766,9 @@ components:
         - issuing_user_name
         - issuing_user_email
       properties:
-        access_key:
+        public_key:
           type: string
-          description: The access key of the client credentials
+          description: The public key of the client credentials
           example: "tskey_abc123"
         name:
           type: string

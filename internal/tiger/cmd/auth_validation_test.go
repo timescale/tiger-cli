@@ -82,7 +82,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
 		return &api.AuthInfo{
 			ProjectId: "test-project-valid",
-			AccessKey: "test-access-key",
+			PublicKey: "test-access-key",
 		}, nil // Success
 	}
 

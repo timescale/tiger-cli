@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -32,7 +33,7 @@ func setupAuthTest(t *testing.T) string {
 		// Always return success with test auth info
 		return &api.AuthInfo{
 			ProjectId: "test-project-id",
-			AccessKey: "test-access-key",
+			PublicKey: "test-access-key",
 		}, nil
 	}
 
@@ -585,17 +586,18 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	// Create a mock server for the /auth/info endpoint
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/auth/info" {
+			authInfo := api.AuthInfo{
+				PublicKey:        "test-access-key",
+				ProjectId:        "test-project-789",
+				Name:             "Test Credentials",
+				IssuingUserName:  "Test User",
+				IssuingUserEmail: "test@example.com",
+				IssuingUserId:    "user-123",
+				Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
-				"access_key": "test-access-key",
-				"project_id": "test-project-789",
-				"name": "Test Credentials",
-				"issuing_user_name": "Test User",
-				"issuing_user_email": "test@example.com",
-				"issuing_user_id": "user-123",
-				"created": "2025-01-01T00:00:00Z"
-			}`))
+			json.NewEncoder(w).Encode(authInfo)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -685,7 +687,7 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 		name              string
 		setupServer       func() *httptest.Server
 		expectedProjectID string
-		expectedAccessKey string
+		expectedPublicKey string
 		expectedError     string
 	}{
 		{
@@ -695,21 +697,22 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 					if r.URL.Path != "/auth/info" {
 						t.Errorf("Expected path /auth/info, got %s", r.URL.Path)
 					}
+					authInfo := api.AuthInfo{
+						PublicKey:        "test-access-key",
+						ProjectId:        "proj-12345",
+						Name:             "Test Credentials",
+						IssuingUserName:  "Test User",
+						IssuingUserEmail: "test@example.com",
+						IssuingUserId:    "user-123",
+						Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+					}
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{
-						"access_key": "test-access-key",
-						"project_id": "proj-12345",
-						"name": "Test Credentials",
-						"issuing_user_name": "Test User",
-						"issuing_user_email": "test@example.com",
-						"issuing_user_id": "user-123",
-						"created": "2025-01-01T00:00:00Z"
-					}`))
+					json.NewEncoder(w).Encode(authInfo)
 				}))
 			},
 			expectedProjectID: "proj-12345",
-			expectedAccessKey: "test-access-key",
+			expectedPublicKey: "test-access-key",
 			expectedError:     "",
 		},
 		{
@@ -722,7 +725,7 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				}))
 			},
 			expectedProjectID: "",
-			expectedAccessKey: "",
+			expectedPublicKey: "",
 			expectedError:     "Invalid or missing authentication credentials",
 		},
 		{
@@ -735,7 +738,7 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				}))
 			},
 			expectedProjectID: "",
-			expectedAccessKey: "",
+			expectedPublicKey: "",
 			expectedError:     "Invalid or missing authentication credentials",
 		},
 		{
@@ -746,7 +749,7 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				}))
 			},
 			expectedProjectID: "",
-			expectedAccessKey: "",
+			expectedPublicKey: "",
 			expectedError:     "unexpected API response: 500",
 		},
 	}
@@ -776,8 +779,8 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				if authInfo.ProjectId != tt.expectedProjectID {
 					t.Errorf("Expected project ID %q, got %q", tt.expectedProjectID, authInfo.ProjectId)
 				}
-				if authInfo.AccessKey != tt.expectedAccessKey {
-					t.Errorf("Expected access key %q, got %q", tt.expectedAccessKey, authInfo.AccessKey)
+				if authInfo.PublicKey != tt.expectedPublicKey {
+					t.Errorf("Expected access key %q, got %q", tt.expectedPublicKey, authInfo.PublicKey)
 				}
 			} else {
 				if err == nil {

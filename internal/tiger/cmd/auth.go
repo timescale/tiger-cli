@@ -184,7 +184,7 @@ func buildStatusCmd() *cobra.Command {
 				cfg.Output = output
 			}
 
-			apiKey, projectID, err := config.GetCredentials()
+			apiKey, _, err := config.GetCredentials()
 			if err != nil {
 				return err
 			}
@@ -216,7 +216,7 @@ func buildStatusCmd() *cobra.Command {
 			authInfo := *resp.JSON200
 
 			// Output auth info in requested format
-			return outputAuthInfo(cmd, authInfo, projectID, cfg.Output)
+			return outputAuthInfo(cmd, authInfo, cfg.Output)
 		},
 	}
 
@@ -240,44 +240,30 @@ func buildAuthCmd() *cobra.Command {
 }
 
 // outputAuthInfo formats and outputs authentication information based on the specified format
-func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, projectID string, format string) error {
+func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, format string) error {
 	outputWriter := cmd.OutOrStdout()
-
-	// Create a struct that includes both AuthInfo and ProjectID for output
-	type AuthStatus struct {
-		api.AuthInfo
-		ProjectID string `json:"project_id" yaml:"project_id"`
-	}
-
-	authStatus := AuthStatus{
-		AuthInfo:  authInfo,
-		ProjectID: projectID,
-	}
 
 	switch strings.ToLower(format) {
 	case "json":
-		return util.SerializeToJSON(outputWriter, authStatus)
+		return util.SerializeToJSON(outputWriter, authInfo)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, authStatus, true)
+		return util.SerializeToYAML(outputWriter, authInfo, true)
 	default: // table format (default)
-		return outputAuthInfoTable(authStatus, outputWriter)
+		return outputAuthInfoTable(authInfo, outputWriter)
 	}
 }
 
 // outputAuthInfoTable outputs authentication information in a formatted table
-func outputAuthInfoTable(authStatus struct {
-	api.AuthInfo
-	ProjectID string `json:"project_id" yaml:"project_id"`
-}, output io.Writer) error {
+func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
 	table.Append("Status", "Logged in")
-	table.Append("Project ID", authStatus.ProjectID)
-	table.Append("Access Key", authStatus.AccessKey)
-	table.Append("Name", authStatus.Name)
-	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authStatus.IssuingUserName, authStatus.IssuingUserEmail))
-	table.Append("Created", authStatus.Created.Format("2006-01-02 15:04:05 MST"))
+	table.Append("Project", fmt.Sprintf("%s (%s)", authInfo.ProjectName, authInfo.ProjectId))
+	table.Append("Public Key", authInfo.PublicKey)
+	table.Append("Credential Name", authInfo.Name)
+	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authInfo.IssuingUserName, authInfo.IssuingUserEmail))
+	table.Append("Created At", authInfo.Created.Format("2006-01-02 15:04:05 MST"))
 
 	return table.Render()
 }

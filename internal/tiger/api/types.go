@@ -67,9 +67,6 @@ const (
 
 // AuthInfo defines model for AuthInfo.
 type AuthInfo struct {
-	// AccessKey The access key of the client credentials
-	AccessKey string `json:"access_key"`
-
 	// Created When the client credentials were created
 	Created time.Time `json:"created"`
 
@@ -90,6 +87,9 @@ type AuthInfo struct {
 
 	// ProjectName The name of the project
 	ProjectName string `json:"project_name"`
+
+	// PublicKey The public key of the client credentials
+	PublicKey string `json:"public_key"`
 }
 
 // ConnectionPooler defines model for ConnectionPooler.
