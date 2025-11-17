@@ -595,6 +595,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 			authInfo.ApiKey.PublicKey = "test-access-key"
 			authInfo.ApiKey.Project.Id = "test-project-789"
 			authInfo.ApiKey.Project.Name = "Test Project"
+			authInfo.ApiKey.Project.PlanType = "FREE"
 			authInfo.ApiKey.Name = "Test Credentials"
 			authInfo.ApiKey.IssuingUser.Name = "Test User"
 			authInfo.ApiKey.IssuingUser.Email = "test@example.com"
@@ -637,6 +638,9 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	}
 	if !strings.Contains(output, "Test User") {
 		t.Errorf("Expected output to contain issuing user name: '%s'", output)
+	}
+	if !strings.Contains(output, "Free") {
+		t.Errorf("Expected output to contain plan type 'Free': '%s'", output)
 	}
 }
 
@@ -711,6 +715,7 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 						authInfo.ApiKey.PublicKey = "test-access-key"
 						authInfo.ApiKey.Project.Id = "proj-12345"
 						authInfo.ApiKey.Project.Name = "Test Project"
+						authInfo.ApiKey.Project.PlanType = "FREE"
 						authInfo.ApiKey.Name = "Test Credentials"
 						authInfo.ApiKey.IssuingUser.Name = "Test User"
 						authInfo.ApiKey.IssuingUser.Email = "test@example.com"

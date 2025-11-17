@@ -12,6 +12,8 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -259,12 +261,16 @@ func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
+	// Convert plan type to title case for display
+	planType := cases.Title(language.English).String(authInfo.ApiKey.Project.PlanType)
+
 	table.Append("Status", "Logged in")
-	table.Append("Project", fmt.Sprintf("%s (%s)", authInfo.ApiKey.Project.Name, authInfo.ApiKey.Project.Id))
-	table.Append("Public Key", authInfo.ApiKey.PublicKey)
 	table.Append("Credential Name", authInfo.ApiKey.Name)
-	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authInfo.ApiKey.IssuingUser.Name, authInfo.ApiKey.IssuingUser.Email))
+	table.Append("Public Key", authInfo.ApiKey.PublicKey)
 	table.Append("Created At", authInfo.ApiKey.Created.Format("2006-01-02 15:04:05 MST"))
+	table.Append("Project", fmt.Sprintf("%s (%s)", authInfo.ApiKey.Project.Name, authInfo.ApiKey.Project.Id))
+	table.Append("Plan Type", planType)
+	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authInfo.ApiKey.IssuingUser.Name, authInfo.ApiKey.IssuingUser.Email))
 
 	return table.Render()
 }
@@ -350,6 +356,7 @@ func validateAndGetAuthInfoImpl(ctx context.Context, cfg *config.Config, apiKey 
 	a.Identify(
 		analytics.Property("userId", authInfo.ApiKey.IssuingUser.Id),
 		analytics.Property("email", string(authInfo.ApiKey.IssuingUser.Email)),
+		analytics.Property("planType", authInfo.ApiKey.Project.PlanType),
 	)
 
 	return authInfo, nil
