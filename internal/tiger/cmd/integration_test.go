@@ -99,9 +99,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -147,7 +146,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
-			"--project-id", projectID,
 		)
 
 		if err != nil {
@@ -1153,11 +1151,10 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -1179,7 +1176,6 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 		"auth", "login",
 		"--public-key", publicKey,
 		"--secret-key", secretKey,
-		"--project-id", projectID,
 	)
 
 	if err != nil {
@@ -1281,12 +1277,11 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	if existingServiceID == "" {
@@ -1314,7 +1309,6 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
-			"--project-id", projectID,
 		)
 
 		if err != nil {
@@ -1349,11 +1343,10 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Check if we have valid integration test credentials
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -1367,11 +1360,10 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	invalidPublicKey := "invalid-public-key"
 	invalidSecretKey := "invalid-secret-key"
 
-	// Login with invalid credentials (this should succeed locally but fail on API calls)
+	// Login with invalid credentials (this should fail during validation)
 	loginOutput, loginErr := executeIntegrationCommand(t.Context(), "auth", "login",
 		"--public-key", invalidPublicKey,
-		"--secret-key", invalidSecretKey,
-		"--project-id", projectID)
+		"--secret-key", invalidSecretKey)
 	if loginErr != nil {
 		t.Logf("Login with invalid credentials failed (expected): %s", loginOutput)
 	} else {
@@ -1508,9 +1500,8 @@ func TestServiceForkIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -1574,7 +1565,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
-			"--project-id", projectID,
 		)
 
 		if err != nil {
