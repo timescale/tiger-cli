@@ -128,22 +128,23 @@ that are missing.
    - User provides one or more of the following:
      - `--public-key` flag or `TIGER_PUBLIC_KEY` env var
      - `--secret-key` flag or `TIGER_SECRET_KEY` env var
-     - `--project-id` flag or `TIGER_PROJECT_ID` env var
    - Flags take precedence over environment variables
 
 2. **Prompt for missing credentials**
-   - CLI prompts user for any values (public key, secret key, or project ID) that weren't provided
-   - TODO: Should be possible to determine the project ID programmatically from
-     the public key/secret key via an API call, which would render the project
-     ID flag/env var unnecessary
+   - CLI prompts user for any values (public key or secret key) that weren't provided
 
-3. **Credential Storage**
+3. **API Key Validation and Project ID Detection**
    - Public key and secret key (client credentials) are concatenated with a
      colon to form the API key (e.g. `publicKey:secretKey`)
+   - CLI validates the API key and retrieves authentication information by calling the `/auth/info` endpoint
+   - Project ID is automatically detected from the API response
+   - User information is retrieved for analytics identification
+
+4. **Credential Storage**
    - API key is stored securely in system keychain (macOS Keychain, Windows
      Credential Manager, Linux Secret Service)
    - Fallback to encrypted file storage if keychain unavailable
-   - Project ID stored in config file
+   - Project ID (auto-detected from API) is stored in config file
 
 #### Error Handling:
 
