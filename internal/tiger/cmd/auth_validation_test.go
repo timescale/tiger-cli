@@ -80,10 +80,12 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 
 	// Mock the validator to return success
 	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
-		return &api.AuthInfo{
-			ProjectId: "test-project-valid",
-			PublicKey: "test-access-key",
-		}, nil // Success
+		authInfo := &api.AuthInfo{
+			Type: api.ApiKey,
+		}
+		authInfo.ApiKey.Project.Id = "test-project-valid"
+		authInfo.ApiKey.PublicKey = "test-access-key"
+		return authInfo, nil // Success
 	}
 
 	defer func() {

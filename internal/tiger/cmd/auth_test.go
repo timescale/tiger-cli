@@ -32,10 +32,12 @@ func setupAuthTest(t *testing.T) string {
 	originalValidator := validateAndGetAuthInfo
 	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
 		// Always return success with test auth info
-		return &api.AuthInfo{
-			ProjectId: "test-project-id",
-			PublicKey: "test-access-key",
-		}, nil
+		authInfo := &api.AuthInfo{
+			Type: api.ApiKey,
+		}
+		authInfo.ApiKey.Project.Id = "test-project-id"
+		authInfo.ApiKey.PublicKey = "test-access-key"
+		return authInfo, nil
 	}
 
 	// Create temporary directory for test config
@@ -588,14 +590,16 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/auth/info" {
 			authInfo := api.AuthInfo{
-				PublicKey:        "test-access-key",
-				ProjectId:        "test-project-789",
-				Name:             "Test Credentials",
-				IssuingUserName:  "Test User",
-				IssuingUserEmail: "test@example.com",
-				IssuingUserId:    "user-123",
-				Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+				Type: api.ApiKey,
 			}
+			authInfo.ApiKey.PublicKey = "test-access-key"
+			authInfo.ApiKey.Project.Id = "test-project-789"
+			authInfo.ApiKey.Project.Name = "Test Project"
+			authInfo.ApiKey.Name = "Test Credentials"
+			authInfo.ApiKey.IssuingUser.Name = "Test User"
+			authInfo.ApiKey.IssuingUser.Email = "test@example.com"
+			authInfo.ApiKey.IssuingUser.Id = "user-123"
+			authInfo.ApiKey.Created = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(authInfo)
@@ -702,14 +706,16 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.URL.Path == "/auth/info" {
 						authInfo := api.AuthInfo{
-							PublicKey:        "test-access-key",
-							ProjectId:        "proj-12345",
-							Name:             "Test Credentials",
-							IssuingUserName:  "Test User",
-							IssuingUserEmail: "test@example.com",
-							IssuingUserId:    "user-123",
-							Created:          time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+							Type: api.ApiKey,
 						}
+						authInfo.ApiKey.PublicKey = "test-access-key"
+						authInfo.ApiKey.Project.Id = "proj-12345"
+						authInfo.ApiKey.Project.Name = "Test Project"
+						authInfo.ApiKey.Name = "Test Credentials"
+						authInfo.ApiKey.IssuingUser.Name = "Test User"
+						authInfo.ApiKey.IssuingUser.Email = "test@example.com"
+						authInfo.ApiKey.IssuingUser.Id = "user-123"
+						authInfo.ApiKey.Created = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
 						json.NewEncoder(w).Encode(authInfo)
@@ -789,11 +795,11 @@ func TestValidateAndGetAuthInfo(t *testing.T) {
 				if authInfo == nil {
 					t.Fatal("Expected auth info to be returned, got nil")
 				}
-				if authInfo.ProjectId != tt.expectedProjectID {
-					t.Errorf("Expected project ID %q, got %q", tt.expectedProjectID, authInfo.ProjectId)
+				if authInfo.ApiKey.Project.Id != tt.expectedProjectID {
+					t.Errorf("Expected project ID %q, got %q", tt.expectedProjectID, authInfo.ApiKey.Project.Id)
 				}
-				if authInfo.PublicKey != tt.expectedPublicKey {
-					t.Errorf("Expected access key %q, got %q", tt.expectedPublicKey, authInfo.PublicKey)
+				if authInfo.ApiKey.PublicKey != tt.expectedPublicKey {
+					t.Errorf("Expected access key %q, got %q", tt.expectedPublicKey, authInfo.ApiKey.PublicKey)
 				}
 			} else {
 				if err == nil {

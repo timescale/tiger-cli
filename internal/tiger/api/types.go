@@ -9,6 +9,11 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AuthInfoType.
+const (
+	ApiKey AuthInfoType = "apiKey"
+)
+
 // Defines values for DeployStatus.
 const (
 	CONFIGURING DeployStatus = "CONFIGURING"
@@ -67,30 +72,48 @@ const (
 
 // AuthInfo defines model for AuthInfo.
 type AuthInfo struct {
-	// Created When the client credentials were created
-	Created time.Time `json:"created"`
+	// ApiKey Information about the API key credentials
+	ApiKey struct {
+		// Created When the client credentials were created
+		Created time.Time `json:"created"`
 
-	// IssuingUserEmail The email of the user who created the client credentials
-	IssuingUserEmail openapi_types.Email `json:"issuing_user_email"`
+		// IssuingUser Information about the user who created the credentials
+		IssuingUser struct {
+			// Email The user's email
+			Email openapi_types.Email `json:"email"`
 
-	// IssuingUserId The ID of the user who created the client credentials
-	IssuingUserId string `json:"issuing_user_id"`
+			// Id The user ID
+			Id string `json:"id"`
 
-	// IssuingUserName The name of the user who created the client credentials
-	IssuingUserName string `json:"issuing_user_name"`
+			// Name The user's name
+			Name string `json:"name"`
+		} `json:"issuing_user"`
 
-	// Name The name of the client credentials
-	Name string `json:"name"`
+		// Name The name of the credential
+		Name string `json:"name"`
 
-	// ProjectId The project ID the client credentials belong to
-	ProjectId string `json:"project_id"`
+		// Project Information about the project
+		Project struct {
+			// Id The project ID
+			Id string `json:"id"`
 
-	// ProjectName The name of the project
-	ProjectName string `json:"project_name"`
+			// Name The name of the project
+			Name string `json:"name"`
 
-	// PublicKey The public key of the client credentials
-	PublicKey string `json:"public_key"`
+			// PlanType The plan type for the project
+			PlanType string `json:"plan_type"`
+		} `json:"project"`
+
+		// PublicKey The public key of the client credentials
+		PublicKey string `json:"public_key"`
+	} `json:"apiKey"`
+
+	// Type The type of authentication being used
+	Type AuthInfoType `json:"type"`
 }
+
+// AuthInfoType The type of authentication being used
+type AuthInfoType string
 
 // ConnectionPooler defines model for ConnectionPooler.
 type ConnectionPooler struct {

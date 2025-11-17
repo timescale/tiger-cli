@@ -757,49 +757,78 @@ components:
     AuthInfo:
       type: object
       required:
-        - public_key
-        - name
-        - project_id
-        - project_name
-        - created
-        - issuing_user_id
-        - issuing_user_name
-        - issuing_user_email
+        - type
+        - apiKey
       properties:
-        public_key:
+        type:
           type: string
-          description: The public key of the client credentials
-          example: "tskey_abc123"
-        name:
-          type: string
-          description: The name of the client credentials
-          example: "my-production-token"
-        project_id:
-          type: string
-          description: The project ID the client credentials belong to
-          example: "rp1pz7uyae"
-        project_name:
-          type: string
-          description: The name of the project
-          example: "My Production Project"
-        created:
-          type: string
-          format: date-time
-          description: When the client credentials were created
-          example: "2024-01-15T10:30:00Z"
-        issuing_user_id:
-          type: string
-          description: The ID of the user who created the client credentials
-          example: "user123"
-        issuing_user_name:
-          type: string
-          description: The name of the user who created the client credentials
-          example: "John Doe"
-        issuing_user_email:
-          type: string
-          format: email
-          description: The email of the user who created the client credentials
-          example: "john.doe@example.com"
+          description: The type of authentication being used
+          enum: ["apiKey"]
+          example: "apiKey"
+        apiKey:
+          type: object
+          description: Information about the API key credentials
+          required:
+            - public_key
+            - name
+            - created
+            - project
+            - issuing_user
+          properties:
+            public_key:
+              type: string
+              description: The public key of the client credentials
+              example: "tskey_abc123"
+            name:
+              type: string
+              description: The name of the credential
+              example: "my-production-token"
+            created:
+              type: string
+              format: date-time
+              description: When the client credentials were created
+              example: "2024-01-15T10:30:00Z"
+            project:
+              type: object
+              description: Information about the project
+              required:
+                - id
+                - name
+                - plan_type
+              properties:
+                id:
+                  type: string
+                  description: The project ID
+                  example: "rp1pz7uyae"
+                name:
+                  type: string
+                  description: The name of the project
+                  example: "My Production Project"
+                plan_type:
+                  type: string
+                  description: The plan type for the project
+                  example: "FREE"
+            issuing_user:
+              type: object
+              description: Information about the user who created the credentials
+              required:
+                - id
+                - name
+                - email
+              properties:
+                id:
+                  type: string
+                  description: The user ID
+                  example: "user123"
+                name:
+                  type: string
+                  description: The user's name
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  description: The user's email
+                  example: "john.doe@example.com"
     VPC:
       type: object
       properties:

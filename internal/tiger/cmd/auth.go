@@ -123,10 +123,10 @@ Examples:
 			}
 
 			// Store the credentials (API key + project ID) together securely
-			if err := config.StoreCredentials(apiKey, authInfo.ProjectId); err != nil {
+			if err := config.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", authInfo.ProjectId)
+			fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", authInfo.ApiKey.Project.Id)
 
 			// Show helpful next steps
 			fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
@@ -260,11 +260,11 @@ func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
 	table.Header("PROPERTY", "VALUE")
 
 	table.Append("Status", "Logged in")
-	table.Append("Project", fmt.Sprintf("%s (%s)", authInfo.ProjectName, authInfo.ProjectId))
-	table.Append("Public Key", authInfo.PublicKey)
-	table.Append("Credential Name", authInfo.Name)
-	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authInfo.IssuingUserName, authInfo.IssuingUserEmail))
-	table.Append("Created At", authInfo.Created.Format("2006-01-02 15:04:05 MST"))
+	table.Append("Project", fmt.Sprintf("%s (%s)", authInfo.ApiKey.Project.Name, authInfo.ApiKey.Project.Id))
+	table.Append("Public Key", authInfo.ApiKey.PublicKey)
+	table.Append("Credential Name", authInfo.ApiKey.Name)
+	table.Append("Issuing User", fmt.Sprintf("%s (%s)", authInfo.ApiKey.IssuingUser.Name, authInfo.ApiKey.IssuingUser.Email))
+	table.Append("Created At", authInfo.ApiKey.Created.Format("2006-01-02 15:04:05 MST"))
 
 	return table.Render()
 }
@@ -346,10 +346,10 @@ func validateAndGetAuthInfoImpl(ctx context.Context, cfg *config.Config, apiKey 
 	authInfo := resp.JSON200
 
 	// Identify the user with analytics
-	a := analytics.New(cfg, client, authInfo.ProjectId)
+	a := analytics.New(cfg, client, authInfo.ApiKey.Project.Id)
 	a.Identify(
-		analytics.Property("userId", authInfo.IssuingUserId),
-		analytics.Property("email", authInfo.IssuingUserEmail),
+		analytics.Property("userId", authInfo.ApiKey.IssuingUser.Id),
+		analytics.Property("email", string(authInfo.ApiKey.IssuingUser.Email)),
 	)
 
 	return authInfo, nil
