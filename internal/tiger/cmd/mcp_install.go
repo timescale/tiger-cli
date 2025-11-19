@@ -27,12 +27,13 @@ import (
 type MCPClient string
 
 const (
-	ClaudeCode MCPClient = "claude-code"
-	Cursor     MCPClient = "cursor" // Both the IDE and the CLI
-	Windsurf   MCPClient = "windsurf"
-	Codex      MCPClient = "codex"
-	Gemini     MCPClient = "gemini"
-	VSCode     MCPClient = "vscode"
+	ClaudeCode  MCPClient = "claude-code"
+	Cursor      MCPClient = "cursor" // Both the IDE and the CLI
+	Windsurf    MCPClient = "windsurf"
+	Codex       MCPClient = "codex"
+	Gemini      MCPClient = "gemini"
+	VSCode      MCPClient = "vscode"
+	Antigravity MCPClient = "antigravity"
 )
 
 // TigerMCPServer represents the Tiger MCP server configuration
@@ -127,6 +128,15 @@ var supportedClients = []clientConfig{
 		},
 		buildInstallCommand: func(tigerPath string) []string {
 			return []string{"code", "--add-mcp", fmt.Sprintf(`{"name":"%s","command":"%s","args":["mcp","start"]}`, mcp.ServerName, tigerPath)}
+		},
+	},
+	{
+		ClientType:           Antigravity,
+		Name:                 "Google Antigravity",
+		EditorNames:          []string{"antigravity", "agy"},
+		MCPServersPathPrefix: "/mcpServers",
+		ConfigPaths: []string{
+			"~/.gemini/antigravity/mcp_config.json",
 		},
 	},
 }
