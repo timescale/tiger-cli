@@ -47,3 +47,18 @@ func ConvertStringSlicePtr[T ~string](ss []string) *[]T {
 	}
 	return &out
 }
+
+// ConvertSliceToAny converts a slice of some type to slice of any.
+// Returns nil if the input slice is nil.
+func ConvertSliceToAny[T any](ts []T) []any {
+	if ts == nil {
+		return nil
+	}
+
+	out := make([]any, len(ts))
+	for i, t := range ts {
+		out[i] = any(t)
+	}
+	return out
+
+}
