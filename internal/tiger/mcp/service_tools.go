@@ -149,7 +149,6 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
-	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only."
@@ -216,7 +215,6 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	setServiceIDSchemaProperties(schema)
 
 	schema.Properties["name"].Description = "Human-readable name for the forked service (auto-generated if not provided)"
-	schema.Properties["name"].MaxLength = util.Ptr(128) // Matches backend validation
 	schema.Properties["name"].Examples = []any{"my-forked-db", "prod-fork-test", "backup-db"}
 
 	schema.Properties["fork_strategy"].Description = "Fork strategy: 'NOW' creates fork at current state, 'LAST_SNAPSHOT' uses last existing snapshot (faster), 'PITR' allows point-in-time recovery to specific timestamp (requires target_time parameter)"
