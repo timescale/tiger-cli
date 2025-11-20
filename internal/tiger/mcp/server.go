@@ -59,7 +59,9 @@ func (s *Server) StartStdio(ctx context.Context) error {
 func (s *Server) HTTPHandler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return s.mcpServer
-	}, nil)
+	}, &mcp.StreamableHTTPOptions{
+		Stateless: true,
+	})
 }
 
 // registerTools registers all available MCP tools
