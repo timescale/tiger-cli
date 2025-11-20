@@ -1511,7 +1511,6 @@ func buildServiceResizeCmd() *cobra.Command {
 	var resizeCPU string
 	var resizeMemory string
 	var resizeWaitTimeout time.Duration
-	var resizeNodes int
 
 	cmd := &cobra.Command{
 		Use:   "resize [service-id]",
@@ -1546,9 +1545,6 @@ Examples:
 
   # Resize and wait for completion with 1 hour timeout
   tiger service resize --cpu 2000 --memory 8 --wait-timeout 1h
-
-  # Resize a read replica set (specify number of nodes)
-  tiger service resize --cpu 2000 --memory 8 --nodes 3
 
 Allowed CPU/Memory Configurations:
   shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
@@ -1594,11 +1590,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("failed to parse memory value: %w", err)
 			}
 
-			// Validate nodes count if specified
-			if cmd.Flags().Changed("nodes") && resizeNodes < 1 {
-				return fmt.Errorf("nodes count must be at least 1")
-			}
-
 			cmd.SilenceUsage = true
 
 			// Get API key and project ID for authentication
@@ -1619,10 +1610,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				MemoryGbs: memoryGBs,
 			}
 
-			if cmd.Flags().Changed("nodes") {
-				resizeReq.Nodes = &resizeNodes
-			}
-
 			// Make API call to resize service
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
@@ -1637,9 +1624,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
 
 			resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
-			if cmd.Flags().Changed("nodes") {
-				resizeDesc = fmt.Sprintf("%s / %s / %d nodes", cpuDisplay, memoryDisplay, resizeNodes)
-			}
 
 			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
 
@@ -1679,7 +1663,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	// Add flags
 	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared' (e.g., 1000, 2000, 4000)")
 	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared' (e.g., 2, 4, 8, 16)")
-	cmd.Flags().IntVar(&resizeNodes, "nodes", 0, "Number of nodes in the replica set (optional)")
 	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 0, "Wait for completion with specified timeout (e.g., 30m, 1h). Default 0 means don't wait")
 
 	return cmd
