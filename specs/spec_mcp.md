@@ -23,6 +23,7 @@ For the initial v0 release, implement these essential tools first:
 - `service_fork` - Fork existing services
 - `service_start` - Start stopped services
 - `service_stop` - Stop running services
+- `service_resize` - Resize service CPU and memory allocation
 - `service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `service_update_password` - Update service master password
 
@@ -295,6 +296,28 @@ Update the master password for a service.
 **Returns:** Operation status confirmation.
 
 **Note:** This tool automatically stores the database password using the same method as the CLI (keyring, pgpass file, etc.).
+
+#### `tiger_service_resize`
+Resize a database service by changing its CPU and memory allocation.
+
+**Parameters:**
+- `service_id` (string, required): Service ID to resize
+- `cpu_memory` (string, required): CPU and memory allocation combination. Choose from:
+  - `"shared/shared"` - Shared resources (free tier)
+  - `"0.5 CPU/2 GB"` - 0.5 CPU cores, 2GB memory
+  - `"1 CPU/4 GB"` - 1 CPU core, 4GB memory
+  - `"2 CPU/8 GB"` - 2 CPU cores, 8GB memory
+  - `"4 CPU/16 GB"` - 4 CPU cores, 16GB memory
+  - `"8 CPU/32 GB"` - 8 CPU cores, 32GB memory
+  - `"16 CPU/64 GB"` - 16 CPU cores, 64GB memory
+  - `"32 CPU/128 GB"` - 32 CPU cores, 128GB memory
+- `nodes` (integer, optional): Number of nodes in the replica set (for replica set resizing)
+- `wait` (boolean, optional): Whether to wait for resize to complete. Default is `false` (returns immediately)
+- `timeout_minutes` (integer, optional): Timeout in minutes when waiting for resize to complete. Only used when `wait` is true. Default is 30
+
+**Returns:** Resize operation status and updated service details (when wait=true).
+
+**Note:** The service will be temporarily unavailable during the resize operation. Increasing resources will increase costs.
 
 ### Database Operations
 
