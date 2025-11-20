@@ -973,7 +973,6 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 type ServiceResizeInput struct {
 	ServiceID      string `json:"service_id"`
 	CPUMemory      string `json:"cpu_memory,omitempty"`
-	Nodes          *int   `json:"nodes,omitempty"`
 	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
 }
 
@@ -994,13 +993,6 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 			"16 CPU/64 GB",
 			"32 CPU/128 GB",
 		}),
-	}
-
-	schema.Properties["nodes"] = &jsonschema.Schema{
-		Type:        "integer",
-		Description: "Number of nodes in the replica set (optional)",
-		Examples:    []any{1, 2, 3},
-		Minimum:     util.Ptr(1.0),
 	}
 
 	schema.Properties["timeout_minutes"] = &jsonschema.Schema{
@@ -1029,7 +1021,6 @@ type ServiceResizeOutput struct {
 	ServiceID string        `json:"service_id"`
 	NewCPU    string        `json:"new_cpu"`
 	NewMemory string        `json:"new_memory"`
-	Nodes     *int          `json:"nodes,omitempty"`
 	Service   ServiceDetail `json:"service,omitempty"`
 }
 
@@ -1062,10 +1053,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		MemoryGbs: memoryGBs,
 	}
 
-	if input.Nodes != nil {
-		resizeReq.Nodes = input.Nodes
-	}
-
 	// Make API call to resize service
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -1086,7 +1073,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		ServiceID: input.ServiceID,
 		NewCPU:    formatCPU(cpuMillis),
 		NewMemory: formatMemory(memoryGBs),
-		Nodes:     input.Nodes,
 	}
 
 	// If timeout is greater than 0, wait for resize to complete

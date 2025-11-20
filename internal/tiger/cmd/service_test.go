@@ -1752,26 +1752,3 @@ func TestServiceResize_InvalidCPUMemoryCombination(t *testing.T) {
 		t.Errorf("Expected invalid combination error, got: %v", err)
 	}
 }
-
-func TestServiceResize_InvalidNodes(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config with API URL
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Test invalid nodes count
-	_, err, _ = executeServiceCommand(t.Context(), "service", "resize", "--cpu", "2000", "--memory", "8", "--nodes", "0")
-	if err == nil {
-		t.Fatal("Expected error for invalid nodes count")
-	}
-
-	if !strings.Contains(err.Error(), "nodes count must be at least 1") {
-		t.Errorf("Expected invalid nodes error, got: %v", err)
-	}
-}
