@@ -34,6 +34,7 @@ const (
 	Gemini      MCPClient = "gemini"
 	VSCode      MCPClient = "vscode"
 	Antigravity MCPClient = "antigravity"
+	KiroCLI     MCPClient = "kiro-cli"
 )
 
 // TigerMCPServer represents the Tiger MCP server configuration
@@ -137,6 +138,17 @@ var supportedClients = []clientConfig{
 		MCPServersPathPrefix: "/mcpServers",
 		ConfigPaths: []string{
 			"~/.gemini/antigravity/mcp_config.json",
+		},
+	},
+	{
+		ClientType:  KiroCLI,
+		Name:        "Kiro CLI",
+		EditorNames: []string{"kiro-cli"},
+		ConfigPaths: []string{
+			"~/.kiro/settings/mcp.json",
+		},
+		buildInstallCommand: func(tigerPath string) []string {
+			return []string{"kiro-cli", "mcp", "add", "--name", mcp.ServerName, "--command", tigerPath, "--args", "mcp,start"}
 		},
 	},
 }
