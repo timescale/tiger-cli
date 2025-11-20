@@ -11,9 +11,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -152,14 +152,14 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
 	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only."
-	schema.Properties["addons"].Items.Enum = []any{util.AddonTimeSeries, util.AddonAI}
+	schema.Properties["addons"].Items.Enum = []any{common.AddonTimeSeries, common.AddonAI}
 	schema.Properties["addons"].UniqueItems = true
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
@@ -187,9 +187,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 
 // ServiceCreateOutput represents output for service_create
 type ServiceCreateOutput struct {
-	Service         ServiceDetail                   `json:"service"`
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Service         ServiceDetail                 `json:"service"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceCreateOutput) Schema() *jsonschema.Schema {
@@ -225,7 +225,7 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(util.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false and is recommended because forking can take several minutes. ONLY set to true if the user explicitly needs to use the forked service immediately to continue the same conversation."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -247,9 +247,9 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 
 // ServiceForkOutput represents output for service_fork
 type ServiceForkOutput struct {
-	Service         ServiceDetail                   `json:"service"`
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Service         ServiceDetail                 `json:"service"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceForkOutput) Schema() *jsonschema.Schema {
@@ -275,12 +275,80 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 
 // ServiceUpdatePasswordOutput represents output for service_update_password
 type ServiceUpdatePasswordOutput struct {
-	Message         string                          `json:"message"`
-	PasswordStorage *password.PasswordStorageResult `json:"password_storage,omitempty"`
+	Message         string                        `json:"message"`
+	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
+}
+
+// ServiceStartInput represents input for service_start
+type ServiceStartInput struct {
+	ServiceID      string `json:"service_id"`
+	Wait           bool   `json:"wait,omitempty"`
+	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+}
+
+func (ServiceStartInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceStartInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully started before returning. Default is false and is recommended because starting can take several minutes. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to start. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
+	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
+
+	return schema
+}
+
+// ServiceStartOutput represents output for service_start
+type ServiceStartOutput struct {
+	Status  string `json:"status" jsonschema:"Current service status after start operation"`
+	Message string `json:"message"`
+}
+
+func (ServiceStartOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceStartOutput](nil))
+}
+
+// ServiceStopInput represents input for service_stop
+type ServiceStopInput struct {
+	ServiceID      string `json:"service_id"`
+	Wait           bool   `json:"wait,omitempty"`
+	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+}
+
+func (ServiceStopInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceStopInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully stopped before returning. Default is false and is recommended because stopping can take several minutes. ONLY set to true if the user explicitly needs confirmation that the service is stopped to continue the same conversation."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
+	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to stop. Only used when 'wait' is true."
+	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
+	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
+
+	return schema
+}
+
+// ServiceStopOutput represents output for service_stop
+type ServiceStopOutput struct {
+	Status  string `json:"status" jsonschema:"Current service status after stop operation"`
+	Message string `json:"message"`
+}
+
+func (ServiceStopOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceStopOutput](nil))
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -381,6 +449,46 @@ WARNING: Creates billable resources.`,
 			Title:           "Update Service Password",
 		},
 	}, s.handleServiceUpdatePassword)
+
+	// service_start
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_start",
+		Title: "Start Database Service",
+		Description: `Start a stopped database service.
+
+This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections.
+
+Default behavior: Returns immediately while service starts in background (recommended).
+Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+		InputSchema:  ServiceStartInput{}.Schema(),
+		OutputSchema: ServiceStartOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Starting a service cannot really break anything
+			IdempotentHint:  true,            // Starting an already-started service is safe (but returns an error)
+			Title:           "Start Database Service",
+		},
+	}, s.handleServiceStart)
+
+	// service_stop
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_stop",
+		Title: "Stop Database Service",
+		Description: `Stop a running database service.
+
+This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections.
+
+Default behavior: Returns immediately while service stops in background (recommended).
+Setting wait=true will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
+timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+		InputSchema:  ServiceStopInput{}.Schema(),
+		OutputSchema: ServiceStopOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(true), // Stopping a service breaks existing connections and could cause app downtime
+			IdempotentHint:  true,           // Stopping an already-stopped service is safe (but returns an error)
+			Title:           "Stop Database Service",
+		},
+	}, s.handleServiceStop)
 }
 
 // handleServiceList handles the service_list MCP tool
@@ -449,23 +557,13 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, ServiceGetOutput{}, resp.JSON4XX
 	}
 
-	service := *resp.JSON200
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(service),
+		Service: s.convertToServiceDetail(*resp.JSON200, input.WithPassword),
 	}
 
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
-		Role:         "tsdbadmin",
-		WithPassword: input.WithPassword,
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else if input.WithPassword && details.Password == "" {
+	// Check if password was requested but not available
+	if input.WithPassword && output.Service.Password == "" {
 		return nil, ServiceGetOutput{}, fmt.Errorf("requested password but password not available")
-	} else {
-		output.Service.Password = details.Password
-		output.Service.ConnectionString = details.String()
 	}
 
 	return nil, output, nil
@@ -487,12 +585,12 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Auto-generate service name if not provided
 	if input.Name == "" {
-		input.Name = util.GenerateServiceName()
+		input.Name = common.GenerateServiceName()
 	}
 
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -520,10 +618,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to create service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(createCtx, projectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -536,44 +634,6 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	service := *resp.JSON202
 	serviceID := util.Deref(service.ServiceId)
 
-	output := ServiceCreateOutput{
-		Service: s.convertToServiceDetail(service),
-		Message: "Service creation request accepted. The service may still be provisioning.",
-	}
-
-	// Save password immediately after service creation, before any waiting
-	// This ensures the password is stored even if the wait fails or is interrupted
-	if service.InitialPassword != nil {
-		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
-		output.PasswordStorage = &result
-		if err != nil {
-			logging.Debug("MCP: Password storage failed", zap.Error(err))
-		} else {
-			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
-		}
-	}
-
-	// Include password in ServiceDetail if requested
-	if input.WithPassword {
-		output.Service.Password = util.Deref(service.InitialPassword)
-	}
-
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
-		Role:            "tsdbadmin",
-		WithPassword:    input.WithPassword,
-		InitialPassword: util.Deref(service.InitialPassword),
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else {
-		if input.WithPassword && details.Password == "" {
-			// This should not happen since we have InitialPassword, but check just in case
-			logging.Error("MCP: Requested password but password not available")
-		}
-		output.Service.ConnectionString = details.String()
-	}
-
 	// Set as default service if requested (defaults to true)
 	if input.SetDefault {
 		if err := cfg.Set("service_id", serviceID); err != nil {
@@ -584,16 +644,44 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}
 	}
 
-	// If wait is explicitly requested, wait for service to be ready
-	if input.Wait {
-		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
-
-		if status, err := s.waitForServiceReady(apiClient, projectID, serviceID, timeout, service.Status); err != nil {
-			output.Message = fmt.Sprintf("Error: %s", err.Error())
+	// Save password immediately after service creation, before any waiting
+	// This ensures the password is stored even if the wait fails or is interrupted
+	var passwordStorage *common.PasswordStorageResult
+	if service.InitialPassword != nil {
+		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		passwordStorage = &result
+		if err != nil {
+			logging.Debug("MCP: Password storage failed", zap.Error(err))
 		} else {
-			output.Service.Status = util.DerefStr(status)
-			output.Message = "Service created successfully and is ready!"
+			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
 		}
+	}
+
+	// If wait is explicitly requested, wait for service to be ready
+	message := "Service creation request accepted. The service may still be provisioning."
+	if input.Wait {
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:    apiClient,
+			ProjectID: projectID,
+			ServiceID: serviceID,
+			Handler: &common.StatusWaitHandler{
+				TargetStatus: "READY",
+				Service:      &service,
+			},
+			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			TimeoutMsg: "service may still be provisioning",
+		}); err != nil {
+			message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			message = "Service created successfully and is ready!"
+		}
+	}
+
+	// Convert service to output format (after wait so status is accurate)
+	output := ServiceCreateOutput{
+		Service:         s.convertToServiceDetail(service, input.WithPassword),
+		Message:         message,
+		PasswordStorage: passwordStorage,
 	}
 
 	return nil, output, nil
@@ -628,7 +716,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Parse CPU/Memory configuration if provided
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := util.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceForkOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -658,10 +746,10 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to fork service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq)
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(forkCtx, projectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}
@@ -674,42 +762,17 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	service := *resp.JSON202
 	serviceID := util.Deref(service.ServiceId)
 
-	output := ServiceForkOutput{
-		Service: s.convertToServiceDetail(service),
-		Message: "Service fork request accepted. The forked service may still be provisioning.",
-	}
-
 	// Save password immediately after service fork, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
+	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := password.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
-		output.PasswordStorage = &result
+		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
 		} else {
 			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
 		}
-	}
-
-	// Include password in ServiceDetail if requested
-	if input.WithPassword {
-		output.Service.Password = util.Deref(service.InitialPassword)
-	}
-
-	// Always include connection string in ServiceDetail
-	// Password is embedded in connection string only if with_password=true
-	if details, err := password.GetConnectionDetails(api.Service(service), password.ConnectionDetailsOptions{
-		Role:            "tsdbadmin",
-		WithPassword:    input.WithPassword,
-		InitialPassword: util.Deref(service.InitialPassword),
-	}); err != nil {
-		logging.Debug("MCP: Failed to build connection string", zap.Error(err))
-	} else {
-		if input.WithPassword && details.Password == "" {
-			// This should not happen since we have InitialPassword, but check just in case
-			logging.Error("MCP: Requested password but password not available")
-		}
-		output.Service.ConnectionString = details.String()
 	}
 
 	// Set as default service if requested (defaults to true)
@@ -723,15 +786,30 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// If wait is explicitly requested, wait for service to be ready
+	message := "Service fork request accepted. The forked service may still be provisioning."
 	if input.Wait {
-		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
-
-		if status, err := s.waitForServiceReady(apiClient, projectID, serviceID, timeout, service.Status); err != nil {
-			output.Message = fmt.Sprintf("Error: %s", err.Error())
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:    apiClient,
+			ProjectID: projectID,
+			ServiceID: serviceID,
+			Handler: &common.StatusWaitHandler{
+				TargetStatus: "READY",
+				Service:      &service,
+			},
+			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			TimeoutMsg: "service may still be provisioning",
+		}); err != nil {
+			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			output.Service.Status = util.DerefStr(status)
-			output.Message = "Service forked successfully and is ready!"
+			message = "Service forked successfully and is ready!"
 		}
+	}
+
+	// Convert service to output format (after wait so status is accurate)
+	output := ServiceForkOutput{
+		Service:         s.convertToServiceDetail(service, input.WithPassword),
+		Message:         message,
+		PasswordStorage: passwordStorage,
 	}
 
 	return nil, output, nil
@@ -768,21 +846,137 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
 	}
 
-	output := ServiceUpdatePasswordOutput{
-		Message: "Master password for 'tsdbadmin' user updated successfully",
-	}
-
 	// Get service details for password storage (similar to CLI implementation)
+	var passwordStorage *common.PasswordStorageResult
 	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
-		result, err := password.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
-		output.PasswordStorage = &result
+		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
+		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
 		} else {
 			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
 		}
+	}
+
+	output := ServiceUpdatePasswordOutput{
+		Message:         "Master password for 'tsdbadmin' user updated successfully",
+		PasswordStorage: passwordStorage,
+	}
+
+	return nil, output, nil
+}
+
+// handleServiceStart handles the service_start MCP tool
+func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolRequest, input ServiceStartInput) (*mcp.CallToolResult, ServiceStartOutput, error) {
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceStartOutput{}, err
+	}
+
+	logging.Debug("MCP: Starting service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID))
+
+	// Make API call to start service
+	startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStartWithResponse(startCtx, projectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceStartOutput{}, resp.JSON4XX
+	}
+
+	service := *resp.JSON202
+
+	// If wait is explicitly requested, wait for service to be ready
+	message := "Service start request accepted. The service may still be starting."
+	if input.Wait {
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:    apiClient,
+			ProjectID: projectID,
+			ServiceID: input.ServiceID,
+			Handler: &common.StatusWaitHandler{
+				TargetStatus: "READY",
+				Service:      &service,
+			},
+			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			TimeoutMsg: "service may still be starting",
+		}); err != nil {
+			message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			message = "Service started successfully and is ready!"
+		}
+	}
+
+	// Return status and message (after wait so status is accurate)
+	output := ServiceStartOutput{
+		Status:  util.DerefStr(service.Status),
+		Message: message,
+	}
+
+	return nil, output, nil
+}
+
+// handleServiceStop handles the service_stop MCP tool
+func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest, input ServiceStopInput) (*mcp.CallToolResult, ServiceStopOutput, error) {
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceStopOutput{}, err
+	}
+
+	logging.Debug("MCP: Stopping service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID))
+
+	// Make API call to stop service
+	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStopWithResponse(stopCtx, projectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceStopOutput{}, resp.JSON4XX
+	}
+
+	service := *resp.JSON202
+
+	// If wait is explicitly requested, wait for service to be paused
+	message := "Service stop request accepted. The service may still be stopping."
+	if input.Wait {
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:    apiClient,
+			ProjectID: projectID,
+			ServiceID: input.ServiceID,
+			Handler: &common.StatusWaitHandler{
+				TargetStatus: "PAUSED",
+				Service:      &service,
+			},
+			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			TimeoutMsg: "service may still be stopping",
+		}); err != nil {
+			message = fmt.Sprintf("Error: %s", err.Error())
+		} else {
+			message = "Service stopped successfully!"
+		}
+	}
+
+	// Return status and message (after wait so status is accurate)
+	output := ServiceStopOutput{
+		Status:  util.DerefStr(service.Status),
+		Message: message,
 	}
 
 	return nil, output, nil

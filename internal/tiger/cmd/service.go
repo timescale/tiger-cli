@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -98,13 +98,13 @@ Examples:
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Make API call to get service details
@@ -118,7 +118,7 @@ Examples:
 
 			// Handle API response
 			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			if resp.JSON200 == nil {
@@ -165,13 +165,13 @@ func buildServiceListCmd() *cobra.Command {
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Make API call to list services
@@ -187,7 +187,7 @@ func buildServiceListCmd() *cobra.Command {
 
 			// Handle API response
 			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			services := *resp.JSON200
@@ -295,11 +295,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
-				createServiceName = util.GenerateServiceName()
+				createServiceName = common.GenerateServiceName()
 			}
 
 			// Validate addons and resources
-			addons, err := util.ValidateAddons(createAddons)
+			addons, err := common.ValidateAddons(createAddons)
 			if err != nil {
 				return err
 			}
@@ -314,7 +314,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := util.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
 			if err != nil {
 				return err
 			}
@@ -329,13 +329,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Prepare service creation request
@@ -367,7 +367,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			resp, err := client.PostProjectsProjectIdServicesWithResponse(ctx, projectID, serviceCreateReq)
 			if err != nil {
-				return fmt.Errorf("failed to create service: %w", err)
+				return fmt.Errorf("failed to create Service: %w", err)
 			}
 
 			// Handle API response
@@ -402,18 +402,18 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					if waitErr = waitForService(cmd.Context(), waitForServiceArgs{
-						client:    client,
-						projectID: projectID,
-						serviceID: serviceID,
-						handler: &statusWaitHandler{
-							targetStatus: "READY",
-							service:      &service,
+					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait Timeout: %v)...\n", createWaitTimeout)
+					if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+						Client:    client,
+						ProjectID: projectID,
+						ServiceID: serviceID,
+						Handler: &common.StatusWaitHandler{
+							TargetStatus: "READY",
+							Service:      &service,
 						},
-						output:     statusOutput,
-						timeout:    createWaitTimeout,
-						timeoutMsg: "service may still be provisioning",
+						Output:     statusOutput,
+						Timeout:    createWaitTimeout,
+						TimeoutMsg: "service may still be provisioning",
 					}); waitErr != nil {
 						fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 					} else {
@@ -430,14 +430,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				cmd.SilenceErrors = true
 				return waitErr
 			default:
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 		},
 	}
 
 	// Add flags
 	cmd.Flags().StringVar(&createServiceName, "name", "", "Service name (auto-generated if not provided)")
-	cmd.Flags().StringSliceVar(&createAddons, "addons", nil, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(util.ValidAddons(), ", ")))
+	cmd.Flags().StringSliceVar(&createAddons, "addons", nil, fmt.Sprintf("Addons to enable (%s, or 'none' for PostgreSQL-only)", strings.Join(common.ValidAddons(), ", ")))
 	cmd.Flags().StringVar(&createRegionCode, "region", "", "Region code")
 	cmd.Flags().StringVar(&createCpuMillis, "cpu", "", "CPU allocation in millicores or 'shared'")
 	cmd.Flags().StringVar(&createMemoryGBs, "memory", "", "Memory allocation in gigabytes or 'shared'")
@@ -507,13 +507,13 @@ Examples:
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Prepare password update request
@@ -534,7 +534,7 @@ Examples:
 
 			// Handle API response
 			if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
@@ -562,7 +562,7 @@ Examples:
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
-	password.ConnectionDetails
+	common.ConnectionDetails
 	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
 	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
 }
@@ -739,13 +739,13 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 	outputSvc.InitialPassword = nil
 
-	opts := password.ConnectionDetailsOptions{
+	opts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 	}
 
-	if connectionDetails, err := password.GetConnectionDetails(service, opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(service, opts); err != nil {
 		if output != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 		}
@@ -786,7 +786,7 @@ func formatTimePtr(t *time.Time) string {
 func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := password.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
+	result, _ := common.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password
@@ -876,7 +876,7 @@ Examples:
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			statusOutput := cmd.ErrOrStderr()
@@ -901,7 +901,7 @@ Examples:
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Make the delete request
@@ -911,12 +911,12 @@ Examples:
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to delete service: %w", err)
+				return fmt.Errorf("failed to delete Service: %w", err)
 			}
 
 			// Handle response
 			if resp.StatusCode() != 202 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
@@ -928,16 +928,16 @@ Examples:
 			}
 
 			// Wait for deletion to complete
-			if err := waitForService(cmd.Context(), waitForServiceArgs{
-				client:    client,
-				projectID: projectID,
-				serviceID: serviceID,
-				handler: &deletionWaitHandler{
-					serviceID: serviceID,
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:    client,
+				ProjectID: projectID,
+				ServiceID: serviceID,
+				Handler: &common.DeletionWaitHandler{
+					ServiceID: serviceID,
 				},
-				output:     statusOutput,
-				timeout:    deleteWaitTimeout,
-				timeoutMsg: "service may still be deleting",
+				Output:     statusOutput,
+				Timeout:    deleteWaitTimeout,
+				TimeoutMsg: "service may still be deleting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
@@ -998,13 +998,13 @@ Examples:
 			// Get API key
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Make the start request
@@ -1014,12 +1014,12 @@ Examples:
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to start service: %w", err)
+				return fmt.Errorf("failed to start Service: %w", err)
 			}
 
 			// Handle API response
 			if resp.StatusCode() != 202 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 			service := *resp.JSON202
 
@@ -1033,18 +1033,18 @@ Examples:
 			}
 
 			// Wait for service to become ready
-			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
-			if err := waitForService(cmd.Context(), waitForServiceArgs{
-				client:    client,
-				projectID: projectID,
-				serviceID: serviceID,
-				handler: &statusWaitHandler{
-					targetStatus: "READY",
-					service:      &service,
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait Timeout: %v)...\n", startWaitTimeout)
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:    client,
+				ProjectID: projectID,
+				ServiceID: serviceID,
+				Handler: &common.StatusWaitHandler{
+					TargetStatus: "READY",
+					Service:      &service,
 				},
-				output:     statusOutput,
-				timeout:    startWaitTimeout,
-				timeoutMsg: "service may still be starting",
+				Output:     statusOutput,
+				Timeout:    startWaitTimeout,
+				TimeoutMsg: "service may still be starting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
@@ -1105,13 +1105,13 @@ Examples:
 			// Get API key
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			// Make the stop request
@@ -1121,12 +1121,12 @@ Examples:
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to stop service: %w", err)
+				return fmt.Errorf("failed to stop Service: %w", err)
 			}
 
 			// Handle API response
 			if resp.StatusCode() != 202 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 			service := *resp.JSON202
 
@@ -1141,17 +1141,17 @@ Examples:
 
 			// Wait for service to become paused
 			fmt.Fprintf(statusOutput, "⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
-			if err := waitForService(cmd.Context(), waitForServiceArgs{
-				client:    client,
-				projectID: projectID,
-				serviceID: serviceID,
-				handler: &statusWaitHandler{
-					targetStatus: "PAUSED",
-					service:      &service,
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:    client,
+				ProjectID: projectID,
+				ServiceID: serviceID,
+				Handler: &common.StatusWaitHandler{
+					TargetStatus: "PAUSED",
+					Service:      &service,
 				},
-				output:     statusOutput,
-				timeout:    stopWaitTimeout,
-				timeoutMsg: "service may still be stopping",
+				Output:     statusOutput,
+				Timeout:    stopWaitTimeout,
+				TimeoutMsg: "service may still be stopping",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
@@ -1278,20 +1278,20 @@ Examples:
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
 			client, err := api.NewTigerClient(cfg, apiKey)
 			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
+				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
-			cpuMillis, memoryGBs, err := util.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
 			if err != nil {
 				return err
 			}
@@ -1346,12 +1346,12 @@ Examples:
 			// Make API call to fork service
 			forkResp, err := client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, projectID, serviceID, forkReq)
 			if err != nil {
-				return fmt.Errorf("failed to fork service: %w", err)
+				return fmt.Errorf("failed to fork Service: %w", err)
 			}
 
 			// Handle API response
 			if forkResp.StatusCode() != 202 {
-				return exitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
 			}
 
 			// Success - service fork accepted
@@ -1378,17 +1378,17 @@ Examples:
 			} else {
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
-				if waitErr = waitForService(cmd.Context(), waitForServiceArgs{
-					client:    client,
-					projectID: projectID,
-					serviceID: forkedServiceID,
-					handler: &statusWaitHandler{
-						targetStatus: "READY",
-						service:      &forkedService,
+				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+					Client:    client,
+					ProjectID: projectID,
+					ServiceID: forkedServiceID,
+					Handler: &common.StatusWaitHandler{
+						TargetStatus: "READY",
+						Service:      &forkedService,
 					},
-					output:     statusOutput,
-					timeout:    forkWaitTimeout,
-					timeoutMsg: "service may still be provisioning",
+					Output:     statusOutput,
+					Timeout:    forkWaitTimeout,
+					TimeoutMsg: "service may still be provisioning",
 				}); waitErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 				} else {
@@ -1458,13 +1458,13 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	// Get API key and project ID for authentication
 	apiKey, projectID, err := getCredentialsForService()
 	if err != nil {
-		return nil, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+		return nil, common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 	}
 
 	// Create API client
 	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create API client: %w", err)
+		return nil, fmt.Errorf("failed to create API Client: %w", err)
 	}
 
 	// Make API call to list services
@@ -1478,7 +1478,7 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return nil, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {

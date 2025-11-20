@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -142,7 +142,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	}
 
 	// Request pooled connection when pooler is not available
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Pooled: true,
 		Role:   "tsdbadmin",
 	})
@@ -339,7 +339,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -569,7 +569,7 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test with malformed connection string (should return ExitInvalidParameters)
+	// Test with malformed connection string (should return common.ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
 	ctx := context.Background()
 	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
@@ -578,14 +578,14 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 		t.Error("Expected error for invalid connection string")
 	}
 
-	// Should be an exitCodeError
-	if exitErr, ok := err.(exitCodeError); ok {
-		// The exact code depends on where it fails - could be ExitTimeout or ExitInvalidParameters
-		if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+	// Should be an common.ExitCodeError
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		// The exact code depends on where it fails - could be common.ExitTimeout or common.ExitInvalidParameters
+		if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for invalid connection string")
+		t.Error("Expected common.ExitCodeError for invalid connection string")
 	}
 }
 
@@ -614,13 +614,13 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
 
-	// Check exit code (should be ExitTimeout for unreachable)
-	if exitErr, ok := err.(exitCodeError); ok {
-		if exitErr.ExitCode() != ExitTimeout {
-			t.Errorf("Expected exit code %d for timeout, got %d", ExitTimeout, exitErr.ExitCode())
+	// Check exit code (should be common.ExitTimeout for unreachable)
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		if exitErr.ExitCode() != common.ExitTimeout {
+			t.Errorf("Expected exit code %d for timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for timeout")
+		t.Error("Expected common.ExitCodeError for timeout")
 	}
 }
 
@@ -775,13 +775,13 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 
 			// For valid durations that fail due to server unreachable, check exit code
 			if tc.expectedOutput == "" {
-				if exitErr, ok := err.(exitCodeError); ok {
-					// Should be ExitTimeout (no response) or ExitInvalidParameters (invalid params) for network errors
-					if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-						t.Errorf("Expected exit code %d or %d, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+				if exitErr, ok := err.(common.ExitCodeError); ok {
+					// Should be common.ExitTimeout (no response) or common.ExitInvalidParameters (invalid params) for network errors
+					if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+						t.Errorf("Expected exit code %d or %d, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 					}
 				} else {
-					t.Error("Expected exitCodeError")
+					t.Error("Expected common.ExitCodeError")
 				}
 			}
 		})
@@ -816,7 +816,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -824,7 +824,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role: "tsdbadmin",
 	})
 	if err != nil {
@@ -843,7 +843,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test connection string with password (simulating --with-password flag)
-	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details2, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -920,7 +920,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -989,7 +989,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1078,7 +1078,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1204,7 +1204,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	// Verify password was saved for the custom role
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, customRole)
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
@@ -1332,7 +1332,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	// Verify password was saved in pgpass storage
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)

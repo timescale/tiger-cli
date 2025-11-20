@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -916,15 +917,15 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected stop to fail for already-stopped service, but got output: %s", output)
 		} else {
-			// Check that it's an exitCodeError with ExitInvalidParameters
+			// Check that it's an exitCodeError with common.ExitInvalidParameters
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				if exitErr.ExitCode() != ExitInvalidParameters {
-					t.Errorf("Expected exit code %d (ExitInvalidParameters) for already-stopped service, got %d. Error: %s", ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				if exitErr.ExitCode() != common.ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-stopped service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", ExitInvalidParameters)
+					t.Logf("✅ Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", common.ExitInvalidParameters)
 				}
 			} else {
-				t.Errorf("Expected exitCodeError with ExitInvalidParameters exit code for already-stopped service, got: %v", err)
+				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-stopped service, got: %v", err)
 			}
 		}
 	})
@@ -1004,15 +1005,15 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected start to fail for already-started service, but got output: %s", output)
 		} else {
-			// Check that it's an exitCodeError with ExitInvalidParameters
+			// Check that it's an exitCodeError with common.ExitInvalidParameters
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				if exitErr.ExitCode() != ExitInvalidParameters {
-					t.Errorf("Expected exit code %d (ExitInvalidParameters) for already-started service, got %d. Error: %s", ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				if exitErr.ExitCode() != common.ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-started service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ Start correctly failed with invalid parameters error (exit code %d) for already-started service", ExitInvalidParameters)
+					t.Logf("✅ Start correctly failed with invalid parameters error (exit code %d) for already-started service", common.ExitInvalidParameters)
 				}
 			} else {
-				t.Errorf("Expected exitCodeError with ExitInvalidParameters exit code for already-started service, got: %v", err)
+				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-started service, got: %v", err)
 			}
 		}
 	})
@@ -1070,11 +1071,11 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Check that it returns the correct exit code (this should be required)
 		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			if exitErr.ExitCode() != ExitServiceNotFound {
-				t.Errorf("Expected exit code %d for service not found, got %d", ExitServiceNotFound, exitErr.ExitCode())
+			if exitErr.ExitCode() != common.ExitServiceNotFound {
+				t.Errorf("Expected exit code %d for service not found, got %d", common.ExitServiceNotFound, exitErr.ExitCode())
 			}
 		} else {
-			t.Error("Expected exitCodeError with ExitServiceNotFound exit code for deleted service")
+			t.Error("Expected exitCodeError with common.ExitServiceNotFound exit code for deleted service")
 		}
 	})
 
@@ -1200,43 +1201,43 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 		{
 			name:             "service get",
 			args:             []string{"service", "get", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service update-password",
 			args:             []string{"service", "update-password", nonExistentServiceID, "--new-password", "test-password"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service delete",
 			args:             []string{"service", "delete", nonExistentServiceID, "--confirm"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service start",
 			args:             []string{"service", "start", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service stop",
 			args:             []string{"service", "stop", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "db connection-string",
 			args:             []string{"db", "connection-string", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "db test-connection",
 			args:             []string{"db", "test-connection", nonExistentServiceID},
-			expectedExitCode: ExitInvalidParameters,
+			expectedExitCode: common.ExitInvalidParameters,
 			reason:           "maintains compatibility with PostgreSQL tooling conventions",
 		},
 		{
 			name:             "db psql",
 			args:             []string{"db", "psql", nonExistentServiceID, "--", "-c", "SELECT 1;"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 	}
 
@@ -1426,8 +1427,8 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 			name: "db connect",
 			args: []string{"db", "connect", "non-existent-service"},
 		},
-		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
-		// for authentication issues, not ExitAuthenticationError like other commands
+		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (common.ExitInvalidParameters)
+		// for authentication issues, not common.ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
 			args: []string{"db", "test-connection", "non-existent-service"},
@@ -1445,15 +1446,15 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 				return
 			}
 
-			// Check that it's an exitCodeError with ExitAuthenticationError
+			// Check that it's an exitCodeError with common.ExitAuthenticationError
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				if exitErr.ExitCode() != ExitAuthenticationError {
-					t.Errorf("Expected exit code %d (ExitAuthenticationError) for %s, got %d. Error: %s", ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
+				if exitErr.ExitCode() != common.ExitAuthenticationError {
+					t.Errorf("Expected exit code %d (common.ExitAuthenticationError) for %s, got %d. Error: %s", common.ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, ExitAuthenticationError)
+					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, common.ExitAuthenticationError)
 				}
 			} else {
-				t.Errorf("Expected exitCodeError with ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
+				t.Errorf("Expected exitCodeError with common.ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
 			}
 
 			// Check error message contains authentication-related text
@@ -1476,12 +1477,12 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 
 			// Check that it's an exitCodeError with the expected exit code
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				expectedExitCode := ExitAuthenticationError
+				expectedExitCode := common.ExitAuthenticationError
 				expectedDescription := "authentication error"
 
 				// db test-connection follows pg_isready conventions and uses exit code 3
 				if tc.name == "db test-connection" {
-					expectedExitCode = ExitInvalidParameters
+					expectedExitCode = common.ExitInvalidParameters
 					expectedDescription = "invalid parameters (pg_isready convention)"
 				}
 

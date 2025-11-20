@@ -88,6 +88,8 @@ Tiger CLI provides the following commands:
   - `create` - Create a new service
   - `get` - Show detailed service information (aliases: `describe`, `show`)
   - `fork` - Fork an existing service
+  - `start` - Start a stopped service
+  - `stop` - Stop a running service
   - `delete` - Delete a service
   - `update-password` - Update service master password
 - `tiger db` - Database operations
@@ -167,6 +169,8 @@ The MCP server exposes the following tools to AI assistants:
 - `service_get` - Get detailed information about a specific service
 - `service_create` - Create new database services with configurable resources
 - `service_fork` - Fork an existing database service to create an independent copy
+- `service_start` - Start a stopped database service
+- `service_stop` - Stop a running database service
 - `service_update_password` - Update the master password for a service
 
 **Database Operations:**
