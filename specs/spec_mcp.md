@@ -312,10 +312,9 @@ Resize a database service by changing its CPU and memory allocation.
   - `"16 CPU/64 GB"` - 16 CPU cores, 64GB memory
   - `"32 CPU/128 GB"` - 32 CPU cores, 128GB memory
 - `nodes` (integer, optional): Number of nodes in the replica set (for replica set resizing)
-- `wait` (boolean, optional): Whether to wait for resize to complete. Default is `false` (returns immediately)
-- `timeout_minutes` (integer, optional): Timeout in minutes when waiting for resize to complete. Only used when `wait` is true. Default is 30
+- `timeout_minutes` (integer, optional): Timeout in minutes to wait for resize to complete. Default is 0 (returns immediately without waiting). Set to positive value to wait for completion.
 
-**Returns:** Resize operation status and updated service details (when wait=true).
+**Returns:** Resize operation status and updated service details (when timeout_minutes > 0).
 
 **Note:** The service will be temporarily unavailable during the resize operation. Increasing resources will increase costs.
 
