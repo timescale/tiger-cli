@@ -68,7 +68,6 @@ Integration tests execute real API calls against a Tiger environment to validate
    ```bash
    TIGER_PUBLIC_KEY_INTEGRATION=your-public-key-here
    TIGER_SECRET_KEY_INTEGRATION=your-secret-key-here
-   TIGER_PROJECT_ID_INTEGRATION=your-project-id-here
    TIGER_API_URL=http://localhost:8080/public/api/v1  # or production URL
    ```
 

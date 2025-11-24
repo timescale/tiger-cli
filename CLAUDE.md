@@ -100,7 +100,6 @@ go test ./internal/tiger/cmd -run Integration
 # To run integration tests with real API calls, set environment variables:
 export TIGER_PUBLIC_KEY_INTEGRATION=your-public-key
 export TIGER_SECRET_KEY_INTEGRATION=your-secret-key
-export TIGER_PROJECT_ID_INTEGRATION=your-project-id
 export TIGER_API_URL_INTEGRATION=http://localhost:8080/public/api/v1
 
 # Optional: Set this to test database commands with existing service

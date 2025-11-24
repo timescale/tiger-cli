@@ -5,6 +5,13 @@ package api
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+// Defines values for AuthInfoType.
+const (
+	ApiKey AuthInfoType = "apiKey"
 )
 
 // Defines values for DeployStatus.
@@ -62,6 +69,51 @@ const (
 	SetEnvironmentInputEnvironmentDEV  SetEnvironmentInputEnvironment = "DEV"
 	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
+
+// AuthInfo defines model for AuthInfo.
+type AuthInfo struct {
+	// ApiKey Information about the API key credentials
+	ApiKey struct {
+		// Created When the client credentials were created
+		Created time.Time `json:"created"`
+
+		// IssuingUser Information about the user who created the credentials
+		IssuingUser struct {
+			// Email The user's email
+			Email openapi_types.Email `json:"email"`
+
+			// Id The user ID
+			Id string `json:"id"`
+
+			// Name The user's name
+			Name string `json:"name"`
+		} `json:"issuing_user"`
+
+		// Name The name of the credential
+		Name string `json:"name"`
+
+		// Project Information about the project
+		Project struct {
+			// Id The project ID
+			Id string `json:"id"`
+
+			// Name The name of the project
+			Name string `json:"name"`
+
+			// PlanType The plan type for the project
+			PlanType string `json:"plan_type"`
+		} `json:"project"`
+
+		// PublicKey The public key of the client credentials
+		PublicKey string `json:"public_key"`
+	} `json:"apiKey"`
+
+	// Type The type of authentication being used
+	Type AuthInfoType `json:"type"`
+}
+
+// AuthInfoType The type of authentication being used
+type AuthInfoType string
 
 // ConnectionPooler defines model for ConnectionPooler.
 type ConnectionPooler struct {

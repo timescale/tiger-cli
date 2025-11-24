@@ -137,7 +137,7 @@ func Error(err error) Option {
 // analytics. It automatically includes common properties like ProjectID. The
 // identification is only sent if the client is initialized and analytics are
 // enabled in the config, otherwise it is skipped.
-func (a *Analytics) Identify(event string, options ...Option) {
+func (a *Analytics) Identify(options ...Option) {
 	// Create properties map with user-provided properties
 	properties := map[string]any{}
 	for _, option := range options {

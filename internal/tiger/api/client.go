@@ -99,6 +99,9 @@ type ClientInterface interface {
 
 	PostAnalyticsTrack(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAuthInfo request
+	GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetProjectsProjectIdServices request
 	GetProjectsProjectIdServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -259,6 +262,18 @@ func (c *Client) PostAnalyticsTrackWithBody(ctx context.Context, contentType str
 
 func (c *Client) PostAnalyticsTrack(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostAnalyticsTrackRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthInfoRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -885,6 +900,33 @@ func NewPostAnalyticsTrackRequestWithBody(server string, contentType string, bod
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAuthInfoRequest generates requests for GetAuthInfo
+func NewGetAuthInfoRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2416,6 +2458,9 @@ type ClientWithResponsesInterface interface {
 
 	PostAnalyticsTrackWithResponse(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAnalyticsTrackResponse, error)
 
+	// GetAuthInfoWithResponse request
+	GetAuthInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthInfoResponse, error)
+
 	// GetProjectsProjectIdServicesWithResponse request
 	GetProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesResponse, error)
 
@@ -2578,6 +2623,29 @@ func (r PostAnalyticsTrackResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r PostAnalyticsTrackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAuthInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AuthInfo
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthInfoResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3324,6 +3392,15 @@ func (c *ClientWithResponses) PostAnalyticsTrackWithResponse(ctx context.Context
 	return ParsePostAnalyticsTrackResponse(rsp)
 }
 
+// GetAuthInfoWithResponse request returning *GetAuthInfoResponse
+func (c *ClientWithResponses) GetAuthInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthInfoResponse, error) {
+	rsp, err := c.GetAuthInfo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthInfoResponse(rsp)
+}
+
 // GetProjectsProjectIdServicesWithResponse request returning *GetProjectsProjectIdServicesResponse
 func (c *ClientWithResponses) GetProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesResponse, error) {
 	rsp, err := c.GetProjectsProjectIdServices(ctx, projectId, reqEditors...)
@@ -3764,6 +3841,39 @@ func ParsePostAnalyticsTrackResponse(rsp *http.Response) (*PostAnalyticsTrackRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest AnalyticsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthInfoResponse parses an HTTP response from a GetAuthInfoWithResponse call
+func ParseGetAuthInfoResponse(rsp *http.Response) (*GetAuthInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthInfo
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

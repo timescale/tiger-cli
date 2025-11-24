@@ -48,7 +48,6 @@ func TestFlagPrecedence(t *testing.T) {
 
 	// Create config file with some values
 	configContent := `api_url: https://file.api.com/v1
-project_id: file-project
 service_id: file-service
 output: table
 analytics: true
@@ -60,14 +59,12 @@ analytics: true
 
 	// Set environment variables
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_PROJECT_ID", "env-project")
 	os.Setenv("TIGER_SERVICE_ID", "env-service")
 	os.Setenv("TIGER_OUTPUT", "json")
 	os.Setenv("TIGER_ANALYTICS", "false")
 
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_PROJECT_ID")
 		os.Unsetenv("TIGER_SERVICE_ID")
 		os.Unsetenv("TIGER_OUTPUT")
 		os.Unsetenv("TIGER_ANALYTICS")
