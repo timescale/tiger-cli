@@ -303,7 +303,6 @@ Resize a database service by changing its CPU and memory allocation.
 **Parameters:**
 - `service_id` (string, required): Service ID to resize
 - `cpu_memory` (string, required): CPU and memory allocation combination. Choose from:
-  - `"shared/shared"` - Shared resources (free tier)
   - `"0.5 CPU/2 GB"` - 0.5 CPU cores, 2GB memory
   - `"1 CPU/4 GB"` - 1 CPU core, 4GB memory
   - `"2 CPU/8 GB"` - 2 CPU cores, 8GB memory

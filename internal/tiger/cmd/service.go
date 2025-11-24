@@ -1540,9 +1540,6 @@ Examples:
   # Resize service using only memory (CPU will be auto-configured to 4000m)
   tiger service resize --memory 16
 
-  # Resize to shared CPU and memory (free tier)
-  tiger service resize --cpu shared --memory shared
-
   # Resize and wait for completion with 30 minute timeout
   tiger service resize --cpu 2000 --memory 8 --wait-timeout 30m
 
@@ -1550,8 +1547,8 @@ Examples:
   tiger service resize --cpu 2000 --memory 8 --wait-timeout 1h
 
 Allowed CPU/Memory Configurations:
-  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		ValidArgsFunction: serviceIDCompletion,
@@ -1573,8 +1570,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// Validate and normalize CPU/Memory configuration
-			cpuMillisStr, memoryGBsStr, err := util.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
+			// Validate and normalize CPU/Memory configuration (using resize-specific validation)
+			cpuMillisStr, memoryGBsStr, err := util.ValidateAndNormalizeCPUMemoryForResize(resizeCPU, resizeMemory)
 			if err != nil {
 				return err
 			}
@@ -1664,8 +1661,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared' (e.g., 1000, 2000, 4000)")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared' (e.g., 2, 4, 8, 16)")
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores (e.g., 500, 1000, 2000, 4000)")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes (e.g., 2, 4, 8, 16)")
 	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 0, "Wait for completion with specified timeout (e.g., 30m, 1h). Default 0 means don't wait")
 
 	return cmd

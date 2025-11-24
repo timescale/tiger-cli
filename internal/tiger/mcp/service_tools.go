@@ -984,7 +984,6 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 		Type:        "string",
 		Description: "CPU and memory allocation combination. Choose from the available configurations.",
 		Enum: util.AnySlice([]string{
-			"shared/shared",
 			"0.5 CPU/2 GB",
 			"1 CPU/4 GB",
 			"2 CPU/8 GB",
@@ -1097,10 +1096,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 // parseCPUMemoryString parses the CPU/Memory string format and returns millicores and GB
 func parseCPUMemoryString(cpuMemory string) (int, int, error) {
 	switch cpuMemory {
-	case "shared/shared":
-		// Shared resources are represented as nil in the API, but we need actual values for resize
-		// The API will interpret these as shared when appropriate
-		return 0, 0, fmt.Errorf("cannot resize to shared resources - use Tiger Cloud console to downgrade")
 	case "0.5 CPU/2 GB":
 		return 500, 2, nil
 	case "1 CPU/4 GB":
