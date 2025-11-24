@@ -17,6 +17,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
@@ -209,7 +210,7 @@ func buildStatusCmd() *cobra.Command {
 
 			// Handle API response
 			if resp.StatusCode() != 200 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			if resp.JSON200 == nil {
