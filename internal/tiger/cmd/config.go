@@ -27,12 +27,7 @@ func buildConfigShowCmd() *cobra.Command {
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
-				return fmt.Errorf("failed to bind output flag: %w", err)
-			}
-			return nil
-		},
+		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 

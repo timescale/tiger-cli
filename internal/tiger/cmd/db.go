@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -643,12 +642,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
-				return fmt.Errorf("failed to bind output flag: %w", err)
-			}
-			return nil
-		},
+		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -175,12 +174,7 @@ func buildStatusCmd() *cobra.Command {
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
-				return fmt.Errorf("failed to bind output flag: %w", err)
-			}
-			return nil
-		},
+		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
