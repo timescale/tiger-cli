@@ -42,6 +42,18 @@ tiger auth login
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
 
+			// Bind persistent flags to viper
+			// Use cmd.Flags() which includes inherited persistent flags from parents
+			if err := errors.Join(
+				viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
+				viper.BindPFlag("service_id", cmd.Flags().Lookup("service-id")),
+				viper.BindPFlag("analytics", cmd.Flags().Lookup("analytics")),
+				viper.BindPFlag("password_storage", cmd.Flags().Lookup("password-storage")),
+				viper.BindPFlag("color", cmd.Flags().Lookup("color")),
+			); err != nil {
+				return fmt.Errorf("failed to bind flags: %w", err)
+			}
+
 			// Setup configuration initialization
 			configDirFlag := cmd.Flags().Lookup("config-dir")
 			if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
@@ -98,18 +110,6 @@ tiger auth login
 	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
-
-	// Bind flags to viper
-	err := errors.Join(
-		viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug")),
-		viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id")),
-		viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics")),
-		viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage")),
-		viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color")),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bind flags: %w", err)
-	}
 
 	// Note: api_url is intentionally not exposed as a CLI flag.
 	// It can be configured via:
