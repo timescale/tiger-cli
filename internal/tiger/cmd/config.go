@@ -27,18 +27,18 @@ func buildConfigShowCmd() *cobra.Command {
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("failed to bind output flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			outputFormat := cfg.Output
-			if cmd.Flags().Changed("output") {
-				outputFormat = output
 			}
 
 			configFile, err := cfg.EnsureConfigDir()
@@ -69,7 +69,7 @@ func buildConfigShowCmd() *cobra.Command {
 			}
 
 			output := cmd.OutOrStdout()
-			switch outputFormat {
+			switch cfg.Output {
 			case "json":
 				return util.SerializeToJSON(output, cfgOut)
 			case "yaml":

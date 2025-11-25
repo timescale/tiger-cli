@@ -75,16 +75,17 @@ Examples:
   tiger service get svc-12345 --output yaml`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("failed to bind output flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
 			}
 
 			// Determine service ID
@@ -148,16 +149,17 @@ func buildServiceListCmd() *cobra.Command {
 		Long:              `List all database services in the current project.`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("failed to bind output flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
 			}
 
 			cmd.SilenceUsage = true
@@ -281,16 +283,17 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("failed to bind output flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
 			}
 
 			// Auto-generate service name if not provided
@@ -1229,6 +1232,12 @@ Examples:
   tiger service fork svc-12345 --now --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("output", cmd.Flags().Lookup("output")); err != nil {
+				return fmt.Errorf("failed to bind output flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -1260,11 +1269,6 @@ Examples:
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
 			}
 
 			// Determine source service ID
