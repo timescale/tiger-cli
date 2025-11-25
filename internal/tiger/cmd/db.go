@@ -642,6 +642,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
+		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
@@ -654,11 +655,6 @@ PostgreSQL Configuration Parameters That May Be Set:
 			cfg, err := config.Load()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
 			}
 
 			// Get password

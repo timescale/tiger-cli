@@ -439,20 +439,20 @@ RunE: func(cmd *cobra.Command, args []string) error {
     if len(args) < 1 {
         return fmt.Errorf("service ID is required")
     }
-    
+
     // 2. Set SilenceUsage = true after argument validation
     cmd.SilenceUsage = true
-    
+
     // 3. Proceed with business logic - errors here don't show usage
     if err := someAPICall(); err != nil {
         return fmt.Errorf("operation failed: %w", err)
     }
-    
+
     return nil
 },
 ```
 
-**Philosophy**: 
+**Philosophy**:
 - Early argument/syntax errors → show usage (helps users learn command syntax)
 - Operational errors after arguments are validated → don't show usage (avoids cluttering output with irrelevant usage info)
 
@@ -465,7 +465,7 @@ Tiger CLI uses a pure functional builder pattern with **zero global command stat
 ### Philosophy
 
 - **No global variables** - All commands, flags, and state are locally scoped
-- **Functional builders** - Every command is built by a dedicated function 
+- **Functional builders** - Every command is built by a dedicated function
 - **Complete tree building** - `buildRootCmd()` constructs the entire CLI structure
 - **Perfect test isolation** - Each test gets completely fresh command instances
 - **Self-contained commands** - All dependencies passed explicitly via parameters
@@ -513,47 +513,41 @@ func buildRootCmd() *cobra.Command {
     // Declare ALL flag variables locally within this function
     var configDir string
     var debug bool
-    var serviceID string
-    var analytics bool
-    var passwordStorage string
+    // ... other flag variables
 
     cmd := &cobra.Command{
         Use:   "tiger",
         Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
         Long:  `Complete CLI description...`,
         PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-            // Use local flag variables in scope
-            if err := logging.Init(debug); err != nil {
-                return fmt.Errorf("failed to initialize logging: %w", err)
+            // Bind persistent flags to viper at execution time
+            if err := errors.Join(
+                viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
+                // ... bind remaining flags
+            ); err != nil {
+                return fmt.Errorf("failed to bind flags: %w", err)
             }
+
+            // Setup configuration and initialize logging
             // ... rest of initialization
-            return nil
         },
     }
 
-    // Set up configuration and flags...
-    cobra.OnInitialize(initConfigFunc)
+    // Set up persistent flags
     cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
     cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-    cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
-    cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
-    cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
-
-    // Bind flags to viper
-    viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-    // ... bind remaining flags
+    // ... add remaining persistent flags
 
     // Add all subcommands (complete tree building)
     cmd.AddCommand(buildVersionCmd())
     cmd.AddCommand(buildConfigCmd())
-    cmd.AddCommand(buildAuthCmd())
-    cmd.AddCommand(buildServiceCmd())
-    cmd.AddCommand(buildDbCmd())
-    cmd.AddCommand(buildMCPCmd())
+    // ... add remaining subcommands
 
     return cmd
 }
 ```
+
+See `internal/tiger/cmd/root.go` for the complete implementation.
 
 ### Simple Command Pattern
 
@@ -563,7 +557,7 @@ For commands without flags:
 func buildVersionCmd() *cobra.Command {
     return &cobra.Command{
         Use:   "version",
-        Short: "Show version information", 
+        Short: "Show version information",
         Long:  `Display version, build time, and git commit information.`,
         Run: func(cmd *cobra.Command, args []string) {
             fmt.Printf("Tiger CLI %s\n", Version)
@@ -583,7 +577,7 @@ func buildMyFlaggedCmd() *cobra.Command {
     var myFlag string
     var enableFeature bool
     var retryCount int
-    
+
     cmd := &cobra.Command{
         Use:   "my-command",
         Short: "Command with local flags",
@@ -591,24 +585,60 @@ func buildMyFlaggedCmd() *cobra.Command {
             if len(args) < 1 {
                 return fmt.Errorf("argument required")
             }
-            
+
             cmd.SilenceUsage = true
-            
+
             // Use flag variables (they're in scope)
-            fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n", 
+            fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n",
                 myFlag, enableFeature, retryCount)
             return nil
         },
     }
-    
+
     // Add flags - bound to local variables
-    cmd.Flags().StringVar(&myFlag, "flag", "", "My flag description")  
+    cmd.Flags().StringVar(&myFlag, "flag", "", "My flag description")
     cmd.Flags().BoolVar(&enableFeature, "enable", false, "Enable feature")
     cmd.Flags().IntVar(&retryCount, "retries", 3, "Retry count")
-    
+
     return cmd
 }
 ```
+
+### Commands with Flags That Need Viper Binding
+
+For commands that need their flags bound to viper for configuration precedence (flag > env > config > default), use the `bindFlags()` helper:
+
+```go
+func buildMyConfigurableFlagCmd() *cobra.Command {
+    var output string
+
+    cmd := &cobra.Command{
+        Use:     "my-command",
+        Short:   "Command with configurable flag",
+        PreRunE: bindFlags("output"),  // Binds flag to viper
+        RunE: func(cmd *cobra.Command, args []string) error {
+            cmd.SilenceUsage = true
+            cfg, err := config.Load()  // Now includes bound flag value
+            // ... use cfg.Output which respects: flag > env > config > default
+        },
+    }
+
+    cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format")
+    return cmd
+}
+```
+
+The `bindFlags()` helper (defined in `internal/tiger/cmd/flag.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+
+**Why bind flags in PreRunE?**
+
+Flags must be bound to viper at **execution time**, not at **build time**, for two critical reasons:
+
+1. **Prevents binding conflicts**: When all commands are built at startup (the builder pattern), binding flags at build time can cause commands' flags to bind to the same viper keys, silently overwriting each other. Only the last binding wins.
+
+2. **Ensures correct precedence**: Viper must bind flags after the command tree is built but before `config.Load()` is called. This happens in `PreRunE` (or `PersistentPreRunE` for persistent flags), ensuring the precedence order works correctly: command-line flags > environment variables > config file > defaults.
+
+**Note:** Use `PreRunE` for command-specific flags, and `PersistentPreRunE` for persistent flags on the root command that apply to all subcommands.
 
 ### Parent Commands with Subcommands
 
@@ -621,12 +651,12 @@ func buildParentCmd() *cobra.Command {
         Short: "Parent command with subcommands",
         Long:  `Parent command containing multiple subcommands.`,
     }
-    
+
     // Add all subcommands (builds complete subtree)
     cmd.AddCommand(buildChild1Cmd())
     cmd.AddCommand(buildChild2Cmd())
     cmd.AddCommand(buildChild3Cmd())
-    
+
     return cmd
 }
 ```
@@ -639,7 +669,7 @@ The main application uses a single builder call:
 func Execute() {
     // Build complete command tree fresh each time
     rootCmd := buildRootCmd()
-    
+
     err := rootCmd.Execute()
     if err != nil {
         if exitErr, ok := err.(interface{ ExitCode() int }); ok {
@@ -673,12 +703,12 @@ Tests use the full root command builder:
 func executeCommand(args ...string) (string, error) {
     // Build complete CLI fresh for each test
     rootCmd := buildRootCmd()
-    
+
     buf := new(bytes.Buffer)
-    rootCmd.SetOut(buf)  
+    rootCmd.SetOut(buf)
     rootCmd.SetErr(buf)
     rootCmd.SetArgs(args)
-    
+
     err := rootCmd.Execute()
     return buf.String(), err
 }
@@ -686,11 +716,11 @@ func executeCommand(args ...string) (string, error) {
 func TestMyCommand(t *testing.T) {
     // Each test gets completely fresh CLI instance
     output, err := executeCommand("my-command", "--flag", "value")
-    
+
     if err != nil {
         t.Fatalf("Command failed: %v", err)
     }
-    
+
     if !strings.Contains(output, "expected") {
         t.Errorf("Expected 'expected' in output: %s", output)
     }
@@ -704,22 +734,22 @@ For tests that need to verify flag values:
 ```go
 func executeAndReturnRoot(args ...string) (*cobra.Command, string, error) {
     rootCmd := buildRootCmd()
-    
+
     buf := new(bytes.Buffer)
     rootCmd.SetOut(buf)
     rootCmd.SetArgs(args)
-    
+
     err := rootCmd.Execute()
     return rootCmd, buf.String(), err
 }
 
 func TestFlagValues(t *testing.T) {
     rootCmd, output, err := executeAndReturnRoot("service", "create", "--name", "test")
-    
+
     // Navigate to specific command
     serviceCmd, _, _ := rootCmd.Find([]string{"service"})
     createCmd, _, _ := serviceCmd.Find([]string{"create"})
-    
+
     // Check flag value
     nameFlag := createCmd.Flags().Lookup("name")
     if nameFlag.Value.String() != "test" {
@@ -731,7 +761,7 @@ func TestFlagValues(t *testing.T) {
 ### Benefits of This Architecture
 
 1. **Zero Global State**: No shared variables between commands or tests
-2. **Perfect Test Isolation**: Each test builds completely fresh command trees  
+2. **Perfect Test Isolation**: Each test builds completely fresh command trees
 3. **Simplified Initialization**: Single entry point builds everything
 4. **Maintainable Code**: No complex global variable management
 5. **Easy Development**: Add new commands by creating builders and adding to root
@@ -744,9 +774,10 @@ When adding new commands to this architecture:
 
 1. **Create a builder function** following the `buildXXXCmd()` pattern
 2. **Declare flags locally** within the builder function scope
-3. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
-4. **No init() function** required - everything goes through the root builder
-5. **Test with `buildRootCmd()`** instead of recreating flag setup
+3. **Bind flags to viper in PreRunE** if the flag needs to be configurable via config file or environment variables
+4. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
+5. **No init() function** required - everything goes through the root builder
+6. **Test with `buildRootCmd()`** instead of recreating flag setup
 
 This architecture ensures Tiger CLI remains maintainable and testable as it grows.
 
@@ -817,7 +848,7 @@ if !confirmFlag {
 For asynchronous operations, provide consistent wait behavior:
 
 1. **Default Wait** - Wait for completion by default
-2. **No-Wait Override** - `--no-wait` to return immediately  
+2. **No-Wait Override** - `--no-wait` to return immediately
 3. **Timeout Control** - `--wait-timeout` with duration parsing
 4. **Exit Code 2** - Use exit code 2 for timeout scenarios
 
@@ -843,7 +874,7 @@ if !noWait {
 ### Help Text and Documentation
 
 1. **Explain Default Behavior** - Always document what happens by default
-2. **Show Override Options** - Explain how to change default behavior  
+2. **Show Override Options** - Explain how to change default behavior
 3. **Include Examples** - Show common usage patterns
 4. **AI Agent Notes** - Add warnings for destructive operations
 
@@ -851,7 +882,7 @@ if !noWait {
 ```go
 Long: `Create a new database service in the current project.
 
-By default, the newly created service will be set as your default service for future 
+By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.
@@ -859,7 +890,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 Examples:
   # Create service (sets as default by default)
   tiger service create --name my-db
-  
+
   # Create service without setting as default
   tiger service create --name temp-db --no-set-default`,
 ```

@@ -1,6 +1,13 @@
 package cmd
 
-import "github.com/timescale/tiger-cli/internal/tiger/config"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+)
 
 // outputFlag implements the [github.com/spf13/pflag.Value] interface.
 type outputFlag string
@@ -38,4 +45,20 @@ func (o *outputWithEnvFlag) String() string {
 
 func (o *outputWithEnvFlag) Type() string {
 	return "string"
+}
+
+type runE func(cmd *cobra.Command, args []string) error
+
+var flagNameReplacer = strings.NewReplacer("-", "_")
+
+func bindFlags(flags ...string) runE {
+	return func(cmd *cobra.Command, args []string) error {
+		for _, flag := range flags {
+			key := flagNameReplacer.Replace(flag)
+			if err := viper.BindPFlag(key, cmd.Flags().Lookup(flag)); err != nil {
+				return fmt.Errorf("failed to bind %s flag: %w", flag, err)
+			}
+		}
+		return nil
+	}
 }
