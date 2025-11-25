@@ -486,6 +486,12 @@ Examples:
   tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlag("new_password", cmd.Flags().Lookup("new-password")); err != nil {
+				return fmt.Errorf("failed to bind new-password flag: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get config
 			cfg, err := config.Load()
@@ -555,9 +561,6 @@ Examples:
 
 	// Add flags
 	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
-
-	// Bind flags to viper
-	viper.BindPFlag("new_password", cmd.Flags().Lookup("new-password"))
 
 	return cmd
 }
