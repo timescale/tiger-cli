@@ -111,13 +111,6 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
 
-	// Note: api_url is intentionally not exposed as a CLI flag.
-	// It can be configured via:
-	// - Environment variable: TIGER_API_URL
-	// - Config file: ~/.config/tiger/config.yaml
-	// - Config command: tiger config set api_url <url>
-	// This is primarily used for internal debugging and development.
-
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())
 	cmd.AddCommand(buildConfigCmd())
