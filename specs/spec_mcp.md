@@ -176,8 +176,7 @@ Create a new database service.
 - `region` (string, optional): Region code
 - `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "shared/shared", "0.5 CPU/2GB", "2 CPU/8GB")
 - `replicas` (number, optional): Number of high-availability replicas - default: 0
-- `wait` (boolean, optional): Wait for service to be ready - default: false
-- `timeout` (number, optional): Timeout for waiting in minutes - default: 30
+- `wait` (boolean, optional): Wait for service to be ready (waits up to 10 minutes) - default: false
 - `set_default` (boolean, optional): Set the newly created service as the default service for future commands - default: true
 - `with_password` (boolean, optional): Include password in response and connection string - default: false
 
@@ -197,8 +196,7 @@ Fork an existing database service to create a new independent copy.
 - `target_time` (string, optional): Target timestamp for point-in-time recovery in RFC3339 format (e.g., "2025-01-15T10:30:00Z"). Required when `fork_strategy` is `"PITR"`, forbidden otherwise.
 - `name` (string, optional): Name for the forked service - auto-generated if not provided
 - `cpu_memory` (string, optional): CPU and memory allocation combination (e.g., "0.5 CPU/2GB", "2 CPU/8GB"). If not specified, inherits from source service.
-- `wait` (boolean, optional): Wait for forked service to be ready - default: false
-- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 30
+- `wait` (boolean, optional): Wait for forked service to be ready (waits up to 10 minutes) - default: false
 - `set_default` (boolean, optional): Set the forked service as the default service for future commands - default: true
 - `with_password` (boolean, optional): Include password in response and connection string - default: false
 
@@ -222,24 +220,18 @@ Start a stopped database service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to start
-- `wait` (boolean, optional): Wait for service to be fully started before returning - default: false
-- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 10
+- `wait` (boolean, optional): Wait for service to be fully started before returning (waits up to 10 minutes). Default is false (recommended) - only set to true if your next steps require connecting to or querying this database.
 
 **Returns:** Operation status with current service status and message.
-
-**Default behavior:** Returns immediately while service starts in background (recommended). Setting `wait=true` will block until the database is ready - only use if your next steps require connecting to or querying this database.
 
 #### `service_stop`
 Stop a running database service.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to stop
-- `wait` (boolean, optional): Wait for service to be fully stopped before returning - default: false
-- `timeout_minutes` (number, optional): Timeout for waiting in minutes - default: 10
+- `wait` (boolean, optional): Wait for service to be fully stopped before returning (waits up to 10 minutes). Default is false (recommended) - only set to true if your next steps require confirmation that the service is stopped.
 
 **Returns:** Operation status with current service status and message.
-
-**Default behavior:** Returns immediately while service stops in background (recommended). Setting `wait=true` will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
 
 #### `service_restart`
 Restart a service.
