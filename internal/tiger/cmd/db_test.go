@@ -686,6 +686,88 @@ func TestIsConnectionRejected(t *testing.T) {
 	}
 }
 
+func TestIsAuthenticationError(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 28P01 (invalid_password)",
+			err: &pgconn.PgError{
+				Code:    "28P01",
+				Message: "password authentication failed for user \"test\"",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 28000 (invalid_authorization_specification)",
+			err: &pgconn.PgError{
+				Code:    "28000",
+				Message: "role \"nonexistent\" does not exist",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 57P03 (cannot_connect_now) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "57P03",
+				Message: "the database system is starting up",
+			},
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 3D000 (database does not exist) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "3D000",
+				Message: "database \"nonexistent\" does not exist",
+			},
+			expected: false,
+		},
+		{
+			name:     "String error containing 'password authentication failed'",
+			err:      fmt.Errorf("connection error: password authentication failed for user \"admin\""),
+			expected: true,
+		},
+		{
+			name:     "String error containing 'FATAL:  password authentication failed'",
+			err:      fmt.Errorf("FATAL:  password authentication failed for user \"test\""),
+			expected: true,
+		},
+		{
+			name:     "Non-auth string error (connection refused)",
+			err:      fmt.Errorf("dial tcp: connection refused"),
+			expected: false,
+		},
+		{
+			name:     "Non-auth string error (timeout)",
+			err:      fmt.Errorf("connection timeout"),
+			expected: false,
+		},
+		{
+			name:     "Non-auth string error (network unreachable)",
+			err:      fmt.Errorf("dial tcp: network is unreachable"),
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isAuthenticationError(tc.err)
+
+			if result != tc.expected {
+				t.Errorf("Expected isAuthenticationError to return %v for error %v, got %v",
+					tc.expected, tc.err, result)
+			}
+		})
+	}
+}
+
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	testCases := []struct {
 		name           string

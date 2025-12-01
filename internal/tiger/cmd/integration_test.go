@@ -374,6 +374,38 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("✅ psql command with updated password succeeded")
 	})
 
+	t.Run("DatabaseConnect_ResetPassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Testing db connect --reset-password for service: %s", serviceID)
+
+		// Use --reset-password flag to reset password and connect in headless mode
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "connect", serviceID,
+			"--reset-password",
+			"--", "-c", "SELECT 1 as reset_password_flag_test;",
+		)
+
+		if err != nil {
+			t.Fatalf("db connect --reset-password failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify we got expected output from SELECT 1
+		if !strings.Contains(output, "1") && !strings.Contains(output, "reset_password_flag_test") {
+			t.Errorf("psql command succeeded but output format unexpected: %s", output)
+		}
+
+		// Verify the output contains password reset success message
+		if !strings.Contains(output, "Password reset successfully") {
+			t.Errorf("Expected password reset success message in output: %s", output)
+		}
+
+		t.Logf("✅ db connect --reset-password succeeded")
+	})
+
 	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)
 	var createdRoles []string
 
