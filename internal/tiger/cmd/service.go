@@ -549,8 +549,8 @@ Examples:
 type OutputService struct {
 	api.Service
 	common.ConnectionDetails
-	ConnectionString string `json:"connection_string,omitempty" yaml:"connection_string,omitempty"`
-	ConsoleURL       string `json:"console_url,omitempty" yaml:"console_url,omitempty"`
+	ConnectionString string `json:"connection_string,omitempty"`
+	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
 // outputService formats and outputs a single service based on the specified format
@@ -566,7 +566,7 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 	case "json":
 		return util.SerializeToJSON(outputWriter, outputSvc)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, outputSvc, true)
+		return util.SerializeToYAML(outputWriter, outputSvc)
 	case "env":
 		return outputServiceEnv(outputSvc, outputWriter)
 	default: // table format (default)
@@ -583,7 +583,7 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string) e
 	case "json":
 		return util.SerializeToJSON(outputWriter, outputServices)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, outputServices, true)
+		return util.SerializeToYAML(outputWriter, outputServices)
 	case "env":
 		return fmt.Errorf("environment variable output is not supported for multiple services")
 	default: // table format (default)
