@@ -213,7 +213,7 @@ Examples:
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
 func buildMCPListCmd() *cobra.Command {
-	outputFormat := "table"
+	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -268,10 +268,8 @@ Examples:
 				return util.SerializeToJSON(output, capabilities)
 			case "yaml":
 				return util.SerializeToYAML(output, capabilities)
-			case "table":
-				return outputCapabilitiesTable(output, capabilities)
 			default:
-				return fmt.Errorf("unsupported output format: %s (supported: table, json, yaml)", outputFormat)
+				return outputCapabilitiesTable(output, capabilities)
 			}
 		},
 	}
