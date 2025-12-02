@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -50,7 +51,7 @@ type ConfigOutput struct {
 	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty"`
 	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty"`
 	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty"`
-	VersionCheckInterval *time.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty"`
+	VersionCheckInterval *util.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty"` // [util.Duration] ensures value is marshaled in [time.Duration.String] format when output
 	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty"`
 }
 
@@ -83,7 +84,7 @@ var defaultValues = map[string]any{
 	"password_storage":        DefaultPasswordStorage,
 	"releases_url":            DefaultReleasesURL,
 	"service_id":              "",
-	"version_check_interval":  DefaultVersionCheckInterval,
+	"version_check_interval":  DefaultVersionCheckInterval.String(), // String can be interpreted as either [time.Duration] (for [Config]) or [util.Duration] (for [ConfigOutput])
 	"version_check_last_time": time.Time{},
 }
 
@@ -149,7 +150,10 @@ func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
 		ConfigDir: &configDir,
 	}
 
-	if err := v.Unmarshal(cfg); err != nil {
+	if err := v.Unmarshal(cfg,
+		// Decode hook allows us to unmarshal a string into a [util.Duration] for the sake of VersionCheckInterval
+		viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc()),
+	); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
 
