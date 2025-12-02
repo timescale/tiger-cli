@@ -68,7 +68,7 @@ func buildConfigShowCmd() *cobra.Command {
 			case "json":
 				return util.SerializeToJSON(output, cfgOut)
 			case "yaml":
-				return util.SerializeToYAML(output, cfgOut)
+				return util.SerializeToYAML(output, cfgOut, false)
 			default:
 				return outputTable(output, cfgOut)
 			}

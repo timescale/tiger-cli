@@ -27,20 +27,18 @@ func SerializeToJSON(w io.Writer, v any) error {
 	return encoder.Encode(v)
 }
 
-// SerializeToYAML serializes a value to YAML format.
-//
-// This function marshals to JSON first, then encodes to YAML. This ensures that
-// structs from third-party libraries and generated code that only have `json:` tags
-// (and no `yaml:` tags) are correctly serialized. It also ensures consistent behavior
-// between JSON and YAML output by respecting `omitempty` tags.
-func SerializeToYAML(w io.Writer, v any) error {
+func SerializeToYAML(w io.Writer, v any, omitNull bool) error {
 	encoder := yaml.NewEncoder(w)
 	defer encoder.Close()
 	encoder.SetIndent(2)
 
-	toOutput, err := toJSON(v)
-	if err != nil {
-		return err
+	if omitNull {
+		if toOutput, err := toJSON(v); err != nil {
+			return err
+		} else {
+			return encoder.Encode(toOutput)
+		}
 	}
-	return encoder.Encode(toOutput)
+
+	return encoder.Encode(v)
 }

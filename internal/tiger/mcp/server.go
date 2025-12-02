@@ -177,10 +177,10 @@ func (s *Server) Close() error {
 
 // Capabilities holds all MCP server capabilities
 type Capabilities struct {
-	Tools             []*mcp.Tool             `json:"tools"`
-	Prompts           []*mcp.Prompt           `json:"prompts"`
-	Resources         []*mcp.Resource         `json:"resources"`
-	ResourceTemplates []*mcp.ResourceTemplate `json:"resource_templates"`
+	Tools             []*mcp.Tool             `json:"tools" yaml:"tools"`
+	Prompts           []*mcp.Prompt           `json:"prompts" yaml:"prompts"`
+	Resources         []*mcp.Resource         `json:"resources" yaml:"resources"`
+	ResourceTemplates []*mcp.ResourceTemplate `json:"resource_templates" yaml:"resource_templates"`
 }
 
 // ListCapabilities creates a temporary in-memory client connection to list all capabilities

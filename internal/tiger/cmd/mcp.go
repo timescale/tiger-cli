@@ -267,7 +267,7 @@ Examples:
 			case "json":
 				return util.SerializeToJSON(output, capabilities)
 			case "yaml":
-				return util.SerializeToYAML(output, capabilities)
+				return util.SerializeToYAML(output, capabilities, false)
 			default:
 				return outputCapabilitiesTable(output, capabilities)
 			}
