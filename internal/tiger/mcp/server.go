@@ -50,7 +50,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	return server, nil
 }
 
-// Run starts the MCP server with the stdio transport
+// StartStdio starts the MCP server with the stdio transport
 func (s *Server) StartStdio(ctx context.Context) error {
 	return s.mcpServer.Run(ctx, &mcp.StdioTransport{})
 }
@@ -173,4 +173,137 @@ func (s *Server) Close() error {
 	}
 
 	return nil
+}
+
+// Capabilities holds all MCP server capabilities
+type Capabilities struct {
+	Tools             []*MCPToolInfo             `json:"tools" yaml:"tools"`
+	Prompts           []*MCPPromptInfo           `json:"prompts" yaml:"prompts"`
+	Resources         []*MCPResourceInfo         `json:"resources" yaml:"resources"`
+	ResourceTemplates []*MCPResourceTemplateInfo `json:"resource_templates" yaml:"resource_templates"`
+}
+
+// MCPToolInfo holds simplified tool information
+type MCPToolInfo struct {
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// MCPPromptInfo holds simplified prompt information
+type MCPPromptInfo struct {
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// MCPResourceInfo holds simplified MCP resource information (not service resources)
+type MCPResourceInfo struct {
+	URI         string `json:"uri" yaml:"uri"`
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// MCPResourceTemplateInfo holds simplified resource template information
+type MCPResourceTemplateInfo struct {
+	URITemplate string `json:"uri_template" yaml:"uri_template"`
+	Name        string `json:"name" yaml:"name"`
+	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
+// ListCapabilities creates a temporary in-memory client connection to list all capabilities
+func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
+	// Create in-memory transports
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+
+	// Create MCP client
+	client := mcp.NewClient(&mcp.Implementation{
+		Name:    ServerName,
+		Version: config.Version,
+	}, nil)
+
+	serverSession, err := s.mcpServer.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect server: %w", err)
+	}
+	defer serverSession.Close()
+
+	// Connect client
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect client: %w", err)
+	}
+	defer clientSession.Close()
+
+	// Collect all capabilities
+	capabilities := &Capabilities{
+		Tools:             []*MCPToolInfo{},
+		Prompts:           []*MCPPromptInfo{},
+		Resources:         []*MCPResourceInfo{},
+		ResourceTemplates: []*MCPResourceTemplateInfo{},
+	}
+
+	// List tools
+	for tool, err := range clientSession.Tools(ctx, nil) {
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tools: %w", err)
+		}
+		capabilities.Tools = append(capabilities.Tools, &MCPToolInfo{
+			Name:        tool.Name,
+			Title:       tool.Title,
+			Description: tool.Description,
+		})
+	}
+
+	// List prompts
+	for prompt, err := range clientSession.Prompts(ctx, nil) {
+		if err != nil {
+			return nil, fmt.Errorf("failed to list prompts: %w", err)
+		}
+		capabilities.Prompts = append(capabilities.Prompts, &MCPPromptInfo{
+			Name:        prompt.Name,
+			Title:       prompt.Title,
+			Description: prompt.Description,
+		})
+	}
+
+	// List resources
+	for resource, err := range clientSession.Resources(ctx, nil) {
+		if err != nil {
+			return nil, fmt.Errorf("failed to list resources: %w", err)
+		}
+		capabilities.Resources = append(capabilities.Resources, &MCPResourceInfo{
+			URI:         resource.URI,
+			Name:        resource.Name,
+			Title:       resource.Title,
+			Description: resource.Description,
+		})
+	}
+
+	// List resource templates
+	for template, err := range clientSession.ResourceTemplates(ctx, nil) {
+		if err != nil {
+			return nil, fmt.Errorf("failed to list resource templates: %w", err)
+		}
+		capabilities.ResourceTemplates = append(capabilities.ResourceTemplates, &MCPResourceTemplateInfo{
+			URITemplate: template.URITemplate,
+			Name:        template.Name,
+			Title:       template.Title,
+			Description: template.Description,
+		})
+	}
+
+	// Close the client session properly
+	if err := clientSession.Close(); err != nil {
+		logging.Error("Error closing client session", zap.Error(err))
+	}
+
+	// Close the server session properly
+	if err := serverSession.Close(); err != nil {
+		logging.Error("Error closing server session", zap.Error(err))
+	}
+
+	return capabilities, nil
 }
