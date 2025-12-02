@@ -382,11 +382,6 @@ func outputCapabilitiesTable(output io.Writer, capabilities *mcp.Capabilities) e
 	table := tablewriter.NewWriter(output)
 	table.Header("TYPE", "NAME")
 
-	// Add tools
-	for _, tool := range capabilities.Tools {
-		table.Append("tool", tool.Name)
-	}
-
 	// Add prompts
 	for _, prompt := range capabilities.Prompts {
 		table.Append("prompt", prompt.Name)
@@ -400,6 +395,11 @@ func outputCapabilitiesTable(output io.Writer, capabilities *mcp.Capabilities) e
 	// Add resource templates
 	for _, template := range capabilities.ResourceTemplates {
 		table.Append("resource_template", template.Name)
+	}
+
+	// Add tools
+	for _, tool := range capabilities.Tools {
+		table.Append("tool", tool.Name)
 	}
 
 	return table.Render()
