@@ -516,36 +516,27 @@ Examples:
 				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
-			// Prepare password update request
-			updateReq := api.UpdatePasswordInput{
-				Password: password,
-			}
-
-			// Make API call to update password
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
+			// Fetch service details first (needed for password storage)
+			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				return fmt.Errorf("failed to update service password: %w", err)
+				return fmt.Errorf("failed to get service details: %w", err)
 			}
+			if serviceResp.StatusCode() != 200 {
+				return common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+			}
+			service := *serviceResp.JSON200
 
 			statusOutput := cmd.ErrOrStderr()
 
-			// Handle API response
-			if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			// Update and save password using shared helper
+			if err := updateAndSaveServicePassword(ctx, client, projectID, service, password, "tsdbadmin", statusOutput); err != nil {
+				return err
 			}
 
 			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
-
-			// Handle password storage using the configured method
-			// Get the service details for password storage
-			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-				handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
-			}
-
 			return nil
 		},
 	}

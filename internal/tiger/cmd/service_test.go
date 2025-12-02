@@ -1102,8 +1102,11 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 		t.Errorf("Environment variable was not picked up, got password required error: %v", err)
 	}
 
-	// Should be network/API error showing the password was found
-	if !strings.Contains(err.Error(), "API request failed") && !strings.Contains(err.Error(), "failed to update service password") {
+	// Should be network/API error showing the password was found and we proceeded to API calls
+	errStr := err.Error()
+	if !strings.Contains(errStr, "API request failed") &&
+		!strings.Contains(errStr, "failed to update service password") &&
+		!strings.Contains(errStr, "failed to get service details") {
 		t.Errorf("Expected network/API error indicating password was found, got: %v", err)
 	}
 }

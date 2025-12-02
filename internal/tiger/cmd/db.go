@@ -206,8 +206,7 @@ Examples:
 				resetPassword: dbConnectResetPassword,
 			}
 
-			// Use password recovery flow that tests connection and offers alternatives on failure
-			return connectWithPasswordRecovery(cmd.Context(), cmd, service, details, psqlPath, psqlFlags, dbConnectRole, opts)
+			return connectWithPasswordMenu(cmd.Context(), cmd, service, details, psqlPath, psqlFlags, dbConnectRole, opts)
 		},
 	}
 
@@ -852,8 +851,9 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 	return serviceArgs, psqlFlags
 }
 
-// launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
+// launchPsql launches psql using the connection string and additional flags.
+// It retrieves the password from storage and sets PGPASSWORD environment variable.
+func launchPsql(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
 	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, cmd)
 	return psqlCmd.Run()
 }
@@ -975,10 +975,7 @@ func isAuthenticationError(err error) bool {
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == "28P01" || pgErr.Code == "28000"
 	}
-	// Fallback to string matching for cases where error isn't wrapped properly
-	errStr := err.Error()
-	return strings.Contains(errStr, "password authentication failed") ||
-		strings.Contains(errStr, "FATAL:  password authentication failed")
+	return false
 }
 
 // testConnectionWithPassword tests database connectivity with a specific password
@@ -1100,8 +1097,43 @@ func selectPasswordRecoveryOption(out io.Writer) (passwordRecoveryOption, error)
 	return result.selected, nil
 }
 
+// updateAndSaveServicePassword updates a service password via API and saves it locally.
+// It handles the API call and password storage.
+func updateAndSaveServicePassword(
+	ctx context.Context,
+	client api.ClientWithResponsesInterface,
+	projectID string,
+	service api.Service,
+	newPassword string,
+	role string,
+	statusOut io.Writer,
+) error {
+	serviceID := *service.ServiceId
+
+	// Call API to update password
+	updateReq := api.UpdatePasswordInput{Password: newPassword}
+	resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+		return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	// Save password locally
+	result, err := common.SavePasswordWithResult(service, newPassword, role)
+	if err != nil {
+		fmt.Fprintf(statusOut, "Warning: could not save password: %v\n", err)
+	} else if result.Success {
+		fmt.Fprintf(statusOut, "%s\n", result.Message)
+	}
+
+	return nil
+}
+
 // resetServicePassword generates a new password and updates it via API
-func resetServicePassword(ctx context.Context, cfg *config.Config, serviceID string, service api.Service, role string, statusOut io.Writer) (string, error) {
+func resetServicePassword(ctx context.Context, cfg *config.Config, service api.Service, role string, statusOut io.Writer) (string, error) {
 	// Generate new password
 	newPassword, err := generateSecurePassword(32)
 	if err != nil {
@@ -1114,32 +1146,18 @@ func resetServicePassword(ctx context.Context, cfg *config.Config, serviceID str
 		return "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
 	}
 
-	// Create API client and call update-password
+	// Create API client
 	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	updateReq := api.UpdatePasswordInput{Password: newPassword}
-	resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to reset password: %w", err)
-	}
-
-	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
-		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	// Update and save password
+	if err := updateAndSaveServicePassword(ctx, client, projectID, service, newPassword, role, statusOut); err != nil {
+		return "", err
 	}
 
 	fmt.Fprintf(statusOut, "Password reset successfully for '%s' user\n", role)
-
-	// Save password using configured storage method
-	result, err := common.SavePasswordWithResult(service, newPassword, role)
-	if err != nil {
-		fmt.Fprintf(statusOut, "Warning: could not save password: %v\n", err)
-	} else if result.Success {
-		fmt.Fprintf(statusOut, "%s\n", result.Message)
-	}
-
 	return newPassword, nil
 }
 
@@ -1149,8 +1167,64 @@ type connectOptions struct {
 	resetPassword bool   // Reset password before connecting (headless mode)
 }
 
-// connectWithPasswordRecovery handles the connection flow with password recovery options
-func connectWithPasswordRecovery(
+// testSaveAndLaunchPsqlWithPassword tests a password, saves it if valid, and launches psql.
+// Returns a retryable error if authentication fails, or a fatal error otherwise.
+func testSaveAndLaunchPsqlWithPassword(
+	ctx context.Context,
+	cmd *cobra.Command,
+	details *common.ConnectionDetails,
+	psqlPath string,
+	psqlFlags []string,
+	service api.Service,
+	password string,
+	role string,
+) error {
+	// Test the password
+	err := testConnectionWithPassword(ctx, details, password, 10*time.Second)
+	if err != nil {
+		return err
+	}
+
+	// Password works! Save it
+	result, saveErr := common.SavePasswordWithResult(service, password, role)
+	if saveErr != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not save password: %v\n", saveErr)
+	} else if result.Success {
+		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", result.Message)
+	}
+
+	// Launch psql (password is now in storage, launchPsql will retrieve it)
+	return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
+}
+
+// resetPasswordAndLaunchPsql resets the password via API and launches psql with the new password.
+func resetPasswordAndLaunchPsql(
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	details *common.ConnectionDetails,
+	psqlPath string,
+	psqlFlags []string,
+	service api.Service,
+	role string,
+	printPassword bool,
+) error {
+	newPassword, err := resetServicePassword(ctx, cfg, service, role, cmd.ErrOrStderr())
+	if err != nil {
+		return err
+	}
+
+	if printPassword {
+		fmt.Fprintf(cmd.ErrOrStderr(), "New password: %s\n", newPassword)
+	}
+
+	// Launch psql (password is now in storage, launchPsql will retrieve it)
+	return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
+}
+
+// connectWithPasswordMenu handles the connection flow if the stored password is invalid
+// Offers an interactive menu to enter the password manually or reset it
+func connectWithPasswordMenu(
 	ctx context.Context,
 	cmd *cobra.Command,
 	service api.Service,
@@ -1160,46 +1234,30 @@ func connectWithPasswordRecovery(
 	role string,
 	opts connectOptions,
 ) error {
-	serviceID := util.Deref(service.ServiceId)
+	// Load config (needed for password reset)
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
 
 	// Handle --reset-password flag (headless mode)
 	if opts.resetPassword {
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		newPassword, err := resetServicePassword(ctx, cfg, serviceID, service, role, cmd.ErrOrStderr())
-		if err != nil {
+		if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role, true); err != nil {
 			return fmt.Errorf("failed to reset password: %w", err)
 		}
-
-		// Print the new password so the user can see/capture it
-		fmt.Fprintf(cmd.ErrOrStderr(), "New password: %s\n", newPassword)
-
-		return launchPsqlWithPassword(details.String(), psqlPath, psqlFlags, newPassword, cmd)
+		return nil
 	}
 
 	// Handle --password flag (headless mode)
 	if opts.password != "" {
-		// Test the provided password first
-		err := testConnectionWithPassword(ctx, details, opts.password, 10*time.Second)
+		err := testSaveAndLaunchPsqlWithPassword(ctx, cmd, details, psqlPath, psqlFlags, service, opts.password, role)
 		if err != nil {
 			if isAuthenticationError(err) {
 				return fmt.Errorf("authentication failed: invalid password")
 			}
 			return fmt.Errorf("connection failed: %w", err)
 		}
-
-		// Password works! Save it and connect
-		result, saveErr := common.SavePasswordWithResult(service, opts.password, role)
-		if saveErr != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not save password: %v\n", saveErr)
-		} else if result.Success {
-			fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", result.Message)
-		}
-
-		return launchPsqlWithPassword(details.String(), psqlPath, psqlFlags, opts.password, cmd)
+		return nil
 	}
 
 	// Interactive mode: Get stored password (if any)
@@ -1211,7 +1269,7 @@ func connectWithPasswordRecovery(
 		err := testConnectionWithPassword(ctx, details, storedPassword, 10*time.Second)
 		if err == nil {
 			// Password works, launch psql
-			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, role, cmd)
+			return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
 		}
 
 		// Check if it's an auth error
@@ -1241,12 +1299,6 @@ func connectWithPasswordRecovery(
 			"Use --password or --reset-password flag for headless operation")
 	}
 
-	// Load config for potential password reset
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
 	// Interactive recovery loop
 	for {
 		option, err := selectPasswordRecoveryOption(cmd.ErrOrStderr())
@@ -1265,8 +1317,8 @@ func connectWithPasswordRecovery(
 				continue
 			}
 
-			// Test the entered password
-			err = testConnectionWithPassword(ctx, details, password, 10*time.Second)
+			// Test, save, and launch
+			err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, details, psqlPath, psqlFlags, service, password, role)
 			if err != nil {
 				if isAuthenticationError(err) {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Password incorrect. Please try again.\n\n")
@@ -1274,47 +1326,18 @@ func connectWithPasswordRecovery(
 				}
 				return fmt.Errorf("connection failed: %w", err)
 			}
-
-			// Password works! Save it and connect
-			result, saveErr := common.SavePasswordWithResult(service, password, role)
-			if saveErr != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not save password: %v\n", saveErr)
-			} else if result.Success {
-				fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", result.Message)
-			}
-
-			// Launch psql with the working password
-			return launchPsqlWithPassword(details.String(), psqlPath, psqlFlags, password, cmd)
+			return nil
 
 		case optionResetPassword:
-			// Reset password via API
-			newPassword, err := resetServicePassword(ctx, cfg, serviceID, service, role, cmd.ErrOrStderr())
-			if err != nil {
+			// Reset and launch (don't print password in interactive mode - it's saved)
+			if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role, false); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error resetting password: %v\n\n", err)
 				continue
 			}
-
-			// Launch psql with new password
-			return launchPsqlWithPassword(details.String(), psqlPath, psqlFlags, newPassword, cmd)
+			return nil
 
 		case optionExit:
 			return nil
 		}
 	}
-}
-
-// launchPsqlWithPassword launches psql with an explicit password via PGPASSWORD env var
-func launchPsqlWithPassword(connectionString, psqlPath string, additionalFlags []string, password string, cmd *cobra.Command) error {
-	args := []string{connectionString}
-	args = append(args, additionalFlags...)
-
-	psqlCmd := exec.Command(psqlPath, args...)
-	psqlCmd.Stdin = cmd.InOrStdin()
-	psqlCmd.Stdout = cmd.OutOrStdout()
-	psqlCmd.Stderr = cmd.ErrOrStderr()
-
-	// Set PGPASSWORD environment variable
-	psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
-
-	return psqlCmd.Run()
 }
