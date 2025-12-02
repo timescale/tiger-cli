@@ -276,7 +276,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -306,7 +306,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -727,31 +727,6 @@ func TestIsAuthenticationError(t *testing.T) {
 				Code:    "3D000",
 				Message: "database \"nonexistent\" does not exist",
 			},
-			expected: false,
-		},
-		{
-			name:     "String error containing 'password authentication failed'",
-			err:      fmt.Errorf("connection error: password authentication failed for user \"admin\""),
-			expected: true,
-		},
-		{
-			name:     "String error containing 'FATAL:  password authentication failed'",
-			err:      fmt.Errorf("FATAL:  password authentication failed for user \"test\""),
-			expected: true,
-		},
-		{
-			name:     "Non-auth string error (connection refused)",
-			err:      fmt.Errorf("dial tcp: connection refused"),
-			expected: false,
-		},
-		{
-			name:     "Non-auth string error (timeout)",
-			err:      fmt.Errorf("connection timeout"),
-			expected: false,
-		},
-		{
-			name:     "Non-auth string error (network unreachable)",
-			err:      fmt.Errorf("dial tcp: network is unreachable"),
 			expected: false,
 		},
 	}

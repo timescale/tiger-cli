@@ -1207,16 +1207,13 @@ func resetPasswordAndLaunchPsql(
 	psqlFlags []string,
 	service api.Service,
 	role string,
-	printPassword bool,
 ) error {
-	newPassword, err := resetServicePassword(ctx, cfg, service, role, cmd.ErrOrStderr())
+	_, err := resetServicePassword(ctx, cfg, service, role, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
 
-	if printPassword {
-		fmt.Fprintf(cmd.ErrOrStderr(), "New password: %s\n", newPassword)
-	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "To view your new password, run: tiger db connection-string --with-password\n")
 
 	// Launch psql (password is now in storage, launchPsql will retrieve it)
 	return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
@@ -1242,7 +1239,7 @@ func connectWithPasswordMenu(
 
 	// Handle --reset-password flag (headless mode)
 	if opts.resetPassword {
-		if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role, true); err != nil {
+		if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role); err != nil {
 			return fmt.Errorf("failed to reset password: %w", err)
 		}
 		return nil
@@ -1265,33 +1262,19 @@ func connectWithPasswordMenu(
 	storedPassword, _ := storage.Get(service, role)
 
 	// Try to connect with stored password first
-	if storedPassword != "" {
-		err := testConnectionWithPassword(ctx, details, storedPassword, 10*time.Second)
-		if err == nil {
-			// Password works, launch psql
-			return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
-		}
-
-		// Check if it's an auth error
-		if !isAuthenticationError(err) {
-			// Non-auth error (network, timeout, etc.) - report it directly
-			return fmt.Errorf("connection failed: %w", err)
-		}
-		// Auth failed with stored password, continue to recovery menu
-		fmt.Fprintf(cmd.ErrOrStderr(), "Stored password is invalid or expired.\n\n")
-	} else {
-		// No stored password - try to connect anyway (psql will prompt or use .pgpass)
-		// But first test if we can connect at all
-		err := testConnectionWithPassword(ctx, details, "", 10*time.Second)
-		if err != nil && !isAuthenticationError(err) {
-			// Non-auth error - report it directly
-			return fmt.Errorf("connection failed: %w", err)
-		}
-		// Either auth error or no password at all - show recovery menu
-		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "No password stored for this service.\n\n")
-		}
+	err = testConnectionWithPassword(ctx, details, storedPassword, 10*time.Second)
+	if err == nil {
+		// Password works, launch psql
+		return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
 	}
+
+	// Check if it's an auth error
+	if !isAuthenticationError(err) {
+		// Non-auth error (network, timeout, etc.) - report it directly
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	// Auth failed with stored password, continue to recovery menu
+	fmt.Fprintf(cmd.ErrOrStderr(), "Stored password is invalid or expired.\n\n")
 
 	// Check if we're in a TTY for interactive menu
 	if !checkStdinIsTTY() {
@@ -1329,8 +1312,8 @@ func connectWithPasswordMenu(
 			return nil
 
 		case optionResetPassword:
-			// Reset and launch (don't print password in interactive mode - it's saved)
-			if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role, false); err != nil {
+			// Reset and launch
+			if err := resetPasswordAndLaunchPsql(ctx, cmd, cfg, details, psqlPath, psqlFlags, service, role); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error resetting password: %v\n\n", err)
 				continue
 			}

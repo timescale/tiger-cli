@@ -519,7 +519,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			// Fetch service details first (needed for password storage)
+			// Fetch service details
 			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
@@ -531,7 +531,7 @@ Examples:
 
 			statusOutput := cmd.ErrOrStderr()
 
-			// Update and save password using shared helper
+			// Update and save password
 			if err := updateAndSaveServicePassword(ctx, client, projectID, service, password, "tsdbadmin", statusOutput); err != nil {
 				return err
 			}
