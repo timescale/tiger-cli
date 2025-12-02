@@ -24,6 +24,9 @@ const (
 	serviceTypeVector      = "VECTOR"
 )
 
+// Wait timeout for MCP tool operations
+const waitTimeout = 10 * time.Minute
+
 // validServiceTypes returns a slice of all valid service type values
 func validServiceTypes() []string {
 	return []string{
@@ -134,15 +137,14 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 
 // ServiceCreateInput represents input for service_create
 type ServiceCreateInput struct {
-	Name           string   `json:"name,omitempty"`
-	Addons         []string `json:"addons,omitempty"`
-	Region         *string  `json:"region,omitempty"`
-	CPUMemory      string   `json:"cpu_memory,omitempty"`
-	Replicas       int      `json:"replicas,omitempty"`
-	Wait           bool     `json:"wait,omitempty"`
-	TimeoutMinutes int      `json:"timeout_minutes,omitempty"`
-	SetDefault     bool     `json:"set_default,omitempty"`
-	WithPassword   bool     `json:"with_password,omitempty"`
+	Name         string   `json:"name,omitempty"`
+	Addons       []string `json:"addons,omitempty"`
+	Region       *string  `json:"region,omitempty"`
+	CPUMemory    string   `json:"cpu_memory,omitempty"`
+	Replicas     int      `json:"replicas,omitempty"`
+	Wait         bool     `json:"wait,omitempty"`
+	SetDefault   bool     `json:"set_default,omitempty"`
+	WithPassword bool     `json:"with_password,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -167,14 +169,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false and is recommended because service creation can take a few minutes and it's usually better to return immediately. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
-
-	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to be ready. Only used when 'wait' is true."
-	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(30))
-	schema.Properties["timeout_minutes"].Examples = []any{15, 30, 60}
 
 	schema.Properties["set_default"].Description = "Whether to set the newly created service as the default service. When true, the service will be set as the default for future commands."
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
@@ -198,15 +195,14 @@ func (ServiceCreateOutput) Schema() *jsonschema.Schema {
 
 // ServiceForkInput represents input for service_fork
 type ServiceForkInput struct {
-	ServiceID      string           `json:"service_id"`
-	Name           string           `json:"name,omitempty"`
-	ForkStrategy   api.ForkStrategy `json:"fork_strategy"`
-	TargetTime     *time.Time       `json:"target_time,omitempty"`
-	CPUMemory      string           `json:"cpu_memory,omitempty"`
-	Wait           bool             `json:"wait,omitempty"`
-	TimeoutMinutes int              `json:"timeout_minutes,omitempty"`
-	SetDefault     bool             `json:"set_default,omitempty"`
-	WithPassword   bool             `json:"with_password,omitempty"`
+	ServiceID    string           `json:"service_id"`
+	Name         string           `json:"name,omitempty"`
+	ForkStrategy api.ForkStrategy `json:"fork_strategy"`
+	TargetTime   *time.Time       `json:"target_time,omitempty"`
+	CPUMemory    string           `json:"cpu_memory,omitempty"`
+	Wait         bool             `json:"wait,omitempty"`
+	SetDefault   bool             `json:"set_default,omitempty"`
+	WithPassword bool             `json:"with_password,omitempty"`
 }
 
 func (ServiceForkInput) Schema() *jsonschema.Schema {
@@ -227,14 +223,9 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
-	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false and is recommended because forking can take several minutes. ONLY set to true if the user explicitly needs to use the forked service immediately to continue the same conversation."
+	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
-
-	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for forked service to be ready. Only used when 'wait' is true."
-	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(30))
-	schema.Properties["timeout_minutes"].Examples = []any{15, 30, 60}
 
 	schema.Properties["set_default"].Description = "Whether to set the newly forked service as the default service. When true, the forked service will be set as the default for future commands."
 	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
@@ -285,9 +276,8 @@ func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
 
 // ServiceStartInput represents input for service_start
 type ServiceStartInput struct {
-	ServiceID      string `json:"service_id"`
-	Wait           bool   `json:"wait,omitempty"`
-	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+	ServiceID string `json:"service_id"`
+	Wait      bool   `json:"wait,omitempty"`
 }
 
 func (ServiceStartInput) Schema() *jsonschema.Schema {
@@ -295,14 +285,9 @@ func (ServiceStartInput) Schema() *jsonschema.Schema {
 
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully started before returning. Default is false and is recommended because starting can take several minutes. ONLY set to true if the user explicitly needs to use the service immediately to continue the same conversation."
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully started before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
-
-	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to start. Only used when 'wait' is true."
-	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
-	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
 
 	return schema
 }
@@ -319,9 +304,8 @@ func (ServiceStartOutput) Schema() *jsonschema.Schema {
 
 // ServiceStopInput represents input for service_stop
 type ServiceStopInput struct {
-	ServiceID      string `json:"service_id"`
-	Wait           bool   `json:"wait,omitempty"`
-	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+	ServiceID string `json:"service_id"`
+	Wait      bool   `json:"wait,omitempty"`
 }
 
 func (ServiceStopInput) Schema() *jsonschema.Schema {
@@ -329,14 +313,9 @@ func (ServiceStopInput) Schema() *jsonschema.Schema {
 
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["wait"].Description = "Whether to wait for the service to be fully stopped before returning. Default is false and is recommended because stopping can take several minutes. ONLY set to true if the user explicitly needs confirmation that the service is stopped to continue the same conversation."
+	schema.Properties["wait"].Description = "Whether to wait for the service to be fully stopped before returning. Default is false (recommended). Only set to true if your next steps require confirmation that the service is stopped. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
-
-	schema.Properties["timeout_minutes"].Description = "Timeout in minutes when waiting for service to stop. Only used when 'wait' is true."
-	schema.Properties["timeout_minutes"].Minimum = util.Ptr(0.0)
-	schema.Properties["timeout_minutes"].Default = util.Must(json.Marshal(10))
-	schema.Properties["timeout_minutes"].Examples = []any{5, 10, 15}
 
 	return schema
 }
@@ -391,10 +370,6 @@ The default type of service created depends on the user's plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
-Default behavior: Returns immediately while service provisions in background (recommended).
-Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
-timeout_minutes: Wait duration in minutes (only relevant with wait=true).
-
 WARNING: Creates billable resources.`,
 		InputSchema:  ServiceCreateInput{}.Schema(),
 		OutputSchema: ServiceCreateOutput{}.Schema(),
@@ -420,10 +395,6 @@ By default:
 - Name will be auto-generated as '{source-service-name}-fork'
 - CPU and memory will be inherited from the source service
 - The forked service will be set as the default service
-
-Default behavior: Returns immediately while service provisions in background (recommended).
-Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
-timeout_minutes: Wait duration in minutes (only relevant with wait=true).
 
 WARNING: Creates billable resources.`,
 		InputSchema:  ServiceForkInput{}.Schema(),
@@ -456,11 +427,7 @@ WARNING: Creates billable resources.`,
 		Title: "Start Database Service",
 		Description: `Start a stopped database service.
 
-This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections.
-
-Default behavior: Returns immediately while service starts in background (recommended).
-Setting wait=true will block until the database is ready - only use if your next steps require connecting to or querying this database.
-timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+This operation starts a service that is currently in a stopped/paused state. The service will transition to a ready state and become available for connections.`,
 		InputSchema:  ServiceStartInput{}.Schema(),
 		OutputSchema: ServiceStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -476,11 +443,7 @@ timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
 		Title: "Stop Database Service",
 		Description: `Stop a running database service.
 
-This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections.
-
-Default behavior: Returns immediately while service stops in background (recommended).
-Setting wait=true will block until the database is stopped - only use if your next steps require confirmation that the service is stopped.
-timeout_minutes: Wait duration in minutes (only relevant with wait=true).`,
+This operation stops a service that is currently running. The service will transition to a stopped/paused state and will no longer accept connections.`,
 		InputSchema:  ServiceStopInput{}.Schema(),
 		OutputSchema: ServiceStopOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -668,7 +631,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 				TargetStatus: "READY",
 				Service:      &service,
 			},
-			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			Timeout:    waitTimeout,
 			TimeoutMsg: "service may still be provisioning",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
@@ -796,7 +759,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 				TargetStatus: "READY",
 				Service:      &service,
 			},
-			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			Timeout:    waitTimeout,
 			TimeoutMsg: "service may still be provisioning",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
@@ -907,7 +870,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 				TargetStatus: "READY",
 				Service:      &service,
 			},
-			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			Timeout:    waitTimeout,
 			TimeoutMsg: "service may still be starting",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
@@ -964,7 +927,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 				TargetStatus: "PAUSED",
 				Service:      &service,
 			},
-			Timeout:    time.Duration(input.TimeoutMinutes) * time.Minute,
+			Timeout:    waitTimeout,
 			TimeoutMsg: "service may still be stopping",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
