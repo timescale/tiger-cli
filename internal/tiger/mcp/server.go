@@ -177,40 +177,10 @@ func (s *Server) Close() error {
 
 // Capabilities holds all MCP server capabilities
 type Capabilities struct {
-	Tools             []*MCPToolInfo             `json:"tools" yaml:"tools"`
-	Prompts           []*MCPPromptInfo           `json:"prompts" yaml:"prompts"`
-	Resources         []*MCPResourceInfo         `json:"resources" yaml:"resources"`
-	ResourceTemplates []*MCPResourceTemplateInfo `json:"resource_templates" yaml:"resource_templates"`
-}
-
-// MCPToolInfo holds simplified tool information
-type MCPToolInfo struct {
-	Name        string `json:"name" yaml:"name"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-}
-
-// MCPPromptInfo holds simplified prompt information
-type MCPPromptInfo struct {
-	Name        string `json:"name" yaml:"name"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-}
-
-// MCPResourceInfo holds simplified MCP resource information (not service resources)
-type MCPResourceInfo struct {
-	URI         string `json:"uri" yaml:"uri"`
-	Name        string `json:"name" yaml:"name"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-}
-
-// MCPResourceTemplateInfo holds simplified resource template information
-type MCPResourceTemplateInfo struct {
-	URITemplate string `json:"uri_template" yaml:"uri_template"`
-	Name        string `json:"name" yaml:"name"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	Tools             []*mcp.Tool             `json:"tools" yaml:"tools"`
+	Prompts           []*mcp.Prompt           `json:"prompts" yaml:"prompts"`
+	Resources         []*mcp.Resource         `json:"resources" yaml:"resources"`
+	ResourceTemplates []*mcp.ResourceTemplate `json:"resource_templates" yaml:"resource_templates"`
 }
 
 // ListCapabilities creates a temporary in-memory client connection to list all capabilities
@@ -239,10 +209,10 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 
 	// Collect all capabilities
 	capabilities := &Capabilities{
-		Tools:             []*MCPToolInfo{},
-		Prompts:           []*MCPPromptInfo{},
-		Resources:         []*MCPResourceInfo{},
-		ResourceTemplates: []*MCPResourceTemplateInfo{},
+		Tools:             []*mcp.Tool{},
+		Prompts:           []*mcp.Prompt{},
+		Resources:         []*mcp.Resource{},
+		ResourceTemplates: []*mcp.ResourceTemplate{},
 	}
 
 	// List tools
@@ -250,11 +220,7 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to list tools: %w", err)
 		}
-		capabilities.Tools = append(capabilities.Tools, &MCPToolInfo{
-			Name:        tool.Name,
-			Title:       tool.Title,
-			Description: tool.Description,
-		})
+		capabilities.Tools = append(capabilities.Tools, tool)
 	}
 
 	// List prompts
@@ -262,11 +228,7 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to list prompts: %w", err)
 		}
-		capabilities.Prompts = append(capabilities.Prompts, &MCPPromptInfo{
-			Name:        prompt.Name,
-			Title:       prompt.Title,
-			Description: prompt.Description,
-		})
+		capabilities.Prompts = append(capabilities.Prompts, prompt)
 	}
 
 	// List resources
@@ -274,12 +236,7 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to list resources: %w", err)
 		}
-		capabilities.Resources = append(capabilities.Resources, &MCPResourceInfo{
-			URI:         resource.URI,
-			Name:        resource.Name,
-			Title:       resource.Title,
-			Description: resource.Description,
-		})
+		capabilities.Resources = append(capabilities.Resources, resource)
 	}
 
 	// List resource templates
@@ -287,12 +244,7 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to list resource templates: %w", err)
 		}
-		capabilities.ResourceTemplates = append(capabilities.ResourceTemplates, &MCPResourceTemplateInfo{
-			URITemplate: template.URITemplate,
-			Name:        template.Name,
-			Title:       template.Title,
-			Description: template.Description,
-		})
+		capabilities.ResourceTemplates = append(capabilities.ResourceTemplates, template)
 	}
 
 	// Close the client session properly
