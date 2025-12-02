@@ -377,7 +377,8 @@ func getListener(host string, startPort int) (net.Listener, int, error) {
 	return nil, 0, fmt.Errorf("no available port found in range %d-%d", startPort, startPort+99)
 }
 
-// outputCapabilitiesTable outputs capabilities in table format
+// outputCapabilitiesTable outputs capabilities in table format. Results are
+// ordered alphabetically by type, then name.
 func outputCapabilitiesTable(output io.Writer, capabilities *mcp.Capabilities) error {
 	table := tablewriter.NewWriter(output)
 	table.Header("TYPE", "NAME")
