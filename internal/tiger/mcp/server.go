@@ -50,7 +50,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 	return server, nil
 }
 
-// Run starts the MCP server with the stdio transport
+// StartStdio starts the MCP server with the stdio transport
 func (s *Server) StartStdio(ctx context.Context) error {
 	return s.mcpServer.Run(ctx, &mcp.StdioTransport{})
 }
