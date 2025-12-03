@@ -14,13 +14,13 @@ import (
 )
 
 type VersionOutput struct {
-	Version         string `json:"version" yaml:"version"`
-	BuildTime       string `json:"build_time" yaml:"build_time"`
-	GitCommit       string `json:"git_commit" yaml:"git_commit"`
-	GoVersion       string `json:"go_version" yaml:"go_version"`
-	Platform        string `json:"platform" yaml:"platform"`
-	LatestVersion   string `json:"latest_version,omitempty" yaml:"latest_version,omitempty"`
-	UpdateAvailable *bool  `json:"update_available,omitempty" yaml:"update_available,omitempty"`
+	Version         string `json:"version"`
+	BuildTime       string `json:"build_time"`
+	GitCommit       string `json:"git_commit"`
+	GoVersion       string `json:"go_version"`
+	Platform        string `json:"platform"`
+	LatestVersion   string `json:"latest_version,omitempty"`
+	UpdateAvailable *bool  `json:"update_available,omitempty"`
 }
 
 func buildVersionCmd() *cobra.Command {
@@ -64,7 +64,7 @@ func buildVersionCmd() *cobra.Command {
 					return err
 				}
 			case "yaml":
-				if err := util.SerializeToYAML(output, versionOutput, true); err != nil {
+				if err := util.SerializeToYAML(output, versionOutput); err != nil {
 					return err
 				}
 			case "bare":
