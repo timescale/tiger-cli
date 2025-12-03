@@ -270,7 +270,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - `service.go` - Service management commands (list, create, get, fork, start, stop, delete, update-password)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
-  - `mcp.go` - MCP server commands (install, start)
+  - `mcp.go` - MCP server commands (install, start, list)
   - `version.go` - Version command
 - **Configuration**: `internal/tiger/config/config.go` - Centralized config with Viper integration
 - **Logging**: `internal/tiger/logging/logging.go` - Structured logging with zap
@@ -280,6 +280,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, update-password)
   - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
+  - `capabilities.go` - Lists all available MCP capabilities (tools, prompts, resources, resource templates)
 - **Common Package**: `internal/tiger/common/` - Shared business logic used by both CLI and MCP
   - Password storage utilities (keyring, pgpass, validation)
   - Wait operations and polling logic (WaitForService)
