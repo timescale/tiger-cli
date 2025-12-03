@@ -1209,7 +1209,7 @@ func resetPasswordAndLaunchPsql(
 		return err
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "To view your new password, run: tiger db connection-string --with-password\n")
+	fmt.Fprintf(cmd.ErrOrStderr(), "To view your new password, run: tiger service get %s --with-password\n", util.Deref(service.ServiceId))
 
 	// Launch psql (password is now in storage, launchPsql will retrieve it)
 	return launchPsql(details.String(), psqlPath, psqlFlags, service, role, cmd)
