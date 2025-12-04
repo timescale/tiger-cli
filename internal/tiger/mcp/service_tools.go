@@ -463,9 +463,9 @@ This operation stops a service that is currently running. The service will trans
 This tool changes the compute resources allocated to your database service. The service
 will be temporarily unavailable during the resize operation.
 
-Default behavior: Returns immediately while resize happens in background (timeout_minutes=0).
-Setting timeout_minutes to a positive value will wait for the resize to complete with the
-specified timeout - only use if you need to perform operations on the resized service immediately.
+Default behavior: Returns immediately while resize happens in background (recommended).
+Setting wait=true will block until the resize is complete - only use if you need to
+perform operations on the resized service immediately.
 
 WARNING: Creates billable resource changes. Increasing resources will increase costs.`,
 		InputSchema:  ServiceResizeInput{}.Schema(),
@@ -973,6 +973,8 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 type ServiceResizeInput struct {
 	ServiceID      string `json:"service_id"`
 	CPUMemory      string `json:"cpu_memory,omitempty"`
+	Nodes          *int   `json:"nodes,omitempty"`
+	Wait           bool   `json:"wait,omitempty"`
 	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
 }
 
@@ -994,11 +996,25 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 		}),
 	}
 
+	schema.Properties["nodes"] = &jsonschema.Schema{
+		Type:        "integer",
+		Description: "Number of nodes in the replica set (optional)",
+		Examples:    []any{1, 2, 3},
+		Minimum:     util.Ptr(1.0),
+	}
+
+	schema.Properties["wait"] = &jsonschema.Schema{
+		Type:        "boolean",
+		Description: "Whether to wait for the resize to complete before returning. Default is false (returns immediately).",
+		Default:     util.Must(json.Marshal(false)),
+		Examples:    []any{false, true},
+	}
+
 	schema.Properties["timeout_minutes"] = &jsonschema.Schema{
 		Type:        "integer",
-		Description: "Timeout in minutes to wait for resize to complete. Set to 0 to return immediately without waiting (default). Set to positive value to wait for completion.",
-		Default:     util.Must(json.Marshal(0)),
-		Examples:    []any{0, 15, 30, 60},
+		Description: "Timeout in minutes when waiting for resize to complete. Only used when 'wait' is true.",
+		Default:     util.Must(json.Marshal(30)),
+		Examples:    []any{15, 30, 60},
 		Minimum:     util.Ptr(0.0),
 	}
 
@@ -1050,6 +1066,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	resizeReq := api.ResizeInput{
 		CpuMillis: cpuMillis,
 		MemoryGbs: memoryGBs,
+		Nodes:     input.Nodes,
 	}
 
 	// Make API call to resize service
@@ -1074,8 +1091,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		NewMemory: formatMemory(memoryGBs),
 	}
 
-	// If timeout is greater than 0, wait for resize to complete
-	if input.TimeoutMinutes > 0 {
+	// If wait is requested, wait for resize to complete
+	if input.Wait {
 		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
 		if err := s.waitForServiceResize(ctx, apiClient, projectID, input.ServiceID, timeout); err != nil {
 			output.Message = fmt.Sprintf("Resize started but error waiting: %s", err.Error())

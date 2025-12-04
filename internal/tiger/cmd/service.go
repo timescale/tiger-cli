@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -1513,7 +1512,9 @@ func getServiceID(cfg *config.Config, args []string) (string, error) {
 func buildServiceResizeCmd() *cobra.Command {
 	var resizeCPU string
 	var resizeMemory string
+	var resizeNoWait bool
 	var resizeWaitTimeout time.Duration
+	var resizeNodes int
 
 	cmd := &cobra.Command{
 		Use:   "resize [service-id]",
@@ -1524,11 +1525,11 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. This command changes the compute resources allocated
 to your database service.
 
-By default (--wait-timeout=0), the command returns immediately after starting the resize.
-Set --wait-timeout to a positive duration to wait for the operation to complete.
+By default, the command waits for the resize operation to complete. Use --no-wait
+to return immediately after starting the resize.
 
 Examples:
-  # Resize default service to 2 CPU cores and 8GB memory (returns immediately)
+  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 
   # Resize specific service to 4 CPU cores and 16GB memory
@@ -1540,11 +1541,14 @@ Examples:
   # Resize service using only memory (CPU will be auto-configured to 4000m)
   tiger service resize --memory 16
 
-  # Resize and wait for completion with 30 minute timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 30m
+  # Resize to shared CPU and memory (free tier)
+  tiger service resize --cpu shared --memory shared
 
-  # Resize and wait for completion with 1 hour timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 1h
+  # Resize without waiting for completion
+  tiger service resize --cpu 2000 --memory 8 --no-wait
+
+  # Resize with custom wait timeout
+  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
 
 Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
@@ -1639,8 +1643,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
 
-			// Handle wait behavior - if timeout is 0 or negative, don't wait
-			if resizeWaitTimeout <= 0 {
+			// Handle wait behavior
+			if resizeNoWait {
 				fmt.Fprintf(statusOutput, "⏳ Service is being resized. Use 'tiger service get %s' to check status.\n", serviceID)
 				return nil
 			}
@@ -1661,9 +1665,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores (e.g., 500, 1000, 2000, 4000)")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes (e.g., 2, 4, 8, 16)")
-	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 0, "Wait for completion with specified timeout (e.g., 30m, 1h). Default 0 means don't wait")
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared' (e.g., 1000, 2000, 4000)")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared' (e.g., 2, 4, 8, 16)")
+	cmd.Flags().IntVar(&resizeNodes, "nodes", 0, "Number of nodes in the replica set (optional)")
+	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
+	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
 }
@@ -1677,7 +1683,7 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := NewSpinner(output, "Service status: RESIZING")
+	spinner := NewSpinner(output, "Service status: %s", "RESIZING")
 	defer spinner.Stop()
 
 	var lastStatus string
@@ -1695,7 +1701,7 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				spinner.Update(fmt.Sprintf("Error checking service status: %v", err))
+				spinner.Update("Error checking service status: %v", err)
 				continue
 			}
 
@@ -1710,7 +1716,7 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 			// Check if status changed
 			if status != lastStatus {
 				lastStatus = status
-				spinner.Update(fmt.Sprintf("Service status: %s", status))
+				spinner.Update("Service status: %s", status)
 			}
 
 			switch status {
