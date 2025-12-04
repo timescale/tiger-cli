@@ -107,7 +107,7 @@ Examples:
 				clientName = args[0]
 			}
 
-			return installMCPForClient(clientName, !noBackup, configPath)
+			return installTigerMCPForClient(clientName, !noBackup, configPath)
 		},
 	}
 
