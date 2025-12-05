@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -39,10 +38,6 @@ func setupServiceTest(t *testing.T) string {
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-
-	// Re-establish viper environment configuration after reset
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first

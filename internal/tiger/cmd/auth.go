@@ -247,7 +247,7 @@ func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, format string) er
 	case "json":
 		return util.SerializeToJSON(outputWriter, authInfo)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, authInfo, true)
+		return util.SerializeToYAML(outputWriter, authInfo)
 	default: // table format (default)
 		return outputAuthInfoTable(authInfo, outputWriter)
 	}

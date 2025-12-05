@@ -24,12 +24,12 @@ type ConnectionDetailsOptions struct {
 }
 
 type ConnectionDetails struct {
-	Role     string `json:"role,omitempty" yaml:"role,omitempty"`
-	Password string `json:"password,omitempty" yaml:"password,omitempty"`
-	Host     string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port     int    `json:"port,omitempty" yaml:"port,omitempty"`
-	Database string `json:"database,omitempty" yaml:"database,omitempty"`
-	IsPooler bool   `json:"is_pooler,omitempty" yaml:"is_pooler,omitempty"`
+	Role     string `json:"role,omitempty"`
+	Password string `json:"password,omitempty"`
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	Database string `json:"database,omitempty"`
+	IsPooler bool   `json:"is_pooler,omitempty"`
 }
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {

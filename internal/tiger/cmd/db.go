@@ -546,10 +546,10 @@ func getPasswordForRole(passwordFlag string) (string, error) {
 
 // CreateRoleResult represents the output of a create role operation
 type CreateRoleResult struct {
-	RoleName         string   `json:"role_name" yaml:"role_name"`
-	ReadOnly         bool     `json:"read_only,omitempty" yaml:"read_only,omitempty"`
-	StatementTimeout string   `json:"statement_timeout,omitempty" yaml:"statement_timeout,omitempty"`
-	FromRoles        []string `json:"from_roles,omitempty" yaml:"from_roles,omitempty"`
+	RoleName         string   `json:"role_name"`
+	ReadOnly         bool     `json:"read_only,omitempty"`
+	StatementTimeout string   `json:"statement_timeout,omitempty"`
+	FromRoles        []string `json:"from_roles,omitempty"`
 }
 
 // outputCreateRoleResult formats and outputs the create role result
@@ -573,7 +573,7 @@ func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, 
 	case "json":
 		return util.SerializeToJSON(outputWriter, result)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, result, false)
+		return util.SerializeToYAML(outputWriter, result)
 	default: // table format
 		fmt.Fprintf(outputWriter, "✓ Role '%s' created successfully\n", roleName)
 		if readOnly {
