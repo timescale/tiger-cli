@@ -185,7 +185,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	// Connect to database
 	conn, err := pgx.ConnectConfig(queryCtx, connConfig)
 	if err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, DBExecuteQueryOutput{}, err
 	}
 	defer conn.Close(context.Background())
 
@@ -216,7 +216,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 			if err.Error() == "no more results in batch" {
 				break
 			}
-			return nil, DBExecuteQueryOutput{}, fmt.Errorf("query execution failed: %w", err)
+			return nil, DBExecuteQueryOutput{}, err
 		}
 
 		// Process this result set
@@ -230,7 +230,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	if err := br.Close(); err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("error closing query: %w", err)
+		return nil, DBExecuteQueryOutput{}, err
 	}
 
 	// Build output from the final result set
@@ -286,14 +286,14 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows) (resultSet, error) {
 		// Scan values into generic interface slice
 		values, err := rows.Values()
 		if err != nil {
-			return resultSet{}, fmt.Errorf("failed to scan row: %w", err)
+			return resultSet{}, err
 		}
 		resultRows = append(resultRows, values)
 	}
 
 	// Check for errors during iteration
-	if rows.Err() != nil {
-		return resultSet{}, fmt.Errorf("error during row iteration: %w", rows.Err())
+	if err := rows.Err(); err != nil {
+		return resultSet{}, err
 	}
 
 	// Get rows affected
