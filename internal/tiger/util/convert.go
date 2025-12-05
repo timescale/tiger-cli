@@ -11,6 +11,13 @@ func Ptr[T any](val T) *T {
 	return &val
 }
 
+func PtrIfNonNil[T ~[]E, E any](val T) *T {
+	if val == nil {
+		return nil
+	}
+	return &val
+}
+
 func Deref[T any](val *T) T {
 	if val == nil {
 		var res T

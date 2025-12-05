@@ -63,7 +63,7 @@ type DBExecuteQueryColumn struct {
 // DBExecuteQueryOutput represents output for db_execute_query
 type DBExecuteQueryOutput struct {
 	Columns       []DBExecuteQueryColumn `json:"columns,omitempty"`
-	Rows          [][]any                `json:"rows,omitempty"`
+	Rows          *[][]any               `json:"rows,omitempty"`
 	RowsAffected  int64                  `json:"rows_affected"`
 	ExecutionTime string                 `json:"execution_time"`
 }
@@ -71,14 +71,14 @@ type DBExecuteQueryOutput struct {
 func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryOutput](nil))
 
-	schema.Properties["columns"].Description = "Column metadata from the query result including name and PostgreSQL type"
+	schema.Properties["columns"].Description = "Column metadata from the query result including name and PostgreSQL type. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
 	schema.Properties["columns"].Examples = []any{[]DBExecuteQueryColumn{
 		{Name: "id", Type: "int4"},
 		{Name: "name", Type: "text"},
 		{Name: "created_at", Type: "timestamptz"},
 	}}
 
-	schema.Properties["rows"].Description = "Result rows as arrays of values. Empty for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
+	schema.Properties["rows"].Description = "Result rows as arrays of values. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
 	schema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
 
 	schema.Properties["rows_affected"].Description = "Number of rows affected by the query. For SELECT, this is the number of rows returned. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
@@ -95,9 +95,11 @@ func (s *Server) registerDatabaseTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:  "db_execute_query",
 		Title: "Execute SQL Query",
-		Description: `Execute a single SQL query against a service database.
+		Description: `Execute SQL queries against a service database.
 
-This tool connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata. Multi-statement queries are not supported.
+This tool connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata.
+
+Multi-statement queries are supported when no parameters are provided. When executing multiple statements separated by semicolons, all statements are executed in a single transaction, and only the results from the final statement are returned. Multi-statement queries with parameters are not supported and will return an error.
 
 WARNING: Use with caution - this tool can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
@@ -157,8 +159,31 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// Parse connection string into config
+	connConfig, err := pgx.ParseConfig(details.String())
+	if err != nil {
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+
+	// Choose query execution mode based on whether parameters are present.
+	// Simple protocol supports multi-statement queries but interpolates
+	// parameters client-side (which we don't want to do, for security's sake).
+	// Extended protocol sends parameters separately but doesn't support
+	// multi-statement queries. This means we don't support multi-statement
+	// queries with parameters (pgx will return an error for them when using
+	// QueryExecModeDescribeExec). See [pgx.QueryExecMode] for details.
+	if len(input.Parameters) > 0 {
+		// Use extended protocol to send parameters separately (more secure,
+		// but doesn't support multi-statement queries).
+		connConfig.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
+	} else {
+		// Use simple protocol to support multi-statement queries when no
+		// parameters are given.
+		connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	}
+
 	// Connect to database
-	conn, err := pgx.Connect(queryCtx, details.String())
+	conn, err := pgx.ConnectConfig(queryCtx, connConfig)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -166,50 +191,117 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	// Execute query and measure time
 	startTime := time.Now()
-	rows, err := conn.Query(queryCtx, input.Query, util.ConvertSliceToAny(input.Parameters)...)
-	if err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("query execution failed: %w", err)
+
+	// Queue the query. When using QueryExecModeSimpleProtocol (no parameters),
+	// it's valid to queue a single multi-statement SQL query as the batch.
+	// See the [pgx.Batch.Queue] documentation for details. When using
+	// QueryExecModeDescribeExec (with parameters), queueing a multi-statement
+	// query here will result in an error when executing it below.
+	batch := &pgx.Batch{}
+	batch.Queue(input.Query, util.ConvertSliceToAny(input.Parameters)...)
+
+	br := conn.SendBatch(queryCtx, batch)
+	defer br.Close()
+
+	// Process all result sets, keeping only the final one
+	var finalResult resultSet
+	for {
+		rows, err := br.Query()
+		if err != nil {
+			// Check if we've reached the final result set and stop iteration.
+			// NOTE: It would be nice if there was a real sentinel error type
+			// we could check here instead of comparing error strings, but pgx
+			// doesn't expose one. We will just need to verify that the error
+			// message doesn't change when we update the pgx dependency.
+			if err.Error() == "no more results in batch" {
+				break
+			}
+			return nil, DBExecuteQueryOutput{}, fmt.Errorf("query execution failed: %w", err)
+		}
+
+		// Process this result set
+		result, err := processResultSet(conn, rows)
+		if err != nil {
+			return nil, DBExecuteQueryOutput{}, err
+		}
+
+		// Save this result set as the current "final" one
+		finalResult = result
 	}
+
+	if err := br.Close(); err != nil {
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("error closing query: %w", err)
+	}
+
+	// Build output from the final result set
+	output := DBExecuteQueryOutput{
+		Columns:       finalResult.columns,
+		Rows:          finalResult.rows,
+		RowsAffected:  finalResult.rowsAffected,
+		ExecutionTime: time.Since(startTime).String(),
+	}
+
+	return nil, output, nil
+}
+
+// resultSet holds the columns, rows, and metadata from a single query result set
+type resultSet struct {
+	columns      []DBExecuteQueryColumn
+	rows         *[][]any
+	rowsAffected int64
+}
+
+// processResultSet reads all data from a pgx.Rows result set
+func processResultSet(conn *pgx.Conn, rows pgx.Rows) (resultSet, error) {
 	defer rows.Close()
 
 	// Get column metadata from field descriptions
 	fieldDescriptions := rows.FieldDescriptions()
-	var columns []DBExecuteQueryColumn
-	for _, fd := range fieldDescriptions {
+	columns := make([]DBExecuteQueryColumn, len(fieldDescriptions))
+	for i, fd := range fieldDescriptions {
 		// Get the type name from the connection's type map
-		dataType, ok := conn.TypeMap().TypeForOID(fd.DataTypeOID)
 		typeName := "unknown"
+		dataType, ok := conn.TypeMap().TypeForOID(fd.DataTypeOID)
 		if ok && dataType != nil {
 			typeName = dataType.Name
 		}
-		columns = append(columns, DBExecuteQueryColumn{
+		columns[i] = DBExecuteQueryColumn{
 			Name: fd.Name,
 			Type: typeName,
-		})
+		}
 	}
 
-	// Collect all rows
+	// Collect all rows from this result set
 	var resultRows [][]any
+	if len(columns) > 0 {
+		// If any columns were returned, initialize resultRows to an empty
+		// slice to ensure we always return a JSON array in the results, even
+		// if empty (we want to be completely clear when a SELECT query returns
+		// no rows). On the other hand, if no columns were returned, it's not a
+		// result returning query (e.g. it's DDL or an INSERT/UPDATE/DELETE/etc.),
+		// so we leave resultRows nil so it gets omitted from the JSON result.
+		resultRows = make([][]any, 0)
+	}
 	for rows.Next() {
 		// Scan values into generic interface slice
 		values, err := rows.Values()
 		if err != nil {
-			return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to scan row: %w", err)
+			return resultSet{}, fmt.Errorf("failed to scan row: %w", err)
 		}
 		resultRows = append(resultRows, values)
 	}
 
 	// Check for errors during iteration
 	if rows.Err() != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("error during row iteration: %w", rows.Err())
+		return resultSet{}, fmt.Errorf("error during row iteration: %w", rows.Err())
 	}
 
-	output := DBExecuteQueryOutput{
-		Columns:       columns,
-		Rows:          resultRows,
-		RowsAffected:  rows.CommandTag().RowsAffected(),
-		ExecutionTime: time.Since(startTime).String(),
-	}
+	// Get rows affected
+	rowsAffected := rows.CommandTag().RowsAffected()
 
-	return nil, output, nil
+	return resultSet{
+		columns:      columns,
+		rows:         util.PtrIfNonNil(resultRows),
+		rowsAffected: rowsAffected,
+	}, nil
 }
