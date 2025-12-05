@@ -9,21 +9,6 @@ import (
 // Options configures the MCP server installation behavior.
 type Options = cmd.InstallOptions
 
-// Client represents supported MCP client types.
-type Client = cmd.MCPClient
-
-// Supported MCP clients.
-const (
-	ClaudeCode  Client = cmd.ClaudeCode
-	Cursor      Client = cmd.Cursor
-	Windsurf    Client = cmd.Windsurf
-	Codex       Client = cmd.Codex
-	Gemini      Client = cmd.Gemini
-	VSCode      Client = cmd.VSCode
-	Antigravity Client = cmd.Antigravity
-	KiroCLI     Client = cmd.KiroCLI
-)
-
 // InstallForClient installs an MCP server configuration for the specified client.
 //
 // Parameters:

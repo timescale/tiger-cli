@@ -45,15 +45,15 @@ type MCPServerConfig struct {
 
 // InstallOptions configures the MCP server installation behavior
 type InstallOptions struct {
-	// CreateBackup creates a backup of existing config files before modification (default: true for CLI)
+	// CreateBackup creates a backup of existing config files before modification
 	CreateBackup bool
 	// CustomConfigPath overrides the default config file location
 	CustomConfigPath string
-	// ServerName is the name to register the MCP server as (default: "tiger")
+	// ServerName is the name to register the MCP server as (required)
 	ServerName string
-	// Command is the path to the MCP server binary (default: auto-detected)
+	// Command is the path to the MCP server binary (required)
 	Command string
-	// Args are the arguments to pass to the MCP server binary (default: ["mcp", "start"])
+	// Args are the arguments to pass to the MCP server binary (required)
 	Args []string
 }
 
@@ -144,11 +144,15 @@ var supportedClients = []clientConfig{
 			"~/AppData/Roaming/Code/User/mcp.json",
 		},
 		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			argsJSON, err := json.Marshal(args)
+			j, err := json.Marshal(map[string]any{
+				"name":    serverName,
+				"command": command,
+				"args":    args,
+			})
 			if err != nil {
-				return nil, fmt.Errorf("failed to marshal args: %w", err)
+				return nil, fmt.Errorf("failed to marshal MCP config: %w", err)
 			}
-			return []string{"code", "--add-mcp", fmt.Sprintf(`{"name":"%s","command":"%s","args":%s}`, serverName, command, argsJSON)}, nil
+			return []string{"code", "--add-mcp", string(j)}, nil
 		},
 	},
 	{

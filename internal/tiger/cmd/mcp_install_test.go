@@ -127,15 +127,6 @@ func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
 }
 
 func TestAddTigerMCPServer(t *testing.T) {
-	// Override getTigerExecutablePath to return "tiger" for tests
-	oldFunc := tigerExecutablePathFunc
-	tigerExecutablePathFunc = func() (string, error) {
-		return "tiger", nil
-	}
-	defer func() {
-		tigerExecutablePathFunc = oldFunc
-	}()
-
 	tests := []struct {
 		name                 string
 		initialConfig        string
@@ -245,12 +236,8 @@ func TestAddTigerMCPServer(t *testing.T) {
 			err := os.WriteFile(configPath, []byte(tt.initialConfig), 0644)
 			require.NoError(t, err)
 
-			// Get the executable path (uses mocked function)
-			execPath, err := getTigerExecutablePath()
-			require.NoError(t, err)
-
 			// Call the function under test
-			err = addMCPServerViaJSON(configPath, tt.mcpServersPathPrefix, "tiger", execPath, []string{"mcp", "start"})
+			err = addMCPServerViaJSON(configPath, tt.mcpServersPathPrefix, "tiger", "tiger", []string{"mcp", "start"})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -280,15 +267,6 @@ func TestAddTigerMCPServer(t *testing.T) {
 }
 
 func TestAddTigerMCPServerFileOperations(t *testing.T) {
-	// Override getTigerExecutablePath to return "tiger" for tests
-	oldFunc := tigerExecutablePathFunc
-	tigerExecutablePathFunc = func() (string, error) {
-		return "tiger", nil
-	}
-	defer func() {
-		tigerExecutablePathFunc = oldFunc
-	}()
-
 	t.Run("creates directory if it doesn't exist", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nested", "dir", "config.json")
@@ -297,9 +275,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		_, err := os.Stat(filepath.Dir(configPath))
 		assert.True(t, os.IsNotExist(err))
 
-		execPath, err := getTigerExecutablePath()
-		require.NoError(t, err)
-		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", execPath, []string{"mcp", "start"})
+		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// Directory should now exist
@@ -315,9 +291,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nonexistent.json")
 
-		execPath, err := getTigerExecutablePath()
-		require.NoError(t, err)
-		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", execPath, []string{"mcp", "start"})
+		err := addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// File should now exist with correct content
@@ -347,9 +321,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(""), 0644)
 		require.NoError(t, err)
 
-		execPath, err := getTigerExecutablePath()
-		require.NoError(t, err)
-		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", execPath, []string{"mcp", "start"})
+		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// File should now have correct content
