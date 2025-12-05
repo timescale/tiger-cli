@@ -276,7 +276,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionString, psqlPath, []string{}, service, "tsdbadmin", nil, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -306,7 +306,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	service := api.Service{}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", nil, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -354,7 +354,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", nil, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -396,7 +396,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", testCmd)
+	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", nil, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -686,6 +686,63 @@ func TestIsConnectionRejected(t *testing.T) {
 	}
 }
 
+func TestIsAuthenticationError(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 28P01 (invalid_password)",
+			err: &pgconn.PgError{
+				Code:    "28P01",
+				Message: "password authentication failed for user \"test\"",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 28000 (invalid_authorization_specification)",
+			err: &pgconn.PgError{
+				Code:    "28000",
+				Message: "role \"nonexistent\" does not exist",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 57P03 (cannot_connect_now) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "57P03",
+				Message: "the database system is starting up",
+			},
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 3D000 (database does not exist) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "3D000",
+				Message: "database \"nonexistent\" does not exist",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isAuthenticationError(tc.err)
+
+			if result != tc.expected {
+				t.Errorf("Expected isAuthenticationError to return %v for error %v, got %v",
+					tc.expected, tc.err, result)
+			}
+		})
+	}
+}
+
 func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -898,7 +955,12 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -967,7 +1029,12 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1036,7 +1103,12 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1112,7 +1184,12 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1181,7 +1258,12 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1233,8 +1315,13 @@ func TestDBSavePassword_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
 
-	// No need to mock since it should fail before reaching getServiceDetailsFunc
+	// No need to mock service details since it should fail before reaching getServiceDetailsFunc
 
 	// Execute save-password without service ID
 	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
@@ -1313,7 +1400,12 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := getCredentialsForDB
+	getCredentialsForDB = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { getCredentialsForDB = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
