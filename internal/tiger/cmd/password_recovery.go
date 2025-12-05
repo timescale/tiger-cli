@@ -44,7 +44,7 @@ func connectWithPasswordMenu(
 		return fmt.Errorf("connection failed: %w", err)
 	}
 	// Auth failed with stored password, continue to recovery menu
-	fmt.Fprintf(cmd.ErrOrStderr(), "Stored password is invalid or expired.\n\n")
+	fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
 	if !checkStdinIsTTY() {
@@ -62,7 +62,7 @@ func connectWithPasswordMenu(
 		case optionEnterPassword:
 			// Prompt for password
 			fmt.Fprint(cmd.ErrOrStderr(), "Enter password: ")
-			password, err := readPasswordFromTerminal()
+			password, err := readString(ctx, readPasswordFromTerminal)
 			fmt.Fprintln(cmd.ErrOrStderr()) // newline after password entry
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error reading password: %v\n\n", err)
@@ -182,7 +182,7 @@ func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m passwordRecoveryModel) View() string {
-	s := "Authentication failed. What would you like to do?\n\n"
+	s := "What would you like to do?\n\n"
 
 	for i, option := range m.options {
 		cursor := " "
@@ -284,7 +284,7 @@ func testSaveAndLaunchPsqlWithPassword(
 	}
 
 	// Launch psql (password is now in storage, launchPsql will retrieve it)
-	return launchPsql(details.String(), psqlPath, psqlFlags, service, details.Role, nil, cmd)
+	return launchPsql(details.String(), psqlPath, psqlFlags, service, details.Role, &details.Password, cmd)
 }
 
 // promptAndResetPassword prompts for a new password and resets it via API.
@@ -298,7 +298,7 @@ func promptAndResetPassword(
 	role string,
 ) (string, error) {
 	fmt.Fprint(out, "Enter new password (leave empty to generate): ")
-	newPassword, err := readPasswordFromTerminal()
+	newPassword, err := readString(ctx, readPasswordFromTerminal)
 	fmt.Fprintln(out) // newline after password entry
 	if err != nil {
 		return "", fmt.Errorf("error reading password: %w", err)
