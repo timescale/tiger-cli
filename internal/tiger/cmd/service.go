@@ -443,6 +443,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 // buildServiceUpdatePasswordCmd creates a new update-password command
 func buildServiceUpdatePasswordCmd() *cobra.Command {
 	var updatePasswordValue string
+	var autoGenerate bool
 
 	cmd := &cobra.Command{
 		Use:   "update-password [service-id]",
@@ -454,6 +455,9 @@ from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
 Examples:
+  # Update password for default service, interactively prompts
+  tiger service update-password
+
   # Update password for default service
   tiger service update-password --new-password new-secure-password
 
@@ -468,7 +472,10 @@ Examples:
   tiger service update-password svc-12345 --new-password new-secure-password
 
   # Update password without saving (using global flag)
-  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
+  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none
+
+  # Auto-generate a secure password
+  tiger service update-password --auto-generate`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		PreRunE:           bindFlags("new-password"),
@@ -487,9 +494,6 @@ Examples:
 
 			// Get password from flag or environment variable via viper
 			password := viper.GetString("new_password")
-			if password == "" {
-				return fmt.Errorf("new password is required. Use --new-password flag or set TIGER_NEW_PASSWORD environment variable")
-			}
 
 			cmd.SilenceUsage = true
 
@@ -520,9 +524,30 @@ Examples:
 
 			statusOutput := cmd.ErrOrStderr()
 
-			// Update and save password
-			if err := updateAndSaveServicePassword(ctx, client, projectID, service, password, "tsdbadmin", statusOutput); err != nil {
-				return err
+			if autoGenerate {
+				// Auto-generate password using existing function
+				if _, err := resetServicePassword(ctx, client, service, "tsdbadmin", "", statusOutput); err != nil {
+					return err
+				}
+			} else if password == "" {
+				// Interactive prompt - check if we're in a terminal
+				if !checkStdinIsTTY() {
+					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+				}
+				_, err := promptAndResetPassword(
+					ctx,
+					statusOutput,
+					client,
+					service,
+					"tsdbadmin",
+				)
+				if err != nil {
+					return err
+				}
+			} else {
+				if _, err := resetServicePassword(ctx, client, service, "tsdbadmin", password, statusOutput); err != nil {
+					return err
+				}
 			}
 
 			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
@@ -532,7 +557,8 @@ Examples:
 
 	// Add flags
 	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
-
+	cmd.Flags().BoolVar(&autoGenerate, "auto-generate", false, "Auto-generate a secure password")
+	cmd.MarkFlagsMutuallyExclusive("new-password", "auto-generate")
 	return cmd
 }
 

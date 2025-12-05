@@ -999,36 +999,6 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	}
 }
 
-func TestServiceUpdatePassword_NoPassword(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config with service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
-		return "test-api-key", "test-project-123", nil
-	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
-
-	// Execute service update-password command without password
-	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password")
-	if err == nil {
-		t.Fatal("Expected error when no password is provided")
-	}
-
-	if !strings.Contains(err.Error(), "password is required") {
-		t.Errorf("Expected error about missing password, got: %v", err)
-	}
-}
-
 func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
