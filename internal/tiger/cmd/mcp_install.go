@@ -45,16 +45,18 @@ type MCPServerConfig struct {
 
 // InstallOptions configures the MCP server installation behavior
 type InstallOptions struct {
-	// CreateBackup creates a backup of existing config files before modification
-	CreateBackup bool
-	// CustomConfigPath overrides the default config file location
-	CustomConfigPath string
+	// ClientName is the name of the client to configure (required)
+	ClientName string
 	// ServerName is the name to register the MCP server as (required)
 	ServerName string
 	// Command is the path to the MCP server binary (required)
 	Command string
 	// Args are the arguments to pass to the MCP server binary (required)
 	Args []string
+	// CreateBackup creates a backup of existing config files before modification
+	CreateBackup bool
+	// CustomConfigPath overrides the default config file location
+	CustomConfigPath string
 }
 
 // clientConfig represents our own client configuration for Tiger MCP installation
@@ -189,8 +191,11 @@ func getValidEditorNames() []string {
 // InstallMCPForClient installs an MCP server configuration for the specified client.
 // This is a generic, configurable function exported for use by external projects via pkg/mcpinstall.
 // Required options: ServerName, Command, Args must all be provided.
-func InstallMCPForClient(clientName string, opts InstallOptions) error {
+func InstallMCPForClient(opts InstallOptions) error {
 	// Validate required options
+	if opts.ClientName == "" {
+		return fmt.Errorf("ClientName is required")
+	}
 	if opts.ServerName == "" {
 		return fmt.Errorf("ServerName is required")
 	}
@@ -202,7 +207,7 @@ func InstallMCPForClient(clientName string, opts InstallOptions) error {
 	}
 
 	// Find the client configuration by name
-	clientCfg, err := findClientConfig(clientName)
+	clientCfg, err := findClientConfig(opts.ClientName)
 	if err != nil {
 		return err
 	}
@@ -217,16 +222,16 @@ func InstallMCPForClient(clientName string, opts InstallOptions) error {
 		// Use manual config path discovery for clients with configured paths
 		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
 		if err != nil {
-			return fmt.Errorf("failed to find configuration for %s: %w", clientName, err)
+			return fmt.Errorf("failed to find configuration for %s: %w", opts.ClientName, err)
 		}
 	} else if clientCfg.buildInstallCommand == nil {
 		// Client has neither ConfigPaths nor buildInstallCommand
-		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", clientName)
+		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", opts.ClientName)
 	}
 	// else: CLI-only client - configPath remains empty, will use buildInstallCommand
 
 	logging.Info("Installing MCP server configuration",
-		zap.String("client", clientName),
+		zap.String("client", opts.ClientName),
 		zap.String("server_name", opts.ServerName),
 		zap.String("command", opts.Command),
 		zap.Strings("args", opts.Args),
@@ -269,14 +274,15 @@ func installTigerMCPForClient(clientName string, createBackup bool, customConfig
 	}
 
 	opts := InstallOptions{
-		CreateBackup:     createBackup,
-		CustomConfigPath: customConfigPath,
+		ClientName:       clientName,
 		ServerName:       mcp.ServerName,
 		Command:          command,
 		Args:             []string{"mcp", "start"},
+		CreateBackup:     createBackup,
+		CustomConfigPath: customConfigPath,
 	}
 
-	if err := InstallMCPForClient(clientName, opts); err != nil {
+	if err := InstallMCPForClient(opts); err != nil {
 		return err
 	}
 
