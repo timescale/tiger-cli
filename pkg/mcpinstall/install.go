@@ -9,6 +9,15 @@ import (
 // Options configures the MCP server installation behavior.
 type Options = cmd.InstallOptions
 
+// ClientInfo contains information about a supported MCP client.
+type ClientInfo = cmd.ClientInfo
+
+// SupportedClients returns information about all supported MCP clients.
+// Use this to get valid values for Options.ClientName.
+func SupportedClients() []ClientInfo {
+	return cmd.SupportedClients()
+}
+
 // Install installs an MCP server configuration for the specified client.
 //
 // Required options:

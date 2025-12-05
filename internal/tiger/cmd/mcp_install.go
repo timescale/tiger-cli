@@ -188,6 +188,26 @@ func getValidEditorNames() []string {
 	return validNames
 }
 
+// ClientInfo contains information about a supported MCP client.
+type ClientInfo struct {
+	// Name is the human-readable display name (e.g., "Claude Code", "Cursor")
+	Name string
+	// ClientName is the identifier to use in InstallOptions.ClientName (e.g., "claude-code", "cursor")
+	ClientName string
+}
+
+// SupportedClients returns information about all supported MCP clients.
+func SupportedClients() []ClientInfo {
+	clients := make([]ClientInfo, 0, len(supportedClients))
+	for _, c := range supportedClients {
+		clients = append(clients, ClientInfo{
+			Name:       c.Name,
+			ClientName: c.EditorNames[0],
+		})
+	}
+	return clients
+}
+
 // InstallMCPForClient installs an MCP server configuration for the specified client.
 // This is a generic, configurable function exported for use by external projects via pkg/mcpinstall.
 // Required options: ServerName, Command, Args must all be provided.
