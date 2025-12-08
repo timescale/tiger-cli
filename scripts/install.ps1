@@ -145,9 +145,8 @@ function Get-InstallDir {
     }
 
     $candidateDirs = @(
-        "$env:LOCALAPPDATA\Programs\TigerCLI",
         "$env:USERPROFILE\.local\bin",
-        "$env:ProgramFiles\TigerCLI"
+        "$env:USERPROFILE\bin",
     )
 
     # Priority 1: Try to find a directory that's writable and in PATH
