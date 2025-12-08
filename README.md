@@ -15,7 +15,7 @@ curl -fsSL https://cli.tigerdata.com | sh
 ### Install Script (Windows)
 
 ```powershell
-iwr -useb https://cli.tigerdata.com/install.ps1 | iex
+irm https://cli.tigerdata.com/install.ps1 | iex
 ```
 
 ### Homebrew (macOS/Linux)

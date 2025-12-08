@@ -5,7 +5,7 @@
 # x86_64 systems.
 #
 # Usage:
-#   iwr -useb https://cli.tigerdata.com/install.ps1 | iex
+#   irm https://cli.tigerdata.com/install.ps1 | iex
 #
 # Environment Variables (all optional):
 #   $env:VERSION           - Specific version to install (e.g., "v1.2.3")
