@@ -6,10 +6,16 @@ Tiger CLI is the command-line interface for Tiger Cloud. It provides commands fo
 
 Multiple installation methods are provided. Choose your preferred method from the options below. If you aren't sure, use the first one!
 
-### Install Script
+### Install Script (Linux/macOS)
 
 ```bash
 curl -fsSL https://cli.tigerdata.com | sh
+```
+
+### Install Script (Windows)
+
+```powershell
+iwr -useb https://cli.tigerdata.com/install.ps1 | iex
 ```
 
 ### Homebrew (macOS/Linux)
