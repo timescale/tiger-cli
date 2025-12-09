@@ -7,16 +7,28 @@
 # Usage:
 #   irm https://cli.tigerdata.com/install.ps1 | iex
 #
-# Environment Variables (all optional):
-#   $env:VERSION           - Specific version to install (e.g., "v1.2.3")
-#                            Default: installs the latest version
+# With custom parameters:
+#   $Version="v1.2.3"; irm https://cli.tigerdata.com/install.ps1 | iex
+#   $InstallDir="C:\custom\path"; irm https://cli.tigerdata.com/install.ps1 | iex
 #
-#   $env:INSTALL_DIR       - Custom installation directory
-#                            Default: auto-detects best location
+# Or if saved locally:
+#   .\install.ps1 -Version "v1.2.3" -InstallDir "C:\custom\path"
+#
+# Parameters (all optional):
+#   Version           - Specific version to install (e.g., "v1.2.3")
+#                       Default: installs the latest version
+#
+#   InstallDir        - Custom installation directory
+#                       Default: $env:LOCALAPPDATA\Programs\TigerCLI
 #
 # Requirements:
 #   - PowerShell 5.1 or higher
 #   - Internet connection for downloading
+
+param(
+    [string]$Version = $Version,
+    [string]$InstallDir = $InstallDir
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -49,11 +61,11 @@ function Write-ErrorMsg {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
-# Get version (from VERSION env var or latest from CloudFront)
+# Get version (from Version parameter or latest from CloudFront)
 function Get-Version {
-    if ($env:VERSION) {
-        Write-Info "Using specified version: $env:VERSION"
-        return $env:VERSION
+    if ($Version) {
+        Write-Info "Using specified version: $Version"
+        return $Version
     }
 
     $url = "$DownloadBaseUrl/latest.txt"
@@ -107,35 +119,35 @@ function Test-InPath {
 
 # Find the best install directory
 function Get-InstallDir {
-    # If user specified INSTALL_DIR, use it (create if needed)
-    if ($env:INSTALL_DIR) {
+    # If user specified InstallDir, use it (create if needed)
+    if ($InstallDir) {
         try {
-            if (-not (Test-Path $env:INSTALL_DIR)) {
-                New-Item -ItemType Directory -Path $env:INSTALL_DIR -Force | Out-Null
+            if (-not (Test-Path $InstallDir)) {
+                New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
             }
-            Write-Info "Using user-specified install directory: $env:INSTALL_DIR"
-            return $env:INSTALL_DIR
+            Write-Info "Using user-specified install directory: $InstallDir"
+            return $InstallDir
         }
         catch {
-            Write-ErrorMsg "Cannot create user-specified install directory: $env:INSTALL_DIR"
+            Write-ErrorMsg "Cannot create user-specified install directory: $InstallDir"
             Write-ErrorMsg "Error: $_"
             exit 1
         }
     }
 
     # Use standard Windows location for user-installed programs
-    $installDir = "$env:LOCALAPPDATA\Programs\TigerCLI"
+    $defaultInstallDir = "$env:LOCALAPPDATA\Programs\TigerCLI"
     try {
-        if (-not (Test-Path $installDir)) {
-            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+        if (-not (Test-Path $defaultInstallDir)) {
+            New-Item -ItemType Directory -Path $defaultInstallDir -Force | Out-Null
         }
-        Write-Info "Install directory: $installDir"
-        return $installDir
+        Write-Info "Install directory: $defaultInstallDir"
+        return $defaultInstallDir
     }
     catch {
-        Write-ErrorMsg "Cannot create install directory: $installDir"
+        Write-ErrorMsg "Cannot create install directory: $defaultInstallDir"
         Write-ErrorMsg "Error: $_"
-        Write-ErrorMsg "Please set `$env:INSTALL_DIR environment variable to specify a different location"
+        Write-ErrorMsg "Please specify a custom installation directory with `$InstallDir parameter"
         exit 1
     }
 }
@@ -348,7 +360,7 @@ function Install-TigerCLI {
     Write-Info "Tiger CLI Installation Script"
     Write-Info "=============================="
 
-    # Get version (handles VERSION env var internally)
+    # Get version (uses Version parameter or fetches latest)
     $version = Get-Version
 
     # Find and ensure install directory exists and get its path
