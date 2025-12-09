@@ -308,23 +308,20 @@ function Test-Installation {
         try {
             $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 
-            # Check if already in PATH (case-insensitive)
-            if ($userPath -notlike "*$InstallDir*") {
-                $newPath = if ($userPath.EndsWith(';')) {
-                    "$userPath$InstallDir"
-                } else {
-                    "$userPath;$InstallDir"
-                }
-
-                [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
-
-                # Update current session too
-                $env:PATH = "$env:PATH;$InstallDir"
-
-                Write-Success "Added $InstallDir to your PATH"
-                Write-Info "Change takes effect immediately in this session"
-                Write-Info "New terminals will automatically have tiger in PATH"
+            $newPath = if ($userPath.EndsWith(';')) {
+                "$userPath$InstallDir"
+            } else {
+                "$userPath;$InstallDir"
             }
+
+            [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+
+            # Update current session too
+            $env:PATH = "$env:PATH;$InstallDir"
+
+            Write-Success "Added $InstallDir to your PATH"
+            Write-Info "Change takes effect immediately in this session"
+            Write-Info "New terminals will automatically have tiger in PATH"
         }
         catch {
             Write-Warn "Failed to update PATH automatically: $_"
