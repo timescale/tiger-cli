@@ -117,6 +117,8 @@ blobs:
         name_template: "latest.txt"
       - glob: ./scripts/install.sh
         name_template: "install.sh"
+      - glob: ./scripts/install.ps1
+        name_template: "install.ps1"
 
 # Homebrew cask configuration
 homebrew_casks:
