@@ -1,8 +1,8 @@
 # Tiger CLI Installation Script for Windows
 #
 # This script automatically downloads and installs the latest version of Tiger
-# CLI from the release server. It downloads the appropriate binary for Windows
-# x86_64 systems.
+# CLI from the release server. It downloads the appropriate binary for your
+# Windows system architecture (x86_64, ARM64, or i386).
 #
 # Usage:
 #   irm https://cli.tigerdata.com/install.ps1 | iex
@@ -241,8 +241,11 @@ function Get-Archive {
     # Construct download URL
     $downloadUrl = "$DownloadBaseUrl/releases/$Version/$ArchiveName"
 
+    # Get architecture for description
+    $arch = Get-Architecture
+
     # Download archive with retry logic
-    Get-FileWithRetry -Url $downloadUrl -OutputFile (Join-Path $TmpDir $ArchiveName) -Description "Tiger CLI $Version for Windows x86_64"
+    Get-FileWithRetry -Url $downloadUrl -OutputFile (Join-Path $TmpDir $ArchiveName) -Description "Tiger CLI $Version for Windows $arch"
 
     # Download and validate checksum
     Write-Info "Verifying file integrity..."
@@ -317,7 +320,12 @@ function Test-Installation {
             [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
 
             # Update current session too
-            $env:PATH = "$env:PATH;$InstallDir"
+            $sessionPath = if ($env:PATH.EndsWith(';')) {
+                "$env:PATH$InstallDir"
+            } else {
+                "$env:PATH;$InstallDir"
+            }
+            $env:PATH = $sessionPath
 
             Write-Success "Added $InstallDir to your PATH"
             Write-Info "Change takes effect immediately in this session"
@@ -415,7 +423,7 @@ function Install-TigerCLI {
         Write-Success "    tiger mcp install"
         Write-Success "For help:"
         Write-Success "    tiger help"
-        Write-Success "Happy coding with Tiger CLI! 🐅"
+        Write-Success "Happy coding with Tiger CLI!"
     }
     finally {
         # Clean up temporary directory
