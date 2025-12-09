@@ -137,7 +137,7 @@ Authentication is handled automatically using:
 2. PGPASSWORD environment variable
 3. If authentication fails, offers interactive options:
    - Enter password manually (will be saved for future use)
-   - Reset password (generates a new password via the API)
+   - Reset password (update or generates a new password via the API)
 
 Examples:
   # Connect to default service
@@ -842,16 +842,20 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 
 // launchPsql launches psql using the connection string and additional flags.
 // It retrieves the password from storage and sets PGPASSWORD environment variable.
-func launchPsql(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, password *string, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, password, cmd)
+func launchPsql(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(details, psqlPath, additionalFlags, service, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, password *string, cmd *cobra.Command) *exec.Cmd {
-	// Build command arguments: connection string first, then additional flags
-	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
+func buildPsqlCommand(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+	password := details.Password
+	// Ensure we don't include password in the connection string to make it not show up in process lists
 	// Passwords are passed via PGPASSWORD environment variable (see below)
+	detailsCopy := *details
+	detailsCopy.Password = ""
+	connectionString := detailsCopy.String()
+	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
@@ -863,14 +867,14 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	psqlCmd.Stderr = cmd.ErrOrStderr()
 
 	// Use provided password directly if available
-	if password != nil {
-		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+*password)
+	if password != "" {
+		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
 	} else {
 		storage := common.GetPasswordStorage()
 		// Only set PGPASSWORD for keyring storage method
 		// pgpass storage relies on psql automatically reading ~/.pgpass file
 		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
-			if storedPassword, err := storage.Get(service, role); err == nil && storedPassword != "" {
+			if storedPassword, err := storage.Get(service, details.Role); err == nil && storedPassword != "" {
 				// Set PGPASSWORD environment variable for psql when using keyring
 				psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+storedPassword)
 			}

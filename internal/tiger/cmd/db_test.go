@@ -269,14 +269,20 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 
 	// Create a dummy service for the test
 	service := api.Service{}
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "",
+	}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(connectionString, psqlPath, []string{}, service, "tsdbadmin", nil, cmd)
+	err := launchPsql(connectionDetails, psqlPath, []string{}, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -298,15 +304,22 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
 
 	// Create a dummy service for the test
 	service := api.Service{}
 
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "",
+	}
+
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", nil, cmd)
+	err := launchPsql(connectionDetails, psqlPath, additionalFlags, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -346,15 +359,22 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	}
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
 	additionalFlags := []string{"--quiet"}
+
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: testPassword,
+	}
 
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", nil, testCmd)
+	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, additionalFlags, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -389,14 +409,21 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 		ProjectId: &projectID,
 	}
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
+
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "", // Password should be fetched from .pgpass
+	}
 
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", nil, testCmd)
+	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, []string{}, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")

@@ -29,31 +29,36 @@ func connectWithPasswordMenu(
 ) error {
 	// Interactive mode: Get stored password (if any)
 	storage := common.GetPasswordStorage()
-	storedPassword, _ := storage.Get(service, details.Role)
+	storedPassword, err := storage.Get(service, details.Role)
+	if err != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not retrieve stored password: %v\n", err)
+	}
 
 	// Try to connect with stored password first
-	err := testConnectionWithPassword(ctx, details, storedPassword)
+	err = testConnectionWithPassword(ctx, details, storedPassword)
 	if err == nil {
 		// Password works, launch psql
-		return launchPsql(details.String(), psqlPath, psqlFlags, service, details.Role, nil, cmd)
+		return launchPsql(details, psqlPath, psqlFlags, service, cmd)
 	}
 
 	// Check if it's an auth error
 	if !isAuthenticationError(err) {
 		// Non-auth error (network, timeout, etc.) - report it directly
-		return fmt.Errorf("connection failed: %w", err)
+		return err
 	}
 	// Auth failed with stored password, continue to recovery menu
-	fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %s\nStored password is likely invalid or expired.\n\n", err.Error())
+	fmt.Fprintf(cmd.ErrOrStderr(), "%s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
 	if !checkStdinIsTTY() {
-		return fmt.Errorf("authentication failed and no TTY available for interactive password entry. ")
+		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
 	}
 
 	// Interactive recovery loop
+	// Only allow password reset for admin role
+	canResetPassword := details.Role == "tsdbadmin"
 	for {
-		option, err := selectPasswordRecoveryOption(cmd.ErrOrStderr())
+		option, err := selectPasswordRecoveryOption(cmd.ErrOrStderr(), canResetPassword)
 		if err != nil {
 			return err
 		}
@@ -65,6 +70,9 @@ func connectWithPasswordMenu(
 			password, err := readString(ctx, readPasswordFromTerminal)
 			fmt.Fprintln(cmd.ErrOrStderr()) // newline after password entry
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil // user cancelled
+				}
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error reading password: %v\n\n", err)
 				continue
 			}
@@ -84,12 +92,16 @@ func connectWithPasswordMenu(
 			// Prompt and reset
 			password, err := promptAndResetPassword(ctx, cmd.ErrOrStderr(), client, service, details.Role)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil // user cancelled
+				}
 				fmt.Fprintf(cmd.ErrOrStderr(), "Error resetting password: %v\n\n", err)
 				continue
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "✅ Master password for '%s' user updated successfully\n", details.Role)
 			// Launch psql (password is now in storage)
-			return launchPsql(details.String(), psqlPath, psqlFlags, service, details.Role, &password, cmd)
+			details.Password = password
+			return launchPsql(details, psqlPath, psqlFlags, service, cmd)
 
 		case optionExit:
 			return nil
@@ -126,19 +138,31 @@ const (
 
 // passwordRecoveryModel is the Bubble Tea model for password recovery selection
 type passwordRecoveryModel struct {
-	options  []string
-	cursor   int
-	selected passwordRecoveryOption
+	options          []string
+	optionMap        []passwordRecoveryOption // maps cursor position to option enum
+	cursor           int
+	selected         passwordRecoveryOption
+	canResetPassword bool
 }
 
-func newPasswordRecoveryModel() passwordRecoveryModel {
+func newPasswordRecoveryModel(canResetPassword bool) passwordRecoveryModel {
+	options := []string{"Enter password manually"}
+	optionMap := []passwordRecoveryOption{optionEnterPassword}
+
+	if canResetPassword {
+		options = append(options, "Update/reset password")
+		optionMap = append(optionMap, optionResetPassword)
+	}
+
+	options = append(options, "Exit")
+	optionMap = append(optionMap, optionExit)
+	optionMap = append(optionMap, optionExit)
+
 	return passwordRecoveryModel{
-		options: []string{
-			"Enter password manually",
-			"Update/reset password",
-			"Exit",
-		},
-		cursor: 0,
+		options:          options,
+		optionMap:        optionMap,
+		cursor:           0,
+		canResetPassword: canResetPassword,
 	}
 }
 
@@ -162,20 +186,18 @@ func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter", " ":
-			m.selected = passwordRecoveryOption(m.cursor)
+			m.selected = m.optionMap[m.cursor]
 			return m, tea.Quit
-		case "1":
-			m.cursor = 0
-			m.selected = optionEnterPassword
-			return m, tea.Quit
-		case "2":
-			m.cursor = 1
-			m.selected = optionResetPassword
-			return m, tea.Quit
-		case "3":
-			m.cursor = 2
-			m.selected = optionExit
-			return m, tea.Quit
+		default:
+			// Handle number keys based on available options
+			if len(msg.String()) == 1 && msg.String()[0] >= '1' && msg.String()[0] <= '9' {
+				idx := int(msg.String()[0] - '1') // '1' -> 0, '2' -> 1, etc.
+				if idx >= 0 && idx < len(m.options) {
+					m.cursor = idx
+					m.selected = m.optionMap[idx]
+					return m, tea.Quit
+				}
+			}
 		}
 	}
 	return m, nil
@@ -197,8 +219,9 @@ func (m passwordRecoveryModel) View() string {
 }
 
 // selectPasswordRecoveryOption shows the interactive menu for password recovery
-func selectPasswordRecoveryOption(out io.Writer) (passwordRecoveryOption, error) {
-	model := newPasswordRecoveryModel()
+// canResetPassword controls whether the "Update/reset password" option is shown
+func selectPasswordRecoveryOption(out io.Writer, canResetPassword bool) (passwordRecoveryOption, error) {
+	model := newPasswordRecoveryModel(canResetPassword)
 
 	program := tea.NewProgram(model, tea.WithOutput(out))
 	finalModel, err := program.Run()
@@ -236,7 +259,7 @@ func updateAndSaveServicePassword(
 		fmt.Fprintf(statusOut, "Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		fmt.Fprintf(statusOut, "%s\n", result.Message)
-		fmt.Fprintf(statusOut, "To view your new password, run: tiger service get %s --with-password\n", util.Deref(service.ServiceId))
+		fmt.Fprintf(statusOut, "To view your new password, run: \n\t tiger service get %s --with-password\n", util.Deref(service.ServiceId))
 	}
 
 	return nil
@@ -283,8 +306,8 @@ func testSaveAndLaunchPsqlWithPassword(
 		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", result.Message)
 	}
 
-	// Launch psql (password is now in storage, launchPsql will retrieve it)
-	return launchPsql(details.String(), psqlPath, psqlFlags, service, details.Role, &details.Password, cmd)
+	// Launch psql
+	return launchPsql(details, psqlPath, psqlFlags, service, cmd)
 }
 
 // promptAndResetPassword prompts for a new password and resets it via API.

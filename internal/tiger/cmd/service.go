@@ -495,6 +495,10 @@ Examples:
 			// Get password from flag or environment variable via viper
 			password := viper.GetString("new_password")
 
+			if autoGenerate && password != "" {
+				return fmt.Errorf("cannot use --auto-generate and --new-password together")
+			}
+
 			cmd.SilenceUsage = true
 
 			// Get API key and project ID for authentication
