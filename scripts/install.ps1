@@ -123,32 +123,17 @@ function Get-InstallDir {
         }
     }
 
-    $candidateDirs = @(
-        "$env:LOCALAPPDATA\Programs\TigerCLI",
-        "$env:USERPROFILE\.local\bin",
-        "$env:USERPROFILE\bin"
-    )
-
-    # Check if any candidate directory already exists and is in PATH
-    # If so, use it (respect user's existing setup)
-    foreach ($dir in $candidateDirs) {
-        if ((Test-Path $dir) -and (Test-InPath $dir)) {
-            Write-Info "Selected install directory: $dir"
-            return $dir
-        }
-    }
-
-    # Otherwise, use the default location (first candidate)
-    $defaultDir = $candidateDirs[0]
+    # Use standard Windows location for user-installed programs
+    $installDir = "$env:LOCALAPPDATA\Programs\TigerCLI"
     try {
-        if (-not (Test-Path $defaultDir)) {
-            New-Item -ItemType Directory -Path $defaultDir -Force | Out-Null
+        if (-not (Test-Path $installDir)) {
+            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
         }
-        Write-Info "Selected install directory: $defaultDir"
-        return $defaultDir
+        Write-Info "Install directory: $installDir"
+        return $installDir
     }
     catch {
-        Write-ErrorMsg "Cannot create install directory: $defaultDir"
+        Write-ErrorMsg "Cannot create install directory: $installDir"
         Write-ErrorMsg "Error: $_"
         Write-ErrorMsg "Please set `$env:INSTALL_DIR environment variable to specify a different location"
         exit 1
