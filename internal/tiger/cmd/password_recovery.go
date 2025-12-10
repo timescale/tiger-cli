@@ -156,7 +156,6 @@ func newPasswordRecoveryModel(canResetPassword bool) passwordRecoveryModel {
 
 	options = append(options, "Exit")
 	optionMap = append(optionMap, optionExit)
-	optionMap = append(optionMap, optionExit)
 
 	return passwordRecoveryModel{
 		options:          options,
