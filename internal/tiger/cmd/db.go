@@ -79,7 +79,11 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+			cfg, projectID, client, err := loadConfigAndApiClient()
+			if err != nil {
+				return err
+			}
+			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
 			if err != nil {
 				return err
 			}
@@ -131,7 +135,9 @@ with the appropriate connection parameters.
 Authentication is handled automatically using:
 1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
 2. PGPASSWORD environment variable
-3. Interactive password prompt (if neither above is available)
+3. If authentication fails, offers interactive options:
+   - Enter password manually (will be saved for future use)
+   - Reset password (update or generates a new password via the API)
 
 Examples:
   # Connect to default service
@@ -158,8 +164,11 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
-
-			service, err := getServiceDetails(cmd, serviceArgs)
+			cfg, projectID, client, err := loadConfigAndApiClient()
+			if err != nil {
+				return err
+			}
+			service, err := getServiceDetails(cmd, cfg, projectID, client, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -182,8 +191,7 @@ Examples:
 				return fmt.Errorf("connection pooler not available for this service")
 			}
 
-			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, dbConnectRole, cmd)
+			return connectWithPasswordMenu(cmd.Context(), cmd, client, service, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -232,7 +240,11 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+			cfg, projectID, client, err := loadConfigAndApiClient()
+			if err != nil {
+				return err
+			}
+			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
@@ -306,7 +318,11 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetailsFunc(cmd, args)
+			cfg, projectID, client, err := loadConfigAndApiClient()
+			if err != nil {
+				return err
+			}
+			service, err := getServiceDetailsFunc(cmd, cfg, projectID, client, args)
 			if err != nil {
 				return err
 			}
@@ -651,10 +667,9 @@ PostgreSQL Configuration Parameters That May Be Set:
 
 			cmd.SilenceUsage = true
 
-			// Get config
-			cfg, err := config.Load()
+			cfg, projectID, client, err := loadConfigAndApiClient()
 			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
+				return err
 			}
 
 			// Get password
@@ -664,7 +679,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Get service details
-			service, err := getServiceDetails(cmd, args)
+			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
 			if err != nil {
 				return err
 			}
@@ -748,13 +763,30 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-// getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
-	// Get config
+func loadConfigAndApiClient() (*config.Config, string, *api.ClientWithResponses, error) {
+	// Load config
 	cfg, err := config.Load()
 	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to load config: %w", err)
 	}
+
+	// Get API key and project ID for authentication
+	apiKey, projectID, err := getCredentialsForDB()
+	if err != nil {
+		return nil, "", nil, common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+	}
+
+	// Create API client
+	client, err := api.NewTigerClient(cfg, apiKey)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	return cfg, projectID, client, nil
+}
+
+// getServiceDetails is a helper that handles common service lookup logic and returns the service details
+func getServiceDetails(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
 
 	// Determine service ID
 	serviceID, err := getServiceID(cfg, args)
@@ -763,18 +795,6 @@ func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
 	}
 
 	cmd.SilenceUsage = true
-
-	// Get API key and project ID for authentication
-	apiKey, projectID, err := getCredentialsForDB()
-	if err != nil {
-		return api.Service{}, common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-	}
-
-	// Create API client
-	client, err := api.NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to create API client: %w", err)
-	}
 
 	// Fetch service details
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
@@ -820,17 +840,22 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 	return serviceArgs, psqlFlags
 }
 
-// launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, cmd)
+// launchPsql launches psql using the connection string and additional flags.
+// It retrieves the password from storage and sets PGPASSWORD environment variable.
+func launchPsql(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(details, psqlPath, additionalFlags, service, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) *exec.Cmd {
-	// Build command arguments: connection string first, then additional flags
-	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
+func buildPsqlCommand(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+	password := details.Password
+	// Ensure we don't include password in the connection string to make it not show up in process lists
 	// Passwords are passed via PGPASSWORD environment variable (see below)
+	detailsCopy := *details
+	detailsCopy.Password = ""
+	connectionString := detailsCopy.String()
+	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
@@ -841,16 +866,21 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	psqlCmd.Stdout = cmd.OutOrStdout()
 	psqlCmd.Stderr = cmd.ErrOrStderr()
 
-	// Only set PGPASSWORD for keyring storage method
-	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := common.GetPasswordStorage()
-	if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service, role); err == nil && password != "" {
-			// Set PGPASSWORD environment variable for psql when using keyring
-			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+	// Use provided password directly if available
+	if password != "" {
+		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+	} else {
+		storage := common.GetPasswordStorage()
+		// Only set PGPASSWORD for keyring storage method
+		// pgpass storage relies on psql automatically reading ~/.pgpass file
+		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
+			if storedPassword, err := storage.Get(service, details.Role); err == nil && storedPassword != "" {
+				// Set PGPASSWORD environment variable for psql when using keyring
+				psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+storedPassword)
+			}
+			// Note: If keyring password retrieval fails, we let psql try without it
+			// This allows fallback to other authentication methods
 		}
-		// Note: If keyring password retrieval fails, we let psql try without it
-		// This allows fallback to other authentication methods
 	}
 
 	return psqlCmd
