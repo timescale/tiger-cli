@@ -443,6 +443,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 // buildServiceUpdatePasswordCmd creates a new update-password command
 func buildServiceUpdatePasswordCmd() *cobra.Command {
 	var updatePasswordValue string
+	var autoGenerate bool
 
 	cmd := &cobra.Command{
 		Use:   "update-password [service-id]",
@@ -454,6 +455,9 @@ from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
 Examples:
+  # Update password for default service, interactively prompts
+  tiger service update-password
+
   # Update password for default service
   tiger service update-password --new-password new-secure-password
 
@@ -468,7 +472,10 @@ Examples:
   tiger service update-password svc-12345 --new-password new-secure-password
 
   # Update password without saving (using global flag)
-  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none`,
+  tiger service update-password svc-12345 --new-password new-secure-password --password-storage none
+
+  # Auto-generate a secure password
+  tiger service update-password --auto-generate`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		PreRunE:           bindFlags("new-password"),
@@ -487,8 +494,9 @@ Examples:
 
 			// Get password from flag or environment variable via viper
 			password := viper.GetString("new_password")
-			if password == "" {
-				return fmt.Errorf("new password is required. Use --new-password flag or set TIGER_NEW_PASSWORD environment variable")
+
+			if autoGenerate && password != "" {
+				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
 
 			cmd.SilenceUsage = true
@@ -505,43 +513,56 @@ Examples:
 				return fmt.Errorf("failed to create API Client: %w", err)
 			}
 
-			// Prepare password update request
-			updateReq := api.UpdatePasswordInput{
-				Password: password,
-			}
-
-			// Make API call to update password
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, serviceID, updateReq)
+			// Fetch service details
+			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				return fmt.Errorf("failed to update service password: %w", err)
+				return fmt.Errorf("failed to get service details: %w", err)
 			}
+			if serviceResp.StatusCode() != 200 {
+				return common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+			}
+			service := *serviceResp.JSON200
 
 			statusOutput := cmd.ErrOrStderr()
 
-			// Handle API response
-			if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			if autoGenerate {
+				// Auto-generate password using existing function
+				if _, err := resetServicePassword(ctx, client, service, "tsdbadmin", "", statusOutput); err != nil {
+					return err
+				}
+			} else if password == "" {
+				// Interactive prompt - check if we're in a terminal
+				if !checkStdinIsTTY() {
+					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
+				}
+				_, err := promptAndResetPassword(
+					ctx,
+					statusOutput,
+					client,
+					service,
+					"tsdbadmin",
+				)
+				if err != nil {
+					return err
+				}
+			} else {
+				if _, err := resetServicePassword(ctx, client, service, "tsdbadmin", password, statusOutput); err != nil {
+					return err
+				}
 			}
 
 			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
-
-			// Handle password storage using the configured method
-			// Get the service details for password storage
-			serviceResp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-				handlePasswordSaving(*serviceResp.JSON200, password, statusOutput)
-			}
-
 			return nil
 		},
 	}
 
 	// Add flags
 	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
-
+	cmd.Flags().BoolVar(&autoGenerate, "auto-generate", false, "Auto-generate a secure password")
+	cmd.MarkFlagsMutuallyExclusive("new-password", "auto-generate")
 	return cmd
 }
 
