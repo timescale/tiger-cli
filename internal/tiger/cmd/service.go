@@ -1576,7 +1576,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration (using resize-specific validation)
-			cpuMillisStr, memoryGBsStr, err := util.ValidateAndNormalizeCPUMemoryForResize(resizeCPU, resizeMemory)
+			cpuMillisStr, memoryGBsStr, err := common.ValidateAndNormalizeCPUMemoryForResize(resizeCPU, resizeMemory)
 			if err != nil {
 				return err
 			}
@@ -1600,7 +1600,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Get API key and project ID for authentication
 			apiKey, projectID, err := getCredentialsForService()
 			if err != nil {
-				return exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 			}
 
 			// Create API client
@@ -1639,7 +1639,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Handle API response
 			if resp.StatusCode() != 202 {
-				return exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
@@ -1684,7 +1684,7 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := NewSpinner(output, "Service status: %s", "RESIZING")
+	spinner := common.NewSpinner(output, "Service status: RESIZING")
 	defer spinner.Stop()
 
 	var lastStatus string
@@ -1693,16 +1693,16 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 		case <-ctx.Done():
 			switch {
 			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return exitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - resize may still be in progress", waitTimeout))
+				return common.ExitWithCode(common.ExitTimeout, fmt.Errorf("wait timeout reached after %v - resize may still be in progress", waitTimeout))
 			case errors.Is(ctx.Err(), context.Canceled):
-				return exitWithCode(ExitGeneralError, fmt.Errorf("canceled waiting - resize may still be in progress"))
+				return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("canceled waiting - resize may still be in progress"))
 			default:
-				return exitWithCode(ExitGeneralError, fmt.Errorf("error waiting - resize may still be in progress: %w", ctx.Err()))
+				return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("error waiting - resize may still be in progress: %w", ctx.Err()))
 			}
 		case <-ticker.C:
 			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
 			if err != nil {
-				spinner.Update("Error checking service status: %v", err)
+				spinner.Update(fmt.Sprintf("Error checking service status: %v", err))
 				continue
 			}
 
@@ -1717,7 +1717,7 @@ func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, 
 			// Check if status changed
 			if status != lastStatus {
 				lastStatus = status
-				spinner.Update("Service status: %s", status)
+				spinner.Update(fmt.Sprintf("Service status: %s", status))
 			}
 
 			switch status {

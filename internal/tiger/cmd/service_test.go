@@ -1702,8 +1702,8 @@ func TestServiceResize_NoAuth(t *testing.T) {
 	}
 
 	// Check for proper exit code
-	if exitErr, ok := err.(interface{ ExitCode() int }); !ok || exitErr.ExitCode() != ExitAuthenticationError {
-		t.Errorf("Expected exit code %d, got: %v", ExitAuthenticationError, err)
+	if exitErr, ok := err.(interface{ ExitCode() int }); !ok || exitErr.ExitCode() != common.ExitAuthenticationError {
+		t.Errorf("Expected exit code %d, got: %v", common.ExitAuthenticationError, err)
 	}
 }
 

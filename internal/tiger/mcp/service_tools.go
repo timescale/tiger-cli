@@ -1102,7 +1102,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 			// Get updated service details
 			serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
 			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-				output.Service = s.convertToServiceDetail(*serviceResp.JSON200)
+				output.Service = s.convertToServiceDetail(*serviceResp.JSON200, false)
 			}
 		}
 	}
