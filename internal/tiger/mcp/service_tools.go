@@ -77,7 +77,7 @@ type ResourceInfo struct {
 
 // setServiceIDSchemaProperties sets common service_id schema properties
 func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
-	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
