@@ -21,8 +21,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// validateAndGetAuthInfo can be overridden for testing
-var validateAndGetAuthInfo = common.ValidateAPIKey
+// validateAPIKey can be overridden for testing
+var validateAPIKey = common.ValidateAPIKey
 
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
@@ -125,7 +125,7 @@ Examples:
 
 			// Validate the API key and get auth info by calling the /auth/info endpoint
 			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-			authInfo, err := validateAndGetAuthInfo(cmd.Context(), cfg, client)
+			authInfo, err := validateAPIKey(cmd.Context(), cfg, client)
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
@@ -183,28 +183,17 @@ func buildStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			apiKey, _, err := config.GetCredentials()
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
 				return err
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
 			}
 
 			// Make API call to get auth information
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := client.GetAuthInfoWithResponse(ctx)
+			resp, err := cfg.Client.GetAuthInfoWithResponse(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to get auth information: %w", err)
 			}

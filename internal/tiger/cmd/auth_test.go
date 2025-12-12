@@ -28,8 +28,8 @@ func setupAuthTest(t *testing.T) string {
 	config.SetTestServiceName(t)
 
 	// Mock the API key validation for testing
-	originalValidator := validateAndGetAuthInfo
-	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+	originalValidator := validateAPIKey
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 		// Always return success with test auth info
 		authInfo := &api.AuthInfo{
 			Type: api.ApiKey,
@@ -67,7 +67,7 @@ func setupAuthTest(t *testing.T) string {
 		config.RemoveCredentials()
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		validateAndGetAuthInfo = originalValidator // Restore original validator
+		validateAPIKey = originalValidator // Restore original validator
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)
 		os.Remove(configFile)
