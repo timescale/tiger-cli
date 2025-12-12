@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	expect "github.com/Netflix/go-expect"
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -2137,5 +2140,389 @@ func TestServiceForkIntegration(t *testing.T) {
 		}
 
 		t.Logf("Logout successful")
+	})
+}
+
+// buildTigerBinary compiles the CLI binary for PTY-based testing
+func buildTigerBinary(t *testing.T, tmpDir string) string {
+	t.Helper()
+
+	binaryPath := filepath.Join(tmpDir, "tiger")
+
+	// Find project root by looking for go.mod
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		t.Fatalf("Failed to find project root: %v", err)
+	}
+
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/tiger")
+	cmd.Dir = projectRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to build tiger binary: %v\nOutput: %s", err, output)
+	}
+
+	return binaryPath
+}
+
+// findProjectRoot finds the project root directory by looking for go.mod
+func findProjectRoot() (string, error) {
+	// Start from current working directory and walk up
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find go.mod in any parent directory")
+		}
+		dir = parent
+	}
+}
+
+// buildTestEnv creates environment variables for PTY test binary
+func buildTestEnv(tmpDir string) []string {
+	env := os.Environ()
+	// Override config directory to use test temp dir
+	env = append(env, "TIGER_CONFIG_DIR="+tmpDir)
+	// Disable analytics for tests
+	env = append(env, "TIGER_ANALYTICS=false")
+	// Use pgpass storage for easier testing (no keyring interaction)
+	env = append(env, "TIGER_PASSWORD_STORAGE=pgpass")
+	return env
+}
+
+// TestDbConnectPasswordResetIntegration tests the interactive password reset flow
+// using go-expect for PTY simulation
+func TestDbConnectPasswordResetIntegration(t *testing.T) {
+	config.SetTestServiceName(t)
+
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
+	}
+
+	// Check if psql is available
+	if _, err := exec.LookPath("psql"); err != nil {
+		t.Skip("Skipping integration test: psql not available")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Use pgpass storage for entire test so main process and subprocess use the same storage
+	os.Setenv("TIGER_PASSWORD_STORAGE", "pgpass")
+	t.Cleanup(func() {
+		os.Unsetenv("TIGER_PASSWORD_STORAGE")
+	})
+
+	var serviceID string
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	// Cleanup function to ensure service is deleted even if test fails
+	defer func() {
+		if serviceID != "" {
+			t.Logf("Cleaning up service: %s", serviceID)
+			_, err := executeIntegrationCommand(
+				t.Context(),
+				"service", "delete", serviceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup service %s: %v", serviceID, err)
+			}
+		}
+	}()
+
+	t.Run("Login", func(t *testing.T) {
+		t.Logf("Logging in with public key: %s...", publicKey[:8])
+
+		// Login in main test process (uses test-specific keyring service name)
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+		)
+
+		if err != nil {
+			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "Successfully logged in") {
+			t.Errorf("Login output doesn't contain success message: %s", output)
+		}
+	})
+
+	t.Run("CreateService", func(t *testing.T) {
+		t.Logf("Creating service for password reset test")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "create",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service creation failed: %v\nOutput: %s", err, output)
+		}
+
+		// Extract service ID from JSON output
+		serviceID = extractServiceIDFromCreateOutput(t, output)
+		t.Logf("Created service with ID: %s", serviceID)
+	})
+
+	// Build tiger binary once for PTY testing (used by multiple subtests)
+	binaryPath := buildTigerBinary(t, tmpDir)
+	t.Logf("Built tiger binary at: %s", binaryPath)
+
+	t.Run("SubprocessLogin", func(t *testing.T) {
+		// Run tiger auth login in subprocess environment to store credentials
+		// in the system keyring (which subprocess will use)
+		t.Logf("Running tiger auth login in subprocess environment")
+
+		cmd := exec.Command(binaryPath, "auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+		)
+		cmd.Env = buildTestEnv(tmpDir)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Subprocess auth login failed: %v\nOutput: %s", err, output)
+		}
+		t.Logf("Subprocess auth login output: %s", output)
+	})
+
+	t.Run("VerifyInitialConnection", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available")
+		}
+
+		t.Logf("Verifying initial connection works before deleting password")
+
+		// Create PTY console
+		c, err := expect.NewConsole(
+			expect.WithDefaultTimeout(60*time.Second),
+			expect.WithStdout(os.Stdout),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create PTY console: %v", err)
+		}
+		defer c.Close()
+
+		// Run tiger db connect
+		cmd := exec.Command(binaryPath, "db", "connect", serviceID)
+		cmd.Stdin = c.Tty()
+		cmd.Stdout = c.Tty()
+		cmd.Stderr = c.Tty()
+		cmd.Env = buildTestEnv(tmpDir)
+
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("Failed to start command: %v", err)
+		}
+
+		// Should connect directly to psql (no menu since password is valid)
+		// Wait for psql prompt
+		t.Logf("Waiting for psql prompt...")
+		_, err = c.ExpectString("tsdb=>")
+		if err != nil {
+			t.Fatalf("Expected psql prompt, got error: %v", err)
+		}
+		t.Logf("Got psql prompt - connection works!")
+
+		// Exit psql
+		c.SendLine("\\q")
+		cmd.Wait()
+
+		t.Logf("Initial connection verified successfully")
+	})
+
+	t.Run("DeleteStoredPassword", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available")
+		}
+
+		t.Logf("Deleting stored password to trigger recovery flow")
+
+		// Get service details to remove password
+		cfg, err := config.Load()
+		if err != nil {
+			t.Fatalf("Failed to load config: %v", err)
+		}
+
+		apiKey, projectID, err := config.GetCredentials()
+		if err != nil {
+			t.Fatalf("Failed to get credentials: %v", err)
+		}
+
+		client, err := api.NewTigerClient(cfg, apiKey)
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+
+		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(t.Context(), projectID, serviceID)
+		if err != nil {
+			t.Fatalf("Failed to get service: %v", err)
+		}
+
+		if resp.JSON200 == nil {
+			t.Fatalf("Service not found")
+		}
+
+		service := *resp.JSON200
+
+		// Remove password from pgpass storage
+		storage := &common.PgpassStorage{}
+		if err := storage.Remove(service, "tsdbadmin"); err != nil {
+			t.Logf("Warning: Failed to remove password from pgpass (may not exist): %v", err)
+		}
+
+		t.Logf("Password removed from storage")
+	})
+
+	t.Run("InteractivePasswordReset", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available")
+		}
+
+		t.Logf("Running interactive password reset flow")
+
+		// Create PTY console with timeout and stdout capture for debugging
+		c, err := expect.NewConsole(
+			expect.WithDefaultTimeout(90*time.Second),
+			expect.WithStdout(os.Stdout), // Echo output to test log
+		)
+		if err != nil {
+			t.Fatalf("Failed to create PTY console: %v", err)
+		}
+		defer c.Close()
+
+		// Set up command with PTY
+		cmd := exec.Command(binaryPath, "db", "connect", serviceID)
+		cmd.Stdin = c.Tty()
+		cmd.Stdout = c.Tty()
+		cmd.Stderr = c.Tty()
+		cmd.Env = buildTestEnv(tmpDir)
+
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("Failed to start command: %v", err)
+		}
+
+		// Wait for the menu prompt (auth failure message comes before it)
+		t.Logf("Waiting for menu prompt...")
+		_, err = c.ExpectString("What would you like to do?")
+		if err != nil {
+			t.Fatalf("Expected menu prompt: %v", err)
+		}
+		t.Logf("Got menu prompt")
+
+		// Select "Update/reset password" (option 2)
+		t.Logf("Selecting option 2 (Update/reset password)")
+		c.Send("2")
+
+		// Expect password prompt
+		t.Logf("Waiting for password prompt...")
+		_, err = c.ExpectString("Enter new password")
+		if err != nil {
+			t.Fatalf("Expected password prompt: %v", err)
+		}
+		t.Logf("Got password prompt")
+
+		// Send empty to auto-generate password
+		t.Logf("Sending empty password to auto-generate")
+		c.SendLine("")
+
+		// Expect success message
+		t.Logf("Waiting for success message...")
+		_, err = c.ExpectString("updated successfully")
+		if err != nil {
+			t.Fatalf("Expected success message: %v", err)
+		}
+		t.Logf("Got success message")
+
+		// psql launches - wait for any prompt indicator then exit
+		t.Logf("Waiting for psql to launch...")
+		// Give psql time to connect and show prompt
+		time.Sleep(2 * time.Second)
+
+		// Exit psql with \q
+		t.Logf("Sending \\q to exit psql")
+		c.SendLine("\\q")
+
+		// Wait for command to complete
+		err = cmd.Wait()
+		if err != nil {
+			t.Logf("Command exited with: %v (this may be expected)", err)
+		}
+
+		t.Logf("Interactive password reset completed")
+	})
+
+	t.Run("VerifyPasswordReset", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available")
+		}
+
+		t.Logf("Verifying password was reset successfully")
+
+		// Test connection with the new password (should be saved in pgpass)
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "test-connection", serviceID,
+			"--timeout", "30s",
+		)
+
+		if err != nil {
+			t.Fatalf("Connection failed after password reset: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "Connection successful") {
+			t.Errorf("Expected successful connection, got: %s", output)
+		}
+
+		t.Logf("Password reset verified - connection successful")
+	})
+
+	t.Run("DeleteService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available")
+		}
+
+		t.Logf("Deleting service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", serviceID,
+			"--confirm",
+			"--wait-timeout", "5m",
+		)
+
+		if err != nil {
+			t.Fatalf("Service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear serviceID so cleanup doesn't try to delete again
+		serviceID = ""
+		t.Logf("Service deleted successfully")
 	})
 }
