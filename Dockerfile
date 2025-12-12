@@ -45,4 +45,5 @@ EXPOSE 8080
 # Copy binary to final image
 COPY --from=build /bin/tiger /usr/local/bin/tiger
 
-CMD ["tiger", "mcp", "start", "http", "--host=", "--port=8080"]
+ENTRYPOINT ["tiger"]
+CMD ["mcp", "start", "http", "--host=", "--port=8080"]
