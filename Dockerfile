@@ -1,9 +1,10 @@
 ARG GO_VERSION=1.25
+ARG BINARY_SOURCE=builder
 
 # When performing a multi-platform build, leverage Go's built-in support for
 # cross-compilation instead of relying on emulation (which is much slower).
 # See: https://docs.docker.com/build/building/multi-platform/#cross-compiling-a-go-application
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -19,6 +20,15 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o /bin/tiger ./cmd/tiger
+
+
+# Used when building Docker images via GoReleaser.
+# See: https://goreleaser.com/customization/dockers_v2/
+FROM scratch AS release
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/tiger /bin/tiger
+
+FROM ${BINARY_SOURCE} AS binary_source
 
 # Create final alpine image
 FROM alpine:3.23 AS final
@@ -43,7 +53,7 @@ VOLUME /home/tiger/.pgpass
 EXPOSE 8080
 
 # Copy binary to final image
-COPY --from=build /bin/tiger /usr/local/bin/tiger
+COPY --from=binary_source /bin/tiger /usr/local/bin/tiger
 
 ENTRYPOINT ["tiger"]
 CMD ["mcp", "start", "http", "--host=", "--port=8080"]

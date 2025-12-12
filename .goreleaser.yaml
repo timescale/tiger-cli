@@ -93,6 +93,19 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
 
+dockers_v2:
+  - images:
+      - ghcr.io/timescale/tiger-cli
+    tags:
+      - "v{{ .Version }}"
+      - "latest" # TODO: Only if not prerelease
+    labels:
+      io.modelcontextprotocol.server.name: "io.github.username/tiger-cli"
+    build_args:
+      BINARY_SOURCE: release
+    platforms:
+      - linux/amd64
+      - linux/arm64
 
 # S3 Blob Storage Configuration
 blobs:
