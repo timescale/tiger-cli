@@ -20,7 +20,7 @@ type ConfigAndAPIClient struct {
 	ProjectID string
 }
 
-func LoadConfigAndApiClient(ctx context.Context) (*ConfigAndAPIClient, error) {
+func LoadConfigAndAPIClient(ctx context.Context) (*ConfigAndAPIClient, error) {
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
@@ -39,6 +39,13 @@ func LoadConfigAndApiClient(ctx context.Context) (*ConfigAndAPIClient, error) {
 		ProjectID:           projectID,
 	}, nil
 }
+
+// Cache of validated API Keys. Useful for avoided unnecessary calls to the
+// /auth/info and /analytics/identify endpoints when the API client is loaded
+// multiple times using credentials provided via the TIGER_PUBLIC_KEY and
+// TIGER_SECRET_KEY env vars (e.g. when using the MCP server, which re-fetches
+// the API client for each tool call).
+var validatedAPIKeyCache = map[string]*api.AuthInfo{}
 
 func getClientAndProjectID(ctx context.Context, cfg *config.Config) (*api.ClientWithResponses, string, error) {
 	// Credentials in the environment take priority
@@ -70,10 +77,16 @@ func getClientAndProjectID(ctx context.Context, cfg *config.Config) (*api.Client
 		return nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	// Validate the API key and get auth info by calling the /auth/info endpoint
-	authInfo, err := ValidateAPIKey(ctx, cfg, client)
-	if err != nil {
-		return nil, "", fmt.Errorf("API key validation failed: %w", err)
+	// Check whether this API Key has already been validated, and return the
+	// cached auth info if so. Otherwise, validate it
+	authInfo, ok := validatedAPIKeyCache[apiKey]
+	if !ok {
+		// Validate the API key and get auth info by calling the /auth/info endpoint
+		authInfo, err = ValidateAPIKey(ctx, cfg, client)
+		if err != nil {
+			return nil, "", fmt.Errorf("API key validation failed: %w", err)
+		}
+		validatedAPIKeyCache[apiKey] = authInfo
 	}
 
 	return client, authInfo.ApiKey.Project.Id, nil
