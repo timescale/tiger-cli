@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.timescale/tiger-cli",
+  "title": "Tiger MCP",
+  "description": "Provides programmatic access to Tiger Cloud services, databases, and documentation.",
+  "version": "{{VERSION}}",
+  "homepage": "https://github.com/timescale/tiger-cli",
+  "repository": {
+    "url": "https://github.com/timescale/tiger-cli",
+    "source": "github",
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/timescale/tiger-cli:{{VERSION}}",
+      "transport": {
+        "type": "stdio",
+      },
+      "environmentVariables": [
+        {
+          "name": "TIGER_PUBLIC_KEY",
+          "description": "Tiger Cloud API public key for authentication",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "TIGER_SECRET_KEY",
+          "description": "Tiger Cloud API secret key for authentication",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

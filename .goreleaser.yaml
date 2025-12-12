@@ -94,13 +94,21 @@ nfpms:
         - statically-linked-binary
 
 dockers_v2:
-  - images:
+  - id: docker
+    images:
       - ghcr.io/timescale/tiger-cli
     tags:
       - "v{{ .Version }}"
-      - "latest" # TODO: Only if not prerelease
+      - '{{ if eq .Prerelease "" }}latest{{ end }}'
     labels:
-      io.modelcontextprotocol.server.name: "io.github.username/tiger-cli"
+      org.opencontainers.image.created: "{{.Date}}"
+      org.opencontainers.image.name: "{{.ProjectName}}"
+      org.opencontainers.image.title: "{{.ProjectName}}"
+      org.opencontainers.image.revision: "{{.FullCommit}}"
+      org.opencontainers.image.source: "https://github.com/timescale/tiger-cli"
+      org.opencontainers.image.url: "https://github.com/timescale/tiger-cli"
+      org.opencontainers.image.version: "{{.Version}}"
+      io.modelcontextprotocol.server.name: "io.github.timescale/tiger-cli"
     build_args:
       BINARY_SOURCE: release
     platforms:
@@ -179,7 +187,7 @@ changelog:
       - "^specs:"
       # TODO: Other files that should be ignored
 
-# PackageCloud publisher for Linux packages
+# Publishers for external registries
 publishers:
   # Upload all Linux packages (deb, rpm) to PackageCloud
   - name: packagecloud
@@ -195,6 +203,13 @@ publishers:
         {{- end }} {{ .ArtifactPath }}
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+
+  # Publish server.json to MCP Registry
+  - name: mcp-registry
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
+    ids:
+      - docker # Only publish docker images
+    cmd: sh -c 'sed "s/{{VERSION}}/{{ .Version }}/g" server-template.json > server.json && ./mcp-publisher publish
 
 # Release configuration
 release:

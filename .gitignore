@@ -49,6 +49,7 @@ config.yaml
 
 # Build artifacts
 latest.txt
+server.json
 completions/
 
 # Claude
