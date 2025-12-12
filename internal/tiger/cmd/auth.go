@@ -15,7 +15,6 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
@@ -23,7 +22,7 @@ import (
 )
 
 // validateAndGetAuthInfo can be overridden for testing
-var validateAndGetAuthInfo = validateAndGetAuthInfoImpl
+var validateAndGetAuthInfo = common.ValidateAPIKey
 
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
@@ -118,9 +117,15 @@ Examples:
 			// Combine the keys in the format "public:secret" for storage
 			apiKey := fmt.Sprintf("%s:%s", creds.publicKey, creds.secretKey)
 
+			// Create API client
+			client, err := api.NewTigerClient(cfg, apiKey)
+			if err != nil {
+				return fmt.Errorf("failed to create client: %w", err)
+			}
+
 			// Validate the API key and get auth info by calling the /auth/info endpoint
 			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
-			authInfo, err := validateAndGetAuthInfo(cmd.Context(), cfg, apiKey)
+			authInfo, err := validateAndGetAuthInfo(cmd.Context(), cfg, client)
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
@@ -315,46 +320,4 @@ func promptForCredentials(ctx context.Context, consoleURL string, creds credenti
 	}
 
 	return creds, nil
-}
-
-// validateAndGetAuthInfoImpl validates the API key and returns authentication information
-// by calling the /auth/info endpoint.
-func validateAndGetAuthInfoImpl(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
-	client, err := api.NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Call the /auth/info endpoint to validate credentials and get auth info
-	resp, err := client.GetAuthInfoWithResponse(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("API call failed: %w", err)
-	}
-
-	// Check the response status
-	if resp.StatusCode() != 200 {
-		if resp.JSON4XX != nil {
-			return nil, resp.JSON4XX
-		}
-		return nil, fmt.Errorf("unexpected API response: %d", resp.StatusCode())
-	}
-
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("empty response from API")
-	}
-
-	authInfo := resp.JSON200
-
-	// Identify the user with analytics
-	a := analytics.New(cfg, client, authInfo.ApiKey.Project.Id)
-	a.Identify(
-		analytics.Property("userId", authInfo.ApiKey.IssuingUser.Id),
-		analytics.Property("email", string(authInfo.ApiKey.IssuingUser.Email)),
-		analytics.Property("planType", authInfo.ApiKey.Project.PlanType),
-	)
-
-	return authInfo, nil
 }

@@ -25,7 +25,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	originalValidator := validateAndGetAuthInfo
 
 	// Mock the validator to return an error
-	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 		return nil, errors.New("invalid API key: authentication failed")
 	}
 
@@ -79,7 +79,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	originalValidator := validateAndGetAuthInfo
 
 	// Mock the validator to return success
-	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{
 			Type: api.ApiKey,
 		}
