@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
-	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
@@ -80,29 +80,6 @@ func (s *Server) registerTools(ctx context.Context) {
 	logging.Info("MCP tools registered successfully")
 }
 
-// createAPIClient creates a new API client and returns it with the project ID
-func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Get credentials (API key + project ID)
-	apiKey, projectID, err := config.GetCredentials()
-	if err != nil {
-		return nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
-	}
-
-	// Create API client with fresh credentials
-	apiClient, err := api.NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create API client: %w", err)
-	}
-
-	return apiClient, projectID, nil
-}
-
 // analyticsMiddleware tracks analytics for all MCP requests
 func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (result mcp.Result, runErr error) {
@@ -115,7 +92,8 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			return next(ctx, method, req)
 		}
 
-		a := analytics.TryInit(cfg)
+		client, projectID, _ := common.NewAPIClient(ctx, cfg)
+		a := analytics.New(cfg, client, projectID)
 
 		switch r := req.(type) {
 		case *mcp.CallToolRequest:

@@ -1,0 +1,23 @@
+services:
+  tiger-cli:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    image: ghcr.io/timescale/tiger-cli:${TAG:-latest}
+    container_name: tiger-cli
+    environment:
+      - TIGER_PUBLIC_KEY
+      - TIGER_SECRET_KEY
+    ports:
+      - 8080:8080
+    volumes:
+      - tiger-config:/home/tiger/.config/tiger
+      - tiger-pgpass:/home/tiger/.pgpass
+
+volumes:
+  tiger-config:
+  tiger-pgpass:

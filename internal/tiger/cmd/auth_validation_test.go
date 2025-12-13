@@ -22,15 +22,15 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
-	originalValidator := validateAndGetAuthInfo
+	originalValidator := validateAPIKey
 
 	// Mock the validator to return an error
-	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 		return nil, errors.New("invalid API key: authentication failed")
 	}
 
 	defer func() {
-		validateAndGetAuthInfo = originalValidator
+		validateAPIKey = originalValidator
 	}()
 
 	// Initialize viper with test directory BEFORE calling RemoveCredentials()
@@ -76,10 +76,10 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
-	originalValidator := validateAndGetAuthInfo
+	originalValidator := validateAPIKey
 
 	// Mock the validator to return success
-	validateAndGetAuthInfo = func(ctx context.Context, cfg *config.Config, apiKey string) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{
 			Type: api.ApiKey,
 		}
@@ -89,7 +89,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 
 	defer func() {
-		validateAndGetAuthInfo = originalValidator
+		validateAPIKey = originalValidator
 	}()
 
 	// Initialize viper with test directory BEFORE calling RemoveCredentials()
