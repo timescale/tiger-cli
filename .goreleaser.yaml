@@ -98,7 +98,9 @@ dockers_v2:
     images:
       - ghcr.io/timescale/tiger-cli
     tags:
-      - "v{{ .Version }}"
+      - "{{ .Version }}"
+      - '{{ if eq .Prerelease "" }}{{ .Major }}{{ end }}'
+      - '{{ if eq .Prerelease "" }}{{ .Major }}.{{ .Minor }}{{ end }}'
       - '{{ if eq .Prerelease "" }}latest{{ end }}'
     labels:
       org.opencontainers.image.created: "{{.Date}}"
@@ -209,7 +211,7 @@ publishers:
     disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
     ids:
       - docker # Only publish docker images
-    cmd: sh -c 'sed "s/{{VERSION}}/{{ .Version }}/g" server-template.json > server.json && ./mcp-publisher publish
+    cmd: sh -c 'sed "s/\$VERSION/{{ .Version }}/g" server-template.json > server.json && ./mcp-publisher publish'
 
 # Release configuration
 release:
