@@ -56,4 +56,4 @@ EXPOSE 8080
 COPY --from=binary_source /bin/tiger /usr/local/bin/tiger
 
 ENTRYPOINT ["tiger"]
-CMD ["mcp", "start", "http", "--host=", "--port=8080"]
+CMD ["mcp", "start"]
