@@ -7,15 +7,45 @@
   "homepage": "https://github.com/timescale/tiger-cli",
   "repository": {
     "url": "https://github.com/timescale/tiger-cli",
-    "source": "github",
+    "source": "github"
   },
   "packages": [
     {
       "registryType": "oci",
       "identifier": "ghcr.io/timescale/tiger-cli:{{VERSION}}",
       "transport": {
-        "type": "stdio",
+        "type": "stdio"
       },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "description": "Mount the config directory into the volume",
+          "name": "--mount",
+          "value": "type=bind,src={source_path},dst=/home/tiger/.config/tiger",
+          "variables": {
+            "source_path": {
+              "description": "Source path on host",
+              "format": "filepath",
+              "isRequired": true,
+              "default": "${HOME}/.config/tiger"
+            }
+          }
+        },
+        {
+          "type": "named",
+          "description": "Mount the .pgpass file into the volume",
+          "name": "--mount",
+          "value": "type=bind,src={source_path},dst=/home/tiger/.pgpass",
+          "variables": {
+            "source_path": {
+              "description": "Source path on host",
+              "format": "filepath",
+              "isRequired": true,
+              "default": "${HOME}/.pgpass"
+            }
+          }
+        }
+      ],
       "environmentVariables": [
         {
           "name": "TIGER_PUBLIC_KEY",

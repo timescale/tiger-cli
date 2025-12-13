@@ -21,13 +21,14 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o /bin/tiger ./cmd/tiger
 
-
-# Used when building Docker images via GoReleaser.
-# See: https://goreleaser.com/customization/dockers_v2/
+# When building Docker images via GoReleaser, to binaries are built externally
+# and copied in. See: https://goreleaser.com/customization/dockers_v2/
 FROM scratch AS release
 ARG TARGETPLATFORM
 COPY ${TARGETPLATFORM}/tiger /bin/tiger
 
+# Either the 'builder' or 'release' stage, depending on whether we're building
+# the binaries in Docker or outside via GoReleaser.
 FROM ${BINARY_SOURCE} AS binary_source
 
 # Create final alpine image
@@ -48,9 +49,6 @@ ENV TIGER_CONFIG_DIR=/home/tiger/.config/tiger
 # Declare config file mount points
 VOLUME /home/tiger/.config/tiger
 VOLUME /home/tiger/.pgpass
-
-# Expose port for sake of MCP server using streamable HTTP transport
-EXPOSE 8080
 
 # Copy binary to final image
 COPY --from=binary_source /bin/tiger /usr/local/bin/tiger
