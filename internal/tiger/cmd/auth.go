@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -186,6 +187,9 @@ func buildStatusCmd() *cobra.Command {
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				if errors.Is(err, config.ErrNotLoggedIn) {
+					return common.ExitWithCode(common.ExitAuthenticationError, config.ErrNotLoggedIn)
+				}
 				return err
 			}
 

@@ -31,6 +31,10 @@ func (e ExitCodeError) ExitCode() int {
 	return e.code
 }
 
+func (e ExitCodeError) Unwrap() error {
+	return e.err
+}
+
 // ExitWithCode returns an error that will cause the program to exit with the specified code
 func ExitWithCode(code int, err error) error {
 	return ExitCodeError{code: code, err: err}
