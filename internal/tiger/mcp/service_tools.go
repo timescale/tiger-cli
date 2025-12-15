@@ -331,6 +331,80 @@ func (ServiceStopOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceStopOutput](nil))
 }
 
+// ServiceResizeInput represents input for service_resize
+type ServiceResizeInput struct {
+	ServiceID      string `json:"service_id"`
+	CPUMemory      string `json:"cpu_memory,omitempty"`
+	Nodes          *int   `json:"nodes,omitempty"`
+	Wait           bool   `json:"wait,omitempty"`
+	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+}
+
+func (ServiceResizeInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["cpu_memory"] = &jsonschema.Schema{
+		Type:        "string",
+		Description: "CPU and memory allocation combination. Choose from the available configurations.",
+		Enum: util.AnySlice([]string{
+			"0.5 CPU/2 GB",
+			"1 CPU/4 GB",
+			"2 CPU/8 GB",
+			"4 CPU/16 GB",
+			"8 CPU/32 GB",
+			"16 CPU/64 GB",
+			"32 CPU/128 GB",
+		}),
+	}
+
+	schema.Properties["nodes"] = &jsonschema.Schema{
+		Type:        "integer",
+		Description: "Number of nodes in the replica set (optional)",
+		Examples:    []any{1, 2, 3},
+		Minimum:     util.Ptr(1.0),
+	}
+
+	schema.Properties["wait"] = &jsonschema.Schema{
+		Type:        "boolean",
+		Description: "Whether to wait for the resize to complete before returning. Default is false (returns immediately).",
+		Default:     util.Must(json.Marshal(false)),
+		Examples:    []any{false, true},
+	}
+
+	schema.Properties["timeout_minutes"] = &jsonschema.Schema{
+		Type:        "integer",
+		Description: "Timeout in minutes when waiting for resize to complete. Only used when 'wait' is true.",
+		Default:     util.Must(json.Marshal(30)),
+		Examples:    []any{15, 30, 60},
+		Minimum:     util.Ptr(0.0),
+	}
+
+	// Remove optional fields from required list
+	newRequired := []string{}
+	for _, field := range schema.Required {
+		if field == "service_id" || field == "cpu_memory" {
+			newRequired = append(newRequired, field)
+		}
+	}
+	schema.Required = newRequired
+
+	return schema
+}
+
+// ServiceResizeOutput represents output for service_resize
+type ServiceResizeOutput struct {
+	Message   string        `json:"message"`
+	ServiceID string        `json:"service_id"`
+	NewCPU    string        `json:"new_cpu"`
+	NewMemory string        `json:"new_memory"`
+	Service   ServiceDetail `json:"service,omitempty"`
+}
+
+func (ServiceResizeOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceResizeOutput](nil))
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools() {
 	// service_list
@@ -967,80 +1041,6 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	return nil, output, nil
-}
-
-// ServiceResizeInput represents input for service_resize
-type ServiceResizeInput struct {
-	ServiceID      string `json:"service_id"`
-	CPUMemory      string `json:"cpu_memory,omitempty"`
-	Nodes          *int   `json:"nodes,omitempty"`
-	Wait           bool   `json:"wait,omitempty"`
-	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
-}
-
-func (ServiceResizeInput) Schema() *jsonschema.Schema {
-	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
-	setServiceIDSchemaProperties(schema)
-
-	schema.Properties["cpu_memory"] = &jsonschema.Schema{
-		Type:        "string",
-		Description: "CPU and memory allocation combination. Choose from the available configurations.",
-		Enum: util.AnySlice([]string{
-			"0.5 CPU/2 GB",
-			"1 CPU/4 GB",
-			"2 CPU/8 GB",
-			"4 CPU/16 GB",
-			"8 CPU/32 GB",
-			"16 CPU/64 GB",
-			"32 CPU/128 GB",
-		}),
-	}
-
-	schema.Properties["nodes"] = &jsonschema.Schema{
-		Type:        "integer",
-		Description: "Number of nodes in the replica set (optional)",
-		Examples:    []any{1, 2, 3},
-		Minimum:     util.Ptr(1.0),
-	}
-
-	schema.Properties["wait"] = &jsonschema.Schema{
-		Type:        "boolean",
-		Description: "Whether to wait for the resize to complete before returning. Default is false (returns immediately).",
-		Default:     util.Must(json.Marshal(false)),
-		Examples:    []any{false, true},
-	}
-
-	schema.Properties["timeout_minutes"] = &jsonschema.Schema{
-		Type:        "integer",
-		Description: "Timeout in minutes when waiting for resize to complete. Only used when 'wait' is true.",
-		Default:     util.Must(json.Marshal(30)),
-		Examples:    []any{15, 30, 60},
-		Minimum:     util.Ptr(0.0),
-	}
-
-	// Remove optional fields from required list
-	newRequired := []string{}
-	for _, field := range schema.Required {
-		if field == "service_id" || field == "cpu_memory" {
-			newRequired = append(newRequired, field)
-		}
-	}
-	schema.Required = newRequired
-
-	return schema
-}
-
-// ServiceResizeOutput represents output for service_resize
-type ServiceResizeOutput struct {
-	Message   string        `json:"message"`
-	ServiceID string        `json:"service_id"`
-	NewCPU    string        `json:"new_cpu"`
-	NewMemory string        `json:"new_memory"`
-	Service   ServiceDetail `json:"service,omitempty"`
-}
-
-func (ServiceResizeOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceResizeOutput](nil))
 }
 
 // handleServiceResize handles the service_resize MCP tool
