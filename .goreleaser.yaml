@@ -189,7 +189,7 @@ changelog:
       - "^specs:"
       # TODO: Other files that should be ignored
 
-# PackageCloud publisher for Linux packages
+# Publishers for external registries
 publishers:
   # Upload all Linux packages (deb, rpm) to PackageCloud
   - name: packagecloud
@@ -205,6 +205,13 @@ publishers:
         {{- end }} {{ .ArtifactPath }}
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
+
+  # Publish server.json to MCP Registry
+  - name: mcp-registry
+    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
+    ids:
+      - docker # Only publish docker images
+    cmd: sh -c 'sed "s/\$VERSION/{{ .Version }}/g" server-template.json > server.json && ./mcp-publisher publish'
 
 # Release configuration
 release:
