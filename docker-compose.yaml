@@ -15,9 +15,9 @@ services:
     ports:
       - 8080:8080
     volumes:
-      - tiger-config:/home/tiger/.config/tiger
-      - tiger-pgpass:/home/tiger/.pgpass
-
-volumes:
-  tiger-config:
-  tiger-pgpass:
+      - type: bind
+        source: ${HOME}/.config/tiger
+        target: /home/tiger/.config/tiger
+      - type: bind
+        source: ${HOME}/.pgpass
+        target: /home/tiger/.pgpass
