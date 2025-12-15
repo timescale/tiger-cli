@@ -34,6 +34,8 @@ func buildVersionCmd() *cobra.Command {
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			versionOutput := VersionOutput{
 				Version:   config.Version,
 				BuildTime: config.BuildTime,
@@ -76,7 +78,6 @@ func buildVersionCmd() *cobra.Command {
 			}
 			if updateAvailable {
 				cmd.SilenceErrors = true
-				cmd.SilenceUsage = true
 				return common.ExitWithCode(common.ExitUpdateAvailable, nil)
 			}
 			return nil

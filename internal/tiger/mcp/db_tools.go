@@ -127,8 +127,8 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 
 // handleDBExecuteQuery handles the db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -137,7 +137,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
 
 	logging.Debug("MCP: Executing database query",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
@@ -145,7 +145,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// Get service details to construct connection string
-	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
