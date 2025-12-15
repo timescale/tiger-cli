@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -1654,7 +1653,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Wait for resize to complete
 			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
 
-			if err := waitForServiceResize(cmd.Context(), client, projectID, serviceID, resizeWaitTimeout, statusOutput); err != nil {
+			var dummyService api.Service
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:     client,
+				ProjectID:  projectID,
+				ServiceID:  serviceID,
+				Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+				Output:     statusOutput,
+				Timeout:    resizeWaitTimeout,
+				TimeoutMsg: "resize may still be in progress",
+			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
@@ -1674,68 +1682,4 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
 	return cmd
-}
-
-// waitForServiceResize waits for a service resize operation to complete
-func waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, waitTimeout time.Duration, output io.Writer) error {
-	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
-	defer cancel()
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	// Start the spinner
-	spinner := common.NewSpinner(output, "Service status: RESIZING")
-	defer spinner.Stop()
-
-	var lastStatus string
-	for {
-		select {
-		case <-ctx.Done():
-			switch {
-			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return common.ExitWithCode(common.ExitTimeout, fmt.Errorf("wait timeout reached after %v - resize may still be in progress", waitTimeout))
-			case errors.Is(ctx.Err(), context.Canceled):
-				return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("canceled waiting - resize may still be in progress"))
-			default:
-				return common.ExitWithCode(common.ExitGeneralError, fmt.Errorf("error waiting - resize may still be in progress: %w", ctx.Err()))
-			}
-		case <-ticker.C:
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				spinner.Update(fmt.Sprintf("Error checking service status: %v", err))
-				continue
-			}
-
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				spinner.Update("Service not found or error checking status")
-				continue
-			}
-
-			service := *resp.JSON200
-			status := util.DerefStr(service.Status)
-
-			// Check if status changed
-			if status != lastStatus {
-				lastStatus = status
-				spinner.Update(fmt.Sprintf("Service status: %s", status))
-			}
-
-			switch status {
-			case "READY":
-				return nil
-			case "FAILED", "ERROR":
-				return fmt.Errorf("resize operation failed with status: %s", status)
-			case "RESIZING", "CONFIGURING", "UPGRADING":
-				// Continue waiting
-			default:
-				// For any other status, check if it's a stable state
-				// If it's not one of the transient states above and not an error,
-				// we consider it complete
-				if status != "RESIZING" && status != "CONFIGURING" && status != "UPGRADING" {
-					return nil
-				}
-			}
-		}
-	}
 }

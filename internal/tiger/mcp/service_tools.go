@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -333,61 +332,17 @@ func (ServiceStopOutput) Schema() *jsonschema.Schema {
 
 // ServiceResizeInput represents input for service_resize
 type ServiceResizeInput struct {
-	ServiceID      string `json:"service_id"`
-	CPUMemory      string `json:"cpu_memory,omitempty"`
-	Nodes          *int   `json:"nodes,omitempty"`
-	Wait           bool   `json:"wait,omitempty"`
-	TimeoutMinutes int    `json:"timeout_minutes,omitempty"`
+	ServiceID string `json:"service_id"`
+	CPUMemory string `json:"cpu_memory"`
+	Wait      bool   `json:"wait,omitempty"`
 }
 
 func (ServiceResizeInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["cpu_memory"] = &jsonschema.Schema{
-		Type:        "string",
-		Description: "CPU and memory allocation combination. Choose from the available configurations.",
-		Enum: util.AnySlice([]string{
-			"0.5 CPU/2 GB",
-			"1 CPU/4 GB",
-			"2 CPU/8 GB",
-			"4 CPU/16 GB",
-			"8 CPU/32 GB",
-			"16 CPU/64 GB",
-			"32 CPU/128 GB",
-		}),
-	}
-
-	schema.Properties["nodes"] = &jsonschema.Schema{
-		Type:        "integer",
-		Description: "Number of nodes in the replica set (optional)",
-		Examples:    []any{1, 2, 3},
-		Minimum:     util.Ptr(1.0),
-	}
-
-	schema.Properties["wait"] = &jsonschema.Schema{
-		Type:        "boolean",
-		Description: "Whether to wait for the resize to complete before returning. Default is false (returns immediately).",
-		Default:     util.Must(json.Marshal(false)),
-		Examples:    []any{false, true},
-	}
-
-	schema.Properties["timeout_minutes"] = &jsonschema.Schema{
-		Type:        "integer",
-		Description: "Timeout in minutes when waiting for resize to complete. Only used when 'wait' is true.",
-		Default:     util.Must(json.Marshal(30)),
-		Examples:    []any{15, 30, 60},
-		Minimum:     util.Ptr(0.0),
-	}
-
-	// Remove optional fields from required list
-	newRequired := []string{}
-	for _, field := range schema.Required {
-		if field == "service_id" || field == "cpu_memory" {
-			newRequired = append(newRequired, field)
-		}
-	}
-	schema.Required = newRequired
+	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedResizeCPUMemoryConfigs().Strings())
 
 	return schema
 }
@@ -1066,7 +1021,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	resizeReq := api.ResizeInput{
 		CpuMillis: cpuMillis,
 		MemoryGbs: memoryGBs,
-		Nodes:     input.Nodes,
 	}
 
 	// Make API call to resize service
@@ -1093,8 +1047,16 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 
 	// If wait is requested, wait for resize to complete
 	if input.Wait {
-		timeout := time.Duration(input.TimeoutMinutes) * time.Minute
-		if err := s.waitForServiceResize(ctx, apiClient, projectID, input.ServiceID, timeout); err != nil {
+		var dummyService api.Service // we don't have a real service struct here
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:     apiClient,
+			ProjectID:  projectID,
+			ServiceID:  input.ServiceID,
+			Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+			Output:     nil, // No output for MCP
+			Timeout:    waitTimeout,
+			TimeoutMsg: "resize may still be in progress",
+		}); err != nil {
 			output.Message = fmt.Sprintf("Resize started but error waiting: %s", err.Error())
 		} else {
 			output.Message = "Service resized successfully!"
@@ -1144,56 +1106,4 @@ func formatCPU(millis int) string {
 // formatMemory formats memory GB for display
 func formatMemory(gb int) string {
 	return fmt.Sprintf("%d GB", gb)
-}
-
-// waitForServiceResize waits for a service resize operation to complete
-func (s *Server) waitForServiceResize(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	var lastStatus string
-	for {
-		select {
-		case <-ctx.Done():
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return fmt.Errorf("timeout waiting for resize after %v", timeout)
-			}
-			return ctx.Err()
-		case <-ticker.C:
-			resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
-			if err != nil {
-				logging.Debug("MCP: Error checking service status during resize", zap.Error(err))
-				continue
-			}
-
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				continue
-			}
-
-			service := *resp.JSON200
-			status := util.DerefStr(service.Status)
-
-			if status != lastStatus {
-				lastStatus = status
-				logging.Debug("MCP: Service status during resize", zap.String("status", status))
-			}
-
-			switch status {
-			case "READY":
-				return nil
-			case "FAILED", "ERROR":
-				return fmt.Errorf("resize failed with status: %s", status)
-			case "RESIZING", "CONFIGURING", "UPGRADING":
-				// Continue waiting
-			default:
-				// Consider any other stable state as complete
-				if status != "RESIZING" && status != "CONFIGURING" && status != "UPGRADING" {
-					return nil
-				}
-			}
-		}
-	}
 }
