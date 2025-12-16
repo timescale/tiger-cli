@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -143,7 +144,8 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 				// Reload credentials after command to account for credentials
 				// changes during command (e.g. `tiger auth login` should
 				// record an analytics event).
-				a := analytics.TryInit(cfg)
+				client, projectID, _ := common.NewAPIClient(cmd.Context(), cfg)
+				a := analytics.New(cfg, client, projectID)
 				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
 					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),

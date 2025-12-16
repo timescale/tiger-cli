@@ -244,6 +244,8 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
+- `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
 - `TIGER_SERVICE_ID` - Default service ID
 - `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
 

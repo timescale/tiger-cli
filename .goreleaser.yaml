@@ -93,6 +93,29 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
 
+dockers_v2:
+  - id: docker
+    images:
+      - ghcr.io/timescale/tiger-cli
+    tags:
+      - "{{ .Version }}"
+      - '{{ if eq .Prerelease "" }}{{ .Major }}{{ end }}'
+      - '{{ if eq .Prerelease "" }}{{ .Major }}.{{ .Minor }}{{ end }}'
+      - '{{ if eq .Prerelease "" }}latest{{ end }}'
+    labels:
+      org.opencontainers.image.created: "{{.Date}}"
+      org.opencontainers.image.name: "{{.ProjectName}}"
+      org.opencontainers.image.title: "{{.ProjectName}}"
+      org.opencontainers.image.revision: "{{.FullCommit}}"
+      org.opencontainers.image.source: "https://github.com/timescale/tiger-cli"
+      org.opencontainers.image.url: "https://github.com/timescale/tiger-cli"
+      org.opencontainers.image.version: "{{.Version}}"
+      io.modelcontextprotocol.server.name: "io.github.timescale/tiger-cli"
+    build_args:
+      BINARY_SOURCE: release
+    platforms:
+      - linux/amd64
+      - linux/arm64
 
 # S3 Blob Storage Configuration
 blobs:
