@@ -2187,7 +2187,7 @@ func findProjectRoot() (string, error) {
 }
 
 // buildTestEnv creates environment variables for PTY test binary
-func buildTestEnv(tmpDir string) []string {
+func buildTestEnv(tmpDir, publicKey, secretKey string) []string {
 	env := os.Environ()
 	// Override config directory to use test temp dir
 	env = append(env, "TIGER_CONFIG_DIR="+tmpDir)
@@ -2195,6 +2195,10 @@ func buildTestEnv(tmpDir string) []string {
 	env = append(env, "TIGER_ANALYTICS=false")
 	// Use pgpass storage for easier testing (no keyring interaction)
 	env = append(env, "TIGER_PASSWORD_STORAGE=pgpass")
+	// Pass credentials via environment so subprocess uses them directly
+	// (bypasses keyring which may have different credentials)
+	env = append(env, "TIGER_PUBLIC_KEY="+publicKey)
+	env = append(env, "TIGER_SECRET_KEY="+secretKey)
 	return env
 }
 
@@ -2296,23 +2300,6 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 	binaryPath := buildTigerBinary(t, tmpDir)
 	t.Logf("Built tiger binary at: %s", binaryPath)
 
-	t.Run("SubprocessLogin", func(t *testing.T) {
-		// Run tiger auth login in subprocess environment to store credentials
-		// in the system keyring (which subprocess will use)
-		t.Logf("Running tiger auth login in subprocess environment")
-
-		cmd := exec.Command(binaryPath, "auth", "login",
-			"--public-key", publicKey,
-			"--secret-key", secretKey,
-		)
-		cmd.Env = buildTestEnv(tmpDir)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("Subprocess auth login failed: %v\nOutput: %s", err, output)
-		}
-		t.Logf("Subprocess auth login output: %s", output)
-	})
-
 	t.Run("VerifyInitialConnection", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available")
@@ -2335,7 +2322,7 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		cmd.Stdin = c.Tty()
 		cmd.Stdout = c.Tty()
 		cmd.Stderr = c.Tty()
-		cmd.Env = buildTestEnv(tmpDir)
+		cmd.Env = buildTestEnv(tmpDir, publicKey, secretKey)
 
 		if err := cmd.Start(); err != nil {
 			t.Fatalf("Failed to start command: %v", err)
@@ -2380,7 +2367,7 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 			t.Fatalf("Failed to create client: %v", err)
 		}
 
-		resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(t.Context(), projectID, serviceID)
+		resp, err := client.GetServiceWithResponse(t.Context(), projectID, serviceID)
 		if err != nil {
 			t.Fatalf("Failed to get service: %v", err)
 		}
@@ -2422,7 +2409,7 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		cmd.Stdin = c.Tty()
 		cmd.Stdout = c.Tty()
 		cmd.Stderr = c.Tty()
-		cmd.Env = buildTestEnv(tmpDir)
+		cmd.Env = buildTestEnv(tmpDir, publicKey, secretKey)
 
 		if err := cmd.Start(); err != nil {
 			t.Fatalf("Failed to start command: %v", err)
