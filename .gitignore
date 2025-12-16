@@ -52,5 +52,8 @@ latest.txt
 server.json
 completions/
 
+# CI dependencies
+mcp-publisher
+
 # Claude
 /.claude/*.local.*
