@@ -206,13 +206,6 @@ publishers:
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
 
-  # Publish server.json to MCP Registry
-  - name: mcp-registry
-    disable: '{{ ne .Prerelease "" }}' # Skip this step for prereleases
-    ids:
-      - docker # Only publish docker images
-    cmd: sh -c 'sed "s/\$VERSION/{{ .Version }}/g" server-template.json > server.json && ./mcp-publisher publish'
-
 # Release configuration
 release:
   github:

@@ -3,7 +3,7 @@
   "name": "io.github.timescale/tiger-cli",
   "title": "Tiger MCP",
   "description": "Provides programmatic access to Tiger Cloud services, databases, and documentation.",
-  "version": "$VERSION",
+  "version": "{{ Version }}",
   "homepage": "https://github.com/timescale/tiger-cli",
   "repository": {
     "url": "https://github.com/timescale/tiger-cli",
@@ -12,7 +12,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/timescale/tiger-cli:$VERSION",
+      "identifier": "ghcr.io/timescale/tiger-cli:{{ Version }}",
       "transport": {
         "type": "stdio"
       },

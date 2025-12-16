@@ -66,6 +66,13 @@ jobs:
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
 
+      - name: Publish to MCP Registry
+        if: "!contains(github.ref_name, '-')" # Skip pre-releases
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
+          ./mcp-publisher publish
+
       - name: Invalidate CloudFront Cache
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.TIGER_CLI_RELEASES_AWS_ACCESS_KEY_ID }}
