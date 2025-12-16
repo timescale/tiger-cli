@@ -21,7 +21,7 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o /bin/tiger ./cmd/tiger
 
-# When building Docker images via GoReleaser, to binaries are built externally
+# When building Docker images via GoReleaser, the binaries are built externally
 # and copied in. See: https://goreleaser.com/customization/dockers_v2/
 FROM scratch AS release
 ARG TARGETPLATFORM
