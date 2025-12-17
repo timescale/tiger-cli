@@ -295,8 +295,9 @@ func TestGetPasswordStorage(t *testing.T) {
 		{"keyring", "keyring", "*common.KeyringStorage"},
 		{"pgpass", "pgpass", "*common.PgpassStorage"},
 		{"none", "none", "*common.NoStorage"},
-		{"default", "", "*common.KeyringStorage"},        // Default case
-		{"invalid", "invalid", "*common.KeyringStorage"}, // Falls back to default
+		{"auto", "auto", "*common.AutoFallbackStorage"},
+		{"default", "", "*common.AutoFallbackStorage"},        // Default case now uses auto
+		{"invalid", "invalid", "*common.AutoFallbackStorage"}, // Falls back to auto
 	}
 
 	for _, tt := range tests {
@@ -935,5 +936,188 @@ func TestSanitizeErrorMessage(t *testing.T) {
 				t.Errorf("sanitizeErrorMessage() = %q, want %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+// Test AutoFallbackStorage using pgpass as fallback (since keyring may not be available in CI)
+func TestAutoFallbackStorage_Integration(t *testing.T) {
+	// Set up test service name for keyring
+	config.SetTestServiceName(t)
+
+	// Create a temporary directory for pgpass
+	tempDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	storage := &AutoFallbackStorage{
+		keyring: &KeyringStorage{},
+		pgpass:  &PgpassStorage{},
+	}
+	service := createTestService("auto-fallback-test-service")
+	password := "test-password-auto"
+	role := "tsdbadmin"
+
+	// Test Save - should succeed using either keyring or pgpass
+	err := storage.Save(service, password, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Save() failed: %v", err)
+	}
+
+	// Verify lastMethod is set to either keyring or pgpass
+	if storage.lastMethod != "keyring" && storage.lastMethod != "pgpass" {
+		t.Errorf("AutoFallbackStorage.lastMethod = %q, want 'keyring' or 'pgpass'", storage.lastMethod)
+	}
+
+	// Test Get - should retrieve the password
+	retrieved, err := storage.Get(service, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Get() failed: %v", err)
+	}
+	if retrieved != password {
+		t.Errorf("AutoFallbackStorage.Get() = %q, want %q", retrieved, password)
+	}
+
+	// Test Remove - should succeed
+	err = storage.Remove(service, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Remove() failed: %v", err)
+	}
+
+	// Verify password is gone
+	_, err = storage.Get(service, role)
+	if err == nil {
+		t.Error("AutoFallbackStorage.Get() should fail after Remove()")
+	}
+}
+
+// Test AutoFallbackStorage GetStorageResult with keyring success
+func TestAutoFallbackStorage_GetStorageResult_KeyringSuccess(t *testing.T) {
+	storage := &AutoFallbackStorage{
+		keyring:    &KeyringStorage{},
+		pgpass:     &PgpassStorage{},
+		lastMethod: "keyring",
+	}
+	testPassword := "test-password"
+
+	result := storage.GetStorageResult(nil, testPassword)
+	if !result.Success {
+		t.Errorf("GetStorageResult() success should be true, got: %t", result.Success)
+	}
+	if result.Method != "keyring" {
+		t.Errorf("GetStorageResult() method should be 'keyring', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password saved to system keyring") {
+		t.Errorf("GetStorageResult() should mention keyring, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Error("GetStorageResult() should never include actual passwords")
+	}
+}
+
+// Test AutoFallbackStorage GetStorageResult with pgpass fallback success
+func TestAutoFallbackStorage_GetStorageResult_PgpassSuccess(t *testing.T) {
+	storage := &AutoFallbackStorage{
+		keyring:    &KeyringStorage{},
+		pgpass:     &PgpassStorage{},
+		lastMethod: "pgpass",
+	}
+	testPassword := "test-password"
+
+	result := storage.GetStorageResult(nil, testPassword)
+	if !result.Success {
+		t.Errorf("GetStorageResult() success should be true, got: %t", result.Success)
+	}
+	if result.Method != "pgpass" {
+		t.Errorf("GetStorageResult() method should be 'pgpass', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Password saved to ~/.pgpass") {
+		t.Errorf("GetStorageResult() should mention pgpass, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Error("GetStorageResult() should never include actual passwords")
+	}
+}
+
+// Test AutoFallbackStorage GetStorageResult with failure
+func TestAutoFallbackStorage_GetStorageResult_Failure(t *testing.T) {
+	storage := &AutoFallbackStorage{
+		keyring:    &KeyringStorage{},
+		pgpass:     &PgpassStorage{},
+		lastMethod: "auto",
+	}
+	testPassword := "test-password"
+	testError := fmt.Errorf("both storage methods failed")
+
+	result := storage.GetStorageResult(testError, testPassword)
+	if result.Success {
+		t.Errorf("GetStorageResult() success should be false, got: %t", result.Success)
+	}
+	if result.Method != "auto" {
+		t.Errorf("GetStorageResult() method should be 'auto', got: %s", result.Method)
+	}
+	if !strings.Contains(result.Message, "Failed to save password") {
+		t.Errorf("GetStorageResult() should mention failure, got: %s", result.Message)
+	}
+	if strings.Contains(result.Message, testPassword) {
+		t.Error("GetStorageResult() should never include actual passwords")
+	}
+}
+
+// Test AutoFallbackStorage Remove succeeds if at least one location succeeds
+func TestAutoFallbackStorage_Remove_PartialSuccess(t *testing.T) {
+	// Set up test service name for keyring
+	config.SetTestServiceName(t)
+
+	// Create a temporary directory for pgpass
+	tempDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	// Save password only to pgpass (not keyring)
+	pgpassStorage := &PgpassStorage{}
+	service := createTestService("partial-remove-test")
+	password := "test-password"
+	role := "tsdbadmin"
+
+	err := pgpassStorage.Save(service, password, role)
+	if err != nil {
+		t.Fatalf("PgpassStorage.Save() failed: %v", err)
+	}
+
+	// Now remove using AutoFallbackStorage - should succeed even if keyring fails
+	autoStorage := &AutoFallbackStorage{
+		keyring: &KeyringStorage{},
+		pgpass:  &PgpassStorage{},
+	}
+
+	err = autoStorage.Remove(service, role)
+	if err != nil {
+		t.Errorf("AutoFallbackStorage.Remove() should succeed when at least one location succeeds, got: %v", err)
+	}
+}
+
+// Security test: Ensure AutoFallbackStorage never includes passwords in messages
+func TestAutoFallbackStorage_SecurityTest_NoPasswordInResults(t *testing.T) {
+	testPassword := "super-secret-password-123"
+	testError := fmt.Errorf("failed to save %s", testPassword)
+
+	storage := &AutoFallbackStorage{
+		keyring:    &KeyringStorage{},
+		pgpass:     &PgpassStorage{},
+		lastMethod: "auto",
+	}
+
+	// Test success case
+	successResult := storage.GetStorageResult(nil, testPassword)
+	if strings.Contains(successResult.Message, testPassword) {
+		t.Errorf("GetStorageResult() success should never include password, got: %s", successResult.Message)
+	}
+
+	// Test error case
+	errorResult := storage.GetStorageResult(testError, testPassword)
+	if strings.Contains(errorResult.Message, testPassword) {
+		t.Errorf("GetStorageResult() error should never include password, got: %s", errorResult.Message)
 	}
 }
