@@ -329,6 +329,36 @@ func (ServiceStopOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceStopOutput](nil))
 }
 
+// ServiceResizeInput represents input for service_resize
+type ServiceResizeInput struct {
+	ServiceID string `json:"service_id"`
+	CPUMemory string `json:"cpu_memory"`
+	Wait      bool   `json:"wait,omitempty"`
+}
+
+func (ServiceResizeInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedResizeCPUMemoryConfigs().Strings())
+
+	return schema
+}
+
+// ServiceResizeOutput represents output for service_resize
+type ServiceResizeOutput struct {
+	Message   string        `json:"message"`
+	ServiceID string        `json:"service_id"`
+	NewCPU    string        `json:"new_cpu"`
+	NewMemory string        `json:"new_memory"`
+	Service   ServiceDetail `json:"service,omitempty"`
+}
+
+func (ServiceResizeOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceResizeOutput](nil))
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools() {
 	// service_list
@@ -451,6 +481,29 @@ This operation stops a service that is currently running. The service will trans
 			Title:           "Stop Database Service",
 		},
 	}, s.handleServiceStop)
+
+	// service_resize
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "service_resize",
+		Title: "Resize Database Service",
+		Description: `Resize a database service by changing its CPU and memory allocation.
+
+This tool changes the compute resources allocated to your database service. The service
+will be temporarily unavailable during the resize operation.
+
+Default behavior: Returns immediately while resize happens in background (recommended).
+Setting wait=true will block until the resize is complete - only use if you need to
+perform operations on the resized service immediately.
+
+WARNING: Creates billable resource changes. Increasing resources will increase costs.`,
+		InputSchema:  ServiceResizeInput{}.Schema(),
+		OutputSchema: ServiceResizeOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			DestructiveHint: util.Ptr(false), // Not destructive, just modifies resources
+			IdempotentHint:  true,            // Can resize to same size multiple times
+			Title:           "Resize Database Service",
+		},
+	}, s.handleServiceResize)
 }
 
 // handleServiceList handles the service_list MCP tool
@@ -930,4 +983,114 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	return nil, output, nil
+}
+
+// handleServiceResize handles the service_resize MCP tool
+func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolRequest, input ServiceResizeInput) (*mcp.CallToolResult, ServiceResizeOutput, error) {
+	// Create fresh API client and get project ID
+	apiClient, projectID, err := s.createAPIClient()
+	if err != nil {
+		return nil, ServiceResizeOutput{}, err
+	}
+
+	logging.Debug("MCP: Resizing service",
+		zap.String("project_id", projectID),
+		zap.String("service_id", input.ServiceID),
+		zap.String("cpu_memory", input.CPUMemory))
+
+	// Parse CPU/Memory combination
+	cpuMillis, memoryGBs, err := parseCPUMemoryString(input.CPUMemory)
+	if err != nil {
+		return nil, ServiceResizeOutput{}, err
+	}
+
+	// Prepare resize request
+	resizeReq := api.ResizeInput{
+		CpuMillis: cpuMillis,
+		MemoryGbs: memoryGBs,
+	}
+
+	// Make API call to resize service
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, projectID, input.ServiceID, resizeReq)
+	if err != nil {
+		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)
+	}
+
+	// Handle API response
+	if resp.StatusCode() != 202 {
+		return nil, ServiceResizeOutput{}, resp.JSON4XX
+	}
+
+	// Prepare output
+	output := ServiceResizeOutput{
+		Message:   "Resize request accepted and is in progress",
+		ServiceID: input.ServiceID,
+		NewCPU:    formatCPU(cpuMillis),
+		NewMemory: formatMemory(memoryGBs),
+	}
+
+	// If wait is requested, wait for resize to complete
+	if input.Wait {
+		var dummyService api.Service // we don't have a real service struct here
+		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
+			Client:     apiClient,
+			ProjectID:  projectID,
+			ServiceID:  input.ServiceID,
+			Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+			Output:     nil, // No output for MCP
+			Timeout:    waitTimeout,
+			TimeoutMsg: "resize may still be in progress",
+		}); err != nil {
+			output.Message = fmt.Sprintf("Resize started but error waiting: %s", err.Error())
+		} else {
+			output.Message = "Service resized successfully!"
+
+			// Get updated service details
+			serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+				output.Service = s.convertToServiceDetail(*serviceResp.JSON200, false)
+			}
+		}
+	}
+
+	return nil, output, nil
+}
+
+// parseCPUMemoryString parses the CPU/Memory string format and returns millicores and GB
+func parseCPUMemoryString(cpuMemory string) (int, int, error) {
+	switch cpuMemory {
+	case "0.5 CPU/2 GB":
+		return 500, 2, nil
+	case "1 CPU/4 GB":
+		return 1000, 4, nil
+	case "2 CPU/8 GB":
+		return 2000, 8, nil
+	case "4 CPU/16 GB":
+		return 4000, 16, nil
+	case "8 CPU/32 GB":
+		return 8000, 32, nil
+	case "16 CPU/64 GB":
+		return 16000, 64, nil
+	case "32 CPU/128 GB":
+		return 32000, 128, nil
+	default:
+		return 0, 0, fmt.Errorf("invalid CPU/Memory combination: %s", cpuMemory)
+	}
+}
+
+// formatCPU formats CPU millicores for display
+func formatCPU(millis int) string {
+	cores := float64(millis) / 1000
+	if cores == float64(int(cores)) {
+		return fmt.Sprintf("%d cores", int(cores))
+	}
+	return fmt.Sprintf("%.1f cores", cores)
+}
+
+// formatMemory formats memory GB for display
+func formatMemory(gb int) string {
+	return fmt.Sprintf("%d GB", gb)
 }
