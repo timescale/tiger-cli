@@ -66,7 +66,7 @@ const (
 	DefaultDocsMCPURL           = "https://mcp.tigerdata.com/docs"
 	DefaultGatewayURL           = "https://console.cloud.timescale.com/api"
 	DefaultOutput               = "table"
-	DefaultPasswordStorage      = "keyring"
+	DefaultPasswordStorage      = "auto"
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
 	DefaultVersionCheckInterval = 24 * time.Hour
 )
@@ -368,8 +368,8 @@ func (c *Config) UpdateField(key string, value any) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("password_storage must be string, got %T", value)
 		}
-		if s != "keyring" && s != "pgpass" && s != "none" {
-			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", s)
+		if s != "auto" && s != "keyring" && s != "pgpass" && s != "none" {
+			return nil, fmt.Errorf("invalid password_storage value: %s (must be auto, keyring, pgpass, or none)", s)
 		}
 		c.PasswordStorage = s
 		validated = s

@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -330,6 +331,97 @@ func (n *NoStorage) GetStorageResult(err error, password string) PasswordStorage
 	}
 }
 
+// AutoFallbackStorage tries keyring first, falls back to pgpass on any error
+type AutoFallbackStorage struct {
+	keyring    *KeyringStorage
+	pgpass     *PgpassStorage
+	lastMethod string // tracks which method was used for GetStorageResult
+}
+
+func (a *AutoFallbackStorage) Save(service api.Service, password string, role string) error {
+	// Try keyring first
+	a.lastMethod = "keyring"
+	keyringErr := a.keyring.Save(service, password, role)
+	if keyringErr == nil {
+		return nil
+	}
+
+	// Any keyring error -> fall back to pgpass
+	a.lastMethod = "pgpass"
+	pgpassErr := a.pgpass.Save(service, password, role)
+	if pgpassErr == nil {
+		return nil
+	}
+
+	// Both failed - return combined error
+	return errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
+}
+
+func (a *AutoFallbackStorage) Get(service api.Service, role string) (string, error) {
+	// Try keyring first
+	password, keyringErr := a.keyring.Get(service, role)
+	if keyringErr == nil {
+		return password, nil
+	}
+
+	// Any keyring error -> try pgpass
+	password, pgpassErr := a.pgpass.Get(service, role)
+	if pgpassErr == nil {
+		return password, nil
+	}
+
+	// Both failed
+	return "", errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
+}
+
+func (a *AutoFallbackStorage) Remove(service api.Service, role string) error {
+	// Try to remove from both (best effort)
+	keyringErr := a.keyring.Remove(service, role)
+	pgpassErr := a.pgpass.Remove(service, role)
+
+	// Success if removed from at least one location
+	if keyringErr == nil || pgpassErr == nil {
+		return nil
+	}
+	// Both failed
+	return errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
+}
+
+func (a *AutoFallbackStorage) GetStorageResult(err error, password string) PasswordStorageResult {
+	if err != nil {
+		return PasswordStorageResult{
+			Success: false,
+			Method:  a.lastMethod,
+			Message: fmt.Sprintf("Failed to save password: %s", sanitizeErrorMessage(err, password)),
+		}
+	}
+
+	// Return method-specific success message
+	switch a.lastMethod {
+	case "keyring":
+		return PasswordStorageResult{
+			Success: true,
+			Method:  "keyring",
+			Message: "Password saved to system keyring for automatic authentication",
+		}
+	default:
+		return PasswordStorageResult{
+			Success: true,
+			Method:  "pgpass",
+			Message: "Password saved to ~/.pgpass for automatic authentication",
+		}
+	}
+}
+
 // GetPasswordStorage returns the appropriate PasswordStorage implementation based on configuration
 func GetPasswordStorage() PasswordStorage {
 	storageMethod := viper.GetString("password_storage")
@@ -341,7 +433,10 @@ func GetPasswordStorage() PasswordStorage {
 	case "none":
 		return &NoStorage{}
 	default:
-		return &KeyringStorage{} // Default to keyring
+		return &AutoFallbackStorage{
+			keyring: &KeyringStorage{},
+			pgpass:  &PgpassStorage{},
+		}
 	}
 }
 
