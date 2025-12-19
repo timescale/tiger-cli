@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -339,26 +340,44 @@ type AutoFallbackStorage struct {
 
 func (a *AutoFallbackStorage) Save(service api.Service, password string, role string) error {
 	// Try keyring first
-	if err := a.keyring.Save(service, password, role); err == nil {
-		a.lastMethod = "keyring"
+	a.lastMethod = "keyring"
+	keyringErr := a.keyring.Save(service, password, role)
+	if keyringErr == nil {
 		return nil
 	}
+
 	// Any keyring error -> fall back to pgpass
-	if err := a.pgpass.Save(service, password, role); err != nil {
-		a.lastMethod = "auto"
-		return err
-	}
 	a.lastMethod = "pgpass"
-	return nil
+	pgpassErr := a.pgpass.Save(service, password, role)
+	if pgpassErr == nil {
+		return nil
+	}
+
+	// Both failed - return combined error
+	return errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
 }
 
 func (a *AutoFallbackStorage) Get(service api.Service, role string) (string, error) {
 	// Try keyring first
-	if password, err := a.keyring.Get(service, role); err == nil {
+	password, keyringErr := a.keyring.Get(service, role)
+	if keyringErr == nil {
 		return password, nil
 	}
+
 	// Any keyring error -> try pgpass
-	return a.pgpass.Get(service, role)
+	password, pgpassErr := a.pgpass.Get(service, role)
+	if pgpassErr == nil {
+		return password, nil
+	}
+
+	// Both failed
+	return "", errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
 }
 
 func (a *AutoFallbackStorage) Remove(service api.Service, role string) error {
@@ -370,8 +389,11 @@ func (a *AutoFallbackStorage) Remove(service api.Service, role string) error {
 	if keyringErr == nil || pgpassErr == nil {
 		return nil
 	}
-	// If both failed, return a combined error
-	return fmt.Errorf("keyring: %v, pgpass: %v", keyringErr, pgpassErr)
+	// Both failed
+	return errors.Join(
+		fmt.Errorf("keyring: %w", keyringErr),
+		fmt.Errorf("pgpass: %w", pgpassErr),
+	)
 }
 
 func (a *AutoFallbackStorage) GetStorageResult(err error, password string) PasswordStorageResult {
@@ -391,17 +413,11 @@ func (a *AutoFallbackStorage) GetStorageResult(err error, password string) Passw
 			Method:  "keyring",
 			Message: "Password saved to system keyring for automatic authentication",
 		}
-	case "pgpass":
+	default:
 		return PasswordStorageResult{
 			Success: true,
 			Method:  "pgpass",
 			Message: "Password saved to ~/.pgpass for automatic authentication",
-		}
-	default:
-		return PasswordStorageResult{
-			Success: true,
-			Method:  "auto",
-			Message: "Password saved for automatic authentication",
 		}
 	}
 }
@@ -416,13 +432,7 @@ func GetPasswordStorage() PasswordStorage {
 		return &PgpassStorage{}
 	case "none":
 		return &NoStorage{}
-	case "auto":
-		return &AutoFallbackStorage{
-			keyring: &KeyringStorage{},
-			pgpass:  &PgpassStorage{},
-		}
 	default:
-		// Default to auto for best compatibility across environments
 		return &AutoFallbackStorage{
 			keyring: &KeyringStorage{},
 			pgpass:  &PgpassStorage{},
