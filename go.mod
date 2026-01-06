@@ -2,6 +2,11 @@ module github.com/timescale/tiger-cli
 
 go 1.25.5
 
+tool (
+	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+	go.uber.org/mock/mockgen
+)
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/charmbracelet/bubbletea v1.3.10
@@ -195,9 +200,4 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.1 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-)
-
-tool (
-	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
-	go.uber.org/mock/mockgen
 )
