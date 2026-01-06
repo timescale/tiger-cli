@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/mcp"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 // buildMCPCmd creates the MCP server command with subcommands
@@ -40,6 +44,7 @@ Use 'tiger mcp start' to launch the MCP server.`,
 	// Add subcommands
 	cmd.AddCommand(buildMCPInstallCmd())
 	cmd.AddCommand(buildMCPStartCmd())
+	cmd.AddCommand(buildMCPListCmd())
 
 	return cmd
 }
@@ -91,7 +96,7 @@ Examples:
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
 				var err error
-				clientName, err = selectClientInteractively(cmd.OutOrStdout())
+				clientName, err = selectClientInteractively(cmd.ErrOrStderr())
 				if err != nil {
 					return fmt.Errorf("failed to select client: %w", err)
 				}
@@ -102,7 +107,7 @@ Examples:
 				clientName = args[0]
 			}
 
-			return installMCPForClient(clientName, !noBackup, configPath)
+			return installTigerMCPForClient(clientName, !noBackup, configPath)
 		},
 	}
 
@@ -132,7 +137,8 @@ Examples:
 
   # Start with HTTP transport
   tiger mcp start http`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
@@ -157,7 +163,8 @@ func buildMCPStdioCmd() *cobra.Command {
 Examples:
   # Start with stdio transport
   tiger mcp start stdio`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return startStdioServer(cmd.Context())
@@ -189,7 +196,8 @@ Examples:
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000`,
-		Args: cobra.NoArgs,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return startHTTPServer(cmd.Context(), httpHost, httpPort)
@@ -203,6 +211,74 @@ Examples:
 	return cmd
 }
 
+// buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
+func buildMCPListCmd() *cobra.Command {
+	var outputFormat string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List available MCP tools, prompts, and resources",
+		Long: `List all MCP tools, prompts, and resources exposed via the Tiger MCP server.
+
+The output can be formatted as a table, JSON, or YAML.
+
+Examples:
+  # List all capabilities in table format (default)
+  tiger mcp list
+
+  # List as JSON
+  tiger mcp list -o json
+
+  # List as YAML
+  tiger mcp list -o yaml`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
+		PreRunE:           bindFlags("output"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Create MCP server
+			server, err := mcp.NewServer(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to create MCP server: %w", err)
+			}
+			defer server.Close()
+
+			// List capabilities
+			capabilities, err := server.ListCapabilities(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to list capabilities: %w", err)
+			}
+
+			// Close the MCP server when finished
+			if err := server.Close(); err != nil {
+				return fmt.Errorf("failed to close MCP server: %w", err)
+			}
+
+			// Format output
+			output := cmd.OutOrStdout()
+			switch cfg.Output {
+			case "json":
+				return util.SerializeToJSON(output, capabilities)
+			case "yaml":
+				return util.SerializeToYAML(output, capabilities)
+			default:
+				return outputCapabilitiesTable(output, capabilities)
+			}
+		},
+	}
+
+	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+
+	return cmd
+}
+
 // startStdioServer starts the MCP server with stdio transport
 func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
@@ -212,10 +288,10 @@ func startStdioServer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
+	defer server.Close()
 
 	// Start the stdio transport
-	err = server.StartStdio(ctx)
-	if err != nil && !errors.Is(err, context.Canceled) {
+	if err := server.StartStdio(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("failed to start MCP server: %w", err)
 	}
 
@@ -235,6 +311,7 @@ func startHTTPServer(ctx context.Context, host string, port int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
+	defer server.Close()
 
 	// Find available port and get the listener
 	listener, actualPort, err := getListener(host, port)
@@ -298,4 +375,33 @@ func getListener(host string, startPort int) (net.Listener, int, error) {
 		}
 	}
 	return nil, 0, fmt.Errorf("no available port found in range %d-%d", startPort, startPort+99)
+}
+
+// outputCapabilitiesTable outputs capabilities in table format. Results are
+// ordered alphabetically by type, then name.
+func outputCapabilitiesTable(output io.Writer, capabilities *mcp.Capabilities) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("TYPE", "NAME")
+
+	// Add prompts
+	for _, prompt := range capabilities.Prompts {
+		table.Append("prompt", prompt.Name)
+	}
+
+	// Add resources
+	for _, resource := range capabilities.Resources {
+		table.Append("resource", resource.Name)
+	}
+
+	// Add resource templates
+	for _, template := range capabilities.ResourceTemplates {
+		table.Append("resource_template", template.Name)
+	}
+
+	// Add tools
+	for _, tool := range capabilities.Tools {
+		table.Append("tool", tool.Name)
+	}
+
+	return table.Render()
 }

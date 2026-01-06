@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -29,6 +30,9 @@ func setupIntegrationTest(t *testing.T) string {
 
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
+	// Disable analytics for integration tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
 
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
@@ -54,8 +58,9 @@ func setupIntegrationTest(t *testing.T) string {
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -95,9 +100,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -143,7 +147,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
-			"--project-id", projectID,
 		)
 
 		if err != nil {
@@ -837,6 +840,182 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("StopService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Stopping service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "stop", serviceID,
+			"--wait-timeout", "10m", // Longer timeout for integration tests
+		)
+
+		if err != nil {
+			t.Fatalf("Service stop failed: %v\nOutput: %s", err, output)
+		} else {
+			// Verify stop success message
+			if !strings.Contains(output, "Stop request accepted") &&
+				!strings.Contains(output, "stopped successfully") {
+				t.Errorf("Expected stop success message, got: %s", output)
+			}
+			t.Logf("Service stop completed successfully")
+		}
+	})
+
+	t.Run("VerifyServiceStopped", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Verifying service is stopped")
+
+		output, err := executeIntegrationCommand(t.Context(), "service", "describe", serviceID, "--output", "json")
+		if err != nil {
+			t.Fatalf("Failed to describe service after stop: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check status
+		var service api.Service
+		if err := json.Unmarshal([]byte(output), &service); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var status string
+		if service.Status != nil {
+			status = string(*service.Status)
+		}
+
+		t.Logf("Service status after stop: %s", status)
+
+		// The status should be PAUSED for stopped services
+		if status != "PAUSED" {
+			t.Logf("Warning: Expected service status to be PAUSED, got %s", status)
+		} else {
+			t.Logf("✅ Service is correctly in PAUSED state")
+		}
+	})
+
+	t.Run("StopAlreadyStoppedService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Attempting to stop already-stopped service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "stop", serviceID,
+			"--wait-timeout", "10m",
+		)
+
+		// This should fail with an invalid parameters error (exit code 3)
+		if err == nil {
+			t.Errorf("Expected stop to fail for already-stopped service, but got output: %s", output)
+		} else {
+			// Check that it's an exitCodeError with common.ExitInvalidParameters
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != common.ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-stopped service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", common.ExitInvalidParameters)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-stopped service, got: %v", err)
+			}
+		}
+	})
+
+	t.Run("StartService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Starting service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "start", serviceID,
+			"--wait-timeout", "10m", // Longer timeout for integration tests
+		)
+
+		if err != nil {
+			t.Fatalf("Service start failed: %v\nOutput: %s", err, output)
+		} else {
+			// Verify start success message
+			if !strings.Contains(output, "Start request accepted") &&
+				!strings.Contains(output, "ready and running") {
+				t.Errorf("Expected start success message, got: %s", output)
+			}
+			t.Logf("Service start completed successfully")
+		}
+	})
+
+	t.Run("VerifyServiceStarted", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Verifying service is started")
+
+		output, err := executeIntegrationCommand(t.Context(), "service", "describe", serviceID, "--output", "json")
+		if err != nil {
+			t.Fatalf("Failed to describe service after start: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check status
+		var service api.Service
+		if err := json.Unmarshal([]byte(output), &service); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var status string
+		if service.Status != nil {
+			status = string(*service.Status)
+		}
+
+		t.Logf("Service status after start: %s", status)
+
+		// The status should be READY for started services
+		if status != "READY" {
+			t.Logf("Warning: Expected service status to be READY, got %s", status)
+		} else {
+			t.Logf("✅ Service is correctly in READY state")
+		}
+	})
+
+	t.Run("StartAlreadyStartedService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Attempting to start already-started service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "start", serviceID,
+			"--wait-timeout", "10m",
+		)
+
+		// This should fail with an invalid parameters error (exit code 3)
+		if err == nil {
+			t.Errorf("Expected start to fail for already-started service, but got output: %s", output)
+		} else {
+			// Check that it's an exitCodeError with common.ExitInvalidParameters
+			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+				if exitErr.ExitCode() != common.ExitInvalidParameters {
+					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-started service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
+				} else {
+					t.Logf("✅ Start correctly failed with invalid parameters error (exit code %d) for already-started service", common.ExitInvalidParameters)
+				}
+			} else {
+				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-started service, got: %v", err)
+			}
+		}
+	})
+
 	t.Run("DeleteService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available for deletion")
@@ -890,11 +1069,11 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Check that it returns the correct exit code (this should be required)
 		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			if exitErr.ExitCode() != ExitServiceNotFound {
-				t.Errorf("Expected exit code %d for service not found, got %d", ExitServiceNotFound, exitErr.ExitCode())
+			if exitErr.ExitCode() != common.ExitServiceNotFound {
+				t.Errorf("Expected exit code %d for service not found, got %d", common.ExitServiceNotFound, exitErr.ExitCode())
 			}
 		} else {
-			t.Error("Expected exitCodeError with ExitServiceNotFound exit code for deleted service")
+			t.Error("Expected exitCodeError with common.ExitServiceNotFound exit code for deleted service")
 		}
 	})
 
@@ -973,11 +1152,10 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -999,7 +1177,6 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 		"auth", "login",
 		"--public-key", publicKey,
 		"--secret-key", secretKey,
-		"--project-id", projectID,
 	)
 
 	if err != nil {
@@ -1020,33 +1197,43 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 		{
 			name:             "service get",
 			args:             []string{"service", "get", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service update-password",
 			args:             []string{"service", "update-password", nonExistentServiceID, "--new-password", "test-password"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "service delete",
 			args:             []string{"service", "delete", nonExistentServiceID, "--confirm"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
+		},
+		{
+			name:             "service start",
+			args:             []string{"service", "start", nonExistentServiceID},
+			expectedExitCode: common.ExitServiceNotFound,
+		},
+		{
+			name:             "service stop",
+			args:             []string{"service", "stop", nonExistentServiceID},
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "db connection-string",
 			args:             []string{"db", "connection-string", nonExistentServiceID},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
 			name:             "db test-connection",
 			args:             []string{"db", "test-connection", nonExistentServiceID},
-			expectedExitCode: ExitInvalidParameters,
+			expectedExitCode: common.ExitInvalidParameters,
 			reason:           "maintains compatibility with PostgreSQL tooling conventions",
 		},
 		{
 			name:             "db psql",
 			args:             []string{"db", "psql", nonExistentServiceID, "--", "-c", "SELECT 1;"},
-			expectedExitCode: ExitServiceNotFound,
+			expectedExitCode: common.ExitServiceNotFound,
 		},
 	}
 
@@ -1091,12 +1278,11 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	if existingServiceID == "" {
@@ -1124,7 +1310,6 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			"auth", "login",
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
-			"--project-id", projectID,
 		)
 
 		if err != nil {
@@ -1159,11 +1344,10 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Check if we have valid integration test credentials
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	projectID := os.Getenv("TIGER_PROJECT_ID_INTEGRATION")
 	config.SetTestServiceName(t)
 
-	if publicKey == "" || secretKey == "" || projectID == "" {
-		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION, TIGER_SECRET_KEY_INTEGRATION, and TIGER_PROJECT_ID_INTEGRATION must be set")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
 	}
 
 	// Set up isolated test environment with temporary config directory
@@ -1177,11 +1361,10 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	invalidPublicKey := "invalid-public-key"
 	invalidSecretKey := "invalid-secret-key"
 
-	// Login with invalid credentials (this should succeed locally but fail on API calls)
+	// Login with invalid credentials (this should fail during validation)
 	loginOutput, loginErr := executeIntegrationCommand(t.Context(), "auth", "login",
 		"--public-key", invalidPublicKey,
-		"--secret-key", invalidSecretKey,
-		"--project-id", projectID)
+		"--secret-key", invalidSecretKey)
 	if loginErr != nil {
 		t.Logf("Login with invalid credentials failed (expected): %s", loginOutput)
 	} else {
@@ -1213,6 +1396,14 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 			name: "service delete",
 			args: []string{"service", "delete", "non-existent-service", "--confirm", "--no-wait"},
 		},
+		{
+			name: "service start",
+			args: []string{"service", "start", "non-existent-service", "--no-wait"},
+		},
+		{
+			name: "service stop",
+			args: []string{"service", "stop", "non-existent-service", "--no-wait"},
+		},
 	}
 
 	// Test db commands that should return authentication errors
@@ -1228,8 +1419,8 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 			name: "db connect",
 			args: []string{"db", "connect", "non-existent-service"},
 		},
-		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (ExitInvalidParameters)
-		// for authentication issues, not ExitAuthenticationError like other commands
+		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (common.ExitInvalidParameters)
+		// for authentication issues, not common.ExitAuthenticationError like other commands
 		{
 			name: "db test-connection",
 			args: []string{"db", "test-connection", "non-existent-service"},
@@ -1247,15 +1438,15 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 				return
 			}
 
-			// Check that it's an exitCodeError with ExitAuthenticationError
+			// Check that it's an exitCodeError with common.ExitAuthenticationError
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				if exitErr.ExitCode() != ExitAuthenticationError {
-					t.Errorf("Expected exit code %d (ExitAuthenticationError) for %s, got %d. Error: %s", ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
+				if exitErr.ExitCode() != common.ExitAuthenticationError {
+					t.Errorf("Expected exit code %d (common.ExitAuthenticationError) for %s, got %d. Error: %s", common.ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, ExitAuthenticationError)
+					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, common.ExitAuthenticationError)
 				}
 			} else {
-				t.Errorf("Expected exitCodeError with ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
+				t.Errorf("Expected exitCodeError with common.ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
 			}
 
 			// Check error message contains authentication-related text
@@ -1278,12 +1469,12 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 
 			// Check that it's an exitCodeError with the expected exit code
 			if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-				expectedExitCode := ExitAuthenticationError
+				expectedExitCode := common.ExitAuthenticationError
 				expectedDescription := "authentication error"
 
 				// db test-connection follows pg_isready conventions and uses exit code 3
 				if tc.name == "db test-connection" {
-					expectedExitCode = ExitInvalidParameters
+					expectedExitCode = common.ExitInvalidParameters
 					expectedDescription = "invalid parameters (pg_isready convention)"
 				}
 
@@ -1302,4 +1493,476 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestServiceForkIntegration tests forking a service with --now strategy and validates data is correctly copied
+func TestServiceForkIntegration(t *testing.T) {
+	config.SetTestServiceName(t)
+	// Check for required environment variables
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
+	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
+	if publicKey == "" || secretKey == "" {
+		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
+	}
+
+	// Set up isolated test environment with temporary config directory
+	tmpDir := setupIntegrationTest(t)
+	t.Logf("Using temporary config directory: %s", tmpDir)
+
+	// Generate unique names to avoid conflicts
+	timestamp := time.Now().Unix()
+	sourceServiceName := fmt.Sprintf("integration-fork-source-%d", timestamp)
+	tableName := fmt.Sprintf("fork_test_data_%d", timestamp)
+
+	var sourceServiceID string
+	var forkedServiceID string
+
+	// Always logout at the end to clean up credentials
+	defer func() {
+		t.Logf("Cleaning up authentication")
+		_, err := executeIntegrationCommand(t.Context(), "auth", "logout")
+		if err != nil {
+			t.Logf("Warning: Failed to logout: %v", err)
+		}
+	}()
+
+	// Cleanup function to ensure source service is deleted
+	defer func() {
+		if sourceServiceID != "" {
+			t.Logf("Cleaning up source service: %s", sourceServiceID)
+			_, err := executeIntegrationCommand(
+				t.Context(),
+				"service", "delete", sourceServiceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup source service %s: %v", sourceServiceID, err)
+			}
+		}
+	}()
+
+	// Cleanup function to ensure forked service is deleted
+	defer func() {
+		if forkedServiceID != "" {
+			t.Logf("Cleaning up forked service: %s", forkedServiceID)
+			_, err := executeIntegrationCommand(
+				t.Context(),
+				"service", "delete", forkedServiceID,
+				"--confirm",
+				"--wait-timeout", "5m",
+			)
+			if err != nil {
+				t.Logf("Warning: Failed to cleanup forked service %s: %v", forkedServiceID, err)
+			}
+		}
+	}()
+
+	t.Run("Login", func(t *testing.T) {
+		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"auth", "login",
+			"--public-key", publicKey,
+			"--secret-key", secretKey,
+		)
+
+		if err != nil {
+			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Login successful")
+	})
+
+	t.Run("CreateSourceService", func(t *testing.T) {
+		t.Logf("Creating source service: %s", sourceServiceName)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "create",
+			"--name", sourceServiceName,
+			"--cpu", "shared",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Source service creation failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract source service ID from create output: %s", output)
+		}
+
+		sourceServiceID = extractedServiceID
+		t.Logf("Created source service with ID: %s", sourceServiceID)
+	})
+
+	t.Run("InsertTestData", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Creating test table: %s", tableName)
+
+		// Create table
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT PRIMARY KEY, data TEXT, created_at TIMESTAMP DEFAULT NOW());", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to create test table: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Inserting test data into table: %s", tableName)
+
+		// Insert test data
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'test-row-1'), (2, 'test-row-2'), (3, 'test-row-3');", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to insert test data: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("✅ Test data inserted successfully")
+	})
+
+	t.Run("VerifySourceData", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Verifying test data in source service")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query test data: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all three rows are present
+		if !strings.Contains(output, "test-row-1") {
+			t.Errorf("Expected 'test-row-1' in output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-2") {
+			t.Errorf("Expected 'test-row-2' in output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-3") {
+			t.Errorf("Expected 'test-row-3' in output, got: %s", output)
+		}
+
+		t.Logf("✅ Source data verified: 3 rows present")
+	})
+
+	t.Run("ForkService_LastSnapshot_NoBackupsYet", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Attempting to fork with --last-snapshot (should fail - no backups yet)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		// We expect this to fail
+		if err == nil {
+			t.Errorf("Expected fork with --last-snapshot to fail when no backups exist, but it succeeded")
+		} else {
+			// Verify the error message indicates no backups/snapshots available
+			if !strings.Contains(err.Error(), "doesn't yet have any backups or snapshots available") &&
+				!strings.Contains(output, "doesn't yet have any backups or snapshots available") {
+				t.Errorf("Expected error about no backups/snapshots, got: %v\nOutput: %s", err, output)
+			} else {
+				t.Logf("✅ Fork with --last-snapshot correctly failed: no backups available yet")
+			}
+		}
+	})
+
+	t.Run("ForkService_Now", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Forking service: %s with --now strategy", sourceServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--now",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service fork failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		forkedServiceID = extractedServiceID
+		t.Logf("✅ Created forked service with ID: %s", forkedServiceID)
+	})
+
+	t.Run("VerifyForkedData", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Verifying test data in forked service")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query forked service data: %v\nOutput: %s", err, output)
+		}
+
+		// Verify all three rows are present in fork
+		if !strings.Contains(output, "test-row-1") {
+			t.Errorf("Expected 'test-row-1' in forked service output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-2") {
+			t.Errorf("Expected 'test-row-2' in forked service output, got: %s", output)
+		}
+		if !strings.Contains(output, "test-row-3") {
+			t.Errorf("Expected 'test-row-3' in forked service output, got: %s", output)
+		}
+
+		t.Logf("✅ Forked data verified: 3 rows present matching source")
+	})
+
+	t.Run("VerifyDataIndependence", func(t *testing.T) {
+		if sourceServiceID == "" || forkedServiceID == "" {
+			t.Skip("Source or forked service ID not available")
+		}
+
+		t.Logf("Verifying data independence between source and fork")
+
+		// Insert new data in forked service
+		t.Logf("Inserting new row in forked service")
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (4, 'fork-only-row');", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to insert data in fork: %v\nOutput: %s", err, output)
+		}
+
+		// Verify fork has 4 rows
+		t.Logf("Verifying fork has 4 rows")
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to count rows in fork: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "4") {
+			t.Errorf("Expected 4 rows in fork after insert, got: %s", output)
+		}
+
+		// Verify source still has 3 rows (unchanged)
+		t.Logf("Verifying source still has 3 rows (unchanged)")
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to count rows in source: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "3") {
+			t.Errorf("Expected 3 rows in source (unchanged), got: %s", output)
+		}
+
+		// Verify source doesn't have fork-only row
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", sourceServiceID,
+			"--", "-c", fmt.Sprintf("SELECT * FROM %s WHERE data = 'fork-only-row';", tableName),
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query source for fork-only row: %v\nOutput: %s", err, output)
+		}
+
+		// The output should show "0 rows" or similar since the row shouldn't exist
+		if strings.Contains(output, "fork-only-row") {
+			t.Errorf("Source service should not contain fork-only row, but got: %s", output)
+		}
+
+		t.Logf("✅ Data independence verified: fork and source are truly independent")
+	})
+
+	t.Run("DeleteForkedService_Now", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --now forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --now forked service deleted successfully")
+	})
+
+	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+		waitDuration := 120 * time.Second
+		t.Logf("Waiting %v for snapshot to become available for --last-snapshot fork...", waitDuration)
+		time.Sleep(waitDuration)
+
+		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from --now fork exists)")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "fork", sourceServiceID,
+			"--last-snapshot",
+			"--wait-timeout", "15m",
+			"--no-set-default",
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
+		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		forkedServiceID = extractedServiceID
+		t.Logf("✅ Created --last-snapshot forked service with ID: %s", forkedServiceID)
+	})
+
+	t.Run("VerifyLastSnapshotForkWorks", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Verifying --last-snapshot forked service is functional")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "psql", forkedServiceID,
+			"--", "-c", "SELECT 1 as test;",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to query --last-snapshot forked service: %v\nOutput: %s", err, output)
+		}
+
+		if !strings.Contains(output, "1") {
+			t.Errorf("Expected to see '1' in query output, got: %s", output)
+		}
+
+		t.Logf("✅ --last-snapshot forked service is functional")
+	})
+
+	t.Run("DeleteForkedService_LastSnapshot", func(t *testing.T) {
+		if forkedServiceID == "" {
+			t.Skip("No forked service ID available")
+		}
+
+		t.Logf("Deleting --last-snapshot forked service: %s", forkedServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", forkedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear forkedServiceID so cleanup doesn't try to delete again
+		forkedServiceID = ""
+		t.Logf("✅ --last-snapshot forked service deleted successfully")
+	})
+
+	t.Run("DeleteSourceService", func(t *testing.T) {
+		if sourceServiceID == "" {
+			t.Skip("No source service ID available")
+		}
+
+		t.Logf("Deleting source service: %s", sourceServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", sourceServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Source service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		// Clear sourceServiceID so cleanup doesn't try to delete again
+		sourceServiceID = ""
+		t.Logf("✅ Source service deleted successfully")
+	})
+
+	t.Run("Logout", func(t *testing.T) {
+		t.Logf("Logging out")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"auth", "logout",
+		)
+
+		if err != nil {
+			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("Logout successful")
+	})
 }

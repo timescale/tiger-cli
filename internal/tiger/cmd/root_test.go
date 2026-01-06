@@ -19,15 +19,22 @@ func TestMain(m *testing.M) {
 func setupTestCommand(t *testing.T) (string, func()) {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-test-cmd-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
+	// Disable analytics for root tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
+		os.Unsetenv("TIGER_ANALYTICS")
 		config.ResetGlobalConfig()
 	}
 
@@ -41,7 +48,6 @@ func TestFlagPrecedence(t *testing.T) {
 
 	// Create config file with some values
 	configContent := `api_url: https://file.api.com/v1
-project_id: file-project
 service_id: file-service
 output: table
 analytics: true
@@ -53,14 +59,12 @@ analytics: true
 
 	// Set environment variables
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_PROJECT_ID", "env-project")
 	os.Setenv("TIGER_SERVICE_ID", "env-service")
 	os.Setenv("TIGER_OUTPUT", "json")
 	os.Setenv("TIGER_ANALYTICS", "false")
 
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_PROJECT_ID")
 		os.Unsetenv("TIGER_SERVICE_ID")
 		os.Unsetenv("TIGER_OUTPUT")
 		os.Unsetenv("TIGER_ANALYTICS")

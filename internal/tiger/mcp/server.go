@@ -2,12 +2,17 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
@@ -39,10 +44,13 @@ func NewServer(ctx context.Context) (*Server, error) {
 	// Register all tools (including proxied docs tools)
 	server.registerTools(ctx)
 
+	// Add analytics tracking middleware
+	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
+
 	return server, nil
 }
 
-// Run starts the MCP server with the stdio transport
+// StartStdio starts the MCP server with the stdio transport
 func (s *Server) StartStdio(ctx context.Context) error {
 	return s.mcpServer.Run(ctx, &mcp.StdioTransport{})
 }
@@ -51,7 +59,9 @@ func (s *Server) StartStdio(ctx context.Context) error {
 func (s *Server) HTTPHandler() http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return s.mcpServer
-	}, nil)
+	}, &mcp.StreamableHTTPOptions{
+		Stateless: true,
+	})
 }
 
 // registerTools registers all available MCP tools
@@ -70,21 +80,65 @@ func (s *Server) registerTools(ctx context.Context) {
 	logging.Info("MCP tools registered successfully")
 }
 
-// createAPIClient creates a new API client and returns it with the project ID
-func (s *Server) createAPIClient() (*api.ClientWithResponses, string, error) {
-	// Get credentials (API key + project ID)
-	apiKey, projectID, err := config.GetCredentials()
-	if err != nil {
-		return nil, "", fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err)
-	}
+// analyticsMiddleware tracks analytics for all MCP requests
+func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
+	return func(ctx context.Context, method string, req mcp.Request) (result mcp.Result, runErr error) {
+		start := time.Now()
 
-	// Create API client with fresh credentials
-	apiClient, err := api.NewTigerClient(apiKey)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create API client: %w", err)
-	}
+		// Load config for analytics
+		cfg, err := config.Load()
+		if err != nil {
+			// If we can't load config, just skip analytics and continue
+			return next(ctx, method, req)
+		}
 
-	return apiClient, projectID, nil
+		client, projectID, _ := common.NewAPIClient(ctx, cfg)
+		a := analytics.New(cfg, client, projectID)
+
+		switch r := req.(type) {
+		case *mcp.CallToolRequest:
+			// Extract arguments from the tool call
+			var args map[string]any
+			if len(r.Params.Arguments) > 0 {
+				if err := json.Unmarshal(r.Params.Arguments, &args); err != nil {
+					logging.Error("Error unmarshaling tool call arguments", zap.Error(err))
+				}
+			}
+
+			defer func() {
+				toolErr := runErr
+				if callToolResult, ok := result.(*mcp.CallToolResult); ok && callToolResult != nil && callToolResult.IsError && len(callToolResult.Content) > 0 {
+					if textContent, ok := callToolResult.Content[0].(*mcp.TextContent); ok && textContent != nil {
+						toolErr = errors.New(textContent.Text)
+					}
+				}
+
+				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
+					analytics.Map(args),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
+					analytics.Error(toolErr),
+				)
+			}()
+		case *mcp.ReadResourceRequest:
+			defer func() {
+				a.Track("Read proxied resource",
+					analytics.Property("resource_uri", r.Params.URI),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
+					analytics.Error(runErr),
+				)
+			}()
+		case *mcp.GetPromptRequest:
+			defer func() {
+				a.Track(fmt.Sprintf("Get %s prompt", r.Params.Name),
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
+					analytics.Error(runErr),
+				)
+			}()
+		}
+
+		// Execute the actual handler
+		return next(ctx, method, req)
+	}
 }
 
 // Close gracefully shuts down the MCP server and all proxy connections

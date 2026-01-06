@@ -85,12 +85,14 @@ For the initial v0 release, implement these essential commands first:
 **Authentication:**
 - `tiger auth login` - Token-based authentication
 - `tiger auth logout` - Remove stored credentials
-- `tiger auth status` - Show current user
+- `tiger auth status` - Show authentication status and detailed credential information
 
 **Core Service Management:**
 - `tiger service list` - List all services
 - `tiger service get` - Show service details (aliases: `describe`, `show`)
 - `tiger service create` - Create new services
+- `tiger service start` - Start stopped services
+- `tiger service stop` - Stop running services
 - `tiger service delete` - Delete services with confirmation
 - `tiger service update-password` - Update service master password
 
@@ -104,7 +106,7 @@ For the initial v0 release, implement these essential commands first:
 - `tiger config set` - Set configuration values
 
 **Future v1+ Commands:**
-- Service lifecycle (start/stop/restart) - pending API endpoints
+- Service restart - pending API endpoint
 - HA management commands
 - Read replica management
 - VPC management and peering
@@ -122,24 +124,23 @@ Manage authentication and credentials (token-based only).
 **Subcommands:**
 - `login`: Authenticate with API token
 - `logout`: Remove stored credentials
-- `status`: Show current authentication status and project ID
+- `status`: Show authentication status and detailed credential information
 
 **Examples:**
 ```bash
-# Login with all credentials via flags
-tiger auth login --public-key YOUR_PUBLIC_KEY --secret-key YOUR_SECRET_KEY --project-id proj-123
+# Login with OAuth (opens browser, creates API keys automatically)
+tiger auth login
 
-# Login with project ID flag (will prompt for keys if not in environment)
-tiger auth login --project-id proj-123
+# Login with credentials via flags
+tiger auth login --public-key YOUR_PUBLIC_KEY --secret-key YOUR_SECRET_KEY
 
 # Login with credentials from environment variables
 export TIGER_PUBLIC_KEY="your-public-key"
 export TIGER_SECRET_KEY="your-secret-key"
-export TIGER_PROJECT_ID="proj-123"
 tiger auth login
 
-# Interactive login (will prompt for any missing credentials)
-tiger auth login
+# Interactive login (will prompt for missing credentials)
+tiger auth login --public-key YOUR_PUBLIC_KEY
 
 # Show current authentication status and project ID
 tiger auth status
@@ -149,34 +150,46 @@ tiger auth logout
 ```
 
 **Authentication Methods:**
-1. `--public-key`, `--secret-key`, and `--project-id` flags: Provide public key, secret key, and project ID directly
-2. `TIGER_PUBLIC_KEY`, `TIGER_SECRET_KEY`, and `TIGER_PROJECT_ID` environment variables
-3. Interactive prompt for any missing credentials (requires TTY)
+1. OAuth flow (recommended): Opens browser for authentication, automatically creates API keys and detects project ID
+2. Manual API key input: Provide `--public-key` and `--secret-key` flags (project ID auto-detected from API)
+3. Environment variables: Set `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` (project ID auto-detected from API). Note that these env vars also work directly with any command without needing to run `tiger auth login` first.
+4. Interactive prompt for any missing credentials (requires TTY)
 
 **Login Process:**
 When using `tiger auth login`, the CLI will:
-1. Prompt for any missing credentials (public key, secret key, project ID) if not provided via flags or environment variables
-2. Combine the public and secret keys into format `<public key>:<secret key>`
-3. Validate the combined API key by making a test API call
-4. Store credentials (API key + project ID) securely as JSON in system keyring or file fallback
+1. For OAuth flow: Open browser for authentication, automatically create API keys, and detect project ID
+2. For manual flow: Prompt for any missing credentials (public key, secret key) if not provided via flags or environment variables
+3. Combine the public and secret keys into format `<public key>:<secret key>`
+4. Validate the API key and retrieve authentication information by calling the `/auth/info` API endpoint
+5. Auto-detect the project ID from the API response
+6. Store credentials (API key + project ID) securely as JSON in system keyring or file fallback
+7. Identify the user for analytics purposes using information from the authentication endpoint
 
-**Project ID Requirement:**
-Project ID is required during login. The CLI will:
-- Use `--project-id` flag if provided
-- Prompt interactively for project ID if flag not provided
-- Fail with an error in non-interactive environments (no TTY) if project ID is not provided via flag
+**Project ID Auto-Detection:**
+The CLI automatically detects the project ID associated with your API keys by making a validation request to the `/auth/info` endpoint. No manual project ID input is required.
 
 **Credentials Storage:**
 Credentials are stored as a JSON object containing both the API key (`<public key>:<secret key>`) and project ID:
 1. **System keyring** (preferred): Uses [go-keyring](https://github.com/zalando/go-keyring) for secure storage in system credential managers (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 2. **File fallback**: If keyring is unavailable, stores in `~/.config/tiger/credentials` with restricted file permissions (600)
 
-Use `tiger auth status` to view your current authentication status and project ID.
+**Auth Status Information:**
+The `tiger auth status` command validates your stored API key by calling the `/auth/info` endpoint and displays:
+- Login status (whether API key is valid)
+- Project name and ID
+- API key public key
+- Credential name
+- Issuing user name and email
+- Credential creation timestamp
 
-**Options:**
+This information helps verify that your authentication is working correctly and provides context about which credentials you're using.
+
+**Login Options:**
 - `--public-key`: Public key for authentication
 - `--secret-key`: Secret key for authentication
-- `--project-id`: Project ID to set as default in configuration
+
+**Status Options:**
+- `-o, --output`: Output format (json, yaml, table) - default: table
 
 ### Service Management
 

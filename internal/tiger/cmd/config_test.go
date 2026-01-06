@@ -18,6 +18,9 @@ import (
 func setupConfigTest(t *testing.T) (string, func()) {
 	t.Helper()
 
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
+
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
 	if err != nil {
@@ -27,12 +30,16 @@ func setupConfigTest(t *testing.T) (string, func()) {
 	// Set environment variable to use test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for config tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	config.UseTestConfig(tmpDir, map[string]any{})
 
 	// Clean up function
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 
 		// Reset global config in the config package
 		// This is important for test isolation
@@ -114,9 +121,8 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 	// Create config file with JSON output format
 	configContent := `api_url: https://json.api.com/v1
 output: json
-analytics: true
-password_storage: none
-version_check_interval: 1h
+analytics: false
+password_storage: keyring
 version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 
 	configFile := config.GetConfigFile(tmpDir)
@@ -145,12 +151,12 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		"service_id":              "",
 		"color":                   true,
 		"output":                  "json",
-		"analytics":               true,
-		"password_storage":        "none",
+		"analytics":               false,
+		"password_storage":        "keyring",
 		"debug":                   false,
 		"config_dir":              tmpDir,
 		"releases_url":            "https://cli.tigerdata.com",
-		"version_check_interval":  float64(3600000000000), // JSON unmarshals time.Duration as nanoseconds (1 hour = 3600000000000ns)
+		"version_check_interval":  "24h0m0s",
 		"version_check_last_time": now.Format(time.RFC3339),
 	}
 
@@ -209,22 +215,13 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 		"debug":                   false,
 		"config_dir":              tmpDir,
 		"releases_url":            "https://cli.tigerdata.com",
-		"version_check_interval":  "24h0m0s", // YAML serializes time.Duration as string
-		"version_check_last_time": now,
+		"version_check_interval":  "24h0m0s",
+		"version_check_last_time": now.Format(time.RFC3339),
 	}
 
 	for key, expectedValue := range expectedValues {
-		switch expectedValue.(type) {
-		case time.Time:
-			// YAML unmarshals time.Time as time.Time type, so we need to compare differently
-			if expectedValue.(time.Time).Format(time.RFC3339) != result[key].(time.Time).Format(time.RFC3339) {
-				t.Errorf("foo Expected %s '%v', got %v", key, expectedValue, result[key])
-			}
-		default:
-			// Other types can be compared directly
-			if result[key] != expectedValue {
-				t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
-			}
+		if result[key] != expectedValue {
+			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
 		}
 	}
 

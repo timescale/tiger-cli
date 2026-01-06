@@ -127,15 +127,6 @@ func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
 }
 
 func TestAddTigerMCPServer(t *testing.T) {
-	// Override getTigerExecutablePath to return "tiger" for tests
-	oldFunc := tigerExecutablePathFunc
-	tigerExecutablePathFunc = func() (string, error) {
-		return "tiger", nil
-	}
-	defer func() {
-		tigerExecutablePathFunc = oldFunc
-	}()
-
 	tests := []struct {
 		name                 string
 		initialConfig        string
@@ -246,7 +237,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			require.NoError(t, err)
 
 			// Call the function under test
-			err = addTigerMCPServerViaJSON(configPath, tt.mcpServersPathPrefix)
+			err = addMCPServerViaJSON(configPath, tt.mcpServersPathPrefix, "tiger", "tiger", []string{"mcp", "start"})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -276,15 +267,6 @@ func TestAddTigerMCPServer(t *testing.T) {
 }
 
 func TestAddTigerMCPServerFileOperations(t *testing.T) {
-	// Override getTigerExecutablePath to return "tiger" for tests
-	oldFunc := tigerExecutablePathFunc
-	tigerExecutablePathFunc = func() (string, error) {
-		return "tiger", nil
-	}
-	defer func() {
-		tigerExecutablePathFunc = oldFunc
-	}()
-
 	t.Run("creates directory if it doesn't exist", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nested", "dir", "config.json")
@@ -293,7 +275,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		_, err := os.Stat(filepath.Dir(configPath))
 		assert.True(t, os.IsNotExist(err))
 
-		err = addTigerMCPServerViaJSON(configPath, "/mcpServers")
+		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// Directory should now exist
@@ -309,7 +291,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "nonexistent.json")
 
-		err := addTigerMCPServerViaJSON(configPath, "/mcpServers")
+		err := addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// File should now exist with correct content
@@ -339,7 +321,7 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(""), 0644)
 		require.NoError(t, err)
 
-		err = addTigerMCPServerViaJSON(configPath, "/mcpServers")
+		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
 		require.NoError(t, err)
 
 		// File should now have correct content
@@ -699,7 +681,7 @@ func TestFindClientConfig(t *testing.T) {
 	})
 }
 
-func TestAddTigerMCPServerViaCLI(t *testing.T) {
+func TestAddMCPServerViaCLI(t *testing.T) {
 	t.Run("returns error when no install command configured", func(t *testing.T) {
 		clientCfg := &clientConfig{
 			ClientType:          "test-client",
@@ -707,7 +689,7 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 			buildInstallCommand: nil, // No build function
 		}
 
-		err := addTigerMCPServerViaCLI(clientCfg)
+		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
 		assert.Error(t, err, "should error when no install command configured")
 		assert.Contains(t, err.Error(), "no install command configured for client Test Client", "error should mention missing install command")
 	})
@@ -717,12 +699,12 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 		clientCfg := &clientConfig{
 			ClientType: "test-client",
 			Name:       "Test Client",
-			buildInstallCommand: func(tigerPath string) []string {
-				return []string{"nonexistent-command-12345", "arg1", "arg2"}
+			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+				return []string{"nonexistent-command-12345", "arg1", "arg2"}, nil
 			},
 		}
 
-		err := addTigerMCPServerViaCLI(clientCfg)
+		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
 		// We expect this to fail since the command doesn't exist, but it shows we got past validation
 		assert.Error(t, err, "should error when command execution fails")
 		assert.Contains(t, err.Error(), "failed to run Test Client installation command", "error should mention installation command failure")
@@ -732,12 +714,12 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 		clientCfg := &clientConfig{
 			ClientType: "test-client",
 			Name:       "Test Client",
-			buildInstallCommand: func(tigerPath string) []string {
-				return []string{"echo"} // Command with no args - should work
+			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+				return []string{"echo"}, nil // Command with no args - should work
 			},
 		}
 
-		err := addTigerMCPServerViaCLI(clientCfg)
+		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
 		// echo command should succeed
 		assert.NoError(t, err, "should not error for valid echo command")
 	})
@@ -746,12 +728,12 @@ func TestAddTigerMCPServerViaCLI(t *testing.T) {
 		clientCfg := &clientConfig{
 			ClientType: "test-client",
 			Name:       "Test Client",
-			buildInstallCommand: func(tigerPath string) []string {
-				return []string{"echo", "test", "output"} // Command with args
+			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+				return []string{"echo", "test", "output"}, nil // Command with args
 			},
 		}
 
-		err := addTigerMCPServerViaCLI(clientCfg)
+		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
 		// echo command should succeed
 		assert.NoError(t, err, "should not error for valid echo command with args")
 	})
@@ -850,9 +832,9 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
 		require.NoError(t, err, "should create initial config file")
 
-		// Call installMCPForClient to install Tiger MCP server
-		err = installMCPForClient("cursor", false, configPath)
-		require.NoError(t, err, "installMCPForClient should succeed")
+		// Call installTigerMCPForClient to install Tiger MCP server
+		err = installTigerMCPForClient("cursor", false, configPath)
+		require.NoError(t, err, "installTigerMCPForClient should succeed")
 
 		// Verify the config file was modified
 		configContent, err := os.ReadFile(configPath)
@@ -886,9 +868,9 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
 		require.NoError(t, err)
 
-		// Call installMCPForClient with backup enabled for Cursor
-		err = installMCPForClient("cursor", true, configPath)
-		require.NoError(t, err, "installMCPForClient should succeed with backup")
+		// Call installTigerMCPForClient with backup enabled for Cursor
+		err = installTigerMCPForClient("cursor", true, configPath)
+		require.NoError(t, err, "installTigerMCPForClient should succeed with backup")
 
 		// Check that a backup file was created
 		backupFiles, err := filepath.Glob(configPath + ".backup.*")
@@ -916,7 +898,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 	})
 
 	t.Run("handles unsupported editor", func(t *testing.T) {
-		err := installMCPForClient("unsupported-editor", false, "")
+		err := installTigerMCPForClient("unsupported-editor", false, "")
 		assert.Error(t, err, "should error for unsupported editor")
 		assert.Contains(t, err.Error(), "unsupported client", "error should mention unsupported client")
 	})
@@ -946,7 +928,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// First installation (should update existing tiger entry)
-		err = installMCPForClient("cursor", false, configPath)
+		err = installTigerMCPForClient("cursor", false, configPath)
 		require.NoError(t, err, "first installation should succeed")
 
 		// Read config after first installation
@@ -971,7 +953,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		assert.Equal(t, "start", args[1], "second arg should be 'start'")
 
 		// Second installation (should be idempotent, no changes)
-		err = installMCPForClient("cursor", false, configPath)
+		err = installTigerMCPForClient("cursor", false, configPath)
 		require.NoError(t, err, "second installation should succeed")
 
 		// Read config after second installation

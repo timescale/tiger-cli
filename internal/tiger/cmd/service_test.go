@@ -11,15 +11,18 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
 func setupServiceTest(t *testing.T) string {
 	t.Helper()
+
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-service-test-*")
@@ -30,18 +33,18 @@ func setupServiceTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for service tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
-
-	// Re-establish viper environment configuration after reset
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -79,11 +82,11 @@ func TestServiceList_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service list command
 	_, err, _ = executeServiceCommand(t.Context(), "service", "list")
@@ -116,7 +119,7 @@ func TestOutputServices_JSON(t *testing.T) {
 	// Verify JSON is valid
 	var result []api.Service
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid JSON output: %v", err)
+		t.Fatalf("Invalid JSON Output: %v", err)
 	}
 
 	if len(result) != len(services) {
@@ -144,7 +147,7 @@ func TestOutputServices_YAML(t *testing.T) {
 	// Verify YAML is valid
 	var result []api.Service
 	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid YAML output: %v", err)
+		t.Fatalf("Invalid YAML Output: %v", err)
 	}
 
 	if len(result) != len(services) {
@@ -201,11 +204,11 @@ func TestServiceFork_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service fork command with required timing flag
 	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
@@ -230,11 +233,11 @@ func TestServiceFork_NoSourceService(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service fork command without providing service ID but with timing flag
 	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
@@ -260,11 +263,11 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service fork command without any timing flag
 	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123")
@@ -290,11 +293,11 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service fork command with multiple timing flags
 	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--last-snapshot")
@@ -320,11 +323,11 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service fork command with invalid timestamp
 	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
@@ -350,11 +353,11 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 	}
 
 	// Mock authentication success
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test with invalid CPU/memory combination (this would fail at API call stage)
 	// Since we don't want to make real API calls, we expect the command to fail during validation
@@ -393,11 +396,11 @@ func TestServiceCreate_ValidationErrors(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test with no name (should auto-generate) - this should now work without error
 	// Just test that it doesn't fail due to missing name
@@ -429,11 +432,11 @@ func TestServiceCreate_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service create command with valid parameters (name will be auto-generated)
 	_, err, _ = executeServiceCommand(t.Context(), "service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1")
@@ -494,11 +497,11 @@ func TestAutoGeneratedServiceName(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test that service name is auto-generated when not provided
 	// We expect this to fail at the API call stage, not at validation
@@ -556,11 +559,11 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service get command without service ID
 	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
@@ -586,11 +589,11 @@ func TestServiceGet_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service get command
 	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
@@ -974,11 +977,11 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service update-password command without service ID
 	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
@@ -988,36 +991,6 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "service ID is required") {
 		t.Errorf("Expected error about missing service ID, got: %v", err)
-	}
-}
-
-func TestServiceUpdatePassword_NoPassword(t *testing.T) {
-	tmpDir := setupServiceTest(t)
-
-	// Set up config with service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
-		return "test-api-key", "test-project-123", nil
-	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
-
-	// Execute service update-password command without password
-	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password")
-	if err == nil {
-		t.Fatal("Expected error when no password is provided")
-	}
-
-	if !strings.Contains(err.Error(), "password is required") {
-		t.Errorf("Expected error about missing password, got: %v", err)
 	}
 }
 
@@ -1034,11 +1007,11 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service update-password command
 	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
@@ -1064,11 +1037,11 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Set environment variable BEFORE creating command (like root test does)
 	originalEnv := os.Getenv("TIGER_NEW_PASSWORD")
@@ -1094,8 +1067,11 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 		t.Errorf("Environment variable was not picked up, got password required error: %v", err)
 	}
 
-	// Should be network/API error showing the password was found
-	if !strings.Contains(err.Error(), "API request failed") && !strings.Contains(err.Error(), "failed to update service password") {
+	// Should be network/API error showing the password was found and we proceeded to API calls
+	errStr := err.Error()
+	if !strings.Contains(errStr, "API request failed") &&
+		!strings.Contains(errStr, "failed to update service password") &&
+		!strings.Contains(errStr, "failed to get service details") {
 		t.Errorf("Expected network/API error indicating password was found, got: %v", err)
 	}
 }
@@ -1112,11 +1088,11 @@ func TestServiceCreate_WaitTimeoutParsing(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	testCases := []struct {
 		name          string
@@ -1203,7 +1179,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	tmpDir := setupServiceTest(t)
 
 	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
+	cfg, err := config.UseTestConfig(tmpDir, map[string]any{
 		"api_url": "http://localhost:9999", // Non-existent server to force timeout
 	})
 	if err != nil {
@@ -1211,16 +1187,16 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Create API client
-	client, err := api.NewTigerClient("test-api-key")
+	client, err := api.NewTigerClient(cfg, "test-api-key")
 	if err != nil {
-		t.Fatalf("Failed to create API client: %v", err)
+		t.Fatalf("Failed to create API Client: %v", err)
 	}
 
 	// Create a test command
@@ -1230,19 +1206,33 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test waitForServiceReady with very short timeout to trigger timeout quickly
-	_, err = waitForServiceReady(t.Context(), client, "test-project-123", "svc-12345", 100*time.Millisecond, nil, cmd.ErrOrStderr())
+	// Create a service object for the handler
+	service := api.Service{}
 
-	// Should return an error with ExitTimeout
+	// Test common.WaitForService with very short timeout to trigger timeout quickly
+	err = common.WaitForService(t.Context(), common.WaitForServiceArgs{
+		Client:    client,
+		ProjectID: "test-project-123",
+		ServiceID: "svc-12345",
+		Handler: &common.StatusWaitHandler{
+			TargetStatus: "READY",
+			Service:      &service,
+		},
+		Output:     cmd.ErrOrStderr(),
+		Timeout:    100 * time.Millisecond,
+		TimeoutMsg: "service may still be provisioning",
+	})
+
+	// Should return an error with common.ExitTimeout
 	if err == nil {
 		t.Error("Expected error for timeout, but got none")
 		return
 	}
 
-	// Check that it's an exitCodeError with ExitTimeout
+	// Check that it's an exitCodeError with common.ExitTimeout
 	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != ExitTimeout {
-			t.Errorf("Expected exit code %d for wait timeout, got %d", ExitTimeout, exitErr.ExitCode())
+		if exitErr.ExitCode() != common.ExitTimeout {
+			t.Errorf("Expected exit code %d for wait timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
 		t.Error("Expected exitCodeError for wait timeout")
@@ -1338,11 +1328,11 @@ func TestServiceDelete_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service delete command
 	_, err, _ = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
@@ -1367,11 +1357,11 @@ func TestServiceDelete_WithConfirmFlag(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service delete command with --confirm flag
 	// This should fail due to network error (which is expected in tests)
@@ -1401,11 +1391,11 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
@@ -1465,11 +1455,11 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1623,11 +1613,11 @@ func TestServiceCreate_OutputFlagDoesNotPersist(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service create with -o json flag
 	// This will fail due to network error (localhost:9999 doesn't exist), but that's OK
@@ -1655,11 +1645,11 @@ func TestServiceList_OutputFlagAffectsCommandOnly(t *testing.T) {
 	configFile := cfg.GetConfigFile()
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Store original config file content
 	originalConfigBytes, err := os.ReadFile(configFile)

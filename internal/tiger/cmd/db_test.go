@@ -14,13 +14,16 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func setupDBTest(t *testing.T) string {
 	t.Helper()
+
+	// Use a unique service name for this test to avoid conflicts
+	config.SetTestServiceName(t)
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-db-test-*")
@@ -31,14 +34,18 @@ func setupDBTest(t *testing.T) string {
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// Disable analytics for DB tests to avoid tracking test events
+	os.Setenv("TIGER_ANALYTICS", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
 
 	t.Cleanup(func() {
 		// Reset global config and viper first
 		config.ResetGlobalConfig()
-		// Clean up environment variable BEFORE cleaning up file system
+		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})
@@ -74,11 +81,11 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connection-string command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "connection-string")
@@ -104,11 +111,11 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connection-string command
 	_, err = executeDBCommand(t.Context(), "db", "connection-string")
@@ -135,7 +142,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	}
 
 	// Request pooled connection when pooler is not available
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Pooled: true,
 		Role:   "tsdbadmin",
 	})
@@ -167,11 +174,11 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connect command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "connect")
@@ -197,11 +204,11 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connect command
 	_, err = executeDBCommand(t.Context(), "db", "connect")
@@ -227,11 +234,11 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test that psql alias works the same as connect
 	_, err1 := executeDBCommand(t.Context(), "db", "connect")
@@ -262,14 +269,20 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 
 	// Create a dummy service for the test
 	service := api.Service{}
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "",
+	}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, []string{}, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionDetails, psqlPath, []string{}, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -291,15 +304,22 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	outBuf := new(bytes.Buffer)
 	cmd.SetOut(outBuf)
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
 	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
 
 	// Create a dummy service for the test
 	service := api.Service{}
 
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "",
+	}
+
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsqlWithConnectionString(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", cmd)
+	err := launchPsql(connectionDetails, psqlPath, additionalFlags, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -332,22 +352,29 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
 	additionalFlags := []string{"--quiet"}
+
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: testPassword,
+	}
 
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, "tsdbadmin", testCmd)
+	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, additionalFlags, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -382,14 +409,21 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 		ProjectId: &projectID,
 	}
 
-	connectionString := "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 	psqlPath := "/usr/bin/psql"
+
+	connectionDetails := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+		Password: "", // Password should be fetched from .pgpass
+	}
 
 	// Create a mock command for testing
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, []string{}, service, "tsdbadmin", testCmd)
+	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, []string{}, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -506,11 +540,11 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db test-connection command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "test-connection")
@@ -536,11 +570,11 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db test-connection command
 	_, err = executeDBCommand(t.Context(), "db", "test-connection")
@@ -562,7 +596,7 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 	cmd.SetOut(outBuf)
 	cmd.SetErr(errBuf)
 
-	// Test with malformed connection string (should return ExitInvalidParameters)
+	// Test with malformed connection string (should return common.ExitInvalidParameters)
 	invalidConnectionString := "this is not a valid connection string at all"
 	ctx := context.Background()
 	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
@@ -571,14 +605,14 @@ func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
 		t.Error("Expected error for invalid connection string")
 	}
 
-	// Should be an exitCodeError
-	if exitErr, ok := err.(exitCodeError); ok {
-		// The exact code depends on where it fails - could be ExitTimeout or ExitInvalidParameters
-		if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+	// Should be an common.ExitCodeError
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		// The exact code depends on where it fails - could be common.ExitTimeout or common.ExitInvalidParameters
+		if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for invalid connection string")
+		t.Error("Expected common.ExitCodeError for invalid connection string")
 	}
 }
 
@@ -607,13 +641,13 @@ func TestTestDatabaseConnection_Timeout(t *testing.T) {
 		t.Errorf("Connection test took too long: %v", duration)
 	}
 
-	// Check exit code (should be ExitTimeout for unreachable)
-	if exitErr, ok := err.(exitCodeError); ok {
-		if exitErr.ExitCode() != ExitTimeout {
-			t.Errorf("Expected exit code %d for timeout, got %d", ExitTimeout, exitErr.ExitCode())
+	// Check exit code (should be common.ExitTimeout for unreachable)
+	if exitErr, ok := err.(common.ExitCodeError); ok {
+		if exitErr.ExitCode() != common.ExitTimeout {
+			t.Errorf("Expected exit code %d for timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
 		}
 	} else {
-		t.Error("Expected exitCodeError for timeout")
+		t.Error("Expected common.ExitCodeError for timeout")
 	}
 }
 
@@ -673,6 +707,63 @@ func TestIsConnectionRejected(t *testing.T) {
 
 			if result != tc.expected {
 				t.Errorf("Expected isConnectionRejected to return %v for error %v, got %v",
+					tc.expected, tc.err, result)
+			}
+		})
+	}
+}
+
+func TestIsAuthenticationError(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 28P01 (invalid_password)",
+			err: &pgconn.PgError{
+				Code:    "28P01",
+				Message: "password authentication failed for user \"test\"",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 28000 (invalid_authorization_specification)",
+			err: &pgconn.PgError{
+				Code:    "28000",
+				Message: "role \"nonexistent\" does not exist",
+			},
+			expected: true,
+		},
+		{
+			name: "PostgreSQL error code 57P03 (cannot_connect_now) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "57P03",
+				Message: "the database system is starting up",
+			},
+			expected: false,
+		},
+		{
+			name: "PostgreSQL error code 3D000 (database does not exist) - not auth error",
+			err: &pgconn.PgError{
+				Code:    "3D000",
+				Message: "database \"nonexistent\" does not exist",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isAuthenticationError(tc.err)
+
+			if result != tc.expected {
+				t.Errorf("Expected isAuthenticationError to return %v for error %v, got %v",
 					tc.expected, tc.err, result)
 			}
 		})
@@ -739,11 +830,11 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			}
 
 			// Mock authentication
-			originalGetCredentials := getCredentialsForDB
-			getCredentialsForDB = func() (string, string, error) {
+			originalGetCredentials := common.GetCredentials
+			common.GetCredentials = func() (string, string, error) {
 				return "test-api-key", "test-project-123", nil
 			}
-			defer func() { getCredentialsForDB = originalGetCredentials }()
+			defer func() { common.GetCredentials = originalGetCredentials }()
 
 			// Execute db test-connection command with timeout flag
 			_, err = executeDBCommand(t.Context(), "db", "test-connection", "--timeout", tc.timeoutFlag)
@@ -768,13 +859,13 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 
 			// For valid durations that fail due to server unreachable, check exit code
 			if tc.expectedOutput == "" {
-				if exitErr, ok := err.(exitCodeError); ok {
-					// Should be ExitTimeout (no response) or ExitInvalidParameters (invalid params) for network errors
-					if exitErr.ExitCode() != ExitTimeout && exitErr.ExitCode() != ExitInvalidParameters {
-						t.Errorf("Expected exit code %d or %d, got %d", ExitTimeout, ExitInvalidParameters, exitErr.ExitCode())
+				if exitErr, ok := err.(common.ExitCodeError); ok {
+					// Should be common.ExitTimeout (no response) or common.ExitInvalidParameters (invalid params) for network errors
+					if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
+						t.Errorf("Expected exit code %d or %d, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
 					}
 				} else {
-					t.Error("Expected exitCodeError")
+					t.Error("Expected common.ExitCodeError")
 				}
 			}
 		})
@@ -809,7 +900,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -817,7 +908,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
-	details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role: "tsdbadmin",
 	})
 	if err != nil {
@@ -836,7 +927,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test connection string with password (simulating --with-password flag)
-	details2, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+	details2, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -891,7 +982,12 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -913,7 +1009,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -960,7 +1056,12 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -982,7 +1083,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1029,7 +1130,12 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1071,7 +1177,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -1105,7 +1211,12 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1174,7 +1285,12 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1197,7 +1313,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	// Verify password was saved for the custom role
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, customRole)
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
@@ -1226,8 +1342,13 @@ func TestDBSavePassword_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
-	// No need to mock since it should fail before reaching getServiceDetailsFunc
+	// No need to mock service details since it should fail before reaching getServiceDetailsFunc
 
 	// Execute save-password without service ID
 	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
@@ -1254,11 +1375,11 @@ func TestDBSavePassword_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute save-password command
 	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
@@ -1306,7 +1427,12 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, args []string) (api.Service, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1325,7 +1451,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	// Verify password was saved in pgpass storage
-	storage := password.GetPasswordStorage()
+	storage := common.GetPasswordStorage()
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)

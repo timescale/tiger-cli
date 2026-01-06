@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/tiger/analytics"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
@@ -39,6 +42,18 @@ tiger auth login
 `,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
+
+			// Bind persistent flags to viper
+			// Use cmd.Flags() which includes inherited persistent flags from parents
+			if err := errors.Join(
+				viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
+				viper.BindPFlag("service_id", cmd.Flags().Lookup("service-id")),
+				viper.BindPFlag("analytics", cmd.Flags().Lookup("analytics")),
+				viper.BindPFlag("password_storage", cmd.Flags().Lookup("password-storage")),
+				viper.BindPFlag("color", cmd.Flags().Lookup("color")),
+			); err != nil {
+				return fmt.Errorf("failed to bind flags: %w", err)
+			}
 
 			// Setup configuration initialization
 			configDirFlag := cmd.Flags().Lookup("config-dir")
@@ -97,25 +112,6 @@ tiger auth login
 	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
 	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
 
-	// Bind flags to viper
-	err := errors.Join(
-		viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug")),
-		viper.BindPFlag("service_id", cmd.PersistentFlags().Lookup("service-id")),
-		viper.BindPFlag("analytics", cmd.PersistentFlags().Lookup("analytics")),
-		viper.BindPFlag("password_storage", cmd.PersistentFlags().Lookup("password-storage")),
-		viper.BindPFlag("color", cmd.PersistentFlags().Lookup("color")),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bind flags: %w", err)
-	}
-
-	// Note: api_url is intentionally not exposed as a CLI flag.
-	// It can be configured via:
-	// - Environment variable: TIGER_API_URL
-	// - Config file: ~/.config/tiger/config.yaml
-	// - Config command: tiger config set api_url <url>
-	// This is primarily used for internal debugging and development.
-
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())
 	cmd.AddCommand(buildConfigCmd())
@@ -124,7 +120,48 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
+	wrapCommandsWithAnalytics(cmd)
+
 	return cmd, nil
+}
+
+func wrapCommandsWithAnalytics(cmd *cobra.Command) {
+	// Wrap this command's RunE if it exists
+	if cmd.RunE != nil {
+		originalRunE := cmd.RunE
+		cmd.RunE = func(c *cobra.Command, args []string) (runErr error) {
+			start := time.Now()
+
+			defer func() {
+				// Reload config after command to account for config changes
+				// during command (e.g. `tiger config set analytics false`
+				// should not result in an analytics event being sent).
+				cfg, err := config.Load()
+				if err != nil {
+					return
+				}
+
+				// Reload credentials after command to account for credentials
+				// changes during command (e.g. `tiger auth login` should
+				// record an analytics event).
+				client, projectID, _ := common.NewAPIClient(cmd.Context(), cfg)
+				a := analytics.New(cfg, client, projectID)
+				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
+					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
+					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
+					analytics.FlagSet(c.Flags()),
+					analytics.Error(runErr),
+				)
+			}()
+
+			return originalRunE(c, args)
+		}
+	}
+
+	// Recursively wrap all children
+	for _, child := range cmd.Commands() {
+		wrapCommandsWithAnalytics(child)
+	}
 }
 
 func Execute(ctx context.Context) error {

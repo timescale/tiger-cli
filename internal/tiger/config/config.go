@@ -4,11 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -16,40 +19,40 @@ import (
 )
 
 type Config struct {
-	APIURL               string        `mapstructure:"api_url" yaml:"api_url"`
-	Analytics            bool          `mapstructure:"analytics" yaml:"analytics"`
-	Color                bool          `mapstructure:"color" yaml:"color"`
-	ConfigDir            string        `mapstructure:"config_dir" yaml:"-"`
-	ConsoleURL           string        `mapstructure:"console_url" yaml:"console_url"`
-	Debug                bool          `mapstructure:"debug" yaml:"debug"`
-	DocsMCP              bool          `mapstructure:"docs_mcp" yaml:"docs_mcp"`
-	DocsMCPURL           string        `mapstructure:"docs_mcp_url" yaml:"docs_mcp_url"`
-	GatewayURL           string        `mapstructure:"gateway_url" yaml:"gateway_url"`
-	Output               string        `mapstructure:"output" yaml:"output"`
-	PasswordStorage      string        `mapstructure:"password_storage" yaml:"password_storage"`
-	ReleasesURL          string        `mapstructure:"releases_url" yaml:"releases_url"`
-	ServiceID            string        `mapstructure:"service_id" yaml:"service_id"`
-	VersionCheckInterval time.Duration `mapstructure:"version_check_interval" yaml:"version_check_interval"`
-	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time" yaml:"version_check_last_time"`
-	viper                *viper.Viper  `mapstructure:"-" yaml:"-"`
+	APIURL               string        `mapstructure:"api_url"`
+	Analytics            bool          `mapstructure:"analytics"`
+	Color                bool          `mapstructure:"color"`
+	ConfigDir            string        `mapstructure:"config_dir"`
+	ConsoleURL           string        `mapstructure:"console_url"`
+	Debug                bool          `mapstructure:"debug"`
+	DocsMCP              bool          `mapstructure:"docs_mcp"`
+	DocsMCPURL           string        `mapstructure:"docs_mcp_url"`
+	GatewayURL           string        `mapstructure:"gateway_url"`
+	Output               string        `mapstructure:"output"`
+	PasswordStorage      string        `mapstructure:"password_storage"`
+	ReleasesURL          string        `mapstructure:"releases_url"`
+	ServiceID            string        `mapstructure:"service_id"`
+	VersionCheckInterval time.Duration `mapstructure:"version_check_interval"`
+	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time"`
+	viper                *viper.Viper  `mapstructure:"-"`
 }
 
 type ConfigOutput struct {
-	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty" yaml:"api_url,omitempty"`
-	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty" yaml:"analytics,omitempty"`
-	Color                *bool          `mapstructure:"color" json:"color,omitempty" yaml:"color,omitempty"`
-	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty" yaml:"config_dir,omitempty"`
-	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty" yaml:"console_url,omitempty"`
-	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty" yaml:"debug,omitempty"`
-	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty" yaml:"docs_mcp,omitempty"`
-	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty" yaml:"docs_mcp_url,omitempty"`
-	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty" yaml:"gateway_url,omitempty"`
-	Output               *string        `mapstructure:"output" json:"output,omitempty" yaml:"output,omitempty"`
-	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty" yaml:"password_storage,omitempty"`
-	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty" yaml:"releases_url,omitempty"`
-	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty" yaml:"service_id,omitempty"`
-	VersionCheckInterval *time.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty" yaml:"version_check_interval,omitempty"`
-	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty" yaml:"version_check_last_time,omitempty"`
+	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty"`
+	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty"`
+	Color                *bool          `mapstructure:"color" json:"color,omitempty"`
+	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty"`
+	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty"`
+	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty"`
+	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
+	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
+	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
+	Output               *string        `mapstructure:"output" json:"output,omitempty"`
+	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty"`
+	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty"`
+	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty"`
+	VersionCheckInterval *util.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty"` // [util.Duration] ensures value is marshaled in [time.Duration.String] format when output
+	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty"`
 }
 
 const (
@@ -81,8 +84,12 @@ var defaultValues = map[string]any{
 	"password_storage":        DefaultPasswordStorage,
 	"releases_url":            DefaultReleasesURL,
 	"service_id":              "",
-	"version_check_interval":  DefaultVersionCheckInterval,
+	"version_check_interval":  DefaultVersionCheckInterval.String(), // String can be interpreted as either [time.Duration] (for [Config]) or [util.Duration] (for [ConfigOutput])
 	"version_check_last_time": time.Time{},
+}
+
+func ValidConfigOptions() iter.Seq[string] {
+	return maps.Keys(defaultValues)
 }
 
 func ApplyDefaults(v *viper.Viper) {
@@ -143,7 +150,10 @@ func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
 		ConfigDir: &configDir,
 	}
 
-	if err := v.Unmarshal(cfg); err != nil {
+	if err := v.Unmarshal(cfg,
+		// Decode hook allows us to unmarshal a string into a [util.Duration] for the sake of VersionCheckInterval
+		viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc()),
+	); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
 

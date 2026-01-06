@@ -100,7 +100,6 @@ go test ./internal/tiger/cmd -run Integration
 # To run integration tests with real API calls, set environment variables:
 export TIGER_PUBLIC_KEY_INTEGRATION=your-public-key
 export TIGER_SECRET_KEY_INTEGRATION=your-secret-key
-export TIGER_PROJECT_ID_INTEGRATION=your-project-id
 export TIGER_API_URL_INTEGRATION=http://localhost:8080/public/api/v1
 
 # Optional: Set this to test database commands with existing service
@@ -171,14 +170,14 @@ func processData(cfg *config.Config) {
 When implementing or updating functionality:
 
 1. **Keep CLI commands and MCP tools in sync** - When updating a CLI command, check if there's a corresponding MCP tool and apply the same changes to keep them aligned. Examples:
-   - `tiger service list` command → `tiger_service_list` MCP tool
-   - `tiger service create` command → `tiger_service_create` MCP tool
+   - `tiger service list` command → `service_list` MCP tool
+   - `tiger service create` command → `service_create` MCP tool
 
 2. **Check for intentional differences** - Some discrepancies between CLI and MCP are intentional (e.g., different default behaviors, different output formats). Before making changes to sync them, ask whether the difference is intentional. Document intentional differences in code comments.
 
 3. **Share code between CLI and MCP** - Code that needs to be used by both CLI commands and MCP tools should be moved to a shared package (not in `internal/tiger/cmd` or `internal/tiger/mcp`). Current examples:
-   - `internal/tiger/util/` - Shared utility functions
-   - `internal/tiger/password/` - Password storage logic used by both CLI and MCP
+   - `internal/tiger/common/` - Shared business logic, password storage, wait operations, error handling, and other utilities that have dependencies on config/api packages
+   - `internal/tiger/util/` - Small utility functions with minimal dependencies (formatting, validation, etc.)
    - `internal/tiger/api/` - API client used by both
 
 ### Documentation Synchronization
@@ -192,6 +191,72 @@ After making changes to commands, tools, configuration, or flags, always check a
 
 Keep these files in sync with the actual implementation. When adding a new flag, config option, or command, update all relevant documentation files.
 
+### Analytics Tracking
+
+Tiger CLI tracks usage analytics to help improve the product. Analytics are automatically tracked using middleware - you typically don't need to add tracking code manually when adding new commands or MCP tools.
+
+#### Automatic Tracking via Middleware
+
+**CLI Commands** - All commands are automatically wrapped with analytics middleware in `internal/tiger/cmd/root.go:134`
+
+This middleware:
+- Automatically tracks all CLI commands with event name like `"Run tiger service create"`
+- Captures elapsed time for each command
+- Tracks all user-provided flags (excluding sensitive ones like passwords and keys)
+- Records success/failure status and error messages
+- Uses `analytics.TryInit()` to gracefully handle cases where credentials aren't available
+
+**MCP Tools** - All MCP tool calls are automatically tracked via middleware in `internal/tiger/mcp/server.go:102`
+
+This middleware:
+- Automatically tracks all MCP tool calls with event name like `"Call service_create tool"`
+- Extracts and tracks tool arguments (excluding sensitive fields like passwords, queries, parameters)
+- Records success/failure status and error messages
+- Also tracks resource reads and prompt requests
+
+#### Event Naming Conventions
+
+The middleware follows these automatic naming conventions:
+
+**CLI Commands:** `"Run tiger <command> <subcommand>"`
+- Example: `"Run tiger service create"`, `"Run tiger db connection-string"`
+
+**MCP Tools:** `"Call <tool_name> tool"`
+- Example: `"Call service_create tool"`, `"Call db_execute_query tool"`
+
+**MCP Resources:** `"Read proxied resource"`
+- Includes the `resource_uri` property
+
+**MCP Prompts:** `"Get <prompt_name> prompt"`
+- Example: `"Get setup_hypertable prompt"`, `"Get migrate_to_hypertables prompt"`
+
+#### Excluding Sensitive Data
+
+The middleware automatically excludes sensitive fields using a centralized ignore list in `internal/tiger/analytics/analytics.go`.
+
+**Current ignore list:**
+- `password` - User passwords
+- `new_password` - New passwords for updates
+- `public_key` - API public keys
+- `secret_key` - API secret keys
+- `project_id` - Project identifiers
+- `query` - SQL queries (may contain sensitive data)
+- `parameters` - SQL parameters (may contain sensitive data)
+
+**IMPORTANT:** When adding new commands or MCP tools, review whether they introduce new sensitive flags, input parameters, or positional arguments:
+
+1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/tiger/analytics/analytics.go`
+   - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
+
+2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
+   - Refactor to use a flag instead
+   - Add filtering logic in `wrapCommandsWithAnalytics()` in `internal/tiger/cmd/root.go` to sanitize or omit the args from tracking
+
+**Common sensitive fields to watch for:**
+- Credentials: API keys, tokens, passwords, secret keys
+- User data: SQL queries, connection strings, personal information
+- Security-related: Private keys, certificates, encryption keys
+
 ## Architecture Overview
 
 Tiger CLI is a Go-based command-line interface for managing Tiger, the modern database cloud. The architecture follows standard Go CLI patterns using Cobra and Viper.
@@ -202,20 +267,26 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
   - `root.go` - Root command with global flags and configuration initialization
   - `auth.go` - Authentication commands (login, logout, status)
-  - `service.go` - Service management commands (list, create, get, fork, delete, update-password)
+  - `service.go` - Service management commands (list, create, get, fork, start, stop, delete, update-password)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
-  - `mcp.go` - MCP server commands (install, start)
+  - `mcp.go` - MCP server commands (install, start, list)
   - `version.go` - Version command
 - **Configuration**: `internal/tiger/config/config.go` - Centralized config with Viper integration
 - **Logging**: `internal/tiger/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
   - `server.go` - MCP server initialization, tool registration, and lifecycle management
-  - `service_tools.go` - Service management tools (list, get, create, update-password)
+  - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, update-password)
   - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
-- **Password Storage**: `internal/tiger/password/` - Secure password storage utilities
+  - `capabilities.go` - Lists all available MCP capabilities (tools, prompts, resources, resource templates)
+- **Common Package**: `internal/tiger/common/` - Shared business logic used by both CLI and MCP
+  - Password storage utilities (keyring, pgpass, validation)
+  - Wait operations and polling logic (WaitForService)
+  - Error handling and exit code utilities
+  - Service detail conversion helpers
+- **Utilities**: `internal/tiger/util/` - Small utility functions with minimal dependencies
 
 ### Configuration System
 
@@ -238,7 +309,7 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 **Two Types of Tools:**
 
 1. **Direct Tiger Tools** - Native tools for Tiger operations
-   - `service_tools.go` - Service management (list, get, create, update-password)
+   - `service_tools.go` - Service management (list, get, create, fork, start, stop, update-password)
    - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
@@ -285,7 +356,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 3. **Register tool with enhanced schema**:
 ```go
 mcp.AddTool(s.mcpServer, &mcp.Tool{
-    Name:        "tiger_service_create",
+    Name:        "service_create",
     Description: `Detailed multi-line description...`,
     InputSchema: ServiceCreateInput{}.Schema(),  // Uses our enhanced schema
 }, s.handleServiceCreate)
@@ -334,9 +405,9 @@ tiger-cli/
 │   ├── config/             # Configuration management
 │   ├── logging/            # Structured logging utilities
 │   ├── mcp/                # MCP server implementation
-│   ├── password/           # Password storage utilities
+│   ├── common/             # Shared business logic (password storage, wait ops, error handling)
 │   ├── cmd/                # CLI commands (Cobra)
-│   └── util/               # Shared utilities
+│   └── util/               # Small utility functions with minimal dependencies
 ├── docs/                   # Documentation
 │   └── development.md      # Development guide (building, testing, contributing)
 ├── specs/                  # CLI specifications and API documentation
@@ -369,20 +440,20 @@ RunE: func(cmd *cobra.Command, args []string) error {
     if len(args) < 1 {
         return fmt.Errorf("service ID is required")
     }
-    
+
     // 2. Set SilenceUsage = true after argument validation
     cmd.SilenceUsage = true
-    
+
     // 3. Proceed with business logic - errors here don't show usage
     if err := someAPICall(); err != nil {
         return fmt.Errorf("operation failed: %w", err)
     }
-    
+
     return nil
 },
 ```
 
-**Philosophy**: 
+**Philosophy**:
 - Early argument/syntax errors → show usage (helps users learn command syntax)
 - Operational errors after arguments are validated → don't show usage (avoids cluttering output with irrelevant usage info)
 
@@ -395,7 +466,7 @@ Tiger CLI uses a pure functional builder pattern with **zero global command stat
 ### Philosophy
 
 - **No global variables** - All commands, flags, and state are locally scoped
-- **Functional builders** - Every command is built by a dedicated function 
+- **Functional builders** - Every command is built by a dedicated function
 - **Complete tree building** - `buildRootCmd()` constructs the entire CLI structure
 - **Perfect test isolation** - Each test gets completely fresh command instances
 - **Self-contained commands** - All dependencies passed explicitly via parameters
@@ -419,6 +490,8 @@ buildRootCmd() → Complete CLI with all commands and flags
 │   ├── buildServiceGetCmd()
 │   ├── buildServiceCreateCmd()
 │   ├── buildServiceForkCmd()
+│   ├── buildServiceStartCmd()
+│   ├── buildServiceStopCmd()
 │   ├── buildServiceDeleteCmd()
 │   └── buildServiceUpdatePasswordCmd()
 ├── buildDbCmd()
@@ -441,47 +514,41 @@ func buildRootCmd() *cobra.Command {
     // Declare ALL flag variables locally within this function
     var configDir string
     var debug bool
-    var serviceID string
-    var analytics bool
-    var passwordStorage string
+    // ... other flag variables
 
     cmd := &cobra.Command{
         Use:   "tiger",
         Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
         Long:  `Complete CLI description...`,
         PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-            // Use local flag variables in scope
-            if err := logging.Init(debug); err != nil {
-                return fmt.Errorf("failed to initialize logging: %w", err)
+            // Bind persistent flags to viper at execution time
+            if err := errors.Join(
+                viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
+                // ... bind remaining flags
+            ); err != nil {
+                return fmt.Errorf("failed to bind flags: %w", err)
             }
+
+            // Setup configuration and initialize logging
             // ... rest of initialization
-            return nil
         },
     }
 
-    // Set up configuration and flags...
-    cobra.OnInitialize(initConfigFunc)
+    // Set up persistent flags
     cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
     cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-    cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
-    cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
-    cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
-
-    // Bind flags to viper
-    viper.BindPFlag("debug", cmd.PersistentFlags().Lookup("debug"))
-    // ... bind remaining flags
+    // ... add remaining persistent flags
 
     // Add all subcommands (complete tree building)
     cmd.AddCommand(buildVersionCmd())
     cmd.AddCommand(buildConfigCmd())
-    cmd.AddCommand(buildAuthCmd())
-    cmd.AddCommand(buildServiceCmd())
-    cmd.AddCommand(buildDbCmd())
-    cmd.AddCommand(buildMCPCmd())
+    // ... add remaining subcommands
 
     return cmd
 }
 ```
+
+See `internal/tiger/cmd/root.go` for the complete implementation.
 
 ### Simple Command Pattern
 
@@ -491,7 +558,7 @@ For commands without flags:
 func buildVersionCmd() *cobra.Command {
     return &cobra.Command{
         Use:   "version",
-        Short: "Show version information", 
+        Short: "Show version information",
         Long:  `Display version, build time, and git commit information.`,
         Run: func(cmd *cobra.Command, args []string) {
             fmt.Printf("Tiger CLI %s\n", Version)
@@ -511,7 +578,7 @@ func buildMyFlaggedCmd() *cobra.Command {
     var myFlag string
     var enableFeature bool
     var retryCount int
-    
+
     cmd := &cobra.Command{
         Use:   "my-command",
         Short: "Command with local flags",
@@ -519,24 +586,60 @@ func buildMyFlaggedCmd() *cobra.Command {
             if len(args) < 1 {
                 return fmt.Errorf("argument required")
             }
-            
+
             cmd.SilenceUsage = true
-            
+
             // Use flag variables (they're in scope)
-            fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n", 
+            fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n",
                 myFlag, enableFeature, retryCount)
             return nil
         },
     }
-    
+
     // Add flags - bound to local variables
-    cmd.Flags().StringVar(&myFlag, "flag", "", "My flag description")  
+    cmd.Flags().StringVar(&myFlag, "flag", "", "My flag description")
     cmd.Flags().BoolVar(&enableFeature, "enable", false, "Enable feature")
     cmd.Flags().IntVar(&retryCount, "retries", 3, "Retry count")
-    
+
     return cmd
 }
 ```
+
+### Commands with Flags That Need Viper Binding
+
+For commands that need their flags bound to viper for configuration precedence (flag > env > config > default), use the `bindFlags()` helper:
+
+```go
+func buildMyConfigurableFlagCmd() *cobra.Command {
+    var output string
+
+    cmd := &cobra.Command{
+        Use:     "my-command",
+        Short:   "Command with configurable flag",
+        PreRunE: bindFlags("output"),  // Binds flag to viper
+        RunE: func(cmd *cobra.Command, args []string) error {
+            cmd.SilenceUsage = true
+            cfg, err := config.Load()  // Now includes bound flag value
+            // ... use cfg.Output which respects: flag > env > config > default
+        },
+    }
+
+    cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format")
+    return cmd
+}
+```
+
+The `bindFlags()` helper (defined in `internal/tiger/cmd/flag.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+
+**Why bind flags in PreRunE?**
+
+Flags must be bound to viper at **execution time**, not at **build time**, for two critical reasons:
+
+1. **Prevents binding conflicts**: When all commands are built at startup (the builder pattern), binding flags at build time can cause commands' flags to bind to the same viper keys, silently overwriting each other. Only the last binding wins.
+
+2. **Ensures correct precedence**: Viper must bind flags after the command tree is built but before `config.Load()` is called. This happens in `PreRunE` (or `PersistentPreRunE` for persistent flags), ensuring the precedence order works correctly: command-line flags > environment variables > config file > defaults.
+
+**Note:** Use `PreRunE` for command-specific flags, and `PersistentPreRunE` for persistent flags on the root command that apply to all subcommands.
 
 ### Parent Commands with Subcommands
 
@@ -549,12 +652,12 @@ func buildParentCmd() *cobra.Command {
         Short: "Parent command with subcommands",
         Long:  `Parent command containing multiple subcommands.`,
     }
-    
+
     // Add all subcommands (builds complete subtree)
     cmd.AddCommand(buildChild1Cmd())
     cmd.AddCommand(buildChild2Cmd())
     cmd.AddCommand(buildChild3Cmd())
-    
+
     return cmd
 }
 ```
@@ -567,7 +670,7 @@ The main application uses a single builder call:
 func Execute() {
     // Build complete command tree fresh each time
     rootCmd := buildRootCmd()
-    
+
     err := rootCmd.Execute()
     if err != nil {
         if exitErr, ok := err.(interface{ ExitCode() int }); ok {
@@ -601,12 +704,12 @@ Tests use the full root command builder:
 func executeCommand(args ...string) (string, error) {
     // Build complete CLI fresh for each test
     rootCmd := buildRootCmd()
-    
+
     buf := new(bytes.Buffer)
-    rootCmd.SetOut(buf)  
+    rootCmd.SetOut(buf)
     rootCmd.SetErr(buf)
     rootCmd.SetArgs(args)
-    
+
     err := rootCmd.Execute()
     return buf.String(), err
 }
@@ -614,11 +717,11 @@ func executeCommand(args ...string) (string, error) {
 func TestMyCommand(t *testing.T) {
     // Each test gets completely fresh CLI instance
     output, err := executeCommand("my-command", "--flag", "value")
-    
+
     if err != nil {
         t.Fatalf("Command failed: %v", err)
     }
-    
+
     if !strings.Contains(output, "expected") {
         t.Errorf("Expected 'expected' in output: %s", output)
     }
@@ -632,22 +735,22 @@ For tests that need to verify flag values:
 ```go
 func executeAndReturnRoot(args ...string) (*cobra.Command, string, error) {
     rootCmd := buildRootCmd()
-    
+
     buf := new(bytes.Buffer)
     rootCmd.SetOut(buf)
     rootCmd.SetArgs(args)
-    
+
     err := rootCmd.Execute()
     return rootCmd, buf.String(), err
 }
 
 func TestFlagValues(t *testing.T) {
     rootCmd, output, err := executeAndReturnRoot("service", "create", "--name", "test")
-    
+
     // Navigate to specific command
     serviceCmd, _, _ := rootCmd.Find([]string{"service"})
     createCmd, _, _ := serviceCmd.Find([]string{"create"})
-    
+
     // Check flag value
     nameFlag := createCmd.Flags().Lookup("name")
     if nameFlag.Value.String() != "test" {
@@ -659,7 +762,7 @@ func TestFlagValues(t *testing.T) {
 ### Benefits of This Architecture
 
 1. **Zero Global State**: No shared variables between commands or tests
-2. **Perfect Test Isolation**: Each test builds completely fresh command trees  
+2. **Perfect Test Isolation**: Each test builds completely fresh command trees
 3. **Simplified Initialization**: Single entry point builds everything
 4. **Maintainable Code**: No complex global variable management
 5. **Easy Development**: Add new commands by creating builders and adding to root
@@ -672,9 +775,10 @@ When adding new commands to this architecture:
 
 1. **Create a builder function** following the `buildXXXCmd()` pattern
 2. **Declare flags locally** within the builder function scope
-3. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
-4. **No init() function** required - everything goes through the root builder
-5. **Test with `buildRootCmd()`** instead of recreating flag setup
+3. **Bind flags to viper in PreRunE** if the flag needs to be configurable via config file or environment variables
+4. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
+5. **No init() function** required - everything goes through the root builder
+6. **Test with `buildRootCmd()`** instead of recreating flag setup
 
 This architecture ensures Tiger CLI remains maintainable and testable as it grows.
 
@@ -745,7 +849,7 @@ if !confirmFlag {
 For asynchronous operations, provide consistent wait behavior:
 
 1. **Default Wait** - Wait for completion by default
-2. **No-Wait Override** - `--no-wait` to return immediately  
+2. **No-Wait Override** - `--no-wait` to return immediately
 3. **Timeout Control** - `--wait-timeout` with duration parsing
 4. **Exit Code 2** - Use exit code 2 for timeout scenarios
 
@@ -771,7 +875,7 @@ if !noWait {
 ### Help Text and Documentation
 
 1. **Explain Default Behavior** - Always document what happens by default
-2. **Show Override Options** - Explain how to change default behavior  
+2. **Show Override Options** - Explain how to change default behavior
 3. **Include Examples** - Show common usage patterns
 4. **AI Agent Notes** - Add warnings for destructive operations
 
@@ -779,7 +883,7 @@ if !noWait {
 ```go
 Long: `Create a new database service in the current project.
 
-By default, the newly created service will be set as your default service for future 
+By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.
@@ -787,7 +891,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 Examples:
   # Create service (sets as default by default)
   tiger service create --name my-db
-  
+
   # Create service without setting as default
   tiger service create --name temp-db --no-set-default`,
 ```

@@ -453,8 +453,9 @@ main() {
     # Show usage information
     log_success "Get started with:"
     log_success "    ${BINARY_NAME} auth login"
+    log_success "    ${BINARY_NAME} mcp install"
     log_success "For help:"
-    log_success "    ${BINARY_NAME} --help"
+    log_success "    ${BINARY_NAME} help"
     log_success "Happy coding with Tiger CLI! 🐅"
 }
 

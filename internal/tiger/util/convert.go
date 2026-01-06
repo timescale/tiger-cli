@@ -11,6 +11,13 @@ func Ptr[T any](val T) *T {
 	return &val
 }
 
+func PtrIfNonNil[T ~[]E, E any](val T) *T {
+	if val == nil {
+		return nil
+	}
+	return &val
+}
+
 func Deref[T any](val *T) T {
 	if val == nil {
 		var res T
@@ -46,4 +53,19 @@ func ConvertStringSlicePtr[T ~string](ss []string) *[]T {
 		out[i] = T(s)
 	}
 	return &out
+}
+
+// ConvertSliceToAny converts a slice of some type to slice of any.
+// Returns nil if the input slice is nil.
+func ConvertSliceToAny[T any](ts []T) []any {
+	if ts == nil {
+		return nil
+	}
+
+	out := make([]any, len(ts))
+	for i, t := range ts {
+		out[i] = any(t)
+	}
+	return out
+
 }

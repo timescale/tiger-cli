@@ -17,15 +17,11 @@ import (
 	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
-	"github.com/timescale/tiger-cli/internal/tiger/config"
-	"github.com/timescale/tiger-cli/internal/tiger/password"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
-	// getCredentialsForDB can be overridden for testing
-	getCredentialsForDB = config.GetCredentials
-
 	// getServiceDetailsFunc can be overridden for testing
 	getServiceDetailsFunc = getServiceDetails
 
@@ -50,9 +46,8 @@ func buildDbConnectionStringCmd() *cobra.Command {
 	var dbConnectionStringWithPassword bool
 
 	cmd := &cobra.Command{
-		Use:               "connection-string [service-id]",
-		Short:             "Get connection string for a service",
-		ValidArgsFunction: serviceIDCompletion,
+		Use:   "connection-string [service-id]",
+		Short: "Get connection string for a service",
 		Long: `Get a PostgreSQL connection string for connecting to a database service.
 
 The service ID can be provided as an argument or will use the default service
@@ -77,13 +72,21 @@ Examples:
 
   # Get connection string with password included (less secure)
   tiger db connection-string svc-12345 --with-password`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
@@ -118,10 +121,9 @@ func buildDbConnectCmd() *cobra.Command {
 	var dbConnectRole string
 
 	cmd := &cobra.Command{
-		Use:               "connect [service-id]",
-		Aliases:           []string{"psql"},
-		Short:             "Connect to a database",
-		ValidArgsFunction: serviceIDCompletion,
+		Use:     "connect [service-id]",
+		Aliases: []string{"psql"},
+		Short:   "Connect to a database",
 		Long: `Connect to a database service using psql client.
 
 The service ID can be provided as an argument or will use the default service
@@ -131,7 +133,9 @@ with the appropriate connection parameters.
 Authentication is handled automatically using:
 1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
 2. PGPASSWORD environment variable
-3. Interactive password prompt (if neither above is available)
+3. If authentication fails, offers interactive options:
+   - Enter password manually (will be saved for future use)
+   - Reset password (update or generates a new password via the API)
 
 Examples:
   # Connect to default service
@@ -153,11 +157,19 @@ Examples:
   # Pass additional flags to psql (use -- to separate)
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
+		Args:              cobra.ArbitraryArgs,
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			service, err := getServiceDetails(cmd, serviceArgs)
+			service, err := getServiceDetailsFunc(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -168,7 +180,7 @@ Examples:
 				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
 			}
 
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled: dbConnectPooled,
 				Role:   dbConnectRole,
 			})
@@ -180,8 +192,7 @@ Examples:
 				return fmt.Errorf("connection pooler not available for this service")
 			}
 
-			// Launch psql with additional flags
-			return launchPsqlWithConnectionString(details.String(), psqlPath, psqlFlags, service, dbConnectRole, cmd)
+			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, service, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -198,9 +209,8 @@ func buildDbTestConnectionCmd() *cobra.Command {
 	var dbTestConnectionRole string
 
 	cmd := &cobra.Command{
-		Use:               "test-connection [service-id]",
-		Short:             "Test database connectivity",
-		ValidArgsFunction: serviceIDCompletion,
+		Use:   "test-connection [service-id]",
+		Short: "Test database connectivity",
 		Long: `Test database connectivity to a service.
 
 The service ID can be provided as an argument or will use the default service
@@ -228,29 +238,37 @@ Examples:
 
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetails(cmd, args)
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
-				return exitWithCode(ExitInvalidParameters, err)
+				cmd.SilenceUsage = true
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
 			})
 			if err != nil {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
 
 			if dbTestConnectionPooled && !details.IsPooler {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
 			if dbTestConnectionTimeout < 0 {
-				return exitWithCode(ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
 			}
 
 			// Test the connection
@@ -271,9 +289,8 @@ func buildDbSavePasswordCmd() *cobra.Command {
 	var dbSavePasswordValue string
 
 	cmd := &cobra.Command{
-		Use:               "save-password [service-id]",
-		Short:             "Save password for a database service",
-		ValidArgsFunction: serviceIDCompletion,
+		Use:   "save-password [service-id]",
+		Short: "Save password for a database service",
 		Long: `Save a password for a database service to configured password storage.
 
 The service ID can be provided as an argument or will use the default service
@@ -301,8 +318,16 @@ Examples:
 
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			service, err := getServiceDetailsFunc(cmd, args)
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -340,7 +365,7 @@ Examples:
 			}
 
 			// Save password using configured storage
-			storage := password.GetPasswordStorage()
+			storage := common.GetPasswordStorage()
 			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}
@@ -526,10 +551,10 @@ func getPasswordForRole(passwordFlag string) (string, error) {
 
 // CreateRoleResult represents the output of a create role operation
 type CreateRoleResult struct {
-	RoleName         string   `json:"role_name" yaml:"role_name"`
-	ReadOnly         bool     `json:"read_only,omitempty" yaml:"read_only,omitempty"`
-	StatementTimeout string   `json:"statement_timeout,omitempty" yaml:"statement_timeout,omitempty"`
-	FromRoles        []string `json:"from_roles,omitempty" yaml:"from_roles,omitempty"`
+	RoleName         string   `json:"role_name"`
+	ReadOnly         bool     `json:"read_only,omitempty"`
+	StatementTimeout string   `json:"statement_timeout,omitempty"`
+	FromRoles        []string `json:"from_roles,omitempty"`
 }
 
 // outputCreateRoleResult formats and outputs the create role result
@@ -553,7 +578,7 @@ func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, 
 	case "json":
 		return util.SerializeToJSON(outputWriter, result)
 	case "yaml":
-		return util.SerializeToYAML(outputWriter, result, false)
+		return util.SerializeToYAML(outputWriter, result)
 	default: // table format
 		fmt.Fprintf(outputWriter, "✓ Role '%s' created successfully\n", roleName)
 		if readOnly {
@@ -578,9 +603,8 @@ func buildDbCreateRoleCmd() *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
-		Use:               "role [service-id]",
-		Short:             "Create a new database role",
-		ValidArgsFunction: serviceIDCompletion,
+		Use:   "role [service-id]",
+		Short: "Create a new database role",
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service ID can be provided as an argument or will use the default service
@@ -637,23 +661,25 @@ PostgreSQL Configuration Parameters That May Be Set:
     (enforces permanent read-only mode for the role)
   - statement_timeout: Set when --statement-timeout flag is provided
     (kills queries that exceed the specified duration, in milliseconds)`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			cmd.SilenceUsage = true
-
-			// Get config
-			cfg, err := config.Load()
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
+				cmd.SilenceUsage = true
+				return err
 			}
 
-			// Use flag value if provided, otherwise use config value
-			if cmd.Flags().Changed("output") {
-				cfg.Output = output
+			// Get service details
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			if err != nil {
+				return err
 			}
 
 			// Get password
@@ -662,14 +688,8 @@ PostgreSQL Configuration Parameters That May Be Set:
 				return fmt.Errorf("failed to determine password: %w", err)
 			}
 
-			// Get service details
-			service, err := getServiceDetails(cmd, args)
-			if err != nil {
-				return err
-			}
-
 			// Build connection string
-			details, err := password.GetConnectionDetails(service, password.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -694,7 +714,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := password.SavePasswordWithResult(service, rolePassword, roleName)
+			result, err := common.SavePasswordWithResult(service, rolePassword, roleName)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", result.Message)
 			} else if !result.Success {
@@ -748,51 +768,27 @@ func buildDbCmd() *cobra.Command {
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, args []string) (api.Service, error) {
-	// Get config
-	cfg, err := config.Load()
-	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
+func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 	// Determine service ID
-	var serviceID string
-	if len(args) > 0 {
-		serviceID = args[0]
-	} else {
-		serviceID = cfg.ServiceID
-	}
-
-	if serviceID == "" {
-		return api.Service{}, fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
+	serviceID, err := getServiceID(cfg.Config, args)
+	if err != nil {
+		return api.Service{}, err
 	}
 
 	cmd.SilenceUsage = true
-
-	// Get API key and project ID for authentication
-	apiKey, projectID, err := getCredentialsForDB()
-	if err != nil {
-		return api.Service{}, exitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-	}
-
-	// Create API client
-	client, err := api.NewTigerClient(apiKey)
-	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to create API client: %w", err)
-	}
 
 	// Fetch service details
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+	resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, serviceID)
 	if err != nil {
 		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
 	}
 
 	// Handle API response
 	if resp.StatusCode() != 200 {
-		return api.Service{}, exitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		return api.Service{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil {
@@ -825,17 +821,22 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 	return serviceArgs, psqlFlags
 }
 
-// launchPsqlWithConnectionString launches psql using the connection string and additional flags
-func launchPsqlWithConnectionString(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(connectionString, psqlPath, additionalFlags, service, role, cmd)
+// launchPsql launches psql using the connection string and additional flags.
+// It retrieves the password from storage and sets PGPASSWORD environment variable.
+func launchPsql(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(details, psqlPath, additionalFlags, service, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []string, service api.Service, role string, cmd *cobra.Command) *exec.Cmd {
-	// Build command arguments: connection string first, then additional flags
-	// Note: connectionString contains only "postgresql://user@host:port/db" - no password
+func buildPsqlCommand(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+	password := details.Password
+	// Ensure we don't include password in the connection string to make it not show up in process lists
 	// Passwords are passed via PGPASSWORD environment variable (see below)
+	detailsCopy := *details
+	detailsCopy.Password = ""
+	connectionString := detailsCopy.String()
+	// Build command arguments: connection string first, then additional flags
 	args := []string{connectionString}
 	args = append(args, additionalFlags...)
 
@@ -846,16 +847,21 @@ func buildPsqlCommand(connectionString, psqlPath string, additionalFlags []strin
 	psqlCmd.Stdout = cmd.OutOrStdout()
 	psqlCmd.Stderr = cmd.ErrOrStderr()
 
-	// Only set PGPASSWORD for keyring storage method
-	// pgpass storage relies on psql automatically reading ~/.pgpass file
-	storage := password.GetPasswordStorage()
-	if _, isKeyring := storage.(*password.KeyringStorage); isKeyring {
-		if password, err := storage.Get(service, role); err == nil && password != "" {
-			// Set PGPASSWORD environment variable for psql when using keyring
-			psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+	// Use provided password directly if available
+	if password != "" {
+		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
+	} else {
+		storage := common.GetPasswordStorage()
+		// Only set PGPASSWORD for keyring storage method
+		// pgpass storage relies on psql automatically reading ~/.pgpass file
+		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {
+			if storedPassword, err := storage.Get(service, details.Role); err == nil && storedPassword != "" {
+				// Set PGPASSWORD environment variable for psql when using keyring
+				psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+storedPassword)
+			}
+			// Note: If keyring password retrieval fails, we let psql try without it
+			// This allows fallback to other authentication methods
 		}
-		// Note: If keyring password retrieval fails, we let psql try without it
-		// This allows fallback to other authentication methods
 	}
 
 	return psqlCmd
@@ -877,17 +883,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(ExitTimeout, err) // Connection timeout
+			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
+			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
-		return exitWithCode(2, err) // No response to connection attempt
+		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 	defer conn.Close(ctx)
 
@@ -897,17 +903,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
-			return exitWithCode(ExitTimeout, err) // Connection timeout
+			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
-			return exitWithCode(ExitGeneralError, err) // Server is rejecting connections
+			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
-		return exitWithCode(2, err) // No response to connection attempt
+		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 
 	// Connection successful

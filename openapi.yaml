@@ -17,12 +17,89 @@ servers:
     description: API server for Tiger Cloud
 
 tags:
+  - name: Auth
+    description: Authentication and authorization information.
   - name: VPCs
     description: Manage VPCs and their peering connections.
   - name: Services
     description: Manage services, read replicas, and their associated actions.
+  - name: Analytics
+    description: Track analytics events.
 
 paths:
+  /auth/info:
+    get:
+      tags:
+        - Auth
+      summary: Get Authentication Info
+      description: Returns information about the authentication credentials being used to access the API
+      responses:
+        '200':
+          description: Authentication information retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthInfo'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /analytics/identify:
+    post:
+      tags:
+        - Analytics
+      summary: Identify a user
+      description: Identifies a user with optional properties for analytics tracking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the user
+                  example:
+                    email: "user@example.com"
+                    name: "John Doe"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /analytics/track:
+    post:
+      tags:
+        - Analytics
+      summary: Track an analytics event
+      description: Tracks an analytics event with optional properties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event
+              properties:
+                event:
+                  type: string
+                  description: The name of the event to track
+                  example: service_created
+                properties:
+                  type: object
+                  additionalProperties: true
+                  description: Optional map of arbitrary properties associated with the event
+                  example:
+                    region: "us-east-1"
+      responses:
+        '200':
+          $ref: '#/components/responses/AnalyticsResponse'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/vpcs:
     get:
       tags:
@@ -271,6 +348,44 @@ paths:
       responses:
         '202':
           description: Deletion request has been accepted.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/start:
+    post:
+      tags:
+        - Services
+      summary: Start a Service
+      description: Starts a stopped service within a project. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '202':
+          description: Service start request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/stop:
+    post:
+      tags:
+        - Services
+      summary: Stop a Service
+      description: Stops a running service within a project. This is an asynchronous operation.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '202':
+          description: Service stop request has been accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -639,6 +754,81 @@ components:
         example: "1234567890"
 
   schemas:
+    AuthInfo:
+      type: object
+      required:
+        - type
+        - apiKey
+      properties:
+        type:
+          type: string
+          description: The type of authentication being used
+          enum: ["apiKey"]
+          example: "apiKey"
+        apiKey:
+          type: object
+          description: Information about the API key credentials
+          required:
+            - public_key
+            - name
+            - created
+            - project
+            - issuing_user
+          properties:
+            public_key:
+              type: string
+              description: The public key of the client credentials
+              example: "tskey_abc123"
+            name:
+              type: string
+              description: The name of the credential
+              example: "my-production-token"
+            created:
+              type: string
+              format: date-time
+              description: When the client credentials were created
+              example: "2024-01-15T10:30:00Z"
+            project:
+              type: object
+              description: Information about the project
+              required:
+                - id
+                - name
+                - plan_type
+              properties:
+                id:
+                  type: string
+                  description: The project ID
+                  example: "rp1pz7uyae"
+                name:
+                  type: string
+                  description: The name of the project
+                  example: "My Production Project"
+                plan_type:
+                  type: string
+                  description: The plan type for the project
+                  example: "FREE"
+            issuing_user:
+              type: object
+              description: Information about the user who created the credentials
+              required:
+                - id
+                - name
+                - email
+              properties:
+                id:
+                  type: string
+                  description: The user ID
+                  example: "user123"
+                name:
+                  type: string
+                  description: The user's name
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  description: The user's email
+                  example: "john.doe@example.com"
     VPC:
       type: object
       properties:
@@ -1071,6 +1261,17 @@ components:
           type: string
 
   responses:
+    AnalyticsResponse:
+      description: Analytics action completed successfully.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: Status of the analytics operation
+                example: "success"
     SuccessMessage:
       description: The action was completed successfully.
       content:

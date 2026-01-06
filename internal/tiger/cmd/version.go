@@ -7,19 +7,20 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
 type VersionOutput struct {
-	Version         string `json:"version" yaml:"version"`
-	BuildTime       string `json:"build_time" yaml:"build_time"`
-	GitCommit       string `json:"git_commit" yaml:"git_commit"`
-	GoVersion       string `json:"go_version" yaml:"go_version"`
-	Platform        string `json:"platform" yaml:"platform"`
-	LatestVersion   string `json:"latest_version,omitempty" yaml:"latest_version,omitempty"`
-	UpdateAvailable *bool  `json:"update_available,omitempty" yaml:"update_available,omitempty"`
+	Version         string `json:"version"`
+	BuildTime       string `json:"build_time"`
+	GitCommit       string `json:"git_commit"`
+	GoVersion       string `json:"go_version"`
+	Platform        string `json:"platform"`
+	LatestVersion   string `json:"latest_version,omitempty"`
+	UpdateAvailable *bool  `json:"update_available,omitempty"`
 }
 
 func buildVersionCmd() *cobra.Command {
@@ -27,10 +28,14 @@ func buildVersionCmd() *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Show version information",
-		Long:  `Display version, build time, and git commit information for the Tiger CLI`,
+		Use:               "version",
+		Short:             "Show version information",
+		Long:              `Display version, build time, and git commit information for the Tiger CLI`,
+		Args:              cobra.NoArgs,
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			versionOutput := VersionOutput{
 				Version:   config.Version,
 				BuildTime: config.BuildTime,
@@ -61,7 +66,7 @@ func buildVersionCmd() *cobra.Command {
 					return err
 				}
 			case "yaml":
-				if err := util.SerializeToYAML(output, versionOutput, true); err != nil {
+				if err := util.SerializeToYAML(output, versionOutput); err != nil {
 					return err
 				}
 			case "bare":
@@ -73,8 +78,7 @@ func buildVersionCmd() *cobra.Command {
 			}
 			if updateAvailable {
 				cmd.SilenceErrors = true
-				cmd.SilenceUsage = true
-				return exitWithCode(ExitUpdateAvailable, nil)
+				return common.ExitWithCode(common.ExitUpdateAvailable, nil)
 			}
 			return nil
 		},

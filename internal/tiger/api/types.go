@@ -5,6 +5,13 @@ package api
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+// Defines values for AuthInfoType.
+const (
+	ApiKey AuthInfoType = "apiKey"
 )
 
 // Defines values for DeployStatus.
@@ -62,6 +69,51 @@ const (
 	SetEnvironmentInputEnvironmentDEV  SetEnvironmentInputEnvironment = "DEV"
 	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
+
+// AuthInfo defines model for AuthInfo.
+type AuthInfo struct {
+	// ApiKey Information about the API key credentials
+	ApiKey struct {
+		// Created When the client credentials were created
+		Created time.Time `json:"created"`
+
+		// IssuingUser Information about the user who created the credentials
+		IssuingUser struct {
+			// Email The user's email
+			Email openapi_types.Email `json:"email"`
+
+			// Id The user ID
+			Id string `json:"id"`
+
+			// Name The user's name
+			Name string `json:"name"`
+		} `json:"issuing_user"`
+
+		// Name The name of the credential
+		Name string `json:"name"`
+
+		// Project Information about the project
+		Project struct {
+			// Id The project ID
+			Id string `json:"id"`
+
+			// Name The name of the project
+			Name string `json:"name"`
+
+			// PlanType The plan type for the project
+			PlanType string `json:"plan_type"`
+		} `json:"project"`
+
+		// PublicKey The public key of the client credentials
+		PublicKey string `json:"public_key"`
+	} `json:"apiKey"`
+
+	// Type The type of authentication being used
+	Type AuthInfoType `json:"type"`
+}
+
+// AuthInfoType The type of authentication being used
+type AuthInfoType string
 
 // ConnectionPooler defines model for ConnectionPooler.
 type ConnectionPooler struct {
@@ -360,6 +412,12 @@ type ServiceId = string
 // VPCId defines model for VPCId.
 type VPCId = string
 
+// AnalyticsResponse defines model for AnalyticsResponse.
+type AnalyticsResponse struct {
+	// Status Status of the analytics operation
+	Status *string `json:"status,omitempty"`
+}
+
 // ClientError defines model for ClientError.
 type ClientError = Error
 
@@ -367,6 +425,27 @@ type ClientError = Error
 type SuccessMessage struct {
 	Message *string `json:"message,omitempty"`
 }
+
+// PostAnalyticsIdentifyJSONBody defines parameters for PostAnalyticsIdentify.
+type PostAnalyticsIdentifyJSONBody struct {
+	// Properties Optional map of arbitrary properties associated with the user
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// PostAnalyticsTrackJSONBody defines parameters for PostAnalyticsTrack.
+type PostAnalyticsTrackJSONBody struct {
+	// Event The name of the event to track
+	Event string `json:"event"`
+
+	// Properties Optional map of arbitrary properties associated with the event
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.
+type PostAnalyticsIdentifyJSONRequestBody PostAnalyticsIdentifyJSONBody
+
+// PostAnalyticsTrackJSONRequestBody defines body for PostAnalyticsTrack for application/json ContentType.
+type PostAnalyticsTrackJSONRequestBody PostAnalyticsTrackJSONBody
 
 // PostProjectsProjectIdServicesJSONRequestBody defines body for PostProjectsProjectIdServices for application/json ContentType.
 type PostProjectsProjectIdServicesJSONRequestBody = ServiceCreate
