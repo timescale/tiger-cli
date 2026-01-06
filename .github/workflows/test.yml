@@ -56,7 +56,6 @@ jobs:
         env:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
-          TIGER_PROJECT_ID_INTEGRATION: ${{ secrets.TIGER_PROJECT_ID_INTEGRATION }}
         run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
 
       - name: Generate coverage report
