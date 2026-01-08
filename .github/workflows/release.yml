@@ -6,7 +6,10 @@ on:
       - "v*"
 
 permissions:
+  id-token: write
   contents: write
+  packages: write
+  attestations: write
 
 jobs:
   goreleaser:
@@ -24,6 +27,25 @@ jobs:
 
       - name: Install package_cloud gem
         run: sudo gem install package_cloud --no-doc
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log In to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install MCP Publisher
+        run: curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -43,6 +65,13 @@ jobs:
           AWS_REGION: us-east-1
           # PackageCloud credentials for publishing Linux packages
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+
+      - name: Publish to MCP Registry
+        if: "!contains(github.ref_name, '-')" # Skip pre-releases
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s/{{ Version }}/$VERSION/g" server-template.json > server.json
+          ./mcp-publisher publish
 
       - name: Invalidate CloudFront Cache
         env:

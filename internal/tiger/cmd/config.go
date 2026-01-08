@@ -90,8 +90,6 @@ func buildConfigSetCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			key, value := args[0], args[1]
-
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
@@ -99,6 +97,7 @@ func buildConfigSetCmd() *cobra.Command {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
+			key, value := args[0], args[1]
 			if err := cfg.Set(key, value); err != nil {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
@@ -118,8 +117,6 @@ func buildConfigUnsetCmd() *cobra.Command {
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: configOptionCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			key := args[0]
-
 			cmd.SilenceUsage = true
 
 			cfg, err := config.Load()
@@ -127,6 +124,7 @@ func buildConfigUnsetCmd() *cobra.Command {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
+			key := args[0]
 			if err := cfg.Unset(key); err != nil {
 				return fmt.Errorf("failed to unset config: %w", err)
 			}

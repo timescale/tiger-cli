@@ -1,0 +1,67 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.timescale/tiger-cli",
+  "title": "Tiger MCP",
+  "description": "Provides programmatic access to Tiger Cloud services, databases, and documentation.",
+  "version": "{{ Version }}",
+  "homepage": "https://github.com/timescale/tiger-cli",
+  "repository": {
+    "url": "https://github.com/timescale/tiger-cli",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/timescale/tiger-cli:{{ Version }}",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "description": "Mount the config directory into the volume",
+          "name": "--mount",
+          "value": "type=bind,src={source_path},dst=/home/tiger/.config/tiger",
+          "variables": {
+            "source_path": {
+              "description": "Source path on host",
+              "format": "filepath",
+              "isRequired": true,
+              "default": "${HOME}/.config/tiger"
+            }
+          }
+        },
+        {
+          "type": "named",
+          "description": "Mount the .pgpass file into the volume",
+          "name": "--mount",
+          "value": "type=bind,src={source_path},dst=/home/tiger/.pgpass",
+          "variables": {
+            "source_path": {
+              "description": "Source path on host",
+              "format": "filepath",
+              "isRequired": true,
+              "default": "${HOME}/.pgpass"
+            }
+          }
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TIGER_PUBLIC_KEY",
+          "description": "Tiger Cloud API public key for authentication",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "TIGER_SECRET_KEY",
+          "description": "Tiger Cloud API secret key for authentication",
+          "format": "string",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

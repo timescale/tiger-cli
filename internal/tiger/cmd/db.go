@@ -18,14 +18,10 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
-	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 var (
-	// getCredentialsForDB can be overridden for testing
-	getCredentialsForDB = config.GetCredentials
-
 	// getServiceDetailsFunc can be overridden for testing
 	getServiceDetailsFunc = getServiceDetails
 
@@ -79,11 +75,13 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, projectID, client, err := loadConfigAndApiClient()
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
 				return err
 			}
-			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -162,13 +160,16 @@ Examples:
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Separate service ID from additional psql flags
-			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
-			cfg, projectID, client, err := loadConfigAndApiClient()
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
 				return err
 			}
-			service, err := getServiceDetails(cmd, cfg, projectID, client, serviceArgs)
+
+			// Separate service ID from additional psql flags
+			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
+
+			service, err := getServiceDetailsFunc(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -191,7 +192,7 @@ Examples:
 				return fmt.Errorf("connection pooler not available for this service")
 			}
 
-			return connectWithPasswordMenu(cmd.Context(), cmd, client, service, details, psqlPath, psqlFlags)
+			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, service, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -240,11 +241,13 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, projectID, client, err := loadConfigAndApiClient()
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
-				return err
+				cmd.SilenceUsage = true
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
-			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
@@ -318,11 +321,13 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, projectID, client, err := loadConfigAndApiClient()
+			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
 				return err
 			}
-			service, err := getServiceDetailsFunc(cmd, cfg, projectID, client, args)
+
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -665,9 +670,14 @@ PostgreSQL Configuration Parameters That May Be Set:
 				return fmt.Errorf("--name is required")
 			}
 
-			cmd.SilenceUsage = true
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
 
-			cfg, projectID, client, err := loadConfigAndApiClient()
+			// Get service details
+			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -676,12 +686,6 @@ PostgreSQL Configuration Parameters That May Be Set:
 			rolePassword, err := getPasswordForRole(passwordFlag)
 			if err != nil {
 				return fmt.Errorf("failed to determine password: %w", err)
-			}
-
-			// Get service details
-			service, err := getServiceDetails(cmd, cfg, projectID, client, args)
-			if err != nil {
-				return err
 			}
 
 			// Build connection string
@@ -763,33 +767,10 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-func loadConfigAndApiClient() (*config.Config, string, *api.ClientWithResponses, error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Get API key and project ID for authentication
-	apiKey, projectID, err := getCredentialsForDB()
-	if err != nil {
-		return nil, "", nil, common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-	}
-
-	// Create API client
-	client, err := api.NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to create API client: %w", err)
-	}
-
-	return cfg, projectID, client, nil
-}
-
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
-
+func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 	// Determine service ID
-	serviceID, err := getServiceID(cfg, args)
+	serviceID, err := getServiceID(cfg.Config, args)
 	if err != nil {
 		return api.Service{}, err
 	}
@@ -800,7 +781,7 @@ func getServiceDetails(cmd *cobra.Command, cfg *config.Config, projectID string,
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, serviceID)
+	resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, serviceID)
 	if err != nil {
 		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
 	}

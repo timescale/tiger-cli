@@ -29,13 +29,13 @@ type DBExecuteQueryInput struct {
 func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
 	schema.Properties["query"].Description = "PostgreSQL query to execute"
 
-	schema.Properties["parameters"].Description = "Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query."
+	schema.Properties["parameters"].Description = "Query parameters. Values are substituted for $1, $2, etc. placeholders in the query."
 	schema.Properties["parameters"].Examples = []any{[]string{"1", "alice"}, []string{"2024-01-01", "100"}}
 
 	schema.Properties["timeout_seconds"].Description = "Query timeout in seconds"
@@ -47,7 +47,7 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema.Properties["role"].Default = util.Must(json.Marshal("tsdbadmin"))
 	schema.Properties["role"].Examples = []any{"tsdbadmin", "readonly", "postgres"}
 
-	schema.Properties["pooled"].Description = "Use connection pooling (if available for the service)"
+	schema.Properties["pooled"].Description = "Use connection pooling (if available)"
 	schema.Properties["pooled"].Default = util.Must(json.Marshal(false))
 	schema.Properties["pooled"].Examples = []any{false, true}
 
@@ -60,31 +60,45 @@ type DBExecuteQueryColumn struct {
 	Type string `json:"type"`
 }
 
+// ResultSet represents a single query result set
+type ResultSet struct {
+	CommandTag   string                 `json:"command_tag"`
+	Columns      []DBExecuteQueryColumn `json:"columns,omitempty"`
+	Rows         *[][]any               `json:"rows,omitempty"`
+	RowsAffected int64                  `json:"rows_affected"`
+}
+
 // DBExecuteQueryOutput represents output for db_execute_query
 type DBExecuteQueryOutput struct {
-	Columns       []DBExecuteQueryColumn `json:"columns,omitempty"`
-	Rows          *[][]any               `json:"rows,omitempty"`
-	RowsAffected  int64                  `json:"rows_affected"`
-	ExecutionTime string                 `json:"execution_time"`
+	ResultSets    []ResultSet `json:"result_sets"`
+	ExecutionTime string      `json:"execution_time"`
 }
 
 func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryOutput](nil))
 
-	schema.Properties["columns"].Description = "Column metadata from the query result including name and PostgreSQL type. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
-	schema.Properties["columns"].Examples = []any{[]DBExecuteQueryColumn{
+	schema.Properties["result_sets"].Description = "Array of result sets returned. For single-statement queries, this array will contain one element. For multi-statement queries, this array will contain one element per statement."
+
+	// Add descriptions for nested ResultSet fields
+	resultSetSchema := schema.Properties["result_sets"].Items
+
+	resultSetSchema.Properties["command_tag"].Description = "Identifies the type of command executed."
+	resultSetSchema.Properties["command_tag"].Examples = []any{"SELECT 2", "INSERT 0 2"}
+
+	resultSetSchema.Properties["columns"].Description = "Column metadata including name and PostgreSQL type. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
+	resultSetSchema.Properties["columns"].Examples = []any{[]DBExecuteQueryColumn{
 		{Name: "id", Type: "int4"},
 		{Name: "name", Type: "text"},
 		{Name: "created_at", Type: "timestamptz"},
 	}}
 
-	schema.Properties["rows"].Description = "Result rows as arrays of values. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
-	schema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
+	resultSetSchema.Properties["rows"].Description = "Result rows as arrays of values. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
+	resultSetSchema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
 
-	schema.Properties["rows_affected"].Description = "Number of rows affected by the query. For SELECT, this is the number of rows returned. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
-	schema.Properties["rows_affected"].Examples = []any{5, 42, 1000}
+	resultSetSchema.Properties["rows_affected"].Description = "Number of rows affected. For SELECT, this is the number of rows returned. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
+	resultSetSchema.Properties["rows_affected"].Examples = []any{5, 42, 1000}
 
-	schema.Properties["execution_time"].Description = "Query execution time as a human-readable duration string"
+	schema.Properties["execution_time"].Description = "Execution time as a human-readable duration string"
 	schema.Properties["execution_time"].Examples = []any{"123ms", "1.5s", "45.2µs"}
 
 	return schema
@@ -97,11 +111,11 @@ func (s *Server) registerDatabaseTools() {
 		Title: "Execute SQL Query",
 		Description: `Execute SQL queries against a service database.
 
-This tool connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column names, row data, and execution metadata.
+Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata.
 
-Multi-statement queries are supported when no parameters are provided. When executing multiple statements separated by semicolons, all statements are executed in a single transaction, and only the results from the final statement are returned. Multi-statement queries with parameters are not supported and will return an error.
+Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
-WARNING: Use with caution - this tool can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
+WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
 		OutputSchema: DBExecuteQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -113,8 +127,8 @@ WARNING: Use with caution - this tool can execute any SQL statement including IN
 
 // handleDBExecuteQuery handles the db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -123,7 +137,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
 
 	logging.Debug("MCP: Executing database query",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
@@ -131,7 +145,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// Get service details to construct connection string
-	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -203,8 +217,8 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	br := conn.SendBatch(queryCtx, batch)
 	defer br.Close()
 
-	// Process all result sets, keeping only the final one
-	var finalResult resultSet
+	// Process all result sets, collecting them all
+	resultSets := make([]ResultSet, 0)
 	for {
 		rows, err := br.Query()
 		if err != nil {
@@ -225,34 +239,25 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 			return nil, DBExecuteQueryOutput{}, err
 		}
 
-		// Save this result set as the current "final" one
-		finalResult = result
+		// Collect this result set
+		resultSets = append(resultSets, result)
 	}
 
 	if err := br.Close(); err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
 
-	// Build output from the final result set
+	// Build output from all result sets
 	output := DBExecuteQueryOutput{
-		Columns:       finalResult.columns,
-		Rows:          finalResult.rows,
-		RowsAffected:  finalResult.rowsAffected,
+		ResultSets:    resultSets,
 		ExecutionTime: time.Since(startTime).String(),
 	}
 
 	return nil, output, nil
 }
 
-// resultSet holds the columns, rows, and metadata from a single query result set
-type resultSet struct {
-	columns      []DBExecuteQueryColumn
-	rows         *[][]any
-	rowsAffected int64
-}
-
 // processResultSet reads all data from a pgx.Rows result set
-func processResultSet(conn *pgx.Conn, rows pgx.Rows) (resultSet, error) {
+func processResultSet(conn *pgx.Conn, rows pgx.Rows) (ResultSet, error) {
 	defer rows.Close()
 
 	// Get column metadata from field descriptions
@@ -286,22 +291,21 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows) (resultSet, error) {
 		// Scan values into generic interface slice
 		values, err := rows.Values()
 		if err != nil {
-			return resultSet{}, err
+			return ResultSet{}, err
 		}
 		resultRows = append(resultRows, values)
 	}
 
 	// Check for errors during iteration
 	if err := rows.Err(); err != nil {
-		return resultSet{}, err
+		return ResultSet{}, err
 	}
 
-	// Get rows affected
-	rowsAffected := rows.CommandTag().RowsAffected()
-
-	return resultSet{
-		columns:      columns,
-		rows:         util.PtrIfNonNil(resultRows),
-		rowsAffected: rowsAffected,
+	commandTag := rows.CommandTag()
+	return ResultSet{
+		CommandTag:   commandTag.String(),
+		Columns:      columns,
+		Rows:         util.PtrIfNonNil(resultRows),
+		RowsAffected: commandTag.RowsAffected(),
 	}, nil
 }

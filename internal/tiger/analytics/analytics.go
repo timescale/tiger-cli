@@ -37,33 +37,15 @@ type Analytics struct {
 	client    *api.ClientWithResponses
 }
 
-// New initializes a new [Analytics] instance.
+// New initializes a new [Analytics] instance. The [config.Config] parameters
+// is required, but the others are optional. Analytics won't be sent if the
+// [api.ClientWithResponses] is nil.
 func New(cfg *config.Config, client *api.ClientWithResponses, projectID string) *Analytics {
 	return &Analytics{
 		config:    cfg,
 		projectID: projectID,
 		client:    client,
 	}
-}
-
-// TryInit tries to load credentials to initialize an [Analytics]
-// instance.  It returns an instance with a nil client if credentials do not
-// exist or it otherwise fails to create a new client. This function is
-// intended to be used when the caller does not otherwise need an API client to
-// function, but would use one if available to track analytics events.
-// Otherwise, call NewAnalytics directly.
-func TryInit(cfg *config.Config) *Analytics {
-	apiKey, projectID, err := config.GetCredentials()
-	if err != nil {
-		return New(cfg, nil, "")
-	}
-
-	client, err := api.NewTigerClient(cfg, apiKey)
-	if err != nil {
-		return New(cfg, nil, projectID)
-	}
-
-	return New(cfg, client, projectID)
 }
 
 // Option is a function that modifies analytics event properties. Options are

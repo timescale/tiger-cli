@@ -12,7 +12,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
-	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
@@ -77,7 +76,7 @@ type ResourceInfo struct {
 
 // setServiceIDSchemaProperties sets common service_id schema properties
 func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
-	schema.Properties["service_id"].Description = "The unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 }
@@ -509,19 +508,19 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}
 
-	logging.Debug("MCP: Listing services", zap.String("project_id", projectID))
+	logging.Debug("MCP: Listing services", zap.String("project_id", cfg.ProjectID))
 
 	// Make API call to list services
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesWithResponse(ctx, projectID)
+	resp, err := cfg.Client.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}
@@ -549,21 +548,21 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceGet handles the service_get MCP tool
 func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
 
 	logging.Debug("MCP: Getting service details",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -587,14 +586,8 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 // handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
@@ -614,7 +607,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	logging.Debug("MCP: Creating service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("name", input.Name),
 		zap.Strings("addons", input.Addons),
 		zap.Stringp("region", input.Region),
@@ -637,7 +630,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesWithResponse(createCtx, projectID, serviceCreateReq)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesWithResponse(createCtx, cfg.ProjectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -677,8 +670,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	message := "Service creation request accepted. The service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    apiClient,
-			ProjectID: projectID,
+			Client:    cfg.Client,
+			ProjectID: cfg.ProjectID,
 			ServiceID: serviceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -705,14 +698,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 // handleServiceFork handles the service_fork MCP tool
 func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest, input ServiceForkInput) (*mcp.CallToolResult, ServiceForkOutput, error) {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, ServiceForkOutput{}, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
@@ -740,7 +727,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	logging.Debug("MCP: Forking service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("name", input.Name),
 		zap.String("fork_strategy", string(input.ForkStrategy)),
@@ -765,7 +752,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(forkCtx, projectID, input.ServiceID, forkReq)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(forkCtx, cfg.ProjectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}
@@ -805,8 +792,8 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service fork request accepted. The forked service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    apiClient,
-			ProjectID: projectID,
+			Client:    cfg.Client,
+			ProjectID: cfg.ProjectID,
 			ServiceID: serviceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -833,14 +820,14 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	logging.Debug("MCP: Updating service password",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Prepare password update request
@@ -852,7 +839,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -864,7 +851,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	// Get service details for password storage (similar to CLI implementation)
 	var passwordStorage *common.PasswordStorageResult
-	serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
 		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
@@ -886,21 +873,21 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 // handleServiceStart handles the service_start MCP tool
 func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolRequest, input ServiceStartInput) (*mcp.CallToolResult, ServiceStartOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceStartOutput{}, err
 	}
 
 	logging.Debug("MCP: Starting service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to start service
 	startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStartWithResponse(startCtx, projectID, input.ServiceID)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStartWithResponse(startCtx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
 	}
@@ -916,8 +903,8 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	message := "Service start request accepted. The service may still be starting."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    apiClient,
-			ProjectID: projectID,
+			Client:    cfg.Client,
+			ProjectID: cfg.ProjectID,
 			ServiceID: input.ServiceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -943,21 +930,21 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 
 // handleServiceStop handles the service_stop MCP tool
 func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest, input ServiceStopInput) (*mcp.CallToolResult, ServiceStopOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
 
 	logging.Debug("MCP: Stopping service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
 	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdStopWithResponse(stopCtx, projectID, input.ServiceID)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStopWithResponse(stopCtx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
 	}
@@ -973,8 +960,8 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service stop request accepted. The service may still be stopping."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    apiClient,
-			ProjectID: projectID,
+			Client:    cfg.Client,
+			ProjectID: cfg.ProjectID,
 			ServiceID: input.ServiceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "PAUSED",

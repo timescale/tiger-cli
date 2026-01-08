@@ -139,8 +139,8 @@ export TIGER_PUBLIC_KEY="your-public-key"
 export TIGER_SECRET_KEY="your-secret-key"
 tiger auth login
 
-# Interactive login (will prompt for any missing credentials)
-tiger auth login
+# Interactive login (will prompt for missing credentials)
+tiger auth login --public-key YOUR_PUBLIC_KEY
 
 # Show current authentication status and project ID
 tiger auth status
@@ -152,7 +152,7 @@ tiger auth logout
 **Authentication Methods:**
 1. OAuth flow (recommended): Opens browser for authentication, automatically creates API keys and detects project ID
 2. Manual API key input: Provide `--public-key` and `--secret-key` flags (project ID auto-detected from API)
-3. Environment variables: Set `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` (project ID auto-detected from API)
+3. Environment variables: Set `TIGER_PUBLIC_KEY` and `TIGER_SECRET_KEY` (project ID auto-detected from API). Note that these env vars also work directly with any command without needing to run `tiger auth login` first.
 4. Interactive prompt for any missing credentials (requires TTY)
 
 **Login Process:**

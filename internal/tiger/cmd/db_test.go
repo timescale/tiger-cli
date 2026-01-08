@@ -81,11 +81,11 @@ func TestDBConnectionString_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connection-string command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "connection-string")
@@ -111,11 +111,11 @@ func TestDBConnectionString_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connection-string command
 	_, err = executeDBCommand(t.Context(), "db", "connection-string")
@@ -174,11 +174,11 @@ func TestDBConnect_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connect command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "connect")
@@ -204,11 +204,11 @@ func TestDBConnect_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db connect command
 	_, err = executeDBCommand(t.Context(), "db", "connect")
@@ -234,11 +234,11 @@ func TestDBConnect_PsqlNotFound(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test that psql alias works the same as connect
 	_, err1 := executeDBCommand(t.Context(), "db", "connect")
@@ -540,11 +540,11 @@ func TestDBTestConnection_NoServiceID(t *testing.T) {
 	}
 
 	// Mock authentication
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db test-connection command without service ID
 	_, err = executeDBCommand(t.Context(), "db", "test-connection")
@@ -570,11 +570,11 @@ func TestDBTestConnection_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute db test-connection command
 	_, err = executeDBCommand(t.Context(), "db", "test-connection")
@@ -830,11 +830,11 @@ func TestDBTestConnection_TimeoutParsing(t *testing.T) {
 			}
 
 			// Mock authentication
-			originalGetCredentials := getCredentialsForDB
-			getCredentialsForDB = func() (string, string, error) {
+			originalGetCredentials := common.GetCredentials
+			common.GetCredentials = func() (string, string, error) {
 				return "test-api-key", "test-project-123", nil
 			}
-			defer func() { getCredentialsForDB = originalGetCredentials }()
+			defer func() { common.GetCredentials = originalGetCredentials }()
 
 			// Execute db test-connection command with timeout flag
 			_, err = executeDBCommand(t.Context(), "db", "test-connection", "--timeout", tc.timeoutFlag)
@@ -982,12 +982,12 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1056,12 +1056,12 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1130,12 +1130,12 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1211,12 +1211,12 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1285,12 +1285,12 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -1342,11 +1342,11 @@ func TestDBSavePassword_NoServiceID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// No need to mock service details since it should fail before reaching getServiceDetailsFunc
 
@@ -1375,11 +1375,11 @@ func TestDBSavePassword_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute save-password command
 	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
@@ -1427,12 +1427,12 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
-	originalGetCredentials := getCredentialsForDB
-	getCredentialsForDB = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "test-api-key", "test-project-123", nil
 	}
-	defer func() { getCredentialsForDB = originalGetCredentials }()
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *config.Config, projectID string, client *api.ClientWithResponses, args []string) (api.Service, error) {
+	defer func() { common.GetCredentials = originalGetCredentials }()
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
