@@ -106,24 +106,6 @@ func ValidateAndNormalizeCPUMemory(cpuMillis, memoryGBs string) (*string, *strin
 	return nil, nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", configs)
 }
 
-// ValidateAndNormalizeCPUMemoryForResize validates CPU/Memory values for resize operations (excludes shared)
-func ValidateAndNormalizeCPUMemoryForResize(cpuMillis, memoryGBs string) (*string, *string, error) {
-	// Return nil for omitted CPU/memory so that values are omitted from the API request
-	if cpuMillis == "" && memoryGBs == "" {
-		return nil, nil, nil
-	}
-
-	configs := GetAllowedResizeCPUMemoryConfigs()
-	for _, config := range configs {
-		if cpuStr, memoryStr, ok := config.Matches(cpuMillis, memoryGBs); ok {
-			return &cpuStr, &memoryStr, nil
-		}
-	}
-
-	// If no match, provide helpful error
-	return nil, nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", configs)
-}
-
 // ParseCPUMemory parses a CPU/memory combination string (e.g., "2 CPU/8GB")
 // and returns millicores and GB. If "shared" is given, returns "shared" for
 // both CPU and memory.

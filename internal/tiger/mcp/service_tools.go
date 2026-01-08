@@ -1009,12 +1009,13 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	logging.Debug("MCP: Resizing service",
 		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
-		zap.String("cpu_memory", input.CPUMemory))
+		zap.String("cpu_memory", input.CPUMemory),
+	)
 
 	// Parse CPU/Memory combination
-	cpuMillis, memoryGBs, err := parseCPUMemoryString(input.CPUMemory)
+	cpuMillis, memoryGBs, err := common.ParseCPUMemory(input.CPUMemory)
 	if err != nil {
-		return nil, ServiceResizeOutput{}, err
+		return nil, ServiceResizeOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 	}
 
 	// Prepare resize request
@@ -1041,8 +1042,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	output := ServiceResizeOutput{
 		Message:   "Resize request accepted and is in progress",
 		ServiceID: input.ServiceID,
-		NewCPU:    formatCPU(cpuMillis),
-		NewMemory: formatMemory(memoryGBs),
+		NewCPU:    cpuMillis,
+		NewMemory: memoryGBs,
 	}
 
 	// If wait is requested, wait for resize to complete
@@ -1053,7 +1054,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 			ProjectID:  projectID,
 			ServiceID:  input.ServiceID,
 			Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
-			Output:     nil, // No output for MCP
 			Timeout:    waitTimeout,
 			TimeoutMsg: "resize may still be in progress",
 		}); err != nil {
@@ -1070,40 +1070,4 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	return nil, output, nil
-}
-
-// parseCPUMemoryString parses the CPU/Memory string format and returns millicores and GB
-func parseCPUMemoryString(cpuMemory string) (int, int, error) {
-	switch cpuMemory {
-	case "0.5 CPU/2 GB":
-		return 500, 2, nil
-	case "1 CPU/4 GB":
-		return 1000, 4, nil
-	case "2 CPU/8 GB":
-		return 2000, 8, nil
-	case "4 CPU/16 GB":
-		return 4000, 16, nil
-	case "8 CPU/32 GB":
-		return 8000, 32, nil
-	case "16 CPU/64 GB":
-		return 16000, 64, nil
-	case "32 CPU/128 GB":
-		return 32000, 128, nil
-	default:
-		return 0, 0, fmt.Errorf("invalid CPU/Memory combination: %s", cpuMemory)
-	}
-}
-
-// formatCPU formats CPU millicores for display
-func formatCPU(millis int) string {
-	cores := float64(millis) / 1000
-	if cores == float64(int(cores)) {
-		return fmt.Sprintf("%d cores", int(cores))
-	}
-	return fmt.Sprintf("%.1f cores", cores)
-}
-
-// formatMemory formats memory GB for display
-func formatMemory(gb int) string {
-	return fmt.Sprintf("%d GB", gb)
 }

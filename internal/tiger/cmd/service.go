@@ -391,7 +391,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
 				} else {
 					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait Timeout: %v)...\n", createWaitTimeout)
+					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
 					if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 						Client:    client,
 						ProjectID: projectID,
@@ -1041,7 +1041,7 @@ Examples:
 			}
 
 			// Wait for service to become ready
-			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait Timeout: %v)...\n", startWaitTimeout)
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -1514,7 +1514,6 @@ func buildServiceResizeCmd() *cobra.Command {
 	var resizeMemory string
 	var resizeNoWait bool
 	var resizeWaitTimeout time.Duration
-	var resizeNodes int
 
 	cmd := &cobra.Command{
 		Use:   "resize [service-id]",
@@ -1558,14 +1557,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// At least one of CPU or memory must be specified
-			if resizeCPU == "" && resizeMemory == "" {
-				return fmt.Errorf("must specify at least one of --cpu or --memory")
-			}
-
 			// Get config
 			cfg, err := config.Load()
 			if err != nil {
+				cmd.SilenceUsage = true
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
@@ -1575,24 +1570,15 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// Validate and normalize CPU/Memory configuration (using resize-specific validation)
-			cpuMillisStr, memoryGBsStr, err := common.ValidateAndNormalizeCPUMemoryForResize(resizeCPU, resizeMemory)
+			// Validate and normalize CPU/Memory configuration
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
 			if err != nil {
 				return err
 			}
 
-			// Both CPU and memory are required for the resize API call
-			if cpuMillisStr == nil || memoryGBsStr == nil {
-				return fmt.Errorf("both CPU and memory must be specified or determinable")
-			}
-
-			// Parse strings to ints
-			var cpuMillis, memoryGBs int
-			if _, err := fmt.Sscanf(*cpuMillisStr, "%d", &cpuMillis); err != nil {
-				return fmt.Errorf("failed to parse CPU value: %w", err)
-			}
-			if _, err := fmt.Sscanf(*memoryGBsStr, "%d", &memoryGBs); err != nil {
-				return fmt.Errorf("failed to parse memory value: %w", err)
+			// At least one of CPU or memory must be specified
+			if cpuMillis == nil || memoryGBs == nil {
+				return fmt.Errorf("must specify at least one of --cpu or --memory")
 			}
 
 			cmd.SilenceUsage = true
@@ -1611,8 +1597,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
-				CpuMillis: cpuMillis,
-				MemoryGbs: memoryGBs,
+				CpuMillis: *cpuMillis,
+				MemoryGbs: *memoryGBs,
 			}
 
 			// Make API call to resize service
@@ -1621,16 +1607,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			statusOutput := cmd.ErrOrStderr()
 
+			// TODO
 			// Display resize information
-			cpuDisplay := fmt.Sprintf("%.1f cores", float64(cpuMillis)/1000)
-			if float64(cpuMillis)/1000 == float64(int(cpuMillis/1000)) {
-				cpuDisplay = fmt.Sprintf("%d cores", cpuMillis/1000)
-			}
-			memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
+			// cpuDisplay := fmt.Sprintf("%.1f cores", float64(cpuMillis)/1000)
+			// if float64(cpuMillis)/1000 == float64(int(cpuMillis/1000)) {
+			// 	cpuDisplay = fmt.Sprintf("%d cores", cpuMillis/1000)
+			// }
+			// memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
 
-			resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
+			// resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
 
-			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
+			// fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
 
 			resp, err := client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, projectID, serviceID, resizeReq)
 			if err != nil {
@@ -1669,15 +1656,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, resizeDesc)
+			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, "TODO") //resizeDesc)
 			return nil
 		},
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared' (e.g., 1000, 2000, 4000)")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared' (e.g., 2, 4, 8, 16)")
-	cmd.Flags().IntVar(&resizeNodes, "nodes", 0, "Number of nodes in the replica set (optional)")
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared'")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared'")
 	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
 	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
