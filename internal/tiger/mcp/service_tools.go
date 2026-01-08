@@ -987,14 +987,14 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 
 // handleServiceResize handles the service_resize MCP tool
 func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolRequest, input ServiceResizeInput) (*mcp.CallToolResult, ServiceResizeOutput, error) {
-	// Create fresh API client and get project ID
-	apiClient, projectID, err := s.createAPIClient()
+	// Load config and API client
+	cfg, err := common.LoadConfig(ctx)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 
 	logging.Debug("MCP: Resizing service",
-		zap.String("project_id", projectID),
+		zap.String("project_id", cfg.ProjectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("cpu_memory", input.CPUMemory),
 	)
@@ -1015,7 +1015,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := apiClient.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, projectID, input.ServiceID, resizeReq)
+	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, cfg.ProjectID, input.ServiceID, resizeReq)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)
 	}
@@ -1037,8 +1037,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	if input.Wait {
 		var dummyService api.Service // we don't have a real service struct here
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:     apiClient,
-			ProjectID:  projectID,
+			Client:     cfg.Client,
+			ProjectID:  cfg.ProjectID,
 			ServiceID:  input.ServiceID,
 			Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
 			Timeout:    waitTimeout,
@@ -1049,7 +1049,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 			output.Message = "Service resized successfully!"
 
 			// Get updated service details
-			serviceResp, err := apiClient.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, projectID, input.ServiceID)
+			serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 				output.Service = s.convertToServiceDetail(*serviceResp.JSON200, false)
 			}

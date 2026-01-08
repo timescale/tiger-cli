@@ -1335,6 +1335,156 @@ Examples:
 	return cmd
 }
 
+// buildServiceResizeCmd creates the resize subcommand
+func buildServiceResizeCmd() *cobra.Command {
+	var resizeCPU string
+	var resizeMemory string
+	var resizeNoWait bool
+	var resizeWaitTimeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "resize [service-id]",
+		Short: "Resize a database service",
+		Long: `Resize a database service by changing its CPU and memory allocation.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command changes the compute resources allocated
+to your database service.
+
+By default, the command waits for the resize operation to complete. Use --no-wait
+to return immediately after starting the resize.
+
+Examples:
+  # Resize default service to 2 CPU cores and 8GB memory
+  tiger service resize --cpu 2000 --memory 8
+
+  # Resize specific service to 4 CPU cores and 16GB memory
+  tiger service resize svc-12345 --cpu 4000 --memory 16
+
+  # Resize service using only CPU (memory will be auto-configured to 8GB)
+  tiger service resize --cpu 2000
+
+  # Resize service using only memory (CPU will be auto-configured to 4000m)
+  tiger service resize --memory 16
+
+  # Resize to shared CPU and memory (free tier)
+  tiger service resize --cpu shared --memory shared
+
+  # Resize without waiting for completion
+  tiger service resize --cpu 2000 --memory 8 --no-wait
+
+  # Resize with custom wait timeout
+  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
+
+Allowed CPU/Memory Configurations:
+  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Determine service ID
+			serviceID, err := getServiceID(cfg.Config, args)
+			if err != nil {
+				return err
+			}
+
+			// Validate and normalize CPU/Memory configuration
+			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
+			if err != nil {
+				return err
+			}
+
+			// At least one of CPU or memory must be specified
+			if cpuMillis == nil || memoryGBs == nil {
+				return fmt.Errorf("must specify at least one of --cpu or --memory")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Prepare resize request
+			resizeReq := api.ResizeInput{
+				CpuMillis: *cpuMillis,
+				MemoryGbs: *memoryGBs,
+			}
+
+			// Make API call to resize service
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
+
+			statusOutput := cmd.ErrOrStderr()
+
+			// TODO
+			// Display resize information
+			// cpuDisplay := fmt.Sprintf("%.1f cores", float64(cpuMillis)/1000)
+			// if float64(cpuMillis)/1000 == float64(int(cpuMillis/1000)) {
+			// 	cpuDisplay = fmt.Sprintf("%d cores", cpuMillis/1000)
+			// }
+			// memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
+
+			// resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
+
+			// fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
+
+			resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
+			if err != nil {
+				return fmt.Errorf("failed to resize service: %w", err)
+			}
+
+			// Handle API response
+			if resp.StatusCode() != 202 {
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
+
+			// Handle wait behavior
+			if resizeNoWait {
+				fmt.Fprintf(statusOutput, "⏳ Service is being resized. Use 'tiger service get %s' to check status.\n", serviceID)
+				return nil
+			}
+
+			// Wait for resize to complete
+			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
+
+			var dummyService api.Service
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:     cfg.Client,
+				ProjectID:  cfg.ProjectID,
+				ServiceID:  serviceID,
+				Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+				Output:     statusOutput,
+				Timeout:    resizeWaitTimeout,
+				TimeoutMsg: "resize may still be in progress",
+			}); err != nil {
+				// Return error for sake of exit code, but silence since we already output it
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
+			}
+
+			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, "TODO") //resizeDesc)
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared'")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared'")
+	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
+	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+
+	return cmd
+}
+
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// Service ID is always first positional argument
 	if len(args) > 0 {
@@ -1397,166 +1547,4 @@ func getServiceID(cfg *config.Config, args []string) (string, error) {
 	}
 
 	return serviceID, nil
-}
-
-// buildServiceResizeCmd creates the resize subcommand
-func buildServiceResizeCmd() *cobra.Command {
-	var resizeCPU string
-	var resizeMemory string
-	var resizeNoWait bool
-	var resizeWaitTimeout time.Duration
-
-	cmd := &cobra.Command{
-		Use:   "resize [service-id]",
-		Short: "Resize a database service",
-		Long: `Resize a database service by changing its CPU and memory allocation.
-
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command changes the compute resources allocated
-to your database service.
-
-By default, the command waits for the resize operation to complete. Use --no-wait
-to return immediately after starting the resize.
-
-Examples:
-  # Resize default service to 2 CPU cores and 8GB memory
-  tiger service resize --cpu 2000 --memory 8
-
-  # Resize specific service to 4 CPU cores and 16GB memory
-  tiger service resize svc-12345 --cpu 4000 --memory 16
-
-  # Resize service using only CPU (memory will be auto-configured to 8GB)
-  tiger service resize --cpu 2000
-
-  # Resize service using only memory (CPU will be auto-configured to 4000m)
-  tiger service resize --memory 16
-
-  # Resize to shared CPU and memory (free tier)
-  tiger service resize --cpu shared --memory shared
-
-  # Resize without waiting for completion
-  tiger service resize --cpu 2000 --memory 8 --no-wait
-
-  # Resize with custom wait timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
-
-Allowed CPU/Memory Configurations:
-  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
-  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
-
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
-		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
-			if err != nil {
-				return err
-			}
-
-			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
-			if err != nil {
-				return err
-			}
-
-			// At least one of CPU or memory must be specified
-			if cpuMillis == nil || memoryGBs == nil {
-				return fmt.Errorf("must specify at least one of --cpu or --memory")
-			}
-
-			cmd.SilenceUsage = true
-
-			// Get API key and project ID for authentication
-			apiKey, projectID, err := getCredentialsForService()
-			if err != nil {
-				return common.ExitWithCode(common.ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
-			}
-
-			// Create API client
-			client, err := api.NewTigerClient(cfg, apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to create API client: %w", err)
-			}
-
-			// Prepare resize request
-			resizeReq := api.ResizeInput{
-				CpuMillis: *cpuMillis,
-				MemoryGbs: *memoryGBs,
-			}
-
-			// Make API call to resize service
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			statusOutput := cmd.ErrOrStderr()
-
-			// TODO
-			// Display resize information
-			// cpuDisplay := fmt.Sprintf("%.1f cores", float64(cpuMillis)/1000)
-			// if float64(cpuMillis)/1000 == float64(int(cpuMillis/1000)) {
-			// 	cpuDisplay = fmt.Sprintf("%d cores", cpuMillis/1000)
-			// }
-			// memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
-
-			// resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
-
-			// fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
-
-			resp, err := client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, projectID, serviceID, resizeReq)
-			if err != nil {
-				return fmt.Errorf("failed to resize service: %w", err)
-			}
-
-			// Handle API response
-			if resp.StatusCode() != 202 {
-				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-			}
-
-			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
-
-			// Handle wait behavior
-			if resizeNoWait {
-				fmt.Fprintf(statusOutput, "⏳ Service is being resized. Use 'tiger service get %s' to check status.\n", serviceID)
-				return nil
-			}
-
-			// Wait for resize to complete
-			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
-
-			var dummyService api.Service
-			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:     client,
-				ProjectID:  projectID,
-				ServiceID:  serviceID,
-				Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
-				Output:     statusOutput,
-				Timeout:    resizeWaitTimeout,
-				TimeoutMsg: "resize may still be in progress",
-			}); err != nil {
-				// Return error for sake of exit code, but silence since we already output it
-				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
-				cmd.SilenceErrors = true
-				return err
-			}
-
-			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, "TODO") //resizeDesc)
-			return nil
-		},
-	}
-
-	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared'")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared'")
-	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
-
-	return cmd
 }
