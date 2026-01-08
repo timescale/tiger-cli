@@ -11,9 +11,7 @@ info:
     name: Tiger Data Support
     url: https://www.tigerdata.com/contact
 servers:
-  - url: http://localhost:8080
-    description: Local development server
-  - url: https://api.tigerdata.com/public/v1
+  - url: https://console.cloud.timescale.com/public/api/v1
     description: API server for Tiger Cloud
 
 tags:
@@ -1211,17 +1209,13 @@ components:
         - memory_gbs
       properties:
         cpu_millis:
-          type: integer
-          description: The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
-          example: 1000
+          type: string
+          description: The new CPU allocation in milli-cores.
+          example: "1000"
         memory_gbs:
-          type: integer
+          type: string
           description: The new memory allocation in gigabytes.
-          example: 4
-        nodes:
-          type: integer
-          description: The new number of nodes in the replica set.
-          example: 2
+          example: "4"
     UpdatePasswordInput:
       type: object
       required:
