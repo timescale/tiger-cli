@@ -1685,11 +1685,11 @@ func TestServiceResize_NoAuth(t *testing.T) {
 	}
 
 	// Mock authentication failure
-	originalGetCredentials := getCredentialsForService
-	getCredentialsForService = func() (string, string, error) {
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
 		return "", "", fmt.Errorf("not logged in")
 	}
-	defer func() { getCredentialsForService = originalGetCredentials }()
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Execute service resize command
 	_, err, _ = executeServiceCommand(t.Context(), "service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8")
@@ -1719,6 +1719,13 @@ func TestServiceResize_MissingParams(t *testing.T) {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
 
+	// Mock authentication
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
+
 	// Test missing both CPU and memory parameters
 	_, err, _ = executeServiceCommand(t.Context(), "service", "resize")
 	if err == nil {
@@ -1741,6 +1748,13 @@ func TestServiceResize_InvalidCPUMemoryCombination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
+
+	// Mock authentication
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	defer func() { common.GetCredentials = originalGetCredentials }()
 
 	// Test invalid CPU/memory combination
 	_, err, _ = executeServiceCommand(t.Context(), "service", "resize", "--cpu", "3000", "--memory", "8")

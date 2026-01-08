@@ -269,7 +269,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
 			if err != nil {
 				return err
 			}
@@ -293,8 +293,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				Name:           createServiceName,
 				Addons:         util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),
 				ReplicaCount:   &createReplicaCount,
-				CpuMillis:      cpuMillis,
-				MemoryGbs:      memoryGBs,
+				CpuMillis:      cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs:      cpuMemoryCfg.MemoryGBsString(),
 				EnvironmentTag: &environmentTag,
 			}
 
@@ -1198,7 +1198,7 @@ Examples:
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
 			if err != nil {
 				return err
 			}
@@ -1240,8 +1240,8 @@ Examples:
 			forkReq := api.ForkServiceCreate{
 				ForkStrategy:   forkStrategy,
 				TargetTime:     targetTime,
-				CpuMillis:      cpuMillis,
-				MemoryGbs:      memoryGBs,
+				CpuMillis:      cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs:      cpuMemoryCfg.MemoryGBsString(),
 				EnvironmentTag: &environmentTag,
 			}
 
@@ -1398,41 +1398,32 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
 			if err != nil {
 				return err
 			}
 
 			// At least one of CPU or memory must be specified
-			if cpuMillis == nil || memoryGBs == nil {
+			if cpuMemoryCfg == nil {
 				return fmt.Errorf("must specify at least one of --cpu or --memory")
 			}
 
 			cmd.SilenceUsage = true
 
+			statusOutput := cmd.ErrOrStderr()
+
+			// Display resize information
+			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
+
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
-				CpuMillis: *cpuMillis,
-				MemoryGbs: *memoryGBs,
+				CpuMillis: *cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
 			}
 
 			// Make API call to resize service
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
-
-			statusOutput := cmd.ErrOrStderr()
-
-			// TODO
-			// Display resize information
-			// cpuDisplay := fmt.Sprintf("%.1f cores", float64(cpuMillis)/1000)
-			// if float64(cpuMillis)/1000 == float64(int(cpuMillis/1000)) {
-			// 	cpuDisplay = fmt.Sprintf("%d cores", cpuMillis/1000)
-			// }
-			// memoryDisplay := fmt.Sprintf("%d GB", memoryGBs)
-
-			// resizeDesc := fmt.Sprintf("%s / %s", cpuDisplay, memoryDisplay)
-
-			// fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, resizeDesc)
 
 			resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
 			if err != nil {
@@ -1471,7 +1462,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, "TODO") //resizeDesc)
+			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
 			return nil
 		},
 	}
