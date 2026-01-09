@@ -1364,11 +1364,12 @@ func buildServiceResizeCmd() *cobra.Command {
 		Long: `Resize a database service by changing its CPU and memory allocation.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration. This command changes the compute resources allocated
-to your database service.
+from your configuration. This command changes the compute and memory resources
+allocated to your database service.
 
-By default, the command waits for the resize operation to complete. Use --no-wait
-to return immediately after starting the resize.
+The service may be temporarily unavailable during the resize operation. Note
+that changing resources will affect your billing - increasing resources will
+increase costs.
 
 Examples:
   # Resize default service to 2 CPU cores and 8GB memory
@@ -1383,10 +1384,7 @@ Examples:
   # Resize service using only memory (CPU will be auto-configured to 4000m)
   tiger service resize --memory 16
 
-  # Resize to shared CPU and memory (free tier)
-  tiger service resize --cpu shared --memory shared
-
-  # Resize without waiting for completion
+  # Resize without waiting for completion (waits by default)
   tiger service resize --cpu 2000 --memory 8 --no-wait
 
   # Resize with custom wait timeout
