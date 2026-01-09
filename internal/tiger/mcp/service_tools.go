@@ -353,8 +353,9 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 
 // ServiceResizeOutput represents output for service_resize
 type ServiceResizeOutput struct {
-	Service ServiceDetail `json:"service"`
-	Message string        `json:"message"`
+	Status    string        `json:"status" jsonschema:"Current service status after resize operation"`
+	Resources *ResourceInfo `json:"resources,omitempty"`
+	Message   string        `json:"message"`
 }
 
 func (ServiceResizeOutput) Schema() *jsonschema.Schema {
@@ -1069,10 +1070,12 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		}
 	}
 
-	// Convert service to output format (after wait so status is accurate)
+	// Return status, resources, and message (after wait so status is accurate)
+	detail := s.convertToServiceDetail(service, false)
 	output := ServiceResizeOutput{
-		Service: s.convertToServiceDetail(service, false),
-		Message: message,
+		Status:    detail.Status,
+		Resources: detail.Resources,
+		Message:   message,
 	}
 
 	return nil, output, nil
