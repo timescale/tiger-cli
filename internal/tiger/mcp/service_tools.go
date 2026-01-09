@@ -1025,6 +1025,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceResizeOutput{}, resp.JSON4XX
 	}
 
+	service := *resp.JSON202
+
 	// Prepare output
 	output := ServiceResizeOutput{
 		Message:   "Resize request accepted and is in progress",
@@ -1035,24 +1037,22 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 
 	// If wait is requested, wait for resize to complete
 	if input.Wait {
-		var dummyService api.Service // we don't have a real service struct here
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:     cfg.Client,
-			ProjectID:  cfg.ProjectID,
-			ServiceID:  input.ServiceID,
-			Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+			Client:    cfg.Client,
+			ProjectID: cfg.ProjectID,
+			ServiceID: input.ServiceID,
+			Handler: &common.StatusWaitHandler{
+				TargetStatus: "READY",
+				Service:      &service,
+			},
 			Timeout:    waitTimeout,
-			TimeoutMsg: "resize may still be in progress",
+			TimeoutMsg: "service may still be resizing",
 		}); err != nil {
 			output.Message = fmt.Sprintf("Resize started but error waiting: %s", err.Error())
 		} else {
 			output.Message = "Service resized successfully!"
-
-			// Get updated service details
-			serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
-			if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
-				output.Service = s.convertToServiceDetail(*serviceResp.JSON200, false)
-			}
+			// Use the service object (updated by WaitForService) in output
+			output.Service = s.convertToServiceDetail(service, false)
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -98,14 +99,13 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 200 {
+			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-
 			service := *resp.JSON200
 
 			// Output service in requested format
@@ -151,11 +151,15 @@ func buildServiceListCmd() *cobra.Command {
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			if resp.StatusCode() != 200 {
+			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
 			services := *resp.JSON200
+
 			if len(services) == 0 {
 				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
@@ -320,67 +324,64 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 202:
-				// Success - service creation accepted
-				if resp.JSON202 == nil {
-					fmt.Fprintln(statusOutput, "✅ Service creation request accepted!")
-					return nil
-				}
-
-				service := *resp.JSON202
-				serviceID := util.Deref(service.ServiceId)
-				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
-				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
-
-				// Save password immediately after service creation, before any waiting
-				// This ensures users have access even if they interrupt the wait or it fails
-				passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
-
-				// Set as default service unless --no-set-default is specified
-				if !createNoSetDefault {
-					if err := setDefaultService(cfg.Config, serviceID, statusOutput); err != nil {
-						// Log warning but don't fail the command
-						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
-					}
-				}
-
-				// Handle wait behavior
-				var waitErr error
-				if createNoWait {
-					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
-				} else {
-					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
-					if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-						Client:    cfg.Client,
-						ProjectID: cfg.ProjectID,
-						ServiceID: serviceID,
-						Handler: &common.StatusWaitHandler{
-							TargetStatus: "READY",
-							Service:      &service,
-						},
-						Output:     statusOutput,
-						Timeout:    createWaitTimeout,
-						TimeoutMsg: "service may still be provisioning",
-					}); waitErr != nil {
-						fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
-					} else {
-						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
-						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
-					}
-				}
-
-				if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
-				}
-
-				// Return error for sake of exit code, but silence it since it was already output above
-				cmd.SilenceErrors = true
-				return waitErr
-			default:
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+			service := *resp.JSON202
+			serviceID := util.Deref(service.ServiceId)
+
+			fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
+			fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
+
+			// Save password immediately after service creation, before any waiting
+			// This ensures users have access even if they interrupt the wait or it fails
+			passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
+
+			// Set as default service unless --no-set-default is specified
+			if !createNoSetDefault {
+				if err := setDefaultService(cfg.Config, serviceID, statusOutput); err != nil {
+					// Log warning but don't fail the command
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+				}
+			}
+
+			// Handle wait behavior
+			var waitErr error
+			if createNoWait {
+				fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
+			} else {
+				// Wait for service to be ready
+				fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
+				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+					Client:    cfg.Client,
+					ProjectID: cfg.ProjectID,
+					ServiceID: serviceID,
+					Handler: &common.StatusWaitHandler{
+						TargetStatus: "READY",
+						Service:      &service,
+					},
+					Output:     statusOutput,
+					Timeout:    createWaitTimeout,
+					TimeoutMsg: "service may still be provisioning",
+				}); waitErr != nil {
+					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
+				} else {
+					fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+					printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
+				}
+			}
+
+			if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
+				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+			}
+
+			// Return error for sake of exit code, but silence it since it was already output above
+			cmd.SilenceErrors = true
+			return waitErr
 		},
 	}
 
@@ -470,8 +471,12 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
-			if serviceResp.StatusCode() != 200 {
+			if serviceResp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+			}
+
+			if serviceResp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *serviceResp.JSON200
 
@@ -859,7 +864,7 @@ Examples:
 			}
 
 			// Handle response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
@@ -951,8 +956,12 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *resp.JSON202
 
@@ -1047,8 +1056,12 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *resp.JSON202
 
@@ -1257,13 +1270,16 @@ Examples:
 			}
 
 			// Handle API response
-			if forkResp.StatusCode() != 202 {
+			if forkResp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
 			}
 
-			// Success - service fork accepted
+			if forkResp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
 			forkedService := *forkResp.JSON202
 			forkedServiceID := util.DerefStr(forkedService.ServiceId)
+
 			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
@@ -1410,9 +1426,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			statusOutput := cmd.ErrOrStderr()
-
 			// Display resize information
+			statusOutput := cmd.ErrOrStderr()
 			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
 
 			// Prepare resize request
@@ -1431,22 +1446,25 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
 			service := *resp.JSON202
+
 			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
 
-			// Handle wait behavior
+			// If not waiting, return early
 			if resizeNoWait {
-				fmt.Fprintf(statusOutput, "⏳ Service is being resized. Use 'tiger service get %s' to check status.\n", serviceID)
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for resize to complete
 			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
-
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    cfg.Client,
 				ProjectID: cfg.ProjectID,
@@ -1457,7 +1475,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				},
 				Output:     statusOutput,
 				Timeout:    resizeWaitTimeout,
-				TimeoutMsg: "resize may still be in progress",
+				TimeoutMsg: "service may still be resizing",
 			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
 				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
@@ -1516,7 +1534,7 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
