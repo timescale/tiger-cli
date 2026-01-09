@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -343,16 +344,17 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedResizeCPUMemoryConfigs().Strings())
 
+	schema.Properties["wait"].Description = "Whether to wait for the service to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
+	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
+	schema.Properties["wait"].Examples = []any{false, true}
+
 	return schema
 }
 
 // ServiceResizeOutput represents output for service_resize
 type ServiceResizeOutput struct {
-	Message   string        `json:"message"`
-	ServiceID string        `json:"service_id"`
-	NewCPU    string        `json:"new_cpu"`
-	NewMemory string        `json:"new_memory"`
-	Service   ServiceDetail `json:"service,omitempty"`
+	Service ServiceDetail `json:"service"`
+	Message string        `json:"message"`
 }
 
 func (ServiceResizeOutput) Schema() *jsonschema.Schema {
@@ -489,11 +491,7 @@ This operation stops a service that is currently running. The service will trans
 		Description: `Resize a database service by changing its CPU and memory allocation.
 
 This tool changes the compute resources allocated to your database service. The service
-will be temporarily unavailable during the resize operation.
-
-Default behavior: Returns immediately while resize happens in background (recommended).
-Setting wait=true will block until the resize is complete - only use if you need to
-perform operations on the resized service immediately.
+may be temporarily unavailable during the resize operation.
 
 WARNING: Creates billable resource changes. Increasing resources will increase costs.`,
 		InputSchema:  ServiceResizeInput{}.Schema(),
@@ -526,7 +524,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, ServiceListOutput{}, resp.JSON4XX
 	}
 
@@ -568,8 +566,12 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, ServiceGetOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON200 == nil {
+		return nil, ServiceGetOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	output := ServiceGetOutput{
@@ -636,8 +638,12 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 202 {
+	if resp.StatusCode() != http.StatusAccepted {
 		return nil, ServiceCreateOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON202 == nil {
+		return nil, ServiceCreateOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *resp.JSON202
@@ -758,8 +764,12 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 202 {
+	if resp.StatusCode() != http.StatusAccepted {
 		return nil, ServiceForkOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON202 == nil {
+		return nil, ServiceForkOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *resp.JSON202
@@ -845,14 +855,14 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
 		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
 	}
 
 	// Get service details for password storage (similar to CLI implementation)
 	var passwordStorage *common.PasswordStorageResult
 	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
-	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
+	if err == nil && serviceResp.StatusCode() == http.StatusOK && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
 		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
 		passwordStorage = &result
@@ -893,8 +903,12 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 202 {
+	if resp.StatusCode() != http.StatusAccepted {
 		return nil, ServiceStartOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON202 == nil {
+		return nil, ServiceStartOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *resp.JSON202
@@ -950,8 +964,12 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 202 {
+	if resp.StatusCode() != http.StatusAccepted {
 		return nil, ServiceStopOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON202 == nil {
+		return nil, ServiceStopOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *resp.JSON202
@@ -1021,21 +1039,18 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 202 {
+	if resp.StatusCode() != http.StatusAccepted {
 		return nil, ServiceResizeOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON202 == nil {
+		return nil, ServiceResizeOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *resp.JSON202
 
-	// Prepare output
-	output := ServiceResizeOutput{
-		Message:   "Resize request accepted and is in progress",
-		ServiceID: input.ServiceID,
-		NewCPU:    cpuMillis,
-		NewMemory: memoryGBs,
-	}
-
 	// If wait is requested, wait for resize to complete
+	message := "Resize request accepted. The service may still be resizing."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
 			Client:    cfg.Client,
@@ -1048,12 +1063,16 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 			Timeout:    waitTimeout,
 			TimeoutMsg: "service may still be resizing",
 		}); err != nil {
-			output.Message = fmt.Sprintf("Resize started but error waiting: %s", err.Error())
+			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			output.Message = "Service resized successfully!"
-			// Use the service object (updated by WaitForService) in output
-			output.Service = s.convertToServiceDetail(service, false)
+			message = "Service resized successfully!"
 		}
+	}
+
+	// Convert service to output format (after wait so status is accurate)
+	output := ServiceResizeOutput{
+		Service: s.convertToServiceDetail(service, false),
+		Message: message,
 	}
 
 	return nil, output, nil
