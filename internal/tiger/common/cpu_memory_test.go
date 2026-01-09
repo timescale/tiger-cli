@@ -4,53 +4,51 @@ import "testing"
 
 func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 	testCases := []struct {
-		name        string
-		cpuMillis   string
-		memoryGbs   string
-		expectError bool
-		expectNil   bool
-		expectedCPU string
-		expectedMem string
+		name         string
+		cpuMillis    string
+		memoryGbs    string
+		expectError  bool
+		expectNil    bool
+		expectShared bool
+		expectedCPU  int
+		expectedMem  int
 	}{
 		{
 			name:        "Valid combination both set (1 CPU, 4GB)",
 			cpuMillis:   "1000",
 			memoryGbs:   "4",
 			expectError: false,
-			expectedCPU: "1000",
-			expectedMem: "4",
+			expectedCPU: 1000,
+			expectedMem: 4,
 		},
 		{
 			name:        "Valid combination both set (0.5 CPU, 2GB)",
 			cpuMillis:   "500",
 			memoryGbs:   "2",
 			expectError: false,
-			expectedCPU: "500",
-			expectedMem: "2",
+			expectedCPU: 500,
+			expectedMem: 2,
 		},
 		{
-			name:        "Valid shared/shared combination",
-			cpuMillis:   "shared",
-			memoryGbs:   "shared",
-			expectError: false,
-			expectedCPU: "shared",
-			expectedMem: "shared",
+			name:         "Valid shared/shared combination",
+			cpuMillis:    "shared",
+			memoryGbs:    "shared",
+			expectError:  false,
+			expectShared: true,
 		},
 		{
-			name:        "CPU shared, memory empty (auto-configure to shared)",
-			cpuMillis:   "shared",
-			memoryGbs:   "",
-			expectError: false,
-			expectedCPU: "shared",
-			expectedMem: "shared",
+			name:         "CPU shared, memory empty (auto-configure to shared)",
+			cpuMillis:    "shared",
+			memoryGbs:    "",
+			expectError:  false,
+			expectShared: true,
 		},
 		{
-			name:        "CPU empty, memory shared (auto-configure to shared)",
-			cpuMillis:   "",
-			memoryGbs:   "shared",
-			expectError: false,
-			expectedCPU: "shared",
-			expectedMem: "shared",
+			name:         "CPU empty, memory shared (auto-configure to shared)",
+			cpuMillis:    "",
+			memoryGbs:    "shared",
+			expectError:  false,
+			expectShared: true,
 		},
 		{
 			name:        "Invalid combination both set (1 CPU, 8GB)",
@@ -63,16 +61,16 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			cpuMillis:   "2000",
 			memoryGbs:   "",
 			expectError: false,
-			expectedCPU: "2000",
-			expectedMem: "8",
+			expectedCPU: 2000,
+			expectedMem: 8,
 		},
 		{
 			name:        "Memory only auto-configure CPU (16GB -> 4 CPU)",
 			cpuMillis:   "",
 			memoryGbs:   "16",
 			expectError: false,
-			expectedCPU: "4000",
-			expectedMem: "16",
+			expectedCPU: 4000,
+			expectedMem: 16,
 		},
 		{
 			name:        "Invalid CPU only",
@@ -97,7 +95,7 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cpu, memory, err := ValidateAndNormalizeCPUMemory(tc.cpuMillis, tc.memoryGbs)
+			config, err := ValidateAndNormalizeCPUMemory(tc.cpuMillis, tc.memoryGbs)
 
 			if tc.expectError {
 				if err == nil {
@@ -112,23 +110,30 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			}
 
 			if tc.expectNil {
-				if cpu != nil || memory != nil {
-					t.Errorf("Expected nil pointers, got cpu=%v, memory=%v", cpu, memory)
+				if config != nil {
+					t.Errorf("Expected nil config, got %+v", config)
 				}
 				return
 			}
 
-			if cpu == nil || memory == nil {
-				t.Errorf("Expected non-nil pointers, got cpu=%v, memory=%v", cpu, memory)
+			if config == nil {
+				t.Errorf("Expected non-nil config, got nil")
 				return
 			}
 
-			if *cpu != tc.expectedCPU {
-				t.Errorf("Expected CPU %s, got %s", tc.expectedCPU, *cpu)
+			if tc.expectShared {
+				if !config.Shared {
+					t.Errorf("Expected shared config, got %+v", config)
+				}
+				return
 			}
 
-			if *memory != tc.expectedMem {
-				t.Errorf("Expected memory %s, got %s", tc.expectedMem, *memory)
+			if config.CPUMillis != tc.expectedCPU {
+				t.Errorf("Expected CPU %d, got %d", tc.expectedCPU, config.CPUMillis)
+			}
+
+			if config.MemoryGBs != tc.expectedMem {
+				t.Errorf("Expected memory %d, got %d", tc.expectedMem, config.MemoryGBs)
 			}
 		})
 	}

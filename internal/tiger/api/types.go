@@ -247,14 +247,11 @@ type ReadReplicaSetCreate struct {
 
 // ResizeInput defines model for ResizeInput.
 type ResizeInput struct {
-	// CpuMillis The new CPU allocation in milli-cores (e.g., 1000 for 1 vCPU).
-	CpuMillis int `json:"cpu_millis"`
+	// CpuMillis The new CPU allocation in milli-cores.
+	CpuMillis string `json:"cpu_millis"`
 
 	// MemoryGbs The new memory allocation in gigabytes.
-	MemoryGbs int `json:"memory_gbs"`
-
-	// Nodes The new number of nodes in the replica set.
-	Nodes *int `json:"nodes,omitempty"`
+	MemoryGbs string `json:"memory_gbs"`
 }
 
 // Service defines model for Service.
