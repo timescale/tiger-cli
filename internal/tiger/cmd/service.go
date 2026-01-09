@@ -1435,6 +1435,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
+			service := *resp.JSON202
 			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
 
 			// Handle wait behavior
@@ -1446,12 +1447,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Wait for resize to complete
 			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
 
-			var dummyService api.Service
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:     cfg.Client,
-				ProjectID:  cfg.ProjectID,
-				ServiceID:  serviceID,
-				Handler:    &common.StatusWaitHandler{TargetStatus: "READY", Service: &dummyService},
+				Client:    cfg.Client,
+				ProjectID: cfg.ProjectID,
+				ServiceID: serviceID,
+				Handler: &common.StatusWaitHandler{
+					TargetStatus: "READY",
+					Service:      &service,
+				},
 				Output:     statusOutput,
 				Timeout:    resizeWaitTimeout,
 				TimeoutMsg: "resize may still be in progress",
@@ -1468,10 +1471,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores or 'shared'")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes or 'shared'")
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes")
 	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	return cmd
 }
