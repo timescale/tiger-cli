@@ -23,6 +23,7 @@ For the initial v0 release, implement these essential tools first:
 - `service_fork` - Fork existing services
 - `service_start` - Start stopped services
 - `service_stop` - Stop running services
+- `service_resize` - Resize service CPU and memory allocation
 - `service_delete` - Delete services (with confirmation, 24-hour safe delete) - Maybe not v0
 - `service_update_password` - Update service master password
 
@@ -242,14 +243,23 @@ Restart a service.
 **Returns:** Operation status.
 
 #### `service_resize`
-Resize service resources.
+Resize a database service by changing its CPU and memory allocation.
 
 **Parameters:**
 - `service_id` (string, required): Service ID to resize
-- `cpu` (string, optional): New CPU allocation
-- `memory` (string, optional): New memory allocation
+- `cpu_memory` (string, required): CPU and memory allocation combination. Choose from:
+  - `"0.5 CPU/2 GB"` - 0.5 CPU cores, 2GB memory
+  - `"1 CPU/4 GB"` - 1 CPU core, 4GB memory
+  - `"2 CPU/8 GB"` - 2 CPU cores, 8GB memory
+  - `"4 CPU/16 GB"` - 4 CPU cores, 16GB memory
+  - `"8 CPU/32 GB"` - 8 CPU cores, 32GB memory
+  - `"16 CPU/64 GB"` - 16 CPU cores, 64GB memory
+  - `"32 CPU/128 GB"` - 32 CPU cores, 128GB memory
+- `wait` (boolean, optional): Whether to wait for resize to complete before returning (waits up to 10 minutes). Default is false (recommended) - only set to true if your next steps require connecting to or querying this database.
 
-**Returns:** Resize operation status.
+**Returns:** Operation status with current service status, updated resources, and message.
+
+**Note:** The service may be temporarily unavailable during the resize operation. Increasing resources will increase costs.
 
 #### `service_enable_pooler`
 Enable connection pooling for a service.

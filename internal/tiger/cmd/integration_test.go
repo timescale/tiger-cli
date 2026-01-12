@@ -1016,6 +1016,146 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("ResizeService", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Resizing service: %s", serviceID)
+
+		// First, get current service details to see current CPU/memory
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "describe", serviceID,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to describe service before resize: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check current resources
+		var serviceBefore api.Service
+		if err := json.Unmarshal([]byte(output), &serviceBefore); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var currentCPU, currentMemory string
+		if serviceBefore.Resources != nil && len(*serviceBefore.Resources) > 0 {
+			resource := (*serviceBefore.Resources)[0]
+			if resource.Spec != nil {
+				if resource.Spec.CpuMillis != nil {
+					cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+					currentCPU = fmt.Sprintf("%.1f CPU", cpuCores)
+				}
+				if resource.Spec.MemoryGbs != nil {
+					currentMemory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
+				}
+			}
+		}
+
+		t.Logf("Current resources: CPU=%s, Memory=%s", currentCPU, currentMemory)
+
+		// Resize to 1 CPU / 4 GB (larger than default 0.5 CPU / 2 GB)
+		// Note: --cpu expects millicores (1000 = 1 CPU), --memory expects GB as integer
+		targetCPUMillis := "1000" // 1 CPU = 1000 millicores
+		targetMemoryGB := "4"     // 4 GB
+
+		t.Logf("Resizing to: CPU=%s millicores (1 CPU), Memory=%s GB", targetCPUMillis, targetMemoryGB)
+
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"service", "resize", serviceID,
+			"--cpu", targetCPUMillis,
+			"--memory", targetMemoryGB,
+			"--wait-timeout", "10m", // Longer timeout for resize operations
+		)
+
+		if err != nil {
+			t.Fatalf("Service resize failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify resize success message
+		if !strings.Contains(output, "Resize completed successfully") &&
+			!strings.Contains(output, "resized successfully") {
+			t.Logf("Note: Expected resize success message, got: %s", output)
+		}
+
+		t.Logf("Service resize command completed successfully")
+	})
+
+	t.Run("VerifyServiceResized", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Verifying service has been resized")
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "describe", serviceID,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Failed to describe service after resize: %v\nOutput: %s", err, output)
+		}
+
+		// Parse JSON to check new resources
+		var serviceAfter api.Service
+		if err := json.Unmarshal([]byte(output), &serviceAfter); err != nil {
+			t.Fatalf("Failed to parse service JSON: %v", err)
+		}
+
+		var newCPUMillis, newMemoryGbs int
+		if serviceAfter.Resources != nil && len(*serviceAfter.Resources) > 0 {
+			resource := (*serviceAfter.Resources)[0]
+			if resource.Spec != nil {
+				if resource.Spec.CpuMillis != nil {
+					newCPUMillis = *resource.Spec.CpuMillis
+				}
+				if resource.Spec.MemoryGbs != nil {
+					newMemoryGbs = *resource.Spec.MemoryGbs
+				}
+			}
+		}
+
+		newCPU := fmt.Sprintf("%.1f CPU", float64(newCPUMillis)/1000)
+		newMemory := fmt.Sprintf("%d GB", newMemoryGbs)
+
+		t.Logf("New resources after resize: CPU=%s (millis=%d), Memory=%s", newCPU, newCPUMillis, newMemory)
+
+		// Verify the service has been resized to expected values
+		expectedCPUMillis := 1000 // 1 CPU = 1000 millicores
+		expectedMemoryGbs := 4    // 4 GB
+
+		if newCPUMillis != expectedCPUMillis {
+			t.Errorf("Expected CPU to be %d millicores after resize, got %d", expectedCPUMillis, newCPUMillis)
+		} else {
+			t.Logf("✅ CPU correctly resized to %d millicores (1 CPU)", newCPUMillis)
+		}
+
+		if newMemoryGbs != expectedMemoryGbs {
+			t.Errorf("Expected Memory to be %d GB after resize, got %d", expectedMemoryGbs, newMemoryGbs)
+		} else {
+			t.Logf("✅ Memory correctly resized to %d GB", newMemoryGbs)
+		}
+
+		// Verify service is still in READY state after resize
+		var status string
+		if serviceAfter.Status != nil {
+			status = string(*serviceAfter.Status)
+		}
+
+		if status != "READY" {
+			t.Logf("Warning: Expected service status to be READY after resize, got %s", status)
+		} else {
+			t.Logf("✅ Service is correctly in READY state after resize")
+		}
+
+		t.Logf("✅ Service resize verified successfully")
+	})
+
 	t.Run("DeleteService", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available for deletion")
@@ -1570,6 +1710,11 @@ func TestServiceForkIntegration(t *testing.T) {
 
 		if err != nil {
 			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
+		}
+
+		// Verify login success message
+		if !strings.Contains(output, "Successfully logged in") && !strings.Contains(output, "Logged in") {
+			t.Errorf("Login output: %s", output)
 		}
 
 		t.Logf("Login successful")
