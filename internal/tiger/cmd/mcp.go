@@ -541,10 +541,16 @@ func outputToolTable(output io.Writer, tool *mcpsdk.Tool) error {
 	if tool.Annotations != nil {
 		ann := tool.Annotations
 		table.Append("Read Only", fmt.Sprintf("%t", ann.ReadOnlyHint))
-		table.Append("Idempotent", fmt.Sprintf("%t", ann.IdempotentHint))
-		if ann.DestructiveHint != nil {
-			table.Append("Destructive", fmt.Sprintf("%t", *ann.DestructiveHint))
+
+		// Only show DestructiveHint and IdempotentHint if ReadOnlyHint is false
+		// (these fields are only meaningful for non-read-only tools)
+		if !ann.ReadOnlyHint {
+			table.Append("Idempotent", fmt.Sprintf("%t", ann.IdempotentHint))
+			if ann.DestructiveHint != nil {
+				table.Append("Destructive", fmt.Sprintf("%t", *ann.DestructiveHint))
+			}
 		}
+
 		if ann.OpenWorldHint != nil {
 			table.Append("Open World", fmt.Sprintf("%t", *ann.OpenWorldHint))
 		}
