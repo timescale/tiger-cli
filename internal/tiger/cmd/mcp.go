@@ -914,7 +914,9 @@ func formatPromptArguments(arguments []*mcpsdk.PromptArgument) string {
 func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// First argument: capability type
 	if len(args) == 0 {
-		return mcp.ValidCapabilityTypes().Strings(), cobra.ShellCompDirectiveNoFileComp
+		return filterCompletionsByPrefix(
+			mcp.ValidCapabilityTypes().Strings(), toComplete,
+		), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	// Second argument: capability name based on type
@@ -964,7 +966,7 @@ func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		return names, cobra.ShellCompDirectiveNoFileComp
+		return filterCompletionsByPrefix(names, toComplete), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return nil, cobra.ShellCompDirectiveNoFileComp
