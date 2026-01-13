@@ -7,11 +7,16 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
+	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/mcp"
@@ -45,6 +50,7 @@ Use 'tiger mcp start' to launch the MCP server.`,
 	cmd.AddCommand(buildMCPInstallCmd())
 	cmd.AddCommand(buildMCPStartCmd())
 	cmd.AddCommand(buildMCPListCmd())
+	cmd.AddCommand(buildMCPGetCmd())
 
 	return cmd
 }
@@ -279,6 +285,109 @@ Examples:
 	return cmd
 }
 
+// buildMCPGetCmd creates the get subcommand for displaying detailed info on a specific MCP capability
+func buildMCPGetCmd() *cobra.Command {
+	var outputFormat string
+
+	cmd := &cobra.Command{
+		Use:   "get <type> <name>",
+		Short: "Get detailed information about a specific MCP capability",
+		Long: `Get detailed information about a specific MCP tool, prompt, resource, or resource template.
+
+The type argument must be one of: tool, prompt, resource, resource_template
+
+Examples:
+  # Get details about a tool
+  tiger mcp get tool service_list
+
+  # Get details about a prompt
+  tiger mcp get prompt setup_hypertable
+
+  # Get details as JSON
+  tiger mcp get tool service_create -o json
+
+  # Get details as YAML
+  tiger mcp get resource my-resource -o yaml`,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: mcpGetCompletion,
+		PreRunE:           bindFlags("output"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			capabilityName := args[1]
+
+			// Validate capability type
+			capabilityType, err := mcp.ValidateCapabilityType(args[0])
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Get config
+			cfg, err := config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+
+			// Create MCP server
+			server, err := mcp.NewServer(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to create MCP server: %w", err)
+			}
+			defer server.Close()
+
+			// List all capabilities
+			capabilities, err := server.ListCapabilities(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("failed to list capabilities: %w", err)
+			}
+
+			// Find the specific capability
+			var capability any
+			var found bool
+			switch capabilityType {
+			case mcp.CapabilityTypeTool:
+				capability, found = capabilities.GetTool(capabilityName)
+			case mcp.CapabilityTypePrompt:
+				capability, found = capabilities.GetPrompt(capabilityName)
+			case mcp.CapabilityTypeResource:
+				capability, found = capabilities.GetResource(capabilityName)
+			case mcp.CapabilityTypeResourceTemplate:
+				capability, found = capabilities.GetResourceTemplate(capabilityName)
+			}
+
+			if !found {
+				return fmt.Errorf("%s %q not found", capabilityType, capabilityName)
+			}
+
+			// Format output
+			output := cmd.OutOrStdout()
+			switch cfg.Output {
+			case "json":
+				return util.SerializeToJSON(output, capability)
+			case "yaml":
+				return util.SerializeToYAML(output, capability)
+			default:
+				switch capabilityType {
+				case mcp.CapabilityTypeTool:
+					return outputToolTable(output, capability.(*mcpsdk.Tool))
+				case mcp.CapabilityTypePrompt:
+					return outputPromptTable(output, capability.(*mcpsdk.Prompt))
+				case mcp.CapabilityTypeResource:
+					return outputResourceTable(output, capability.(*mcpsdk.Resource))
+				case mcp.CapabilityTypeResourceTemplate:
+					return outputResourceTemplateTable(output, capability.(*mcpsdk.ResourceTemplate))
+				default:
+					return fmt.Errorf("unsupported capability type: %s", capabilityType)
+				}
+			}
+		},
+	}
+
+	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+
+	return cmd
+}
+
 // startStdioServer starts the MCP server with stdio transport
 func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
@@ -404,4 +513,369 @@ func outputCapabilitiesTable(output io.Writer, capabilities *mcp.Capabilities) e
 	}
 
 	return table.Render()
+}
+
+// outputToolTable outputs a tool in table format
+func outputToolTable(output io.Writer, tool *mcpsdk.Tool) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("PROPERTY", "VALUE")
+
+	// Configure column width and wrapping
+	table.Configure(func(cfg *tablewriter.Config) {
+		cfg.Row.ColMaxWidths.PerColumn = map[int]int{1: 100} // Max 100 chars for VALUE column
+		cfg.Row.Formatting.AutoWrap = tw.WrapNormal
+		cfg.Behavior.TrimSpace = tw.Off // Preserve leading whitespace for indentation
+		cfg.Behavior.TrimLine = tw.Off  // Preserve blank lines within cell content
+	})
+
+	// Basic fields
+	table.Append("Name", tool.Name)
+	if tool.Title != "" {
+		table.Append("Title", tool.Title)
+	}
+	if tool.Description != "" {
+		table.Append("Description", tool.Description)
+	}
+
+	// Annotations as top-level properties
+	if tool.Annotations != nil {
+		ann := tool.Annotations
+		table.Append("Read Only", fmt.Sprintf("%t", ann.ReadOnlyHint))
+		table.Append("Idempotent", fmt.Sprintf("%t", ann.IdempotentHint))
+		if ann.DestructiveHint != nil {
+			table.Append("Destructive", fmt.Sprintf("%t", *ann.DestructiveHint))
+		}
+		if ann.OpenWorldHint != nil {
+			table.Append("Open World", fmt.Sprintf("%t", *ann.OpenWorldHint))
+		}
+	}
+
+	// InputSchema (formatted for readability)
+	if tool.InputSchema != nil {
+		formatted := formatJSONSchema(tool.InputSchema, 0)
+		if formatted != "" {
+			table.Append("Input", formatted)
+		}
+	}
+
+	// OutputSchema (formatted for readability)
+	if tool.OutputSchema != nil {
+		formatted := formatJSONSchema(tool.OutputSchema, 0)
+		if formatted != "" {
+			table.Append("Output", formatted)
+		}
+	}
+
+	return table.Render()
+}
+
+// outputPromptTable outputs a prompt in table format
+func outputPromptTable(output io.Writer, prompt *mcpsdk.Prompt) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("PROPERTY", "VALUE")
+
+	// Configure column width and wrapping
+	table.Configure(func(cfg *tablewriter.Config) {
+		cfg.Row.ColMaxWidths.PerColumn = map[int]int{1: 100} // Max 100 chars for VALUE column
+		cfg.Row.Formatting.AutoWrap = tw.WrapNormal
+		cfg.Behavior.TrimSpace = tw.Off // Preserve leading whitespace for indentation
+		cfg.Behavior.TrimLine = tw.Off  // Preserve blank lines within cell content
+	})
+
+	// Basic fields
+	table.Append("Name", prompt.Name)
+	if prompt.Title != "" {
+		table.Append("Title", prompt.Title)
+	}
+	if prompt.Description != "" {
+		table.Append("Description", prompt.Description)
+	}
+
+	// Arguments (formatted as bullet list)
+	if len(prompt.Arguments) > 0 {
+		formatted := formatPromptArguments(prompt.Arguments)
+		if formatted != "" {
+			table.Append("Arguments", formatted)
+		}
+	}
+
+	return table.Render()
+}
+
+// outputResourceTable outputs a resource in table format
+func outputResourceTable(output io.Writer, resource *mcpsdk.Resource) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("PROPERTY", "VALUE")
+
+	// Configure column width and wrapping
+	table.Configure(func(cfg *tablewriter.Config) {
+		cfg.Row.ColMaxWidths.PerColumn = map[int]int{1: 100} // Max 100 chars for VALUE column
+		cfg.Row.Formatting.AutoWrap = tw.WrapNormal
+		cfg.Behavior.TrimSpace = tw.Off // Preserve leading whitespace for indentation
+		cfg.Behavior.TrimLine = tw.Off  // Preserve blank lines within cell content
+	})
+
+	// Basic fields
+	table.Append("Name", resource.Name)
+	if resource.Title != "" {
+		table.Append("Title", resource.Title)
+	}
+	if resource.Description != "" {
+		table.Append("Description", resource.Description)
+	}
+	table.Append("URI", resource.URI)
+	if resource.MIMEType != "" {
+		table.Append("MIMEType", resource.MIMEType)
+	}
+	if resource.Size > 0 {
+		table.Append("Size", fmt.Sprintf("%d bytes", resource.Size))
+	}
+
+	// Annotations as top-level properties
+	if resource.Annotations != nil {
+		ann := resource.Annotations
+		if len(ann.Audience) > 0 {
+			audiences := make([]string, len(ann.Audience))
+			for i, role := range ann.Audience {
+				audiences[i] = string(role)
+			}
+			table.Append("Audience", fmt.Sprintf("%v", audiences))
+		}
+		if ann.Priority != 0 {
+			table.Append("Priority", fmt.Sprintf("%f", ann.Priority))
+		}
+		if ann.LastModified != "" {
+			table.Append("Last Modified", ann.LastModified)
+		}
+	}
+
+	return table.Render()
+}
+
+// outputResourceTemplateTable outputs a resource template in table format
+func outputResourceTemplateTable(output io.Writer, template *mcpsdk.ResourceTemplate) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("PROPERTY", "VALUE")
+
+	// Configure column width and wrapping
+	table.Configure(func(cfg *tablewriter.Config) {
+		cfg.Row.ColMaxWidths.PerColumn = map[int]int{1: 100} // Max 100 chars for VALUE column
+		cfg.Row.Formatting.AutoWrap = tw.WrapNormal
+		cfg.Behavior.TrimSpace = tw.Off // Preserve leading whitespace for indentation
+		cfg.Behavior.TrimLine = tw.Off  // Preserve blank lines within cell content
+	})
+
+	// Basic fields
+	table.Append("Name", template.Name)
+	if template.Title != "" {
+		table.Append("Title", template.Title)
+	}
+	if template.Description != "" {
+		table.Append("Description", template.Description)
+	}
+	table.Append("URITemplate", template.URITemplate)
+	if template.MIMEType != "" {
+		table.Append("MIMEType", template.MIMEType)
+	}
+
+	// Annotations as top-level properties
+	if template.Annotations != nil {
+		ann := template.Annotations
+		if len(ann.Audience) > 0 {
+			audiences := make([]string, len(ann.Audience))
+			for i, role := range ann.Audience {
+				audiences[i] = string(role)
+			}
+			table.Append("Audience", fmt.Sprintf("%v", audiences))
+		}
+		if ann.Priority != 0 {
+			table.Append("Priority", fmt.Sprintf("%f", ann.Priority))
+		}
+		if ann.LastModified != "" {
+			table.Append("Last Modified", ann.LastModified)
+		}
+	}
+
+	return table.Render()
+}
+
+// formatSchemaType recursively formats a JSON schema type into TypeScript-style syntax
+func formatSchemaType(prop *jsonschema.Schema) string {
+	if prop == nil {
+		return ""
+	}
+
+	// Handle union types
+	if len(prop.Types) > 0 {
+		var types []string
+		for _, t := range prop.Types {
+			if t == "array" && prop.Items != nil {
+				// Recursively format array items
+				itemType := formatSchemaType(prop.Items)
+				if itemType == "" {
+					itemType = "any"
+				}
+				types = append(types, itemType+"[]")
+			} else {
+				types = append(types, t)
+			}
+		}
+		return strings.Join(types, "|")
+	}
+
+	// Handle single type
+	if prop.Type == "array" && prop.Items != nil {
+		// Recursively format array items
+		itemType := formatSchemaType(prop.Items)
+		if itemType == "" {
+			itemType = "any"
+		}
+		return itemType + "[]"
+	}
+
+	// Return the base type, or "any" if no type is specified
+	if prop.Type != "" {
+		return prop.Type
+	}
+	return "any"
+}
+
+// formatJSONSchema formats a JSON schema into a readable parameter list
+func formatJSONSchema(s *jsonschema.Schema, indent int) string {
+	if s == nil || len(s.Properties) == 0 {
+		return ""
+	}
+
+	// Build formatted output
+	indentStr := strings.Repeat("  ", indent)
+
+	var lines []string
+	for propName, prop := range s.Properties {
+		if prop == nil {
+			continue
+		}
+
+		// Build property line with bullet point
+		line := indentStr + "• " + propName
+
+		// Add required marker
+		if slices.Contains(s.Required, propName) {
+			line += " (required)"
+		}
+
+		// Add type using recursive formatter
+		if typeStr := formatSchemaType(prop); typeStr != "" && typeStr != "any" {
+			line += ": " + typeStr
+		}
+
+		// Add description
+		if prop.Description != "" {
+			line += " - " + prop.Description
+		}
+
+		// Add default value
+		if len(prop.Default) > 0 {
+			line += " (default: " + string(prop.Default) + ")"
+		}
+
+		lines = append(lines, line)
+
+		if len(prop.Properties) > 0 {
+			// Handle nested objects
+			nested := formatJSONSchema(prop, indent+1)
+			if nested != "" {
+				lines = append(lines, nested)
+			}
+		} else if prop.Items != nil && len(prop.Items.Properties) > 0 {
+			// Handle nested arrays of objects
+			nested := formatJSONSchema(prop.Items, indent+1)
+			if nested != "" {
+				lines = append(lines, nested)
+			}
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// formatPromptArguments formats prompt arguments into a readable bullet-point list
+func formatPromptArguments(arguments []*mcpsdk.PromptArgument) string {
+	if len(arguments) == 0 {
+		return ""
+	}
+
+	var lines []string
+	for _, arg := range arguments {
+		// Build argument line with bullet point
+		line := "• " + arg.Name
+
+		// Add required marker
+		if arg.Required {
+			line += " (required)"
+		}
+
+		// Add description
+		if arg.Description != "" {
+			line += " - " + arg.Description
+		}
+
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// mcpGetCompletion provides custom completions for the get command
+func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// First argument: capability type
+	if len(args) == 0 {
+		return mcp.ValidCapabilityTypes().Strings(), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Second argument: capability name based on type
+	if len(args) == 1 {
+		// Validate capability type
+		capabilityType, err := mcp.ValidateCapabilityType(args[0])
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		// Create MCP server to get capabilities
+		server, err := mcp.NewServer(cmd.Context())
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		defer server.Close()
+
+		capabilities, err := server.ListCapabilities(cmd.Context())
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		var names []string
+		switch capabilityType {
+		case mcp.CapabilityTypeTool:
+			for _, tool := range capabilities.Tools {
+				names = append(names, tool.Name)
+			}
+		case mcp.CapabilityTypePrompt:
+			for _, prompt := range capabilities.Prompts {
+				names = append(names, prompt.Name)
+			}
+		case mcp.CapabilityTypeResource:
+			for _, resource := range capabilities.Resources {
+				names = append(names, resource.Name)
+			}
+		case mcp.CapabilityTypeResourceTemplate:
+			for _, template := range capabilities.ResourceTemplates {
+				names = append(names, template.Name)
+			}
+		default:
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return nil, cobra.ShellCompDirectiveNoFileComp
 }
