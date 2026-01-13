@@ -20,7 +20,7 @@ type WaitHandler interface {
 	// continue. It also returns an error, which is either immediately returned
 	// from WaitForService or temporarily shown next to the spinner depending
 	// on the first return value.
-	Check(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error)
+	Check(resp *api.GetServiceResponse) (bool, error)
 }
 
 type WaitForServiceArgs struct {
@@ -56,7 +56,7 @@ func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 				return fmt.Errorf("error waiting - %s: %w", args.TimeoutMsg, ctx.Err())
 			}
 		case <-ticker.C:
-			resp, err := args.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, args.ProjectID, args.ServiceID)
+			resp, err := args.Client.GetServiceWithResponse(ctx, args.ProjectID, args.ServiceID)
 			if err != nil {
 				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
 				continue
@@ -83,7 +83,7 @@ func (h *StatusWaitHandler) Message() string {
 	return fmt.Sprintf("Service status: %s", util.DerefStr(h.Service.Status))
 }
 
-func (h *StatusWaitHandler) Check(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error) {
+func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 	switch resp.StatusCode() {
 	case 200:
 		if resp.JSON200 == nil {
@@ -122,7 +122,7 @@ func (h *DeletionWaitHandler) Message() string {
 	return fmt.Sprintf("Waiting for service '%s' to be deleted", h.ServiceID)
 }
 
-func (h *DeletionWaitHandler) Check(resp *api.GetProjectsProjectIdServicesServiceIdResponse) (bool, error) {
+func (h *DeletionWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 	switch resp.StatusCode() {
 	case 200:
 		return false, nil

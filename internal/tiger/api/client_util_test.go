@@ -40,7 +40,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 
 	// Make a request to trigger the User-Agent header
 	ctx := context.Background()
-	_, err = client.GetProjectsProjectIdServicesWithResponse(ctx, "test-project-id")
+	_, err = client.GetServicesWithResponse(ctx, "test-project-id")
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestNewTigerClientAuthorizationHeader(t *testing.T) {
 
 	// Make a request to trigger the Authorization header
 	ctx := context.Background()
-	_, err = client.GetProjectsProjectIdServicesWithResponse(ctx, "test-project-id")
+	_, err = client.GetServicesWithResponse(ctx, "test-project-id")
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}

@@ -145,7 +145,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// Get service details to construct connection string
-	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
