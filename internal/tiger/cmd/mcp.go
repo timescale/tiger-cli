@@ -297,27 +297,26 @@ The type argument must be one of: tool, prompt, resource, resource_template
 
 Examples:
   # Get details about a tool
-  tiger mcp get tool service_list
+  tiger mcp get tool service_create
 
   # Get details about a prompt
-  tiger mcp get prompt setup_hypertable
+  tiger mcp get prompt setup-timescaledb-hypertables
 
   # Get details as JSON
   tiger mcp get tool service_create -o json
 
   # Get details as YAML
-  tiger mcp get resource my-resource -o yaml`,
+  tiger mcp get tool service_create -o yaml`,
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: mcpGetCompletion,
 		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			capabilityName := args[1]
-
 			// Validate capability type
 			capabilityType, err := mcp.ValidateCapabilityType(args[0])
 			if err != nil {
 				return err
 			}
+			capabilityName := args[1]
 
 			cmd.SilenceUsage = true
 
@@ -346,8 +345,10 @@ Examples:
 			}
 
 			// Find the specific capability
-			var capability any
-			var found bool
+			var (
+				capability any
+				found      bool
+			)
 			switch capabilityType {
 			case mcp.CapabilityTypeTool:
 				capability, found = capabilities.GetTool(capabilityName)
@@ -357,6 +358,8 @@ Examples:
 				capability, found = capabilities.GetResource(capabilityName)
 			case mcp.CapabilityTypeResourceTemplate:
 				capability, found = capabilities.GetResourceTemplate(capabilityName)
+			default:
+				return fmt.Errorf("unsupported capability type: %s", capabilityType)
 			}
 
 			if !found {
@@ -371,17 +374,17 @@ Examples:
 			case "yaml":
 				return util.SerializeToYAML(output, capability)
 			default:
-				switch capabilityType {
-				case mcp.CapabilityTypeTool:
-					return outputToolText(output, capability.(*mcpsdk.Tool))
-				case mcp.CapabilityTypePrompt:
-					return outputPromptText(output, capability.(*mcpsdk.Prompt))
-				case mcp.CapabilityTypeResource:
-					return outputResourceText(output, capability.(*mcpsdk.Resource))
-				case mcp.CapabilityTypeResourceTemplate:
-					return outputResourceTemplateText(output, capability.(*mcpsdk.ResourceTemplate))
+				switch c := capability.(type) {
+				case *mcpsdk.Tool:
+					return outputToolText(output, c)
+				case *mcpsdk.Prompt:
+					return outputPromptText(output, c)
+				case *mcpsdk.Resource:
+					return outputResourceText(output, c)
+				case *mcpsdk.ResourceTemplate:
+					return outputResourceTemplateText(output, c)
 				default:
-					return fmt.Errorf("unsupported capability type: %s", capabilityType)
+					return fmt.Errorf("unsupported capability type: %T", c)
 				}
 			}
 		},
