@@ -886,8 +886,7 @@ func formatPromptArguments(arguments []*mcpsdk.PromptArgument) string {
 	}
 
 	// Sort arguments alphabetically by name
-	sortedArgs := make([]*mcpsdk.PromptArgument, len(arguments))
-	copy(sortedArgs, arguments)
+	sortedArgs := slices.Clone(arguments)
 	slices.SortFunc(sortedArgs, func(a, b *mcpsdk.PromptArgument) int {
 		return strings.Compare(a.Name, b.Name)
 	})
