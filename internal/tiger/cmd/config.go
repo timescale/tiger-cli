@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -234,11 +233,5 @@ func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	var results []string
-	for opt := range config.ValidConfigOptions() {
-		if strings.HasPrefix(opt, toComplete) {
-			results = append(results, opt)
-		}
-	}
-	return results, cobra.ShellCompDirectiveNoFileComp
+	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
 }

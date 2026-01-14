@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"iter"
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -88,8 +88,8 @@ var defaultValues = map[string]any{
 	"version_check_last_time": time.Time{},
 }
 
-func ValidConfigOptions() iter.Seq[string] {
-	return maps.Keys(defaultValues)
+func ValidConfigOptions() []string {
+	return slices.Collect(maps.Keys(defaultValues))
 }
 
 func ApplyDefaults(v *viper.Viper) {

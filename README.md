@@ -111,6 +111,7 @@ Tiger CLI provides the following commands:
   - `install` - Install and configure MCP server for an AI assistant
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources
+  - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
 - `tiger version` - Show version information
 
 Use `tiger <command> --help` for detailed information about each command.

@@ -340,8 +340,9 @@ func (s *Server) registerServiceTools() {
 		InputSchema:  ServiceListInput{}.Schema(),
 		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: true,
-			Title:        "List Database Services",
+			ReadOnlyHint:  true,
+			OpenWorldHint: util.Ptr(true),
+			Title:         "List Database Services",
 		},
 	}, s.handleServiceList)
 
@@ -354,8 +355,9 @@ func (s *Server) registerServiceTools() {
 		InputSchema:  ServiceGetInput{}.Schema(),
 		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: true,
-			Title:        "Get Service Details",
+			ReadOnlyHint:  true,
+			OpenWorldHint: util.Ptr(true),
+			Title:         "Get Service Details",
 		},
 	}, s.handleServiceGet)
 
@@ -373,8 +375,10 @@ WARNING: Creates billable resources.`,
 		InputSchema:  ServiceCreateInput{}.Schema(),
 		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,           // Creating with same name creates multiple services (name is not unique)
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Create Database Service",
 		},
 	}, s.handleServiceCreate)
@@ -399,8 +403,10 @@ WARNING: Creates billable resources.`,
 		InputSchema:  ServiceForkInput{}.Schema(),
 		OutputSchema: ServiceForkOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,           // Forking same service multiple times creates multiple forks
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Fork Database Service",
 		},
 	}, s.handleServiceFork)
@@ -414,8 +420,10 @@ WARNING: Creates billable resources.`,
 		InputSchema:  ServiceUpdatePasswordInput{}.Schema(),
 		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(true), // Modifies authentication credentials
 			IdempotentHint:  true,           // Same password can be set multiple times
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Update Service Password",
 		},
 	}, s.handleServiceUpdatePassword)
@@ -430,8 +438,10 @@ This operation starts a service that is currently in a stopped/paused state. The
 		InputSchema:  ServiceStartInput{}.Schema(),
 		OutputSchema: ServiceStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(false), // Starting a service cannot really break anything
 			IdempotentHint:  true,            // Starting an already-started service is safe (but returns an error)
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Start Database Service",
 		},
 	}, s.handleServiceStart)
@@ -446,8 +456,10 @@ This operation stops a service that is currently running. The service will trans
 		InputSchema:  ServiceStopInput{}.Schema(),
 		OutputSchema: ServiceStopOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(true), // Stopping a service breaks existing connections and could cause app downtime
 			IdempotentHint:  true,           // Stopping an already-stopped service is safe (but returns an error)
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Stop Database Service",
 		},
 	}, s.handleServiceStop)
