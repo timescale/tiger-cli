@@ -289,8 +289,9 @@ func buildMCPGetCmd() *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
-		Use:   "get <type> <name>",
-		Short: "Get detailed information about a specific MCP capability",
+		Use:     "get <type> <name>",
+		Aliases: []string{"describe", "show"},
+		Short:   "Get detailed information about a specific MCP capability",
 		Long: `Get detailed information about a specific MCP tool, prompt, resource, or resource template.
 
 The type argument must be one of: tool, prompt, resource, resource_template
