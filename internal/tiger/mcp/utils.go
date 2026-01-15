@@ -64,7 +64,6 @@ func (s *Server) convertToServiceDetail(service api.Service, withPassword bool) 
 		Status:    util.DerefStr(service.Status),
 		Type:      util.DerefStr(service.ServiceType),
 		Region:    util.Deref(service.RegionCode),
-		Paused:    util.Deref(service.Paused),
 	}
 
 	// Add creation time if available

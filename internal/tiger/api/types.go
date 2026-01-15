@@ -279,9 +279,6 @@ type Service struct {
 	// Name The name of the service.
 	Name *string `json:"name,omitempty"`
 
-	// Paused Whether the service is paused
-	Paused *bool `json:"paused,omitempty"`
-
 	// ProjectId The project this service belongs to.
 	ProjectId       *string           `json:"project_id,omitempty"`
 	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
@@ -342,6 +339,12 @@ type ServiceCreate struct {
 
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
+
+// ServiceLogs defines model for ServiceLogs.
+type ServiceLogs struct {
+	// Logs Array of log entries (up to 500 entries per page, may be empty)
+	Logs []string `json:"logs"`
+}
 
 // ServiceType defines model for ServiceType.
 type ServiceType string
@@ -439,6 +442,18 @@ type PostAnalyticsTrackJSONBody struct {
 
 	// Properties Optional map of arbitrary properties associated with the event
 	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// GetServiceLogsParams defines parameters for GetServiceLogs.
+type GetServiceLogsParams struct {
+	// ServiceOrdinal Specific service instance ordinal (for multi-node services)
+	ServiceOrdinal *int `form:"service_ordinal,omitempty" json:"service_ordinal,omitempty"`
+
+	// PageIndex Page index for pagination (0-based)
+	PageIndex *int `form:"page_index,omitempty" json:"page_index,omitempty"`
+
+	// StartTime Starting timestamp for log search (RFC3339 format)
+	StartTime *time.Time `form:"start_time,omitempty" json:"start_time,omitempty"`
 }
 
 // PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.

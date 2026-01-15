@@ -11,9 +11,7 @@ info:
     name: Tiger Data Support
     url: https://www.tigerdata.com/contact
 servers:
-  - url: http://localhost:8080
-    description: Local development server
-  - url: https://api.tigerdata.com/public/v1
+  - url: https://console.cloud.timescale.com/public/api/v1
     description: API server for Tiger Cloud
 
 tags:
@@ -549,6 +547,47 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/logs:
+    get:
+      operationId: getServiceLogs
+      tags:
+        - Services
+      summary: Get service logs
+      description: |
+        Fetch logs for a specific service. Returns up to 500 log entries from
+        available logs. Supports pagination.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: service_ordinal
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Specific service instance ordinal (for multi-node services)
+        - name: page_index
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page index for pagination (0-based)
+        - name: start_time
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Starting timestamp for log search (RFC3339 format)
+      responses:
+        '200':
+          description: Service logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceLogs'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/setHA:
     post:
       tags:
@@ -953,9 +992,6 @@ components:
           description: The initial password for the service.
           format: password
           example: "a-very-secure-initial-password"
-        paused:
-          type: boolean
-          description: Whether the service is paused
         status:
           $ref: '#/components/schemas/DeployStatus'
           description: Current status of the service
@@ -1252,6 +1288,16 @@ components:
           type: string
           description: The ID of the VPC to attach the service to.
           example: "1234567890"
+    ServiceLogs:
+      type: object
+      required:
+        - logs
+      properties:
+        logs:
+          type: array
+          items:
+            type: string
+          description: Array of log entries (up to 500 entries per page, may be empty)
     Error:
       type: object
       properties:

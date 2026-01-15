@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,6 +39,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceStopCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 	cmd.AddCommand(buildServiceForkCmd())
+	cmd.AddCommand(buildServiceLogsCmd())
 
 	return cmd
 }
@@ -643,11 +646,6 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 		}
 	}
 
-	// Pause status
-	if service.Paused != nil && *service.Paused {
-		table.Append("Paused", "Yes")
-	}
-
 	// Timestamps
 	if service.Created != nil {
 		table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
@@ -1212,8 +1210,7 @@ Examples:
 				forkStrategy = api.LASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.PITR
-				parsedTime := forkToTimestamp
-				targetTime = &parsedTime
+				targetTime = util.Ptr(forkToTimestamp)
 			}
 
 			// Display what we're about to do
@@ -1330,6 +1327,162 @@ Examples:
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+
+	return cmd
+}
+
+// buildServiceLogsCmd creates the logs command for viewing service logs
+func buildServiceLogsCmd() *cobra.Command {
+	var tail int
+	var startTime time.Time
+	var serviceOrdinal int
+	var output string
+
+	cmd := &cobra.Command{
+		Use:     "logs [service-id]",
+		Aliases: []string{"log"},
+		Short:   "View logs for a service",
+		Long: `View logs for a database service.
+
+Fetches and displays logs from the specified service. By default, shows all logs
+from the first page of available logs.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration.
+
+Examples:
+  # View all logs from first page for default service (default behavior)
+  tiger service logs
+
+  # View logs for specific service
+  tiger service logs svc-12345
+
+  # View logs starting from a specific time
+  tiger service logs --start-time "2024-01-15T10:00:00Z"
+
+  # View logs for a specific service instance (multi-node services)
+  tiger service logs --service-ordinal 1
+
+  # View last 100 lines (fetches multiple pages if needed)
+  tiger service logs --tail 100
+
+  # View last 1000 lines (fetches multiple pages if needed)
+  tiger service logs --tail 1000`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		PreRunE:           bindFlags("output"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Determine service ID
+			serviceID, err := getServiceID(cfg.Config, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Build query parameters
+			params := api.GetServiceLogsParams{
+				PageIndex: util.Ptr(0),
+			}
+
+			// Check if service-ordinal flag was explicitly set (0 is a valid ordinal)
+			// If not set, omit the parameter and let the backend fetch primaryOrdinal
+			if cmd.Flags().Changed("service-ordinal") {
+				params.ServiceOrdinal = &serviceOrdinal
+			}
+			// If service-ordinal is not provided, params.ServiceOrdinal remains nil,
+			// and the backend will automatically fetch and use primaryOrdinal
+
+			// Set StartTime: if not explicitly provided, use time.Now() to ensure
+			// consistent pagination across multiple page requests
+			if !startTime.IsZero() {
+				params.StartTime = &startTime
+			} else {
+				now := time.Now()
+				params.StartTime = &now
+			}
+
+			// Fetch logs with pagination support
+			ctx, cancel := context.WithTimeout(cmd.Context(), 2*time.Minute)
+			defer cancel()
+
+			// Fetch pages until we have enough logs or reach the end
+			var logs []string
+			for {
+				resp, err := cfg.Client.GetServiceLogsWithResponse(
+					ctx,
+					cfg.ProjectID,
+					serviceID,
+					&params,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to fetch logs: %w", err)
+				}
+
+				if resp.StatusCode() != http.StatusOK {
+					return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+				}
+
+				if resp.JSON200 == nil {
+					return fmt.Errorf("unexpected empty response")
+				}
+
+				pageLogs := resp.JSON200.Logs
+				logs = append(logs, pageLogs...)
+
+				// Stop conditions:
+				// 1. --tail wasn't provided (in which case we only fetch a single page)
+				// 2. Page is empty (no more logs available)
+				// 3. We have enough logs to satisfy tail requirement
+				if !cmd.Flags().Changed("tail") ||
+					len(pageLogs) == 0 ||
+					len(logs) >= tail {
+					break
+				}
+
+				*params.PageIndex++
+			}
+
+			// Apply tail filter
+			if cmd.Flags().Changed("tail") && len(logs) > tail {
+				logs = logs[:tail]
+			}
+
+			// Reverse the order of the logs. This is necessary because the API
+			// returns logs in descending order by timestamp (with the most
+			// recent logs first), whereas in terminal output, it's much more
+			// common for the most recent logs to appear last.
+			slices.Reverse(logs)
+
+			// Display logs based on output format
+			outputWriter := cmd.OutOrStdout()
+			switch strings.ToLower(cfg.Output) {
+			case "json":
+				return util.SerializeToJSON(outputWriter, logs)
+			case "yaml":
+				return util.SerializeToYAML(outputWriter, logs)
+			default: // text format (default)
+				for _, log := range logs {
+					fmt.Fprintln(outputWriter, log)
+				}
+			}
+
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().IntVar(&tail, "tail", 0, "Number of log lines to show (fetches multiple pages if needed, 0 means show all from first page)")
+	cmd.Flags().TimeVar(&startTime, "start-time", time.Time{}, []string{time.RFC3339}, "Starting timestamp for logs (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
+	cmd.Flags().IntVar(&serviceOrdinal, "service-ordinal", 0, "Specific service instance ordinal (for multi-node services, 0 is valid)")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd
 }
