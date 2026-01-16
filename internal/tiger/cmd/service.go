@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -1469,8 +1471,18 @@ Examples:
 			case "yaml":
 				return util.SerializeToYAML(outputWriter, logs)
 			default: // text format (default)
+				// Apply colorization if color is enabled and output is a terminal
+				shouldColorize := cfg.Color && util.IsTerminal(outputWriter)
+				if shouldColorize {
+					// Temporarily enable color for this output
+					original := color.NoColor
+					defer func() { color.NoColor = original }()
+					color.NoColor = false
+				}
+
 				for _, log := range logs {
-					fmt.Fprintln(outputWriter, log)
+					colorizedLog := colorizeLogLine(log, shouldColorize)
+					fmt.Fprintln(outputWriter, colorizedLog)
 				}
 			}
 
@@ -1485,6 +1497,49 @@ Examples:
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd
+}
+
+// logLevelRegex matches PostgreSQL log levels in log lines
+// Pattern: word boundary + log level + colon
+var logLevelRegex = regexp.MustCompile(`\b(DEBUG|INFO|NOTICE|WARNING|LOG|ERROR|FATAL|PANIC|DETAIL|HINT|QUERY|CONTEXT|LOCATION):`)
+
+// colorizeLogLine applies color to the log level in a PostgreSQL log line
+// If colorEnabled is false, returns the line unchanged
+func colorizeLogLine(line string, colorEnabled bool) string {
+	if !colorEnabled {
+		return line
+	}
+
+	// Find the log level in the line
+	return logLevelRegex.ReplaceAllStringFunc(line, func(match string) string {
+		// Remove the colon to get just the level
+		logLevel := strings.TrimSuffix(match, ":")
+
+		// Apply color based on severity
+		var coloredLevel string
+		switch logLevel {
+		case "ERROR", "FATAL", "PANIC":
+			coloredLevel = color.RedString(logLevel)
+		case "WARNING":
+			coloredLevel = color.YellowString(logLevel)
+		case "INFO", "NOTICE":
+			coloredLevel = color.BlueString(logLevel)
+		case "DEBUG":
+			coloredLevel = color.MagentaString(logLevel)
+		case "QUERY":
+			coloredLevel = color.GreenString(logLevel)
+		case "LOG":
+			coloredLevel = color.CyanString(logLevel)
+		case "DETAIL", "HINT", "CONTEXT", "LOCATION":
+			coloredLevel = color.WhiteString(logLevel)
+		default:
+			// Unknown level - leave uncolored
+			coloredLevel = logLevel
+		}
+
+		// Return with the colon
+		return coloredLevel + ":"
+	})
 }
 
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
