@@ -1336,7 +1336,7 @@ Examples:
 // buildServiceLogsCmd creates the logs command for viewing service logs
 func buildServiceLogsCmd() *cobra.Command {
 	var tail int
-	var startTime time.Time
+	var until time.Time
 	var node int
 	var output string
 
@@ -1359,8 +1359,8 @@ Examples:
   # View logs for specific service
   tiger service logs svc-12345
 
-  # View logs starting from a specific time
-  tiger service logs --start-time "2024-01-15T10:00:00Z"
+  # View logs before a specific time
+  tiger service logs --until "2024-01-15T10:00:00Z"
 
   # View logs for a specific node (multi-node services)
   tiger service logs --node 1
@@ -1391,7 +1391,7 @@ Examples:
 
 			// Build query parameters
 			params := api.GetServiceLogsParams{
-				PageIndex: util.Ptr(0),
+				Page: util.Ptr(0),
 			}
 
 			// Check if node flag was explicitly set (0 is a valid node)
@@ -1402,13 +1402,13 @@ Examples:
 			// If node is not provided, params.Node remains nil,
 			// and the backend will automatically fetch and use primaryOrdinal
 
-			// Set StartTime: if not explicitly provided, use time.Now() to ensure
+			// Set Until: if not explicitly provided, use time.Now() to ensure
 			// consistent pagination across multiple page requests
-			if !startTime.IsZero() {
-				params.StartTime = &startTime
+			if !until.IsZero() {
+				params.Until = &until
 			} else {
 				now := time.Now()
-				params.StartTime = &now
+				params.Until = &now
 			}
 
 			// Fetch logs with pagination support
@@ -1449,7 +1449,7 @@ Examples:
 					break
 				}
 
-				*params.PageIndex++
+				*params.Page++
 			}
 
 			// Apply tail filter
@@ -1492,7 +1492,7 @@ Examples:
 
 	// Add flags
 	cmd.Flags().IntVar(&tail, "tail", 0, "Number of log lines to show (fetches multiple pages if needed, 0 means show all from first page)")
-	cmd.Flags().TimeVar(&startTime, "start-time", time.Time{}, []string{time.RFC3339}, "Starting timestamp for logs (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
+	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
 	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for multi-node services, 0 is valid)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
 

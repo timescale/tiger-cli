@@ -1405,9 +1405,9 @@ func NewGetServiceLogsRequest(server string, projectId ProjectId, serviceId Serv
 
 		}
 
-		if params.PageIndex != nil {
+		if params.Page != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page_index", runtime.ParamLocationQuery, *params.PageIndex); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1421,9 +1421,9 @@ func NewGetServiceLogsRequest(server string, projectId ProjectId, serviceId Serv
 
 		}
 
-		if params.StartTime != nil {
+		if params.Until != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "start_time", runtime.ParamLocationQuery, *params.StartTime); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "until", runtime.ParamLocationQuery, *params.Until); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

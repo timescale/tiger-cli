@@ -449,11 +449,11 @@ type GetServiceLogsParams struct {
 	// Node Specific service node to fetch logs from (for multi-node services)
 	Node *int `form:"node,omitempty" json:"node,omitempty"`
 
-	// PageIndex Page index for pagination (0-based)
-	PageIndex *int `form:"page_index,omitempty" json:"page_index,omitempty"`
+	// Page Page number for pagination (0-based)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
 
-	// StartTime Starting timestamp for log search (RFC3339 format)
-	StartTime *time.Time `form:"start_time,omitempty" json:"start_time,omitempty"`
+	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
+	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
 }
 
 // PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.

@@ -565,19 +565,19 @@ paths:
           schema:
             type: integer
           description: Specific service node to fetch logs from (for multi-node services)
-        - name: page_index
+        - name: page
           in: query
           required: false
           schema:
             type: integer
-          description: Page index for pagination (0-based)
-        - name: start_time
+          description: Page number for pagination (0-based)
+        - name: until
           in: query
           required: false
           schema:
             type: string
             format: date-time
-          description: Starting timestamp for log search (RFC3339 format)
+          description: Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
       responses:
         '200':
           description: Service logs retrieved successfully
