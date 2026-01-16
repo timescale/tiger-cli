@@ -118,7 +118,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -177,7 +177,7 @@ func buildServiceListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
 }
@@ -400,7 +400,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -1328,7 +1328,7 @@ Examples:
 	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -1346,14 +1346,14 @@ func buildServiceLogsCmd() *cobra.Command {
 		Short:   "View logs for a service",
 		Long: `View logs for a database service.
 
-Fetches and displays logs from the specified service. By default, shows all logs
-from the first page of available logs.
+Fetches and displays logs from the specified service. By default, shows the last
+100 log entries. Supports filtering by time.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration.
 
 Examples:
-  # View all logs from first page for default service (default behavior)
+  # View last 100 logs for default service (default behavior)
   tiger service logs
 
   # View logs for specific service
@@ -1362,13 +1362,13 @@ Examples:
   # View logs before a specific time
   tiger service logs --until "2024-01-15T10:00:00Z"
 
-  # View logs for a specific node (multi-node services)
+  # View logs for a specific node (for services with HA replicas)
   tiger service logs --node 1
 
-  # View last 100 lines (fetches multiple pages if needed)
-  tiger service logs --tail 100
+  # View last 50 lines
+  tiger service logs --tail 50
 
-  # View last 1000 lines (fetches multiple pages if needed)
+  # View last 1000 lines
   tiger service logs --tail 1000`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
@@ -1440,12 +1440,9 @@ Examples:
 				logs = append(logs, pageLogs...)
 
 				// Stop conditions:
-				// 1. --tail wasn't provided (in which case we only fetch a single page)
-				// 2. Page is empty (no more logs available)
-				// 3. We have enough logs to satisfy tail requirement
-				if !cmd.Flags().Changed("tail") ||
-					len(pageLogs) == 0 ||
-					len(logs) >= tail {
+				// 1. Page is empty (no more logs available)
+				// 2. We have enough logs to satisfy tail requirement
+				if len(pageLogs) == 0 || len(logs) >= tail {
 					break
 				}
 
@@ -1453,7 +1450,7 @@ Examples:
 			}
 
 			// Apply tail filter
-			if cmd.Flags().Changed("tail") && len(logs) > tail {
+			if len(logs) > tail {
 				logs = logs[:tail]
 			}
 
@@ -1491,9 +1488,9 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().IntVar(&tail, "tail", 0, "Number of log lines to show (fetches multiple pages if needed, 0 means show all from first page)")
+	cmd.Flags().IntVar(&tail, "tail", 100, "Number of log lines to show")
 	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
-	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for multi-node services, 0 is valid)")
+	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd
