@@ -446,8 +446,8 @@ type PostAnalyticsTrackJSONBody struct {
 
 // GetServiceLogsParams defines parameters for GetServiceLogs.
 type GetServiceLogsParams struct {
-	// ServiceOrdinal Specific service instance ordinal (for multi-node services)
-	ServiceOrdinal *int `form:"service_ordinal,omitempty" json:"service_ordinal,omitempty"`
+	// Node Specific service node to fetch logs from (for multi-node services)
+	Node *int `form:"node,omitempty" json:"node,omitempty"`
 
 	// PageIndex Page index for pagination (0-based)
 	PageIndex *int `form:"page_index,omitempty" json:"page_index,omitempty"`

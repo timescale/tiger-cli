@@ -1337,7 +1337,7 @@ Examples:
 func buildServiceLogsCmd() *cobra.Command {
 	var tail int
 	var startTime time.Time
-	var serviceOrdinal int
+	var node int
 	var output string
 
 	cmd := &cobra.Command{
@@ -1362,8 +1362,8 @@ Examples:
   # View logs starting from a specific time
   tiger service logs --start-time "2024-01-15T10:00:00Z"
 
-  # View logs for a specific service instance (multi-node services)
-  tiger service logs --service-ordinal 1
+  # View logs for a specific node (multi-node services)
+  tiger service logs --node 1
 
   # View last 100 lines (fetches multiple pages if needed)
   tiger service logs --tail 100
@@ -1394,12 +1394,12 @@ Examples:
 				PageIndex: util.Ptr(0),
 			}
 
-			// Check if service-ordinal flag was explicitly set (0 is a valid ordinal)
+			// Check if node flag was explicitly set (0 is a valid node)
 			// If not set, omit the parameter and let the backend fetch primaryOrdinal
-			if cmd.Flags().Changed("service-ordinal") {
-				params.ServiceOrdinal = &serviceOrdinal
+			if cmd.Flags().Changed("node") {
+				params.Node = &node
 			}
-			// If service-ordinal is not provided, params.ServiceOrdinal remains nil,
+			// If node is not provided, params.Node remains nil,
 			// and the backend will automatically fetch and use primaryOrdinal
 
 			// Set StartTime: if not explicitly provided, use time.Now() to ensure
@@ -1493,7 +1493,7 @@ Examples:
 	// Add flags
 	cmd.Flags().IntVar(&tail, "tail", 0, "Number of log lines to show (fetches multiple pages if needed, 0 means show all from first page)")
 	cmd.Flags().TimeVar(&startTime, "start-time", time.Time{}, []string{time.RFC3339}, "Starting timestamp for logs (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
-	cmd.Flags().IntVar(&serviceOrdinal, "service-ordinal", 0, "Specific service instance ordinal (for multi-node services, 0 is valid)")
+	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for multi-node services, 0 is valid)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd

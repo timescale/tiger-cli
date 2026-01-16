@@ -559,12 +559,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/ServiceId'
-        - name: service_ordinal
+        - name: node
           in: query
           required: false
           schema:
             type: integer
-          description: Specific service instance ordinal (for multi-node services)
+          description: Specific service node to fetch logs from (for multi-node services)
         - name: page_index
           in: query
           required: false
