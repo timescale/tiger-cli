@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -1389,76 +1387,27 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Build query parameters
-			params := api.GetServiceLogsParams{
-				Page: util.Ptr(0),
+			// Prepare parameters
+			var untilPtr *time.Time
+			if !until.IsZero() {
+				untilPtr = &until
 			}
 
 			// Check if node flag was explicitly set (0 is a valid node)
 			// If not set, omit the parameter and let the backend fetch primaryOrdinal
+			var nodePtr *int
 			if cmd.Flags().Changed("node") {
-				params.Node = &node
-			}
-			// If node is not provided, params.Node remains nil,
-			// and the backend will automatically fetch and use primaryOrdinal
-
-			// Set Until: if not explicitly provided, use time.Now() to ensure
-			// consistent pagination across multiple page requests
-			if !until.IsZero() {
-				params.Until = &until
-			} else {
-				now := time.Now()
-				params.Until = &now
+				nodePtr = &node
 			}
 
 			// Fetch logs with pagination support
-			ctx, cancel := context.WithTimeout(cmd.Context(), 2*time.Minute)
+			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
 			defer cancel()
 
-			// Fetch pages until we have enough logs or reach the end
-			var logs []string
-			for {
-				resp, err := cfg.Client.GetServiceLogsWithResponse(
-					ctx,
-					cfg.ProjectID,
-					serviceID,
-					&params,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to fetch logs: %w", err)
-				}
-
-				if resp.StatusCode() != http.StatusOK {
-					return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-				}
-
-				if resp.JSON200 == nil {
-					return fmt.Errorf("unexpected empty response")
-				}
-
-				pageLogs := resp.JSON200.Logs
-				logs = append(logs, pageLogs...)
-
-				// Stop conditions:
-				// 1. Page is empty (no more logs available)
-				// 2. We have enough logs to satisfy tail requirement
-				if len(pageLogs) == 0 || len(logs) >= tail {
-					break
-				}
-
-				*params.Page++
+			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, untilPtr, nodePtr)
+			if err != nil {
+				return err
 			}
-
-			// Apply tail filter
-			if len(logs) > tail {
-				logs = logs[:tail]
-			}
-
-			// Reverse the order of the logs. This is necessary because the API
-			// returns logs in descending order by timestamp (with the most
-			// recent logs first), whereas in terminal output, it's much more
-			// common for the most recent logs to appear last.
-			slices.Reverse(logs)
 
 			// Display logs based on output format
 			outputWriter := cmd.OutOrStdout()
