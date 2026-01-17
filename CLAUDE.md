@@ -267,7 +267,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
   - `root.go` - Root command with global flags and configuration initialization
   - `auth.go` - Authentication commands (login, logout, status)
-  - `service.go` - Service management commands (list, create, get, fork, start, stop, delete, update-password)
+  - `service.go` - Service management commands (list, create, get, fork, start, stop, delete, update-password, logs)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
   - `config.go` - Configuration management commands (show, set, unset, reset)
   - `mcp.go` - MCP server commands (install, start, list)
@@ -277,7 +277,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
   - `server.go` - MCP server initialization, tool registration, and lifecycle management
-  - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, update-password)
+  - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, update-password, logs)
   - `db_tools.go` - Database operation tools (execute-query)
   - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
   - `capabilities.go` - Lists all available MCP capabilities (tools, prompts, resources, resource templates)
@@ -286,6 +286,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - Wait operations and polling logic (WaitForService)
   - Error handling and exit code utilities
   - Service detail conversion helpers
+  - Log fetching with pagination (FetchServiceLogs)
 - **Utilities**: `internal/tiger/util/` - Small utility functions with minimal dependencies
 
 ### Configuration System
@@ -309,7 +310,7 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 **Two Types of Tools:**
 
 1. **Direct Tiger Tools** - Native tools for Tiger operations
-   - `service_tools.go` - Service management (list, get, create, fork, start, stop, update-password)
+   - `service_tools.go` - Service management (list, get, create, fork, start, stop, update-password, logs)
    - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
@@ -405,7 +406,7 @@ tiger-cli/
 │   ├── config/             # Configuration management
 │   ├── logging/            # Structured logging utilities
 │   ├── mcp/                # MCP server implementation
-│   ├── common/             # Shared business logic (password storage, wait ops, error handling)
+│   ├── common/             # Shared business logic (password storage, wait ops, error handling, log fetching)
 │   ├── cmd/                # CLI commands (Cobra)
 │   └── util/               # Small utility functions with minimal dependencies
 ├── docs/                   # Documentation
@@ -493,7 +494,8 @@ buildRootCmd() → Complete CLI with all commands and flags
 │   ├── buildServiceStartCmd()
 │   ├── buildServiceStopCmd()
 │   ├── buildServiceDeleteCmd()
-│   └── buildServiceUpdatePasswordCmd()
+│   ├── buildServiceUpdatePasswordCmd()
+│   └── buildServiceLogsCmd()
 ├── buildDbCmd()
 │   ├── buildDbConnectionStringCmd()
 │   ├── buildDbConnectCmd()
