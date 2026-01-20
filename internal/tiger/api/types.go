@@ -426,14 +426,14 @@ type SuccessMessage struct {
 	Message *string `json:"message,omitempty"`
 }
 
-// PostAnalyticsIdentifyJSONBody defines parameters for PostAnalyticsIdentify.
-type PostAnalyticsIdentifyJSONBody struct {
+// IdentifyUserJSONBody defines parameters for IdentifyUser.
+type IdentifyUserJSONBody struct {
 	// Properties Optional map of arbitrary properties associated with the user
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
-// PostAnalyticsTrackJSONBody defines parameters for PostAnalyticsTrack.
-type PostAnalyticsTrackJSONBody struct {
+// TrackEventJSONBody defines parameters for TrackEvent.
+type TrackEventJSONBody struct {
 	// Event The name of the event to track
 	Event string `json:"event"`
 
@@ -441,50 +441,50 @@ type PostAnalyticsTrackJSONBody struct {
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
-// PostAnalyticsIdentifyJSONRequestBody defines body for PostAnalyticsIdentify for application/json ContentType.
-type PostAnalyticsIdentifyJSONRequestBody PostAnalyticsIdentifyJSONBody
+// IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.
+type IdentifyUserJSONRequestBody IdentifyUserJSONBody
 
-// PostAnalyticsTrackJSONRequestBody defines body for PostAnalyticsTrack for application/json ContentType.
-type PostAnalyticsTrackJSONRequestBody PostAnalyticsTrackJSONBody
+// TrackEventJSONRequestBody defines body for TrackEvent for application/json ContentType.
+type TrackEventJSONRequestBody TrackEventJSONBody
 
-// PostProjectsProjectIdServicesJSONRequestBody defines body for PostProjectsProjectIdServices for application/json ContentType.
-type PostProjectsProjectIdServicesJSONRequestBody = ServiceCreate
+// CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
+type CreateServiceJSONRequestBody = ServiceCreate
 
-// PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdAttachToVPC for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody = ServiceVPCInput
+// AttachServiceToVPCJSONRequestBody defines body for AttachServiceToVPC for application/json ContentType.
+type AttachServiceToVPCJSONRequestBody = ServiceVPCInput
 
-// PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdDetachFromVPC for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody = ServiceVPCInput
+// DetachServiceFromVPCJSONRequestBody defines body for DetachServiceFromVPC for application/json ContentType.
+type DetachServiceFromVPCJSONRequestBody = ServiceVPCInput
 
-// PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdForkService for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody = ForkServiceCreate
+// ForkServiceJSONRequestBody defines body for ForkService for application/json ContentType.
+type ForkServiceJSONRequestBody = ForkServiceCreate
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSets for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody = ReadReplicaSetCreate
+// CreateReplicaSetJSONRequestBody defines body for CreateReplicaSet for application/json ContentType.
+type CreateReplicaSetJSONRequestBody = ReadReplicaSetCreate
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody = ResizeInput
+// ResizeReplicaSetJSONRequestBody defines body for ResizeReplicaSet for application/json ContentType.
+type ResizeReplicaSetJSONRequestBody = ResizeInput
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody = SetEnvironmentInput
+// SetReplicaEnvironmentJSONRequestBody defines body for SetReplicaEnvironment for application/json ContentType.
+type SetReplicaEnvironmentJSONRequestBody = SetEnvironmentInput
 
-// PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdResize for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody = ResizeInput
+// ResizeServiceJSONRequestBody defines body for ResizeService for application/json ContentType.
+type ResizeServiceJSONRequestBody = ResizeInput
 
-// PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdSetEnvironment for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody = SetEnvironmentInput
+// SetEnvironmentJSONRequestBody defines body for SetEnvironment for application/json ContentType.
+type SetEnvironmentJSONRequestBody = SetEnvironmentInput
 
-// PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdSetHA for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody = SetHAReplicaInput
+// SetHAReplicaJSONRequestBody defines body for SetHAReplica for application/json ContentType.
+type SetHAReplicaJSONRequestBody = SetHAReplicaInput
 
-// PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody defines body for PostProjectsProjectIdServicesServiceIdUpdatePassword for application/json ContentType.
-type PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody = UpdatePasswordInput
+// UpdatePasswordJSONRequestBody defines body for UpdatePassword for application/json ContentType.
+type UpdatePasswordJSONRequestBody = UpdatePasswordInput
 
-// PostProjectsProjectIdVpcsJSONRequestBody defines body for PostProjectsProjectIdVpcs for application/json ContentType.
-type PostProjectsProjectIdVpcsJSONRequestBody = VPCCreate
+// CreateVPCJSONRequestBody defines body for CreateVPC for application/json ContentType.
+type CreateVPCJSONRequestBody = VPCCreate
 
-// PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody defines body for PostProjectsProjectIdVpcsVpcIdPeerings for application/json ContentType.
-type PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody = PeeringCreate
+// CreateVPCPeeringJSONRequestBody defines body for CreateVPCPeering for application/json ContentType.
+type CreateVPCPeeringJSONRequestBody = PeeringCreate
 
-// PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody defines body for PostProjectsProjectIdVpcsVpcIdRename for application/json ContentType.
-type PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody = VPCRename
+// RenameVPCJSONRequestBody defines body for RenameVPC for application/json ContentType.
+type RenameVPCJSONRequestBody = VPCRename

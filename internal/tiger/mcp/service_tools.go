@@ -467,7 +467,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
+	resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}
@@ -509,7 +509,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -577,7 +577,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.PostProjectsProjectIdServicesWithResponse(createCtx, cfg.ProjectID, serviceCreateReq)
+	resp, err := cfg.Client.CreateServiceWithResponse(createCtx, cfg.ProjectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -699,7 +699,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(forkCtx, cfg.ProjectID, input.ServiceID, forkReq)
+	resp, err := cfg.Client.ForkServiceWithResponse(forkCtx, cfg.ProjectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}
@@ -786,7 +786,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
+	resp, err := cfg.Client.UpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -798,7 +798,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	// Get service details for password storage (similar to CLI implementation)
 	var passwordStorage *common.PasswordStorageResult
-	serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
 	if err == nil && serviceResp.StatusCode() == 200 && serviceResp.JSON200 != nil {
 		// Save the new password using the shared util function
 		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
@@ -834,7 +834,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStartWithResponse(startCtx, cfg.ProjectID, input.ServiceID)
+	resp, err := cfg.Client.StartServiceWithResponse(startCtx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
 	}
@@ -891,7 +891,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStopWithResponse(stopCtx, cfg.ProjectID, input.ServiceID)
+	resp, err := cfg.Client.StopServiceWithResponse(stopCtx, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
 	}
