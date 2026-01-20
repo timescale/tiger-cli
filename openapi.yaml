@@ -27,6 +27,7 @@ tags:
 paths:
   /auth/info:
     get:
+      operationId: getAuthInfo
       tags:
         - Auth
       summary: Get Authentication Info
@@ -43,6 +44,7 @@ paths:
 
   /analytics/identify:
     post:
+      operationId: identifyUser
       tags:
         - Analytics
       summary: Identify a user
@@ -69,6 +71,7 @@ paths:
 
   /analytics/track:
     post:
+      operationId: trackEvent
       tags:
         - Analytics
       summary: Track an analytics event
@@ -100,6 +103,7 @@ paths:
 
   /projects/{project_id}/vpcs:
     get:
+      operationId: getVPCs
       tags:
         - VPCs
       parameters:
@@ -118,6 +122,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     post:
+      operationId: createVPC
       tags:
         - VPCs
       parameters:
@@ -142,6 +147,7 @@ paths:
 
   /projects/{project_id}/vpcs/{vpc_id}:
     get:
+      operationId: getVPC
       tags:
         - VPCs
       parameters:
@@ -159,6 +165,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     delete:
+      operationId: deleteVPC
       tags:
         - VPCs
       summary: Delete a VPC
@@ -174,6 +181,7 @@ paths:
 
   /projects/{project_id}/vpcs/{vpc_id}/rename:
     post:
+      operationId: renameVPC
       tags:
         - VPCs
       summary: Rename a VPC
@@ -199,6 +207,7 @@ paths:
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings:
     get:
+      operationId: getVPCPeerings
       tags:
         - VPCs
       summary: List VPC Peerings
@@ -218,6 +227,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     post:
+      operationId: createVPCPeering
       tags:
         - VPCs
       summary: Create a VPC Peering
@@ -243,6 +253,7 @@ paths:
 
   /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id}:
     get:
+      operationId: getVPCPeering
       tags:
         - VPCs
       summary: Get a VPC Peering
@@ -261,6 +272,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     delete:
+      operationId: deleteVPCPeering
       tags:
         - VPCs
       summary: Delete a VPC Peering
@@ -277,6 +289,7 @@ paths:
 
   /projects/{project_id}/services:
     get:
+      operationId: getServices
       tags:
         - Services
       summary: List All Services
@@ -295,6 +308,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     post:
+      operationId: createService
       tags:
         - Services
       summary: Create a Service
@@ -319,6 +333,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}:
     get:
+      operationId: getService
       tags:
         - Services
       summary: Get a Service
@@ -336,6 +351,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     delete:
+      operationId: deleteService
       tags:
         - Services
       summary: Delete a Service
@@ -351,6 +367,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/start:
     post:
+      operationId: startService
       tags:
         - Services
       summary: Start a Service
@@ -370,6 +387,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/stop:
     post:
+      operationId: stopService
       tags:
         - Services
       summary: Stop a Service
@@ -389,6 +407,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/attachToVPC:
     post:
+      operationId: attachServiceToVPC
       tags:
         - Services
       summary: Attach Service to VPC
@@ -410,6 +429,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/detachFromVPC:
     post:
+      operationId: detachServiceFromVPC
       tags:
         - Services
       summary: Detach Service from VPC
@@ -431,6 +451,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/resize:
     post:
+      operationId: resizeService
       tags:
         - Services
       summary: Resize a Service
@@ -456,6 +477,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/enablePooler:
     post:
+      operationId: enablePooler
       tags:
         - Services
       summary: Enable Connection Pooler for a Service
@@ -471,6 +493,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/disablePooler:
     post:
+      operationId: disablePooler
       tags:
         - Services
       summary: Disable Connection Pooler for a Service
@@ -486,6 +509,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/forkService:
     post:
+      operationId: forkService
       tags:
         - Services
       summary: Fork a Service
@@ -511,6 +535,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/updatePassword:
     post:
+      operationId: updatePassword
       tags:
         - Services
       summary: Update Service Password
@@ -532,6 +557,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/setEnvironment:
     post:
+      operationId: setEnvironment
       tags:
         - Services
       summary: Set Environment for a Service
@@ -553,6 +579,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/setHA:
     post:
+      operationId: setHAReplica
       tags:
         - Services
       summary: Change HA configuration for a Service
@@ -578,6 +605,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets:
     get:
+      operationId: getReplicaSets
       tags:
         - Read Replica Sets
       summary: Get Read Replica Sets
@@ -597,6 +625,7 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
     post:
+      operationId: createReplicaSet
       tags:
         - Read Replica Sets
       summary: Create a Read Replica Set
@@ -622,6 +651,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}:
     delete:
+      operationId: deleteReplicaSet
       tags:
         - Read Replica Sets
       summary: Delete a Read Replica Set
@@ -638,6 +668,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/resize:
     post:
+      operationId: resizeReplicaSet
       tags:
         - Read Replica Sets
       summary: Resize a Read Replica Set
@@ -660,6 +691,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/enablePooler:
     post:
+      operationId: enableReplicaPooler
       tags:
         - Read Replica Sets
       summary: Enable Connection Pooler for a Read Replica
@@ -676,6 +708,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/disablePooler:
     post:
+      operationId: disableReplicaPooler
       tags:
         - Read Replica Sets
       summary: Disable Connection Pooler for a Read Replica
@@ -692,6 +725,7 @@ paths:
 
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/setEnvironment:
     post:
+      operationId: setReplicaEnvironment
       tags:
         - Read Replica Sets
       summary: Set Environment for a Read Replica

@@ -782,7 +782,7 @@ func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (a
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, serviceID)
+	resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
 	if err != nil {
 		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
 	}

@@ -156,7 +156,7 @@ func (a *Analytics) Identify(options ...Option) {
 	defer cancel()
 
 	// Send the event
-	resp, err := a.client.PostAnalyticsIdentifyWithResponse(ctx, api.PostAnalyticsIdentifyJSONRequestBody{
+	resp, err := a.client.IdentifyUserWithResponse(ctx, api.IdentifyUserJSONRequestBody{
 		Properties: &properties,
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func (a *Analytics) Track(event string, options ...Option) {
 	defer cancel()
 
 	// Send the event
-	resp, err := a.client.PostAnalyticsTrackWithResponse(ctx, api.PostAnalyticsTrackJSONRequestBody{
+	resp, err := a.client.TrackEventWithResponse(ctx, api.TrackEventJSONRequestBody{
 		Event:      event,
 		Properties: &properties,
 	})

@@ -93,7 +93,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, serviceID)
+			resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
@@ -143,7 +143,7 @@ func buildServiceListCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
+			resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
 			if err != nil {
 				return fmt.Errorf("failed to list services: %w", err)
 			}
@@ -318,7 +318,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			} else {
 				fmt.Fprintf(statusOutput, "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
 			}
-			resp, err := cfg.Client.PostProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID, serviceCreateReq)
+			resp, err := cfg.Client.CreateServiceWithResponse(ctx, cfg.ProjectID, serviceCreateReq)
 			if err != nil {
 				return fmt.Errorf("failed to create Service: %w", err)
 			}
@@ -467,7 +467,7 @@ Examples:
 			defer cancel()
 
 			// Fetch service details
-			serviceResp, err := cfg.Client.GetProjectsProjectIdServicesServiceIdWithResponse(ctx, cfg.ProjectID, serviceID)
+			serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
@@ -854,7 +854,7 @@ Examples:
 			}
 
 			// Make the delete request
-			resp, err := cfg.Client.DeleteProjectsProjectIdServicesServiceIdWithResponse(
+			resp, err := cfg.Client.DeleteServiceWithResponse(
 				cmd.Context(),
 				api.ProjectId(cfg.ProjectID),
 				api.ServiceId(serviceID),
@@ -946,7 +946,7 @@ Examples:
 			cmd.SilenceUsage = true
 
 			// Make the start request
-			resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStartWithResponse(
+			resp, err := cfg.Client.StartServiceWithResponse(
 				context.Background(),
 				api.ProjectId(cfg.ProjectID),
 				api.ServiceId(serviceID),
@@ -1046,7 +1046,7 @@ Examples:
 			cmd.SilenceUsage = true
 
 			// Make the stop request
-			resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdStopWithResponse(
+			resp, err := cfg.Client.StopServiceWithResponse(
 				context.Background(),
 				api.ProjectId(cfg.ProjectID),
 				api.ServiceId(serviceID),
@@ -1264,7 +1264,7 @@ Examples:
 			}
 
 			// Make API call to fork service
-			forkResp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx, cfg.ProjectID, serviceID, forkReq)
+			forkResp, err := cfg.Client.ForkServiceWithResponse(ctx, cfg.ProjectID, serviceID, forkReq)
 			if err != nil {
 				return fmt.Errorf("failed to fork Service: %w", err)
 			}
@@ -1438,7 +1438,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
+			resp, err := cfg.Client.ResizeServiceWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize service: %w", err)
 			}
@@ -1526,7 +1526,7 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetProjectsProjectIdServicesWithResponse(ctx, cfg.ProjectID)
+	resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list services: %w", err)
 	}

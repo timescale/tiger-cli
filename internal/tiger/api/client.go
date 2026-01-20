@@ -89,143 +89,143 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// PostAnalyticsIdentifyWithBody request with any body
-	PostAnalyticsIdentifyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// IdentifyUserWithBody request with any body
+	IdentifyUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostAnalyticsIdentify(ctx context.Context, body PostAnalyticsIdentifyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	IdentifyUser(ctx context.Context, body IdentifyUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostAnalyticsTrackWithBody request with any body
-	PostAnalyticsTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// TrackEventWithBody request with any body
+	TrackEventWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostAnalyticsTrack(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	TrackEvent(ctx context.Context, body TrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAuthInfo request
 	GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdServices request
-	GetProjectsProjectIdServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetServices request
+	GetServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesWithBody request with any body
-	PostProjectsProjectIdServicesWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateServiceWithBody request with any body
+	CreateServiceWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServices(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateService(ctx context.Context, projectId ProjectId, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteProjectsProjectIdServicesServiceId request
-	DeleteProjectsProjectIdServicesServiceId(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteService request
+	DeleteService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdServicesServiceId request
-	GetProjectsProjectIdServicesServiceId(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetService request
+	GetService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdAttachToVPCWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdAttachToVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// AttachServiceToVPCWithBody request with any body
+	AttachServiceToVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdAttachToVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	AttachServiceToVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DetachServiceFromVPCWithBody request with any body
+	DetachServiceFromVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdDetachFromVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DetachServiceFromVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body DetachServiceFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdDisablePooler request
-	PostProjectsProjectIdServicesServiceIdDisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DisablePooler request
+	DisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdEnablePooler request
-	PostProjectsProjectIdServicesServiceIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// EnablePooler request
+	EnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdForkServiceWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ForkServiceWithBody request with any body
+	ForkServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdServicesServiceIdReplicaSets request
-	GetProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetReplicaSets request
+	GetReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateReplicaSetWithBody request with any body
+	CreateReplicaSetWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, body CreateReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId request
-	DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteReplicaSet request
+	DeleteReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePooler request
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DisableReplicaPooler request
+	DisableReplicaPooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePooler request
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// EnableReplicaPooler request
+	EnableReplicaPooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ResizeReplicaSetWithBody request with any body
+	ResizeReplicaSetWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ResizeReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body ResizeReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SetReplicaEnvironmentWithBody request with any body
+	SetReplicaEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SetReplicaEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body SetReplicaEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdResizeWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdResizeWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ResizeServiceWithBody request with any body
+	ResizeServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdResize(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ResizeService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ResizeServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SetEnvironmentWithBody request with any body
+	SetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdSetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdSetHAWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdSetHAWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SetHAReplicaWithBody request with any body
+	SetHAReplicaWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdSetHA(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SetHAReplica(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetHAReplicaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdStart request
-	PostProjectsProjectIdServicesServiceIdStart(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// StartService request
+	StartService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdStop request
-	PostProjectsProjectIdServicesServiceIdStop(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// StopService request
+	StopService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody request with any body
-	PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpdatePasswordWithBody request with any body
+	UpdatePasswordWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdServicesServiceIdUpdatePassword(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdatePassword(ctx context.Context, projectId ProjectId, serviceId ServiceId, body UpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdVpcs request
-	GetProjectsProjectIdVpcs(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetVPCs request
+	GetVPCs(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdVpcsWithBody request with any body
-	PostProjectsProjectIdVpcsWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateVPCWithBody request with any body
+	CreateVPCWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdVpcs(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdVpcsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateVPC(ctx context.Context, projectId ProjectId, body CreateVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteProjectsProjectIdVpcsVpcId request
-	DeleteProjectsProjectIdVpcsVpcId(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteVPC request
+	DeleteVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdVpcsVpcId request
-	GetProjectsProjectIdVpcsVpcId(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetVPC request
+	GetVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdVpcsVpcIdPeerings request
-	GetProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetVPCPeerings request
+	GetVPCPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdVpcsVpcIdPeeringsWithBody request with any body
-	PostProjectsProjectIdVpcsVpcIdPeeringsWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateVPCPeeringWithBody request with any body
+	CreateVPCPeeringWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, body CreateVPCPeeringJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId request
-	DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteVPCPeering request
+	DeleteVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId request
-	GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetVPCPeering request
+	GetVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostProjectsProjectIdVpcsVpcIdRenameWithBody request with any body
-	PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// RenameVPCWithBody request with any body
+	RenameVPCWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostProjectsProjectIdVpcsVpcIdRename(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	RenameVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, body RenameVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) PostAnalyticsIdentifyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostAnalyticsIdentifyRequestWithBody(c.Server, contentType, body)
+func (c *Client) IdentifyUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIdentifyUserRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +236,8 @@ func (c *Client) PostAnalyticsIdentifyWithBody(ctx context.Context, contentType 
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostAnalyticsIdentify(ctx context.Context, body PostAnalyticsIdentifyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostAnalyticsIdentifyRequest(c.Server, body)
+func (c *Client) IdentifyUser(ctx context.Context, body IdentifyUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewIdentifyUserRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -248,8 +248,8 @@ func (c *Client) PostAnalyticsIdentify(ctx context.Context, body PostAnalyticsId
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostAnalyticsTrackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostAnalyticsTrackRequestWithBody(c.Server, contentType, body)
+func (c *Client) TrackEventWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTrackEventRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -260,8 +260,8 @@ func (c *Client) PostAnalyticsTrackWithBody(ctx context.Context, contentType str
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostAnalyticsTrack(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostAnalyticsTrackRequest(c.Server, body)
+func (c *Client) TrackEvent(ctx context.Context, body TrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTrackEventRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -284,8 +284,8 @@ func (c *Client) GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn)
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdServicesRequest(c.Server, projectId)
+func (c *Client) GetServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServicesRequest(c.Server, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -296,8 +296,8 @@ func (c *Client) GetProjectsProjectIdServices(ctx context.Context, projectId Pro
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesRequestWithBody(c.Server, projectId, contentType, body)
+func (c *Client) CreateServiceWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceRequestWithBody(c.Server, projectId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -308,8 +308,8 @@ func (c *Client) PostProjectsProjectIdServicesWithBody(ctx context.Context, proj
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServices(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesRequest(c.Server, projectId, body)
+func (c *Client) CreateService(ctx context.Context, projectId ProjectId, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceRequest(c.Server, projectId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -320,8 +320,8 @@ func (c *Client) PostProjectsProjectIdServices(ctx context.Context, projectId Pr
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteProjectsProjectIdServicesServiceId(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectsProjectIdServicesServiceIdRequest(c.Server, projectId, serviceId)
+func (c *Client) DeleteService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteServiceRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -332,8 +332,8 @@ func (c *Client) DeleteProjectsProjectIdServicesServiceId(ctx context.Context, p
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdServicesServiceId(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdServicesServiceIdRequest(c.Server, projectId, serviceId)
+func (c *Client) GetService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -344,8 +344,8 @@ func (c *Client) GetProjectsProjectIdServicesServiceId(ctx context.Context, proj
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdAttachToVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) AttachServiceToVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAttachServiceToVPCRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +356,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdAttachToVPCWithBody(ctx c
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdAttachToVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequest(c.Server, projectId, serviceId, body)
+func (c *Client) AttachServiceToVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAttachServiceToVPCRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -368,8 +368,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdAttachToVPC(ctx context.C
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) DetachServiceFromVPCWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDetachServiceFromVPCRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -380,8 +380,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBody(ctx
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdDetachFromVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequest(c.Server, projectId, serviceId, body)
+func (c *Client) DetachServiceFromVPC(ctx context.Context, projectId ProjectId, serviceId ServiceId, body DetachServiceFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDetachServiceFromVPCRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -392,8 +392,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdDetachFromVPC(ctx context
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdDisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdDisablePoolerRequest(c.Server, projectId, serviceId)
+func (c *Client) DisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisablePoolerRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -404,8 +404,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdDisablePooler(ctx context
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest(c.Server, projectId, serviceId)
+func (c *Client) EnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnablePoolerRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -416,8 +416,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdEnablePooler(ctx context.
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdForkServiceRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) ForkServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkServiceRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -428,8 +428,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx c
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdForkServiceRequest(c.Server, projectId, serviceId, body)
+func (c *Client) ForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkServiceRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -440,8 +440,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdForkService(ctx context.C
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdServicesServiceIdReplicaSetsRequest(c.Server, projectId, serviceId)
+func (c *Client) GetReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetReplicaSetsRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -452,8 +452,8 @@ func (c *Client) GetProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Co
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) CreateReplicaSetWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateReplicaSetRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -464,8 +464,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsWithBody(ctx c
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequest(c.Server, projectId, serviceId, body)
+func (c *Client) CreateReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, body CreateReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateReplicaSetRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -476,8 +476,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSets(ctx context.C
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRequest(c.Server, projectId, serviceId, replicaSetId)
+func (c *Client) DeleteReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteReplicaSetRequest(c.Server, projectId, serviceId, replicaSetId)
 	if err != nil {
 		return nil, err
 	}
@@ -488,8 +488,8 @@ func (c *Client) DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerRequest(c.Server, projectId, serviceId, replicaSetId)
+func (c *Client) DisableReplicaPooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableReplicaPoolerRequest(c.Server, projectId, serviceId, replicaSetId)
 	if err != nil {
 		return nil, err
 	}
@@ -500,8 +500,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDi
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerRequest(c.Server, projectId, serviceId, replicaSetId)
+func (c *Client) EnableReplicaPooler(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableReplicaPoolerRequest(c.Server, projectId, serviceId, replicaSetId)
 	if err != nil {
 		return nil, err
 	}
@@ -512,8 +512,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEn
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequestWithBody(c.Server, projectId, serviceId, replicaSetId, contentType, body)
+func (c *Client) ResizeReplicaSetWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeReplicaSetRequestWithBody(c.Server, projectId, serviceId, replicaSetId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -524,8 +524,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRe
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequest(c.Server, projectId, serviceId, replicaSetId, body)
+func (c *Client) ResizeReplicaSet(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body ResizeReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeReplicaSetRequest(c.Server, projectId, serviceId, replicaSetId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -536,8 +536,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRe
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequestWithBody(c.Server, projectId, serviceId, replicaSetId, contentType, body)
+func (c *Client) SetReplicaEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetReplicaEnvironmentRequestWithBody(c.Server, projectId, serviceId, replicaSetId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -548,8 +548,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSe
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequest(c.Server, projectId, serviceId, replicaSetId, body)
+func (c *Client) SetReplicaEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body SetReplicaEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetReplicaEnvironmentRequest(c.Server, projectId, serviceId, replicaSetId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -560,8 +560,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSe
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdResizeWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdResizeRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) ResizeServiceWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeServiceRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -572,8 +572,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdResizeWithBody(ctx contex
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdResize(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdResizeRequest(c.Server, projectId, serviceId, body)
+func (c *Client) ResizeService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ResizeServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeServiceRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -584,8 +584,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdResize(ctx context.Contex
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) SetEnvironmentWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEnvironmentRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -596,8 +596,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBody(ct
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdSetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequest(c.Server, projectId, serviceId, body)
+func (c *Client) SetEnvironment(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEnvironmentRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -608,8 +608,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdSetEnvironment(ctx contex
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdSetHAWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) SetHAReplicaWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetHAReplicaRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -620,8 +620,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdSetHAWithBody(ctx context
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdSetHA(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdSetHARequest(c.Server, projectId, serviceId, body)
+func (c *Client) SetHAReplica(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetHAReplicaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetHAReplicaRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -632,8 +632,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdSetHA(ctx context.Context
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdStart(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdStartRequest(c.Server, projectId, serviceId)
+func (c *Client) StartService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartServiceRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -644,8 +644,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdStart(ctx context.Context
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdStop(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdStopRequest(c.Server, projectId, serviceId)
+func (c *Client) StopService(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopServiceRequest(c.Server, projectId, serviceId)
 	if err != nil {
 		return nil, err
 	}
@@ -656,8 +656,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdStop(ctx context.Context,
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+func (c *Client) UpdatePasswordWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePasswordRequestWithBody(c.Server, projectId, serviceId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -668,8 +668,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody(ct
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdServicesServiceIdUpdatePassword(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequest(c.Server, projectId, serviceId, body)
+func (c *Client) UpdatePassword(ctx context.Context, projectId ProjectId, serviceId ServiceId, body UpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePasswordRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -680,8 +680,8 @@ func (c *Client) PostProjectsProjectIdServicesServiceIdUpdatePassword(ctx contex
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdVpcs(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdVpcsRequest(c.Server, projectId)
+func (c *Client) GetVPCs(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVPCsRequest(c.Server, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -692,8 +692,8 @@ func (c *Client) GetProjectsProjectIdVpcs(ctx context.Context, projectId Project
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcsWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsRequestWithBody(c.Server, projectId, contentType, body)
+func (c *Client) CreateVPCWithBody(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateVPCRequestWithBody(c.Server, projectId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -704,8 +704,8 @@ func (c *Client) PostProjectsProjectIdVpcsWithBody(ctx context.Context, projectI
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcs(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdVpcsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsRequest(c.Server, projectId, body)
+func (c *Client) CreateVPC(ctx context.Context, projectId ProjectId, body CreateVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateVPCRequest(c.Server, projectId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -716,8 +716,8 @@ func (c *Client) PostProjectsProjectIdVpcs(ctx context.Context, projectId Projec
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteProjectsProjectIdVpcsVpcId(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectsProjectIdVpcsVpcIdRequest(c.Server, projectId, vpcId)
+func (c *Client) DeleteVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteVPCRequest(c.Server, projectId, vpcId)
 	if err != nil {
 		return nil, err
 	}
@@ -728,8 +728,8 @@ func (c *Client) DeleteProjectsProjectIdVpcsVpcId(ctx context.Context, projectId
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdVpcsVpcId(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdVpcsVpcIdRequest(c.Server, projectId, vpcId)
+func (c *Client) GetVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVPCRequest(c.Server, projectId, vpcId)
 	if err != nil {
 		return nil, err
 	}
@@ -740,8 +740,8 @@ func (c *Client) GetProjectsProjectIdVpcsVpcId(ctx context.Context, projectId Pr
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdVpcsVpcIdPeeringsRequest(c.Server, projectId, vpcId)
+func (c *Client) GetVPCPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVPCPeeringsRequest(c.Server, projectId, vpcId)
 	if err != nil {
 		return nil, err
 	}
@@ -752,8 +752,8 @@ func (c *Client) GetProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, proj
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcsVpcIdPeeringsWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsVpcIdPeeringsRequestWithBody(c.Server, projectId, vpcId, contentType, body)
+func (c *Client) CreateVPCPeeringWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateVPCPeeringRequestWithBody(c.Server, projectId, vpcId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -764,8 +764,8 @@ func (c *Client) PostProjectsProjectIdVpcsVpcIdPeeringsWithBody(ctx context.Cont
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsVpcIdPeeringsRequest(c.Server, projectId, vpcId, body)
+func (c *Client) CreateVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, body CreateVPCPeeringJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateVPCPeeringRequest(c.Server, projectId, vpcId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -776,8 +776,8 @@ func (c *Client) PostProjectsProjectIdVpcsVpcIdPeerings(ctx context.Context, pro
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(c.Server, projectId, vpcId, peeringId)
+func (c *Client) DeleteVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteVPCPeeringRequest(c.Server, projectId, vpcId, peeringId)
 	if err != nil {
 		return nil, err
 	}
@@ -788,8 +788,8 @@ func (c *Client) DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.C
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(c.Server, projectId, vpcId, peeringId)
+func (c *Client) GetVPCPeering(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVPCPeeringRequest(c.Server, projectId, vpcId, peeringId)
 	if err != nil {
 		return nil, err
 	}
@@ -800,8 +800,8 @@ func (c *Client) GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx context.Cont
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsVpcIdRenameRequestWithBody(c.Server, projectId, vpcId, contentType, body)
+func (c *Client) RenameVPCWithBody(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameVPCRequestWithBody(c.Server, projectId, vpcId, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -812,8 +812,8 @@ func (c *Client) PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx context.Contex
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostProjectsProjectIdVpcsVpcIdRename(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostProjectsProjectIdVpcsVpcIdRenameRequest(c.Server, projectId, vpcId, body)
+func (c *Client) RenameVPC(ctx context.Context, projectId ProjectId, vpcId VPCId, body RenameVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameVPCRequest(c.Server, projectId, vpcId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -824,19 +824,19 @@ func (c *Client) PostProjectsProjectIdVpcsVpcIdRename(ctx context.Context, proje
 	return c.Client.Do(req)
 }
 
-// NewPostAnalyticsIdentifyRequest calls the generic PostAnalyticsIdentify builder with application/json body
-func NewPostAnalyticsIdentifyRequest(server string, body PostAnalyticsIdentifyJSONRequestBody) (*http.Request, error) {
+// NewIdentifyUserRequest calls the generic IdentifyUser builder with application/json body
+func NewIdentifyUserRequest(server string, body IdentifyUserJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostAnalyticsIdentifyRequestWithBody(server, "application/json", bodyReader)
+	return NewIdentifyUserRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewPostAnalyticsIdentifyRequestWithBody generates requests for PostAnalyticsIdentify with any type of body
-func NewPostAnalyticsIdentifyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewIdentifyUserRequestWithBody generates requests for IdentifyUser with any type of body
+func NewIdentifyUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -864,19 +864,19 @@ func NewPostAnalyticsIdentifyRequestWithBody(server string, contentType string, 
 	return req, nil
 }
 
-// NewPostAnalyticsTrackRequest calls the generic PostAnalyticsTrack builder with application/json body
-func NewPostAnalyticsTrackRequest(server string, body PostAnalyticsTrackJSONRequestBody) (*http.Request, error) {
+// NewTrackEventRequest calls the generic TrackEvent builder with application/json body
+func NewTrackEventRequest(server string, body TrackEventJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostAnalyticsTrackRequestWithBody(server, "application/json", bodyReader)
+	return NewTrackEventRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewPostAnalyticsTrackRequestWithBody generates requests for PostAnalyticsTrack with any type of body
-func NewPostAnalyticsTrackRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewTrackEventRequestWithBody generates requests for TrackEvent with any type of body
+func NewTrackEventRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -931,8 +931,8 @@ func NewGetAuthInfoRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewGetProjectsProjectIdServicesRequest generates requests for GetProjectsProjectIdServices
-func NewGetProjectsProjectIdServicesRequest(server string, projectId ProjectId) (*http.Request, error) {
+// NewGetServicesRequest generates requests for GetServices
+func NewGetServicesRequest(server string, projectId ProjectId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -965,19 +965,19 @@ func NewGetProjectsProjectIdServicesRequest(server string, projectId ProjectId) 
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesRequest calls the generic PostProjectsProjectIdServices builder with application/json body
-func NewPostProjectsProjectIdServicesRequest(server string, projectId ProjectId, body PostProjectsProjectIdServicesJSONRequestBody) (*http.Request, error) {
+// NewCreateServiceRequest calls the generic CreateService builder with application/json body
+func NewCreateServiceRequest(server string, projectId ProjectId, body CreateServiceJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesRequestWithBody(server, projectId, "application/json", bodyReader)
+	return NewCreateServiceRequestWithBody(server, projectId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesRequestWithBody generates requests for PostProjectsProjectIdServices with any type of body
-func NewPostProjectsProjectIdServicesRequestWithBody(server string, projectId ProjectId, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateServiceRequestWithBody generates requests for CreateService with any type of body
+func NewCreateServiceRequestWithBody(server string, projectId ProjectId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1012,8 +1012,8 @@ func NewPostProjectsProjectIdServicesRequestWithBody(server string, projectId Pr
 	return req, nil
 }
 
-// NewDeleteProjectsProjectIdServicesServiceIdRequest generates requests for DeleteProjectsProjectIdServicesServiceId
-func NewDeleteProjectsProjectIdServicesServiceIdRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewDeleteServiceRequest generates requests for DeleteService
+func NewDeleteServiceRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1053,8 +1053,8 @@ func NewDeleteProjectsProjectIdServicesServiceIdRequest(server string, projectId
 	return req, nil
 }
 
-// NewGetProjectsProjectIdServicesServiceIdRequest generates requests for GetProjectsProjectIdServicesServiceId
-func NewGetProjectsProjectIdServicesServiceIdRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewGetServiceRequest generates requests for GetService
+func NewGetServiceRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1094,19 +1094,19 @@ func NewGetProjectsProjectIdServicesServiceIdRequest(server string, projectId Pr
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequest calls the generic PostProjectsProjectIdServicesServiceIdAttachToVPC builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody) (*http.Request, error) {
+// NewAttachServiceToVPCRequest calls the generic AttachServiceToVPC builder with application/json body
+func NewAttachServiceToVPCRequest(server string, projectId ProjectId, serviceId ServiceId, body AttachServiceToVPCJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewAttachServiceToVPCRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdAttachToVPC with any type of body
-func NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewAttachServiceToVPCRequestWithBody generates requests for AttachServiceToVPC with any type of body
+func NewAttachServiceToVPCRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1148,19 +1148,19 @@ func NewPostProjectsProjectIdServicesServiceIdAttachToVPCRequestWithBody(server 
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequest calls the generic PostProjectsProjectIdServicesServiceIdDetachFromVPC builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody) (*http.Request, error) {
+// NewDetachServiceFromVPCRequest calls the generic DetachServiceFromVPC builder with application/json body
+func NewDetachServiceFromVPCRequest(server string, projectId ProjectId, serviceId ServiceId, body DetachServiceFromVPCJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewDetachServiceFromVPCRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdDetachFromVPC with any type of body
-func NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewDetachServiceFromVPCRequestWithBody generates requests for DetachServiceFromVPC with any type of body
+func NewDetachServiceFromVPCRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1202,8 +1202,8 @@ func NewPostProjectsProjectIdServicesServiceIdDetachFromVPCRequestWithBody(serve
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdDisablePoolerRequest generates requests for PostProjectsProjectIdServicesServiceIdDisablePooler
-func NewPostProjectsProjectIdServicesServiceIdDisablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewDisablePoolerRequest generates requests for DisablePooler
+func NewDisablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1243,8 +1243,8 @@ func NewPostProjectsProjectIdServicesServiceIdDisablePoolerRequest(server string
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest generates requests for PostProjectsProjectIdServicesServiceIdEnablePooler
-func NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewEnablePoolerRequest generates requests for EnablePooler
+func NewEnablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1284,19 +1284,19 @@ func NewPostProjectsProjectIdServicesServiceIdEnablePoolerRequest(server string,
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdForkServiceRequest calls the generic PostProjectsProjectIdServicesServiceIdForkService builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdForkServiceRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody) (*http.Request, error) {
+// NewForkServiceRequest calls the generic ForkService builder with application/json body
+func NewForkServiceRequest(server string, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdForkServiceRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewForkServiceRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdForkServiceRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdForkService with any type of body
-func NewPostProjectsProjectIdServicesServiceIdForkServiceRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewForkServiceRequestWithBody generates requests for ForkService with any type of body
+func NewForkServiceRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1338,8 +1338,8 @@ func NewPostProjectsProjectIdServicesServiceIdForkServiceRequestWithBody(server 
 	return req, nil
 }
 
-// NewGetProjectsProjectIdServicesServiceIdReplicaSetsRequest generates requests for GetProjectsProjectIdServicesServiceIdReplicaSets
-func NewGetProjectsProjectIdServicesServiceIdReplicaSetsRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewGetReplicaSetsRequest generates requests for GetReplicaSets
+func NewGetReplicaSetsRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1379,19 +1379,19 @@ func NewGetProjectsProjectIdServicesServiceIdReplicaSetsRequest(server string, p
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequest calls the generic PostProjectsProjectIdServicesServiceIdReplicaSets builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody) (*http.Request, error) {
+// NewCreateReplicaSetRequest calls the generic CreateReplicaSet builder with application/json body
+func NewCreateReplicaSetRequest(server string, projectId ProjectId, serviceId ServiceId, body CreateReplicaSetJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewCreateReplicaSetRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdReplicaSets with any type of body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateReplicaSetRequestWithBody generates requests for CreateReplicaSet with any type of body
+func NewCreateReplicaSetRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1433,8 +1433,8 @@ func NewPostProjectsProjectIdServicesServiceIdReplicaSetsRequestWithBody(server 
 	return req, nil
 }
 
-// NewDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRequest generates requests for DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId
-func NewDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
+// NewDeleteReplicaSetRequest generates requests for DeleteReplicaSet
+func NewDeleteReplicaSetRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1481,8 +1481,8 @@ func NewDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRequest(s
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerRequest generates requests for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePooler
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
+// NewDisableReplicaPoolerRequest generates requests for DisableReplicaPooler
+func NewDisableReplicaPoolerRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1529,8 +1529,8 @@ func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePool
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerRequest generates requests for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePooler
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
+// NewEnableReplicaPoolerRequest generates requests for EnableReplicaPooler
+func NewEnableReplicaPoolerRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1577,19 +1577,19 @@ func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoole
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequest calls the generic PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody) (*http.Request, error) {
+// NewResizeReplicaSetRequest calls the generic ResizeReplicaSet builder with application/json body
+func NewResizeReplicaSetRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body ResizeReplicaSetJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequestWithBody(server, projectId, serviceId, replicaSetId, "application/json", bodyReader)
+	return NewResizeReplicaSetRequestWithBody(server, projectId, serviceId, replicaSetId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize with any type of body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader) (*http.Request, error) {
+// NewResizeReplicaSetRequestWithBody generates requests for ResizeReplicaSet with any type of body
+func NewResizeReplicaSetRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1638,19 +1638,19 @@ func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeReque
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequest calls the generic PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody) (*http.Request, error) {
+// NewSetReplicaEnvironmentRequest calls the generic SetReplicaEnvironment builder with application/json body
+func NewSetReplicaEnvironmentRequest(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body SetReplicaEnvironmentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequestWithBody(server, projectId, serviceId, replicaSetId, "application/json", bodyReader)
+	return NewSetReplicaEnvironmentRequestWithBody(server, projectId, serviceId, replicaSetId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment with any type of body
-func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader) (*http.Request, error) {
+// NewSetReplicaEnvironmentRequestWithBody generates requests for SetReplicaEnvironment with any type of body
+func NewSetReplicaEnvironmentRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1699,19 +1699,19 @@ func NewPostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironm
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdResizeRequest calls the generic PostProjectsProjectIdServicesServiceIdResize builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdResizeRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody) (*http.Request, error) {
+// NewResizeServiceRequest calls the generic ResizeService builder with application/json body
+func NewResizeServiceRequest(server string, projectId ProjectId, serviceId ServiceId, body ResizeServiceJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdResizeRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewResizeServiceRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdResizeRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdResize with any type of body
-func NewPostProjectsProjectIdServicesServiceIdResizeRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewResizeServiceRequestWithBody generates requests for ResizeService with any type of body
+func NewResizeServiceRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1753,19 +1753,19 @@ func NewPostProjectsProjectIdServicesServiceIdResizeRequestWithBody(server strin
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequest calls the generic PostProjectsProjectIdServicesServiceIdSetEnvironment builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody) (*http.Request, error) {
+// NewSetEnvironmentRequest calls the generic SetEnvironment builder with application/json body
+func NewSetEnvironmentRequest(server string, projectId ProjectId, serviceId ServiceId, body SetEnvironmentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewSetEnvironmentRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdSetEnvironment with any type of body
-func NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewSetEnvironmentRequestWithBody generates requests for SetEnvironment with any type of body
+func NewSetEnvironmentRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1807,19 +1807,19 @@ func NewPostProjectsProjectIdServicesServiceIdSetEnvironmentRequestWithBody(serv
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdSetHARequest calls the generic PostProjectsProjectIdServicesServiceIdSetHA builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdSetHARequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody) (*http.Request, error) {
+// NewSetHAReplicaRequest calls the generic SetHAReplica builder with application/json body
+func NewSetHAReplicaRequest(server string, projectId ProjectId, serviceId ServiceId, body SetHAReplicaJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewSetHAReplicaRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdSetHA with any type of body
-func NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewSetHAReplicaRequestWithBody generates requests for SetHAReplica with any type of body
+func NewSetHAReplicaRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1861,8 +1861,8 @@ func NewPostProjectsProjectIdServicesServiceIdSetHARequestWithBody(server string
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdStartRequest generates requests for PostProjectsProjectIdServicesServiceIdStart
-func NewPostProjectsProjectIdServicesServiceIdStartRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewStartServiceRequest generates requests for StartService
+func NewStartServiceRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1902,8 +1902,8 @@ func NewPostProjectsProjectIdServicesServiceIdStartRequest(server string, projec
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdStopRequest generates requests for PostProjectsProjectIdServicesServiceIdStop
-func NewPostProjectsProjectIdServicesServiceIdStopRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+// NewStopServiceRequest generates requests for StopService
+func NewStopServiceRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1943,19 +1943,19 @@ func NewPostProjectsProjectIdServicesServiceIdStopRequest(server string, project
 	return req, nil
 }
 
-// NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequest calls the generic PostProjectsProjectIdServicesServiceIdUpdatePassword builder with application/json body
-func NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequest(server string, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody) (*http.Request, error) {
+// NewUpdatePasswordRequest calls the generic UpdatePassword builder with application/json body
+func NewUpdatePasswordRequest(server string, projectId ProjectId, serviceId ServiceId, body UpdatePasswordJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+	return NewUpdatePasswordRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequestWithBody generates requests for PostProjectsProjectIdServicesServiceIdUpdatePassword with any type of body
-func NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpdatePasswordRequestWithBody generates requests for UpdatePassword with any type of body
+func NewUpdatePasswordRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1997,8 +1997,8 @@ func NewPostProjectsProjectIdServicesServiceIdUpdatePasswordRequestWithBody(serv
 	return req, nil
 }
 
-// NewGetProjectsProjectIdVpcsRequest generates requests for GetProjectsProjectIdVpcs
-func NewGetProjectsProjectIdVpcsRequest(server string, projectId ProjectId) (*http.Request, error) {
+// NewGetVPCsRequest generates requests for GetVPCs
+func NewGetVPCsRequest(server string, projectId ProjectId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2031,19 +2031,19 @@ func NewGetProjectsProjectIdVpcsRequest(server string, projectId ProjectId) (*ht
 	return req, nil
 }
 
-// NewPostProjectsProjectIdVpcsRequest calls the generic PostProjectsProjectIdVpcs builder with application/json body
-func NewPostProjectsProjectIdVpcsRequest(server string, projectId ProjectId, body PostProjectsProjectIdVpcsJSONRequestBody) (*http.Request, error) {
+// NewCreateVPCRequest calls the generic CreateVPC builder with application/json body
+func NewCreateVPCRequest(server string, projectId ProjectId, body CreateVPCJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdVpcsRequestWithBody(server, projectId, "application/json", bodyReader)
+	return NewCreateVPCRequestWithBody(server, projectId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdVpcsRequestWithBody generates requests for PostProjectsProjectIdVpcs with any type of body
-func NewPostProjectsProjectIdVpcsRequestWithBody(server string, projectId ProjectId, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateVPCRequestWithBody generates requests for CreateVPC with any type of body
+func NewCreateVPCRequestWithBody(server string, projectId ProjectId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2078,8 +2078,8 @@ func NewPostProjectsProjectIdVpcsRequestWithBody(server string, projectId Projec
 	return req, nil
 }
 
-// NewDeleteProjectsProjectIdVpcsVpcIdRequest generates requests for DeleteProjectsProjectIdVpcsVpcId
-func NewDeleteProjectsProjectIdVpcsVpcIdRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
+// NewDeleteVPCRequest generates requests for DeleteVPC
+func NewDeleteVPCRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2119,8 +2119,8 @@ func NewDeleteProjectsProjectIdVpcsVpcIdRequest(server string, projectId Project
 	return req, nil
 }
 
-// NewGetProjectsProjectIdVpcsVpcIdRequest generates requests for GetProjectsProjectIdVpcsVpcId
-func NewGetProjectsProjectIdVpcsVpcIdRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
+// NewGetVPCRequest generates requests for GetVPC
+func NewGetVPCRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2160,8 +2160,8 @@ func NewGetProjectsProjectIdVpcsVpcIdRequest(server string, projectId ProjectId,
 	return req, nil
 }
 
-// NewGetProjectsProjectIdVpcsVpcIdPeeringsRequest generates requests for GetProjectsProjectIdVpcsVpcIdPeerings
-func NewGetProjectsProjectIdVpcsVpcIdPeeringsRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
+// NewGetVPCPeeringsRequest generates requests for GetVPCPeerings
+func NewGetVPCPeeringsRequest(server string, projectId ProjectId, vpcId VPCId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2201,19 +2201,19 @@ func NewGetProjectsProjectIdVpcsVpcIdPeeringsRequest(server string, projectId Pr
 	return req, nil
 }
 
-// NewPostProjectsProjectIdVpcsVpcIdPeeringsRequest calls the generic PostProjectsProjectIdVpcsVpcIdPeerings builder with application/json body
-func NewPostProjectsProjectIdVpcsVpcIdPeeringsRequest(server string, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody) (*http.Request, error) {
+// NewCreateVPCPeeringRequest calls the generic CreateVPCPeering builder with application/json body
+func NewCreateVPCPeeringRequest(server string, projectId ProjectId, vpcId VPCId, body CreateVPCPeeringJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdVpcsVpcIdPeeringsRequestWithBody(server, projectId, vpcId, "application/json", bodyReader)
+	return NewCreateVPCPeeringRequestWithBody(server, projectId, vpcId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdVpcsVpcIdPeeringsRequestWithBody generates requests for PostProjectsProjectIdVpcsVpcIdPeerings with any type of body
-func NewPostProjectsProjectIdVpcsVpcIdPeeringsRequestWithBody(server string, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateVPCPeeringRequestWithBody generates requests for CreateVPCPeering with any type of body
+func NewCreateVPCPeeringRequestWithBody(server string, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2255,8 +2255,8 @@ func NewPostProjectsProjectIdVpcsVpcIdPeeringsRequestWithBody(server string, pro
 	return req, nil
 }
 
-// NewDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest generates requests for DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId
-func NewDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(server string, projectId ProjectId, vpcId VPCId, peeringId PeeringId) (*http.Request, error) {
+// NewDeleteVPCPeeringRequest generates requests for DeleteVPCPeering
+func NewDeleteVPCPeeringRequest(server string, projectId ProjectId, vpcId VPCId, peeringId PeeringId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2303,8 +2303,8 @@ func NewDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(server string, 
 	return req, nil
 }
 
-// NewGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest generates requests for GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId
-func NewGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(server string, projectId ProjectId, vpcId VPCId, peeringId PeeringId) (*http.Request, error) {
+// NewGetVPCPeeringRequest generates requests for GetVPCPeering
+func NewGetVPCPeeringRequest(server string, projectId ProjectId, vpcId VPCId, peeringId PeeringId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2351,19 +2351,19 @@ func NewGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdRequest(server string, pro
 	return req, nil
 }
 
-// NewPostProjectsProjectIdVpcsVpcIdRenameRequest calls the generic PostProjectsProjectIdVpcsVpcIdRename builder with application/json body
-func NewPostProjectsProjectIdVpcsVpcIdRenameRequest(server string, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody) (*http.Request, error) {
+// NewRenameVPCRequest calls the generic RenameVPC builder with application/json body
+func NewRenameVPCRequest(server string, projectId ProjectId, vpcId VPCId, body RenameVPCJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewPostProjectsProjectIdVpcsVpcIdRenameRequestWithBody(server, projectId, vpcId, "application/json", bodyReader)
+	return NewRenameVPCRequestWithBody(server, projectId, vpcId, "application/json", bodyReader)
 }
 
-// NewPostProjectsProjectIdVpcsVpcIdRenameRequestWithBody generates requests for PostProjectsProjectIdVpcsVpcIdRename with any type of body
-func NewPostProjectsProjectIdVpcsVpcIdRenameRequestWithBody(server string, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader) (*http.Request, error) {
+// NewRenameVPCRequestWithBody generates requests for RenameVPC with any type of body
+func NewRenameVPCRequestWithBody(server string, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2448,142 +2448,142 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// PostAnalyticsIdentifyWithBodyWithResponse request with any body
-	PostAnalyticsIdentifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAnalyticsIdentifyResponse, error)
+	// IdentifyUserWithBodyWithResponse request with any body
+	IdentifyUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IdentifyUserResponse, error)
 
-	PostAnalyticsIdentifyWithResponse(ctx context.Context, body PostAnalyticsIdentifyJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAnalyticsIdentifyResponse, error)
+	IdentifyUserWithResponse(ctx context.Context, body IdentifyUserJSONRequestBody, reqEditors ...RequestEditorFn) (*IdentifyUserResponse, error)
 
-	// PostAnalyticsTrackWithBodyWithResponse request with any body
-	PostAnalyticsTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAnalyticsTrackResponse, error)
+	// TrackEventWithBodyWithResponse request with any body
+	TrackEventWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TrackEventResponse, error)
 
-	PostAnalyticsTrackWithResponse(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAnalyticsTrackResponse, error)
+	TrackEventWithResponse(ctx context.Context, body TrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*TrackEventResponse, error)
 
 	// GetAuthInfoWithResponse request
 	GetAuthInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthInfoResponse, error)
 
-	// GetProjectsProjectIdServicesWithResponse request
-	GetProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesResponse, error)
+	// GetServicesWithResponse request
+	GetServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetServicesResponse, error)
 
-	// PostProjectsProjectIdServicesWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesResponse, error)
+	// CreateServiceWithBodyWithResponse request with any body
+	CreateServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
-	PostProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesResponse, error)
+	CreateServiceWithResponse(ctx context.Context, projectId ProjectId, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
-	// DeleteProjectsProjectIdServicesServiceIdWithResponse request
-	DeleteProjectsProjectIdServicesServiceIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdServicesServiceIdResponse, error)
+	// DeleteServiceWithResponse request
+	DeleteServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error)
 
-	// GetProjectsProjectIdServicesServiceIdWithResponse request
-	GetProjectsProjectIdServicesServiceIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdResponse, error)
+	// GetServiceWithResponse request
+	GetServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetServiceResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdAttachToVPCWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdAttachToVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdAttachToVPCResponse, error)
+	// AttachServiceToVPCWithBodyWithResponse request with any body
+	AttachServiceToVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdAttachToVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdAttachToVPCResponse, error)
+	AttachServiceToVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse, error)
+	// DetachServiceFromVPCWithBodyWithResponse request with any body
+	DetachServiceFromVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdDetachFromVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse, error)
+	DetachServiceFromVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body DetachServiceFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdDisablePoolerWithResponse request
-	PostProjectsProjectIdServicesServiceIdDisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDisablePoolerResponse, error)
+	// DisablePoolerWithResponse request
+	DisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DisablePoolerResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse request
-	PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdEnablePoolerResponse, error)
+	// EnablePoolerWithResponse request
+	EnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*EnablePoolerResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error)
+	// ForkServiceWithBodyWithResponse request with any body
+	ForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkServiceResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error)
+	ForkServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkServiceResponse, error)
 
-	// GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse request
-	GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdReplicaSetsResponse, error)
+	// GetReplicaSetsWithResponse request
+	GetReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsResponse, error)
+	// CreateReplicaSetWithBodyWithResponse request with any body
+	CreateReplicaSetWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReplicaSetResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsResponse, error)
+	CreateReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body CreateReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateReplicaSetResponse, error)
 
-	// DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdWithResponse request
-	DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse, error)
+	// DeleteReplicaSetWithResponse request
+	DeleteReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DeleteReplicaSetResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerWithResponse request
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse, error)
+	// DisableReplicaPoolerWithResponse request
+	DisableReplicaPoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DisableReplicaPoolerResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerWithResponse request
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse, error)
+	// EnableReplicaPoolerWithResponse request
+	EnableReplicaPoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*EnableReplicaPoolerResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse, error)
+	// ResizeReplicaSetWithBodyWithResponse request with any body
+	ResizeReplicaSetWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeReplicaSetResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse, error)
+	ResizeReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body ResizeReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeReplicaSetResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse, error)
+	// SetReplicaEnvironmentWithBodyWithResponse request with any body
+	SetReplicaEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetReplicaEnvironmentResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse, error)
+	SetReplicaEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body SetReplicaEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*SetReplicaEnvironmentResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdResizeWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdResizeWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdResizeResponse, error)
+	// ResizeServiceWithBodyWithResponse request with any body
+	ResizeServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeServiceResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdResizeResponse, error)
+	ResizeServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ResizeServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeServiceResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse, error)
+	// SetEnvironmentWithBodyWithResponse request with any body
+	SetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEnvironmentResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdSetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse, error)
+	SetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEnvironmentResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdSetHAWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdSetHAWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error)
+	// SetHAReplicaWithBodyWithResponse request with any body
+	SetHAReplicaWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetHAReplicaResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdSetHAWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error)
+	SetHAReplicaWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetHAReplicaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetHAReplicaResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdStartWithResponse request
-	PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStartResponse, error)
+	// StartServiceWithResponse request
+	StartServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*StartServiceResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdStopWithResponse request
-	PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStopResponse, error)
+	// StopServiceWithResponse request
+	StopServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*StopServiceResponse, error)
 
-	// PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse request with any body
-	PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error)
+	// UpdatePasswordWithBodyWithResponse request with any body
+	UpdatePasswordWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePasswordResponse, error)
 
-	PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error)
+	UpdatePasswordWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body UpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePasswordResponse, error)
 
-	// GetProjectsProjectIdVpcsWithResponse request
-	GetProjectsProjectIdVpcsWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsResponse, error)
+	// GetVPCsWithResponse request
+	GetVPCsWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetVPCsResponse, error)
 
-	// PostProjectsProjectIdVpcsWithBodyWithResponse request with any body
-	PostProjectsProjectIdVpcsWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsResponse, error)
+	// CreateVPCWithBodyWithResponse request with any body
+	CreateVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateVPCResponse, error)
 
-	PostProjectsProjectIdVpcsWithResponse(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdVpcsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsResponse, error)
+	CreateVPCWithResponse(ctx context.Context, projectId ProjectId, body CreateVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVPCResponse, error)
 
-	// DeleteProjectsProjectIdVpcsVpcIdWithResponse request
-	DeleteProjectsProjectIdVpcsVpcIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdVpcsVpcIdResponse, error)
+	// DeleteVPCWithResponse request
+	DeleteVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*DeleteVPCResponse, error)
 
-	// GetProjectsProjectIdVpcsVpcIdWithResponse request
-	GetProjectsProjectIdVpcsVpcIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdResponse, error)
+	// GetVPCWithResponse request
+	GetVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetVPCResponse, error)
 
-	// GetProjectsProjectIdVpcsVpcIdPeeringsWithResponse request
-	GetProjectsProjectIdVpcsVpcIdPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdPeeringsResponse, error)
+	// GetVPCPeeringsWithResponse request
+	GetVPCPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetVPCPeeringsResponse, error)
 
-	// PostProjectsProjectIdVpcsVpcIdPeeringsWithBodyWithResponse request with any body
-	PostProjectsProjectIdVpcsVpcIdPeeringsWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdPeeringsResponse, error)
+	// CreateVPCPeeringWithBodyWithResponse request with any body
+	CreateVPCPeeringWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateVPCPeeringResponse, error)
 
-	PostProjectsProjectIdVpcsVpcIdPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdPeeringsResponse, error)
+	CreateVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body CreateVPCPeeringJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVPCPeeringResponse, error)
 
-	// DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse request
-	DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error)
+	// DeleteVPCPeeringWithResponse request
+	DeleteVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*DeleteVPCPeeringResponse, error)
 
-	// GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse request
-	GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error)
+	// GetVPCPeeringWithResponse request
+	GetVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*GetVPCPeeringResponse, error)
 
-	// PostProjectsProjectIdVpcsVpcIdRenameWithBodyWithResponse request with any body
-	PostProjectsProjectIdVpcsVpcIdRenameWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error)
+	// RenameVPCWithBodyWithResponse request with any body
+	RenameVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameVPCResponse, error)
 
-	PostProjectsProjectIdVpcsVpcIdRenameWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error)
+	RenameVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body RenameVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameVPCResponse, error)
 }
 
-type PostAnalyticsIdentifyResponse struct {
+type IdentifyUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *AnalyticsResponse
@@ -2591,7 +2591,7 @@ type PostAnalyticsIdentifyResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostAnalyticsIdentifyResponse) Status() string {
+func (r IdentifyUserResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2599,14 +2599,14 @@ func (r PostAnalyticsIdentifyResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostAnalyticsIdentifyResponse) StatusCode() int {
+func (r IdentifyUserResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostAnalyticsTrackResponse struct {
+type TrackEventResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *AnalyticsResponse
@@ -2614,7 +2614,7 @@ type PostAnalyticsTrackResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostAnalyticsTrackResponse) Status() string {
+func (r TrackEventResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2622,7 +2622,7 @@ func (r PostAnalyticsTrackResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostAnalyticsTrackResponse) StatusCode() int {
+func (r TrackEventResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2652,7 +2652,7 @@ func (r GetAuthInfoResponse) StatusCode() int {
 	return 0
 }
 
-type GetProjectsProjectIdServicesResponse struct {
+type GetServicesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Service
@@ -2660,7 +2660,7 @@ type GetProjectsProjectIdServicesResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdServicesResponse) Status() string {
+func (r GetServicesResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2668,14 +2668,14 @@ func (r GetProjectsProjectIdServicesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdServicesResponse) StatusCode() int {
+func (r GetServicesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesResponse struct {
+type CreateServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
@@ -2683,7 +2683,7 @@ type PostProjectsProjectIdServicesResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesResponse) Status() string {
+func (r CreateServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2691,21 +2691,21 @@ func (r PostProjectsProjectIdServicesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesResponse) StatusCode() int {
+func (r CreateServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteProjectsProjectIdServicesServiceIdResponse struct {
+type DeleteServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteProjectsProjectIdServicesServiceIdResponse) Status() string {
+func (r DeleteServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2713,14 +2713,14 @@ func (r DeleteProjectsProjectIdServicesServiceIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteProjectsProjectIdServicesServiceIdResponse) StatusCode() int {
+func (r DeleteServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdServicesServiceIdResponse struct {
+type GetServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Service
@@ -2728,7 +2728,7 @@ type GetProjectsProjectIdServicesServiceIdResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdServicesServiceIdResponse) Status() string {
+func (r GetServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2736,14 +2736,14 @@ func (r GetProjectsProjectIdServicesServiceIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdServicesServiceIdResponse) StatusCode() int {
+func (r GetServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdAttachToVPCResponse struct {
+type AttachServiceToVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *SuccessMessage
@@ -2751,7 +2751,7 @@ type PostProjectsProjectIdServicesServiceIdAttachToVPCResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdAttachToVPCResponse) Status() string {
+func (r AttachServiceToVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2759,14 +2759,14 @@ func (r PostProjectsProjectIdServicesServiceIdAttachToVPCResponse) Status() stri
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdAttachToVPCResponse) StatusCode() int {
+func (r AttachServiceToVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse struct {
+type DetachServiceFromVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *SuccessMessage
@@ -2774,7 +2774,7 @@ type PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse) Status() string {
+func (r DetachServiceFromVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2782,14 +2782,14 @@ func (r PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse) Status() st
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse) StatusCode() int {
+func (r DetachServiceFromVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdDisablePoolerResponse struct {
+type DisablePoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
@@ -2797,7 +2797,7 @@ type PostProjectsProjectIdServicesServiceIdDisablePoolerResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdDisablePoolerResponse) Status() string {
+func (r DisablePoolerResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2805,14 +2805,14 @@ func (r PostProjectsProjectIdServicesServiceIdDisablePoolerResponse) Status() st
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdDisablePoolerResponse) StatusCode() int {
+func (r DisablePoolerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdEnablePoolerResponse struct {
+type EnablePoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
@@ -2820,7 +2820,7 @@ type PostProjectsProjectIdServicesServiceIdEnablePoolerResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdEnablePoolerResponse) Status() string {
+func (r EnablePoolerResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2828,14 +2828,14 @@ func (r PostProjectsProjectIdServicesServiceIdEnablePoolerResponse) Status() str
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdEnablePoolerResponse) StatusCode() int {
+func (r EnablePoolerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdForkServiceResponse struct {
+type ForkServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
@@ -2843,7 +2843,7 @@ type PostProjectsProjectIdServicesServiceIdForkServiceResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdForkServiceResponse) Status() string {
+func (r ForkServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2851,14 +2851,14 @@ func (r PostProjectsProjectIdServicesServiceIdForkServiceResponse) Status() stri
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdForkServiceResponse) StatusCode() int {
+func (r ForkServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
+type GetReplicaSetsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]ReadReplicaSet
@@ -2866,7 +2866,7 @@ type GetProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdServicesServiceIdReplicaSetsResponse) Status() string {
+func (r GetReplicaSetsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2874,14 +2874,14 @@ func (r GetProjectsProjectIdServicesServiceIdReplicaSetsResponse) Status() strin
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdServicesServiceIdReplicaSetsResponse) StatusCode() int {
+func (r GetReplicaSetsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
+type CreateReplicaSetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *ReadReplicaSet
@@ -2889,7 +2889,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsResponse) Status() string {
+func (r CreateReplicaSetResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2897,21 +2897,21 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsResponse) Status() stri
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsResponse) StatusCode() int {
+func (r CreateReplicaSetResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse struct {
+type DeleteReplicaSetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse) Status() string {
+func (r DeleteReplicaSetResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2919,37 +2919,14 @@ func (r DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse)
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse) StatusCode() int {
+func (r DeleteReplicaSetResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *SuccessMessage
-	JSON4XX      *ClientError
-}
-
-// Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse struct {
+type DisableReplicaPoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
@@ -2957,7 +2934,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerRe
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse) Status() string {
+func (r DisableReplicaPoolerResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -2965,36 +2942,14 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoole
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse) StatusCode() int {
+func (r DisableReplicaPoolerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON4XX      *ClientError
-}
-
-// Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse struct {
+type EnableReplicaPoolerResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
@@ -3002,7 +2957,7 @@ type PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse) Status() string {
+func (r EnableReplicaPoolerResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3010,22 +2965,21 @@ func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironm
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse) StatusCode() int {
+func (r EnableReplicaPoolerResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdResizeResponse struct {
+type ResizeReplicaSetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON202      *Service
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdResizeResponse) Status() string {
+func (r ResizeReplicaSetResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3033,14 +2987,14 @@ func (r PostProjectsProjectIdServicesServiceIdResizeResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdResizeResponse) StatusCode() int {
+func (r ResizeReplicaSetResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse struct {
+type SetReplicaEnvironmentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *SuccessMessage
@@ -3048,7 +3002,7 @@ type PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse) Status() string {
+func (r SetReplicaEnvironmentResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3056,14 +3010,14 @@ func (r PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse) Status() s
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse) StatusCode() int {
+func (r SetReplicaEnvironmentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdSetHAResponse struct {
+type ResizeServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
@@ -3071,7 +3025,7 @@ type PostProjectsProjectIdServicesServiceIdSetHAResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdSetHAResponse) Status() string {
+func (r ResizeServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3079,14 +3033,37 @@ func (r PostProjectsProjectIdServicesServiceIdSetHAResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdSetHAResponse) StatusCode() int {
+func (r ResizeServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdStartResponse struct {
+type SetEnvironmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SuccessMessage
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r SetEnvironmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetEnvironmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SetHAReplicaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
@@ -3094,7 +3071,7 @@ type PostProjectsProjectIdServicesServiceIdStartResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdStartResponse) Status() string {
+func (r SetHAReplicaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3102,14 +3079,14 @@ func (r PostProjectsProjectIdServicesServiceIdStartResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdStartResponse) StatusCode() int {
+func (r SetHAReplicaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdStopResponse struct {
+type StartServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *Service
@@ -3117,7 +3094,7 @@ type PostProjectsProjectIdServicesServiceIdStopResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdStopResponse) Status() string {
+func (r StartServiceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3125,21 +3102,44 @@ func (r PostProjectsProjectIdServicesServiceIdStopResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdStopResponse) StatusCode() int {
+func (r StartServiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse struct {
+type StopServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *Service
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r StopServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdatePasswordResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse) Status() string {
+func (r UpdatePasswordResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3147,14 +3147,14 @@ func (r PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse) Status() s
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse) StatusCode() int {
+func (r UpdatePasswordResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdVpcsResponse struct {
+type GetVPCsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]VPC
@@ -3162,7 +3162,7 @@ type GetProjectsProjectIdVpcsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdVpcsResponse) Status() string {
+func (r GetVPCsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3170,14 +3170,14 @@ func (r GetProjectsProjectIdVpcsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdVpcsResponse) StatusCode() int {
+func (r GetVPCsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdVpcsResponse struct {
+type CreateVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *VPC
@@ -3185,7 +3185,7 @@ type PostProjectsProjectIdVpcsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdVpcsResponse) Status() string {
+func (r CreateVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3193,21 +3193,21 @@ func (r PostProjectsProjectIdVpcsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdVpcsResponse) StatusCode() int {
+func (r CreateVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteProjectsProjectIdVpcsVpcIdResponse struct {
+type DeleteVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteProjectsProjectIdVpcsVpcIdResponse) Status() string {
+func (r DeleteVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3215,14 +3215,14 @@ func (r DeleteProjectsProjectIdVpcsVpcIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteProjectsProjectIdVpcsVpcIdResponse) StatusCode() int {
+func (r DeleteVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdVpcsVpcIdResponse struct {
+type GetVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *VPC
@@ -3230,7 +3230,7 @@ type GetProjectsProjectIdVpcsVpcIdResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdVpcsVpcIdResponse) Status() string {
+func (r GetVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3238,14 +3238,14 @@ func (r GetProjectsProjectIdVpcsVpcIdResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdVpcsVpcIdResponse) StatusCode() int {
+func (r GetVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
+type GetVPCPeeringsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Peering
@@ -3253,7 +3253,7 @@ type GetProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdVpcsVpcIdPeeringsResponse) Status() string {
+func (r GetVPCPeeringsResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3261,14 +3261,14 @@ func (r GetProjectsProjectIdVpcsVpcIdPeeringsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdVpcsVpcIdPeeringsResponse) StatusCode() int {
+func (r GetVPCPeeringsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
+type CreateVPCPeeringResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *Peering
@@ -3276,7 +3276,7 @@ type PostProjectsProjectIdVpcsVpcIdPeeringsResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdVpcsVpcIdPeeringsResponse) Status() string {
+func (r CreateVPCPeeringResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3284,21 +3284,21 @@ func (r PostProjectsProjectIdVpcsVpcIdPeeringsResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdVpcsVpcIdPeeringsResponse) StatusCode() int {
+func (r CreateVPCPeeringResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse struct {
+type DeleteVPCPeeringResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON4XX      *ClientError
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) Status() string {
+func (r DeleteVPCPeeringResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3306,14 +3306,14 @@ func (r DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) Status() stri
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) StatusCode() int {
+func (r DeleteVPCPeeringResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse struct {
+type GetVPCPeeringResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Peering
@@ -3321,7 +3321,7 @@ type GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) Status() string {
+func (r GetVPCPeeringResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3329,14 +3329,14 @@ func (r GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) Status() string 
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse) StatusCode() int {
+func (r GetVPCPeeringResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type PostProjectsProjectIdVpcsVpcIdRenameResponse struct {
+type RenameVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *VPC
@@ -3344,7 +3344,7 @@ type PostProjectsProjectIdVpcsVpcIdRenameResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r PostProjectsProjectIdVpcsVpcIdRenameResponse) Status() string {
+func (r RenameVPCResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3352,45 +3352,45 @@ func (r PostProjectsProjectIdVpcsVpcIdRenameResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r PostProjectsProjectIdVpcsVpcIdRenameResponse) StatusCode() int {
+func (r RenameVPCResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// PostAnalyticsIdentifyWithBodyWithResponse request with arbitrary body returning *PostAnalyticsIdentifyResponse
-func (c *ClientWithResponses) PostAnalyticsIdentifyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAnalyticsIdentifyResponse, error) {
-	rsp, err := c.PostAnalyticsIdentifyWithBody(ctx, contentType, body, reqEditors...)
+// IdentifyUserWithBodyWithResponse request with arbitrary body returning *IdentifyUserResponse
+func (c *ClientWithResponses) IdentifyUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IdentifyUserResponse, error) {
+	rsp, err := c.IdentifyUserWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostAnalyticsIdentifyResponse(rsp)
+	return ParseIdentifyUserResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostAnalyticsIdentifyWithResponse(ctx context.Context, body PostAnalyticsIdentifyJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAnalyticsIdentifyResponse, error) {
-	rsp, err := c.PostAnalyticsIdentify(ctx, body, reqEditors...)
+func (c *ClientWithResponses) IdentifyUserWithResponse(ctx context.Context, body IdentifyUserJSONRequestBody, reqEditors ...RequestEditorFn) (*IdentifyUserResponse, error) {
+	rsp, err := c.IdentifyUser(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostAnalyticsIdentifyResponse(rsp)
+	return ParseIdentifyUserResponse(rsp)
 }
 
-// PostAnalyticsTrackWithBodyWithResponse request with arbitrary body returning *PostAnalyticsTrackResponse
-func (c *ClientWithResponses) PostAnalyticsTrackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAnalyticsTrackResponse, error) {
-	rsp, err := c.PostAnalyticsTrackWithBody(ctx, contentType, body, reqEditors...)
+// TrackEventWithBodyWithResponse request with arbitrary body returning *TrackEventResponse
+func (c *ClientWithResponses) TrackEventWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TrackEventResponse, error) {
+	rsp, err := c.TrackEventWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostAnalyticsTrackResponse(rsp)
+	return ParseTrackEventResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostAnalyticsTrackWithResponse(ctx context.Context, body PostAnalyticsTrackJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAnalyticsTrackResponse, error) {
-	rsp, err := c.PostAnalyticsTrack(ctx, body, reqEditors...)
+func (c *ClientWithResponses) TrackEventWithResponse(ctx context.Context, body TrackEventJSONRequestBody, reqEditors ...RequestEditorFn) (*TrackEventResponse, error) {
+	rsp, err := c.TrackEvent(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostAnalyticsTrackResponse(rsp)
+	return ParseTrackEventResponse(rsp)
 }
 
 // GetAuthInfoWithResponse request returning *GetAuthInfoResponse
@@ -3402,406 +3402,406 @@ func (c *ClientWithResponses) GetAuthInfoWithResponse(ctx context.Context, reqEd
 	return ParseGetAuthInfoResponse(rsp)
 }
 
-// GetProjectsProjectIdServicesWithResponse request returning *GetProjectsProjectIdServicesResponse
-func (c *ClientWithResponses) GetProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesResponse, error) {
-	rsp, err := c.GetProjectsProjectIdServices(ctx, projectId, reqEditors...)
+// GetServicesWithResponse request returning *GetServicesResponse
+func (c *ClientWithResponses) GetServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetServicesResponse, error) {
+	rsp, err := c.GetServices(ctx, projectId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdServicesResponse(rsp)
+	return ParseGetServicesResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesWithBody(ctx, projectId, contentType, body, reqEditors...)
+// CreateServiceWithBodyWithResponse request with arbitrary body returning *CreateServiceResponse
+func (c *ClientWithResponses) CreateServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
+	rsp, err := c.CreateServiceWithBody(ctx, projectId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesResponse(rsp)
+	return ParseCreateServiceResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesWithResponse(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServices(ctx, projectId, body, reqEditors...)
+func (c *ClientWithResponses) CreateServiceWithResponse(ctx context.Context, projectId ProjectId, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
+	rsp, err := c.CreateService(ctx, projectId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesResponse(rsp)
+	return ParseCreateServiceResponse(rsp)
 }
 
-// DeleteProjectsProjectIdServicesServiceIdWithResponse request returning *DeleteProjectsProjectIdServicesServiceIdResponse
-func (c *ClientWithResponses) DeleteProjectsProjectIdServicesServiceIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdServicesServiceIdResponse, error) {
-	rsp, err := c.DeleteProjectsProjectIdServicesServiceId(ctx, projectId, serviceId, reqEditors...)
+// DeleteServiceWithResponse request returning *DeleteServiceResponse
+func (c *ClientWithResponses) DeleteServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error) {
+	rsp, err := c.DeleteService(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteProjectsProjectIdServicesServiceIdResponse(rsp)
+	return ParseDeleteServiceResponse(rsp)
 }
 
-// GetProjectsProjectIdServicesServiceIdWithResponse request returning *GetProjectsProjectIdServicesServiceIdResponse
-func (c *ClientWithResponses) GetProjectsProjectIdServicesServiceIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdResponse, error) {
-	rsp, err := c.GetProjectsProjectIdServicesServiceId(ctx, projectId, serviceId, reqEditors...)
+// GetServiceWithResponse request returning *GetServiceResponse
+func (c *ClientWithResponses) GetServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetServiceResponse, error) {
+	rsp, err := c.GetService(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdServicesServiceIdResponse(rsp)
+	return ParseGetServiceResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdAttachToVPCWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdAttachToVPCResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdAttachToVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdAttachToVPCResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdAttachToVPCWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// AttachServiceToVPCWithBodyWithResponse request with arbitrary body returning *AttachServiceToVPCResponse
+func (c *ClientWithResponses) AttachServiceToVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error) {
+	rsp, err := c.AttachServiceToVPCWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse(rsp)
+	return ParseAttachServiceToVPCResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdAttachToVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdAttachToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdAttachToVPCResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdAttachToVPC(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) AttachServiceToVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error) {
+	rsp, err := c.AttachServiceToVPC(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse(rsp)
+	return ParseAttachServiceToVPCResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdDetachFromVPCWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// DetachServiceFromVPCWithBodyWithResponse request with arbitrary body returning *DetachServiceFromVPCResponse
+func (c *ClientWithResponses) DetachServiceFromVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error) {
+	rsp, err := c.DetachServiceFromVPCWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse(rsp)
+	return ParseDetachServiceFromVPCResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdDetachFromVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdDetachFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdDetachFromVPC(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) DetachServiceFromVPCWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body DetachServiceFromVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error) {
+	rsp, err := c.DetachServiceFromVPC(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse(rsp)
+	return ParseDetachServiceFromVPCResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdDisablePoolerWithResponse request returning *PostProjectsProjectIdServicesServiceIdDisablePoolerResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdDisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdDisablePoolerResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdDisablePooler(ctx, projectId, serviceId, reqEditors...)
+// DisablePoolerWithResponse request returning *DisablePoolerResponse
+func (c *ClientWithResponses) DisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*DisablePoolerResponse, error) {
+	rsp, err := c.DisablePooler(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdDisablePoolerResponse(rsp)
+	return ParseDisablePoolerResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse request returning *PostProjectsProjectIdServicesServiceIdEnablePoolerResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdEnablePoolerResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdEnablePooler(ctx, projectId, serviceId, reqEditors...)
+// EnablePoolerWithResponse request returning *EnablePoolerResponse
+func (c *ClientWithResponses) EnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*EnablePoolerResponse, error) {
+	rsp, err := c.EnablePooler(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp)
+	return ParseEnablePoolerResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdForkServiceResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdForkServiceWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// ForkServiceWithBodyWithResponse request with arbitrary body returning *ForkServiceResponse
+func (c *ClientWithResponses) ForkServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkServiceResponse, error) {
+	rsp, err := c.ForkServiceWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse(rsp)
+	return ParseForkServiceResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdForkServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdForkService(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) ForkServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkServiceResponse, error) {
+	rsp, err := c.ForkService(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse(rsp)
+	return ParseForkServiceResponse(rsp)
 }
 
-// GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse request returning *GetProjectsProjectIdServicesServiceIdReplicaSetsResponse
-func (c *ClientWithResponses) GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
-	rsp, err := c.GetProjectsProjectIdServicesServiceIdReplicaSets(ctx, projectId, serviceId, reqEditors...)
+// GetReplicaSetsWithResponse request returning *GetReplicaSetsResponse
+func (c *ClientWithResponses) GetReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error) {
+	rsp, err := c.GetReplicaSets(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp)
+	return ParseGetReplicaSetsResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdReplicaSetsResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// CreateReplicaSetWithBodyWithResponse request with arbitrary body returning *CreateReplicaSetResponse
+func (c *ClientWithResponses) CreateReplicaSetWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReplicaSetResponse, error) {
+	rsp, err := c.CreateReplicaSetWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp)
+	return ParseCreateReplicaSetResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdReplicaSetsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSets(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) CreateReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body CreateReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateReplicaSetResponse, error) {
+	rsp, err := c.CreateReplicaSet(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp)
+	return ParseCreateReplicaSetResponse(rsp)
 }
 
-// DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdWithResponse request returning *DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse
-func (c *ClientWithResponses) DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse, error) {
-	rsp, err := c.DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetId(ctx, projectId, serviceId, replicaSetId, reqEditors...)
+// DeleteReplicaSetWithResponse request returning *DeleteReplicaSetResponse
+func (c *ClientWithResponses) DeleteReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DeleteReplicaSetResponse, error) {
+	rsp, err := c.DeleteReplicaSet(ctx, projectId, serviceId, replicaSetId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse(rsp)
+	return ParseDeleteReplicaSetResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerWithResponse request returning *PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePooler(ctx, projectId, serviceId, replicaSetId, reqEditors...)
+// DisableReplicaPoolerWithResponse request returning *DisableReplicaPoolerResponse
+func (c *ClientWithResponses) DisableReplicaPoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*DisableReplicaPoolerResponse, error) {
+	rsp, err := c.DisableReplicaPooler(ctx, projectId, serviceId, replicaSetId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse(rsp)
+	return ParseDisableReplicaPoolerResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerWithResponse request returning *PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePooler(ctx, projectId, serviceId, replicaSetId, reqEditors...)
+// EnableReplicaPoolerWithResponse request returning *EnableReplicaPoolerResponse
+func (c *ClientWithResponses) EnableReplicaPoolerWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, reqEditors ...RequestEditorFn) (*EnableReplicaPoolerResponse, error) {
+	rsp, err := c.EnableReplicaPooler(ctx, projectId, serviceId, replicaSetId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse(rsp)
+	return ParseEnableReplicaPoolerResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithBody(ctx, projectId, serviceId, replicaSetId, contentType, body, reqEditors...)
+// ResizeReplicaSetWithBodyWithResponse request with arbitrary body returning *ResizeReplicaSetResponse
+func (c *ClientWithResponses) ResizeReplicaSetWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeReplicaSetResponse, error) {
+	rsp, err := c.ResizeReplicaSetWithBody(ctx, projectId, serviceId, replicaSetId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse(rsp)
+	return ParseResizeReplicaSetResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResize(ctx, projectId, serviceId, replicaSetId, body, reqEditors...)
+func (c *ClientWithResponses) ResizeReplicaSetWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body ResizeReplicaSetJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeReplicaSetResponse, error) {
+	rsp, err := c.ResizeReplicaSet(ctx, projectId, serviceId, replicaSetId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse(rsp)
+	return ParseResizeReplicaSetResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithBody(ctx, projectId, serviceId, replicaSetId, contentType, body, reqEditors...)
+// SetReplicaEnvironmentWithBodyWithResponse request with arbitrary body returning *SetReplicaEnvironmentResponse
+func (c *ClientWithResponses) SetReplicaEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetReplicaEnvironmentResponse, error) {
+	rsp, err := c.SetReplicaEnvironmentWithBody(ctx, projectId, serviceId, replicaSetId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse(rsp)
+	return ParseSetReplicaEnvironmentResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironment(ctx, projectId, serviceId, replicaSetId, body, reqEditors...)
+func (c *ClientWithResponses) SetReplicaEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, replicaSetId ReplicaSetId, body SetReplicaEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*SetReplicaEnvironmentResponse, error) {
+	rsp, err := c.SetReplicaEnvironment(ctx, projectId, serviceId, replicaSetId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse(rsp)
+	return ParseSetReplicaEnvironmentResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdResizeWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdResizeResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdResizeWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdResizeResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdResizeWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// ResizeServiceWithBodyWithResponse request with arbitrary body returning *ResizeServiceResponse
+func (c *ClientWithResponses) ResizeServiceWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeServiceResponse, error) {
+	rsp, err := c.ResizeServiceWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdResizeResponse(rsp)
+	return ParseResizeServiceResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdResizeWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdResizeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdResizeResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdResize(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) ResizeServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ResizeServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeServiceResponse, error) {
+	rsp, err := c.ResizeService(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdResizeResponse(rsp)
+	return ParseResizeServiceResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdSetEnvironmentWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// SetEnvironmentWithBodyWithResponse request with arbitrary body returning *SetEnvironmentResponse
+func (c *ClientWithResponses) SetEnvironmentWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEnvironmentResponse, error) {
+	rsp, err := c.SetEnvironmentWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse(rsp)
+	return ParseSetEnvironmentResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdSetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdSetEnvironment(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) SetEnvironmentWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEnvironmentResponse, error) {
+	rsp, err := c.SetEnvironment(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse(rsp)
+	return ParseSetEnvironmentResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdSetHAWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdSetHAResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdSetHAWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdSetHAWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// SetHAReplicaWithBodyWithResponse request with arbitrary body returning *SetHAReplicaResponse
+func (c *ClientWithResponses) SetHAReplicaWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetHAReplicaResponse, error) {
+	rsp, err := c.SetHAReplicaWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp)
+	return ParseSetHAReplicaResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdSetHAWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdSetHAJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdSetHA(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) SetHAReplicaWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body SetHAReplicaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetHAReplicaResponse, error) {
+	rsp, err := c.SetHAReplica(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp)
+	return ParseSetHAReplicaResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdStartWithResponse request returning *PostProjectsProjectIdServicesServiceIdStartResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdStartWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStartResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdStart(ctx, projectId, serviceId, reqEditors...)
+// StartServiceWithResponse request returning *StartServiceResponse
+func (c *ClientWithResponses) StartServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*StartServiceResponse, error) {
+	rsp, err := c.StartService(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp)
+	return ParseStartServiceResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdStopWithResponse request returning *PostProjectsProjectIdServicesServiceIdStopResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdStopWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdStopResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdStop(ctx, projectId, serviceId, reqEditors...)
+// StopServiceWithResponse request returning *StopServiceResponse
+func (c *ClientWithResponses) StopServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*StopServiceResponse, error) {
+	rsp, err := c.StopService(ctx, projectId, serviceId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp)
+	return ParseStopServiceResponse(rsp)
 }
 
-// PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+// UpdatePasswordWithBodyWithResponse request with arbitrary body returning *UpdatePasswordResponse
+func (c *ClientWithResponses) UpdatePasswordWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePasswordResponse, error) {
+	rsp, err := c.UpdatePasswordWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse(rsp)
+	return ParseUpdatePasswordResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body PostProjectsProjectIdServicesServiceIdUpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error) {
-	rsp, err := c.PostProjectsProjectIdServicesServiceIdUpdatePassword(ctx, projectId, serviceId, body, reqEditors...)
+func (c *ClientWithResponses) UpdatePasswordWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body UpdatePasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePasswordResponse, error) {
+	rsp, err := c.UpdatePassword(ctx, projectId, serviceId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse(rsp)
+	return ParseUpdatePasswordResponse(rsp)
 }
 
-// GetProjectsProjectIdVpcsWithResponse request returning *GetProjectsProjectIdVpcsResponse
-func (c *ClientWithResponses) GetProjectsProjectIdVpcsWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsResponse, error) {
-	rsp, err := c.GetProjectsProjectIdVpcs(ctx, projectId, reqEditors...)
+// GetVPCsWithResponse request returning *GetVPCsResponse
+func (c *ClientWithResponses) GetVPCsWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetVPCsResponse, error) {
+	rsp, err := c.GetVPCs(ctx, projectId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdVpcsResponse(rsp)
+	return ParseGetVPCsResponse(rsp)
 }
 
-// PostProjectsProjectIdVpcsWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdVpcsResponse
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcsWithBody(ctx, projectId, contentType, body, reqEditors...)
+// CreateVPCWithBodyWithResponse request with arbitrary body returning *CreateVPCResponse
+func (c *ClientWithResponses) CreateVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateVPCResponse, error) {
+	rsp, err := c.CreateVPCWithBody(ctx, projectId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsResponse(rsp)
+	return ParseCreateVPCResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsWithResponse(ctx context.Context, projectId ProjectId, body PostProjectsProjectIdVpcsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcs(ctx, projectId, body, reqEditors...)
+func (c *ClientWithResponses) CreateVPCWithResponse(ctx context.Context, projectId ProjectId, body CreateVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVPCResponse, error) {
+	rsp, err := c.CreateVPC(ctx, projectId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsResponse(rsp)
+	return ParseCreateVPCResponse(rsp)
 }
 
-// DeleteProjectsProjectIdVpcsVpcIdWithResponse request returning *DeleteProjectsProjectIdVpcsVpcIdResponse
-func (c *ClientWithResponses) DeleteProjectsProjectIdVpcsVpcIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdVpcsVpcIdResponse, error) {
-	rsp, err := c.DeleteProjectsProjectIdVpcsVpcId(ctx, projectId, vpcId, reqEditors...)
+// DeleteVPCWithResponse request returning *DeleteVPCResponse
+func (c *ClientWithResponses) DeleteVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*DeleteVPCResponse, error) {
+	rsp, err := c.DeleteVPC(ctx, projectId, vpcId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteProjectsProjectIdVpcsVpcIdResponse(rsp)
+	return ParseDeleteVPCResponse(rsp)
 }
 
-// GetProjectsProjectIdVpcsVpcIdWithResponse request returning *GetProjectsProjectIdVpcsVpcIdResponse
-func (c *ClientWithResponses) GetProjectsProjectIdVpcsVpcIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdResponse, error) {
-	rsp, err := c.GetProjectsProjectIdVpcsVpcId(ctx, projectId, vpcId, reqEditors...)
+// GetVPCWithResponse request returning *GetVPCResponse
+func (c *ClientWithResponses) GetVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetVPCResponse, error) {
+	rsp, err := c.GetVPC(ctx, projectId, vpcId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdVpcsVpcIdResponse(rsp)
+	return ParseGetVPCResponse(rsp)
 }
 
-// GetProjectsProjectIdVpcsVpcIdPeeringsWithResponse request returning *GetProjectsProjectIdVpcsVpcIdPeeringsResponse
-func (c *ClientWithResponses) GetProjectsProjectIdVpcsVpcIdPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdPeeringsResponse, error) {
-	rsp, err := c.GetProjectsProjectIdVpcsVpcIdPeerings(ctx, projectId, vpcId, reqEditors...)
+// GetVPCPeeringsWithResponse request returning *GetVPCPeeringsResponse
+func (c *ClientWithResponses) GetVPCPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, reqEditors ...RequestEditorFn) (*GetVPCPeeringsResponse, error) {
+	rsp, err := c.GetVPCPeerings(ctx, projectId, vpcId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp)
+	return ParseGetVPCPeeringsResponse(rsp)
 }
 
-// PostProjectsProjectIdVpcsVpcIdPeeringsWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdVpcsVpcIdPeeringsResponse
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsVpcIdPeeringsWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdPeeringsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcsVpcIdPeeringsWithBody(ctx, projectId, vpcId, contentType, body, reqEditors...)
+// CreateVPCPeeringWithBodyWithResponse request with arbitrary body returning *CreateVPCPeeringResponse
+func (c *ClientWithResponses) CreateVPCPeeringWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateVPCPeeringResponse, error) {
+	rsp, err := c.CreateVPCPeeringWithBody(ctx, projectId, vpcId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp)
+	return ParseCreateVPCPeeringResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsVpcIdPeeringsWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdPeeringsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdPeeringsResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcsVpcIdPeerings(ctx, projectId, vpcId, body, reqEditors...)
+func (c *ClientWithResponses) CreateVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body CreateVPCPeeringJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVPCPeeringResponse, error) {
+	rsp, err := c.CreateVPCPeering(ctx, projectId, vpcId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp)
+	return ParseCreateVPCPeeringResponse(rsp)
 }
 
-// DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse request returning *DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse
-func (c *ClientWithResponses) DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error) {
-	rsp, err := c.DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx, projectId, vpcId, peeringId, reqEditors...)
+// DeleteVPCPeeringWithResponse request returning *DeleteVPCPeeringResponse
+func (c *ClientWithResponses) DeleteVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*DeleteVPCPeeringResponse, error) {
+	rsp, err := c.DeleteVPCPeering(ctx, projectId, vpcId, peeringId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp)
+	return ParseDeleteVPCPeeringResponse(rsp)
 }
 
-// GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse request returning *GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse
-func (c *ClientWithResponses) GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error) {
-	rsp, err := c.GetProjectsProjectIdVpcsVpcIdPeeringsPeeringId(ctx, projectId, vpcId, peeringId, reqEditors...)
+// GetVPCPeeringWithResponse request returning *GetVPCPeeringResponse
+func (c *ClientWithResponses) GetVPCPeeringWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, peeringId PeeringId, reqEditors ...RequestEditorFn) (*GetVPCPeeringResponse, error) {
+	rsp, err := c.GetVPCPeering(ctx, projectId, vpcId, peeringId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp)
+	return ParseGetVPCPeeringResponse(rsp)
 }
 
-// PostProjectsProjectIdVpcsVpcIdRenameWithBodyWithResponse request with arbitrary body returning *PostProjectsProjectIdVpcsVpcIdRenameResponse
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsVpcIdRenameWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcsVpcIdRenameWithBody(ctx, projectId, vpcId, contentType, body, reqEditors...)
+// RenameVPCWithBodyWithResponse request with arbitrary body returning *RenameVPCResponse
+func (c *ClientWithResponses) RenameVPCWithBodyWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameVPCResponse, error) {
+	rsp, err := c.RenameVPCWithBody(ctx, projectId, vpcId, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp)
+	return ParseRenameVPCResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostProjectsProjectIdVpcsVpcIdRenameWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body PostProjectsProjectIdVpcsVpcIdRenameJSONRequestBody, reqEditors ...RequestEditorFn) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error) {
-	rsp, err := c.PostProjectsProjectIdVpcsVpcIdRename(ctx, projectId, vpcId, body, reqEditors...)
+func (c *ClientWithResponses) RenameVPCWithResponse(ctx context.Context, projectId ProjectId, vpcId VPCId, body RenameVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameVPCResponse, error) {
+	rsp, err := c.RenameVPC(ctx, projectId, vpcId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp)
+	return ParseRenameVPCResponse(rsp)
 }
 
-// ParsePostAnalyticsIdentifyResponse parses an HTTP response from a PostAnalyticsIdentifyWithResponse call
-func ParsePostAnalyticsIdentifyResponse(rsp *http.Response) (*PostAnalyticsIdentifyResponse, error) {
+// ParseIdentifyUserResponse parses an HTTP response from a IdentifyUserWithResponse call
+func ParseIdentifyUserResponse(rsp *http.Response) (*IdentifyUserResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostAnalyticsIdentifyResponse{
+	response := &IdentifyUserResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -3826,15 +3826,15 @@ func ParsePostAnalyticsIdentifyResponse(rsp *http.Response) (*PostAnalyticsIdent
 	return response, nil
 }
 
-// ParsePostAnalyticsTrackResponse parses an HTTP response from a PostAnalyticsTrackWithResponse call
-func ParsePostAnalyticsTrackResponse(rsp *http.Response) (*PostAnalyticsTrackResponse, error) {
+// ParseTrackEventResponse parses an HTTP response from a TrackEventWithResponse call
+func ParseTrackEventResponse(rsp *http.Response) (*TrackEventResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostAnalyticsTrackResponse{
+	response := &TrackEventResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -3892,15 +3892,15 @@ func ParseGetAuthInfoResponse(rsp *http.Response) (*GetAuthInfoResponse, error) 
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdServicesResponse parses an HTTP response from a GetProjectsProjectIdServicesWithResponse call
-func ParseGetProjectsProjectIdServicesResponse(rsp *http.Response) (*GetProjectsProjectIdServicesResponse, error) {
+// ParseGetServicesResponse parses an HTTP response from a GetServicesWithResponse call
+func ParseGetServicesResponse(rsp *http.Response) (*GetServicesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdServicesResponse{
+	response := &GetServicesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -3925,15 +3925,15 @@ func ParseGetProjectsProjectIdServicesResponse(rsp *http.Response) (*GetProjects
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesResponse parses an HTTP response from a PostProjectsProjectIdServicesWithResponse call
-func ParsePostProjectsProjectIdServicesResponse(rsp *http.Response) (*PostProjectsProjectIdServicesResponse, error) {
+// ParseCreateServiceResponse parses an HTTP response from a CreateServiceWithResponse call
+func ParseCreateServiceResponse(rsp *http.Response) (*CreateServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesResponse{
+	response := &CreateServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -3958,15 +3958,15 @@ func ParsePostProjectsProjectIdServicesResponse(rsp *http.Response) (*PostProjec
 	return response, nil
 }
 
-// ParseDeleteProjectsProjectIdServicesServiceIdResponse parses an HTTP response from a DeleteProjectsProjectIdServicesServiceIdWithResponse call
-func ParseDeleteProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (*DeleteProjectsProjectIdServicesServiceIdResponse, error) {
+// ParseDeleteServiceResponse parses an HTTP response from a DeleteServiceWithResponse call
+func ParseDeleteServiceResponse(rsp *http.Response) (*DeleteServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteProjectsProjectIdServicesServiceIdResponse{
+	response := &DeleteServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -3984,15 +3984,15 @@ func ParseDeleteProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdServicesServiceIdResponse parses an HTTP response from a GetProjectsProjectIdServicesServiceIdWithResponse call
-func ParseGetProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (*GetProjectsProjectIdServicesServiceIdResponse, error) {
+// ParseGetServiceResponse parses an HTTP response from a GetServiceWithResponse call
+func ParseGetServiceResponse(rsp *http.Response) (*GetServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdServicesServiceIdResponse{
+	response := &GetServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4017,15 +4017,15 @@ func ParseGetProjectsProjectIdServicesServiceIdResponse(rsp *http.Response) (*Ge
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdAttachToVPCWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdAttachToVPCResponse, error) {
+// ParseAttachServiceToVPCResponse parses an HTTP response from a AttachServiceToVPCWithResponse call
+func ParseAttachServiceToVPCResponse(rsp *http.Response) (*AttachServiceToVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdAttachToVPCResponse{
+	response := &AttachServiceToVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4050,15 +4050,15 @@ func ParsePostProjectsProjectIdServicesServiceIdAttachToVPCResponse(rsp *http.Re
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdDetachFromVPCWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse, error) {
+// ParseDetachServiceFromVPCResponse parses an HTTP response from a DetachServiceFromVPCWithResponse call
+func ParseDetachServiceFromVPCResponse(rsp *http.Response) (*DetachServiceFromVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdDetachFromVPCResponse{
+	response := &DetachServiceFromVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4083,15 +4083,15 @@ func ParsePostProjectsProjectIdServicesServiceIdDetachFromVPCResponse(rsp *http.
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdDisablePoolerResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdDisablePoolerWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdDisablePoolerResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdDisablePoolerResponse, error) {
+// ParseDisablePoolerResponse parses an HTTP response from a DisablePoolerWithResponse call
+func ParseDisablePoolerResponse(rsp *http.Response) (*DisablePoolerResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdDisablePoolerResponse{
+	response := &DisablePoolerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4116,15 +4116,15 @@ func ParsePostProjectsProjectIdServicesServiceIdDisablePoolerResponse(rsp *http.
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdEnablePoolerWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdEnablePoolerResponse, error) {
+// ParseEnablePoolerResponse parses an HTTP response from a EnablePoolerWithResponse call
+func ParseEnablePoolerResponse(rsp *http.Response) (*EnablePoolerResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdEnablePoolerResponse{
+	response := &EnablePoolerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4149,15 +4149,15 @@ func ParsePostProjectsProjectIdServicesServiceIdEnablePoolerResponse(rsp *http.R
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdForkServiceWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdForkServiceResponse, error) {
+// ParseForkServiceResponse parses an HTTP response from a ForkServiceWithResponse call
+func ParseForkServiceResponse(rsp *http.Response) (*ForkServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdForkServiceResponse{
+	response := &ForkServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4182,15 +4182,15 @@ func ParsePostProjectsProjectIdServicesServiceIdForkServiceResponse(rsp *http.Re
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdServicesServiceIdReplicaSetsResponse parses an HTTP response from a GetProjectsProjectIdServicesServiceIdReplicaSetsWithResponse call
-func ParseGetProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Response) (*GetProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
+// ParseGetReplicaSetsResponse parses an HTTP response from a GetReplicaSetsWithResponse call
+func ParseGetReplicaSetsResponse(rsp *http.Response) (*GetReplicaSetsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdServicesServiceIdReplicaSetsResponse{
+	response := &GetReplicaSetsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4215,15 +4215,15 @@ func ParseGetProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Res
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdReplicaSetsWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdReplicaSetsResponse, error) {
+// ParseCreateReplicaSetResponse parses an HTTP response from a CreateReplicaSetWithResponse call
+func ParseCreateReplicaSetResponse(rsp *http.Response) (*CreateReplicaSetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdReplicaSetsResponse{
+	response := &CreateReplicaSetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4248,15 +4248,15 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsResponse(rsp *http.Re
 	return response, nil
 }
 
-// ParseDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse parses an HTTP response from a DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdWithResponse call
-func ParseDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse(rsp *http.Response) (*DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse, error) {
+// ParseDeleteReplicaSetResponse parses an HTTP response from a DeleteReplicaSetWithResponse call
+func ParseDeleteReplicaSetResponse(rsp *http.Response) (*DeleteReplicaSetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResponse{
+	response := &DeleteReplicaSetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4274,48 +4274,15 @@ func ParseDeleteProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdRespons
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse, error) {
+// ParseDisableReplicaPoolerResponse parses an HTTP response from a DisableReplicaPoolerWithResponse call
+func ParseDisableReplicaPoolerResponse(rsp *http.Response) (*DisableReplicaPoolerResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdDisablePoolerResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SuccessMessage
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
-		var dest ClientError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON4XX = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoolerResponse{
+	response := &DisableReplicaPoolerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4340,41 +4307,15 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdEnablePoo
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse, error) {
+// ParseEnableReplicaPoolerResponse parses an HTTP response from a EnableReplicaPoolerWithResponse call
+func ParseEnableReplicaPoolerResponse(rsp *http.Response) (*EnableReplicaPoolerResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdResizeResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
-		var dest ClientError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON4XX = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnvironmentResponse{
+	response := &EnableReplicaPoolerResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4399,27 +4340,20 @@ func ParsePostProjectsProjectIdServicesServiceIdReplicaSetsReplicaSetIdSetEnviro
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdResizeResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdResizeWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdResizeResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdResizeResponse, error) {
+// ParseResizeReplicaSetResponse parses an HTTP response from a ResizeReplicaSetWithResponse call
+func ParseResizeReplicaSetResponse(rsp *http.Response) (*ResizeReplicaSetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdResizeResponse{
+	response := &ResizeReplicaSetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
-		var dest Service
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON202 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -4432,15 +4366,15 @@ func ParsePostProjectsProjectIdServicesServiceIdResizeResponse(rsp *http.Respons
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdSetEnvironmentWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse, error) {
+// ParseSetReplicaEnvironmentResponse parses an HTTP response from a SetReplicaEnvironmentWithResponse call
+func ParseSetReplicaEnvironmentResponse(rsp *http.Response) (*SetReplicaEnvironmentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdSetEnvironmentResponse{
+	response := &SetReplicaEnvironmentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4465,15 +4399,15 @@ func ParsePostProjectsProjectIdServicesServiceIdSetEnvironmentResponse(rsp *http
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdSetHAResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdSetHAWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdSetHAResponse, error) {
+// ParseResizeServiceResponse parses an HTTP response from a ResizeServiceWithResponse call
+func ParseResizeServiceResponse(rsp *http.Response) (*ResizeServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdSetHAResponse{
+	response := &ResizeServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4498,15 +4432,48 @@ func ParsePostProjectsProjectIdServicesServiceIdSetHAResponse(rsp *http.Response
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdStartResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdStartWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdStartResponse, error) {
+// ParseSetEnvironmentResponse parses an HTTP response from a SetEnvironmentWithResponse call
+func ParseSetEnvironmentResponse(rsp *http.Response) (*SetEnvironmentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdStartResponse{
+	response := &SetEnvironmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuccessMessage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetHAReplicaResponse parses an HTTP response from a SetHAReplicaWithResponse call
+func ParseSetHAReplicaResponse(rsp *http.Response) (*SetHAReplicaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetHAReplicaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4531,15 +4498,15 @@ func ParsePostProjectsProjectIdServicesServiceIdStartResponse(rsp *http.Response
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdStopResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdStopWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdStopResponse, error) {
+// ParseStartServiceResponse parses an HTTP response from a StartServiceWithResponse call
+func ParseStartServiceResponse(rsp *http.Response) (*StartServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdStopResponse{
+	response := &StartServiceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4564,15 +4531,48 @@ func ParsePostProjectsProjectIdServicesServiceIdStopResponse(rsp *http.Response)
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse parses an HTTP response from a PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse call
-func ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse(rsp *http.Response) (*PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse, error) {
+// ParseStopServiceResponse parses an HTTP response from a StopServiceWithResponse call
+func ParseStopServiceResponse(rsp *http.Response) (*StopServiceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdServicesServiceIdUpdatePasswordResponse{
+	response := &StopServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdatePasswordResponse parses an HTTP response from a UpdatePasswordWithResponse call
+func ParseUpdatePasswordResponse(rsp *http.Response) (*UpdatePasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdatePasswordResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4590,15 +4590,15 @@ func ParsePostProjectsProjectIdServicesServiceIdUpdatePasswordResponse(rsp *http
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdVpcsResponse parses an HTTP response from a GetProjectsProjectIdVpcsWithResponse call
-func ParseGetProjectsProjectIdVpcsResponse(rsp *http.Response) (*GetProjectsProjectIdVpcsResponse, error) {
+// ParseGetVPCsResponse parses an HTTP response from a GetVPCsWithResponse call
+func ParseGetVPCsResponse(rsp *http.Response) (*GetVPCsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdVpcsResponse{
+	response := &GetVPCsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4623,15 +4623,15 @@ func ParseGetProjectsProjectIdVpcsResponse(rsp *http.Response) (*GetProjectsProj
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdVpcsResponse parses an HTTP response from a PostProjectsProjectIdVpcsWithResponse call
-func ParsePostProjectsProjectIdVpcsResponse(rsp *http.Response) (*PostProjectsProjectIdVpcsResponse, error) {
+// ParseCreateVPCResponse parses an HTTP response from a CreateVPCWithResponse call
+func ParseCreateVPCResponse(rsp *http.Response) (*CreateVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdVpcsResponse{
+	response := &CreateVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4656,15 +4656,15 @@ func ParsePostProjectsProjectIdVpcsResponse(rsp *http.Response) (*PostProjectsPr
 	return response, nil
 }
 
-// ParseDeleteProjectsProjectIdVpcsVpcIdResponse parses an HTTP response from a DeleteProjectsProjectIdVpcsVpcIdWithResponse call
-func ParseDeleteProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*DeleteProjectsProjectIdVpcsVpcIdResponse, error) {
+// ParseDeleteVPCResponse parses an HTTP response from a DeleteVPCWithResponse call
+func ParseDeleteVPCResponse(rsp *http.Response) (*DeleteVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteProjectsProjectIdVpcsVpcIdResponse{
+	response := &DeleteVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4682,15 +4682,15 @@ func ParseDeleteProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*DeleteP
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdVpcsVpcIdResponse parses an HTTP response from a GetProjectsProjectIdVpcsVpcIdWithResponse call
-func ParseGetProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*GetProjectsProjectIdVpcsVpcIdResponse, error) {
+// ParseGetVPCResponse parses an HTTP response from a GetVPCWithResponse call
+func ParseGetVPCResponse(rsp *http.Response) (*GetVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdVpcsVpcIdResponse{
+	response := &GetVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4715,15 +4715,15 @@ func ParseGetProjectsProjectIdVpcsVpcIdResponse(rsp *http.Response) (*GetProject
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdVpcsVpcIdPeeringsResponse parses an HTTP response from a GetProjectsProjectIdVpcsVpcIdPeeringsWithResponse call
-func ParseGetProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*GetProjectsProjectIdVpcsVpcIdPeeringsResponse, error) {
+// ParseGetVPCPeeringsResponse parses an HTTP response from a GetVPCPeeringsWithResponse call
+func ParseGetVPCPeeringsResponse(rsp *http.Response) (*GetVPCPeeringsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdVpcsVpcIdPeeringsResponse{
+	response := &GetVPCPeeringsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4748,15 +4748,15 @@ func ParseGetProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*Ge
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse parses an HTTP response from a PostProjectsProjectIdVpcsVpcIdPeeringsWithResponse call
-func ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*PostProjectsProjectIdVpcsVpcIdPeeringsResponse, error) {
+// ParseCreateVPCPeeringResponse parses an HTTP response from a CreateVPCPeeringWithResponse call
+func ParseCreateVPCPeeringResponse(rsp *http.Response) (*CreateVPCPeeringResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdVpcsVpcIdPeeringsResponse{
+	response := &CreateVPCPeeringResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4781,15 +4781,15 @@ func ParsePostProjectsProjectIdVpcsVpcIdPeeringsResponse(rsp *http.Response) (*P
 	return response, nil
 }
 
-// ParseDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse parses an HTTP response from a DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse call
-func ParseDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Response) (*DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error) {
+// ParseDeleteVPCPeeringResponse parses an HTTP response from a DeleteVPCPeeringWithResponse call
+func ParseDeleteVPCPeeringResponse(rsp *http.Response) (*DeleteVPCPeeringResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse{
+	response := &DeleteVPCPeeringResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4807,15 +4807,15 @@ func ParseDeleteProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Re
 	return response, nil
 }
 
-// ParseGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse parses an HTTP response from a GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdWithResponse call
-func ParseGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Response) (*GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse, error) {
+// ParseGetVPCPeeringResponse parses an HTTP response from a GetVPCPeeringWithResponse call
+func ParseGetVPCPeeringResponse(rsp *http.Response) (*GetVPCPeeringResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse{
+	response := &GetVPCPeeringResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -4840,15 +4840,15 @@ func ParseGetProjectsProjectIdVpcsVpcIdPeeringsPeeringIdResponse(rsp *http.Respo
 	return response, nil
 }
 
-// ParsePostProjectsProjectIdVpcsVpcIdRenameResponse parses an HTTP response from a PostProjectsProjectIdVpcsVpcIdRenameWithResponse call
-func ParsePostProjectsProjectIdVpcsVpcIdRenameResponse(rsp *http.Response) (*PostProjectsProjectIdVpcsVpcIdRenameResponse, error) {
+// ParseRenameVPCResponse parses an HTTP response from a RenameVPCWithResponse call
+func ParseRenameVPCResponse(rsp *http.Response) (*RenameVPCResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostProjectsProjectIdVpcsVpcIdRenameResponse{
+	response := &RenameVPCResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
