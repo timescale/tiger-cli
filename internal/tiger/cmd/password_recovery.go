@@ -244,7 +244,7 @@ func updateAndSaveServicePassword(
 ) error {
 	// Call API to update password
 	updateReq := api.UpdatePasswordInput{Password: newPassword}
-	resp, err := client.PostProjectsProjectIdServicesServiceIdUpdatePasswordWithResponse(ctx, *service.ProjectId, *service.ServiceId, updateReq)
+	resp, err := client.UpdatePasswordWithResponse(ctx, *service.ProjectId, *service.ServiceId, updateReq)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
