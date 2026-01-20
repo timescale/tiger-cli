@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -572,7 +573,17 @@ func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
 
 	// Parameters (input schema)
 	if tool.InputSchema != nil {
-		formatted := formatJSONSchema(tool.InputSchema, 1)
+		raw, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			return fmt.Errorf("Error marshaling input schema to JSON: %w", err)
+		}
+
+		var inputSchema *jsonschema.Schema
+		if err := json.Unmarshal(raw, &inputSchema); err != nil {
+			return fmt.Errorf("Error unmarshaling input schema from JSON: %w", err)
+		}
+
+		formatted := formatJSONSchema(inputSchema, 1)
 		if formatted != "" {
 			lines = append(lines, "Parameters:")
 			lines = append(lines, formatted)
@@ -582,7 +593,17 @@ func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
 
 	// Output schema
 	if tool.OutputSchema != nil {
-		formatted := formatJSONSchema(tool.OutputSchema, 1)
+		raw, err := json.Marshal(tool.OutputSchema)
+		if err != nil {
+			return fmt.Errorf("Error marshaling output schema to JSON: %w", err)
+		}
+
+		var outputSchema *jsonschema.Schema
+		if err := json.Unmarshal(raw, &outputSchema); err != nil {
+			return fmt.Errorf("Error unmarshaling output schema from JSON: %w", err)
+		}
+
+		formatted := formatJSONSchema(outputSchema, 1)
 		if formatted != "" {
 			lines = append(lines, "Output:")
 			lines = append(lines, formatted)
