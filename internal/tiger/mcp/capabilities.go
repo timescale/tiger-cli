@@ -85,3 +85,81 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 
 	return capabilities, nil
 }
+
+func (c *Capabilities) Names() []string {
+	var names []string
+	for _, tool := range c.Tools {
+		names = append(names, tool.Name)
+	}
+	for _, prompt := range c.Prompts {
+		names = append(names, prompt.Name)
+	}
+	for _, resource := range c.Resources {
+		names = append(names, resource.Name)
+	}
+	for _, template := range c.ResourceTemplates {
+		names = append(names, template.Name)
+	}
+	return names
+}
+
+// Get finds any capability (tool, prompt, resource, or resource template) by
+// name.  Returns the capability if found, or nil if not found. Note that if
+// there are duplicate names (e.g. a tool and a prompt with the same name) it
+// will return the first found. We should therefore aim to avoid duplicate
+// capability names.
+func (c *Capabilities) Get(name string) any {
+	if tool := c.getTool(name); tool != nil {
+		return tool
+	}
+	if prompt := c.getPrompt(name); prompt != nil {
+		return prompt
+	}
+	if resource := c.getResource(name); resource != nil {
+		return resource
+	}
+	if template := c.getResourceTemplate(name); template != nil {
+		return template
+	}
+	return nil
+}
+
+// getTool finds a tool by name, returns the tool if found, nil otherwise
+func (c *Capabilities) getTool(name string) *mcp.Tool {
+	for _, tool := range c.Tools {
+		if tool.Name == name {
+			return tool
+		}
+	}
+	return nil
+}
+
+// getPrompt finds a prompt by name, returns the prompt if found, nil otherwise
+func (c *Capabilities) getPrompt(name string) *mcp.Prompt {
+	for _, prompt := range c.Prompts {
+		if prompt.Name == name {
+			return prompt
+		}
+	}
+	return nil
+}
+
+// getResource finds a resource by name, returns the resource if found, nil otherwise
+func (c *Capabilities) getResource(name string) *mcp.Resource {
+	for _, resource := range c.Resources {
+		if resource.Name == name {
+			return resource
+		}
+	}
+	return nil
+}
+
+// getResourceTemplate finds a resource template by name, returns the template if found, nil otherwise
+func (c *Capabilities) getResourceTemplate(name string) *mcp.ResourceTemplate {
+	for _, template := range c.ResourceTemplates {
+		if template.Name == name {
+			return template
+		}
+	}
+	return nil
+}

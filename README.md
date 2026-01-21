@@ -111,6 +111,7 @@ Tiger CLI provides the following commands:
   - `install` - Install and configure MCP server for an AI assistant
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources
+  - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
 - `tiger version` - Show version information
 
 Use `tiger <command> --help` for detailed information about each command.
@@ -190,9 +191,8 @@ The MCP server automatically uses your CLI authentication and configuration, so 
 In addition to the service management tools listed above, the Tiger MCP server also proxies tools from a remote documentation MCP server. This feature provides AI assistants with semantic search capabilities for PostgreSQL, TimescaleDB, and Tiger Cloud documentation, as well as prompts/guides for various Tiger Cloud features.
 
 The proxied documentation server ([pg-aiguide](https://github.com/timescale/pg-aiguide)) currently provides the following tools:
-- `view_skill` - Retrieve comprehensive guides for TimescaleDB features and best practices
-- `semantic_search_postgres_docs` - Search PostgreSQL documentation using natural language queries
-- `semantic_search_tiger_docs` - Search Tiger Cloud and TimescaleDB documentation using natural language queries
+- `view_skill` - Retrieve comprehensive guides for Postgres and TimescaleDB features and best practices
+- `search_docs` - Search PostgreSQL and TimescaleDB documentation using natural language queries
 
 This proxy connection is enabled by default and requires no additional configuration.
 
