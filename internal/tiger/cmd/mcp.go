@@ -290,35 +290,28 @@ func buildMCPGetCmd() *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
-		Use:     "get <type> <name>",
+		Use:     "get <name>",
 		Aliases: []string{"describe", "show"},
 		Short:   "Get detailed information about a specific MCP capability",
 		Long: `Get detailed information about a specific MCP tool, prompt, resource, or resource template.
 
-The type argument must be one of: tool, prompt, resource, resource_template
-
 Examples:
   # Get details about a tool
-  tiger mcp get tool service_create
+  tiger mcp get service_create
 
   # Get details about a prompt
-  tiger mcp get prompt setup-timescaledb-hypertables
+  tiger mcp get setup-timescaledb-hypertables
 
   # Get details as JSON
-  tiger mcp get tool service_create -o json
+  tiger mcp get service_create -o json
 
   # Get details as YAML
-  tiger mcp get tool service_create -o yaml`,
-		Args:              cobra.ExactArgs(2),
+  tiger mcp get service_create -o yaml`,
+		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: mcpGetCompletion,
 		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate capability type
-			capabilityType, err := mcp.ValidateCapabilityType(args[0])
-			if err != nil {
-				return err
-			}
-			capabilityName := args[1]
+			capabilityName := args[0]
 
 			cmd.SilenceUsage = true
 
@@ -347,25 +340,9 @@ Examples:
 			}
 
 			// Find the specific capability
-			var (
-				capability any
-				found      bool
-			)
-			switch capabilityType {
-			case mcp.CapabilityTypeTool:
-				capability, found = capabilities.GetTool(capabilityName)
-			case mcp.CapabilityTypePrompt:
-				capability, found = capabilities.GetPrompt(capabilityName)
-			case mcp.CapabilityTypeResource:
-				capability, found = capabilities.GetResource(capabilityName)
-			case mcp.CapabilityTypeResourceTemplate:
-				capability, found = capabilities.GetResourceTemplate(capabilityName)
-			default:
-				return fmt.Errorf("unsupported capability type: %s", capabilityType)
-			}
-
-			if !found {
-				return fmt.Errorf("%s %q not found", capabilityType, capabilityName)
+			capability := capabilities.Get(capabilityName)
+			if capability == nil {
+				return fmt.Errorf("capability %q not found", capabilityName)
 			}
 
 			// Format output
@@ -936,62 +913,27 @@ func formatPromptArguments(arguments []*mcpsdk.PromptArgument) string {
 
 // mcpGetCompletion provides custom completions for the get command
 func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// First argument: capability type
-	if len(args) == 0 {
-		return filterCompletionsByPrefix(
-			mcp.ValidCapabilityTypes().Strings(), toComplete,
-		), cobra.ShellCompDirectiveNoFileComp
+	// Capability name is always first positional argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	// Second argument: capability name based on type
-	if len(args) == 1 {
-		// Validate capability type
-		capabilityType, err := mcp.ValidateCapabilityType(args[0])
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
+	// Create MCP server to get capabilities
+	server, err := mcp.NewServer(cmd.Context())
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	defer server.Close()
 
-		// Create MCP server to get capabilities
-		server, err := mcp.NewServer(cmd.Context())
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		defer server.Close()
-
-		capabilities, err := server.ListCapabilities(cmd.Context())
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		// Close the MCP server when finished
-		if err := server.Close(); err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		var names []string
-		switch capabilityType {
-		case mcp.CapabilityTypeTool:
-			for _, tool := range capabilities.Tools {
-				names = append(names, tool.Name)
-			}
-		case mcp.CapabilityTypePrompt:
-			for _, prompt := range capabilities.Prompts {
-				names = append(names, prompt.Name)
-			}
-		case mcp.CapabilityTypeResource:
-			for _, resource := range capabilities.Resources {
-				names = append(names, resource.Name)
-			}
-		case mcp.CapabilityTypeResourceTemplate:
-			for _, template := range capabilities.ResourceTemplates {
-				names = append(names, template.Name)
-			}
-		default:
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		return filterCompletionsByPrefix(names, toComplete), cobra.ShellCompDirectiveNoFileComp
+	capabilities, err := server.ListCapabilities(cmd.Context())
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	return nil, cobra.ShellCompDirectiveNoFileComp
+	// Close the MCP server when finished
+	if err := server.Close(); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return filterCompletionsByPrefix(capabilities.Names(), toComplete), cobra.ShellCompDirectiveNoFileComp
 }

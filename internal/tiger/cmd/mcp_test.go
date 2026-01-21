@@ -258,31 +258,13 @@ func TestMCPGetCommand(t *testing.T) {
 		{name: "setup-timescaledb-hypertables", arguments: false},
 	}
 
-	t.Run("Invalid capability type", func(t *testing.T) {
+	t.Run("Invalid capability name", func(t *testing.T) {
 		rootCmd, _ := setupMCPTest(t)
 
-		// Execute with invalid capability type
-		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "invalid_type", "some_name"})
-		assert.Error(t, err, "should error for invalid capability type")
-		assert.Contains(t, err.Error(), "invalid capability type", "error should mention invalid capability type")
-	})
-
-	t.Run("Invalid tool name", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
-
-		// Execute with valid type but invalid name
-		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "tool", "nonexistent_tool"})
-		assert.Error(t, err, "should error for nonexistent tool")
-		assert.Contains(t, err.Error(), "not found", "error should mention tool not found")
-	})
-
-	t.Run("Invalid prompt name", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
-
-		// Execute with valid type but invalid name
-		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "prompt", "nonexistent-prompt"})
-		assert.Error(t, err, "should error for nonexistent prompt")
-		assert.Contains(t, err.Error(), "not found", "error should mention prompt not found")
+		// Execute with invalid capability name
+		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "nonexistent_capability"})
+		assert.Error(t, err, "should error for nonexistent capability")
+		assert.Contains(t, err.Error(), "not found", "error should mention capability not found")
 	})
 
 	t.Run("Valid tools", func(t *testing.T) {
@@ -290,7 +272,7 @@ func TestMCPGetCommand(t *testing.T) {
 			t.Run(tool.name, func(t *testing.T) {
 				t.Run("Table", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "tool", tool.name})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name})
 
 					lines := strings.Split(output, "\n")
 					require.NotEmpty(t, lines, "output should not be empty")
@@ -314,7 +296,7 @@ func TestMCPGetCommand(t *testing.T) {
 
 				t.Run("JSON", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "tool", tool.name, "-o", "json"})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "json"})
 
 					// Should be valid JSON
 					var toolData map[string]interface{}
@@ -333,7 +315,7 @@ func TestMCPGetCommand(t *testing.T) {
 
 				t.Run("YAML", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "tool", tool.name, "-o", "yaml"})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "yaml"})
 
 					// Should be valid YAML
 					var toolData map[string]interface{}
@@ -358,7 +340,7 @@ func TestMCPGetCommand(t *testing.T) {
 			t.Run(prompt.name, func(t *testing.T) {
 				t.Run("Table", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "prompt", prompt.name})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name})
 
 					lines := strings.Split(output, "\n")
 					require.NotEmpty(t, lines, "output should not be empty")
@@ -377,7 +359,7 @@ func TestMCPGetCommand(t *testing.T) {
 
 				t.Run("JSON", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "prompt", prompt.name, "-o", "json"})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "json"})
 
 					// Should be valid JSON
 					var promptData map[string]interface{}
@@ -398,7 +380,7 @@ func TestMCPGetCommand(t *testing.T) {
 
 				t.Run("YAML", func(t *testing.T) {
 					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", "prompt", prompt.name, "-o", "yaml"})
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "yaml"})
 
 					// Should be valid YAML
 					var promptData map[string]interface{}

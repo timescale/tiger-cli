@@ -3,63 +3,12 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"go.uber.org/zap"
 )
-
-// CapabilityType represents a type of MCP capability
-type CapabilityType string
-
-const (
-	CapabilityTypeTool             CapabilityType = "tool"
-	CapabilityTypePrompt           CapabilityType = "prompt"
-	CapabilityTypeResource         CapabilityType = "resource"
-	CapabilityTypeResourceTemplate CapabilityType = "resource_template"
-)
-
-// String returns the string representation of the capability type
-func (t CapabilityType) String() string {
-	return string(t)
-}
-
-type CapabilityTypes []CapabilityType
-
-func (t CapabilityTypes) Strings() []string {
-	strs := make([]string, len(t))
-	for i, t := range t {
-		strs[i] = t.String()
-	}
-	return strs
-}
-
-func (t CapabilityTypes) String() string {
-	return strings.Join(t.Strings(), ", ")
-}
-
-func ValidCapabilityTypes() CapabilityTypes {
-	return CapabilityTypes{
-		CapabilityTypeTool,
-		CapabilityTypePrompt,
-		CapabilityTypeResource,
-		CapabilityTypeResourceTemplate,
-	}
-}
-
-// ValidateCapabilityType validates that a string is a valid capability type
-// Returns the CapabilityType and nil if valid, or an error if invalid
-func ValidateCapabilityType(s string) (CapabilityType, error) {
-	types := ValidCapabilityTypes()
-	for _, valid := range types {
-		if s == string(valid) {
-			return valid, nil
-		}
-	}
-	return "", fmt.Errorf("invalid capability type %q, must be one of: %s", s, types)
-}
 
 // Capabilities holds all MCP server capabilities
 type Capabilities struct {
@@ -137,42 +86,77 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 	return capabilities, nil
 }
 
-// GetTool finds a tool by name, returns the tool and true if found, nil and false otherwise
-func (c *Capabilities) GetTool(name string) (*mcp.Tool, bool) {
+func (c *Capabilities) Names() []string {
+	var names []string
+	for _, tool := range c.Tools {
+		names = append(names, tool.Name)
+	}
+	for _, prompt := range c.Prompts {
+		names = append(names, prompt.Name)
+	}
+	for _, resource := range c.Resources {
+		names = append(names, resource.Name)
+	}
+	for _, template := range c.ResourceTemplates {
+		names = append(names, template.Name)
+	}
+	return names
+}
+
+// Get finds any capability (tool, prompt, resource, or resource template) by name.
+// Returns the capability if found, or nil if not found.
+func (c *Capabilities) Get(name string) any {
+	if tool := c.getTool(name); tool != nil {
+		return tool
+	}
+	if prompt := c.getPrompt(name); prompt != nil {
+		return prompt
+	}
+	if resource := c.getResource(name); resource != nil {
+		return resource
+	}
+	if template := c.getResourceTemplate(name); template != nil {
+		return template
+	}
+	return nil
+}
+
+// getTool finds a tool by name, returns the tool if found, nil otherwise
+func (c *Capabilities) getTool(name string) *mcp.Tool {
 	for _, tool := range c.Tools {
 		if tool.Name == name {
-			return tool, true
+			return tool
 		}
 	}
-	return nil, false
+	return nil
 }
 
-// GetPrompt finds a prompt by name, returns the prompt and true if found, nil and false otherwise
-func (c *Capabilities) GetPrompt(name string) (*mcp.Prompt, bool) {
+// getPrompt finds a prompt by name, returns the prompt if found, nil otherwise
+func (c *Capabilities) getPrompt(name string) *mcp.Prompt {
 	for _, prompt := range c.Prompts {
 		if prompt.Name == name {
-			return prompt, true
+			return prompt
 		}
 	}
-	return nil, false
+	return nil
 }
 
-// GetResource finds a resource by name, returns the resource and true if found, nil and false otherwise
-func (c *Capabilities) GetResource(name string) (*mcp.Resource, bool) {
+// getResource finds a resource by name, returns the resource if found, nil otherwise
+func (c *Capabilities) getResource(name string) *mcp.Resource {
 	for _, resource := range c.Resources {
 		if resource.Name == name {
-			return resource, true
+			return resource
 		}
 	}
-	return nil, false
+	return nil
 }
 
-// GetResourceTemplate finds a resource template by name, returns the template and true if found, nil and false otherwise
-func (c *Capabilities) GetResourceTemplate(name string) (*mcp.ResourceTemplate, bool) {
+// getResourceTemplate finds a resource template by name, returns the template if found, nil otherwise
+func (c *Capabilities) getResourceTemplate(name string) *mcp.ResourceTemplate {
 	for _, template := range c.ResourceTemplates {
 		if template.Name == name {
-			return template, true
+			return template
 		}
 	}
-	return nil, false
+	return nil
 }
