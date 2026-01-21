@@ -3156,6 +3156,7 @@ func (r SetReplicaEnvironmentResponse) StatusCode() int {
 type ResizeServiceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON202      *Service
 	JSON4XX      *ClientError
 }
 
@@ -4590,6 +4591,13 @@ func ParseResizeServiceResponse(rsp *http.Response) (*ResizeServiceResponse, err
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

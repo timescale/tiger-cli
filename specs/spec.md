@@ -283,14 +283,20 @@ tiger service delete svc-12345 --confirm --no-wait
 # Delete service with custom wait timeout
 tiger service delete svc-12345 --confirm --wait-timeout 15m
 
-# Resize service
-tiger service resize svc-12345 --cpu 4 --memory 16GB
+# Resize service (specify both CPU and memory)
+tiger service resize svc-12345 --cpu 2000 --memory 8
+
+# Resize service (specify only CPU, memory auto-configured)
+tiger service resize svc-12345 --cpu 2000
+
+# Resize service (specify only memory, CPU auto-configured)
+tiger service resize svc-12345 --memory 8
 
 # Resize service without waiting
-tiger service resize svc-12345 --cpu 4 --memory 16GB --no-wait
+tiger service resize svc-12345 --cpu 2000 --memory 8 --no-wait
 
 # Resize service with custom timeout
-tiger service resize svc-12345 --cpu 4 --memory 16GB --wait-timeout 15m
+tiger service resize svc-12345 --cpu 2000 --memory 8 --wait-timeout 15m
 
 # Start/stop service
 tiger service start svc-12345
@@ -372,14 +378,6 @@ tiger service create --name "my-service" --memory 8
 
 # Creates a production service with 4 CPU and 16GB memory
 tiger service create --name "prod-db" --cpu 4 --memory 16 --environment PROD
-
-```bash
-
-# Resize with only CPU
-tiger service resize svc-12345 --cpu 4
-
-# Resize with only memory
-tiger service resize svc-12345 --memory 16
 ```
 
 **Note:** A future command like `tiger service list-types` or `tiger service list-configurations` should be added to programmatically discover available service types, CPU/memory configurations, and regions without requiring users to reference documentation.

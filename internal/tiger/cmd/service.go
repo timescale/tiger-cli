@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -39,6 +40,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceStopCmd())
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 	cmd.AddCommand(buildServiceForkCmd())
+	cmd.AddCommand(buildServiceResizeCmd())
 	cmd.AddCommand(buildServiceLogsCmd())
 
 	return cmd
@@ -100,14 +102,13 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 200 {
+			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-
 			service := *resp.JSON200
 
 			// Output service in requested format
@@ -153,11 +154,15 @@ func buildServiceListCmd() *cobra.Command {
 			statusOutput := cmd.ErrOrStderr()
 
 			// Handle API response
-			if resp.StatusCode() != 200 {
+			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
 			services := *resp.JSON200
+
 			if len(services) == 0 {
 				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
 				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
@@ -271,7 +276,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(createCpuMillis, createMemoryGBs)
 			if err != nil {
 				return err
 			}
@@ -295,8 +300,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				Name:           createServiceName,
 				Addons:         util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),
 				ReplicaCount:   &createReplicaCount,
-				CpuMillis:      cpuMillis,
-				MemoryGbs:      memoryGBs,
+				CpuMillis:      cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs:      cpuMemoryCfg.MemoryGBsString(),
 				EnvironmentTag: &environmentTag,
 			}
 
@@ -322,67 +327,64 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Handle API response
-			switch resp.StatusCode() {
-			case 202:
-				// Success - service creation accepted
-				if resp.JSON202 == nil {
-					fmt.Fprintln(statusOutput, "✅ Service creation request accepted!")
-					return nil
-				}
-
-				service := *resp.JSON202
-				serviceID := util.Deref(service.ServiceId)
-				fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
-				fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
-
-				// Save password immediately after service creation, before any waiting
-				// This ensures users have access even if they interrupt the wait or it fails
-				passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
-
-				// Set as default service unless --no-set-default is specified
-				if !createNoSetDefault {
-					if err := setDefaultService(cfg.Config, serviceID, statusOutput); err != nil {
-						// Log warning but don't fail the command
-						fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
-					}
-				}
-
-				// Handle wait behavior
-				var waitErr error
-				if createNoWait {
-					fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
-				} else {
-					// Wait for service to be ready
-					fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait Timeout: %v)...\n", createWaitTimeout)
-					if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-						Client:    cfg.Client,
-						ProjectID: cfg.ProjectID,
-						ServiceID: serviceID,
-						Handler: &common.StatusWaitHandler{
-							TargetStatus: "READY",
-							Service:      &service,
-						},
-						Output:     statusOutput,
-						Timeout:    createWaitTimeout,
-						TimeoutMsg: "service may still be provisioning",
-					}); waitErr != nil {
-						fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
-					} else {
-						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
-						printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
-					}
-				}
-
-				if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
-				}
-
-				// Return error for sake of exit code, but silence it since it was already output above
-				cmd.SilenceErrors = true
-				return waitErr
-			default:
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+			service := *resp.JSON202
+			serviceID := util.Deref(service.ServiceId)
+
+			fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
+			fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
+
+			// Save password immediately after service creation, before any waiting
+			// This ensures users have access even if they interrupt the wait or it fails
+			passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
+
+			// Set as default service unless --no-set-default is specified
+			if !createNoSetDefault {
+				if err := setDefaultService(cfg.Config, serviceID, statusOutput); err != nil {
+					// Log warning but don't fail the command
+					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+				}
+			}
+
+			// Handle wait behavior
+			var waitErr error
+			if createNoWait {
+				fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
+			} else {
+				// Wait for service to be ready
+				fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
+				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+					Client:    cfg.Client,
+					ProjectID: cfg.ProjectID,
+					ServiceID: serviceID,
+					Handler: &common.StatusWaitHandler{
+						TargetStatus: "READY",
+						Service:      &service,
+					},
+					Output:     statusOutput,
+					Timeout:    createWaitTimeout,
+					TimeoutMsg: "service may still be provisioning",
+				}); waitErr != nil {
+					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
+				} else {
+					fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+					printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
+				}
+			}
+
+			if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
+				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+			}
+
+			// Return error for sake of exit code, but silence it since it was already output above
+			cmd.SilenceErrors = true
+			return waitErr
 		},
 	}
 
@@ -472,8 +474,12 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
-			if serviceResp.StatusCode() != 200 {
+			if serviceResp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+			}
+
+			if serviceResp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *serviceResp.JSON200
 
@@ -856,7 +862,7 @@ Examples:
 			}
 
 			// Handle response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
@@ -948,8 +954,12 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *resp.JSON202
 
@@ -963,7 +973,7 @@ Examples:
 			}
 
 			// Wait for service to become ready
-			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait Timeout: %v)...\n", startWaitTimeout)
+			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    cfg.Client,
 				ProjectID: cfg.ProjectID,
@@ -1044,8 +1054,12 @@ Examples:
 			}
 
 			// Handle API response
-			if resp.StatusCode() != 202 {
+			if resp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
 			}
 			service := *resp.JSON202
 
@@ -1195,7 +1209,7 @@ Examples:
 			defer cancel()
 
 			// Use provided custom values, validate against allowed combinations
-			cpuMillis, memoryGBs, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
 			if err != nil {
 				return err
 			}
@@ -1236,8 +1250,8 @@ Examples:
 			forkReq := api.ForkServiceCreate{
 				ForkStrategy:   forkStrategy,
 				TargetTime:     targetTime,
-				CpuMillis:      cpuMillis,
-				MemoryGbs:      memoryGBs,
+				CpuMillis:      cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs:      cpuMemoryCfg.MemoryGBsString(),
 				EnvironmentTag: &environmentTag,
 			}
 
@@ -1253,13 +1267,16 @@ Examples:
 			}
 
 			// Handle API response
-			if forkResp.StatusCode() != 202 {
+			if forkResp.StatusCode() != http.StatusAccepted {
 				return common.ExitWithErrorFromStatusCode(forkResp.StatusCode(), forkResp.JSON4XX)
 			}
 
-			// Success - service fork accepted
+			if forkResp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
 			forkedService := *forkResp.JSON202
 			forkedServiceID := util.DerefStr(forkedService.ServiceId)
+
 			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
@@ -1327,6 +1344,150 @@ Examples:
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+
+	return cmd
+}
+
+// buildServiceResizeCmd creates the resize subcommand
+func buildServiceResizeCmd() *cobra.Command {
+	var resizeCPU string
+	var resizeMemory string
+	var resizeNoWait bool
+	var resizeWaitTimeout time.Duration
+
+	cmd := &cobra.Command{
+		Use:   "resize [service-id]",
+		Short: "Resize a database service",
+		Long: `Resize a database service by changing its CPU and memory allocation.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command changes the compute and memory resources
+allocated to your database service.
+
+The service may be temporarily unavailable during the resize operation. Note
+that changing resources will affect your billing - increasing resources will
+increase costs.
+
+Examples:
+  # Resize default service to 2 CPU cores and 8GB memory
+  tiger service resize --cpu 2000 --memory 8
+
+  # Resize specific service to 4 CPU cores and 16GB memory
+  tiger service resize svc-12345 --cpu 4000 --memory 16
+
+  # Resize service using only CPU (memory will be auto-configured to 8GB)
+  tiger service resize --cpu 2000
+
+  # Resize service using only memory (CPU will be auto-configured to 4000m)
+  tiger service resize --memory 16
+
+  # Resize without waiting for completion (waits by default)
+  tiger service resize --cpu 2000 --memory 8 --no-wait
+
+  # Resize with custom wait timeout
+  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
+
+Allowed CPU/Memory Configurations:
+  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Determine service ID
+			serviceID, err := getServiceID(cfg.Config, args)
+			if err != nil {
+				return err
+			}
+
+			// Validate and normalize CPU/Memory configuration
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
+			if err != nil {
+				return err
+			}
+
+			// At least one of CPU or memory must be specified
+			if cpuMemoryCfg == nil {
+				return fmt.Errorf("must specify at least one of --cpu or --memory")
+			}
+
+			cmd.SilenceUsage = true
+
+			// Display resize information
+			statusOutput := cmd.ErrOrStderr()
+			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
+
+			// Prepare resize request
+			resizeReq := api.ResizeInput{
+				CpuMillis: *cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
+			}
+
+			// Make API call to resize service
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
+
+			resp, err := cfg.Client.ResizeServiceWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
+			if err != nil {
+				return fmt.Errorf("failed to resize service: %w", err)
+			}
+
+			// Handle API response
+			if resp.StatusCode() != http.StatusAccepted {
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON202 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+			service := *resp.JSON202
+
+			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
+
+			// If not waiting, return early
+			if resizeNoWait {
+				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
+				return nil
+			}
+
+			// Wait for resize to complete
+			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
+			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
+				Client:    cfg.Client,
+				ProjectID: cfg.ProjectID,
+				ServiceID: serviceID,
+				Handler: &common.StatusWaitHandler{
+					TargetStatus: "READY",
+					Service:      &service,
+				},
+				Output:     statusOutput,
+				Timeout:    resizeWaitTimeout,
+				TimeoutMsg: "service may still be resizing",
+			}); err != nil {
+				// Return error for sake of exit code, but silence since we already output it
+				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.SilenceErrors = true
+				return err
+			}
+
+			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes")
+	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
+	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	return cmd
 }
@@ -1525,7 +1686,7 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	}
 
 	// Handle API response
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 

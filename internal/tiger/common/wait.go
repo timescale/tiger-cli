@@ -16,6 +16,12 @@ type WaitHandler interface {
 	// to the spinner while waiting for a service to reach some state.
 	Message() string
 
+	// InitialCheck returns true if we don't need to begin the waiting/polling
+	// process, and false if we should.  It also returns an error, which is
+	// either immediately returned from WaitForService or temporarily shown
+	// next to the spinner depending on the first return value.
+	InitialCheck() (bool, error)
+
 	// Check returns true if we're done waiting/polling, and false if we should
 	// continue. It also returns an error, which is either immediately returned
 	// from WaitForService or temporarily shown next to the spinner depending
@@ -36,6 +42,10 @@ type WaitForServiceArgs struct {
 func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 	ctx, cancel := context.WithTimeout(ctx, args.Timeout)
 	defer cancel()
+
+	if done, err := args.Handler.InitialCheck(); done {
+		return err
+	}
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -83,6 +93,11 @@ func (h *StatusWaitHandler) Message() string {
 	return fmt.Sprintf("Service status: %s", util.DerefStr(h.Service.Status))
 }
 
+func (h *StatusWaitHandler) InitialCheck() (bool, error) {
+	// Check initial service status
+	return h.checkServiceStatus(h.Service)
+}
+
 func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 	switch resp.StatusCode() {
 	case 200:
@@ -93,15 +108,8 @@ func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 		// Update the passed-in service's status, so it's correct when output after waiting.
 		h.Service.Status = resp.JSON200.Status
 
-		status := util.DerefStr(resp.JSON200.Status)
-		switch status {
-		case h.TargetStatus:
-			return true, nil
-		case "FAILED", "ERROR":
-			return true, fmt.Errorf("service failed with status: %s", status)
-		default:
-			return false, nil
-		}
+		// Check returned service status
+		return h.checkServiceStatus(resp.JSON200)
 	case 404:
 		// Can happen if user deletes service while it's still provisioning
 		return true, errors.New("service not found")
@@ -114,12 +122,28 @@ func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 	}
 }
 
+func (h *StatusWaitHandler) checkServiceStatus(service *api.Service) (bool, error) {
+	status := util.DerefStr(service.Status)
+	switch status {
+	case h.TargetStatus:
+		return true, nil
+	case "FAILED", "ERROR":
+		return true, fmt.Errorf("service failed with status: %s", status)
+	default:
+		return false, nil
+	}
+}
+
 type DeletionWaitHandler struct {
 	ServiceID string
 }
 
 func (h *DeletionWaitHandler) Message() string {
 	return fmt.Sprintf("Waiting for service '%s' to be deleted", h.ServiceID)
+}
+
+func (h *DeletionWaitHandler) InitialCheck() (bool, error) {
+	return false, nil
 }
 
 func (h *DeletionWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
