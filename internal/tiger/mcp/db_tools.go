@@ -120,7 +120,10 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
 		OutputSchema: DBExecuteQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    false,
 			DestructiveHint: util.Ptr(true), // Can execute destructive SQL
+			IdempotentHint:  false,          // Queries may have side effects
+			OpenWorldHint:   util.Ptr(true),
 			Title:           "Execute SQL Query",
 		},
 	}, s.handleDBExecuteQuery)
