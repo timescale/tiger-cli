@@ -83,8 +83,7 @@ func TestMCPListCommand(t *testing.T) {
 	// Expected tools and prompts that should be present in all output formats
 	expectedTools := []string{
 		"db_execute_query",
-		"semantic_search_postgres_docs",
-		"semantic_search_tiger_docs",
+		"search_docs",
 		"service_create",
 		"service_fork",
 		"service_get",
@@ -238,8 +237,7 @@ func TestMCPGetCommand(t *testing.T) {
 	// Expected tools with their section expectations
 	expectedTools := []toolExpectation{
 		{name: "db_execute_query", parameters: true, output: true},
-		{name: "semantic_search_postgres_docs", parameters: true, output: true},
-		{name: "semantic_search_tiger_docs", parameters: true, output: true},
+		{name: "search_docs", parameters: true, output: true},
 		{name: "service_create", parameters: true, output: true},
 		{name: "service_fork", parameters: true, output: true},
 		{name: "service_get", parameters: true, output: true},
