@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -15,50 +16,74 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
-func TestMCPListCommand(t *testing.T) {
-	// Setup test environment for each subtest
-	setupMCPListTest := func(t *testing.T) (*cobra.Command, string) {
-		t.Helper()
+// setupMCPTest sets up a test environment for MCP command tests.
+// Returns the root command and temporary directory path.
+func setupMCPTest(t *testing.T) (*cobra.Command, string) {
+	t.Helper()
 
-		// Use a unique service name for this test to avoid keyring conflicts
-		setupTestCommand(t)
+	// Use a unique service name for this test to avoid keyring conflicts
+	setupTestCommand(t)
 
-		// Create temporary directory for test config
-		tmpDir, err := os.MkdirTemp("", "tiger-mcp-test-*")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
-		}
-
-		// Set temporary config directory
-		os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-
-		// Disable analytics for tests
-		os.Setenv("TIGER_ANALYTICS", "false")
-
-		// Reset global config and viper to ensure test isolation
-		config.ResetGlobalConfig()
-
-		t.Cleanup(func() {
-			// Reset global config and viper first
-			config.ResetGlobalConfig()
-			// Clean up environment variables BEFORE cleaning up file system
-			os.Unsetenv("TIGER_CONFIG_DIR")
-			os.Unsetenv("TIGER_ANALYTICS")
-			// Then clean up file system
-			os.RemoveAll(tmpDir)
-		})
-
-		rootCmd, err := buildRootCmd(t.Context())
-		require.NoError(t, err, "should build root command")
-
-		return rootCmd, tmpDir
+	// Create temporary directory for test config
+	tmpDir, err := os.MkdirTemp("", "tiger-mcp-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
 	}
+
+	// Set temporary config directory
+	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
+	// Disable analytics for tests
+	os.Setenv("TIGER_ANALYTICS", "false")
+
+	// Reset global config and viper to ensure test isolation
+	config.ResetGlobalConfig()
+
+	t.Cleanup(func() {
+		// Reset global config and viper first
+		config.ResetGlobalConfig()
+		// Clean up environment variables BEFORE cleaning up file system
+		os.Unsetenv("TIGER_CONFIG_DIR")
+		os.Unsetenv("TIGER_ANALYTICS")
+		// Then clean up file system
+		os.RemoveAll(tmpDir)
+	})
+
+	rootCmd, err := buildRootCmd(t.Context())
+	require.NoError(t, err, "should build root command")
+
+	return rootCmd, tmpDir
+}
+
+// executeCommand executes a command and returns both output and error
+func executeCommand(t *testing.T, rootCmd *cobra.Command, args []string) (string, error) {
+	t.Helper()
+
+	var buf strings.Builder
+	rootCmd.SetOut(&buf)
+	rootCmd.SetErr(&buf)
+	rootCmd.SetArgs(args)
+
+	err := rootCmd.Execute()
+	return buf.String(), err
+}
+
+// captureCommandOutput executes a command and returns its output, failing the test if there's an error
+func captureCommandOutput(t *testing.T, rootCmd *cobra.Command, args []string) string {
+	t.Helper()
+
+	output, err := executeCommand(t, rootCmd, args)
+	require.NoError(t, err, "command should execute successfully")
+
+	return output
+}
+
+func TestMCPListCommand(t *testing.T) {
 
 	// Expected tools and prompts that should be present in all output formats
 	expectedTools := []string{
 		"db_execute_query",
-		"semantic_search_postgres_docs",
-		"semantic_search_tiger_docs",
+		"search_docs",
 		"service_create",
 		"service_fork",
 		"service_get",
@@ -126,8 +151,8 @@ func TestMCPListCommand(t *testing.T) {
 		}
 	}
 
-	t.Run("lists capabilities in table format by default", func(t *testing.T) {
-		rootCmd, _ := setupMCPListTest(t)
+	t.Run("Table format", func(t *testing.T) {
+		rootCmd, _ := setupMCPTest(t)
 
 		// Execute the list command
 		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list"})
@@ -156,8 +181,8 @@ func TestMCPListCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("lists capabilities in JSON format", func(t *testing.T) {
-		rootCmd, _ := setupMCPListTest(t)
+	t.Run("JSON format", func(t *testing.T) {
+		rootCmd, _ := setupMCPTest(t)
 
 		// Execute the list command with JSON output
 		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "json"})
@@ -171,8 +196,8 @@ func TestMCPListCommand(t *testing.T) {
 		validateCapabilities(t, capabilities)
 	})
 
-	t.Run("lists capabilities in YAML format", func(t *testing.T) {
-		rootCmd, _ := setupMCPListTest(t)
+	t.Run("YAML format", func(t *testing.T) {
+		rootCmd, _ := setupMCPTest(t)
 
 		// Execute the list command with YAML output
 		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "yaml"})
@@ -186,8 +211,8 @@ func TestMCPListCommand(t *testing.T) {
 		validateCapabilities(t, capabilities)
 	})
 
-	t.Run("handles invalid output format", func(t *testing.T) {
-		rootCmd, _ := setupMCPListTest(t)
+	t.Run("Invalid output format", func(t *testing.T) {
+		rootCmd, _ := setupMCPTest(t)
 
 		// Execute with invalid output format should fail
 		_, err := executeCommand(t, rootCmd, []string{"mcp", "list", "-o", "invalid"})
@@ -195,25 +220,183 @@ func TestMCPListCommand(t *testing.T) {
 	})
 }
 
-// executeCommand executes a command and returns both output and error
-func executeCommand(t *testing.T, rootCmd *cobra.Command, args []string) (string, error) {
-	t.Helper()
+func TestMCPGetCommand(t *testing.T) {
+	// toolExpectation defines what sections we expect for each tool
+	type toolExpectation struct {
+		name       string
+		parameters bool
+		output     bool
+	}
 
-	var buf strings.Builder
-	rootCmd.SetOut(&buf)
-	rootCmd.SetErr(&buf)
-	rootCmd.SetArgs(args)
+	// promptExpectation defines what sections we expect for each prompt
+	type promptExpectation struct {
+		name      string
+		arguments bool
+	}
 
-	err := rootCmd.Execute()
-	return buf.String(), err
-}
+	// Expected tools with their section expectations
+	expectedTools := []toolExpectation{
+		{name: "db_execute_query", parameters: true, output: true},
+		{name: "search_docs", parameters: true, output: true},
+		{name: "service_create", parameters: true, output: true},
+		{name: "service_fork", parameters: true, output: true},
+		{name: "service_get", parameters: true, output: true},
+		{name: "service_list", parameters: false, output: true},
+		{name: "service_start", parameters: true, output: true},
+		{name: "service_stop", parameters: true, output: true},
+		{name: "service_update_password", parameters: true, output: true},
+		{name: "view_skill", parameters: true, output: true},
+	}
 
-// captureCommandOutput executes a command and returns its output, failing the test if there's an error
-func captureCommandOutput(t *testing.T, rootCmd *cobra.Command, args []string) string {
-	t.Helper()
+	// Expected prompts with their section expectations
+	expectedPrompts := []promptExpectation{
+		{name: "design-postgres-tables", arguments: false},
+		{name: "find-hypertable-candidates", arguments: false},
+		{name: "migrate-postgres-tables-to-hypertables", arguments: false},
+		{name: "setup-timescaledb-hypertables", arguments: false},
+	}
 
-	output, err := executeCommand(t, rootCmd, args)
-	require.NoError(t, err, "command should execute successfully")
+	t.Run("Invalid capability name", func(t *testing.T) {
+		rootCmd, _ := setupMCPTest(t)
 
-	return output
+		// Execute with invalid capability name
+		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "nonexistent_capability"})
+		assert.Error(t, err, "should error for nonexistent capability")
+		assert.Contains(t, err.Error(), "not found", "error should mention capability not found")
+	})
+
+	t.Run("Valid tools", func(t *testing.T) {
+		for _, tool := range expectedTools {
+			t.Run(tool.name, func(t *testing.T) {
+				t.Run("Table", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name})
+
+					lines := strings.Split(output, "\n")
+					require.NotEmpty(t, lines, "output should not be empty")
+
+					// Check for tool name line
+					assert.Contains(t, output, fmt.Sprintf("Tool name: %s", tool.name), "output should contain tool name line")
+
+					// Check for description section
+					assert.Contains(t, output, "Description:", "output should contain 'Description:' section")
+
+					// Check for parameters section if expected
+					if tool.parameters {
+						assert.Contains(t, output, "Parameters:", "output should contain 'Parameters:' section")
+					}
+
+					// Check for output section if expected
+					if tool.output {
+						assert.Contains(t, output, "Output:", "output should contain 'Output:' section")
+					}
+				})
+
+				t.Run("JSON", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "json"})
+
+					// Should be valid JSON
+					var toolData map[string]interface{}
+					err := json.Unmarshal([]byte(output), &toolData)
+					require.NoError(t, err, "output should be valid JSON")
+
+					// Check for all expected top-level fields
+					assert.Contains(t, toolData, "name", "tool should have name field")
+					assert.Contains(t, toolData, "description", "tool should have description field")
+					assert.Contains(t, toolData, "title", "tool should have title field")
+					assert.Contains(t, toolData, "annotations", "tool should have annotations field")
+					assert.Contains(t, toolData, "inputSchema", "tool should have inputSchema field")
+					assert.Contains(t, toolData, "outputSchema", "tool should have outputSchema field")
+					assert.Equal(t, tool.name, toolData["name"], "tool name should match")
+				})
+
+				t.Run("YAML", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "yaml"})
+
+					// Should be valid YAML
+					var toolData map[string]interface{}
+					err := yaml.Unmarshal([]byte(output), &toolData)
+					require.NoError(t, err, "output should be valid YAML")
+
+					// Check for all expected top-level fields
+					assert.Contains(t, toolData, "name", "tool should have name field")
+					assert.Contains(t, toolData, "description", "tool should have description field")
+					assert.Contains(t, toolData, "title", "tool should have title field")
+					assert.Contains(t, toolData, "annotations", "tool should have annotations field")
+					assert.Contains(t, toolData, "inputSchema", "tool should have inputSchema field")
+					assert.Contains(t, toolData, "outputSchema", "tool should have outputSchema field")
+					assert.Equal(t, tool.name, toolData["name"], "tool name should match")
+				})
+			})
+		}
+	})
+
+	t.Run("Valid prompts", func(t *testing.T) {
+		for _, prompt := range expectedPrompts {
+			t.Run(prompt.name, func(t *testing.T) {
+				t.Run("Table", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name})
+
+					lines := strings.Split(output, "\n")
+					require.NotEmpty(t, lines, "output should not be empty")
+
+					// Check for prompt name line
+					assert.Contains(t, output, fmt.Sprintf("Prompt name: %s", prompt.name), "output should contain prompt name line")
+
+					// Check for description section
+					assert.Contains(t, output, "Description:", "output should contain 'Description:' section")
+
+					// Check for arguments section if expected
+					if prompt.arguments {
+						assert.Contains(t, output, "Arguments:", "output should contain 'Arguments:' section")
+					}
+				})
+
+				t.Run("JSON", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "json"})
+
+					// Should be valid JSON
+					var promptData map[string]interface{}
+					err := json.Unmarshal([]byte(output), &promptData)
+					require.NoError(t, err, "output should be valid JSON")
+
+					// Check for all expected top-level fields
+					assert.Contains(t, promptData, "name", "prompt should have name field")
+					assert.Contains(t, promptData, "description", "prompt should have description field")
+					assert.Contains(t, promptData, "title", "prompt should have title field")
+					assert.Equal(t, prompt.name, promptData["name"], "prompt name should match")
+
+					// Check for arguments field if expected
+					if prompt.arguments {
+						assert.Contains(t, promptData, "arguments", "prompt should have arguments field")
+					}
+				})
+
+				t.Run("YAML", func(t *testing.T) {
+					rootCmd, _ := setupMCPTest(t)
+					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "yaml"})
+
+					// Should be valid YAML
+					var promptData map[string]interface{}
+					err := yaml.Unmarshal([]byte(output), &promptData)
+					require.NoError(t, err, "output should be valid YAML")
+
+					// Check for all expected top-level fields
+					assert.Contains(t, promptData, "name", "prompt should have name field")
+					assert.Contains(t, promptData, "description", "prompt should have description field")
+					assert.Contains(t, promptData, "title", "prompt should have title field")
+					assert.Equal(t, prompt.name, promptData["name"], "prompt name should match")
+
+					// Check for arguments field if expected
+					if prompt.arguments {
+						assert.Contains(t, promptData, "arguments", "prompt should have arguments field")
+					}
+				})
+			})
+		}
+	})
 }
