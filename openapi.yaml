@@ -577,6 +577,47 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/logs:
+    get:
+      operationId: getServiceLogs
+      tags:
+        - Services
+      summary: Get service logs
+      description: |
+        Fetch logs for a specific service. Returns up to 500 log entries from
+        available logs. Supports pagination.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: node
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Specific service node to fetch logs from (for multi-node services)
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Page number for pagination (0-based)
+        - name: until
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
+      responses:
+        '200':
+          description: Service logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceLogs'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/setHA:
     post:
       operationId: setHAReplica
@@ -989,9 +1030,6 @@ components:
           description: The initial password for the service.
           format: password
           example: "a-very-secure-initial-password"
-        paused:
-          type: boolean
-          description: Whether the service is paused
         status:
           $ref: '#/components/schemas/DeployStatus'
           description: Current status of the service
@@ -1284,6 +1322,16 @@ components:
           type: string
           description: The ID of the VPC to attach the service to.
           example: "1234567890"
+    ServiceLogs:
+      type: object
+      required:
+        - logs
+      properties:
+        logs:
+          type: array
+          items:
+            type: string
+          description: Array of log entries (up to 500 entries per page, may be empty)
     Error:
       type: object
       properties:

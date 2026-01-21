@@ -272,6 +272,34 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		t.Logf("Service status: %v", service.Status)
 	})
 
+	t.Run("ServiceLogs", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		t.Logf("Fetching logs for service: %s", serviceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"service", "logs", serviceID,
+			"--output", "json",
+		)
+
+		if err != nil {
+			t.Fatalf("Service logs failed: %v\nOutput: %s", err, output)
+		}
+
+		// Note: Logs can take some time to become available after service creation,
+		// so we just verify that we get a valid JSON array response (even if empty).
+		// We don't check for specific log lines or require logs to be present.
+		var logs []string
+		if err := json.Unmarshal([]byte(output), &logs); err != nil {
+			t.Fatalf("Failed to parse logs JSON: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("✅ Service logs fetched successfully (returned %d log entries)", len(logs))
+	})
+
 	t.Run("DatabasePsqlCommand_OriginalPassword", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available from create test")

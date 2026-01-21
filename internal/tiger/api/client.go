@@ -137,6 +137,9 @@ type ClientInterface interface {
 
 	ForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetServiceLogs request
+	GetServiceLogs(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetReplicaSets request
 	GetReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -430,6 +433,18 @@ func (c *Client) ForkServiceWithBody(ctx context.Context, projectId ProjectId, s
 
 func (c *Client) ForkService(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewForkServiceRequest(c.Server, projectId, serviceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetServiceLogs(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceLogsRequest(c.Server, projectId, serviceId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1334,6 +1349,101 @@ func NewForkServiceRequestWithBody(server string, projectId ProjectId, serviceId
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetServiceLogsRequest generates requests for GetServiceLogs
+func NewGetServiceLogsRequest(server string, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/logs", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Node != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "node", runtime.ParamLocationQuery, *params.Node); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "until", runtime.ParamLocationQuery, *params.Until); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2496,6 +2606,9 @@ type ClientWithResponsesInterface interface {
 
 	ForkServiceWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body ForkServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkServiceResponse, error)
 
+	// GetServiceLogsWithResponse request
+	GetServiceLogsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*GetServiceLogsResponse, error)
+
 	// GetReplicaSetsWithResponse request
 	GetReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error)
 
@@ -2852,6 +2965,29 @@ func (r ForkServiceResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ForkServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetServiceLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ServiceLogs
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServiceLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServiceLogsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3515,6 +3651,15 @@ func (c *ClientWithResponses) ForkServiceWithResponse(ctx context.Context, proje
 	return ParseForkServiceResponse(rsp)
 }
 
+// GetServiceLogsWithResponse request returning *GetServiceLogsResponse
+func (c *ClientWithResponses) GetServiceLogsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*GetServiceLogsResponse, error) {
+	rsp, err := c.GetServiceLogs(ctx, projectId, serviceId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceLogsResponse(rsp)
+}
+
 // GetReplicaSetsWithResponse request returning *GetReplicaSetsResponse
 func (c *ClientWithResponses) GetReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error) {
 	rsp, err := c.GetReplicaSets(ctx, projectId, serviceId, reqEditors...)
@@ -4169,6 +4314,39 @@ func ParseForkServiceResponse(rsp *http.Response) (*ForkServiceResponse, error) 
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServiceLogsResponse parses an HTTP response from a GetServiceLogsWithResponse call
+func ParseGetServiceLogsResponse(rsp *http.Response) (*GetServiceLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServiceLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServiceLogs
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError

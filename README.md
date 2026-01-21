@@ -99,6 +99,7 @@ Tiger CLI provides the following commands:
   - `resize` - Resize service CPU and memory allocation
   - `delete` - Delete a service
   - `update-password` - Update service master password
+  - `logs` - View service logs
 - `tiger db` - Database operations
   - `connect` - Connect to a database with psql
   - `connection-string` - Get connection string for a service
@@ -182,6 +183,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_stop` - Stop a running database service
 - `service_resize` - Resize a database service by changing CPU and memory allocation
 - `service_update_password` - Update the master password for a service
+- `service_logs` - View logs for a database service
 
 **Database Operations:**
 - `db_execute_query` - Execute SQL queries against a database service with support for parameterized queries, custom timeouts, and connection pooling

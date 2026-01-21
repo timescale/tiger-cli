@@ -276,9 +276,6 @@ type Service struct {
 	// Name The name of the service.
 	Name *string `json:"name,omitempty"`
 
-	// Paused Whether the service is paused
-	Paused *bool `json:"paused,omitempty"`
-
 	// ProjectId The project this service belongs to.
 	ProjectId       *string           `json:"project_id,omitempty"`
 	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
@@ -339,6 +336,12 @@ type ServiceCreate struct {
 
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
+
+// ServiceLogs defines model for ServiceLogs.
+type ServiceLogs struct {
+	// Logs Array of log entries (up to 500 entries per page, may be empty)
+	Logs []string `json:"logs"`
+}
 
 // ServiceType defines model for ServiceType.
 type ServiceType string
@@ -436,6 +439,18 @@ type TrackEventJSONBody struct {
 
 	// Properties Optional map of arbitrary properties associated with the event
 	Properties *map[string]interface{} `json:"properties,omitempty"`
+}
+
+// GetServiceLogsParams defines parameters for GetServiceLogs.
+type GetServiceLogsParams struct {
+	// Node Specific service node to fetch logs from (for multi-node services)
+	Node *int `form:"node,omitempty" json:"node,omitempty"`
+
+	// Page Page number for pagination (0-based)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
+	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
 }
 
 // IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.

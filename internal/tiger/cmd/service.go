@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -39,6 +41,7 @@ func buildServiceCmd() *cobra.Command {
 	cmd.AddCommand(buildServiceUpdatePasswordCmd())
 	cmd.AddCommand(buildServiceForkCmd())
 	cmd.AddCommand(buildServiceResizeCmd())
+	cmd.AddCommand(buildServiceLogsCmd())
 
 	return cmd
 }
@@ -114,7 +117,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -177,7 +180,7 @@ func buildServiceListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
 }
@@ -397,7 +400,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -647,11 +650,6 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 			}
 			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port))
 		}
-	}
-
-	// Pause status
-	if service.Paused != nil && *service.Paused {
-		table.Append("Paused", "Yes")
 	}
 
 	// Timestamps
@@ -1226,8 +1224,7 @@ Examples:
 				forkStrategy = api.LASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.PITR
-				parsedTime := forkToTimestamp
-				targetTime = &parsedTime
+				targetTime = util.Ptr(forkToTimestamp)
 			}
 
 			// Display what we're about to do
@@ -1346,7 +1343,7 @@ Examples:
 	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "output format (json, yaml, env, table)")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
@@ -1493,6 +1490,163 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	return cmd
+}
+
+// buildServiceLogsCmd creates the logs command for viewing service logs
+func buildServiceLogsCmd() *cobra.Command {
+	var tail int
+	var until time.Time
+	var node int
+	var output string
+
+	cmd := &cobra.Command{
+		Use:     "logs [service-id]",
+		Aliases: []string{"log"},
+		Short:   "View logs for a service",
+		Long: `View logs for a database service.
+
+Fetches and displays logs from the specified service. By default, shows the last
+100 log entries. Supports filtering by time.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration.
+
+Examples:
+  # View last 100 logs for default service (default behavior)
+  tiger service logs
+
+  # View logs for specific service
+  tiger service logs svc-12345
+
+  # View logs before a specific time
+  tiger service logs --until "2024-01-15T10:00:00Z"
+
+  # View logs for a specific node (for services with HA replicas)
+  tiger service logs --node 1
+
+  # View last 50 lines
+  tiger service logs --tail 50
+
+  # View last 1000 lines
+  tiger service logs --tail 1000`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		PreRunE:           bindFlags("output"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Determine service ID
+			serviceID, err := getServiceID(cfg.Config, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Prepare parameters
+			var untilPtr *time.Time
+			if !until.IsZero() {
+				untilPtr = &until
+			}
+
+			// Check if node flag was explicitly set (0 is a valid node)
+			// If not set, omit the parameter and let the backend fetch primaryOrdinal
+			var nodePtr *int
+			if cmd.Flags().Changed("node") {
+				nodePtr = &node
+			}
+
+			// Fetch logs with pagination support
+			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
+			defer cancel()
+
+			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, untilPtr, nodePtr)
+			if err != nil {
+				return err
+			}
+
+			// Display logs based on output format
+			outputWriter := cmd.OutOrStdout()
+			switch strings.ToLower(cfg.Output) {
+			case "json":
+				return util.SerializeToJSON(outputWriter, logs)
+			case "yaml":
+				return util.SerializeToYAML(outputWriter, logs)
+			default: // text format (default)
+				// Apply colorization if color is enabled and output is a terminal
+				shouldColorize := cfg.Color && util.IsTerminal(outputWriter)
+				if shouldColorize {
+					// Temporarily enable color for this output
+					original := color.NoColor
+					defer func() { color.NoColor = original }()
+					color.NoColor = false
+				}
+
+				for _, log := range logs {
+					colorizedLog := colorizeLogLine(log, shouldColorize)
+					fmt.Fprintln(outputWriter, colorizedLog)
+				}
+			}
+
+			return nil
+		},
+	}
+
+	// Add flags
+	cmd.Flags().IntVar(&tail, "tail", 100, "Number of log lines to show")
+	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
+	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
+	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
+
+	return cmd
+}
+
+// logLevelRegex matches PostgreSQL log levels in log lines
+// Pattern: word boundary + log level + colon
+var logLevelRegex = regexp.MustCompile(`\b(DEBUG|INFO|NOTICE|WARNING|LOG|ERROR|FATAL|PANIC|DETAIL|HINT|QUERY|CONTEXT|LOCATION):`)
+
+// colorizeLogLine applies color to the log level in a PostgreSQL log line
+// If colorEnabled is false, returns the line unchanged
+func colorizeLogLine(line string, colorEnabled bool) string {
+	if !colorEnabled {
+		return line
+	}
+
+	// Find the log level in the line
+	return logLevelRegex.ReplaceAllStringFunc(line, func(match string) string {
+		// Remove the colon to get just the level
+		logLevel := strings.TrimSuffix(match, ":")
+
+		// Apply color based on severity
+		var coloredLevel string
+		switch logLevel {
+		case "ERROR", "FATAL", "PANIC":
+			coloredLevel = color.RedString(logLevel)
+		case "WARNING":
+			coloredLevel = color.YellowString(logLevel)
+		case "INFO", "NOTICE":
+			coloredLevel = color.BlueString(logLevel)
+		case "DEBUG":
+			coloredLevel = color.MagentaString(logLevel)
+		case "QUERY":
+			coloredLevel = color.GreenString(logLevel)
+		case "LOG":
+			coloredLevel = color.CyanString(logLevel)
+		case "DETAIL", "HINT", "CONTEXT", "LOCATION":
+			coloredLevel = color.WhiteString(logLevel)
+		default:
+			// Unknown level - leave uncolored
+			coloredLevel = logLevel
+		}
+
+		// Return with the colon
+		return coloredLevel + ":"
+	})
 }
 
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
