@@ -103,8 +103,11 @@ func (c *Capabilities) Names() []string {
 	return names
 }
 
-// Get finds any capability (tool, prompt, resource, or resource template) by name.
-// Returns the capability if found, or nil if not found.
+// Get finds any capability (tool, prompt, resource, or resource template) by
+// name.  Returns the capability if found, or nil if not found. Note that if
+// there are duplicate names (e.g. a tool and a prompt with the same name) it
+// will return the first found. We should therefore aim to avoid duplicate
+// capability names.
 func (c *Capabilities) Get(name string) any {
 	if tool := c.getTool(name); tool != nil {
 		return tool
