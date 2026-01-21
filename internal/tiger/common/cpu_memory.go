@@ -13,12 +13,12 @@ type CPUMemoryConfig struct {
 	MemoryGBs int  // Memory in GB
 }
 
-func (c *CPUMemoryConfig) Matches(cpuMillis, memoryGBs string) (string, string, bool) {
+func (c *CPUMemoryConfig) Matches(cpuMillis, memoryGBs string) bool {
 	if c.Shared {
 		if (cpuMillis == "shared" && memoryGBs == "shared") ||
 			(cpuMillis == "shared" && memoryGBs == "") ||
 			(cpuMillis == "" && memoryGBs == "shared") {
-			return "shared", "shared", true
+			return true
 		}
 	}
 
@@ -28,10 +28,34 @@ func (c *CPUMemoryConfig) Matches(cpuMillis, memoryGBs string) (string, string, 
 	if (cpuMillis == cpuMillisStr && memoryGBs == memoryGBsStr) ||
 		(cpuMillis == cpuMillisStr && memoryGBs == "") ||
 		(cpuMillis == "" && memoryGBs == memoryGBsStr) {
-		return cpuMillisStr, memoryGBsStr, true
+		return true
 	}
 
-	return "", "", false
+	return false
+}
+
+func (c *CPUMemoryConfig) CPUMillisString() *string {
+	if c == nil {
+		return nil
+	}
+
+	str := "shared"
+	if !c.Shared {
+		str = strconv.Itoa(c.CPUMillis)
+	}
+	return &str
+}
+
+func (c *CPUMemoryConfig) MemoryGBsString() *string {
+	if c == nil {
+		return nil
+	}
+
+	str := "shared"
+	if !c.Shared {
+		str = strconv.Itoa(c.MemoryGBs)
+	}
+	return &str
 }
 
 func (c *CPUMemoryConfig) String() string {
@@ -62,6 +86,18 @@ func GetAllowedCPUMemoryConfigs() CPUMemoryConfigs {
 	}
 }
 
+// GetAllowedResizeCPUMemoryConfigs returns the allowed CPU/Memory configurations for resize operations (excludes shared)
+func GetAllowedResizeCPUMemoryConfigs() CPUMemoryConfigs {
+	all := GetAllowedCPUMemoryConfigs()
+	filtered := make(CPUMemoryConfigs, 0, len(all)-1)
+	for _, config := range all {
+		if !config.Shared {
+			filtered = append(filtered, config)
+		}
+	}
+	return filtered
+}
+
 // Strings returns a slice of user-friendly strings of allowed CPU/Memory combinations
 func (c CPUMemoryConfigs) Strings() []string {
 	strs := make([]string, 0, len(c))
@@ -77,21 +113,21 @@ func (c CPUMemoryConfigs) String() string {
 }
 
 // ValidateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic
-func ValidateAndNormalizeCPUMemory(cpuMillis, memoryGBs string) (*string, *string, error) {
+func ValidateAndNormalizeCPUMemory(cpuMillis, memoryGBs string) (*CPUMemoryConfig, error) {
 	// Return nil for omitted CPU/memory so that values are omitted from the API request
 	if cpuMillis == "" && memoryGBs == "" {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	configs := GetAllowedCPUMemoryConfigs()
 	for _, config := range configs {
-		if cpuStr, memoryStr, ok := config.Matches(cpuMillis, memoryGBs); ok {
-			return &cpuStr, &memoryStr, nil
+		if config.Matches(cpuMillis, memoryGBs) {
+			return &config, nil
 		}
 	}
 
 	// If no match, provide helpful error
-	return nil, nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", configs)
+	return nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", configs)
 }
 
 // ParseCPUMemory parses a CPU/memory combination string (e.g., "2 CPU/8GB")

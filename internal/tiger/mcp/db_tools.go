@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -153,8 +154,12 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 
-	if serviceResp.StatusCode() != 200 {
+	if serviceResp.StatusCode() != http.StatusOK {
 		return nil, DBExecuteQueryOutput{}, serviceResp.JSON4XX
+	}
+
+	if serviceResp.JSON200 == nil {
+		return nil, DBExecuteQueryOutput{}, fmt.Errorf("empty response from API")
 	}
 
 	service := *serviceResp.JSON200
