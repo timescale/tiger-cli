@@ -295,8 +295,9 @@ func TestGetPasswordStorage(t *testing.T) {
 		{"keyring", "keyring", "*common.KeyringStorage"},
 		{"pgpass", "pgpass", "*common.PgpassStorage"},
 		{"none", "none", "*common.NoStorage"},
-		{"default", "", "*common.KeyringStorage"},        // Default case
-		{"invalid", "invalid", "*common.KeyringStorage"}, // Falls back to default
+		{"auto", "auto", "*common.AutoFallbackStorage"},
+		{"default", "", "*common.AutoFallbackStorage"},
+		{"invalid", "invalid", "*common.AutoFallbackStorage"}, // Falls back to auto
 	}
 
 	for _, tt := range tests {
@@ -935,5 +936,57 @@ func TestSanitizeErrorMessage(t *testing.T) {
 				t.Errorf("sanitizeErrorMessage() = %q, want %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+// Test AutoFallbackStorage using pgpass as fallback (since keyring may not be available in CI)
+func TestAutoFallbackStorage_Integration(t *testing.T) {
+	// Set up test service name for keyring
+	config.SetTestServiceName(t)
+
+	// Create a temporary directory for pgpass
+	tempDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	storage := &AutoFallbackStorage{
+		keyring: &KeyringStorage{},
+		pgpass:  &PgpassStorage{},
+	}
+	service := createTestService("auto-fallback-test-service")
+	password := "test-password-auto"
+	role := "tsdbadmin"
+
+	// Test Save - should succeed using either keyring or pgpass
+	err := storage.Save(service, password, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Save() failed: %v", err)
+	}
+
+	// Verify lastMethod is set to either keyring or pgpass
+	if storage.lastMethod != "keyring" && storage.lastMethod != "pgpass" {
+		t.Errorf("AutoFallbackStorage.lastMethod = %q, want 'keyring' or 'pgpass'", storage.lastMethod)
+	}
+
+	// Test Get - should retrieve the password
+	retrieved, err := storage.Get(service, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Get() failed: %v", err)
+	}
+	if retrieved != password {
+		t.Errorf("AutoFallbackStorage.Get() = %q, want %q", retrieved, password)
+	}
+
+	// Test Remove - should succeed
+	err = storage.Remove(service, role)
+	if err != nil {
+		t.Fatalf("AutoFallbackStorage.Remove() failed: %v", err)
+	}
+
+	// Verify password is gone
+	_, err = storage.Get(service, role)
+	if err == nil {
+		t.Error("AutoFallbackStorage.Get() should fail after Remove()")
 	}
 }

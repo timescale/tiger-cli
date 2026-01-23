@@ -100,6 +100,8 @@ func GetPassword(service api.Service, role string) (string, error) {
 			return "", fmt.Errorf("no password found in keyring for this service")
 		case *PgpassStorage:
 			return "", fmt.Errorf("no password found in ~/.pgpass for this service")
+		case *AutoFallbackStorage:
+			return "", fmt.Errorf("no password found for this service (checked keyring and ~/.pgpass)")
 		default:
 			return "", fmt.Errorf("failed to retrieve password: %w", err)
 		}
