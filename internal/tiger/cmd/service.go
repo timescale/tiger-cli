@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -492,11 +490,12 @@ Examples:
 				}
 			} else if password == "" {
 				// Interactive prompt - check if we're in a terminal
-				if !checkStdinIsTTY() {
+				if !checkOutputIsTTY(cmd.OutOrStdout()) {
 					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
 				_, err := promptAndResetPassword(
 					ctx,
+					cmd.InOrStdin(),
 					statusOutput,
 					cfg.Client,
 					service,
@@ -832,10 +831,7 @@ Examples:
 			if !deleteConfirm {
 				fmt.Fprintf(statusOutput, "Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
 				fmt.Fprintf(statusOutput, "Type the service ID '%s' to confirm: ", serviceID)
-				confirmation, err := readString(cmd.Context(), func() (string, error) {
-					reader := bufio.NewReader(os.Stdin)
-					return reader.ReadString('\n')
-				})
+				confirmation, err := readLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}

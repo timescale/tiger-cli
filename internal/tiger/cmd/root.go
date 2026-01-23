@@ -1,22 +1,25 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
-
 	"github.com/timescale/tiger-cli/internal/tiger/analytics"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
+	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
@@ -173,22 +176,58 @@ func Execute(ctx context.Context) error {
 	return rootCmd.Execute()
 }
 
-func readString(ctx context.Context, readFn func() (string, error)) (string, error) {
+// readLine reads a line of text from the input, cancellable via context.
+func readLine(ctx context.Context, in io.Reader) (string, error) {
 	valCh := make(chan string)
 	errCh := make(chan error)
 	defer func() { close(valCh); close(errCh) }()
 	go func() {
-		val, err := readFn()
+		val, err := bufio.NewReader(in).ReadString('\n')
 		if err != nil {
 			errCh <- err
 			return
 		}
 		select {
-		case <-ctx.Done(): // don't return an empty value if the context is already canceled
+		case <-ctx.Done():
 			return
 		default:
 		}
 		valCh <- val
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case err := <-errCh:
+		return "", err
+	case val := <-valCh:
+		return strings.TrimSpace(val), nil
+	}
+}
+
+// readPassword reads a password with hidden input, cancellable via context.
+// This is a package-level var so it can be overridden for testing.
+var readPassword = func(ctx context.Context, in io.Reader) (string, error) {
+	f, ok := in.(*os.File)
+	if !ok {
+		return "", fmt.Errorf("password input requires a terminal file descriptor")
+	}
+
+	valCh := make(chan string)
+	errCh := make(chan error)
+	defer func() { close(valCh); close(errCh) }()
+	go func() {
+		val, err := term.ReadPassword(int(f.Fd()))
+		if err != nil {
+			errCh <- err
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		valCh <- string(val)
 	}()
 
 	select {
