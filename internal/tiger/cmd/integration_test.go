@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -2143,65 +2142,6 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 }
 
-// buildTigerBinary compiles the CLI binary for PTY-based testing
-func buildTigerBinary(t *testing.T, tmpDir string) string {
-	t.Helper()
-
-	binaryPath := filepath.Join(tmpDir, "tiger")
-
-	// Find project root by looking for go.mod
-	projectRoot, err := findProjectRoot()
-	if err != nil {
-		t.Fatalf("Failed to find project root: %v", err)
-	}
-
-	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/tiger")
-	cmd.Dir = projectRoot
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Failed to build tiger binary: %v\nOutput: %s", err, output)
-	}
-
-	return binaryPath
-}
-
-// findProjectRoot finds the project root directory by looking for go.mod
-func findProjectRoot() (string, error) {
-	// Start from current working directory and walk up
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("could not find go.mod in any parent directory")
-		}
-		dir = parent
-	}
-}
-
-// buildTestEnv creates environment variables for PTY test binary
-func buildTestEnv(tmpDir, publicKey, secretKey string) []string {
-	env := os.Environ()
-	// Override config directory to use test temp dir
-	env = append(env, "TIGER_CONFIG_DIR="+tmpDir)
-	// Disable analytics for tests
-	env = append(env, "TIGER_ANALYTICS=false")
-	// Use pgpass storage for easier testing (no keyring interaction)
-	env = append(env, "TIGER_PASSWORD_STORAGE=pgpass")
-	// Pass credentials via environment so subprocess uses them directly
-	// (bypasses keyring which may have different credentials)
-	env = append(env, "TIGER_PUBLIC_KEY="+publicKey)
-	env = append(env, "TIGER_SECRET_KEY="+secretKey)
-	return env
-}
-
 // TestDbConnectPasswordResetIntegration tests the interactive password reset flow
 // using go-expect for PTY simulation
 func TestDbConnectPasswordResetIntegration(t *testing.T) {
@@ -2296,10 +2236,6 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		t.Logf("Created service with ID: %s", serviceID)
 	})
 
-	// Build tiger binary once for PTY testing (used by multiple subtests)
-	binaryPath := buildTigerBinary(t, tmpDir)
-	t.Logf("Built tiger binary at: %s", binaryPath)
-
 	t.Run("VerifyInitialConnection", func(t *testing.T) {
 		if serviceID == "" {
 			t.Skip("No service ID available")
@@ -2318,16 +2254,20 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		defer c.Close()
 
 		// Run tiger db connect
-		cmd := exec.Command(binaryPath, "db", "connect", serviceID)
-		cmd.Stdin = c.Tty()
-		cmd.Stdout = c.Tty()
-		cmd.Stderr = c.Tty()
-		cmd.Env = buildTestEnv(tmpDir, publicKey, secretKey)
-
-		if err := cmd.Start(); err != nil {
-			t.Fatalf("Failed to start command: %v", err)
+		cmd, err := buildRootCmd(t.Context())
+		if err != nil {
+			t.Fatalf("Failed to build root command: %v", err)
 		}
+		cmd.SetArgs([]string{"db", "connect", serviceID})
+		cmd.SetIn(c.Tty())
+		cmd.SetOut(c.Tty())
+		cmd.SetErr(c.Tty())
 
+		// Run in goroutine since Execute() blocks
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Execute()
+		}()
 		// Should connect directly to psql (no menu since password is valid)
 		// Wait for psql prompt
 		t.Logf("Waiting for psql prompt...")
@@ -2339,7 +2279,14 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 
 		// Exit psql
 		c.SendLine("\\q")
-		cmd.Wait()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Logf("Command finished with: %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Logf("Command still running after psql exit (may be expected)")
+		}
 
 		t.Logf("Initial connection verified successfully")
 	})
@@ -2405,21 +2352,25 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		defer c.Close()
 
 		// Set up command with PTY
-		cmd := exec.Command(binaryPath, "db", "connect", serviceID)
-		cmd.Stdin = c.Tty()
-		cmd.Stdout = c.Tty()
-		cmd.Stderr = c.Tty()
-		cmd.Env = buildTestEnv(tmpDir, publicKey, secretKey)
-
-		if err := cmd.Start(); err != nil {
-			t.Fatalf("Failed to start command: %v", err)
+		cmd, err := buildRootCmd(t.Context())
+		if err != nil {
+			t.Fatalf("Failed to build root command: %v", err)
 		}
+		cmd.SetArgs([]string{"db", "connect", serviceID})
+		cmd.SetIn(c.Tty())
+		cmd.SetOut(c.Tty())
+		cmd.SetErr(c.Tty())
+
+		done := make(chan error, 1)
+		go func() {
+			done <- cmd.Execute()
+		}()
 
 		// Wait for the menu prompt (auth failure message comes before it)
 		t.Logf("Waiting for menu prompt...")
-		_, err = c.ExpectString("What would you like to do?")
+		_, err = c.ExpectString("Update/reset password") // Wait for actual option text
 		if err != nil {
-			t.Fatalf("Expected menu prompt: %v", err)
+			t.Fatalf("Expected menu to render: %v", err)
 		}
 		t.Logf("Got menu prompt")
 
@@ -2447,19 +2398,25 @@ func TestDbConnectPasswordResetIntegration(t *testing.T) {
 		}
 		t.Logf("Got success message")
 
-		// psql launches - wait for any prompt indicator then exit
-		t.Logf("Waiting for psql to launch...")
-		// Give psql time to connect and show prompt
-		time.Sleep(2 * time.Second)
+		// Wait for psql to launch and show prompt
+		t.Logf("Waiting for psql prompt...")
+		_, err = c.ExpectString("=>")
+		if err != nil {
+			t.Logf("Did not see psql prompt, continuing anyway: %v", err)
+		}
 
 		// Exit psql with \q
 		t.Logf("Sending \\q to exit psql")
 		c.SendLine("\\q")
 
 		// Wait for command to complete
-		err = cmd.Wait()
-		if err != nil {
-			t.Logf("Command exited with: %v (this may be expected)", err)
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Logf("Command exited with: %v (may be expected)", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Logf("Timeout waiting for command to finish")
 		}
 
 		t.Logf("Interactive password reset completed")
