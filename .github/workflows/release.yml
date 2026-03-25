@@ -64,7 +64,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGER_CLI_RELEASES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
           # PackageCloud credentials for publishing Linux packages
-          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+          PACKAGECLOUD_TOKEN: ${{ secrets.IO_PACKAGECLOUD_TOKEN }}
 
       - name: Publish to MCP Registry
         if: "!contains(github.ref_name, '-')" # Skip pre-releases
