@@ -16,7 +16,7 @@ if [ ! -f .env ]; then
     echo "Please create a .env file with the required environment variables:"
     echo "  TIGER_PUBLIC_KEY_INTEGRATION=your-public-key"
     echo "  TIGER_SECRET_KEY_INTEGRATION=your-secret-key"
-    echo "  TIGER_API_URL_INTEGRATION=https://console.cloud.timescale.com/public/api/v1"
+    echo "  TIGER_API_URL_INTEGRATION=https://console.cloud.tigerdata.com/public/api/v1"
     echo ""
     echo "Optional:"
     echo "  TIGER_EXISTING_SERVICE_ID_INTEGRATION=existing-service-id"

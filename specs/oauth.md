@@ -76,7 +76,7 @@ for Code Exchange) for secure browser-based authentication.
      - `state`: Random state parameter for CSRF protection
 
 2. **Browser Redirect**
-   - CLI opens user's default browser to authorization URL (e.g. https://console.cloud.timescale.com/oauth/authorize)
+   - CLI opens user's default browser to authorization URL (e.g. https://console.cloud.tigerdata.com/oauth/authorize)
    - User completes authentication flow in browser
      - Must log in if not already logged in
      - Click "Authorize" button to authorize the CLI app
@@ -86,13 +86,13 @@ for Code Exchange) for secure browser-based authentication.
 3. **Authorization Code Exchange**
    - CLI receives callback request with authorization code
    - CLI verifies state parameter is correct
-   - CLI exchanges authorization code for access token via POST to token endpoint (e.g. https://console.cloud.timescale.com/api/idp/external/cli/token):
+   - CLI exchanges authorization code for access token via POST to token endpoint (e.g. https://console.cloud.tigerdata.com/api/idp/external/cli/token):
      - `grant_type=authorization_code`
      - `client_id`: Tiger CLI application ID
      - `code`: Authorization code from callback
      - `redirect_uri`: Same URI used in authorization request
      - `code_verifier`: PKCE code verifier
-   - CLI redirects browser from local callback URL to success page (e.g. https://console.cloud.timescale.com/oauth/code/success)
+   - CLI redirects browser from local callback URL to success page (e.g. https://console.cloud.tigerdata.com/oauth/code/success)
    - CLI shuts down local HTTP server
 
 4. **API Key Generation**
