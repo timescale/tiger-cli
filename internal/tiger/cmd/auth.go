@@ -58,7 +58,7 @@ restricted permissions.
 You may also provide API keys via flags or environment variables, in which case they will be used
 directly. The CLI will prompt for any missing information.
 
-You can find your API credentials at: https://console.cloud.timescale.com/dashboard/settings
+You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings
 
 Examples:
   # Interactive login with OAuth (opens browser, creates API keys automatically)

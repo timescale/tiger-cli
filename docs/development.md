@@ -15,17 +15,17 @@ go install ./cmd/tiger
 
 # (Optional) Set up the API endpoint
 # For prod (default)
-tiger config set console_url https://console.cloud.timescale.com
-tiger config set gateway_url https://console.cloud.timescale.com/api
-tiger config set api_url https://console.cloud.timescale.com/public/api/v1
+tiger config set console_url https://console.cloud.tigerdata.com
+tiger config set gateway_url https://console.cloud.tigerdata.com/api
+tiger config set api_url https://console.cloud.tigerdata.com/public/api/v1
 
 # For dev
-tiger config set console_url https://console.dev.timescale.com
-tiger config set gateway_url https://console.dev.timescale.com/api
-tiger config set api_url https://console.dev.timescale.com/public/api/v1
+tiger config set console_url https://console.dev.tigerdata.com
+tiger config set gateway_url https://console.dev.tigerdata.com/api
+tiger config set api_url https://console.dev.tigerdata.com/public/api/v1
 
 # For development against local Tiger Cloud Console:
-tiger config set console_url https://local.dev.timescale.com:8080
+tiger config set console_url https://local.dev.tigerdata.com:8080
 
 # For development against local REST API:
 tiger config set api_url http://localhost:8080/public/api/v1
@@ -35,9 +35,9 @@ tiger config set api_url http://localhost:8080/public/api/v1
 
 There are a handful of configuration options and environment variables that are specifically intended for use during development:
 
-- `api_url` (`TIGER_API_URL`) - Tiger Cloud API endpoint (default: https://console.cloud.timescale.com/public/api/v1)
-- `console_url` (`TIGER_CONSOLE_URL`) - Tiger Cloud Console URL (default: https://console.cloud.timescale.com)
-- `gateway_url` (`TIGER_GATEWAY_URL`) - Tiger Cloud Gateway URL (default: https://console.cloud.timescale.com/api)
+- `api_url` (`TIGER_API_URL`) - Tiger Cloud API endpoint (default: https://console.cloud.tigerdata.com/public/api/v1)
+- `console_url` (`TIGER_CONSOLE_URL`) - Tiger Cloud Console URL (default: https://console.cloud.tigerdata.com)
+- `gateway_url` (`TIGER_GATEWAY_URL`) - Tiger Cloud Gateway URL (default: https://console.cloud.tigerdata.com/api)
 - `docs_mcp_url` (`TIGER_DOCS_MCP_URL`) - Docs MCP server URL (default: https://mcp.tigerdata.com/docs)
 
 ## Running Tests

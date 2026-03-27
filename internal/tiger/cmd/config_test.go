@@ -92,8 +92,8 @@ password_storage: pgpass
 	// Check table output contains all expected key:value lines
 	expectedLines := map[string]string{
 		"api_url":          "https://test.api.com/v1",
-		"console_url":      "https://console.cloud.timescale.com",
-		"gateway_url":      "https://console.cloud.timescale.com/api",
+		"console_url":      "https://console.cloud.tigerdata.com",
+		"gateway_url":      "https://console.cloud.tigerdata.com/api",
 		"docs_mcp":         "true",
 		"docs_mcp_url":     "https://mcp.tigerdata.com/docs",
 		"service_id":       "test-service",
@@ -144,8 +144,8 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 	// Verify ALL JSON keys and their expected values
 	expectedValues := map[string]interface{}{
 		"api_url":                 "https://json.api.com/v1",
-		"console_url":             "https://console.cloud.timescale.com",
-		"gateway_url":             "https://console.cloud.timescale.com/api",
+		"console_url":             "https://console.cloud.tigerdata.com",
+		"gateway_url":             "https://console.cloud.tigerdata.com/api",
 		"docs_mcp":                true,
 		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
 		"service_id":              "",
@@ -203,8 +203,8 @@ version_check_last_time: ` + now.Format(time.RFC3339) + "\n"
 	// Verify ALL YAML keys and their expected values
 	expectedValues := map[string]any{
 		"api_url":                 "https://yaml.api.com/v1",
-		"console_url":             "https://console.cloud.timescale.com",
-		"gateway_url":             "https://console.cloud.timescale.com/api",
+		"console_url":             "https://console.cloud.tigerdata.com",
+		"gateway_url":             "https://console.cloud.tigerdata.com/api",
 		"docs_mcp":                true,
 		"docs_mcp_url":            "https://mcp.tigerdata.com/docs",
 		"service_id":              "",

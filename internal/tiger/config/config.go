@@ -57,14 +57,14 @@ type ConfigOutput struct {
 
 const (
 	ConfigFileName              = "config.yaml"
-	DefaultAPIURL               = "https://console.cloud.timescale.com/public/api/v1"
+	DefaultAPIURL               = "https://console.cloud.tigerdata.com/public/api/v1"
 	DefaultAnalytics            = true
 	DefaultColor                = true
-	DefaultConsoleURL           = "https://console.cloud.timescale.com"
+	DefaultConsoleURL           = "https://console.cloud.tigerdata.com"
 	DefaultDebug                = false
 	DefaultDocsMCP              = true
 	DefaultDocsMCPURL           = "https://mcp.tigerdata.com/docs"
-	DefaultGatewayURL           = "https://console.cloud.timescale.com/api"
+	DefaultGatewayURL           = "https://console.cloud.tigerdata.com/api"
 	DefaultOutput               = "table"
 	DefaultPasswordStorage      = "keyring"
 	DefaultReleasesURL          = "https://cli.tigerdata.com"

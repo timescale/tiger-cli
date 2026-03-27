@@ -11,7 +11,7 @@ info:
     name: Tiger Data Support
     url: https://www.tigerdata.com/contact
 servers:
-  - url: https://console.cloud.timescale.com/public/api/v1
+  - url: https://console.cloud.tigerdata.com/public/api/v1
     description: API server for Tiger Cloud
 
 tags:
