@@ -366,6 +366,7 @@ type ServiceLogsInput struct {
 	ServiceID string     `json:"service_id"`
 	Node      *int       `json:"node,omitempty"`
 	Tail      int        `json:"tail,omitempty"`
+	From      *time.Time `json:"from,omitempty"`
 	Until     *time.Time `json:"until,omitempty"`
 }
 
@@ -382,6 +383,9 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 	schema.Properties["tail"].Default = util.Must(json.Marshal(100))
 	schema.Properties["tail"].Minimum = util.Ptr(1.0)
 	schema.Properties["tail"].Examples = []any{50, 100, 1000}
+
+	schema.Properties["from"].Description = "Fetch logs after this timestamp (RFC3339 format, e.g., '2024-01-15T09:00:00Z'). Lower bound for the log search window."
+	schema.Properties["from"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
 
 	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format, e.g., '2024-01-15T10:00:00Z'). If not provided, fetches logs up to the current time."
 	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
@@ -1158,6 +1162,7 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 		zap.String("service_id", input.ServiceID),
 		zap.Intp("node", input.Node),
 		zap.Int("tail", input.Tail),
+		zap.Timep("from", input.From),
 		zap.Timep("until", input.Until),
 	)
 
@@ -1165,7 +1170,7 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	logsCtx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	logs, err := common.FetchServiceLogs(logsCtx, cfg, input.ServiceID, input.Tail, input.Until, input.Node)
+	logs, err := common.FetchServiceLogs(logsCtx, cfg, input.ServiceID, input.Tail, input.From, input.Until, input.Node)
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}

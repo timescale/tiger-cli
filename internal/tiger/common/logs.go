@@ -20,12 +20,14 @@ func FetchServiceLogs(
 	cfg *Config,
 	serviceID string,
 	tail int,
+	from *time.Time,
 	until *time.Time,
 	node *int,
 ) ([]string, error) {
 	params := &api.GetServiceLogsParams{
-		Node:  node,
-		Until: until,
+		Node:      node,
+		StartTime: from,
+		Until:     until,
 	}
 
 	// Fix the upper time bound so that all paginated requests share the same
