@@ -337,12 +337,27 @@ type ServiceCreate struct {
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
 
+// ServiceLogEntry defines model for ServiceLogEntry.
+type ServiceLogEntry struct {
+	// Message Log message text
+	Message string `json:"message"`
+
+	// Severity PostgreSQL severity level (e.g. LOG, WARNING, ERROR, FATAL)
+	Severity string `json:"severity"`
+
+	// Timestamp Timestamp of the log entry (RFC3339 format)
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // ServiceLogs defines model for ServiceLogs.
 type ServiceLogs struct {
+	// Entries Structured log entries with timestamp and severity metadata. Only present on the cursor-based path.
+	Entries *[]ServiceLogEntry `json:"entries,omitempty"`
+
 	// LastCursor Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
 	LastCursor *string `json:"lastCursor,omitempty"`
 
-	// Logs Array of log entries (up to 500 entries per page, may be empty)
+	// Logs Array of log message strings. Preserved for backwards compatibility.
 	Logs []string `json:"logs"`
 }
 

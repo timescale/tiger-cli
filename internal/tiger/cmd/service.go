@@ -1593,8 +1593,8 @@ Examples:
 					color.NoColor = false
 				}
 
-				for _, log := range logs {
-					colorizedLog := colorizeLogLine(log, shouldColorize)
+				for _, entry := range logs {
+					colorizedLog := colorizeLogLine(entry.Message, shouldColorize)
 					fmt.Fprintln(outputWriter, colorizedLog)
 				}
 			}

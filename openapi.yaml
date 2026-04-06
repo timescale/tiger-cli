@@ -1335,6 +1335,23 @@ components:
           type: string
           description: The ID of the VPC to attach the service to.
           example: "1234567890"
+    ServiceLogEntry:
+      type: object
+      required:
+        - timestamp
+        - message
+        - severity
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the log entry (RFC3339 format)
+        message:
+          type: string
+          description: Log message text
+        severity:
+          type: string
+          description: PostgreSQL severity level (e.g. LOG, WARNING, ERROR, FATAL)
     ServiceLogs:
       type: object
       required:
@@ -1344,7 +1361,12 @@ components:
           type: array
           items:
             type: string
-          description: Array of log entries (up to 500 entries per page, may be empty)
+          description: Array of log message strings. Preserved for backwards compatibility.
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceLogEntry'
+          description: Structured log entries with timestamp and severity metadata. Only present on the cursor-based path.
         lastCursor:
           type: string
           description: Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.

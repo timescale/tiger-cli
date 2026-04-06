@@ -11,7 +11,7 @@ import (
 )
 
 // FetchServiceLogs fetches service logs with cursor-based pagination up to the specified
-// tail limit. Returns logs in ascending order by timestamp (oldest first, newest last).
+// tail limit. Returns entries in ascending order by timestamp (oldest first, newest last).
 // NOTE: The node parameter specifies the specific service node to fetch logs
 // from, for services with HA replicas. If nil, the backend automatically
 // returns logs for the primary.
@@ -23,7 +23,7 @@ func FetchServiceLogs(
 	from *time.Time,
 	until *time.Time,
 	node *int,
-) ([]string, error) {
+) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
 		Node:  node,
 		From:  from,
@@ -38,7 +38,7 @@ func FetchServiceLogs(
 		params.Until = &now
 	}
 
-	var logs []string
+	var entries []api.ServiceLogEntry
 	for {
 		resp, err := cfg.Client.GetServiceLogsWithResponse(ctx, cfg.ProjectID, serviceID, params)
 		if err != nil {
@@ -53,10 +53,11 @@ func FetchServiceLogs(
 			return nil, fmt.Errorf("unexpected empty response")
 		}
 
-		logs = append(logs, resp.JSON200.Logs...)
+		page := toEntries(resp.JSON200)
+		entries = append(entries, page...)
 
 		// Stop when we have enough logs or the server signals no further pages.
-		if len(logs) >= tail || resp.JSON200.LastCursor == nil {
+		if len(entries) >= tail || resp.JSON200.LastCursor == nil {
 			break
 		}
 
@@ -64,12 +65,26 @@ func FetchServiceLogs(
 	}
 
 	// Trim to the requested tail count.
-	if len(logs) > tail {
-		logs = logs[:tail]
+	if len(entries) > tail {
+		entries = entries[:tail]
 	}
 
 	// Reverse: the API returns logs newest-first; terminal output is oldest-first.
-	slices.Reverse(logs)
+	slices.Reverse(entries)
 
-	return logs, nil
+	return entries, nil
+}
+
+// toEntries converts a ServiceLogs response to a slice of ServiceLogEntry.
+// Uses the structured entries field when available (cursor path); falls back
+// to constructing minimal entries from the plain logs strings (legacy path).
+func toEntries(logs *api.ServiceLogs) []api.ServiceLogEntry {
+	if logs.Entries != nil {
+		return *logs.Entries
+	}
+	entries := make([]api.ServiceLogEntry, len(logs.Logs))
+	for i, msg := range logs.Logs {
+		entries[i] = api.ServiceLogEntry{Message: msg}
+	}
+	return entries
 }
