@@ -608,6 +608,12 @@ paths:
             type: string
             format: date-time
           description: Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque pagination cursor returned as lastCursor in a previous response. When provided, returns the next page of logs older than the cursor position.
       responses:
         '200':
           description: Service logs retrieved successfully
@@ -1332,6 +1338,9 @@ components:
           items:
             type: string
           description: Array of log entries (up to 500 entries per page, may be empty)
+        lastCursor:
+          type: string
+          description: Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
     Error:
       type: object
       properties:

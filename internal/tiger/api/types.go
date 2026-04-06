@@ -339,6 +339,9 @@ type ServiceCreateAddons string
 
 // ServiceLogs defines model for ServiceLogs.
 type ServiceLogs struct {
+	// LastCursor Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
+	LastCursor *string `json:"lastCursor,omitempty"`
+
 	// Logs Array of log entries (up to 500 entries per page, may be empty)
 	Logs []string `json:"logs"`
 }
@@ -451,6 +454,9 @@ type GetServiceLogsParams struct {
 
 	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
 	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
+
+	// Cursor Opaque pagination cursor returned as lastCursor in a previous response. When provided, returns the next page of logs older than the cursor position.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.
