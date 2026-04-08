@@ -1594,7 +1594,11 @@ Examples:
 				}
 
 				for _, entry := range logs {
-					colorizedLog := colorizeLogLine(entry.Message, shouldColorize)
+					line := entry.Message
+					if !entry.Timestamp.IsZero() {
+						line = entry.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + line
+					}
+					colorizedLog := colorizeLogLine(line, shouldColorize)
 					fmt.Fprintln(outputWriter, colorizedLog)
 				}
 			}
