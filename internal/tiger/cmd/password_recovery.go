@@ -50,7 +50,7 @@ func connectWithPasswordMenu(
 	fmt.Fprintf(cmd.ErrOrStderr(), "%s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
-	if !checkStdinIsTTY() {
+	if !checkOutputIsTTY(cmd.OutOrStdout()) {
 		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
 	}
 
@@ -58,7 +58,7 @@ func connectWithPasswordMenu(
 	// Only allow password reset for admin role
 	canResetPassword := details.Role == "tsdbadmin"
 	for {
-		option, err := selectPasswordRecoveryOption(cmd.ErrOrStderr(), canResetPassword)
+		option, err := selectPasswordRecoveryOption(cmd.InOrStdin(), cmd.ErrOrStderr(), canResetPassword)
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func connectWithPasswordMenu(
 		case optionEnterPassword:
 			// Prompt for password
 			fmt.Fprint(cmd.ErrOrStderr(), "Enter password: ")
-			password, err := readString(ctx, readPasswordFromTerminal)
+			password, err := readPassword(ctx, cmd.InOrStdin())
 			fmt.Fprintln(cmd.ErrOrStderr()) // newline after password entry
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
@@ -90,7 +90,7 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cmd.ErrOrStderr(), client, service, details.Role)
+			password, err := promptAndResetPassword(ctx, cmd.InOrStdin(), cmd.ErrOrStderr(), client, service, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
@@ -219,10 +219,10 @@ func (m passwordRecoveryModel) View() string {
 
 // selectPasswordRecoveryOption shows the interactive menu for password recovery
 // canResetPassword controls whether the "Update/reset password" option is shown
-func selectPasswordRecoveryOption(out io.Writer, canResetPassword bool) (passwordRecoveryOption, error) {
+func selectPasswordRecoveryOption(in io.Reader, out io.Writer, canResetPassword bool) (passwordRecoveryOption, error) {
 	model := newPasswordRecoveryModel(canResetPassword)
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(in), tea.WithOutput(out))
 	finalModel, err := program.Run()
 	if err != nil {
 		return optionExit, fmt.Errorf("failed to run password recovery menu: %w", err)
@@ -314,13 +314,14 @@ func testSaveAndLaunchPsqlWithPassword(
 // Returns the new password on success.
 func promptAndResetPassword(
 	ctx context.Context,
+	in io.Reader,
 	out io.Writer,
 	client api.ClientWithResponsesInterface,
 	service api.Service,
 	role string,
 ) (string, error) {
 	fmt.Fprint(out, "Enter new password (leave empty to generate): ")
-	newPassword, err := readString(ctx, readPasswordFromTerminal)
+	newPassword, err := readPassword(ctx, in)
 	fmt.Fprintln(out) // newline after password entry
 	if err != nil {
 		return "", fmt.Errorf("error reading password: %w", err)

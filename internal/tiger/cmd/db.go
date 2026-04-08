@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,7 +16,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
@@ -26,18 +26,9 @@ var (
 	// getServiceDetailsFunc can be overridden for testing
 	getServiceDetailsFunc = getServiceDetails
 
-	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
-	checkStdinIsTTY = func() bool {
-		return util.IsTerminal(os.Stdin)
-	}
-
-	// readPasswordFromTerminal can be overridden for testing to inject password input
-	readPasswordFromTerminal = func() (string, error) {
-		val, err := term.ReadPassword(int(os.Stdin.Fd()))
-		if err != nil {
-			return "", err
-		}
-		return string(val), nil
+	// checkOutputIsTTY can be overridden for testing to bypass TTY detection
+	checkOutputIsTTY = func(w io.Writer) bool {
+		return util.IsTerminal(w)
 	}
 )
 
@@ -350,12 +341,12 @@ Examples:
 				passwordToSave = envPassword
 			} else {
 				// Interactive prompt - check if we're in a terminal
-				if !checkStdinIsTTY() {
+				if !checkOutputIsTTY(cmd.OutOrStdout()) {
 					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
 
 				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
-				passwordToSave, err = readString(cmd.Context(), readPasswordFromTerminal)
+				passwordToSave, err = readPassword(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read password: %w", err)
 				}

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
@@ -286,12 +284,10 @@ func promptForCredentials(ctx context.Context, consoleURL string, creds credenti
 
 	fmt.Printf("You can find your API credentials at: %s/dashboard/settings\n\n", consoleURL)
 
-	reader := bufio.NewReader(os.Stdin)
-
 	// Prompt for public key if missing
 	if creds.publicKey == "" {
 		fmt.Print("Enter your public key: ")
-		publicKey, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
+		publicKey, err := readLine(ctx, os.Stdin)
 		if err != nil {
 			return credentials{}, err
 		}
@@ -301,10 +297,7 @@ func promptForCredentials(ctx context.Context, consoleURL string, creds credenti
 	// Prompt for secret key if missing
 	if creds.secretKey == "" {
 		fmt.Print("Enter your secret key: ")
-		password, err := readString(ctx, func() (string, error) {
-			val, err := term.ReadPassword(int(os.Stdin.Fd()))
-			return string(val), err
-		})
+		password, err := readPassword(ctx, os.Stdin)
 		if err != nil {
 			return credentials{}, err
 		}
