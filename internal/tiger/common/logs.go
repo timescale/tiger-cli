@@ -20,13 +20,13 @@ func FetchServiceLogs(
 	cfg *Config,
 	serviceID string,
 	tail int,
-	from *time.Time,
+	since *time.Time,
 	until *time.Time,
 	node *int,
 ) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
 		Node:  node,
-		From:  from,
+		Since: since,
 		Until: until,
 	}
 
@@ -53,8 +53,9 @@ func FetchServiceLogs(
 			return nil, fmt.Errorf("unexpected empty response")
 		}
 
-		page := toEntries(resp.JSON200)
-		entries = append(entries, page...)
+		if resp.JSON200.Entries != nil {
+			entries = append(entries, *resp.JSON200.Entries...)
+		}
 
 		// Stop when we have enough logs or the server signals no further pages.
 		if len(entries) >= tail || resp.JSON200.LastCursor == nil {
@@ -73,18 +74,4 @@ func FetchServiceLogs(
 	slices.Reverse(entries)
 
 	return entries, nil
-}
-
-// toEntries converts a ServiceLogs response to a slice of ServiceLogEntry.
-// Uses the structured entries field when available (cursor path); falls back
-// to constructing minimal entries from the plain logs strings (legacy path).
-func toEntries(logs *api.ServiceLogs) []api.ServiceLogEntry {
-	if logs.Entries != nil {
-		return *logs.Entries
-	}
-	entries := make([]api.ServiceLogEntry, len(logs.Logs))
-	for i, msg := range logs.Logs {
-		entries[i] = api.ServiceLogEntry{Message: msg}
-	}
-	return entries
 }

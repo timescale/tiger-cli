@@ -598,6 +598,7 @@ paths:
         - name: page
           in: query
           required: false
+          deprecated: true
           schema:
             type: integer
           description: Page number for pagination (0-based)
@@ -608,13 +609,13 @@ paths:
             type: string
             format: date-time
           description: Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
-        - name: from
+        - name: since
           in: query
           required: false
           schema:
             type: string
             format: date-time
-          description: Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z). Lower bound for the log search window.
+          description: Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z).
         - name: cursor
           in: query
           required: false

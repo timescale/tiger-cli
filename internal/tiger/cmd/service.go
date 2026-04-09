@@ -1495,7 +1495,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 // buildServiceLogsCmd creates the logs command for viewing service logs
 func buildServiceLogsCmd() *cobra.Command {
 	var tail int
-	var from time.Time
+	var since time.Time
 	var until time.Time
 	var node int
 	var output string
@@ -1520,7 +1520,7 @@ Examples:
   tiger service logs svc-12345
 
   # View logs within a time range
-  tiger service logs --from "2024-01-15T09:00:00Z" --until "2024-01-15T10:00:00Z"
+  tiger service logs --since "2024-01-15T09:00:00Z" --until "2024-01-15T10:00:00Z"
 
   # View logs for a specific node (for services with HA replicas)
   tiger service logs --node 1
@@ -1550,9 +1550,9 @@ Examples:
 			cmd.SilenceUsage = true
 
 			// Prepare parameters
-			var fromPtr *time.Time
-			if !from.IsZero() {
-				fromPtr = &from
+			var sincePtr *time.Time
+			if !since.IsZero() {
+				sincePtr = &since
 			}
 
 			var untilPtr *time.Time
@@ -1571,7 +1571,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
 			defer cancel()
 
-			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, fromPtr, untilPtr, nodePtr)
+			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, sincePtr, untilPtr, nodePtr)
 			if err != nil {
 				return err
 			}
@@ -1609,7 +1609,7 @@ Examples:
 
 	// Add flags
 	cmd.Flags().IntVar(&tail, "tail", 100, "Number of log lines to show")
-	cmd.Flags().TimeVar(&from, "from", time.Time{}, []string{time.RFC3339}, "Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z)")
+	cmd.Flags().TimeVar(&since, "since", time.Time{}, []string{time.RFC3339}, "Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z)")
 	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
 	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")

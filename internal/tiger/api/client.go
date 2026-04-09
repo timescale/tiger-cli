@@ -1437,9 +1437,9 @@ func NewGetServiceLogsRequest(server string, projectId ProjectId, serviceId Serv
 
 		}
 
-		if params.From != nil {
+		if params.Since != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "from", runtime.ParamLocationQuery, *params.From); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "since", runtime.ParamLocationQuery, *params.Since); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err

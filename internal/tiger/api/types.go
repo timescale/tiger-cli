@@ -470,8 +470,8 @@ type GetServiceLogsParams struct {
 	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
 	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
 
-	// From Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z). Lower bound for the log search window.
-	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+	// Since Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z).
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
 
 	// Cursor Opaque pagination cursor returned as lastCursor in a previous response. When provided, returns the next page of logs older than the cursor position.
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
