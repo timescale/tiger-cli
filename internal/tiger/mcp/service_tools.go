@@ -366,6 +366,7 @@ type ServiceLogsInput struct {
 	ServiceID string     `json:"service_id"`
 	Node      *int       `json:"node,omitempty"`
 	Tail      int        `json:"tail,omitempty"`
+	Since     *time.Time `json:"since,omitempty"`
 	Until     *time.Time `json:"until,omitempty"`
 }
 
@@ -383,6 +384,9 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 	schema.Properties["tail"].Minimum = util.Ptr(1.0)
 	schema.Properties["tail"].Examples = []any{50, 100, 1000}
 
+	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format, e.g., '2024-01-15T09:00:00Z'). If not provided, only the tail parameter limits how far back logs are fetched."
+	schema.Properties["since"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
+
 	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format, e.g., '2024-01-15T10:00:00Z'). If not provided, fetches logs up to the current time."
 	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
 
@@ -391,7 +395,14 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 
 // ServiceLogsOutput represents output for service_logs
 type ServiceLogsOutput struct {
-	Logs []string `json:"logs" jsonschema:"Array of log entries, ordered from oldest to newest"`
+	Entries []serviceLogEntryOutput `json:"entries" jsonschema:"Structured log entries with timestamp, message, and severity, ordered from oldest to newest"`
+}
+
+// serviceLogEntryOutput is the MCP output shape for a single log entry.
+type serviceLogEntryOutput struct {
+	Timestamp time.Time `json:"timestamp"`
+	Message   string    `json:"message"`
+	Severity  string    `json:"severity"`
 }
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
@@ -558,7 +569,9 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 		Title: "Get Service Logs",
 		Description: `View logs for a database service.
 
-Fetches and displays logs from the specified service. By default, shows the last 100 log entries. Supports filtering by time and node (for services with HA replicas).`,
+Fetches and displays logs from the specified service. By default, shows the last 100 log entries.
+
+Supports filtering by time (via since/until parameters) and node (for services with HA replicas).`,
 		InputSchema:  ServiceLogsInput{}.Schema(),
 		OutputSchema: ServiceLogsOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -1158,6 +1171,7 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 		zap.String("service_id", input.ServiceID),
 		zap.Intp("node", input.Node),
 		zap.Int("tail", input.Tail),
+		zap.Timep("since", input.Since),
 		zap.Timep("until", input.Until),
 	)
 
@@ -1165,15 +1179,19 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	logsCtx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	logs, err := common.FetchServiceLogs(logsCtx, cfg, input.ServiceID, input.Tail, input.Until, input.Node)
+	entries, err := common.FetchServiceLogs(logsCtx, cfg, input.ServiceID, input.Tail, input.Since, input.Until, input.Node)
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}
 
-	// Return logs as array
-	output := ServiceLogsOutput{
-		Logs: logs,
+	structured := make([]serviceLogEntryOutput, len(entries))
+	for i, e := range entries {
+		structured[i] = serviceLogEntryOutput{
+			Timestamp: e.Timestamp,
+			Message:   e.Message,
+			Severity:  e.Severity,
+		}
 	}
 
-	return nil, output, nil
+	return nil, ServiceLogsOutput{Entries: structured}, nil
 }

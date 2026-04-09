@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
-	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// FetchServiceLogs fetches service logs with pagination support up to the specified
-// tail limit. Returns logs in ascending order by timestamp (oldest first, newest last).
-// NOTE: The node parameter specifies the Specific service node to fetch logs
+// FetchServiceLogs fetches service logs with cursor-based pagination up to the specified
+// tail limit. Returns entries in ascending order by timestamp (oldest first, newest last).
+// NOTE: The node parameter specifies the specific service node to fetch logs
 // from, for services with HA replicas. If nil, the backend automatically
 // returns logs for the primary.
 func FetchServiceLogs(
@@ -21,25 +20,25 @@ func FetchServiceLogs(
 	cfg *Config,
 	serviceID string,
 	tail int,
+	since *time.Time,
 	until *time.Time,
 	node *int,
-) ([]string, error) {
-	// Initialize params
+) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
 		Node:  node,
-		Page:  util.Ptr(0),
+		Since: since,
 		Until: until,
 	}
 
-	// Set until time to current time if not provided for
-	// consistent pagination across multiple page requests
+	// Fix the upper time bound so that all paginated requests share the same
+	// window — without this, a clock tick between requests could cause the
+	// second page to return logs already included on the first page.
 	if params.Until == nil {
 		now := time.Now()
 		params.Until = &now
 	}
 
-	// Fetch pages until we have enough logs or reach the end
-	var logs []string
+	var entries []api.ServiceLogEntry
 	for {
 		resp, err := cfg.Client.GetServiceLogsWithResponse(ctx, cfg.ProjectID, serviceID, params)
 		if err != nil {
@@ -54,29 +53,25 @@ func FetchServiceLogs(
 			return nil, fmt.Errorf("unexpected empty response")
 		}
 
-		pageLogs := resp.JSON200.Logs
-		logs = append(logs, pageLogs...)
+		if resp.JSON200.Entries != nil {
+			entries = append(entries, *resp.JSON200.Entries...)
+		}
 
-		// Stop conditions:
-		// 1. Page is empty (no more logs available)
-		// 2. We have enough logs to satisfy tail requirement
-		if len(pageLogs) == 0 || len(logs) >= tail {
+		// Stop when we have enough logs or the server signals no further pages.
+		if len(entries) >= tail || resp.JSON200.LastCursor == nil {
 			break
 		}
 
-		*params.Page++
+		params.Cursor = resp.JSON200.LastCursor
 	}
 
-	// Apply tail filter
-	if len(logs) > tail {
-		logs = logs[:tail]
+	// Trim to the requested tail count.
+	if len(entries) > tail {
+		entries = entries[:tail]
 	}
 
-	// Reverse the order of the logs. This is necessary because the API
-	// returns logs in descending order by timestamp (with the most
-	// recent logs first), whereas in terminal output, it's more natural
-	// for the most recent logs to appear last.
-	slices.Reverse(logs)
+	// Reverse: the API returns logs newest-first; terminal output is oldest-first.
+	slices.Reverse(entries)
 
-	return logs, nil
+	return entries, nil
 }

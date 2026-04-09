@@ -337,9 +337,27 @@ type ServiceCreate struct {
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
 
+// ServiceLogEntry defines model for ServiceLogEntry.
+type ServiceLogEntry struct {
+	// Message Log message text
+	Message string `json:"message"`
+
+	// Severity PostgreSQL severity level (e.g. LOG, WARNING, ERROR, FATAL)
+	Severity string `json:"severity"`
+
+	// Timestamp Timestamp of the log entry (RFC3339 format)
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // ServiceLogs defines model for ServiceLogs.
 type ServiceLogs struct {
-	// Logs Array of log entries (up to 500 entries per page, may be empty)
+	// Entries Structured log entries with timestamp and severity metadata. Only present on the cursor-based path.
+	Entries *[]ServiceLogEntry `json:"entries,omitempty"`
+
+	// LastCursor Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
+	LastCursor *string `json:"lastCursor,omitempty"`
+
+	// Logs Array of log message strings. Preserved for backwards compatibility.
 	Logs []string `json:"logs"`
 }
 
@@ -451,6 +469,12 @@ type GetServiceLogsParams struct {
 
 	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
 	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
+
+	// Since Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z).
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+
+	// Cursor Opaque pagination cursor returned as lastCursor in a previous response. When provided, returns the next page of logs older than the cursor position.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.
