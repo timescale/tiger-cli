@@ -395,14 +395,7 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 
 // ServiceLogsOutput represents output for service_logs
 type ServiceLogsOutput struct {
-	Entries []serviceLogEntryOutput `json:"entries" jsonschema:"Structured log entries with timestamp, message, and severity, ordered from oldest to newest"`
-}
-
-// serviceLogEntryOutput is the MCP output shape for a single log entry.
-type serviceLogEntryOutput struct {
-	Timestamp time.Time `json:"timestamp"`
-	Message   string    `json:"message"`
-	Severity  string    `json:"severity"`
+	Logs []string `json:"logs" jsonschema:"Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."`
 }
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
@@ -1184,14 +1177,14 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceLogsOutput{}, err
 	}
 
-	structured := make([]serviceLogEntryOutput, len(entries))
+	logs := make([]string, len(entries))
 	for i, e := range entries {
-		structured[i] = serviceLogEntryOutput{
-			Timestamp: e.Timestamp,
-			Message:   e.Message,
-			Severity:  e.Severity,
+		if !e.Timestamp.IsZero() {
+			logs[i] = e.Timestamp.UTC().Format(time.RFC3339) + " " + e.Message
+		} else {
+			logs[i] = e.Message
 		}
 	}
 
-	return nil, ServiceLogsOutput{Entries: structured}, nil
+	return nil, ServiceLogsOutput{Logs: logs}, nil
 }
