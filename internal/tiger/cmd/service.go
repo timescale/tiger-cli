@@ -1595,7 +1595,8 @@ Examples:
 				for _, entry := range logs {
 					line := entry.Message
 					if !entry.Timestamp.IsZero() {
-						line = entry.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + line
+						// Local timezone for terminal output; MCP and public API use UTC.
+						line = entry.Timestamp.Local().Format("2006-01-02 15:04:05 MST") + " " + line
 					}
 					fmt.Fprintln(outputWriter, colorizeLogEntry(line, entry.Severity, shouldColorize))
 				}

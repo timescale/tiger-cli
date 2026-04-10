@@ -1180,7 +1180,7 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	logs := make([]string, len(entries))
 	for i, e := range entries {
 		if !e.Timestamp.IsZero() {
-			logs[i] = e.Timestamp.UTC().Format(time.RFC3339) + " " + e.Message
+			logs[i] = e.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + e.Message
 		} else {
 			logs[i] = e.Message
 		}
