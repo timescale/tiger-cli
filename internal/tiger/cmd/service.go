@@ -1619,6 +1619,8 @@ Examples:
 // line using the API-provided severity field. Using the structured field avoids
 // false positives where a severity word appears in the message body rather than
 // as an actual log level. If colorEnabled is false, returns the line unchanged.
+//
+// PostgreSQL severity levels: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS
 func colorizeLogEntry(line, severity string, colorEnabled bool) string {
 	if !colorEnabled || severity == "" {
 		return line
