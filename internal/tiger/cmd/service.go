@@ -1615,30 +1615,31 @@ Examples:
 	return cmd
 }
 
-// colorizeLogEntry applies a color to the entire log line based on the
-// structured severity field. If colorEnabled is false, returns the line unchanged.
+// colorizeLogEntry colorizes the severity token (e.g. "ERROR:") within the log
+// line using the API-provided severity field. Using the structured field avoids
+// false positives where a severity word appears in the message body rather than
+// as an actual log level. If colorEnabled is false, returns the line unchanged.
 func colorizeLogEntry(line, severity string, colorEnabled bool) string {
-	if !colorEnabled {
+	if !colorEnabled || severity == "" {
 		return line
 	}
+
+	var colorFn func(string, ...interface{}) string
 	switch strings.ToUpper(severity) {
 	case "ERROR", "FATAL", "PANIC":
-		return color.RedString(line)
+		colorFn = color.RedString
 	case "WARNING":
-		return color.YellowString(line)
-	case "INFO", "NOTICE":
-		return color.BlueString(line)
+		colorFn = color.YellowString
+	case "LOG", "INFO", "NOTICE":
+		colorFn = color.BlueString
 	case "DEBUG":
-		return color.MagentaString(line)
-	case "QUERY":
-		return color.GreenString(line)
-	case "LOG":
-		return color.CyanString(line)
-	case "DETAIL", "HINT", "CONTEXT", "LOCATION":
-		return color.WhiteString(line)
+		colorFn = color.MagentaString
 	default:
 		return line
 	}
+
+	token := strings.ToUpper(severity) + ":"
+	return strings.Replace(line, token, colorFn(token), 1)
 }
 
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
