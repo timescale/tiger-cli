@@ -292,7 +292,11 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Note: Logs can take some time to become available after service creation,
 		// so we just verify that we get a valid JSON array response (even if empty).
 		// We don't check for specific log lines or require logs to be present.
-		var logs []string
+		var logs []struct {
+			Message   string `json:"message"`
+			Severity  string `json:"severity"`
+			Timestamp string `json:"timestamp"`
+		}
 		if err := json.Unmarshal([]byte(output), &logs); err != nil {
 			t.Fatalf("Failed to parse logs JSON: %v\nOutput: %s", err, output)
 		}
@@ -1839,12 +1843,12 @@ func TestServiceForkIntegration(t *testing.T) {
 		t.Logf("✅ Source data verified: 3 rows present")
 	})
 
-	t.Run("ForkService_LastSnapshot_NoBackupsYet", func(t *testing.T) {
+	t.Run("ForkService_LastSnapshot_EarlyFork", func(t *testing.T) {
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
 		}
 
-		t.Logf("Attempting to fork with --last-snapshot (should fail - no backups yet)")
+		t.Logf("Forking service: %s with --last-snapshot strategy (early fork)", sourceServiceID)
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
@@ -1855,18 +1859,32 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--output", "json",
 		)
 
-		// We expect this to fail
-		if err == nil {
-			t.Errorf("Expected fork with --last-snapshot to fail when no backups exist, but it succeeded")
-		} else {
-			// Verify the error message indicates no backups/snapshots available
-			if !strings.Contains(err.Error(), "doesn't yet have any backups or snapshots available") &&
-				!strings.Contains(output, "doesn't yet have any backups or snapshots available") {
-				t.Errorf("Expected error about no backups/snapshots, got: %v\nOutput: %s", err, output)
-			} else {
-				t.Logf("✅ Fork with --last-snapshot correctly failed: no backups available yet")
-			}
+		if err != nil {
+			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
 		}
+
+		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
+		if extractedServiceID == "" {
+			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
+		}
+
+		t.Logf("✅ Created --last-snapshot forked service with ID: %s", extractedServiceID)
+
+		// Delete the forked service to free up the service slot for subsequent tests
+		t.Logf("Deleting early fork service: %s", extractedServiceID)
+
+		output, err = executeIntegrationCommand(
+			t.Context(),
+			"service", "delete", extractedServiceID,
+			"--confirm",
+			"--wait-timeout", "10m",
+		)
+
+		if err != nil {
+			t.Fatalf("Early fork service deletion failed: %v\nOutput: %s", err, output)
+		}
+
+		t.Logf("✅ Early fork service deleted successfully")
 	})
 
 	t.Run("ForkService_Now", func(t *testing.T) {
