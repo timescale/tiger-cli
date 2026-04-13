@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -1598,8 +1597,7 @@ Examples:
 					if !entry.Timestamp.IsZero() {
 						line = entry.Timestamp.UTC().Format("2006-01-02 15:04:05 UTC") + " " + line
 					}
-					colorizedLog := colorizeLogLine(line, shouldColorize)
-					fmt.Fprintln(outputWriter, colorizedLog)
+					fmt.Fprintln(outputWriter, colorizeLogEntry(line, entry.Severity, shouldColorize))
 				}
 			}
 
@@ -1617,47 +1615,33 @@ Examples:
 	return cmd
 }
 
-// logLevelRegex matches PostgreSQL log levels in log lines
-// Pattern: word boundary + log level + colon
-var logLevelRegex = regexp.MustCompile(`\b(DEBUG|INFO|NOTICE|WARNING|LOG|ERROR|FATAL|PANIC|DETAIL|HINT|QUERY|CONTEXT|LOCATION):`)
-
-// colorizeLogLine applies color to the log level in a PostgreSQL log line
-// If colorEnabled is false, returns the line unchanged
-func colorizeLogLine(line string, colorEnabled bool) string {
-	if !colorEnabled {
+// colorizeLogEntry colorizes the severity token (e.g. "ERROR:") within the log
+// line using the API-provided severity field. Using the structured field avoids
+// false positives where a severity word appears in the message body rather than
+// as an actual log level. If colorEnabled is false, returns the line unchanged.
+//
+// PostgreSQL severity levels: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS
+func colorizeLogEntry(line, severity string, colorEnabled bool) string {
+	if !colorEnabled || severity == "" {
 		return line
 	}
 
-	// Find the log level in the line
-	return logLevelRegex.ReplaceAllStringFunc(line, func(match string) string {
-		// Remove the colon to get just the level
-		logLevel := strings.TrimSuffix(match, ":")
+	var colorFn func(string, ...interface{}) string
+	switch strings.ToUpper(severity) {
+	case "ERROR", "FATAL", "PANIC":
+		colorFn = color.RedString
+	case "WARNING":
+		colorFn = color.YellowString
+	case "LOG", "INFO", "NOTICE":
+		colorFn = color.BlueString
+	case "DEBUG":
+		colorFn = color.MagentaString
+	default:
+		return line
+	}
 
-		// Apply color based on severity
-		var coloredLevel string
-		switch logLevel {
-		case "ERROR", "FATAL", "PANIC":
-			coloredLevel = color.RedString(logLevel)
-		case "WARNING":
-			coloredLevel = color.YellowString(logLevel)
-		case "INFO", "NOTICE":
-			coloredLevel = color.BlueString(logLevel)
-		case "DEBUG":
-			coloredLevel = color.MagentaString(logLevel)
-		case "QUERY":
-			coloredLevel = color.GreenString(logLevel)
-		case "LOG":
-			coloredLevel = color.CyanString(logLevel)
-		case "DETAIL", "HINT", "CONTEXT", "LOCATION":
-			coloredLevel = color.WhiteString(logLevel)
-		default:
-			// Unknown level - leave uncolored
-			coloredLevel = logLevel
-		}
-
-		// Return with the colon
-		return coloredLevel + ":"
-	})
+	token := strings.ToUpper(severity) + ":"
+	return strings.Replace(line, token, colorFn(token), 1)
 }
 
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
