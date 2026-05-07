@@ -30,6 +30,7 @@ type Config struct {
 	GatewayURL           string        `mapstructure:"gateway_url"`
 	Output               string        `mapstructure:"output"`
 	PasswordStorage      string        `mapstructure:"password_storage"`
+	ReadOnly             bool          `mapstructure:"read_only"`
 	ReleasesURL          string        `mapstructure:"releases_url"`
 	ServiceID            string        `mapstructure:"service_id"`
 	VersionCheckInterval time.Duration `mapstructure:"version_check_interval"`
@@ -49,6 +50,7 @@ type ConfigOutput struct {
 	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
 	Output               *string        `mapstructure:"output" json:"output,omitempty"`
 	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty"`
+	ReadOnly             *bool          `mapstructure:"read_only" json:"read_only,omitempty"`
 	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty"`
 	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty"`
 	VersionCheckInterval *util.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty"` // [util.Duration] ensures value is marshaled in [time.Duration.String] format when output
@@ -67,6 +69,7 @@ const (
 	DefaultGatewayURL           = "https://console.cloud.tigerdata.com/api"
 	DefaultOutput               = "table"
 	DefaultPasswordStorage      = "keyring"
+	DefaultReadOnly             = false
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
 	DefaultVersionCheckInterval = 24 * time.Hour
 )
@@ -82,6 +85,7 @@ var defaultValues = map[string]any{
 	"gateway_url":             DefaultGatewayURL,
 	"output":                  DefaultOutput,
 	"password_storage":        DefaultPasswordStorage,
+	"read_only":               DefaultReadOnly,
 	"releases_url":            DefaultReleasesURL,
 	"service_id":              "",
 	"version_check_interval":  DefaultVersionCheckInterval.String(), // String can be interpreted as either [time.Duration] (for [Config]) or [util.Duration] (for [ConfigOutput])
@@ -373,6 +377,22 @@ func (c *Config) UpdateField(key string, value any) (any, error) {
 		}
 		c.PasswordStorage = s
 		validated = s
+
+	case "read_only":
+		switch v := value.(type) {
+		case bool:
+			c.ReadOnly = v
+			validated = v
+		case string:
+			b, err := setBool("read_only", v)
+			if err != nil {
+				return nil, err
+			}
+			c.ReadOnly = b
+			validated = b
+		default:
+			return nil, fmt.Errorf("read_only must be string or bool, got %T", value)
+		}
 
 	case "debug":
 		switch v := value.(type) {
