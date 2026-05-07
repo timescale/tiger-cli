@@ -314,6 +314,10 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
    - `db_tools.go` - Database operations (execute-query)
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
 
+**Read-Only Mode Gate:**
+
+Write/destructive MCP tool handlers must call `checkReadOnly(cfg.Config)` (defined in `internal/tiger/mcp/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the handler returns `errReadOnly` and the API client is never invoked.
+
 **Tool Definition Pattern:**
 
 When defining MCP tools, we use a pattern that balances type safety with schema flexibility:

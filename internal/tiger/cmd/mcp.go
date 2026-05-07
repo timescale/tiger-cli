@@ -250,7 +250,7 @@ Examples:
 			}
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context())
+			server, err := mcp.NewServer(cmd.Context(), cfg)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}
@@ -322,7 +322,7 @@ Examples:
 			}
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context())
+			server, err := mcp.NewServer(cmd.Context(), cfg)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}
@@ -378,8 +378,13 @@ Examples:
 func startStdioServer(ctx context.Context) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Create MCP server
-	server, err := mcp.NewServer(ctx)
+	server, err := mcp.NewServer(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
@@ -401,8 +406,13 @@ func startStdioServer(ctx context.Context) error {
 func startHTTPServer(ctx context.Context, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	// Create MCP server
-	server, err := mcp.NewServer(ctx)
+	server, err := mcp.NewServer(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
@@ -918,8 +928,13 @@ func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
 	// Create MCP server to get capabilities
-	server, err := mcp.NewServer(cmd.Context())
+	server, err := mcp.NewServer(cmd.Context(), cfg)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
