@@ -28,14 +28,19 @@ type Server struct {
 	docsProxyClient *ProxyClient
 }
 
-// NewServer creates a new Tiger MCP server instance
-func NewServer(ctx context.Context) (*Server, error) {
-	// Create MCP server
+// NewServer creates a new Tiger MCP server instance. The caller-supplied cfg
+// is used only to render the read-only warning in server instructions.
+func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
+	var opts *mcp.ServerOptions
+	if instructions := buildServerInstructions(cfg); instructions != "" {
+		opts = &mcp.ServerOptions{Instructions: instructions}
+	}
+
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
-	}, nil)
+	}, opts)
 
 	server := &Server{
 		mcpServer: mcpServer,

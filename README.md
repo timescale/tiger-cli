@@ -234,6 +234,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
+- `read_only` - When `true`, write/destructive Tiger MCP tools (`service_create`, `service_fork`, `service_start`, `service_stop`, `service_resize`, `service_update_password`) refuse to run. Read tools (`service_list`, `service_get`, `service_logs`) and `db_execute_query` are unaffected. Default: `false`.
 - `service_id` - Default service ID
 - `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: `24h`)
 
@@ -248,6 +249,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_READ_ONLY` - When `true`, write/destructive Tiger MCP tools refuse to run
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
 - `TIGER_SERVICE_ID` - Default service ID
