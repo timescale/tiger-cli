@@ -41,6 +41,5 @@ func buildServerInstructions(cfg *config.Config) string {
 	return "READ-ONLY MODE IS ENABLED. The following Tiger MCP tools will refuse to run: " +
 		strings.Join(readOnlyGatedTools, ", ") + ". " +
 		"Before asking the user to provide inputs for any of these operations, " +
-		"tell them read-only mode is on and ask whether to disable it " +
-		"(run: `tiger config unset read_only`) or skip the operation."
+		"tell them read-only mode is on."
 }

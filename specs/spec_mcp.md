@@ -71,8 +71,6 @@ Tools gated by read-only mode:
 - `service_resize`
 - `service_update_password`
 
-`db_execute_query` is intentionally not gated; database-level read-only enforcement is a separate concern (see the `tsdb_admin.read_only_role` mechanism documented under `tiger db create role --read-only`).
-
 To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
 
 When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools and asking the LLM to inform the user before gathering inputs for them. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate itself is unaffected because handlers reload config per call).
