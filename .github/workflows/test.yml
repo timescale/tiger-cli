@@ -56,7 +56,7 @@ jobs:
         env:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
-        run: go test -race -coverprofile=coverage.out -coverpkg=./... ./...
+        run: go test -race -timeout 15m -coverprofile=coverage.out -coverpkg=./... ./...
 
       - name: Generate coverage report
         run: go tool cover -html=coverage.out -o=coverage.html
