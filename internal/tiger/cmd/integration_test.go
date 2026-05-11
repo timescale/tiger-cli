@@ -93,6 +93,59 @@ func executeIntegrationCommand(ctx context.Context, args ...string) (string, err
 	return buf.String(), err
 }
 
+// sweepStaleIntegrationServices deletes any service whose name starts with
+// "integration-" and was created more than threshold ago. Best-effort: every
+// failure is logged, none is fatal.
+//
+// This catches services leaked by prior runs that were killed before their
+// own deferred cleanup could fire (e.g. `go test` outer timeout, SIGKILL).
+func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
+	t.Helper()
+	ctx := context.Background()
+
+	output, err := executeIntegrationCommand(ctx, "service", "list", "-o", "json")
+	if err != nil {
+		t.Logf("Sweep: failed to list services, skipping: %v", err)
+		return
+	}
+
+	var services []struct {
+		ServiceID *string    `json:"service_id"`
+		Name      *string    `json:"name"`
+		Created   *time.Time `json:"created"`
+	}
+	if err := json.Unmarshal([]byte(output), &services); err != nil {
+		t.Logf("Sweep: failed to parse service list, skipping: %v", err)
+		return
+	}
+
+	cutoff := time.Now().Add(-threshold)
+	swept := 0
+	for _, s := range services {
+		if s.ServiceID == nil || s.Name == nil || s.Created == nil {
+			continue
+		}
+		if !strings.HasPrefix(*s.Name, "integration-") {
+			continue
+		}
+		if !s.Created.Before(cutoff) {
+			continue
+		}
+		t.Logf("Sweep: deleting stale service %s (name=%s, created=%s)",
+			*s.ServiceID, *s.Name, s.Created.Format(time.RFC3339))
+		if _, err := executeIntegrationCommand(ctx,
+			"service", "delete", *s.ServiceID,
+			"--confirm", "--no-wait"); err != nil {
+			t.Logf("Sweep: failed to delete %s: %v", *s.ServiceID, err)
+			continue
+		}
+		swept++
+	}
+	if swept > 0 {
+		t.Logf("Sweep: deleted %d stale service(s)", swept)
+	}
+}
+
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
 // login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
@@ -138,6 +191,10 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			}
 		}
 	}()
+
+	// Sweep any orphan integration services left over from prior runs.
+	// Registered last so it runs first (LIFO) — while creds are still valid.
+	defer sweepStaleIntegrationServices(t, time.Hour)
 
 	t.Run("Login", func(t *testing.T) {
 		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
