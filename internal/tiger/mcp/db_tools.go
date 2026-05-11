@@ -116,6 +116,8 @@ Connects to a PostgreSQL database service in Tiger Cloud and executes the provid
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
+When read-only mode is enabled in the Tiger CLI configuration, the database connection is opened with an immutable read-only GUC, so writes and DDL will be rejected by the server regardless of the query contents.
+
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
 		OutputSchema: DBExecuteQueryOutput{}.Schema(),
@@ -146,6 +148,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
 		zap.Bool("pooled", input.Pooled),
+		zap.Bool("read_only", cfg.ReadOnly),
 	)
 
 	// Get service details to construct connection string
@@ -169,6 +172,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,
+		ReadOnly:     cfg.ReadOnly,
 	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)

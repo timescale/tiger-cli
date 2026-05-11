@@ -50,4 +50,7 @@ func TestBuildServerInstructions(t *testing.T) {
 			t.Errorf("instructions missing gated tool %q in: %q", tool, got)
 		}
 	}
+	if !strings.Contains(got, "db_execute_query") {
+		t.Errorf("instructions should mention db_execute_query's read-only GUC behavior: %q", got)
+	}
 }
