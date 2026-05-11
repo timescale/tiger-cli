@@ -423,6 +423,11 @@ tiger db connect svc-12345 --pooled --role readonly -- --no-psqlrc -v ON_ERROR_S
 tiger db connection-string svc-12345
 # Get pooled connection string
 tiger db connection-string svc-12345 --pooled
+# Get a read-only connection string (Tiger Cloud immutable read-only GUC)
+tiger db connection-string svc-12345 --read-only
+
+# Connect in read-only mode (writes and DDL rejected by the server)
+tiger db connect svc-12345 --read-only
 
 # Test database connectivity
 tiger db test-connection svc-12345

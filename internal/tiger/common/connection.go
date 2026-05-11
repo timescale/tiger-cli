@@ -21,6 +21,12 @@ type ConnectionDetailsOptions struct {
 	// If provided and WithPassword is true, this password will be used
 	// instead of fetching from password storage. This is useful when password_storage=none.
 	InitialPassword string
+
+	// ReadOnly forces the connection into Tiger Cloud's immutable read-only
+	// mode by injecting the tsdb_admin.read_only_connection GUC as a startup
+	// parameter. The GUC cannot be disabled with SET for the duration of the
+	// session, so this is safe to use even when the LLM controls the SQL.
+	ReadOnly bool
 }
 
 type ConnectionDetails struct {
@@ -30,7 +36,12 @@ type ConnectionDetails struct {
 	Port     int    `json:"port,omitempty"`
 	Database string `json:"database,omitempty"`
 	IsPooler bool   `json:"is_pooler,omitempty"`
+	readOnly bool
 }
+
+// readOnlyConnectionOption is the URL-encoded `options` query parameter that
+// activates Tiger Cloud's immutable read-only connection mode.
+const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3Dtrue"
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
 	if service.Endpoint == nil {
@@ -62,6 +73,7 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		Port:     *endpoint.Port,
 		Database: "tsdb", // Database is always "tsdb" for TimescaleDB/PostgreSQL services
 		IsPooler: isPooler,
+		readOnly: opts.ReadOnly,
 	}
 
 	if opts.WithPassword {
@@ -77,12 +89,17 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 
 // String creates a PostgreSQL connection string from service details
 func (d *ConnectionDetails) String() string {
+	query := "sslmode=require"
+	if d.readOnly {
+		query += "&" + readOnlyConnectionOption
+	}
+
 	if d.Password == "" {
 		// Build connection string without password (default behavior)
-		return fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=require", d.Role, d.Host, d.Port, d.Database)
+		return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", d.Role, d.Host, d.Port, d.Database, query)
 	}
 	// Include password in connection string
-	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=require", d.Role, d.Password, d.Host, d.Port, d.Database)
+	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?%s", d.Role, d.Password, d.Host, d.Port, d.Database, query)
 }
 
 // GetPassword fetches the password for the specified service from the

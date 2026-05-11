@@ -88,6 +88,20 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			expectedIsPooler: true,
 		},
 		{
+			name: "Read-only injects tsdb_admin.read_only_connection GUC",
+			service: api.Service{
+				Endpoint: &api.Endpoint{
+					Host: util.Ptr("test-host.tigerdata.com"),
+					Port: util.Ptr(5432),
+				},
+			},
+			opts: ConnectionDetailsOptions{
+				Role:     "tsdbadmin",
+				ReadOnly: true,
+			},
+			expectedString: "postgresql://tsdbadmin@test-host.tigerdata.com:5432/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue",
+		},
+		{
 			name: "Pooled connection fallback to direct when pooler unavailable",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
@@ -378,6 +392,52 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	expectedString := "postgresql://tsdbadmin@test-host.com:5432/tsdb?sslmode=require"
 	if result.String() != expectedString {
 		t.Errorf("Expected connection string %q, got %q", expectedString, result.String())
+	}
+}
+
+func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
+	config.SetTestServiceName(t)
+
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	serviceID := "test-readonly-service"
+	projectID := "test-readonly-project"
+	host := "test-host.com"
+	port := 5432
+	service := api.Service{
+		ServiceId: &serviceID,
+		ProjectId: &projectID,
+		Endpoint: &api.Endpoint{
+			Host: &host,
+			Port: &port,
+		},
+	}
+
+	testPassword := "test-password-readonly-789"
+	role := "tsdbadmin"
+	storage := GetPasswordStorage()
+	if err := storage.Save(service, testPassword, role); err != nil {
+		t.Fatalf("Failed to save test password: %v", err)
+	}
+	defer storage.Remove(service, role)
+
+	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+		Role:         role,
+		WithPassword: true,
+		ReadOnly:     true,
+	})
+	if err != nil {
+		t.Fatalf("GetConnectionDetails failed: %v", err)
+	}
+
+	expected := fmt.Sprintf(
+		"postgresql://tsdbadmin:%s@%s:%d/tsdb?sslmode=require&options=-c%%20tsdb_admin.read_only_connection%%3Dtrue",
+		testPassword, host, port,
+	)
+	if got := details.String(); got != expected {
+		t.Errorf("Expected connection string %q, got %q", expected, got)
 	}
 }
 

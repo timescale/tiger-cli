@@ -71,9 +71,11 @@ Tools gated by read-only mode:
 - `service_resize`
 - `service_update_password`
 
+`db_execute_query` is **not** gated — instead, when read-only mode is enabled the database connection used by the tool is opened with the `tsdb_admin.read_only_connection=true` GUC injected as a startup `options` parameter. This is a Tiger Cloud GUC that activates an immutable read-only connection for the session, so writes and DDL are rejected by the server itself and cannot be re-enabled by the LLM with a `SET` statement.
+
 To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
 
-When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools and asking the LLM to inform the user before gathering inputs for them. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate itself is unaffected because handlers reload config per call).
+When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools, mentioning that `db_execute_query` runs against a read-only connection, and asking the LLM to inform the user before gathering inputs for the gated tools. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate and the GUC injection are both unaffected because handlers reload config per call).
 
 ### CLI MCP Commands
 

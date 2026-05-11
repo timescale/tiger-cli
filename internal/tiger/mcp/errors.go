@@ -41,5 +41,7 @@ func buildServerInstructions(cfg *config.Config) string {
 	return "READ-ONLY MODE IS ENABLED. The following Tiger MCP tools will refuse to run: " +
 		strings.Join(readOnlyGatedTools, ", ") + ". " +
 		"Before asking the user to provide inputs for any of these operations, " +
-		"tell them read-only mode is on."
+		"tell them read-only mode is on. " +
+		"db_execute_query is still available, but the database connection is opened with " +
+		"an immutable read-only GUC, so writes and DDL will be rejected by the server."
 }
