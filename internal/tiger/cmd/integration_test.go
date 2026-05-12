@@ -93,6 +93,60 @@ func executeIntegrationCommand(ctx context.Context, args ...string) (string, err
 	return buf.String(), err
 }
 
+// testServicePrefix is the name prefix used by every service created by the
+// integration tests. The sweeper filters by this prefix so it only deletes
+// services this test suite owns.
+const testServicePrefix = "integration-"
+
+// sweepStaleIntegrationServices deletes any service whose name starts with
+// testServicePrefix and was created more than threshold ago. Best-effort:
+// every failure is logged, none is fatal.
+//
+// This catches services leaked by prior runs that were killed before their
+// own deferred cleanup could fire (e.g. `go test` outer timeout, SIGKILL).
+func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
+	t.Helper()
+	ctx := t.Context()
+
+	output, err := executeIntegrationCommand(ctx, "service", "list", "-o", "json")
+	if err != nil {
+		t.Logf("Sweep: failed to list services, skipping: %v", err)
+		return
+	}
+
+	var services []api.Service
+	if err := json.Unmarshal([]byte(output), &services); err != nil {
+		t.Logf("Sweep: failed to parse service list, skipping: %v", err)
+		return
+	}
+
+	cutoff := time.Now().Add(-threshold)
+	swept := 0
+	for _, s := range services {
+		if s.ServiceId == nil || s.Name == nil || s.Created == nil {
+			continue
+		}
+		if !strings.HasPrefix(*s.Name, testServicePrefix) {
+			continue
+		}
+		if !s.Created.Before(cutoff) {
+			continue
+		}
+		t.Logf("Sweep: deleting stale service %s (name=%s, created=%s)",
+			*s.ServiceId, *s.Name, s.Created.Format(time.RFC3339))
+		if _, err := executeIntegrationCommand(ctx,
+			"service", "delete", *s.ServiceId,
+			"--confirm", "--no-wait"); err != nil {
+			t.Logf("Sweep: failed to delete %s: %v", *s.ServiceId, err)
+			continue
+		}
+		swept++
+	}
+	if swept > 0 {
+		t.Logf("Sweep: deleted %d stale service(s)", swept)
+	}
+}
+
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
 // login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
@@ -160,6 +214,10 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		t.Logf("Login successful")
 	})
+
+	// Sweep orphans from prior runs while we're authenticated and before
+	// the test does anything that could fail. Runs once per CI run.
+	sweepStaleIntegrationServices(t, time.Hour)
 
 	t.Run("Status", func(t *testing.T) {
 		t.Logf("Verifying authentication status")
