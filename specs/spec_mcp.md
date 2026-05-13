@@ -61,7 +61,7 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### Read-Only Mode
 
-When the `read_only` config option is `true` (or `TIGER_READ_ONLY=true`), write/destructive MCP tools refuse to run and return an error explaining how to disable read-only mode. This is intended for AI agent setups that need to inspect Tiger Cloud resources without risk of mutation.
+When the `read_only` config option is `true` (or `TIGER_READ_ONLY=true`), write/destructive MCP tools refuse to run and return an error. This is intended for AI agent setups that need to inspect Tiger Cloud resources without risk of mutation.
 
 Tools gated by read-only mode:
 - `service_create`
@@ -75,7 +75,7 @@ Tools gated by read-only mode:
 
 To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
 
-When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools, mentioning that `db_execute_query` runs against a read-only connection, and asking the LLM to inform the user before gathering inputs for the gated tools. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate and the GUC injection are both unaffected because handlers reload config per call).
+When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools and asking the LLM to inform the user before gathering inputs for them. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate and the GUC injection are both unaffected because handlers reload config per call).
 
 ### CLI MCP Commands
 

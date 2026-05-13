@@ -6,10 +6,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
-var errReadOnly = errors.New("this operation is not allowed in read-only mode (unset with: tiger config unset read_only)")
+var errReadOnly = errors.New("this operation is not allowed in read-only mode")
 
-// readOnlyGatedTools shares the gated-tool list between the gate and the
-// server-instructions warning so they can't drift.
 var readOnlyGatedTools = []string{
 	toolServiceCreate,
 	toolServiceFork,
