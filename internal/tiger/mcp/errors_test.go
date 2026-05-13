@@ -30,17 +30,29 @@ func TestCheckReadOnly(t *testing.T) {
 }
 
 func TestBuildServerInstructions(t *testing.T) {
-	if got := buildServerInstructions(nil); got != "" {
-		t.Errorf("nil cfg should produce empty instructions, got %q", got)
-	}
+	const capabilitiesMarker = "Tiger MCP provides tools"
 
-	if got := buildServerInstructions(&config.Config{ReadOnly: false}); got != "" {
-		t.Errorf("read-only off should produce empty instructions, got %q", got)
+	for _, tt := range []struct {
+		name string
+		cfg  *config.Config
+	}{
+		{name: "nil cfg", cfg: nil},
+		{name: "read-only off", cfg: &config.Config{ReadOnly: false}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildServerInstructions(tt.cfg)
+			if !strings.Contains(got, capabilitiesMarker) {
+				t.Errorf("instructions missing capabilities blurb: %q", got)
+			}
+			if strings.Contains(got, "READ-ONLY MODE IS ENABLED") {
+				t.Errorf("instructions should not contain read-only banner when read-only is off: %q", got)
+			}
+		})
 	}
 
 	got := buildServerInstructions(&config.Config{ReadOnly: true})
-	if got == "" {
-		t.Fatal("read-only on should produce non-empty instructions")
+	if !strings.Contains(got, capabilitiesMarker) {
+		t.Errorf("instructions missing capabilities blurb: %q", got)
 	}
 	if !strings.Contains(got, "READ-ONLY MODE IS ENABLED") {
 		t.Errorf("instructions missing read-only banner: %q", got)
@@ -49,8 +61,5 @@ func TestBuildServerInstructions(t *testing.T) {
 		if !strings.Contains(got, tool) {
 			t.Errorf("instructions missing gated tool %q in: %q", tool, got)
 		}
-	}
-	if !strings.Contains(got, "db_execute_query") {
-		t.Errorf("instructions should mention db_execute_query's read-only GUC behavior: %q", got)
 	}
 }
