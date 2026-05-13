@@ -69,6 +69,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.Analytics != DefaultAnalytics {
 		t.Errorf("Expected Analytics %t, got %t", DefaultAnalytics, cfg.Analytics)
 	}
+	if cfg.ReadOnly != DefaultReadOnly {
+		t.Errorf("Expected ReadOnly %t, got %t", DefaultReadOnly, cfg.ReadOnly)
+	}
 	if cfg.ConfigDir != tmpDir {
 		t.Errorf("Expected ConfigDir %s, got %s", tmpDir, cfg.ConfigDir)
 	}
@@ -82,6 +85,7 @@ func TestLoad_FromConfigFile(t *testing.T) {
 service_id: test-service-456
 output: json
 analytics: false
+read_only: true
 `
 	configFile := GetConfigFile(tmpDir)
 	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
@@ -112,6 +116,9 @@ analytics: false
 	if cfg.Analytics != false {
 		t.Errorf("Expected Analytics false, got %t", cfg.Analytics)
 	}
+	if !cfg.ReadOnly {
+		t.Errorf("Expected ReadOnly true, got false")
+	}
 }
 
 func TestLoad_FromEnvironmentVariables(t *testing.T) {
@@ -123,6 +130,7 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	os.Setenv("TIGER_SERVICE_ID", "env-service-101")
 	os.Setenv("TIGER_OUTPUT", "yaml")
 	os.Setenv("TIGER_ANALYTICS", "false")
+	os.Setenv("TIGER_READ_ONLY", "true")
 
 	setupViper(t, tmpDir)
 
@@ -132,6 +140,7 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 		os.Unsetenv("TIGER_SERVICE_ID")
 		os.Unsetenv("TIGER_OUTPUT")
 		os.Unsetenv("TIGER_ANALYTICS")
+		os.Unsetenv("TIGER_READ_ONLY")
 	}()
 
 	cfg, err := Load()
@@ -151,6 +160,9 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	}
 	if cfg.Analytics != false {
 		t.Errorf("Expected Analytics false, got %t", cfg.Analytics)
+	}
+	if !cfg.ReadOnly {
+		t.Errorf("Expected ReadOnly true, got false")
 	}
 }
 

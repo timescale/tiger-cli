@@ -146,6 +146,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
 		zap.Bool("pooled", input.Pooled),
+		zap.Bool("read_only", cfg.ReadOnly),
 	)
 
 	// Get service details to construct connection string
@@ -169,6 +170,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,
+		ReadOnly:     cfg.ReadOnly,
 	})
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)

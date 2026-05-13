@@ -212,6 +212,9 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.PasswordStorage != nil {
 		table.Append("password_storage", *cfg.PasswordStorage)
 	}
+	if cfg.ReadOnly != nil {
+		table.Append("read_only", fmt.Sprintf("%t", *cfg.ReadOnly))
+	}
 	if cfg.ReleasesURL != nil {
 		table.Append("releases_url", *cfg.ReleasesURL)
 	}

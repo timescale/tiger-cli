@@ -45,6 +45,7 @@ func buildDbConnectionStringCmd() *cobra.Command {
 	var dbConnectionStringPooled bool
 	var dbConnectionStringRole string
 	var dbConnectionStringWithPassword bool
+	var dbConnectionStringReadOnly bool
 
 	cmd := &cobra.Command{
 		Use:   "connection-string [service-id]",
@@ -58,6 +59,9 @@ for establishing a database connection to the TimescaleDB/PostgreSQL service.
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
 
+Use --read-only to emit a connection string that opens the session in Tiger
+Cloud's immutable read-only mode (writes and DDL are rejected by the server).
+
 Examples:
   # Get connection string for default service
   tiger db connection-string
@@ -70,6 +74,9 @@ Examples:
 
   # Get connection string with custom role/username
   tiger db connection-string svc-12345 --role readonly
+
+  # Get a read-only connection string
+  tiger db connection-string svc-12345 --read-only
 
   # Get connection string with password included (less secure)
   tiger db connection-string svc-12345 --with-password`,
@@ -91,6 +98,7 @@ Examples:
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
+				ReadOnly:     dbConnectionStringReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
@@ -113,6 +121,7 @@ Examples:
 	cmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
 	cmd.Flags().BoolVar(&dbConnectionStringWithPassword, "with-password", false, "Include password in connection string (less secure)")
+	cmd.Flags().BoolVar(&dbConnectionStringReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 
 	return cmd
 }
@@ -120,6 +129,7 @@ Examples:
 func buildDbConnectCmd() *cobra.Command {
 	var dbConnectPooled bool
 	var dbConnectRole string
+	var dbConnectReadOnly bool
 
 	cmd := &cobra.Command{
 		Use:     "connect [service-id]",
@@ -155,6 +165,9 @@ Examples:
   tiger db connect svc-12345 --role readonly
   tiger db psql svc-12345 --role readonly
 
+  # Connect in read-only mode (writes and DDL are rejected by the server)
+  tiger db connect svc-12345 --read-only
+
   # Pass additional flags to psql (use -- to separate)
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
@@ -182,8 +195,9 @@ Examples:
 			}
 
 			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
-				Pooled: dbConnectPooled,
-				Role:   dbConnectRole,
+				Pooled:   dbConnectPooled,
+				Role:     dbConnectRole,
+				ReadOnly: dbConnectReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
@@ -200,6 +214,7 @@ Examples:
 	// Add flags for db connect command (works for both connect and psql)
 	cmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&dbConnectReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 
 	return cmd
 }
