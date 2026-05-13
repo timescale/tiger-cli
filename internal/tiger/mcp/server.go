@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -28,19 +29,33 @@ type Server struct {
 	docsProxyClient *ProxyClient
 }
 
+// buildServerInstructions returns the `instructions` string the MCP SDK
+// sends to clients at initialize.
+//
+// Instructions are evaluated once at server start; toggling read_only
+// mid-session leaves the warning stale until the MCP client restarts. The
+// gate itself stays correct because handlers reload config per call.
+func buildServerInstructions(cfg *config.Config) string {
+	base := "Tiger MCP provides tools for creating, managing, and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). " +
+		"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+
+	if cfg == nil || !cfg.ReadOnly {
+		return base
+	}
+	return base + " " +
+		"READ-ONLY MODE IS ENABLED. The following Tiger MCP tools will refuse to run: " +
+		strings.Join(readOnlyGatedTools, ", ") + ". " +
+		"Before asking the user to provide inputs for any of these operations, tell them read-only mode is on."
+}
+
 // NewServer creates a new Tiger MCP server instance. The caller-supplied cfg
 // is used only to render the read-only warning in server instructions.
 func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
-	var opts *mcp.ServerOptions
-	if instructions := buildServerInstructions(cfg); instructions != "" {
-		opts = &mcp.ServerOptions{Instructions: instructions}
-	}
-
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
-	}, opts)
+	}, &mcp.ServerOptions{Instructions: buildServerInstructions(cfg)})
 
 	server := &Server{
 		mcpServer: mcpServer,

@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -25,21 +24,4 @@ func checkReadOnly(cfg *config.Config) error {
 		return errReadOnly
 	}
 	return nil
-}
-
-// buildServerInstructions returns the `instructions` string the MCP SDK
-// sends to clients at initialize. Empty when read-only is off so the SDK
-// omits the field.
-//
-// Instructions are evaluated once at server start; toggling read_only
-// mid-session leaves the warning stale until the MCP client restarts. The
-// gate itself stays correct because handlers reload config per call.
-func buildServerInstructions(cfg *config.Config) string {
-	if cfg == nil || !cfg.ReadOnly {
-		return ""
-	}
-	return "READ-ONLY MODE IS ENABLED. The following Tiger MCP tools will refuse to run: " +
-		strings.Join(readOnlyGatedTools, ", ") + ". " +
-		"Before asking the user to provide inputs for any of these operations, " +
-		"tell them read-only mode is on."
 }
