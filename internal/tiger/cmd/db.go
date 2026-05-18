@@ -61,6 +61,9 @@ Use --with-password to include the password directly in the connection string.
 
 Use --read-only to emit a connection string that opens the session in Tiger
 Cloud's immutable read-only mode (writes and DDL are rejected by the server).
+The global read_only config option (or TIGER_READ_ONLY=true) also forces this
+behavior, so connection strings produced while read-only mode is on always
+open read-only sessions.
 
 Examples:
   # Get connection string for default service
@@ -98,7 +101,7 @@ Examples:
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
-				ReadOnly:     dbConnectionStringReadOnly,
+				ReadOnly:     dbConnectionStringReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
@@ -197,7 +200,7 @@ Examples:
 			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:   dbConnectPooled,
 				Role:     dbConnectRole,
-				ReadOnly: dbConnectReadOnly,
+				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)

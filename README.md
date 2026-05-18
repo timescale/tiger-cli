@@ -234,7 +234,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
-- `read_only` - When `true`, write/destructive operations refuse to run for both the CLI and the Tiger MCP server. The gated CLI commands are `tiger service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`; the corresponding MCP tools (`service_create`, `service_fork`, `service_start`, `service_stop`, `service_resize`, `service_update_password`) refuse to run as well. Read commands/tools are unaffected. `db_execute_query` is still available, but its database connection is opened with an immutable Tiger Cloud read-only GUC so writes and DDL are rejected by the server. Default: `false`.
+- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected. Default: `false`.
 - `service_id` - Default service ID
 - `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: `24h`)
 

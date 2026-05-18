@@ -1462,3 +1462,65 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
 	}
 }
+
+// TestDBConnectionString_ReadOnlyConfig verifies that the global read_only
+// config option forces the read-only GUC into the emitted connection string
+// even when --read-only is not passed on the command line.
+func TestDBConnectionString_ReadOnlyConfig(t *testing.T) {
+	const readOnlyMarker = "tsdb_admin.read_only_connection"
+
+	cases := []struct {
+		name      string
+		readOnly  bool
+		extraArgs []string
+		want      bool
+	}{
+		{"flag off, config off", false, nil, false},
+		{"flag on, config off", false, []string{"--read-only"}, true},
+		{"flag off, config on", true, nil, true},
+		{"flag on, config on", true, []string{"--read-only"}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := setupDBTest(t)
+
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":    "http://localhost:9999",
+				"project_id": "test-project-123",
+				"service_id": "svc-ro-test",
+				"read_only":  tc.readOnly,
+			})
+			if err != nil {
+				t.Fatalf("Failed to save test config: %v", err)
+			}
+
+			originalGetCredentials := common.GetCredentials
+			common.GetCredentials = func() (string, string, error) {
+				return "test-api-key", "test-project-123", nil
+			}
+			t.Cleanup(func() { common.GetCredentials = originalGetCredentials })
+
+			originalGetServiceDetails := getServiceDetailsFunc
+			getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+				host := "test-host.com"
+				port := 5432
+				return api.Service{
+					Endpoint: &api.Endpoint{Host: &host, Port: &port},
+				}, nil
+			}
+			t.Cleanup(func() { getServiceDetailsFunc = originalGetServiceDetails })
+
+			args := append([]string{"db", "connection-string"}, tc.extraArgs...)
+			out, err := executeDBCommand(t.Context(), args...)
+			if err != nil {
+				t.Fatalf("executeDBCommand failed: %v", err)
+			}
+
+			got := strings.Contains(out, readOnlyMarker)
+			if got != tc.want {
+				t.Errorf("read-only marker present = %v, want %v\noutput: %s", got, tc.want, out)
+			}
+		})
+	}
+}

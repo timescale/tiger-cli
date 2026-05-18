@@ -48,7 +48,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: true)
 - `output` - Output format: json, yaml, or table (default: table)
 - `password_storage` - Password storage method: keyring, pgpass, or none (default: keyring)
-- `read_only` - When `true`, write/destructive CLI commands (`tiger service create`, `fork`, `start`, `stop`, `resize`, `update-password`, `delete`) and Tiger MCP tools refuse to run; `db_execute_query` is opened against an immutable read-only database connection (default: false). See `specs/spec_mcp.md` for the MCP-side details.
+- `read_only` - When `true`, mutating operations are refused: `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` and their MCP equivalents return an error, and `tiger db connect`/`connection-string`/`db_execute_query` open against an immutable read-only database connection regardless of `--read-only` (default: false). See `specs/spec_mcp.md` for details.
 - `service_id` - Default service ID
 - `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: 24h)
 
