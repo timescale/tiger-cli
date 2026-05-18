@@ -12,6 +12,7 @@ import (
 // Defines values for AuthInfoType.
 const (
 	ApiKey AuthInfoType = "apiKey"
+	Oauth  AuthInfoType = "oauth"
 )
 
 // Defines values for DeployStatus.
@@ -70,10 +71,11 @@ const (
 	SetEnvironmentInputEnvironmentPROD SetEnvironmentInputEnvironment = "PROD"
 )
 
-// AuthInfo defines model for AuthInfo.
+// AuthInfo Information about the authentication credentials being used. Exactly one
+// of `apiKey` or `oauth` is populated; the `type` field discriminates.
 type AuthInfo struct {
 	// ApiKey Information about the API key credentials
-	ApiKey struct {
+	ApiKey *struct {
 		// Created When the client credentials were created
 		Created time.Time `json:"created"`
 
@@ -106,13 +108,29 @@ type AuthInfo struct {
 
 		// PublicKey The public key of the client credentials
 		PublicKey string `json:"public_key"`
-	} `json:"apiKey"`
+	} `json:"apiKey,omitempty"`
 
-	// Type The type of authentication being used
+	// Oauth OAuth user details. Present for OAuth (PKCE) user callers.
+	Oauth *struct {
+		User struct {
+			// Email The user's email
+			Email openapi_types.Email `json:"email"`
+
+			// Id The numeric user ID
+			Id string `json:"id"`
+
+			// Name The user's name
+			Name string `json:"name"`
+		} `json:"user"`
+	} `json:"oauth,omitempty"`
+
+	// Type Discriminator for the credential shape. `apiKey` for PAT callers;
+	// `oauth` for OAuth (PKCE) user callers.
 	Type AuthInfoType `json:"type"`
 }
 
-// AuthInfoType The type of authentication being used
+// AuthInfoType Discriminator for the credential shape. `apiKey` for PAT callers;
+// `oauth` for OAuth (PKCE) user callers.
 type AuthInfoType string
 
 // ConnectionPooler defines model for ConnectionPooler.
@@ -134,7 +152,13 @@ type EnvironmentTag string
 
 // Error defines model for Error.
 type Error struct {
-	Code    *string `json:"code,omitempty"`
+	Code *string `json:"code,omitempty"`
+
+	// Details Additional context about the failure. Often the actionable part
+	// of the error (e.g. "bearer auth is not enabled on this server"
+	// for a generic UNAUTHORIZED). Optional; absent on errors with no
+	// extra detail.
+	Details *string `json:"details,omitempty"`
 	Message *string `json:"message,omitempty"`
 }
 
@@ -201,6 +225,12 @@ type PeeringCreate struct {
 	PeerAccountId  string `json:"peer_account_id"`
 	PeerRegionCode string `json:"peer_region_code"`
 	PeerVpcId      string `json:"peer_vpc_id"`
+}
+
+// Project defines model for Project.
+type Project struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // ReadReplicaSet defines model for ReadReplicaSet.
@@ -459,6 +489,12 @@ type TrackEventJSONBody struct {
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
+// LogoutJSONBody defines parameters for Logout.
+type LogoutJSONBody struct {
+	// RefreshToken The OAuth refresh token to revoke.
+	RefreshToken *string `json:"refresh_token,omitempty"`
+}
+
 // GetServiceLogsParams defines parameters for GetServiceLogs.
 type GetServiceLogsParams struct {
 	// Node Specific service node to fetch logs from (for multi-node services)
@@ -482,6 +518,9 @@ type IdentifyUserJSONRequestBody IdentifyUserJSONBody
 
 // TrackEventJSONRequestBody defines body for TrackEvent for application/json ContentType.
 type TrackEventJSONRequestBody TrackEventJSONBody
+
+// LogoutJSONRequestBody defines body for Logout for application/json ContentType.
+type LogoutJSONRequestBody LogoutJSONBody
 
 // CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
 type CreateServiceJSONRequestBody = ServiceCreate

@@ -72,6 +72,11 @@ const (
 	DefaultReadOnly             = false
 	DefaultReleasesURL          = "https://cli.tigerdata.com"
 	DefaultVersionCheckInterval = 24 * time.Hour
+
+	// TigerCLIClientID is the OAuth client identifier registered with
+	// savannah-gateway's /idp/external/cli/token endpoint. Used for both the
+	// initial PKCE flow and refresh-token grants.
+	TigerCLIClientID = "45e1b16d-e435-4049-97b2-8daad150818c"
 )
 
 var defaultValues = map[string]any{

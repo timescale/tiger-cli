@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -80,11 +81,8 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 
 	// Mock the validator to return success
 	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
-		authInfo := &api.AuthInfo{
-			Type: api.ApiKey,
-		}
-		authInfo.ApiKey.Project.Id = "test-project-valid"
-		authInfo.ApiKey.PublicKey = "test-access-key"
+		authInfo := &api.AuthInfo{}
+		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
 		return authInfo, nil // Success
 	}
 

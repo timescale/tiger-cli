@@ -2,11 +2,9 @@ package common
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/timescale/tiger-cli/internal/tiger/api"
@@ -32,21 +30,18 @@ func TestValidateAPIKey(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.URL.Path == "/auth/info" {
-						authInfo := api.AuthInfo{
-							Type: api.ApiKey,
-						}
-						authInfo.ApiKey.PublicKey = "test-access-key"
-						authInfo.ApiKey.Project.Id = "proj-12345"
-						authInfo.ApiKey.Project.Name = "Test Project"
-						authInfo.ApiKey.Project.PlanType = "FREE"
-						authInfo.ApiKey.Name = "Test Credentials"
-						authInfo.ApiKey.IssuingUser.Name = "Test User"
-						authInfo.ApiKey.IssuingUser.Email = "test@example.com"
-						authInfo.ApiKey.IssuingUser.Id = "user-123"
-						authInfo.ApiKey.Created = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						json.NewEncoder(w).Encode(authInfo)
+						w.Write([]byte(`{
+							"type": "apiKey",
+							"apiKey": {
+								"public_key": "test-access-key",
+								"name": "Test Credentials",
+								"created": "2025-01-01T00:00:00Z",
+								"project": {"id": "proj-12345", "name": "Test Project", "plan_type": "free"},
+								"issuing_user": {"id": "user-123", "name": "Test User", "email": "test@example.com"}
+							}
+						}`))
 					} else if r.URL.Path == "/analytics/identify" {
 						// Analytics identify endpoint (called after auth info)
 						w.Header().Set("Content-Type", "application/json")

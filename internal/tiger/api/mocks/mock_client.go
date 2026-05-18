@@ -542,6 +542,26 @@ func (mr *MockClientInterfaceMockRecorder) GetAuthInfo(ctx any, reqEditors ...an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfo", reflect.TypeOf((*MockClientInterface)(nil).GetAuthInfo), varargs...)
 }
 
+// GetProjects mocks base method.
+func (m *MockClientInterface) GetProjects(ctx context.Context, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjects", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjects indicates an expected call of GetProjects.
+func (mr *MockClientInterfaceMockRecorder) GetProjects(ctx any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjects", reflect.TypeOf((*MockClientInterface)(nil).GetProjects), varargs...)
+}
+
 // GetReplicaSets mocks base method.
 func (m *MockClientInterface) GetReplicaSets(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -740,6 +760,46 @@ func (mr *MockClientInterfaceMockRecorder) IdentifyUserWithBody(ctx, contentType
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentifyUserWithBody", reflect.TypeOf((*MockClientInterface)(nil).IdentifyUserWithBody), varargs...)
+}
+
+// Logout mocks base method.
+func (m *MockClientInterface) Logout(ctx context.Context, body api.LogoutJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Logout", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Logout indicates an expected call of Logout.
+func (mr *MockClientInterfaceMockRecorder) Logout(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockClientInterface)(nil).Logout), varargs...)
+}
+
+// LogoutWithBody mocks base method.
+func (m *MockClientInterface) LogoutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "LogoutWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LogoutWithBody indicates an expected call of LogoutWithBody.
+func (mr *MockClientInterfaceMockRecorder) LogoutWithBody(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutWithBody", reflect.TypeOf((*MockClientInterface)(nil).LogoutWithBody), varargs...)
 }
 
 // RenameVPC mocks base method.
@@ -1586,6 +1646,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetAuthInfoWithResponse(
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfoWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetAuthInfoWithResponse), varargs...)
 }
 
+// GetProjectsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetProjectsWithResponse(ctx context.Context, reqEditors ...api.RequestEditorFn) (*api.GetProjectsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetProjectsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetProjectsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectsWithResponse indicates an expected call of GetProjectsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetProjectsWithResponse(ctx any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetProjectsWithResponse), varargs...)
+}
+
 // GetReplicaSetsWithResponse mocks base method.
 func (m *MockClientWithResponsesInterface) GetReplicaSetsWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*api.GetReplicaSetsResponse, error) {
 	m.ctrl.T.Helper()
@@ -1784,6 +1864,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) IdentifyUserWithResponse
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentifyUserWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).IdentifyUserWithResponse), varargs...)
+}
+
+// LogoutWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) LogoutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.LogoutResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "LogoutWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.LogoutResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LogoutWithBodyWithResponse indicates an expected call of LogoutWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) LogoutWithBodyWithResponse(ctx, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).LogoutWithBodyWithResponse), varargs...)
+}
+
+// LogoutWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) LogoutWithResponse(ctx context.Context, body api.LogoutJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.LogoutResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "LogoutWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.LogoutResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LogoutWithResponse indicates an expected call of LogoutWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) LogoutWithResponse(ctx, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).LogoutWithResponse), varargs...)
 }
 
 // RenameVPCWithBodyWithResponse mocks base method.

@@ -12,8 +12,12 @@ import (
 )
 
 var (
-	// GetCredentials can be overridden for testing
-	GetCredentials = config.GetCredentials
+	// GetCredentials is a test-only override seam, nil in production.
+	// Deprecated: only carries PAT-shaped overrides. Prefer overriding
+	// GetStoredCredentials when both auth kinds need to be controlled.
+	GetCredentials func() (string, string, error)
+
+	GetStoredCredentials = defaultGetStoredCredentials
 
 	// Cache of validated API Keys. Useful for avoided unnecessary calls to the
 	// /auth/info and /analytics/identify endpoints when the API client is
@@ -22,6 +26,16 @@ var (
 	// re-fetches the API client for each tool call).
 	validatedAPIKeyCache = map[string]*api.AuthInfo{}
 )
+
+func defaultGetStoredCredentials() (*config.Credentials, error) {
+	// Honor a PAT-shaped test override when present; production leaves it nil.
+	if GetCredentials != nil {
+		if apiKey, projectID, err := GetCredentials(); err == nil && apiKey != "" {
+			return &config.Credentials{APIKey: apiKey, ProjectID: projectID}, nil
+		}
+	}
+	return config.GetStoredCredentials()
+}
 
 // NewAPIClient initializes a [api.ClientWithResponses] and returns it along
 // with the current project ID. Credentials are pulled from the environment (if
@@ -38,20 +52,19 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 
 	// If there were no credentials in the environment, try to load stored credentials
 	if publicKey == "" && secretKey == "" {
-		apiKey, projectID, err := GetCredentials()
+		stored, err := GetStoredCredentials()
 		if err != nil {
 			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 		}
 
-		// Create API client
-		client, err := api.NewTigerClient(cfg, apiKey)
+		client, err := api.NewTigerClientForCredentials(cfg, stored)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to create API client: %w", err)
 		}
 
-		// Return immediately. Credentials were already verified and user was
-		// already identified for analytics via `tiger auth login`.
-		return client, projectID, nil
+		// Credentials were already verified and the user was already identified
+		// for analytics via `tiger auth login`.
+		return client, stored.ProjectID, nil
 	}
 
 	// Create API client
@@ -77,19 +90,18 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 }
 
 // ValidateAPIKey validates the API key by calling the /auth/info endpoint, and
-// returns authentication information. It also identifies the user for the sake
-// of analytics.
+// returns the caller's identity. It also identifies the user for the sake of
+// analytics. Only PAT credentials reach this path, so the response always
+// carries the apiKey branch.
 func ValidateAPIKey(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Call the /auth/info endpoint to validate credentials and get auth info
 	resp, err := client.GetAuthInfoWithResponse(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("API call failed: %w", err)
 	}
 
-	// Check the response status
 	if resp.StatusCode() != 200 {
 		if resp.JSON4XX != nil {
 			return nil, resp.JSON4XX
@@ -102,13 +114,16 @@ func ValidateAPIKey(ctx context.Context, cfg *config.Config, client *api.ClientW
 	}
 
 	authInfo := resp.JSON200
+	if authInfo.ApiKey == nil {
+		return nil, fmt.Errorf("expected a PAT credential")
+	}
+	apiKey := authInfo.ApiKey
 
-	// Identify the user with analytics
-	a := analytics.New(cfg, client, authInfo.ApiKey.Project.Id)
+	a := analytics.New(cfg, client, apiKey.Project.Id)
 	a.Identify(
-		analytics.Property("userId", authInfo.ApiKey.IssuingUser.Id),
-		analytics.Property("email", string(authInfo.ApiKey.IssuingUser.Email)),
-		analytics.Property("planType", authInfo.ApiKey.Project.PlanType),
+		analytics.Property("userId", apiKey.IssuingUser.Id),
+		analytics.Property("email", string(apiKey.IssuingUser.Email)),
+		analytics.Property("planType", apiKey.Project.PlanType),
 	)
 
 	return authInfo, nil

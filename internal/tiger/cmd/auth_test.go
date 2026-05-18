@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -30,12 +32,8 @@ func setupAuthTest(t *testing.T) string {
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKey
 	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
-		// Always return success with test auth info
-		authInfo := &api.AuthInfo{
-			Type: api.ApiKey,
-		}
-		authInfo.ApiKey.Project.Id = "test-project-id"
-		authInfo.ApiKey.PublicKey = "test-access-key"
+		authInfo := &api.AuthInfo{}
+		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-id"}}}`), authInfo)
 		return authInfo, nil
 	}
 
@@ -165,7 +163,7 @@ func TestAuthLogin_KeyEnvironmentVariables(t *testing.T) {
 }
 
 // setupOAuthTest creates a complete OAuth test environment with mock server and browser
-func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) string {
+func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID string) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
 
@@ -185,7 +183,8 @@ func setupOAuthTest(t *testing.T, projects []Project, expectedProjectID string) 
 	configContent := fmt.Sprintf(`
 console_url: "%s"
 gateway_url: "%s"
-`, mockServer.URL, mockServer.URL)
+api_url: "%s"
+`, mockServer.URL, mockServer.URL, mockServer.URL)
 	err := os.WriteFile(configFile, []byte(configContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
@@ -201,7 +200,7 @@ gateway_url: "%s"
 }
 
 // startMockOAuthServer starts a mock server that handles all OAuth endpoints
-func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
+func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server {
 	t.Helper()
 
 	mux := http.NewServeMux()
@@ -215,13 +214,22 @@ func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
 			return
 		}
 
-		clientID := r.FormValue("client_id")
-		code := r.FormValue("code")
-		codeVerifier := r.FormValue("code_verifier")
-
-		if clientID == "" || code == "" || codeVerifier == "" {
-			http.Error(w, "Missing required parameters", http.StatusBadRequest)
-			return
+		// The mock backs both the initial authorization_code exchange and the
+		// silent refresh that oauth2.NewClient performs once the access token
+		// is past its expires_at. Both grants return the same canned token so
+		// downstream assertions remain stable.
+		grantType := r.FormValue("grant_type")
+		switch grantType {
+		case "refresh_token":
+			if r.FormValue("refresh_token") == "" || r.FormValue("client_id") == "" {
+				http.Error(w, "Missing required parameters", http.StatusBadRequest)
+				return
+			}
+		default:
+			if r.FormValue("client_id") == "" || r.FormValue("code") == "" || r.FormValue("code_verifier") == "" {
+				http.Error(w, "Missing required parameters", http.StatusBadRequest)
+				return
+			}
 		}
 
 		tokenResponse := map[string]interface{}{
@@ -236,67 +244,12 @@ func startMockOAuthServer(t *testing.T, projects []Project) *httptest.Server {
 		}
 	})
 
-	// GraphQL endpoint for getUserProjects and other queries
-	mux.HandleFunc("POST /query", func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("Mock server received GraphQL request")
-
-		var requestBody map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-			http.Error(w, "Failed to decode request body", http.StatusBadRequest)
-			return
-		}
-
-		query, ok := requestBody["query"].(string)
-		if !ok {
-			http.Error(w, "Missing query in request", http.StatusBadRequest)
-			return
-		}
-
-		// Handle different GraphQL queries
-		if strings.Contains(query, "getAllProjects") {
-			response := GraphQLResponse[GetAllProjectsData]{
-				Data: &GetAllProjectsData{
-					GetAllProjects: projects,
-				},
-			}
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-			}
-		} else if strings.Contains(query, "getUser") {
-			response := GraphQLResponse[GetUserData]{
-				Data: &GetUserData{
-					GetUser: User{
-						ID:    "user-456",
-						Name:  "Test User",
-						Email: "test@example.com",
-					},
-				},
-			}
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-			}
-		} else if strings.Contains(query, "createPATRecord") {
-			response := GraphQLResponse[CreatePATRecordData]{
-				Data: &CreatePATRecordData{
-					CreatePATRecord: PATRecordResponse{
-						ClientCredentials: struct {
-							AccessKey string `json:"accessKey"`
-							SecretKey string `json:"secretKey"`
-						}{
-							AccessKey: "test-access-key",
-							SecretKey: "test-secret-key",
-						},
-					},
-				},
-			}
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, "Unknown GraphQL query", http.StatusBadRequest)
+	// REST endpoint backing selectProjectID
+	mux.HandleFunc("GET /projects", func(w http.ResponseWriter, _ *http.Request) {
+		t.Logf("Mock server received GET /projects request")
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(projects); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		}
 	})
 
@@ -379,8 +332,8 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 }
 
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
-	mockServerURL := setupOAuthTest(t, []Project{
-		{ID: "project-123", Name: "Test Project"},
+	mockServerURL := setupOAuthTest(t, []api.Project{
+		{Id: "project-123", Name: "Test Project"},
 	}, "project-123")
 
 	// Execute login command - the mocked openBrowser will handle the callback automatically
@@ -390,12 +343,9 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	// Build regex pattern to match the complete output
-	// Note: Project ID now comes from the validation API call mock, not the OAuth flow
 	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
 		`Opening browser for authentication\.\.\.\n`+
-		`Validating API key\.\.\.\n`+
-		`Successfully logged in \(project: test-project-id\)\n`+
+		`Successfully logged in \(project: project-123\)\n`+
 		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
@@ -406,26 +356,33 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	// Verify credentials were stored
-	expectedAPIKey := "test-access-key:test-secret-key"
-	expectedProjectID := "test-project-id" // From validation mock
-	storedKey, storedProjectID, err := config.GetCredentials()
+	stored, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
-	if storedKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	if stored.OAuth == nil {
+		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
 	}
-	if storedProjectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
+	token, projectID := stored.OAuth, stored.ProjectID
+	if token.AccessToken != "mock-access-token-12345" {
+		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
+	}
+	if token.RefreshToken != "mock-refresh-token-67890" {
+		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
+	}
+	if !token.Expiry.Equal(time.Unix(1234567890, 0)) {
+		t.Errorf("Expected expiry derived from expires_at=1234567890, got %v", token.Expiry)
+	}
+	if projectID != "project-123" {
+		t.Errorf("Expected project ID 'project-123', got '%s'", projectID)
 	}
 }
 
 func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
-	mockServerURL := setupOAuthTest(t, []Project{
-		{ID: "project-123", Name: "Test Project 1"},
-		{ID: "project-456", Name: "Test Project 2"},
-		{ID: "project-789", Name: "Test Project 3"},
+	mockServerURL := setupOAuthTest(t, []api.Project{
+		{Id: "project-123", Name: "Test Project 1"},
+		{Id: "project-456", Name: "Test Project 2"},
+		{Id: "project-789", Name: "Test Project 3"},
 	}, "project-789")
 
 	// Mock the project selection to simulate user selecting the third project (index 2)
@@ -434,10 +391,10 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		selectProjectInteractively = originalSelectProjectInteractively
 	}()
 
-	selectProjectInteractively = func(projects []Project, out io.Writer) (string, error) {
-		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].ID)
+	selectProjectInteractively = func(projects []api.Project, out io.Writer) (string, error) {
+		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].Id)
 		// Simulate user pressing down arrow twice and then enter (selects third project)
-		return projects[2].ID, nil
+		return projects[2].Id, nil
 	}
 
 	// Execute login command - both mocked functions will handle OAuth flow and project selection
@@ -447,12 +404,9 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	// Build regex pattern to match the complete output
-	// Note: Project ID now comes from the validation API call mock, not the OAuth flow
 	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
 		`Opening browser for authentication\.\.\.\n`+
-		`Validating API key\.\.\.\n`+
-		`Successfully logged in \(project: test-project-id\)\n`+
+		`Successfully logged in \(project: project-789\)\n`+
 		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
 
 	matched, err := regexp.MatchString(expectedPattern, output)
@@ -463,18 +417,83 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	// Verify credentials were stored
-	expectedAPIKey := "test-access-key:test-secret-key"
-	expectedProjectID := "test-project-id" // From validation mock
-	storedKey, storedProjectID, err := config.GetCredentials()
+	stored, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
-	if storedKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
+	if stored.OAuth == nil {
+		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
 	}
-	if storedProjectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
+	token, projectID := stored.OAuth, stored.ProjectID
+	if token.AccessToken != "mock-access-token-12345" {
+		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
+	}
+	if token.RefreshToken != "mock-refresh-token-67890" {
+		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
+	}
+	if !token.Expiry.Equal(time.Unix(1234567890, 0)) {
+		t.Errorf("Expected expiry derived from expires_at=1234567890, got %v", token.Expiry)
+	}
+	if projectID != "project-789" {
+		t.Errorf("Expected project ID 'project-789', got '%s'", projectID)
+	}
+}
+
+// TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
+// refreshed, the rotated token is persisted with a non-zero Expiry derived from
+// the gateway's non-standard `expires_at`.
+func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
+	tmpDir := setupAuthTest(t)
+
+	// Mock server backs the refresh_token grant (returns expires_at=1234567890).
+	mockServer := startMockOAuthServer(t, nil)
+	configFile := config.GetConfigFile(tmpDir)
+	configContent := fmt.Sprintf("gateway_url: \"%s\"\napi_url: \"%s\"\n", mockServer.URL, mockServer.URL)
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Store an already-expired OAuth token that still has a valid refresh token.
+	expired := &oauth2.Token{
+		AccessToken:  "stale-access-token",
+		RefreshToken: "mock-refresh-token-67890",
+		Expiry:       time.Now().Add(-time.Hour),
+	}
+	if err := config.StoreOAuthCredentials(expired, "project-789"); err != nil {
+		t.Fatalf("Failed to store oauth credentials: %v", err)
+	}
+
+	cfg := &config.Config{APIURL: mockServer.URL, GatewayURL: mockServer.URL}
+	stored, err := config.GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to load stored credentials: %v", err)
+	}
+
+	client, err := api.NewTigerClientForCredentials(cfg, stored)
+	if err != nil {
+		t.Fatalf("Failed to build client: %v", err)
+	}
+
+	// Any request makes the oauth2 transport mint a token first; since the
+	// stored token is expired, that triggers a refresh + persist. The response
+	// status itself is irrelevant — we only care about the persisted token.
+	if _, err := client.GetAuthInfoWithResponse(t.Context()); err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+
+	reloaded, err := config.GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to reload credentials: %v", err)
+	}
+	if reloaded.OAuth == nil {
+		t.Fatal("Expected OAuth credentials to remain stored after refresh")
+	}
+	if reloaded.OAuth.AccessToken != "mock-access-token-12345" {
+		t.Fatalf("Expected token to be refreshed, got access token %q", reloaded.OAuth.AccessToken)
+	}
+	want := time.Unix(1234567890, 0)
+	if !reloaded.OAuth.Expiry.Equal(want) {
+		t.Errorf("Expected persisted expiry %v (from expires_at), got %v", want, reloaded.OAuth.Expiry)
 	}
 }
 
@@ -588,21 +607,18 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	// Create a mock server for the /auth/info endpoint
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/auth/info" {
-			authInfo := api.AuthInfo{
-				Type: api.ApiKey,
-			}
-			authInfo.ApiKey.PublicKey = "test-access-key"
-			authInfo.ApiKey.Project.Id = "test-project-789"
-			authInfo.ApiKey.Project.Name = "Test Project"
-			authInfo.ApiKey.Project.PlanType = "FREE"
-			authInfo.ApiKey.Name = "Test Credentials"
-			authInfo.ApiKey.IssuingUser.Name = "Test User"
-			authInfo.ApiKey.IssuingUser.Email = "test@example.com"
-			authInfo.ApiKey.IssuingUser.Id = "user-123"
-			authInfo.ApiKey.Created = time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(authInfo)
+			w.Write([]byte(`{
+				"type": "apiKey",
+				"apiKey": {
+					"public_key": "test-access-key",
+					"name": "Test Credentials",
+					"created": "2025-01-01T00:00:00Z",
+					"project": {"id": "test-project-789", "name": "Test Project", "plan_type": "free"},
+					"issuing_user": {"id": "user-123", "name": "Test User", "email": "test@example.com"}
+				}
+			}`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
