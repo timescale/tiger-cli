@@ -61,7 +61,7 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### Read-Only Mode
 
-When the `read_only` config option is `true` (or `TIGER_READ_ONLY=true`), write/destructive MCP tools refuse to run and return an error. This is intended for AI agent setups that need to inspect Tiger Cloud resources without risk of mutation.
+When the `read_only` config option is `true` (or `TIGER_READ_ONLY=true`), write/destructive MCP tools refuse to run and return an error. The same flag also gates the corresponding CLI commands (`tiger service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, `service delete`), so flipping it on prevents accidental mutation through either entry point. This is intended for AI agent setups that need to inspect Tiger Cloud resources without risk of mutation.
 
 Tools gated by read-only mode:
 - `service_create`

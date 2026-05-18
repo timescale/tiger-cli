@@ -32,6 +32,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: json, yaml, or table
 - `TIGER_PASSWORD_STORAGE` - Password storage method: keyring, pgpass, or none
+- `TIGER_READ_ONLY` - When `true`, write/destructive CLI commands and Tiger MCP tools refuse to run
 - `TIGER_SERVICE_ID` - Default service ID
 - `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
 
@@ -47,6 +48,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: true)
 - `output` - Output format: json, yaml, or table (default: table)
 - `password_storage` - Password storage method: keyring, pgpass, or none (default: keyring)
+- `read_only` - When `true`, write/destructive CLI commands (`tiger service create`, `fork`, `start`, `stop`, `resize`, `update-password`, `delete`) and Tiger MCP tools refuse to run; `db_execute_query` is opened against an immutable read-only database connection (default: false). See `specs/spec_mcp.md` for the MCP-side details.
 - `service_id` - Default service ID
 - `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: 24h)
 

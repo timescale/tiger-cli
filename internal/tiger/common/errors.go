@@ -1,6 +1,23 @@
 package common
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+)
+
+// ErrReadOnly is returned when a destructive operation is attempted while
+// read-only mode is enabled in the user's config.
+var ErrReadOnly = errors.New("this operation is not allowed in read-only mode")
+
+// CheckReadOnly returns ErrReadOnly if read-only mode is enabled. Callers
+// should invoke this before any destructive API call.
+func CheckReadOnly(cfg *config.Config) error {
+	if cfg != nil && cfg.ReadOnly {
+		return ErrReadOnly
+	}
+	return nil
+}
 
 // Exit codes as defined in the CLI specification
 const (

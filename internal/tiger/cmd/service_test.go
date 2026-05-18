@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -1764,5 +1765,50 @@ func TestServiceResize_InvalidCPUMemoryCombination(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid CPU/Memory combination") {
 		t.Errorf("Expected invalid combination error, got: %v", err)
+	}
+}
+
+// TestDestructiveCommands_ReadOnly verifies that destructive service commands
+// refuse to run when read_only mode is enabled, before any API call is made.
+func TestDestructiveCommands_ReadOnly(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"create", []string{"service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1"}},
+		{"fork", []string{"service", "fork", "source-service-123", "--now"}},
+		{"start", []string{"service", "start", "source-service-123"}},
+		{"stop", []string{"service", "stop", "source-service-123"}},
+		{"resize", []string{"service", "resize", "source-service-123", "--cpu", "1000", "--memory", "4"}},
+		{"update-password", []string{"service", "update-password", "source-service-123", "--auto-generate"}},
+		{"delete", []string{"service", "delete", "source-service-123", "--confirm"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := setupServiceTest(t)
+
+			_, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":   "http://localhost:9999",
+				"read_only": true,
+			})
+			if err != nil {
+				t.Fatalf("Failed to save test config: %v", err)
+			}
+
+			originalGetCredentials := common.GetCredentials
+			common.GetCredentials = func() (string, string, error) {
+				return "test-api-key", "test-project-123", nil
+			}
+			defer func() { common.GetCredentials = originalGetCredentials }()
+
+			_, err, _ = executeServiceCommand(t.Context(), tc.args...)
+			if err == nil {
+				t.Fatalf("Expected error in read-only mode for %q, got nil", tc.name)
+			}
+			if !errors.Is(err, common.ErrReadOnly) {
+				t.Errorf("Expected common.ErrReadOnly for %q, got: %v", tc.name, err)
+			}
+		})
 	}
 }

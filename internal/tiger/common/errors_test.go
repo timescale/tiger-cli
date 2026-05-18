@@ -1,9 +1,33 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
+
+func TestCheckReadOnly(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *config.Config
+		wantErr error
+	}{
+		{name: "nil cfg allows writes", cfg: nil, wantErr: nil},
+		{name: "read-only off allows writes", cfg: &config.Config{ReadOnly: false}, wantErr: nil},
+		{name: "read-only on blocks writes", cfg: &config.Config{ReadOnly: true}, wantErr: ErrReadOnly},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckReadOnly(tt.cfg)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("CheckReadOnly(%+v) error = %v, want %v", tt.cfg, err, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestExitCodeError(t *testing.T) {
 	// Test the ExitCodeError type

@@ -1,33 +1,11 @@
 package mcp
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
-
-func TestCheckReadOnly(t *testing.T) {
-	tests := []struct {
-		name     string
-		readOnly bool
-		wantErr  error
-	}{
-		{name: "read-only off allows writes", readOnly: false, wantErr: nil},
-		{name: "read-only on blocks writes", readOnly: true, wantErr: errReadOnly},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Config{ReadOnly: tt.readOnly}
-			err := checkReadOnly(cfg)
-			if !errors.Is(err, tt.wantErr) {
-				t.Errorf("checkReadOnly(ReadOnly=%t) error = %v, want %v", tt.readOnly, err, tt.wantErr)
-			}
-		})
-	}
-}
 
 func TestBuildServerInstructions(t *testing.T) {
 	const capabilitiesMarker = "Tiger MCP provides tools"
