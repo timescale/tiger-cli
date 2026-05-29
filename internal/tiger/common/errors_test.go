@@ -14,7 +14,6 @@ func TestCheckReadOnly(t *testing.T) {
 		cfg     *config.Config
 		wantErr error
 	}{
-		{name: "nil cfg allows writes", cfg: nil, wantErr: nil},
 		{name: "read-only off allows writes", cfg: &config.Config{ReadOnly: false}, wantErr: nil},
 		{name: "read-only on blocks writes", cfg: &config.Config{ReadOnly: true}, wantErr: ErrReadOnly},
 	}

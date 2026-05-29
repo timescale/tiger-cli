@@ -13,7 +13,7 @@ var ErrReadOnly = errors.New("this operation is not allowed in read-only mode")
 // CheckReadOnly returns ErrReadOnly if read-only mode is enabled. Callers
 // should invoke this before any destructive API call.
 func CheckReadOnly(cfg *config.Config) error {
-	if cfg != nil && cfg.ReadOnly {
+	if cfg.ReadOnly {
 		return ErrReadOnly
 	}
 	return nil

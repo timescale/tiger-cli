@@ -145,11 +145,16 @@ from your configuration. This command will launch an interactive psql session
 with the appropriate connection parameters.
 
 Authentication is handled automatically using:
-1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
+1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)
 2. PGPASSWORD environment variable
 3. If authentication fails, offers interactive options:
    - Enter password manually (will be saved for future use)
    - Reset password (update or generates a new password via the API)
+
+Use --read-only to open the psql session in Tiger Cloud's immutable read-only
+mode (writes and DDL are rejected by the server). The global read_only config
+option (or TIGER_READ_ONLY=true) also forces this behavior, so sessions started
+while read-only mode is on are always read-only.
 
 Examples:
   # Connect to default service
