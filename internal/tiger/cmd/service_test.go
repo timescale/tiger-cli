@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -1764,5 +1765,44 @@ func TestServiceResize_InvalidCPUMemoryCombination(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid CPU/Memory combination") {
 		t.Errorf("Expected invalid combination error, got: %v", err)
+	}
+}
+
+// TestDestructiveCommands_ReadOnly verifies that destructive service commands
+// refuse to run when read_only mode is enabled, before any API call is made.
+// The localhost:9999 api_url would surface any unintended request as a
+// connection-refused error rather than ErrReadOnly.
+func TestDestructiveCommands_ReadOnly(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":   "http://localhost:9999",
+		"read_only": true,
+	}); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	originalGetCredentials := common.GetCredentials
+	common.GetCredentials = func() (string, string, error) {
+		return "test-api-key", "test-project-123", nil
+	}
+	t.Cleanup(func() { common.GetCredentials = originalGetCredentials })
+
+	cases := [][]string{
+		{"service", "create", "--addons", "none", "--region", "us-east-1", "--cpu", "1000", "--memory", "4", "--replicas", "1"},
+		{"service", "fork", "source-service-123", "--now"},
+		{"service", "start", "source-service-123"},
+		{"service", "stop", "source-service-123"},
+		{"service", "resize", "source-service-123", "--cpu", "1000", "--memory", "4"},
+		{"service", "update-password", "source-service-123", "--auto-generate"},
+		{"service", "delete", "source-service-123", "--confirm"},
+	}
+
+	for _, args := range cases {
+		t.Run(args[1], func(t *testing.T) {
+			_, err, _ := executeServiceCommand(t.Context(), args...)
+			if !errors.Is(err, common.ErrReadOnly) {
+				t.Errorf("Expected common.ErrReadOnly, got: %v", err)
+			}
+		})
 	}
 }

@@ -61,17 +61,13 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 ### Read-Only Mode
 
-When the `read_only` config option is `true` (or `TIGER_READ_ONLY=true`), write/destructive MCP tools refuse to run and return an error. This is intended for AI agent setups that need to inspect Tiger Cloud resources without risk of mutation.
+When `read_only` is `true` (or `TIGER_READ_ONLY=true`), Tiger refuses any mutating operation:
 
-Tools gated by read-only mode:
-- `service_create`
-- `service_fork`
-- `service_start`
-- `service_stop`
-- `service_resize`
-- `service_update_password`
+- **Tiger MCP** — write tools (`service_create`, `service_fork`, `service_start`, `service_stop`, `service_resize`, `service_update_password`) return an error.
+- **Tiger CLI** — the matching `tiger service` subcommands (plus `service delete`) return an error.
+- **Database sessions** — `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open with `tsdb_admin.read_only_connection=true` even without `--read-only`.
 
-`db_execute_query` is **not** gated — instead, when read-only mode is enabled the database connection used by the tool is opened with the `tsdb_admin.read_only_connection=true` GUC injected as a startup `options` parameter. This is a Tiger Cloud GUC that activates an immutable read-only connection for the session, so writes and DDL are rejected by the server itself and cannot be re-enabled by the LLM with a `SET` statement.
+Intended for AI agents that should be able to read Tiger Cloud resources without risk of mutation. `tsdb_admin.read_only_connection` is a Tiger Cloud GUC injected as a startup `options` parameter; it activates an immutable read-only connection so writes and DDL are rejected by the server itself and cannot be re-enabled with a `SET` statement.
 
 To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
 

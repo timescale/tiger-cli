@@ -293,6 +293,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
+				return err
+			}
+
 			// Prepare service creation request
 			environmentTag := api.EnvironmentTag(createEnvironment)
 			serviceCreateReq := api.ServiceCreate{
@@ -447,6 +451,11 @@ Examples:
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -825,6 +834,17 @@ Examples:
 
 			cmd.SilenceUsage = true
 
+			// Load config before the confirmation prompt so read-only mode
+			// refuses without asking the user to type the service ID.
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
+				return err
+			}
+
 			statusOutput := cmd.ErrOrStderr()
 
 			// Prompt for confirmation unless --confirm is used
@@ -842,12 +862,6 @@ Examples:
 					fmt.Fprintln(statusOutput, "❌ Delete operation cancelled.")
 					return nil
 				}
-			}
-
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
-			if err != nil {
-				return err
 			}
 
 			// Make the delete request
@@ -930,6 +944,11 @@ Examples:
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -1030,6 +1049,11 @@ Examples:
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -1192,6 +1216,11 @@ Examples:
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -1397,6 +1426,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Load config and API client
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			if err := common.CheckReadOnly(cfg.Config); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}

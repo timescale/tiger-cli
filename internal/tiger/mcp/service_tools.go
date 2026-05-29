@@ -681,7 +681,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
@@ -801,7 +801,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -931,7 +931,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
@@ -988,7 +988,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		return nil, ServiceStartOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceStartOutput{}, err
 	}
 
@@ -1053,7 +1053,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceStopOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
 
@@ -1118,7 +1118,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceResizeOutput{}, err
 	}
 
-	if err := checkReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg.Config); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 

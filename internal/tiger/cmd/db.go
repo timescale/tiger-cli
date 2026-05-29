@@ -61,6 +61,9 @@ Use --with-password to include the password directly in the connection string.
 
 Use --read-only to emit a connection string that opens the session in Tiger
 Cloud's immutable read-only mode (writes and DDL are rejected by the server).
+The global read_only config option (or TIGER_READ_ONLY=true) also forces this
+behavior, so connection strings produced while read-only mode is on always
+open read-only sessions.
 
 Examples:
   # Get connection string for default service
@@ -98,7 +101,7 @@ Examples:
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
-				ReadOnly:     dbConnectionStringReadOnly,
+				ReadOnly:     dbConnectionStringReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)
@@ -142,11 +145,16 @@ from your configuration. This command will launch an interactive psql session
 with the appropriate connection parameters.
 
 Authentication is handled automatically using:
-1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)  
+1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)
 2. PGPASSWORD environment variable
 3. If authentication fails, offers interactive options:
    - Enter password manually (will be saved for future use)
    - Reset password (update or generates a new password via the API)
+
+Use --read-only to open the psql session in Tiger Cloud's immutable read-only
+mode (writes and DDL are rejected by the server). The global read_only config
+option (or TIGER_READ_ONLY=true) also forces this behavior, so sessions started
+while read-only mode is on are always read-only.
 
 Examples:
   # Connect to default service
@@ -197,7 +205,7 @@ Examples:
 			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
 				Pooled:   dbConnectPooled,
 				Role:     dbConnectRole,
-				ReadOnly: dbConnectReadOnly,
+				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to build connection string: %w", err)

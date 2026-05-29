@@ -316,7 +316,7 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 **Read-Only Mode Gate:**
 
-Write/destructive MCP tool handlers must call `checkReadOnly(cfg.Config)` (defined in `internal/tiger/mcp/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the handler returns `errReadOnly` and the API client is never invoked.
+Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg.Config)` (defined in `internal/tiger/common/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
 
 **Tool Definition Pattern:**
 
