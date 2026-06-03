@@ -123,6 +123,28 @@ type ConnectionPooler struct {
 // DeployStatus defines model for DeployStatus.
 type DeployStatus string
 
+// DraftInvoice defines model for DraftInvoice.
+type DraftInvoice struct {
+	AmountDue          *string                 `json:"amount_due,omitempty"`
+	BillingAccountId   *string                 `json:"billing_account_id,omitempty"`
+	BillingPeriodEnd   *time.Time              `json:"billing_period_end,omitempty"`
+	BillingPeriodStart *time.Time              `json:"billing_period_start,omitempty"`
+	Currency           *string                 `json:"currency,omitempty"`
+	LineItems          *[]DraftInvoiceLineItem `json:"line_items,omitempty"`
+
+	// Status Invoice status; "none" when nothing is due.
+	Status   *string `json:"status,omitempty"`
+	Subtotal *string `json:"subtotal,omitempty"`
+	Total    *string `json:"total,omitempty"`
+}
+
+// DraftInvoiceLineItem defines model for DraftInvoiceLineItem.
+type DraftInvoiceLineItem struct {
+	Amount    *string `json:"amount,omitempty"`
+	Label     *string `json:"label,omitempty"`
+	ServiceId *string `json:"service_id,omitempty"`
+}
+
 // Endpoint defines model for Endpoint.
 type Endpoint struct {
 	Host *string `json:"host,omitempty"`

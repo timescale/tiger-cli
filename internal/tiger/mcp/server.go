@@ -89,6 +89,9 @@ func (s *Server) registerTools(ctx context.Context) {
 	// Service management tools
 	s.registerServiceTools()
 
+	// Billing tools
+	s.registerBillingTools()
+
 	// Database operation tools
 	s.registerDatabaseTools()
 

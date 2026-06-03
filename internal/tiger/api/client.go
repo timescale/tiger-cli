@@ -102,6 +102,9 @@ type ClientInterface interface {
 	// GetAuthInfo request
 	GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetDraftInvoice request
+	GetDraftInvoice(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetServices request
 	GetServices(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -277,6 +280,18 @@ func (c *Client) TrackEvent(ctx context.Context, body TrackEventJSONRequestBody,
 
 func (c *Client) GetAuthInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuthInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetDraftInvoice(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDraftInvoiceRequest(c.Server, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -929,6 +944,40 @@ func NewGetAuthInfoRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/auth/info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDraftInvoiceRequest generates requests for GetDraftInvoice
+func NewGetDraftInvoiceRequest(server string, projectId ProjectId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/billing/draft-invoice", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2603,6 +2652,9 @@ type ClientWithResponsesInterface interface {
 	// GetAuthInfoWithResponse request
 	GetAuthInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthInfoResponse, error)
 
+	// GetDraftInvoiceWithResponse request
+	GetDraftInvoiceWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error)
+
 	// GetServicesWithResponse request
 	GetServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetServicesResponse, error)
 
@@ -2791,6 +2843,29 @@ func (r GetAuthInfoResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetAuthInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetDraftInvoiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DraftInvoice
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDraftInvoiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDraftInvoiceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3570,6 +3645,15 @@ func (c *ClientWithResponses) GetAuthInfoWithResponse(ctx context.Context, reqEd
 	return ParseGetAuthInfoResponse(rsp)
 }
 
+// GetDraftInvoiceWithResponse request returning *GetDraftInvoiceResponse
+func (c *ClientWithResponses) GetDraftInvoiceWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetDraftInvoiceResponse, error) {
+	rsp, err := c.GetDraftInvoice(ctx, projectId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDraftInvoiceResponse(rsp)
+}
+
 // GetServicesWithResponse request returning *GetServicesResponse
 func (c *ClientWithResponses) GetServicesWithResponse(ctx context.Context, projectId ProjectId, reqEditors ...RequestEditorFn) (*GetServicesResponse, error) {
 	rsp, err := c.GetServices(ctx, projectId, reqEditors...)
@@ -4052,6 +4136,39 @@ func ParseGetAuthInfoResponse(rsp *http.Response) (*GetAuthInfoResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest AuthInfo
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDraftInvoiceResponse parses an HTTP response from a GetDraftInvoiceWithResponse call
+func ParseGetDraftInvoiceResponse(rsp *http.Response) (*GetDraftInvoiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDraftInvoiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DraftInvoice
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

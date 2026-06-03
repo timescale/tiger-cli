@@ -542,6 +542,26 @@ func (mr *MockClientInterfaceMockRecorder) GetAuthInfo(ctx any, reqEditors ...an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfo", reflect.TypeOf((*MockClientInterface)(nil).GetAuthInfo), varargs...)
 }
 
+// GetDraftInvoice mocks base method.
+func (m *MockClientInterface) GetDraftInvoice(ctx context.Context, projectId api.ProjectId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetDraftInvoice", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDraftInvoice indicates an expected call of GetDraftInvoice.
+func (mr *MockClientInterfaceMockRecorder) GetDraftInvoice(ctx, projectId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDraftInvoice", reflect.TypeOf((*MockClientInterface)(nil).GetDraftInvoice), varargs...)
+}
+
 // GetReplicaSets mocks base method.
 func (m *MockClientInterface) GetReplicaSets(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -1584,6 +1604,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetAuthInfoWithResponse(
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfoWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetAuthInfoWithResponse), varargs...)
+}
+
+// GetDraftInvoiceWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetDraftInvoiceWithResponse(ctx context.Context, projectId api.ProjectId, reqEditors ...api.RequestEditorFn) (*api.GetDraftInvoiceResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetDraftInvoiceWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetDraftInvoiceResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDraftInvoiceWithResponse indicates an expected call of GetDraftInvoiceWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetDraftInvoiceWithResponse(ctx, projectId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDraftInvoiceWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetDraftInvoiceWithResponse), varargs...)
 }
 
 // GetReplicaSetsWithResponse mocks base method.
