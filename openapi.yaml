@@ -365,6 +365,28 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/billing/draft-invoice:
+    get:
+      operationId: getDraftInvoice
+      tags:
+        - Billing
+      summary: Get the current draft invoice
+      description: >
+        Retrieves the current draft (upcoming) invoice for the project, including a
+        per-service cost breakdown. Returns status "none" with zeroed totals when
+        nothing is due yet.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: The current draft invoice.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftInvoice'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/start:
     post:
       operationId: startService
@@ -1092,6 +1114,46 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReadReplicaSet'
+    DraftInvoice:
+      type: object
+      properties:
+        billing_account_id:
+          type: string
+        currency:
+          type: string
+          example: "USD"
+        status:
+          type: string
+          description: 'Invoice status; "none" when nothing is due.'
+          example: "draft"
+        billing_period_start:
+          type: string
+          format: date-time
+        billing_period_end:
+          type: string
+          format: date-time
+        amount_due:
+          type: string
+          example: "123.45"
+        subtotal:
+          type: string
+        total:
+          type: string
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DraftInvoiceLineItem'
+    DraftInvoiceLineItem:
+      type: object
+      properties:
+        service_id:
+          type: string
+        label:
+          type: string
+          example: "Compute"
+        amount:
+          type: string
+          example: "12.34"
     ServiceType:
       type: string
       enum:
