@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -718,5 +719,26 @@ func TestResetGlobalConfig(t *testing.T) {
 	// Should have new env value
 	if cfg2.ServiceID != "test-service-after-reset" {
 		t.Errorf("Expected new service ID after reset, got %s", cfg2.ServiceID)
+	}
+}
+
+func TestEnsureConfigDir_ErrorSuggestsOverride(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("cannot trigger mkdir failure as root")
+	}
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0700) })
+
+	_, err := ensureConfigDir(filepath.Join(parent, "tiger"))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	for _, want := range []string{"TIGER_CONFIG_DIR", "--config-dir"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("expected error to mention %q; got: %s", want, err.Error())
+		}
 	}
 }
