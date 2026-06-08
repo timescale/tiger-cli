@@ -39,20 +39,6 @@ type CheckResult struct {
 	UpdateCommand   string
 }
 
-// shouldCheck returns true if enough time has passed since the last check
-func shouldCheck(lastCheckTime time.Time, interval time.Duration) bool {
-	if interval == 0 {
-		return false // Version check disabled
-	}
-
-	if lastCheckTime.IsZero() {
-		return true // Never checked before
-	}
-
-	nextCheck := lastCheckTime.Add(interval)
-	return time.Now().After(nextCheck)
-}
-
 // FetchLatestVersion downloads the latest version string from the given URL
 func fetchLatestVersion(checkURL string) (string, error) {
 	client := &http.Client{
@@ -172,7 +158,7 @@ func detectInstallMethod(binaryPath string) InstallMethod {
 }
 
 // GetUpdateCommand returns the command to update Tiger CLI based on the install method
-func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
+func getUpdateCommand(method InstallMethod) string {
 	switch method {
 	case InstallMethodHomebrew:
 		return "brew update && brew upgrade tiger-cli"
@@ -184,16 +170,18 @@ func getUpdateCommand(method InstallMethod, cfg *config.Config) string {
 			return "sudo dnf update tiger-cli"
 		}
 		return "sudo yum update tiger-cli"
-	case InstallMethodInstallSh:
-		return "curl -fsSL " + cfg.ReleasesURL + " | sh"
 	case InstallMethodDevelopment:
 		return "rebuild from source or install via package manager"
 	default:
-		return "visit https://github.com/timescale/tiger-cli/releases"
+		// InstallMethodInstallSh and InstallMethodUnknown: `tiger upgrade`
+		// replaces the binary in place; if it can't (e.g. wrong permissions or
+		// an unrecognized package manager), it reports a clear error directing
+		// the user back to their original install method.
+		return "tiger upgrade"
 	}
 }
 
-func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer) (*CheckResult, error) {
+func checkVersionForUpdate(version string, cfg *config.Config) (*CheckResult, error) {
 	latestVersion, err := fetchLatestVersion(cfg.ReleasesURL + "/latest.txt")
 	if err != nil {
 		return nil, err
@@ -201,17 +189,12 @@ func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer
 
 	updateAvailable := compareVersions(version, latestVersion)
 
-	// Detect installation method
-	binaryPath, err := os.Executable()
-	if err != nil {
-		if cfg.Debug && output != nil {
-			fmt.Fprintf(*output, "Warning: failed to get executable path: %v\n", err)
-		}
-		binaryPath = ""
-	}
+	// Detect installation method. On failure, fall back to an empty path, which
+	// detectInstallMethod reports as "unknown".
+	binaryPath, _ := os.Executable()
 
 	installMethod := detectInstallMethod(binaryPath)
-	updateCommand := getUpdateCommand(installMethod, cfg)
+	updateCommand := getUpdateCommand(installMethod)
 
 	return &CheckResult{
 		UpdateAvailable: updateAvailable,
@@ -222,9 +205,17 @@ func checkVersionForUpdate(version string, cfg *config.Config, output *io.Writer
 	}, nil
 }
 
-// CheckForUpdate checks if a new version is available and returns the result
-func checkForUpdate(cfg *config.Config, output *io.Writer) (*CheckResult, error) {
-	return checkVersionForUpdate(config.Version, cfg, output)
+// CheckForUpdate fetches the latest released version and returns the result
+// with no side effects (no throttling, CI/terminal gating, or persisted
+// state). Gating (whether to check at all) is the caller's responsibility:
+// the startup notifier gates on an interactive, non-CI terminal in root.go,
+// while the `tiger upgrade` command always wants a fresh result on demand.
+//
+// Note: CheckResult.LatestVersion has its leading "v" trimmed (for display and
+// comparison). Callers that need the release tag used in download paths (e.g.
+// releases/v1.2.3/) must re-add the "v" prefix.
+func CheckForUpdate(cfg *config.Config) (*CheckResult, error) {
+	return checkVersionForUpdate(config.Version, cfg)
 }
 
 // PrintUpdateWarning prints a warning message to stderr if an update is available
@@ -251,70 +242,4 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 		color.CyanString(result.LatestVersion),
 		result.UpdateCommand,
 	)
-}
-
-// PerformCheck performs the full version check flow:
-// 1. Check if enough time has passed
-// 2. Fetch and compare versions
-// 3. Update the last check timestamp
-// 4. Print warning if update available
-func PerformCheck(cfg *config.Config, output *io.Writer, force bool) *CheckResult {
-	// Skip if version check is disabled
-	if !force && cfg.VersionCheckInterval == 0 {
-		if cfg.Debug && output != nil {
-			fmt.Fprintln(*output, "Version check is disabled")
-		}
-		return nil
-	}
-
-	if !force && util.IsCI() {
-		if cfg.Debug && output != nil {
-			fmt.Fprintln(*output, "Skipping version check (CI environment detected)")
-		}
-		return nil
-	}
-
-	if !force && !(util.IsTerminal(os.Stderr) && util.IsTerminal(os.Stdout)) {
-		if cfg.Debug && output != nil {
-			fmt.Fprintln(*output, "Skipping version check (non-interactive terminal detected)")
-		}
-		return nil
-	}
-
-	// Skip if not enough time has passed
-	if !force && !shouldCheck(cfg.VersionCheckLastTime, cfg.VersionCheckInterval) {
-		if cfg.Debug && output != nil {
-			fmt.Fprintf(
-				*output,
-				"Skipping version check (too soon)\n  Last check: %s, Interval: %s\n",
-				cfg.VersionCheckLastTime.Format(time.RFC3339),
-				cfg.VersionCheckInterval,
-			)
-		}
-		return nil
-	}
-
-	// Perform the check
-	result, err := checkForUpdate(cfg, output)
-	if err != nil {
-		if cfg.Debug && output != nil {
-			fmt.Fprintf(*output, "Warning: version check failed: %v\n", err)
-		} else if output != nil {
-			fmt.Fprintf(*output, "Warning: failed to check the latest CLI version.\n")
-		}
-		// Don't update last check time on error - we'll retry next time
-		return nil
-	}
-
-	// Update last check time only after successful check
-	// This ensures we retry quickly if the check failed
-	now := time.Now()
-	if err := cfg.Set("version_check_last_time", now.Format(time.RFC3339)); err != nil {
-		if cfg.Debug && output != nil {
-			fmt.Fprintf(*output, "Warning: failed to update last check time: %v\n", err)
-		}
-		// Don't fail if we can't update the timestamp
-	}
-
-	return result
 }

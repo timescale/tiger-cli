@@ -16,6 +16,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 	"github.com/timescale/tiger-cli/internal/tiger/version"
 )
 
@@ -27,6 +28,11 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 	var passwordStorage string
 	var skipUpdateCheck bool
 	var colorFlag bool
+
+	// versionCheckCh receives the result of the background update check started
+	// in PersistentPreRunE and drained in PersistentPostRunE. nil when no check
+	// was launched (disabled, non-interactive, CI, or --skip-update-check).
+	var versionCheckCh chan *version.CheckResult
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -80,6 +86,27 @@ tiger auth login
 				color.NoColor = true
 			}
 
+			// Kick off a background check for a newer release so the network
+			// fetch overlaps with the command's actual work; the result is
+			// printed in PersistentPostRunE. Gated to interactive, non-CI
+			// terminals. `version --check` runs its own synchronous check.
+			isVersionCheckCmd := cmd.Name() == "version" && cmd.Flag("check") != nil && cmd.Flag("check").Changed
+			if cfg.VersionCheck && !skipUpdateCheck && !isVersionCheckCmd &&
+				!util.IsCI() && util.IsTerminal(cmd.ErrOrStderr()) {
+				versionCheckCh = make(chan *version.CheckResult, 1)
+				go func() {
+					result, err := version.CheckForUpdate(cfg)
+					if err != nil {
+						// A failed check (e.g. offline) shouldn't spam a warning
+						// on every command; surface it only in debug logs.
+						logging.Debug("background version check failed", zap.Error(err))
+						versionCheckCh <- nil
+						return
+					}
+					versionCheckCh <- result
+				}()
+			}
+
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
@@ -88,14 +115,13 @@ tiger auth login
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			// Skip update check if:
-			// 1. --skip-update-check flag was provided
-			// 2. Running "version --check" (version command handles its own check)
-			isVersionCheck := cmd.Name() == "version" && cmd.Flag("check").Changed
-			if !skipUpdateCheck && !isVersionCheck {
+			// Print the result of the background check started in
+			// PersistentPreRunE, if one was launched. Re-check cfg.VersionCheck
+			// in case the command itself toggled it off (e.g.
+			// `tiger config set version_check false`).
+			if versionCheckCh != nil && cfg.VersionCheck {
 				output := cmd.ErrOrStderr()
-				result := version.PerformCheck(cfg, &output, false)
-				version.PrintUpdateWarning(result, cfg, &output)
+				version.PrintUpdateWarning(<-versionCheckCh, cfg, &output)
 			}
 
 			logging.Sync()
@@ -114,6 +140,7 @@ tiger auth login
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd())
+	cmd.AddCommand(buildUpgradeCmd())
 	cmd.AddCommand(buildConfigCmd())
 	cmd.AddCommand(buildAuthCmd())
 	cmd.AddCommand(buildServiceCmd())

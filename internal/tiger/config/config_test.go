@@ -122,6 +122,60 @@ read_only: true
 	}
 }
 
+func TestLoad_MigrateVersionCheck(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileBody string
+		env      map[string]string
+		want     bool
+	}{
+		{
+			name:     "legacy interval 0 keeps checks disabled",
+			fileBody: "version_check_interval: 0\n",
+			want:     false,
+		},
+		{
+			name:     "explicit version_check overrides legacy interval",
+			fileBody: "version_check_interval: 0\nversion_check: true\n",
+			want:     true,
+		},
+		{
+			name:     "env var overrides legacy interval",
+			fileBody: "version_check_interval: 24h\n",
+			env:      map[string]string{"TIGER_VERSION_CHECK": "false"},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := setupTestConfig(t)
+
+			configFile := GetConfigFile(tmpDir)
+			if err := os.WriteFile(configFile, []byte(tt.fileBody), 0644); err != nil {
+				t.Fatalf("Failed to write config file: %v", err)
+			}
+
+			os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+			t.Cleanup(func() { os.Unsetenv("TIGER_CONFIG_DIR") })
+			for k, val := range tt.env {
+				os.Setenv(k, val)
+				t.Cleanup(func() { os.Unsetenv(k) })
+			}
+
+			setupViper(t, tmpDir)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() failed: %v", err)
+			}
+			if cfg.VersionCheck != tt.want {
+				t.Errorf("VersionCheck = %t, want %t", cfg.VersionCheck, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 

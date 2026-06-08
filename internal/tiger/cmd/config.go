@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -52,6 +51,7 @@ func buildConfigShowCmd() *cobra.Command {
 			if err := config.ReadInConfig(v); err != nil {
 				return err
 			}
+			config.MigrateVersionCheck(v)
 
 			cfgOut, err := config.ForOutputFromViper(v)
 			if err != nil {
@@ -221,11 +221,8 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.ServiceID != nil {
 		table.Append("service_id", *cfg.ServiceID)
 	}
-	if cfg.VersionCheckInterval != nil {
-		table.Append("version_check_interval", cfg.VersionCheckInterval.String())
-	}
-	if cfg.VersionCheckLastTime != nil {
-		table.Append("version_check_last_time", cfg.VersionCheckLastTime.Format(time.RFC1123))
+	if cfg.VersionCheck != nil {
+		table.Append("version_check", fmt.Sprintf("%t", *cfg.VersionCheck))
 	}
 	return table.Render()
 }

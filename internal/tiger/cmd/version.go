@@ -50,7 +50,12 @@ func buildVersionCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("Error loading config: %w", err)
 				}
-				if result := version.PerformCheck(cfg, util.Ptr(cmd.ErrOrStderr()), true); result != nil {
+				result, err := version.CheckForUpdate(cfg)
+				if err != nil {
+					// A failed check shouldn't fail the version command; warn and
+					// continue printing the local version info.
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to check for updates: %v\n", err)
+				} else if result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
 					updateAvailable = result.UpdateAvailable
