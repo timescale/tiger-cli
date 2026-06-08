@@ -86,17 +86,17 @@ func TestGetCredentialsFromFile(t *testing.T) {
 
 	// Get credentials - should get from file since keyring is empty
 	// (each test uses a unique keyring service name)
-	apiKey, projectID, err := GetCredentials()
+	creds, err := GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
 
 	// Should return combined API key (publicKey:secretKey) and project ID
-	if apiKey != "public:secret" {
-		t.Errorf("Expected API key 'public:secret', got '%s'", apiKey)
+	if creds.APIKey != "public:secret" {
+		t.Errorf("Expected API key 'public:secret', got '%s'", creds.APIKey)
 	}
-	if projectID != "project456" {
-		t.Errorf("Expected project ID 'project456', got '%s'", projectID)
+	if creds.ProjectID != "project456" {
+		t.Errorf("Expected project ID 'project456', got '%s'", creds.ProjectID)
 	}
 }
 
@@ -104,7 +104,7 @@ func TestGetCredentialsFromFile_NotExists(t *testing.T) {
 	setupCredentialTest(t)
 
 	// Try to get credentials when file doesn't exist
-	_, _, err := GetCredentials()
+	_, err := GetStoredCredentials()
 	if err == nil {
 		t.Fatal("Expected error when credentials file doesn't exist")
 	}

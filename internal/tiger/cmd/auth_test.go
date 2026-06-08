@@ -114,10 +114,11 @@ func TestAuthLogin_KeyFlags(t *testing.T) {
 	expectedAPIKey := "test-public-key:test-secret-key"
 	expectedProjectID := "test-project-id" // Comes from mock validation function
 
-	apiKey, projectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
+	apiKey, projectID := creds.APIKey, creds.ProjectID
 
 	if apiKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
@@ -150,10 +151,11 @@ func TestAuthLogin_KeyEnvironmentVariables(t *testing.T) {
 	// Verify credentials were stored
 	expectedAPIKey := "env-public-key:env-secret-key"
 	expectedProjectID := "test-project-id" // Auto-detected from mock
-	storedKey, storedProjectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
+	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
@@ -529,10 +531,11 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	}
 
 	// Verify file storage works
-	storedKey, storedProjectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file fallback: %v", err)
 	}
+	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
@@ -589,10 +592,11 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 
 	// Verify getCredentials works with file-only storage
-	storedKey, storedProjectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
+	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
 	if storedKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
 	}
@@ -684,7 +688,7 @@ func TestAuthLogout_Success(t *testing.T) {
 	}
 
 	// Verify credentials are stored
-	_, _, err = config.GetCredentials()
+	_, err = config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials should be stored: %v", err)
 	}
@@ -700,7 +704,7 @@ func TestAuthLogout_Success(t *testing.T) {
 	}
 
 	// Verify credentials are removed
-	_, _, err = config.GetCredentials()
+	_, err = config.GetStoredCredentials()
 	if err == nil {
 		t.Fatal("Credentials should be removed after logout")
 	}

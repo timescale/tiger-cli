@@ -95,13 +95,15 @@ Examples:
 					out:        cmd.OutOrStdout(),
 				}
 
-				token, projectID, err := l.loginWithOAuth(cmd.Context())
+				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
 				if err != nil {
 					return err
 				}
 				if err := config.StoreOAuthCredentials(token, projectID); err != nil {
 					return fmt.Errorf("failed to store credentials: %w", err)
 				}
+				// Identify the user for analytics.
+				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
 				finishLogin(cmd, projectID)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
@@ -296,7 +298,7 @@ func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
 		if user.Name != "" {
 			displayName = fmt.Sprintf("%s (%s)", user.Name, user.Email)
 		}
-		table.Append("Auth Method", "OAuth (PKCE)")
+		table.Append("Auth Method", "OAuth")
 		table.Append("User", displayName)
 	default:
 		return fmt.Errorf("unsupported auth info type: %q", authInfo.Type)

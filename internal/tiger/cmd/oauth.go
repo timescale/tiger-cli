@@ -19,6 +19,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
 
@@ -38,18 +39,25 @@ type oauthLogin struct {
 	out        io.Writer
 }
 
-func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, string, error) {
+func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
 	token, err := l.getOAuthToken(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to authenticate via OAuth: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to authenticate via OAuth: %w", err)
 	}
 
-	projectID, err := l.selectProjectID(ctx, token)
+	// Build the token-authenticated client once and reuse it for the
+	// subsequent authenticated requests.
+	client, err := api.NewTigerClientWithToken(l.cfg, token, nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to select project: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return token, projectID, nil
+	projectID, err := l.selectProjectID(ctx, client)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to select project: %w", err)
+	}
+
+	return token, client, projectID, nil
 }
 
 func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
@@ -218,17 +226,13 @@ func openBrowserImpl(url string) error {
 	return cmd.Start()
 }
 
-func (l *oauthLogin) selectProjectID(ctx context.Context, token *oauth2.Token) (string, error) {
-	client, err := api.NewTigerClientWithToken(l.cfg, token, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create API client: %w", err)
-	}
+func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
 	resp, err := client.GetProjectsWithResponse(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
 	if resp.JSON200 == nil {
-		return "", fmt.Errorf("failed to get user projects: %s", resp.Status())
+		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 	projects := *resp.JSON200
 

@@ -37,6 +37,7 @@ type Credentials struct {
 // testServiceNameOverride allows tests to override the service name for isolation
 var testServiceNameOverride string
 
+// GetServiceName returns the appropriate service name for keyring operations
 func GetServiceName() string {
 	// Tests should set a unique service name to avoid conflicts
 	if testServiceNameOverride != "" {
@@ -145,20 +146,6 @@ func storeToFile(credentials string) error {
 
 var ErrNotLoggedIn = errors.New("not logged in")
 
-// GetCredentials retrieves a PAT API key and project ID from storage. Returns
-// an error if the stored credentials are OAuth rather than PAT — OAuth-aware
-// callers should use GetStoredCredentials.
-func GetCredentials() (string, string, error) {
-	creds, err := GetStoredCredentials()
-	if err != nil {
-		return "", "", err
-	}
-	if creds.APIKey == "" {
-		return "", "", fmt.Errorf("stored credentials are not a PAT")
-	}
-	return creds.APIKey, creds.ProjectID, nil
-}
-
 func GetStoredCredentials() (*Credentials, error) {
 	raw, err := loadCredentialsBlob()
 	if err != nil {
@@ -206,16 +193,19 @@ func loadCredentialsBlob() (string, error) {
 	return string(data), nil
 }
 
+// RemoveCredentials removes stored credentials from keyring and file fallback
 func RemoveCredentials() error {
 	// Remove from keyring (ignore errors as it might not exist)
 	removeCredentialsFromKeyring()
 	return removeCredentialsFile()
 }
 
+// removeCredentialsFromKeyring removes credentials from keyring (test helper)
 func removeCredentialsFromKeyring() {
 	keyring.Delete(GetServiceName(), keyringUsername)
 }
 
+// removeCredentialsFile removes credentials file
 func removeCredentialsFile() error {
 	credentialsFile := getCredentialsFileName()
 	if err := os.Remove(credentialsFile); err != nil && !os.IsNotExist(err) {

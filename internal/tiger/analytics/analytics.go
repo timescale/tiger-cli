@@ -137,7 +137,7 @@ func (a *Analytics) Identify(options ...Option) {
 	)
 
 	// Check if analytics is disabled
-	if !a.enabled() {
+	if !a.Enabled() {
 		logger.Debug("Analytics identify skipped (analytics disabled)")
 		return
 	}
@@ -202,7 +202,7 @@ func (a *Analytics) Track(event string, options ...Option) {
 	)
 
 	// Check if analytics is disabled
-	if !a.enabled() {
+	if !a.Enabled() {
 		logger.Debug("Analytics event skipped (analytics disabled)")
 		return
 	}
@@ -239,7 +239,9 @@ func (a *Analytics) Track(event string, options ...Option) {
 	logger.Debug("Analytics event sent", zap.String("status", *resp.JSON200.Status))
 }
 
-func (a *Analytics) enabled() bool {
+// Enabled reports whether analytics events will actually be sent given the
+// current config and environment.
+func (a *Analytics) Enabled() bool {
 	if envVarIsTrue("DO_NOT_TRACK") ||
 		envVarIsTrue("NO_TELEMETRY") ||
 		envVarIsTrue("DISABLE_TELEMETRY") {

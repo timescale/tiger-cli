@@ -70,12 +70,15 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 		},
 	}
 
-	var src oauth2.TokenSource = oauthCfg.TokenSource(context.Background(), token)
+	// Stash our pooled client in the context.
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, getHTTPClient())
+
+	var src oauth2.TokenSource = oauthCfg.TokenSource(ctx, token)
 	if persist != nil {
 		src = &persistingTokenSource{base: src, persist: persist, last: token.AccessToken}
 	}
 
-	httpClient := oauth2.NewClient(context.Background(), src)
+	httpClient := oauth2.NewClient(ctx, src)
 	httpClient.Timeout = 30 * time.Second
 
 	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {

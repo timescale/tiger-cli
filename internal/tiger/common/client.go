@@ -12,12 +12,10 @@ import (
 )
 
 var (
-	// GetCredentials is a test-only override seam, nil in production.
-	// Deprecated: only carries PAT-shaped overrides. Prefer overriding
-	// GetStoredCredentials when both auth kinds need to be controlled.
-	GetCredentials func() (string, string, error)
-
-	GetStoredCredentials = defaultGetStoredCredentials
+	// GetStoredCredentials loads the stored credentials (PAT or OAuth) from the
+	// keyring or fallback file. It's a package var so tests can override it to
+	// inject credentials of either shape.
+	GetStoredCredentials = config.GetStoredCredentials
 
 	// Cache of validated API Keys. Useful for avoided unnecessary calls to the
 	// /auth/info and /analytics/identify endpoints when the API client is
@@ -26,16 +24,6 @@ var (
 	// re-fetches the API client for each tool call).
 	validatedAPIKeyCache = map[string]*api.AuthInfo{}
 )
-
-func defaultGetStoredCredentials() (*config.Credentials, error) {
-	// Honor a PAT-shaped test override when present; production leaves it nil.
-	if GetCredentials != nil {
-		if apiKey, projectID, err := GetCredentials(); err == nil && apiKey != "" {
-			return &config.Credentials{APIKey: apiKey, ProjectID: projectID}, nil
-		}
-	}
-	return config.GetStoredCredentials()
-}
 
 // NewAPIClient initializes a [api.ClientWithResponses] and returns it along
 // with the current project ID. Credentials are pulled from the environment (if
@@ -127,4 +115,29 @@ func ValidateAPIKey(ctx context.Context, cfg *config.Config, client *api.ClientW
 	)
 
 	return authInfo, nil
+}
+
+// IdentifyOAuthUser sends an analytics Identify for an OAuth (PKCE) login,
+// using the token-authenticated client built during login. It fetches the
+// caller's identity via /auth/info. Best-effort.
+func IdentifyOAuthUser(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses, projectID string) {
+	// Skip the /auth/info round-trip entirely when analytics is disabled.
+	a := analytics.New(cfg, client, projectID)
+	if !a.Enabled() {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	resp, err := client.GetAuthInfoWithResponse(ctx)
+	if err != nil || resp.JSON200 == nil || resp.JSON200.Oauth == nil {
+		return
+	}
+	user := resp.JSON200.Oauth.User
+
+	a.Identify(
+		analytics.Property("userId", user.Id),
+		analytics.Property("email", string(user.Email)),
+	)
 }

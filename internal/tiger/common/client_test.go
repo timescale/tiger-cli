@@ -5,12 +5,61 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
+
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 )
+
+// TestNewAPIClient_OAuthCredentials verifies that when stored credentials are
+// OAuth-shaped, NewAPIClient builds a Bearer-authenticated client and returns the stored project ID.
+func TestNewAPIClient_OAuthCredentials(t *testing.T) {
+	if err := logging.Init(false); err != nil {
+		t.Fatalf("Failed to initialize logging: %v", err)
+	}
+
+	// Ensure env-var credentials don't take precedence over the stored override.
+	t.Setenv("TIGER_PUBLIC_KEY", "")
+	t.Setenv("TIGER_SECRET_KEY", "")
+
+	// Capture the Authorization header the client sends.
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+
+	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
+		"api_url": server.URL,
+	})
+	require.NoError(t, err)
+
+	// Override the credential seam with an OAuth token.
+	original := GetStoredCredentials
+	GetStoredCredentials = func() (*config.Credentials, error) {
+		return &config.Credentials{
+			OAuth:     &oauth2.Token{AccessToken: "test-access-token", Expiry: time.Now().Add(time.Hour)},
+			ProjectID: "proj-oauth-123",
+		}, nil
+	}
+	t.Cleanup(func() { GetStoredCredentials = original })
+
+	client, projectID, err := NewAPIClient(context.Background(), cfg)
+	require.NoError(t, err)
+	require.Equal(t, "proj-oauth-123", projectID)
+
+	// Issue a request so the client attaches the bearer token.
+	_, err = client.GetServicesWithResponse(context.Background(), projectID)
+	require.NoError(t, err)
+	require.Equal(t, "Bearer test-access-token", gotAuth)
+}
 
 func TestValidateAPIKey(t *testing.T) {
 	// Initialize logger for analytics code

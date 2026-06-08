@@ -61,7 +61,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 
 	// Verify that no credentials were stored
-	if _, _, err := config.GetCredentials(); err == nil {
+	if _, err := config.GetStoredCredentials(); err == nil {
 		t.Error("Credentials should not be stored when validation fails")
 	}
 }
@@ -114,10 +114,11 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Verify that credentials were stored
 	expectedAPIKey := "valid-public:valid-secret"
 	expectedProjectID := "test-project-valid"
-	apiKey, projectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
+	apiKey, projectID := creds.APIKey, creds.ProjectID
 	if apiKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 	}

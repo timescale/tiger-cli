@@ -909,7 +909,7 @@ components:
           type: string
           description: |
             Discriminator for the credential shape. `apiKey` for PAT callers;
-            `oauth` for OAuth (PKCE) user callers.
+            `oauth` for OAuth user callers.
           enum: ["apiKey", "oauth"]
           example: "apiKey"
         apiKey:
@@ -978,7 +978,7 @@ components:
                   example: "john.doe@example.com"
         oauth:
           type: object
-          description: OAuth user details. Present for OAuth (PKCE) user callers.
+          description: OAuth user details. Present for OAuth user callers.
           required:
             - user
           properties:
