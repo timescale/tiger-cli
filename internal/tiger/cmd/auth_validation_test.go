@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -60,7 +61,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 
 	// Verify that no credentials were stored
-	if _, _, err := config.GetCredentials(); err == nil {
+	if _, err := config.GetStoredCredentials(); err == nil {
 		t.Error("Credentials should not be stored when validation fails")
 	}
 }
@@ -80,11 +81,8 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 
 	// Mock the validator to return success
 	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
-		authInfo := &api.AuthInfo{
-			Type: api.ApiKey,
-		}
-		authInfo.ApiKey.Project.Id = "test-project-valid"
-		authInfo.ApiKey.PublicKey = "test-access-key"
+		authInfo := &api.AuthInfo{}
+		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
 		return authInfo, nil // Success
 	}
 
@@ -116,10 +114,11 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Verify that credentials were stored
 	expectedAPIKey := "valid-public:valid-secret"
 	expectedProjectID := "test-project-valid"
-	apiKey, projectID, err := config.GetCredentials()
+	creds, err := config.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
+	apiKey, projectID := creds.APIKey, creds.ProjectID
 	if apiKey != expectedAPIKey {
 		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
 	}

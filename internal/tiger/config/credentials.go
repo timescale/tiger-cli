@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/zalando/go-keyring"
+	"golang.org/x/oauth2"
 )
 
 // Keyring parameters
@@ -17,10 +18,20 @@ const (
 	keyringUsername    = "credentials"
 )
 
-// storedCredentials represents the JSON structure for stored credentials
+// storedCredentials represents the JSON structure for stored credentials.
+// Exactly one of APIKey (PAT) or OAuth (PKCE) is populated per login.
 type storedCredentials struct {
-	APIKey    string `json:"api_key"`
-	ProjectID string `json:"project_id"`
+	APIKey    string        `json:"api_key,omitempty"`
+	OAuth     *oauth2.Token `json:"oauth,omitempty"`
+	ProjectID string        `json:"project_id"`
+}
+
+// Credentials is the resolved form of what's in keyring/file. Exactly one of
+// APIKey (PAT) or OAuth (PKCE) is populated.
+type Credentials struct {
+	APIKey    string
+	OAuth     *oauth2.Token
+	ProjectID string
 }
 
 // testServiceNameOverride allows tests to override the service name for isolation
@@ -58,26 +69,24 @@ func getCredentialsFileName() string {
 	return fmt.Sprintf("%s/credentials", configDir)
 }
 
-// StoreCredentials stores the API key (public:secret) and project ID together
-// The credentials are stored as JSON with api_key and project_id fields
+// StoreCredentials stores a PAT credential.
 func StoreCredentials(apiKey, projectID string) error {
-	creds := storedCredentials{
+	return storeCredentials(storedCredentials{
 		APIKey:    apiKey,
 		ProjectID: projectID,
-	}
+	})
+}
 
-	credentialsJSON, err := json.Marshal(creds)
-	if err != nil {
-		return fmt.Errorf("failed to marshal credentials: %w", err)
+// StoreOAuthCredentials stores an OAuth token (access + refresh + expiry) and
+// project ID. Use this for the PKCE login path; use StoreCredentials for PAT.
+func StoreOAuthCredentials(token *oauth2.Token, projectID string) error {
+	if token == nil {
+		return fmt.Errorf("oauth token must not be nil")
 	}
-
-	// Try keyring first
-	if err := storeToKeyring(string(credentialsJSON)); err == nil {
-		return nil
-	}
-
-	// Fallback to file storage
-	return storeToFile(string(credentialsJSON))
+	return storeCredentials(storedCredentials{
+		OAuth:     token,
+		ProjectID: projectID,
+	})
 }
 
 // StoreCredentialsToFile stores credentials to file (test helper)
@@ -92,6 +101,18 @@ func StoreCredentialsToFile(apiKey, projectID string) error {
 		return fmt.Errorf("failed to marshal credentials: %w", err)
 	}
 
+	return storeToFile(string(credentialsJSON))
+}
+
+func storeCredentials(creds storedCredentials) error {
+	credentialsJSON, err := json.Marshal(creds)
+	if err != nil {
+		return fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
+	if err := storeToKeyring(string(credentialsJSON)); err == nil {
+		return nil
+	}
 	return storeToFile(string(credentialsJSON))
 }
 
@@ -125,62 +146,51 @@ func storeToFile(credentials string) error {
 
 var ErrNotLoggedIn = errors.New("not logged in")
 
-// GetCredentials retrieves the API key and project ID from storage
-// Returns (apiKey, projectID, error) where apiKey is in "publicKey:secretKey" format
-func GetCredentials() (string, string, error) {
-	// Try keyring first
-	if apiKey, projectId, err := getCredentialsFromKeyring(); err == nil {
-		return apiKey, projectId, nil
-	}
-
-	// Fallback to file storage
-	return getCredentialsFromFile()
-}
-
-// getCredentialsFromKeyring gets credentials from keyring.
-func getCredentialsFromKeyring() (string, string, error) {
-	combined, err := keyring.Get(GetServiceName(), keyringUsername)
+func GetStoredCredentials() (*Credentials, error) {
+	raw, err := loadCredentialsBlob()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return parseCredentials(combined)
+
+	var stored storedCredentials
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
+		return nil, fmt.Errorf("failed to parse credentials: %w", err)
+	}
+	if stored.ProjectID == "" {
+		return nil, fmt.Errorf("project ID not found in stored credentials")
+	}
+
+	switch {
+	case stored.OAuth != nil && stored.OAuth.AccessToken != "":
+		return &Credentials{OAuth: stored.OAuth, ProjectID: stored.ProjectID}, nil
+	case stored.APIKey != "":
+		return &Credentials{APIKey: stored.APIKey, ProjectID: stored.ProjectID}, nil
+	default:
+		return nil, fmt.Errorf("stored credentials have neither API key nor OAuth token")
+	}
 }
 
-// getCredentialsFromFile retrieves credentials from file
-func getCredentialsFromFile() (string, string, error) {
+// loadCredentialsBlob returns the raw JSON blob from keyring or file fallback.
+func loadCredentialsBlob() (string, error) {
+	if blob, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
+		if blob == "" {
+			return "", ErrNotLoggedIn
+		}
+		return blob, nil
+	}
+
 	credentialsFile := getCredentialsFileName()
 	data, err := os.ReadFile(credentialsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", "", ErrNotLoggedIn
+			return "", ErrNotLoggedIn
 		}
-		return "", "", fmt.Errorf("failed to read credentials file: %w", err)
+		return "", fmt.Errorf("failed to read credentials file: %w", err)
 	}
-
-	credentials := string(data)
-	if credentials == "" {
-		return "", "", ErrNotLoggedIn
+	if len(data) == 0 {
+		return "", ErrNotLoggedIn
 	}
-
-	return parseCredentials(credentials)
-}
-
-// parseCredentials parses the stored credentials from JSON format
-// Returns (apiKey, projectID, error) where apiKey is in "publicKey:secretKey" format
-func parseCredentials(combined string) (string, string, error) {
-	var creds storedCredentials
-	if err := json.Unmarshal([]byte(combined), &creds); err != nil {
-		return "", "", fmt.Errorf("failed to parse credentials: %w", err)
-	}
-
-	if creds.APIKey == "" {
-		return "", "", fmt.Errorf("API key not found in stored credentials")
-	}
-	if creds.ProjectID == "" {
-		return "", "", fmt.Errorf("project ID not found in stored credentials")
-	}
-
-	return creds.APIKey, creds.ProjectID, nil
+	return string(data), nil
 }
 
 // RemoveCredentials removes stored credentials from keyring and file fallback

@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -18,10 +17,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/oauth2"
-)
 
-// OAuth parameters
-const clientID = "45e1b16d-e435-4049-97b2-8daad150818c"
+	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/common"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
+)
 
 var (
 	// openBrowser can be overridden for testing
@@ -32,49 +32,46 @@ var (
 )
 
 type oauthLogin struct {
+	cfg        *config.Config
 	authURL    string
 	tokenURL   string
 	successURL string
-	graphql    *GraphQLClient
 	out        io.Writer
 }
 
-func (l *oauthLogin) loginWithOAuth(ctx context.Context) (credentials, error) {
-	// Get a user access token via OAuth
-	accessToken, err := l.getAccessToken(ctx)
+func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
+	token, err := l.getOAuthToken(ctx)
 	if err != nil {
-		return credentials{}, fmt.Errorf("failed to authenticate via OAuth: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to authenticate via OAuth: %w", err)
 	}
 
-	// Get the user's project ID (with interactive selection if needed)
-	projectID, err := l.selectProjectID(ctx, accessToken)
+	// Build the token-authenticated client once and reuse it for the
+	// subsequent authenticated requests.
+	client, err := api.NewTigerClientWithToken(l.cfg, token, nil)
 	if err != nil {
-		return credentials{}, fmt.Errorf("failed to select project: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	// Create API key for the selected project
-	creds, err := l.createCredentials(ctx, accessToken, projectID)
+	projectID, err := l.selectProjectID(ctx, client)
 	if err != nil {
-		return credentials{}, fmt.Errorf("failed to create credentials: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to select project: %w", err)
 	}
 
-	return creds, nil
+	return token, client, projectID, nil
 }
 
-func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
-	// Generate PKCE parameters
+func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 	codeVerifier := oauth2.GenerateVerifier()
 
-	// Generate random state string (to guard against CRSF attacks)
+	// Random state guards against CSRF on the OAuth callback.
 	state, err := l.generateRandomState(32)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate random state: %w", err)
+		return nil, fmt.Errorf("failed to generate random state: %w", err)
 	}
 
-	// Start local HTTP server for handling the OAuth callback
 	server, err := l.startOAuthServer(state, codeVerifier)
 	if err != nil {
-		return "", fmt.Errorf("failed to create local server: %w", err)
+		return nil, fmt.Errorf("failed to create local server: %w", err)
 	}
 	defer func() {
 		if err := server.server.Shutdown(ctx); err != nil {
@@ -82,7 +79,6 @@ func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
 		}
 	}()
 
-	// Open browser
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
 	fmt.Fprintf(l.out, "Auth URL is: %s\n", authURL)
 	fmt.Fprintln(l.out, "Opening browser for authentication...")
@@ -90,14 +86,13 @@ func (l *oauthLogin) getAccessToken(ctx context.Context) (string, error) {
 		fmt.Fprintf(l.out, "Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
 	}
 
-	// Wait for callback with timeout
 	select {
 	case result := <-server.resultChan:
-		return result.accessToken, result.err
+		return result.token, result.err
 	case <-time.After(5 * time.Minute):
-		return "", fmt.Errorf("authorization timeout - no callback received within 5 minutes")
+		return nil, fmt.Errorf("authorization timeout - no callback received within 5 minutes")
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 
@@ -116,21 +111,19 @@ type oauthServer struct {
 }
 
 type oauthResult struct {
-	accessToken string
-	err         error
+	token *oauth2.Token
+	err   error
 }
 
 func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oauthServer, error) {
-	// Start listening on an available port
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on local port: %w", err)
 	}
 
-	// Build OAuth config with localhost redirect URI
 	port := listener.Addr().(*net.TCPAddr).Port
 	oauthCfg := oauth2.Config{
-		ClientID: clientID,
+		ClientID: config.TigerCLIClientID,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:   l.authURL,
 			TokenURL:  l.tokenURL,
@@ -208,7 +201,7 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, c.successURL, http.StatusTemporaryRedirect)
 
 	c.resultChan <- oauthResult{
-		accessToken: token.AccessToken,
+		token: token,
 	}
 }
 
@@ -232,26 +225,28 @@ func openBrowserImpl(url string) error {
 	return cmd.Start()
 }
 
-// selectProjectID prompts the user to select a project if multiple are available
-func (l *oauthLogin) selectProjectID(ctx context.Context, accessToken string) (string, error) {
-	// First, get the list of projects the user has access to
-	projects, err := l.graphql.getUserProjects(ctx, accessToken)
+func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
+	resp, err := client.GetProjectsWithResponse(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
+	if resp.JSON200 == nil {
+		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+	projects := *resp.JSON200
 
 	switch len(projects) {
 	case 0:
 		return "", fmt.Errorf("user has no accessible projects")
 	case 1:
-		return projects[0].ID, nil
+		return projects[0].Id, nil
 	default:
 		return selectProjectInteractively(projects, l.out)
 	}
 }
 
 // selectProjectInteractivelyImpl is the default implementation for project selection using Bubble Tea
-func selectProjectInteractivelyImpl(projects []Project, out io.Writer) (string, error) {
+func selectProjectInteractivelyImpl(projects []api.Project, out io.Writer) (string, error) {
 	model := projectSelectModel{
 		projects: projects,
 		cursor:   0,
@@ -271,9 +266,8 @@ func selectProjectInteractivelyImpl(projects []Project, out io.Writer) (string, 
 	return result.selected, nil
 }
 
-// projectSelectModel represents the Bubble Tea model for project selection
 type projectSelectModel struct {
-	projects     []Project
+	projects     []api.Project
 	cursor       int
 	selected     string
 	numberBuffer string
@@ -302,7 +296,7 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter", " ":
-			m.selected = m.projects[m.cursor].ID
+			m.selected = m.projects[m.cursor].Id
 			return m, tea.Quit
 		case "backspace":
 			// Handle backspace to remove last character from buffer
@@ -349,7 +343,7 @@ func (m projectSelectModel) View() string {
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
+		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.Id)
 	}
 
 	// Show the current number buffer if user is typing
@@ -359,45 +353,4 @@ func (m projectSelectModel) View() string {
 
 	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
 	return s
-}
-
-// createCredentials creates client credentials (i.e. a PAT record) for the
-// selected project
-func (l *oauthLogin) createCredentials(ctx context.Context, accessToken, projectID string) (credentials, error) {
-	// Get user information for PAT name
-	user, err := l.graphql.getUser(ctx, accessToken)
-	if err != nil {
-		return credentials{}, fmt.Errorf("failed to get user info: %w", err)
-	}
-
-	// Create a PAT record for this project
-	patRecord, err := l.graphql.createPATRecord(ctx, accessToken, projectID, l.buildPATName(user))
-	if err != nil {
-		// Check if error is about reaching maximum token limit
-		if strings.Contains(err.Error(), "reached maximum token limit for project") {
-			return credentials{}, fmt.Errorf("failed to create API key: %w\n\nYou can delete existing API keys at: https://console.cloud.tigerdata.com/dashboard/settings", err)
-		}
-		return credentials{}, fmt.Errorf("failed to create PAT record: %w", err)
-	}
-
-	return credentials{
-		publicKey: patRecord.ClientCredentials.AccessKey,
-		secretKey: patRecord.ClientCredentials.SecretKey,
-	}, nil
-}
-
-// Build the PAT/Client Credentials name. This is displayed under "Project settings"
-// in the console and helps identify what the credentials are for
-func (l *oauthLogin) buildPATName(user *User) string {
-	// Use user name, fallback to email if name is empty,
-	// fallback to hostname as last resort.
-	if user.Name != "" {
-		return "TigerCLI - " + user.Name
-	} else if user.Email != "" {
-		return "TigerCLI - " + user.Email
-	} else if hostname, _ := os.Hostname(); hostname != "" {
-		return "TigerCLI - " + hostname
-	} else {
-		return "TigerCLI"
-	}
 }
