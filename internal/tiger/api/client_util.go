@@ -118,32 +118,10 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	if tok.AccessToken != p.last {
-		// The standard oauth2 refresh only reads `expires_in`, so a token
-		// refreshed from the gateway's non-standard `expires_at` lands with a
-		// zero Expiry. Normalize it before persisting, otherwise the stored
-		// token looks non-expiring and never refreshes again.
-		SetTokenExpiry(tok)
 		_ = p.persist(tok)
 		p.last = tok.AccessToken
 	}
 	return tok, nil
-}
-
-// SetTokenExpiry populates Token.Expiry from the gateway's non-standard
-// `expires_at` (Unix seconds) field. The Go oauth2 library only reads the
-// standard `expires_in`, so without this the stored token's Expiry is zero
-// and TokenSource.Valid() always returns true.
-func SetTokenExpiry(token *oauth2.Token) {
-	switch v := token.Extra("expires_at").(type) {
-	case float64:
-		if v > 0 {
-			token.Expiry = time.Unix(int64(v), 0)
-		}
-	case int64:
-		if v > 0 {
-			token.Expiry = time.Unix(v, 0)
-		}
-	}
 }
 
 func (e *Error) Error() string {

@@ -218,7 +218,7 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 
 		// The mock backs both the initial authorization_code exchange and the
 		// silent refresh that oauth2.NewClient performs once the access token
-		// is past its expires_at. Both grants return the same canned token so
+		// is past its expiry. Both grants return the same canned token so
 		// downstream assertions remain stable.
 		grantType := r.FormValue("grant_type")
 		switch grantType {
@@ -237,7 +237,7 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 		tokenResponse := map[string]interface{}{
 			"access_token":  "mock-access-token-12345",
 			"refresh_token": "mock-refresh-token-67890",
-			"expires_at":    1234567890,
+			"expires_in":    3600,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -333,6 +333,17 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 	}
 }
 
+// assertExpiresInAbout checks that the token Expiry was derived from the
+// standard `expires_in` (the mock returns 3600s), allowing slack for elapsed
+// test time.
+func assertExpiresInAbout(t *testing.T, expiry time.Time) {
+	t.Helper()
+	d := time.Until(expiry)
+	if d < 3540*time.Second || d > 3600*time.Second {
+		t.Errorf("Expected expiry ~3600s from now (from expires_in=3600), got %v (in %v)", expiry, d)
+	}
+}
+
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	mockServerURL := setupOAuthTest(t, []api.Project{
 		{Id: "project-123", Name: "Test Project"},
@@ -372,9 +383,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	if token.RefreshToken != "mock-refresh-token-67890" {
 		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
 	}
-	if !token.Expiry.Equal(time.Unix(1234567890, 0)) {
-		t.Errorf("Expected expiry derived from expires_at=1234567890, got %v", token.Expiry)
-	}
+	assertExpiresInAbout(t, token.Expiry)
 	if projectID != "project-123" {
 		t.Errorf("Expected project ID 'project-123', got '%s'", projectID)
 	}
@@ -433,9 +442,7 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	if token.RefreshToken != "mock-refresh-token-67890" {
 		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
 	}
-	if !token.Expiry.Equal(time.Unix(1234567890, 0)) {
-		t.Errorf("Expected expiry derived from expires_at=1234567890, got %v", token.Expiry)
-	}
+	assertExpiresInAbout(t, token.Expiry)
 	if projectID != "project-789" {
 		t.Errorf("Expected project ID 'project-789', got '%s'", projectID)
 	}
@@ -443,11 +450,11 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 
 // TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
 // refreshed, the rotated token is persisted with a non-zero Expiry derived from
-// the gateway's non-standard `expires_at`.
+// the standard `expires_in` returned by the gateway.
 func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 
-	// Mock server backs the refresh_token grant (returns expires_at=1234567890).
+	// Mock server backs the refresh_token grant (returns expires_in=3600).
 	mockServer := startMockOAuthServer(t, nil)
 	configFile := config.GetConfigFile(tmpDir)
 	configContent := fmt.Sprintf("gateway_url: \"%s\"\napi_url: \"%s\"\n", mockServer.URL, mockServer.URL)
@@ -493,10 +500,7 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 	if reloaded.OAuth.AccessToken != "mock-access-token-12345" {
 		t.Fatalf("Expected token to be refreshed, got access token %q", reloaded.OAuth.AccessToken)
 	}
-	want := time.Unix(1234567890, 0)
-	if !reloaded.OAuth.Expiry.Equal(want) {
-		t.Errorf("Expected persisted expiry %v (from expires_at), got %v", want, reloaded.OAuth.Expiry)
-	}
+	assertExpiresInAbout(t, reloaded.OAuth.Expiry)
 }
 
 // TestAuthLogin_KeyringFallback tests the scenario where keyring fails and system falls back to file storage

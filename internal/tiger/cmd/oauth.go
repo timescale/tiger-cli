@@ -196,7 +196,6 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.sendError(fmt.Errorf("failed to exchange code for tokens: %w", err))
 		return
 	}
-	api.SetTokenExpiry(token)
 
 	// Redirect to success page
 	http.Redirect(w, r, c.successURL, http.StatusTemporaryRedirect)
