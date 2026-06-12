@@ -34,6 +34,9 @@ func setupIntegrationTest(t *testing.T) string {
 	// Disable analytics for integration tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 
+	// Disable read-only mode (default: true) so mutating commands can run
+	os.Setenv("TIGER_READ_ONLY", "false")
+
 	// Reset global config and viper to ensure test isolation
 	config.ResetGlobalConfig()
 
@@ -61,6 +64,7 @@ func setupIntegrationTest(t *testing.T) string {
 		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_ANALYTICS")
+		os.Unsetenv("TIGER_READ_ONLY")
 		// Then clean up file system
 		os.RemoveAll(tmpDir)
 	})

@@ -52,6 +52,11 @@ func buildConfigShowCmd() *cobra.Command {
 				return err
 			}
 			config.MigrateVersionCheck(v)
+			if !noDefaults {
+				// Grandfathered read_only is effectively a default, so hide
+				// it with the other defaults.
+				config.MigrateReadOnly(v)
+			}
 
 			cfgOut, err := config.ForOutputFromViper(v)
 			if err != nil {

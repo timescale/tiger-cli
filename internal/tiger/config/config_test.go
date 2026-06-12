@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
@@ -70,8 +72,10 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.Analytics != DefaultAnalytics {
 		t.Errorf("Expected Analytics %t, got %t", DefaultAnalytics, cfg.Analytics)
 	}
-	if cfg.ReadOnly != DefaultReadOnly {
-		t.Errorf("Expected ReadOnly %t, got %t", DefaultReadOnly, cfg.ReadOnly)
+	// setupTestConfig writes a config file without read_only, so it's
+	// grandfathered to false (see MigrateReadOnly).
+	if cfg.ReadOnly {
+		t.Errorf("Expected ReadOnly false for pre-existing config file, got true")
 	}
 	if cfg.ConfigDir != tmpDir {
 		t.Errorf("Expected ConfigDir %s, got %s", tmpDir, cfg.ConfigDir)
@@ -174,6 +178,153 @@ func TestLoad_MigrateVersionCheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoad_MigrateReadOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileBody *string // nil means no config file
+		env      map[string]string
+		want     bool
+	}{
+		{
+			name:     "no config file gets read-only default",
+			fileBody: nil,
+			want:     DefaultReadOnly,
+		},
+		{
+			name:     "pre-existing config file without key is grandfathered",
+			fileBody: util.Ptr("output: json\n"),
+			want:     false,
+		},
+		{
+			name:     "explicit read_only in config file is respected",
+			fileBody: util.Ptr("read_only: true\n"),
+			want:     true,
+		},
+		{
+			name:     "env var overrides grandfathered value",
+			fileBody: util.Ptr("output: json\n"),
+			env:      map[string]string{"TIGER_READ_ONLY": "true"},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			t.Cleanup(ResetGlobalConfig)
+
+			if tt.fileBody != nil {
+				configFile := GetConfigFile(tmpDir)
+				if err := os.WriteFile(configFile, []byte(*tt.fileBody), 0644); err != nil {
+					t.Fatalf("Failed to write config file: %v", err)
+				}
+			}
+
+			os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+			t.Cleanup(func() { os.Unsetenv("TIGER_CONFIG_DIR") })
+			for k, val := range tt.env {
+				os.Setenv(k, val)
+				t.Cleanup(func() { os.Unsetenv(k) })
+			}
+
+			setupViper(t, tmpDir)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() failed: %v", err)
+			}
+			if cfg.ReadOnly != tt.want {
+				t.Errorf("ReadOnly = %t, want %t", cfg.ReadOnly, tt.want)
+			}
+		})
+	}
+}
+
+// TestReadOnlyMaterializedOnWrite verifies that Set/Unset/Reset record
+// read_only explicitly, so rewritten files aren't grandfathered to false.
+func TestReadOnlyMaterializedOnWrite(t *testing.T) {
+	loadReadOnly := func(t *testing.T, tmpDir string) bool {
+		t.Helper()
+		ResetGlobalConfig()
+		setupViper(t, tmpDir)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() failed: %v", err)
+		}
+		return cfg.ReadOnly
+	}
+
+	setup := func(t *testing.T, fileBody *string) (string, *Config) {
+		t.Helper()
+		tmpDir := t.TempDir()
+		t.Cleanup(ResetGlobalConfig)
+		os.Setenv("TIGER_CONFIG_DIR", tmpDir)
+		t.Cleanup(func() { os.Unsetenv("TIGER_CONFIG_DIR") })
+		if fileBody != nil {
+			if err := os.WriteFile(GetConfigFile(tmpDir), []byte(*fileBody), 0644); err != nil {
+				t.Fatalf("Failed to write config file: %v", err)
+			}
+		}
+		setupViper(t, tmpDir)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() failed: %v", err)
+		}
+		return tmpDir, cfg
+	}
+
+	t.Run("Set on fresh install pins read-only default", func(t *testing.T) {
+		tmpDir, cfg := setup(t, nil)
+		if err := cfg.Set("output", "json"); err != nil {
+			t.Fatalf("Set() failed: %v", err)
+		}
+		if got := loadReadOnly(t, tmpDir); got != DefaultReadOnly {
+			t.Errorf("ReadOnly = %t after Set on fresh install, want %t", got, DefaultReadOnly)
+		}
+	})
+
+	t.Run("Set on grandfathered config pins false", func(t *testing.T) {
+		tmpDir, cfg := setup(t, util.Ptr("service_id: svc-123\n"))
+		if err := cfg.Set("output", "json"); err != nil {
+			t.Fatalf("Set() failed: %v", err)
+		}
+		// Assert on the file itself rather than the loaded value: the
+		// grandfathering shim would yield an effective false even if Set
+		// failed to write the key.
+		v := viper.New()
+		v.SetConfigFile(GetConfigFile(tmpDir))
+		if err := v.ReadInConfig(); err != nil {
+			t.Fatalf("Failed to read config file: %v", err)
+		}
+		if !v.InConfig("read_only") {
+			t.Fatal("read_only not written to config file by Set")
+		}
+		if v.GetBool("read_only") {
+			t.Error("read_only = true in config file after Set on grandfathered config, want false")
+		}
+	})
+
+	t.Run("Unset read_only restores current default", func(t *testing.T) {
+		tmpDir, cfg := setup(t, util.Ptr("read_only: false\n"))
+		if err := cfg.Unset("read_only"); err != nil {
+			t.Fatalf("Unset() failed: %v", err)
+		}
+		if got := loadReadOnly(t, tmpDir); got != DefaultReadOnly {
+			t.Errorf("ReadOnly = %t after Unset, want %t", got, DefaultReadOnly)
+		}
+	})
+
+	t.Run("Reset restores current default", func(t *testing.T) {
+		tmpDir, cfg := setup(t, util.Ptr("read_only: false\noutput: json\n"))
+		if err := cfg.Reset(); err != nil {
+			t.Fatalf("Reset() failed: %v", err)
+		}
+		if got := loadReadOnly(t, tmpDir); got != DefaultReadOnly {
+			t.Errorf("ReadOnly = %t after Reset, want %t", got, DefaultReadOnly)
+		}
+	})
 }
 
 func TestLoad_FromEnvironmentVariables(t *testing.T) {

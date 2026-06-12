@@ -69,7 +69,7 @@ When `read_only` is `true` (or `TIGER_READ_ONLY=true`), Tiger refuses any mutati
 
 Intended for AI agents that should be able to read Tiger Cloud resources without risk of mutation. `tsdb_admin.read_only_connection` is a Tiger Cloud GUC injected as a startup `options` parameter; it activates an immutable read-only connection so writes and DDL are rejected by the server itself and cannot be re-enabled with a `SET` statement.
 
-To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
+Read-only mode is enabled by default for new installations. Config files created by older CLI versions don't contain the `read_only` key and are grandfathered to `false` (see `MigrateReadOnly` in `internal/tiger/config/config.go`), so upgrading doesn't break existing workflows. To toggle: `tiger config set read_only false` / `tiger config set read_only true`.
 
 When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools and asking the LLM to inform the user before gathering inputs for them. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate and the GUC injection are both unaffected because handlers reload config per call).
 
