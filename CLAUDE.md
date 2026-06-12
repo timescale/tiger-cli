@@ -105,6 +105,9 @@ export TIGER_API_URL_INTEGRATION=http://localhost:8080/public/api/v1
 # Optional: Set this to test database commands with existing service
 export TIGER_EXISTING_SERVICE_ID_INTEGRATION=existing-service-id
 
+# Optional: Set this to run the upgrade test against the live release CDN
+export TIGER_UPGRADE_INTEGRATION=1
+
 # Then run tests normally
 go test ./internal/tiger/cmd -v -run Integration
 ```

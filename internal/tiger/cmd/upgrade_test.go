@@ -8,13 +8,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
@@ -122,6 +125,78 @@ func TestUpgradeCmd(t *testing.T) {
 			t.Errorf("unexpected error: %v (want prefix %q)", err, wantPrefix)
 		}
 	})
+}
+
+// TestUpgradeLiveCDNIntegration exercises the full upgrade flow end-to-end
+// against the live release CDN: it builds a dev binary, runs
+// `tiger upgrade --version <latest> --force` as a subprocess to replace that
+// binary in place with the latest published release, and verifies the
+// resulting binary runs and reports the new version.
+//
+// Gated behind TIGER_UPGRADE_INTEGRATION because it downloads a real release
+// archive over the network. Enabled in the GitHub Actions test workflow so a
+// broken upgrade path is caught before release.
+func TestUpgradeLiveCDNIntegration(t *testing.T) {
+	if os.Getenv("TIGER_UPGRADE_INTEGRATION") == "" {
+		t.Skip("Skipping live upgrade integration test: set TIGER_UPGRADE_INTEGRATION=1 to run")
+	}
+
+	// Determine the latest published version, the same way install.sh does.
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(config.DefaultReleasesURL + "/latest.txt")
+	if err != nil {
+		t.Fatalf("failed to fetch latest.txt: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected status %d fetching latest.txt", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read latest.txt: %v", err)
+	}
+	latestTag := normalizeTag(strings.TrimSpace(string(body)))
+
+	// Build a dev binary to be upgraded in place. A dev build requires --force,
+	// which is exactly the path this test wants to exercise.
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, binaryFilename())
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", binPath, "github.com/timescale/tiger-cli/cmd/tiger")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	// Isolate the subprocesses from the developer's real config, and keep
+	// analytics and the startup version check inert.
+	configDir := filepath.Join(tmpDir, "config")
+	if err := os.Mkdir(configDir, 0o755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	env := append(os.Environ(),
+		"TIGER_CONFIG_DIR="+configDir,
+		"TIGER_ANALYTICS=false",
+		"TIGER_VERSION_CHECK=false",
+	)
+
+	upgrade := exec.CommandContext(t.Context(), binPath, "upgrade", "--version", latestTag, "--force")
+	upgrade.Env = env
+	out, err := upgrade.CombinedOutput()
+	if err != nil {
+		t.Fatalf("upgrade failed: %v\n%s", err, out)
+	}
+	if want := "tiger upgraded successfully to " + latestTag; !strings.Contains(string(out), want) {
+		t.Errorf("upgrade output missing %q:\n%s", want, out)
+	}
+
+	versionCmd := exec.CommandContext(t.Context(), binPath, "version")
+	versionCmd.Env = env
+	out, err = versionCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("version command on upgraded binary failed: %v\n%s", err, out)
+	}
+	if want := strings.TrimPrefix(latestTag, "v"); !strings.Contains(string(out), want) {
+		t.Errorf("upgraded binary version output %q does not contain %q", out, want)
+	}
 }
 
 func TestNormalizeTag(t *testing.T) {
