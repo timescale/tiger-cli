@@ -245,7 +245,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
-- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected. Default: `false`.
+- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected. Default: `true` for new installations; config files created by older CLI versions keep the previous default of `false`. Set `read_only` to `false` to enable mutating operations.
 - `service_id` - Default service ID
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
@@ -260,7 +260,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
-- `TIGER_READ_ONLY` - When `true`, write/destructive CLI commands and Tiger MCP tools refuse to run, and `db_execute_query` runs against a read-only database connection
+- `TIGER_READ_ONLY` - When `true` (the default for new installations), write/destructive CLI commands and Tiger MCP tools refuse to run, and `db_execute_query` runs against a read-only database connection
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
 - `TIGER_SERVICE_ID` - Default service ID

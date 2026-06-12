@@ -322,6 +322,8 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg.Config)` (defined in `internal/tiger/common/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
 
+`read_only` defaults to `true` for new installations only: a config file without the key predates the default flip and is grandfathered to `false` by `MigrateReadOnly` (same in-memory-shim pattern as `MigrateVersionCheck`). To keep that detection sound, every config file written by `Set`/`Unset`/`Reset` records `read_only` explicitly (see `materializeReadOnly`) — preserve this invariant in any new config-file write path. In tests, a config file written via `config.UseTestConfig` without `read_only` therefore behaves like a grandfathered install (`read_only=false`).
+
 **Tool Definition Pattern:**
 
 When defining MCP tools, we use a pattern that balances type safety with schema flexibility:

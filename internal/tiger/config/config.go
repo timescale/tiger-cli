@@ -65,7 +65,7 @@ const (
 	DefaultGatewayURL      = "https://console.cloud.tigerdata.com/api"
 	DefaultOutput          = "table"
 	DefaultPasswordStorage = "keyring"
-	DefaultReadOnly        = false
+	DefaultReadOnly        = true
 	DefaultReleasesURL     = "https://cli.tigerdata.com"
 	DefaultVersionCheck    = true
 
@@ -137,6 +137,7 @@ func SetupViper(configDir string) error {
 	}
 
 	MigrateVersionCheck(v)
+	MigrateReadOnly(v)
 	return nil
 }
 
@@ -156,6 +157,36 @@ func SetupViper(configDir string) error {
 func MigrateVersionCheck(v *viper.Viper) {
 	if v.InConfig("version_check_interval") && !v.InConfig("version_check") {
 		v.SetDefault("version_check", v.GetDuration("version_check_interval") != 0)
+	}
+}
+
+// MigrateReadOnly grandfathers installations that predate read-only-by-default.
+// Older CLI versions only wrote read_only to the config file when the user set
+// it explicitly (current versions always record it; see materializeReadOnly),
+// so a config file without the key predates the default flip and keeps its old
+// effective value (false) rather than breaking mutating commands on upgrade.
+// Fresh installations have no config file and get the read-only default.
+//
+// Applied via SetDefault, so an explicit config file value or TIGER_READ_ONLY
+// env var still wins. Like MigrateVersionCheck, this is an in-memory shim.
+func MigrateReadOnly(v *viper.Viper) {
+	if _, err := os.Stat(v.ConfigFileUsed()); err == nil && !v.InConfig("read_only") {
+		v.SetDefault("read_only", false)
+	}
+}
+
+// materializeReadOnly pins read_only in every config file this version writes,
+// so a freshly created file isn't mistaken for a pre-upgrade install and
+// grandfathered to false by MigrateReadOnly on the next load. Must be called
+// before the file is rewritten.
+func materializeReadOnly(v *viper.Viper) {
+	if v.IsSet("read_only") {
+		return
+	}
+	if _, err := os.Stat(v.ConfigFileUsed()); err == nil {
+		v.Set("read_only", false)
+	} else {
+		v.Set("read_only", DefaultReadOnly)
 	}
 }
 
@@ -267,6 +298,7 @@ func (c *Config) Set(key, value string) error {
 	v.ReadInConfig()
 
 	v.Set(key, validated)
+	materializeReadOnly(v)
 
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
@@ -493,6 +525,14 @@ func (c *Config) Unset(key string) error {
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
+	// Keep read_only materialized (see materializeReadOnly); unsetting it
+	// restores the current default.
+	if key == "read_only" {
+		vNew.Set("read_only", DefaultReadOnly)
+	} else {
+		materializeReadOnly(vNew)
+	}
+
 	// Apply the default to the current global viper state
 	if def, ok := defaultValues[key]; ok {
 		if _, err := c.UpdateField(key, def); err != nil {
@@ -514,6 +554,8 @@ func (c *Config) Reset() error {
 
 	v := viper.New()
 	v.SetConfigFile(configFile)
+
+	v.Set("read_only", DefaultReadOnly)
 
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
