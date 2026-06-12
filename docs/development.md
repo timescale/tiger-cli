@@ -92,6 +92,7 @@ go test ./internal/tiger/cmd -v -run Integration
 - **Database connectivity**: Generate connection strings and execute psql commands
 - **Output formats**: Validate JSON, YAML, and table output formats
 - **Error handling**: Test authentication failures and resource cleanup
+- **Self-upgrade**: With `TIGER_UPGRADE_INTEGRATION=1` set, `TestUpgradeLiveCDNIntegration` builds a dev binary and upgrades it in place against the live release CDN (runs in CI)
 
 **Note**: Integration tests create and delete real services, which may incur costs. Use a development environment when possible.
 

@@ -6,53 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/timescale/tiger-cli/internal/tiger/config"
 )
-
-func TestShouldCheck(t *testing.T) {
-	tests := []struct {
-		name          string
-		lastCheckTime time.Time
-		interval      time.Duration
-		want          bool
-	}{
-		{
-			name:          "disabled when interval is 0",
-			lastCheckTime: time.Now(),
-			interval:      0,
-			want:          false,
-		},
-		{
-			name:          "never checked before",
-			lastCheckTime: time.Time{},
-			interval:      time.Hour,
-			want:          true,
-		},
-		{
-			name:          "checked recently",
-			lastCheckTime: time.Now().Add(-30 * time.Minute), // 30 minutes ago
-			interval:      time.Hour,                         // 1 hour interval
-			want:          false,
-		},
-		{
-			name:          "checked long ago",
-			lastCheckTime: time.Now().Add(-2 * time.Hour), // 2 hours ago
-			interval:      time.Hour,                      // 1 hour interval
-			want:          true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := shouldCheck(tt.lastCheckTime, tt.interval)
-			if got != tt.want {
-				t.Errorf("shouldCheck() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -171,7 +127,6 @@ func TestDetectInstallMethod(t *testing.T) {
 }
 
 func TestGetUpdateCommand(t *testing.T) {
-	testUrl := "https://cli.example.com"
 	tests := []struct {
 		name   string
 		method InstallMethod
@@ -195,7 +150,7 @@ func TestGetUpdateCommand(t *testing.T) {
 		{
 			name:   "install.sh",
 			method: InstallMethodInstallSh,
-			want:   "curl -fsSL " + testUrl + " | sh",
+			want:   "tiger upgrade",
 		},
 		{
 			name:   "development",
@@ -205,17 +160,13 @@ func TestGetUpdateCommand(t *testing.T) {
 		{
 			name:   "unknown",
 			method: InstallMethodUnknown,
-			want:   "visit https://github.com/timescale/tiger-cli/releases",
+			want:   "tiger upgrade",
 		},
-	}
-
-	cfg := &config.Config{
-		ReleasesURL: testUrl,
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getUpdateCommand(tt.method, cfg)
+			got := getUpdateCommand(tt.method)
 			// For RPM, accept either yum or dnf
 			if tt.method == InstallMethodRPM {
 				if got != "sudo yum update tiger-cli" && got != "sudo dnf update tiger-cli" {
@@ -334,7 +285,7 @@ func TestCheckForUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := checkVersionForUpdate(tt.currentVersion, cfg, nil)
+			result, err := checkVersionForUpdate(tt.currentVersion, cfg)
 			if err != nil {
 				t.Errorf("checkVersionForUpdate() error = %v", err)
 				return
@@ -349,34 +300,5 @@ func TestCheckForUpdate(t *testing.T) {
 				t.Errorf("checkVersionForUpdate() CurrentVersion = %v, want %v", result.CurrentVersion, tt.currentVersion)
 			}
 		})
-	}
-}
-
-func TestPerformCheck_Disabled(t *testing.T) {
-	// Create config with version check disabled
-	cfg := &config.Config{
-		VersionCheckInterval: 0, // Disabled
-		ReleasesURL:          "http://example.com",
-	}
-
-	// Should return immediately without error
-	result := PerformCheck(cfg, nil, false)
-	if result != nil {
-		t.Errorf("PerformCheck() with disabled check should return nil")
-	}
-}
-
-func TestPerformCheck_TooSoon(t *testing.T) {
-	// Create config with recent check
-	cfg := &config.Config{
-		VersionCheckInterval: time.Hour,  // 1 hour
-		VersionCheckLastTime: time.Now(), // Just checked
-		ReleasesURL:          "http://example.com",
-	}
-
-	// Should return immediately without error (and without making HTTP request)
-	result := PerformCheck(cfg, nil, false)
-	if result != nil {
-		t.Errorf("PerformCheck() with recent check should return nil")
 	}
 }

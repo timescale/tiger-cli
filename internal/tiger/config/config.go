@@ -9,9 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"time"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -19,59 +17,57 @@ import (
 )
 
 type Config struct {
-	APIURL               string        `mapstructure:"api_url"`
-	Analytics            bool          `mapstructure:"analytics"`
-	Color                bool          `mapstructure:"color"`
-	ConfigDir            string        `mapstructure:"config_dir"`
-	ConsoleURL           string        `mapstructure:"console_url"`
-	Debug                bool          `mapstructure:"debug"`
-	DocsMCP              bool          `mapstructure:"docs_mcp"`
-	DocsMCPURL           string        `mapstructure:"docs_mcp_url"`
-	GatewayURL           string        `mapstructure:"gateway_url"`
-	Output               string        `mapstructure:"output"`
-	PasswordStorage      string        `mapstructure:"password_storage"`
-	ReadOnly             bool          `mapstructure:"read_only"`
-	ReleasesURL          string        `mapstructure:"releases_url"`
-	ServiceID            string        `mapstructure:"service_id"`
-	VersionCheckInterval time.Duration `mapstructure:"version_check_interval"`
-	VersionCheckLastTime time.Time     `mapstructure:"version_check_last_time"`
-	viper                *viper.Viper  `mapstructure:"-"`
+	APIURL          string       `mapstructure:"api_url"`
+	Analytics       bool         `mapstructure:"analytics"`
+	Color           bool         `mapstructure:"color"`
+	ConfigDir       string       `mapstructure:"config_dir"`
+	ConsoleURL      string       `mapstructure:"console_url"`
+	Debug           bool         `mapstructure:"debug"`
+	DocsMCP         bool         `mapstructure:"docs_mcp"`
+	DocsMCPURL      string       `mapstructure:"docs_mcp_url"`
+	GatewayURL      string       `mapstructure:"gateway_url"`
+	Output          string       `mapstructure:"output"`
+	PasswordStorage string       `mapstructure:"password_storage"`
+	ReadOnly        bool         `mapstructure:"read_only"`
+	ReleasesURL     string       `mapstructure:"releases_url"`
+	ServiceID       string       `mapstructure:"service_id"`
+	VersionCheck    bool         `mapstructure:"version_check"`
+	viper           *viper.Viper `mapstructure:"-"`
 }
 
 type ConfigOutput struct {
-	APIURL               *string        `mapstructure:"api_url" json:"api_url,omitempty"`
-	Analytics            *bool          `mapstructure:"analytics" json:"analytics,omitempty"`
-	Color                *bool          `mapstructure:"color" json:"color,omitempty"`
-	ConfigDir            *string        `mapstructure:"config_dir" json:"config_dir,omitempty"`
-	ConsoleURL           *string        `mapstructure:"console_url" json:"console_url,omitempty"`
-	Debug                *bool          `mapstructure:"debug" json:"debug,omitempty"`
-	DocsMCP              *bool          `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
-	DocsMCPURL           *string        `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
-	GatewayURL           *string        `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
-	Output               *string        `mapstructure:"output" json:"output,omitempty"`
-	PasswordStorage      *string        `mapstructure:"password_storage" json:"password_storage,omitempty"`
-	ReadOnly             *bool          `mapstructure:"read_only" json:"read_only,omitempty"`
-	ReleasesURL          *string        `mapstructure:"releases_url" json:"releases_url,omitempty"`
-	ServiceID            *string        `mapstructure:"service_id" json:"service_id,omitempty"`
-	VersionCheckInterval *util.Duration `mapstructure:"version_check_interval" json:"version_check_interval,omitempty"` // [util.Duration] ensures value is marshaled in [time.Duration.String] format when output
-	VersionCheckLastTime *time.Time     `mapstructure:"version_check_last_time" json:"version_check_last_time,omitempty"`
+	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
+	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty"`
+	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
+	ConfigDir       *string `mapstructure:"config_dir" json:"config_dir,omitempty"`
+	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
+	Debug           *bool   `mapstructure:"debug" json:"debug,omitempty"`
+	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
+	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
+	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
+	Output          *string `mapstructure:"output" json:"output,omitempty"`
+	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty"`
+	ReadOnly        *bool   `mapstructure:"read_only" json:"read_only,omitempty"`
+	ReleasesURL     *string `mapstructure:"releases_url" json:"releases_url,omitempty"`
+	ServiceID       *string `mapstructure:"service_id" json:"service_id,omitempty"`
+	VersionCheck    *bool   `mapstructure:"version_check" json:"version_check,omitempty"`
 }
 
 const (
-	ConfigFileName              = "config.yaml"
-	DefaultAPIURL               = "https://console.cloud.tigerdata.com/public/api/v1"
-	DefaultAnalytics            = true
-	DefaultColor                = true
-	DefaultConsoleURL           = "https://console.cloud.tigerdata.com"
-	DefaultDebug                = false
-	DefaultDocsMCP              = true
-	DefaultDocsMCPURL           = "https://mcp.tigerdata.com/docs"
-	DefaultGatewayURL           = "https://console.cloud.tigerdata.com/api"
-	DefaultOutput               = "table"
-	DefaultPasswordStorage      = "keyring"
-	DefaultReadOnly             = false
-	DefaultReleasesURL          = "https://cli.tigerdata.com"
-	DefaultVersionCheckInterval = 24 * time.Hour
+	ConfigFileName         = "config.yaml"
+	DefaultAPIURL          = "https://console.cloud.tigerdata.com/public/api/v1"
+	DefaultAnalytics       = true
+	DefaultColor           = true
+	DefaultConsoleURL      = "https://console.cloud.tigerdata.com"
+	DefaultDebug           = false
+	DefaultDocsMCP         = true
+	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs"
+	DefaultGatewayURL      = "https://console.cloud.tigerdata.com/api"
+	DefaultOutput          = "table"
+	DefaultPasswordStorage = "keyring"
+	DefaultReadOnly        = false
+	DefaultReleasesURL     = "https://cli.tigerdata.com"
+	DefaultVersionCheck    = true
 
 	// TigerCLIClientID is the OAuth client identifier registered with
 	// savannah-gateway's /idp/external/cli/token endpoint. Used for both the
@@ -80,21 +76,20 @@ const (
 )
 
 var defaultValues = map[string]any{
-	"analytics":               DefaultAnalytics,
-	"api_url":                 DefaultAPIURL,
-	"color":                   DefaultColor,
-	"console_url":             DefaultConsoleURL,
-	"debug":                   DefaultDebug,
-	"docs_mcp":                DefaultDocsMCP,
-	"docs_mcp_url":            DefaultDocsMCPURL,
-	"gateway_url":             DefaultGatewayURL,
-	"output":                  DefaultOutput,
-	"password_storage":        DefaultPasswordStorage,
-	"read_only":               DefaultReadOnly,
-	"releases_url":            DefaultReleasesURL,
-	"service_id":              "",
-	"version_check_interval":  DefaultVersionCheckInterval.String(), // String can be interpreted as either [time.Duration] (for [Config]) or [util.Duration] (for [ConfigOutput])
-	"version_check_last_time": time.Time{},
+	"analytics":        DefaultAnalytics,
+	"api_url":          DefaultAPIURL,
+	"color":            DefaultColor,
+	"console_url":      DefaultConsoleURL,
+	"debug":            DefaultDebug,
+	"docs_mcp":         DefaultDocsMCP,
+	"docs_mcp_url":     DefaultDocsMCPURL,
+	"gateway_url":      DefaultGatewayURL,
+	"output":           DefaultOutput,
+	"password_storage": DefaultPasswordStorage,
+	"read_only":        DefaultReadOnly,
+	"releases_url":     DefaultReleasesURL,
+	"service_id":       "",
+	"version_check":    DefaultVersionCheck,
 }
 
 func ValidConfigOptions() []string {
@@ -137,7 +132,31 @@ func SetupViper(configDir string) error {
 	// Set defaults for all config values
 	ApplyDefaults(v)
 
-	return ReadInConfig(v)
+	if err := ReadInConfig(v); err != nil {
+		return err
+	}
+
+	MigrateVersionCheck(v)
+	return nil
+}
+
+// MigrateVersionCheck preserves backward compatibility with configs written by
+// older CLI versions, which used a `version_check_interval` duration (0 to
+// disable) instead of the current `version_check` bool. If a pre-existing
+// config file set the old key and not the new one, we derive the new value
+// from it (0 → false, any non-zero interval → true) so a user who had disabled
+// update checks doesn't have them silently re-enabled on upgrade.
+//
+// The derived value is applied via SetDefault, so an explicit `version_check`
+// from the config file or a TIGER_VERSION_CHECK env var still takes precedence.
+// It must be called after ApplyDefaults so the derived value overrides the
+// generic default, and after ReadInConfig so InConfig can see the file keys.
+// This is an in-memory shim only; the old key remains in the file until it is
+// rewritten (e.g. via `tiger config set`/`unset`).
+func MigrateVersionCheck(v *viper.Viper) {
+	if v.InConfig("version_check_interval") && !v.InConfig("version_check") {
+		v.SetDefault("version_check", v.GetDuration("version_check_interval") != 0)
+	}
 }
 
 func FromViper(v *viper.Viper) (*Config, error) {
@@ -159,10 +178,7 @@ func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
 		ConfigDir: &configDir,
 	}
 
-	if err := v.Unmarshal(cfg,
-		// Decode hook allows us to unmarshal a string into a [util.Duration] for the sake of VersionCheckInterval
-		viper.DecodeHook(mapstructure.TextUnmarshallerHookFunc()),
-	); err != nil {
+	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
 
@@ -423,56 +439,20 @@ func (c *Config) UpdateField(key string, value any) (any, error) {
 		c.ReleasesURL = s
 		validated = s
 
-	case "version_check_interval":
+	case "version_check":
 		switch v := value.(type) {
-		case time.Duration:
-			if v < 0 {
-				return nil, fmt.Errorf("version_check_interval must be non-negative (0 to disable)")
-			}
-			c.VersionCheckInterval = v
+		case bool:
+			c.VersionCheck = v
 			validated = v
 		case string:
-			// Parse duration string like "1h", "30m", "24h"
-			d, err := time.ParseDuration(v)
+			b, err := setBool("version_check", v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid version_check_interval value: %s (must be a duration like '1h', '30m', etc.)", v)
+				return nil, err
 			}
-			if d < 0 {
-				return nil, fmt.Errorf("version_check_interval must be non-negative (0 to disable)")
-			}
-			c.VersionCheckInterval = d
-			validated = d
+			c.VersionCheck = b
+			validated = b
 		default:
-			return nil, fmt.Errorf("version_check_interval must be string or duration, got %T", value)
-		}
-
-	case "version_check_last_time":
-		nowish := time.Now().Add(time.Hour)
-		switch v := value.(type) {
-		case time.Time:
-			if v.After(nowish) {
-				return nil, fmt.Errorf("version_check_last_time cannot be in the future")
-			}
-			c.VersionCheckLastTime = v
-			validated = v
-		case string:
-			// Try parsing as RFC3339 first, then as unix timestamp
-			t, err := time.Parse(time.RFC3339, v)
-			if err != nil {
-				// Try parsing as unix timestamp
-				i, err := strconv.ParseInt(v, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid version_check_last_time value: %s (must be RFC3339 timestamp or unix timestamp)", v)
-				}
-				t = time.Unix(i, 0)
-			}
-			if t.After(nowish) {
-				return nil, fmt.Errorf("version_check_last_time cannot be in the future")
-			}
-			c.VersionCheckLastTime = t
-			validated = t
-		default:
-			return nil, fmt.Errorf("version_check_last_time must be string or time, got %T", value)
+			return nil, fmt.Errorf("version_check must be string or bool, got %T", value)
 		}
 
 	default:

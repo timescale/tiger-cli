@@ -54,6 +54,16 @@ For manual repository installation instructions, see [here](https://packagecloud
 go install github.com/timescale/tiger-cli/cmd/tiger@latest
 ```
 
+## Updating
+
+To upgrade an existing installation to the latest release:
+
+```bash
+tiger upgrade
+```
+
+This downloads the latest published binary, verifies its checksum, and replaces the currently running binary in place. If Tiger CLI was installed via a package manager (Homebrew, apt, yum/dnf), `tiger upgrade` will instead point you at the matching package-manager command.
+
 ## Quick Start
 
 After installing Tiger CLI, authenticate with your Tiger Cloud account:
@@ -115,6 +125,7 @@ Tiger CLI provides the following commands:
   - `list` - List available MCP tools, prompts, and resources
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
 - `tiger version` - Show version information
+- `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
 
 Use `tiger <command> --help` for detailed information about each command.
 
@@ -236,7 +247,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected. Default: `false`.
 - `service_id` - Default service ID
-- `version_check_interval` - How often the CLI will check for new versions, 0 to disable (default: `24h`)
+- `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
 ### Environment Variables
 
@@ -253,7 +264,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
 - `TIGER_SERVICE_ID` - Default service ID
-- `TIGER_VERSION_CHECK_INTERVAL` - How often the CLI will check for new versions, 0 to disable
+- `TIGER_VERSION_CHECK` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available; `false` to disable
 
 ### Global Flags
 

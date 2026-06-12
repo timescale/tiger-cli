@@ -105,6 +105,9 @@ export TIGER_API_URL_INTEGRATION=http://localhost:8080/public/api/v1
 # Optional: Set this to test database commands with existing service
 export TIGER_EXISTING_SERVICE_ID_INTEGRATION=existing-service-id
 
+# Optional: Set this to run the upgrade test against the live release CDN
+export TIGER_UPGRADE_INTEGRATION=1
+
 # Then run tests normally
 go test ./internal/tiger/cmd -v -run Integration
 ```
@@ -272,6 +275,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - `config.go` - Configuration management commands (show, set, unset, reset)
   - `mcp.go` - MCP server commands (install, start, list, get)
   - `version.go` - Version command
+  - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/tiger/config/config.go` - Centralized config with Viper integration
 - **Logging**: `internal/tiger/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
@@ -481,6 +485,7 @@ Tiger CLI uses a pure functional builder pattern with **zero global command stat
 ```
 buildRootCmd() → Complete CLI with all commands and flags
 ├── buildVersionCmd()
+├── buildUpgradeCmd()
 ├── buildConfigCmd()
 │   ├── buildConfigShowCmd()
 │   ├── buildConfigSetCmd()

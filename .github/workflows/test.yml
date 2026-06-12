@@ -56,6 +56,8 @@ jobs:
         env:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
+          # Runs the live-CDN upgrade test (TestUpgradeLiveCDNIntegration)
+          TIGER_UPGRADE_INTEGRATION: "1"
         run: go test -race -timeout 15m -coverprofile=coverage.out -coverpkg=./... ./...
 
       - name: Generate coverage report
