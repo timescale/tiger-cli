@@ -90,9 +90,7 @@ tiger auth login
 			// fetch overlaps with the command's actual work; the result is
 			// printed in PersistentPostRunE. Gated to interactive, non-CI
 			// terminals. `version --check` runs its own synchronous check, and
-			// `upgrade` is excluded because it performs its own check — printing
-			// "a new release is available" right after upgrading would be
-			// confusing (the running process still reports the old version).
+			// `upgrade` is excluded because it performs its own check.
 			isVersionCheckCmd := cmd.Name() == "version" && cmd.Flag("check") != nil && cmd.Flag("check").Changed
 			isUpgradeCmd := cmd.Name() == "upgrade"
 			if cfg.VersionCheck && !skipUpdateCheck && !isVersionCheckCmd && !isUpgradeCmd &&

@@ -199,6 +199,24 @@ func TestUpgradeLiveCDNIntegration(t *testing.T) {
 	}
 }
 
+func TestIsDowngrade(t *testing.T) {
+	cases := []struct {
+		current, target string
+		want            bool
+	}{
+		{"0.20.5", "v0.20.4", true},
+		{"0.20.4", "v0.20.5", false},
+		{"0.20.5", "v0.20.5", false},
+		{"dev", "v0.20.5", false},
+		{"unknown", "v0.20.5", false},
+	}
+	for _, tc := range cases {
+		if got := isDowngrade(tc.current, tc.target); got != tc.want {
+			t.Errorf("isDowngrade(%q, %q) = %v, want %v", tc.current, tc.target, got, tc.want)
+		}
+	}
+}
+
 func TestNormalizeTag(t *testing.T) {
 	cases := map[string]string{
 		"1.2.3":  "v1.2.3",

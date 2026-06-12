@@ -158,7 +158,11 @@ func runUpgrade(cmd *cobra.Command, requestedVersion string, force bool) error {
 	archiveURL := fmt.Sprintf("%s/releases/%s/%s", releasesURL, targetTag, archiveFilename)
 	checksumURL := archiveURL + ".sha256"
 
-	cmd.Printf("Upgrading tiger %s → %s\n", currentVersion, targetTag)
+	verb, pastVerb := "Upgrading", "upgraded"
+	if isDowngrade(currentVersion, targetTag) {
+		verb, pastVerb = "Downgrading", "downgraded"
+	}
+	cmd.Printf("%s tiger %s → %s\n", verb, currentVersion, targetTag)
 	cmd.Printf("Downloading %s\n", archiveURL)
 	if err := downloadFile(ctx, archiveURL, archivePath); err != nil {
 		return fmt.Errorf("failed to download release archive: %w", err)
@@ -183,8 +187,17 @@ func runUpgrade(cmd *cobra.Command, requestedVersion string, force bool) error {
 		return err
 	}
 
-	cmd.Printf("tiger upgraded successfully to %s\n", targetTag)
+	cmd.Printf("tiger %s successfully to %s\n", pastVerb, targetTag)
 	return nil
+}
+
+// isDowngrade reports whether the requested target version is lower than the
+// current one (only possible via --version). False when either version is
+// unparsable (e.g. a dev build being replaced with --force).
+func isDowngrade(currentVersion, targetTag string) bool {
+	cur, curErr := semver.NewVersion(currentVersion)
+	tgt, tgtErr := semver.NewVersion(targetTag)
+	return curErr == nil && tgtErr == nil && tgt.LessThan(cur)
 }
 
 // resolveCurrentBinaryPath returns the absolute path of the running binary,
