@@ -13,7 +13,7 @@ require (
 	github.com/cli/safeexec v1.0.1
 	github.com/fatih/color v1.18.0
 	github.com/google/jsonschema-go v0.4.2
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/olekukonko/tablewriter v1.1.2
