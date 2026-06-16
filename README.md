@@ -111,7 +111,7 @@ Tiger CLI provides the following commands:
   - `update-password` - Update service master password
   - `logs` - View service logs
 - `tiger db` - Database operations
-  - `connect` - Connect to a database with psql
+  - `connect` - Connect to a database with psql (in an interactive terminal, offers to connect to or create a read replica; use `--no-replica-prompt` to skip)
   - `connection-string` - Get connection string for a service
   - `test-connection` - Test database connectivity
 - `tiger config` - Configuration management
