@@ -111,8 +111,8 @@ Examples:
 				return fmt.Errorf("password not available to include in connection string")
 			}
 
-			if dbConnectionStringPooled && !details.IsPooler {
-				return fmt.Errorf("connection pooler not available for this service")
+			if err := details.RequirePooler(dbConnectionStringPooled); err != nil {
+				return err
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -159,10 +159,9 @@ while read-only mode is on are always read-only.
 
 When run in an interactive terminal, this command checks whether the service has
 any read replicas. If it does, it offers to connect to one of them instead of the
-primary. If it has none, it offers to create a new read replica and connect to it.
-Use --no-replica-prompt to skip this prompt and always connect to the requested
-service. The prompt is automatically skipped when stdin is not a terminal (e.g.
-in scripts).
+primary. Use --no-replica-prompt to skip this prompt and always connect to the
+requested service. The prompt is automatically skipped when stdin is not a
+terminal (e.g. in scripts) or when the service has no read replicas.
 
 Examples:
   # Connect to default service
@@ -193,9 +192,10 @@ Examples:
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			cfg, err := common.LoadConfig(cmd.Context())
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -219,12 +219,12 @@ Examples:
 				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			}
 
-			// Optionally offer to connect to (or create) a read replica instead
-			// of the primary service. In non-interactive contexts this returns
-			// the primary's details without prompting. Pooler availability is
-			// validated here: a hard error for the primary, warn-and-fall-back
-			// for replicas.
-			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt, cfg.ReadOnly)
+			// Optionally offer to connect to an existing read replica instead of
+			// the primary service. In non-interactive contexts, or when the
+			// service has no read replicas, this returns the primary's details
+			// without prompting. Pooler availability is validated here: a hard
+			// error for the primary, warn-and-fall-back for replicas.
+			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -243,7 +243,7 @@ Examples:
 	cmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
 	cmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
 	cmd.Flags().BoolVar(&dbConnectReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
-	cmd.Flags().BoolVar(&dbConnectNoReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to (or create) a read replica")
+	cmd.Flags().BoolVar(&dbConnectNoReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to a read replica")
 
 	return cmd
 }
@@ -307,8 +307,8 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
 			}
 
-			if dbTestConnectionPooled && !details.IsPooler {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("connection pooler not available for this service"))
+			if err := details.RequirePooler(dbTestConnectionPooled); err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)

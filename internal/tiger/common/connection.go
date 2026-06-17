@@ -39,6 +39,17 @@ type ConnectionDetails struct {
 	readOnly bool
 }
 
+// RequirePooler returns an error when pooling was requested but the resolved
+// connection isn't using the pooler endpoint. Callers that treat a missing
+// pooler as fatal use this; the read replica path instead warns and falls back
+// to a direct connection.
+func (d *ConnectionDetails) RequirePooler(requested bool) error {
+	if requested && !d.IsPooler {
+		return fmt.Errorf("connection pooler not available for this service")
+	}
+	return nil
+}
+
 // readOnlyConnectionOption is the URL-encoded `options` query parameter that
 // activates Tiger Cloud's immutable read-only connection mode.
 const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3Dtrue"

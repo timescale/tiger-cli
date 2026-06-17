@@ -39,22 +39,19 @@ type WaitForServiceArgs struct {
 	TimeoutMsg string
 }
 
-// pollStep performs one poll iteration. When done is true, waiting is over and
-// err is the terminal result (nil on success). When done is false, message is
-// shown next to the spinner until the next tick and err is ignored.
-type pollStep func(ctx context.Context) (done bool, message string, err error)
-
-// poll runs step on a ticker until it reports done, the timeout elapses, or ctx
-// is cancelled, driving the spinner shown to the user. timeoutMsg is appended to
-// the timeout/cancel errors.
-func poll(ctx context.Context, out io.Writer, timeout, interval time.Duration, initialMessage, timeoutMsg string, step pollStep) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
+	ctx, cancel := context.WithTimeout(ctx, args.Timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(interval)
+	if done, err := args.Handler.InitialCheck(); done {
+		return err
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	spinner := NewSpinner(out, initialMessage)
+	// Start the spinner
+	spinner := NewSpinner(args.Output, args.Handler.Message())
 	defer spinner.Stop()
 
 	for {
@@ -62,42 +59,29 @@ func poll(ctx context.Context, out io.Writer, timeout, interval time.Duration, i
 		case <-ctx.Done():
 			switch {
 			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return ExitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", timeout, timeoutMsg))
+				return ExitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", args.Timeout, args.TimeoutMsg))
 			case errors.Is(ctx.Err(), context.Canceled):
-				return fmt.Errorf("canceled waiting - %s", timeoutMsg)
+				return fmt.Errorf("canceled waiting - %s", args.TimeoutMsg)
 			default:
-				return fmt.Errorf("error waiting - %s: %w", timeoutMsg, ctx.Err())
+				return fmt.Errorf("error waiting - %s: %w", args.TimeoutMsg, ctx.Err())
 			}
 		case <-ticker.C:
-			done, message, err := step(ctx)
-			if done {
-				return err
-			}
-			spinner.Update(message)
-		}
-	}
-}
-
-func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
-	if done, err := args.Handler.InitialCheck(); done {
-		return err
-	}
-
-	return poll(ctx, args.Output, args.Timeout, time.Second, args.Handler.Message(), args.TimeoutMsg,
-		func(ctx context.Context) (bool, string, error) {
 			resp, err := args.Client.GetServiceWithResponse(ctx, args.ProjectID, args.ServiceID)
 			if err != nil {
-				return false, fmt.Sprintf("Error checking service status: %s", err), nil
+				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
+				continue
 			}
 
 			if done, err := args.Handler.Check(resp); done {
-				return true, "", err
+				return err
 			} else if err != nil {
-				return false, fmt.Sprintf("Error checking service status: %s", err), nil
+				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
+				continue
 			}
 
-			return false, args.Handler.Message(), nil
-		})
+			spinner.Update(args.Handler.Message())
+		}
+	}
 }
 
 type StatusWaitHandler struct {
@@ -148,58 +132,6 @@ func (h *StatusWaitHandler) checkServiceStatus(service *api.Service) (bool, erro
 	default:
 		return false, nil
 	}
-}
-
-// WaitForReplicaSetArgs configures WaitForReplicaSet.
-type WaitForReplicaSetArgs struct {
-	Client       *api.ClientWithResponses
-	ProjectID    string
-	ServiceID    string
-	ReplicaSetID string
-	Output       io.Writer
-	Timeout      time.Duration
-}
-
-// WaitForReplicaSet polls until the replica set with the given ID becomes
-// active, returning it. It errors if the replica enters an error state or the
-// timeout is reached.
-func WaitForReplicaSet(ctx context.Context, args WaitForReplicaSetArgs) (*api.ReadReplicaSet, error) {
-	const initialMessage = "Read replica status: creating"
-
-	var found *api.ReadReplicaSet
-	err := poll(ctx, args.Output, args.Timeout, 2*time.Second, initialMessage, "read replica may still be provisioning",
-		func(ctx context.Context) (bool, string, error) {
-			resp, err := args.Client.GetReplicaSetsWithResponse(ctx, args.ProjectID, args.ServiceID)
-			if err != nil {
-				return false, fmt.Sprintf("Error checking read replica status: %s", err), nil
-			}
-			if resp.StatusCode() != 200 || resp.JSON200 == nil {
-				return false, fmt.Sprintf("Error checking read replica status: %s", resp.Status()), nil
-			}
-
-			for i := range *resp.JSON200 {
-				rs := &(*resp.JSON200)[i]
-				if rs.Id == nil || *rs.Id != args.ReplicaSetID {
-					continue
-				}
-				switch util.Deref(rs.Status) {
-				case api.ReadReplicaSetStatusActive:
-					found = rs
-					return true, "", nil
-				case api.ReadReplicaSetStatusError:
-					return true, "", fmt.Errorf("read replica entered error state")
-				default:
-					return false, fmt.Sprintf("Read replica status: %s", util.Deref(rs.Status)), nil
-				}
-			}
-
-			// Not in the list yet; keep showing the initial message.
-			return false, initialMessage, nil
-		})
-	if err != nil {
-		return nil, err
-	}
-	return found, nil
 }
 
 type DeletionWaitHandler struct {

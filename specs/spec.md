@@ -568,21 +568,17 @@ The `save-password` command accepts passwords through three methods (in order of
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
 **Read Replica Prompt (connect/psql):**
-When `tiger db connect` / `tiger db psql` runs in an interactive terminal, it checks whether the target service has any read replicas (read replica sets) and presents a menu:
-- if the service has one or more active read replicas, it offers to connect to the primary (default) or to one of the existing replicas;
-- if the service has no read replicas, it offers to connect to the primary (default) or to create a new read replica (inheriting the primary's CPU/memory) and connect to it once it becomes active.
-
-Creating a read replica is a mutating operation, so the "create a new read replica" option is suppressed in read-only mode (`read_only` config or `TIGER_READ_ONLY=true`); connecting to the primary or an existing replica is still offered.
+When `tiger db connect` / `tiger db psql` runs in an interactive terminal, it checks whether the target service has any read replicas (read replica sets). If the service has one or more active read replicas, it presents a menu offering to connect to the primary (default) or to one of the existing replicas. If the service has no read replicas, no menu is shown and the command connects to the primary directly.
 
 A read replica shares the primary service's credentials, so stored passwords and password recovery work transparently against the replica. The prompt is automatically skipped when stdin is not a TTY (e.g. in scripts/automation), in which case the command connects to the requested service as before. Use `--no-replica-prompt` to skip the prompt even in an interactive terminal.
 
-`--pooled` is treated differently for replicas than for the primary. For the primary, requesting `--pooled` when no pooler exists is a hard error (unchanged). For a read replica, `--pooled` is best-effort: if the replica has a connection pooler it is used, otherwise the CLI prints a warning and connects directly. Because a newly created read replica has no pooler, the create-and-connect flow always falls back to a direct connection (with a warning) rather than provisioning the replica and then failing.
+`--pooled` is treated differently for replicas than for the primary. For the primary, requesting `--pooled` when no pooler exists is a hard error. For a read replica, `--pooled` is best-effort: if the replica has a connection pooler it is used, otherwise the CLI prints a warning and connects directly.
 
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
 - `--read-only`: Open the connection in Tiger Cloud's immutable read-only mode (connect/connection-string)
-- `--no-replica-prompt`: Don't prompt to connect to (or create) a read replica (connect/psql)
+- `--no-replica-prompt`: Don't prompt to connect to a read replica (connect/psql)
 - `--password`: Password to save (for save-password command). Provide value with `--password=value`. If flag is not provided, uses TIGER_NEW_PASSWORD environment variable if set, otherwise prompts interactively.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 
