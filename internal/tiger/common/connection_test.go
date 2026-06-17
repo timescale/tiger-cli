@@ -474,3 +474,92 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 		t.Errorf("Expected error message to contain '%s', got: %v", expectedError, err)
 	}
 }
+
+func TestGetReplicaConnectionDetails(t *testing.T) {
+	primaryHost := "primary.example.com"
+	replicaHost := "replica.example.com"
+	poolerHost := "replica-pooler.example.com"
+	port := 5432
+	poolerPort := 6432
+
+	primary := api.Service{
+		ServiceId: util.Ptr("svc-primary"),
+		ProjectId: util.Ptr("proj-1"),
+		Endpoint: &api.Endpoint{
+			Host: &primaryHost,
+			Port: &port,
+		},
+	}
+
+	t.Run("direct endpoint", func(t *testing.T) {
+		replica := api.ReadReplicaSet{
+			Id:       util.Ptr("rep-1"),
+			Name:     util.Ptr("my-replica"),
+			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+		}
+
+		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if details.Host != replicaHost {
+			t.Errorf("expected replica host %q, got %q", replicaHost, details.Host)
+		}
+		if details.Port != port {
+			t.Errorf("expected port %d, got %d", port, details.Port)
+		}
+		if details.IsPooler {
+			t.Errorf("expected IsPooler false for direct endpoint")
+		}
+		if details.Database != "tsdb" {
+			t.Errorf("expected database tsdb, got %q", details.Database)
+		}
+	})
+
+	t.Run("pooled endpoint when available", func(t *testing.T) {
+		replica := api.ReadReplicaSet{
+			Id:       util.Ptr("rep-1"),
+			Name:     util.Ptr("my-replica"),
+			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+			ConnectionPooler: &api.ConnectionPooler{
+				Endpoint: &api.Endpoint{Host: &poolerHost, Port: &poolerPort},
+			},
+		}
+
+		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if details.Host != poolerHost || details.Port != poolerPort {
+			t.Errorf("expected pooler endpoint %s:%d, got %s:%d", poolerHost, poolerPort, details.Host, details.Port)
+		}
+		if !details.IsPooler {
+			t.Errorf("expected IsPooler true when pooler used")
+		}
+	})
+
+	t.Run("falls back to direct when pooler requested but unavailable", func(t *testing.T) {
+		replica := api.ReadReplicaSet{
+			Id:       util.Ptr("rep-1"),
+			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+		}
+
+		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if details.IsPooler {
+			t.Errorf("expected IsPooler false when no pooler available")
+		}
+		if details.Host != replicaHost {
+			t.Errorf("expected fallback to direct host %q, got %q", replicaHost, details.Host)
+		}
+	})
+
+	t.Run("error when endpoint missing", func(t *testing.T) {
+		replica := api.ReadReplicaSet{Id: util.Ptr("rep-1")}
+		if _, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
+			t.Fatal("expected error for missing replica endpoint")
+		}
+	})
+}

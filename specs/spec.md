@@ -431,6 +431,9 @@ tiger db connection-string svc-12345 --read-only
 # Connect in read-only mode (writes and DDL rejected by the server)
 tiger db connect svc-12345 --read-only
 
+# Connect without the interactive read replica prompt
+tiger db connect svc-12345 --no-replica-prompt
+
 # Test database connectivity
 tiger db test-connection svc-12345
 
@@ -564,9 +567,18 @@ The `save-password` command accepts passwords through three methods (in order of
 **Advanced psql Usage:**
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
+**Read Replica Prompt (connect/psql):**
+When `tiger db connect` / `tiger db psql` runs in an interactive terminal, it checks whether the target service has any read replicas (read replica sets). If the service has one or more active read replicas, it presents a menu offering to connect to the primary (default) or to one of the existing replicas. If the service has no read replicas, no menu is shown and the command connects to the primary directly.
+
+A read replica shares the primary service's credentials, so stored passwords and password recovery work transparently against the replica. The prompt is automatically skipped when stdin is not a TTY (e.g. in scripts/automation), in which case the command connects to the requested service as before. Use `--no-replica-prompt` to skip the prompt even in an interactive terminal.
+
+`--pooled` is treated differently for replicas than for the primary. For the primary, requesting `--pooled` when no pooler exists is a hard error. For a read replica, `--pooled` is best-effort: if the replica has a connection pooler it is used, otherwise the CLI prints a warning and connects directly.
+
 **Options:**
 - `--pooled`: Use connection pooling (for connection-string command)
 - `--role`: Database role to use (default: tsdbadmin)
+- `--read-only`: Open the connection in Tiger Cloud's immutable read-only mode (connect/connection-string)
+- `--no-replica-prompt`: Don't prompt to connect to a read replica (connect/psql)
 - `--password`: Password to save (for save-password command). Provide value with `--password=value`. If flag is not provided, uses TIGER_NEW_PASSWORD environment variable if set, otherwise prompts interactively.
 - `-t, --timeout`: Timeout for test-connection (accepts any duration format from Go's time.ParseDuration: "3s", "30s", "1m", etc.) (default: 3s, set to 0 to disable)
 

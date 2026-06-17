@@ -39,6 +39,17 @@ type ConnectionDetails struct {
 	readOnly bool
 }
 
+// RequirePooler returns an error when pooling was requested but the resolved
+// connection isn't using the pooler endpoint. Callers that treat a missing
+// pooler as fatal use this; the read replica path instead warns and falls back
+// to a direct connection.
+func (d *ConnectionDetails) RequirePooler(requested bool) error {
+	if requested && !d.IsPooler {
+		return fmt.Errorf("connection pooler not available for this service")
+	}
+	return nil
+}
+
 // readOnlyConnectionOption is the URL-encoded `options` query parameter that
 // activates Tiger Cloud's immutable read-only connection mode.
 const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3Dtrue"
@@ -47,23 +58,34 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 	if service.Endpoint == nil {
 		return nil, fmt.Errorf("service endpoint not available")
 	}
+	return buildConnectionDetails(service.Endpoint, service.ConnectionPooler, service, opts)
+}
 
-	// Use pooler endpoint if requested and available, otherwise use direct endpoint
-	var endpoint *api.Endpoint
+// GetReplicaConnectionDetails builds connection details for a read replica set.
+// Host/port come from the replica's endpoint, but the password is looked up via
+// the primary, since replicas share the primary's credentials.
+func GetReplicaConnectionDetails(primary api.Service, replica api.ReadReplicaSet, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	if replica.Endpoint == nil {
+		return nil, fmt.Errorf("read replica endpoint not available")
+	}
+	return buildConnectionDetails(replica.Endpoint, replica.ConnectionPooler, primary, opts)
+}
+
+// buildConnectionDetails selects the endpoint (pooler when requested and
+// available, otherwise direct) and assembles the connection details. The
+// password, if requested, is looked up against passwordService.
+func buildConnectionDetails(direct *api.Endpoint, pooler *api.ConnectionPooler, passwordService api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	endpoint := direct
 	isPooler := false
-	if opts.Pooled && service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		endpoint = service.ConnectionPooler.Endpoint
+	if opts.Pooled && pooler != nil && pooler.Endpoint != nil {
+		endpoint = pooler.Endpoint
 		isPooler = true
-	} else {
-		// If pooled was requested but no pooler is available, fall back to direct connection
-		endpoint = service.Endpoint
 	}
 
 	if endpoint == nil || endpoint.Host == nil || *endpoint.Host == "" {
 		return nil, fmt.Errorf("endpoint host not available")
 	}
-
-	if endpoint == nil || endpoint.Port == nil || *endpoint.Port == 0 {
+	if endpoint.Port == nil || *endpoint.Port == 0 {
 		return nil, fmt.Errorf("endpoint port not available")
 	}
 
@@ -79,7 +101,7 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 	if opts.WithPassword {
 		if opts.InitialPassword != "" {
 			details.Password = opts.InitialPassword
-		} else if password, err := GetPassword(service, opts.Role); err == nil {
+		} else if password, err := GetPassword(passwordService, opts.Role); err == nil {
 			details.Password = password
 		}
 	}

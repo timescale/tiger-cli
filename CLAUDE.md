@@ -272,6 +272,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - `auth.go` - Authentication commands (login, logout, status)
   - `service.go` - Service management commands (list, create, get, fork, start, stop, resize, delete, update-password, logs)
   - `db.go` - Database operation commands (connection-string, connect, test-connection)
+  - `read_replica.go` - Read replica selection flow for `db connect`/`psql`: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas.
   - `config.go` - Configuration management commands (show, set, unset, reset)
   - `mcp.go` - MCP server commands (install, start, list, get)
   - `version.go` - Version command
@@ -288,6 +289,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Common Package**: `internal/tiger/common/` - Shared business logic used by both CLI and MCP
   - Password storage utilities (keyring, pgpass, validation)
   - Wait operations and polling logic (WaitForService)
+  - Connection detail helpers (GetConnectionDetails, GetReplicaConnectionDetails for read replicas)
   - Error handling and exit code utilities
   - Service detail conversion helpers
   - Log fetching with pagination (FetchServiceLogs)
