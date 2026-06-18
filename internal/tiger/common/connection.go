@@ -1,7 +1,10 @@
 package common
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 )
@@ -59,6 +62,28 @@ func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*
 		return nil, fmt.Errorf("service endpoint not available")
 	}
 	return buildConnectionDetails(service.Endpoint, service.ConnectionPooler, service, opts)
+}
+
+// ConnectToService resolves the service's connection details and opens a pgx
+// connection using the given query execution mode. It is the shared
+// service-to-connection path used by the query and schema tools. The caller
+// owns the returned connection and must Close it.
+func ConnectToService(ctx context.Context, service api.Service, opts ConnectionDetailsOptions, mode pgx.QueryExecMode) (*pgx.Conn, error) {
+	details, err := GetConnectionDetails(service, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build connection string: %w", err)
+	}
+	if err := details.RequirePooler(opts.Pooled); err != nil {
+		return nil, err
+	}
+
+	connConfig, err := pgx.ParseConfig(details.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+	connConfig.DefaultQueryExecMode = mode
+
+	return pgx.ConnectConfig(ctx, connConfig)
 }
 
 // GetReplicaConnectionDetails builds connection details for a read replica set.

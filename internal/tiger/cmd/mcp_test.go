@@ -83,6 +83,7 @@ func TestMCPListCommand(t *testing.T) {
 	// Expected tools and prompts that should be present in all output formats
 	expectedTools := []string{
 		"db_execute_query",
+		"db_schema",
 		"search_docs",
 		"service_create",
 		"service_fork",
