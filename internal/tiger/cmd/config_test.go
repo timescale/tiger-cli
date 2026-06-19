@@ -155,6 +155,7 @@ password_storage: keyring
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,
+		"mcp_max_rows":     float64(config.DefaultMCPMaxRows),
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -212,6 +213,7 @@ password_storage: keyring
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,
+		"mcp_max_rows":     config.DefaultMCPMaxRows,
 	}
 
 	for key, expectedValue := range expectedValues {

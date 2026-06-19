@@ -37,7 +37,9 @@ type Server struct {
 // gate itself stays correct because handlers reload config per call.
 func buildServerInstructions(cfg *config.Config) string {
 	base := "Tiger MCP provides tools for creating, managing, and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). " +
-		"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+		"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation. " +
+		"When working with data, do the work in the database: push aggregation, filtering, sorting, and joins into SQL rather than fetching raw rows and computing locally. " +
+		"db_execute_query caps the rows and total size it returns; if a result is truncated, refine the query (aggregate, filter, or paginate with LIMIT/OFFSET) instead of re-running it to pull everything."
 
 	if cfg == nil || !cfg.ReadOnly {
 		return base

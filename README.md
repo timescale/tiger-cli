@@ -245,6 +245,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `color` - Enable/disable colored output (default: `true`)
 - `debug` - Enable/disable debug logging (default: `false`)
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
+- `mcp_max_rows` - Default maximum number of rows the `db_execute_query` MCP tool returns per result set before truncating, to limit how much data lands in an AI agent's context. The tool's `max_rows` parameter overrides this per call, and both are hard-capped at 10000. Only applies to the MCP tool, not CLI commands. Default: `100`
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected — `tiger db schema` and the `db_schema` MCP tool always open a read-only session regardless of this setting. Default: `false`.

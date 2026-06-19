@@ -350,8 +350,11 @@ Execute a SQL query on a service database.
 - `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)
 - `role` (string, optional): Database role/username to connect as (default: tsdbadmin)
 - `pooled` (boolean, optional): Use connection pooling (default: false)
+- `max_rows` (number, optional): Maximum rows to return per result set before truncating. Defaults to the `mcp_max_rows` config value (default 100). Hard-capped at 10000.
 
 **Returns:** Query results with rows, columns (including types), rows affected count, and execution metadata.
+
+**Result limiting (context-window protection):** To keep large query results from overflowing an AI agent's context window, results are capped. Each result set returns at most `max_rows` rows (per-call parameter, falling back to the `mcp_max_rows` config value, hard-capped at 10000), and the total serialized row data across all result sets is bounded by a built-in safety net. When a cap is hit, the in-flight query is aborted (so PostgreSQL stops streaming unused rows), the affected result set's `truncated` field is set to `true`, the top-level response sets `truncated: true`, and a `notice` field returns guidance to refine the query in SQL (aggregate, filter, or paginate with `LIMIT`/`OFFSET`) rather than re-running it. The tool description also instructs agents to push computation (aggregation, filtering, sorting, joins) into SQL instead of fetching raw rows. This limiting applies only to the MCP tool, not to CLI commands.
 
 **Example Response:**
 ```json
@@ -375,6 +378,7 @@ Execute a SQL query on a service database.
 - `columns` includes both the column name and PostgreSQL data type for each column
 - Empty `rows` array for commands that don't return rows (INSERT, UPDATE, DELETE, DDL commands)
 - For parity with `tiger db connect` command, supports custom roles and connection pooling
+- `truncated` (per result set and top-level) and `notice` are present only when results were capped; see "Result limiting" above
 
 ### High-Availability Management
 
