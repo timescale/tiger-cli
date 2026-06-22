@@ -114,6 +114,7 @@ Tiger CLI provides the following commands:
   - `connect` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip)
   - `connection-string` - Get connection string for a service
   - `test-connection` - Test database connectivity
+  - `schema` - Display database schema information (tables, views, indexes, functions, TimescaleDB hypertables, and more)
 - `tiger config` - Configuration management
   - `show` - Show current configuration
   - `set` - Set configuration value
@@ -198,6 +199,7 @@ The MCP server exposes the following tools to AI assistants:
 
 **Database Operations:**
 - `db_execute_query` - Execute SQL queries against a database service with support for parameterized queries, custom timeouts, and connection pooling
+- `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
 
 The MCP server automatically uses your CLI authentication and configuration, so no additional setup is required beyond `tiger auth login`.
 
@@ -245,7 +247,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
-- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected. Default: `false`.
+- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands and their MCP equivalents return an error, and `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected — `tiger db schema` and the `db_schema` MCP tool always open a read-only session regardless of this setting. Default: `false`.
 - `service_id` - Default service ID
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 

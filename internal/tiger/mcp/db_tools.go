@@ -127,6 +127,119 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 			Title:           "Execute SQL Query",
 		},
 	}, s.handleDBExecuteQuery)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:  "db_schema",
+		Title: "Show Database Schema",
+		Description: `Display the schema of a service database.
+
+Connects to a PostgreSQL/TimescaleDB service in Tiger Cloud and returns its schema as readable text: tables (regular, partitioned, and foreign), views, materialized views, enum types, functions, procedures, indexes, triggers, and TimescaleDB hypertable and continuous aggregate metadata. Only objects the connecting role can access are returned.
+
+By default only user-facing schemas and objects are shown; view/routine definitions and object comments are omitted unless requested. The connection is opened in immutable read-only mode.`,
+		InputSchema:  DBSchemaInput{}.Schema(),
+		OutputSchema: DBSchemaOutput{}.Schema(),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:  true,
+			OpenWorldHint: util.Ptr(true),
+			Title:         "Show Database Schema",
+		},
+	}, s.handleDBSchema)
+}
+
+// DBSchemaInput represents input for db_schema
+type DBSchemaInput struct {
+	ServiceID   string `json:"service_id"`
+	SchemaName  string `json:"schema,omitempty"`
+	Internal    bool   `json:"internal,omitempty"`
+	Definitions bool   `json:"definitions,omitempty"`
+	Comments    bool   `json:"comments,omitempty"`
+	Role        string `json:"role,omitempty"`
+	Pooled      bool   `json:"pooled,omitempty"`
+}
+
+func (DBSchemaInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[DBSchemaInput](nil))
+
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
+	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
+
+	schema.Properties["schema"].Description = "Restrict output to a single schema (namespace). When omitted, all accessible schemas are returned."
+	schema.Properties["schema"].Examples = []any{"public"}
+
+	schema.Properties["internal"].Description = "Include system schemas (pg_*, information_schema, TimescaleDB internals) and extension-owned objects."
+	schema.Properties["internal"].Default = util.Must(json.Marshal(false))
+
+	schema.Properties["definitions"].Description = "Include full object definitions (view SELECTs, function/procedure bodies)."
+	schema.Properties["definitions"].Default = util.Must(json.Marshal(false))
+
+	schema.Properties["comments"].Description = "Include object comments (COMMENT ON text)."
+	schema.Properties["comments"].Default = util.Must(json.Marshal(false))
+
+	schema.Properties["role"].Description = "Database role/username to connect as"
+	schema.Properties["role"].Default = util.Must(json.Marshal("tsdbadmin"))
+	schema.Properties["role"].Examples = []any{"tsdbadmin", "readonly", "postgres"}
+
+	schema.Properties["pooled"].Description = "Use connection pooling (if available)"
+	schema.Properties["pooled"].Default = util.Must(json.Marshal(false))
+	schema.Properties["pooled"].Examples = []any{false, true}
+
+	return schema
+}
+
+// DBSchemaOutput represents output for db_schema
+type DBSchemaOutput struct {
+	SchemaText string `json:"schema"`
+}
+
+func (DBSchemaOutput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[DBSchemaOutput](nil))
+
+	schema.Properties["schema"].Description = "The database schema rendered as human-readable text, grouped under a SCHEMA header per namespace."
+
+	return schema
+}
+
+// handleDBSchema handles the db_schema MCP tool
+func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, input DBSchemaInput) (*mcp.CallToolResult, DBSchemaOutput, error) {
+	cfg, err := common.LoadConfig(ctx)
+	if err != nil {
+		return nil, DBSchemaOutput{}, err
+	}
+
+	logging.Debug("MCP: Getting database schema",
+		zap.String("project_id", cfg.ProjectID),
+		zap.String("service_id", input.ServiceID),
+		zap.String("schema", input.SchemaName),
+		zap.Bool("internal", input.Internal),
+		zap.Bool("definitions", input.Definitions),
+		zap.Bool("comments", input.Comments),
+		zap.String("role", input.Role),
+		zap.Bool("pooled", input.Pooled),
+	)
+
+	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	if err != nil {
+		return nil, DBSchemaOutput{}, fmt.Errorf("failed to get service details: %w", err)
+	}
+	if serviceResp.StatusCode() != http.StatusOK {
+		return nil, DBSchemaOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+	}
+	if serviceResp.JSON200 == nil {
+		return nil, DBSchemaOutput{}, fmt.Errorf("empty response from API")
+	}
+
+	schema, err := common.FetchServiceSchema(ctx, *serviceResp.JSON200, input.Role, input.Pooled, common.SchemaOptions{
+		Schema:             input.SchemaName,
+		IncludeInternal:    input.Internal,
+		IncludeDefinitions: input.Definitions,
+		IncludeComments:    input.Comments,
+	})
+	if err != nil {
+		return nil, DBSchemaOutput{}, err
+	}
+
+	return nil, DBSchemaOutput{SchemaText: common.FormatSchema(schema)}, nil
 }
 
 // handleDBExecuteQuery handles the db_execute_query MCP tool
@@ -156,7 +269,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, DBExecuteQueryOutput{}, serviceResp.JSON4XX
+		return nil, DBExecuteQueryOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
 	}
 
 	if serviceResp.JSON200 == nil {
@@ -165,29 +278,9 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	service := *serviceResp.JSON200
 
-	// Build connection string with password
-	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
-		Pooled:       input.Pooled,
-		Role:         input.Role,
-		WithPassword: true,
-		ReadOnly:     cfg.ReadOnly,
-	})
-	if err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to build connection string: %w", err)
-	}
-	if input.Pooled && !details.IsPooler {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("connection pooler not available for service %s", input.ServiceID)
-	}
-
 	// Create query context with timeout
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
-	// Parse connection string into config
-	connConfig, err := pgx.ParseConfig(details.String())
-	if err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to parse connection string: %w", err)
-	}
 
 	// Choose query execution mode based on whether parameters are present.
 	// Simple protocol supports multi-statement queries but interpolates
@@ -196,18 +289,20 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	// multi-statement queries. This means we don't support multi-statement
 	// queries with parameters (pgx will return an error for them when using
 	// QueryExecModeDescribeExec). See [pgx.QueryExecMode] for details.
+	mode := pgx.QueryExecModeSimpleProtocol
 	if len(input.Parameters) > 0 {
 		// Use extended protocol to send parameters separately (more secure,
 		// but doesn't support multi-statement queries).
-		connConfig.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
-	} else {
-		// Use simple protocol to support multi-statement queries when no
-		// parameters are given.
-		connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+		mode = pgx.QueryExecModeDescribeExec
 	}
 
 	// Connect to database
-	conn, err := pgx.ConnectConfig(queryCtx, connConfig)
+	conn, err := common.ConnectToService(queryCtx, service, common.ConnectionDetailsOptions{
+		Pooled:       input.Pooled,
+		Role:         input.Role,
+		WithPassword: true,
+		ReadOnly:     cfg.ReadOnly,
+	}, mode)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}

@@ -612,7 +612,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceListOutput{}, resp.JSON4XX
+		return nil, ServiceListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil {
@@ -654,7 +654,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceGetOutput{}, resp.JSON4XX
+		return nil, ServiceGetOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil {
@@ -730,7 +730,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceCreateOutput{}, resp.JSON4XX
+		return nil, ServiceCreateOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON202 == nil {
@@ -860,7 +860,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceForkOutput{}, resp.JSON4XX
+		return nil, ServiceForkOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON202 == nil {
@@ -955,7 +955,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
-		return nil, ServiceUpdatePasswordOutput{}, resp.JSON4XX
+		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	// Get service details for password storage (similar to CLI implementation)
@@ -1007,7 +1007,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceStartOutput{}, resp.JSON4XX
+		return nil, ServiceStartOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON202 == nil {
@@ -1072,7 +1072,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceStopOutput{}, resp.JSON4XX
+		return nil, ServiceStopOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON202 == nil {
@@ -1151,7 +1151,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 
 	// Handle API response
 	if resp.StatusCode() != http.StatusAccepted {
-		return nil, ServiceResizeOutput{}, resp.JSON4XX
+		return nil, ServiceResizeOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON202 == nil {
