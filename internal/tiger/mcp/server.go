@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -27,25 +27,35 @@ const (
 type Server struct {
 	mcpServer       *mcp.Server
 	docsProxyClient *ProxyClient
+
+	// readOnly is captured from config at construction time. Handlers still call
+	// common.CheckReadOnly in case read_only is toggled on mid-session.
+	readOnly bool
 }
 
-// buildServerInstructions returns the `instructions` string the MCP SDK
-// sends to clients at initialize.
-//
-// Instructions are evaluated once at server start; toggling read_only
-// mid-session leaves the warning stale until the MCP client restarts. The
-// gate itself stays correct because handlers reload config per call.
+// addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
+func addTool[In, Out any](s *Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	if s.readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
+		logging.Debug("Skipping write tool in read-only mode", zap.String("tool", t.Name))
+		return
+	}
+	mcp.AddTool(s.mcpServer, t, h)
+}
+
+// buildServerInstructions returns the `instructions` string the MCP SDK sends
+// to clients at initialize. Evaluated once at server start, like tool registration.
 func buildServerInstructions(cfg *config.Config) string {
-	base := "Tiger MCP provides tools for creating, managing, and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). " +
-		"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+	intro := "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
 
 	if cfg == nil || !cfg.ReadOnly {
-		return base
+		return intro +
+			"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
 	}
-	return base + " " +
-		"READ-ONLY MODE IS ENABLED. The following Tiger MCP tools will refuse to run: " +
-		strings.Join(readOnlyGatedTools, ", ") + ". " +
-		"Before asking the user to provide inputs for any of these operations, tell them read-only mode is on."
+	// Read-only mode: announce the mode and the blocked operations so the model
+	// won't attempt them.
+	return intro +
+		"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, or modify services. " +
+		"db_execute_query connects read-only, so writes and DDL are rejected by the server."
 }
 
 // NewServer creates a new Tiger MCP server instance. The caller-supplied cfg
@@ -59,6 +69,7 @@ func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
 
 	server := &Server{
 		mcpServer: mcpServer,
+		readOnly:  cfg != nil && cfg.ReadOnly,
 	}
 
 	// Register all tools (including proxied docs tools)
