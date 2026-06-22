@@ -61,7 +61,7 @@ const (
 	DefaultConsoleURL      = "https://console.cloud.tigerdata.com"
 	DefaultDebug           = false
 	DefaultDocsMCP         = true
-	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs"
+	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database"
 	DefaultGatewayURL      = "https://console.cloud.tigerdata.com/api"
 	DefaultOutput          = "table"
 	DefaultPasswordStorage = "keyring"
