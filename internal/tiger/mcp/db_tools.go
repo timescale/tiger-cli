@@ -223,7 +223,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, DBSchemaOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
 	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, DBSchemaOutput{}, serviceResp.JSON4XX
+		return nil, DBSchemaOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
 	}
 	if serviceResp.JSON200 == nil {
 		return nil, DBSchemaOutput{}, fmt.Errorf("empty response from API")
@@ -269,7 +269,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, DBExecuteQueryOutput{}, serviceResp.JSON4XX
+		return nil, DBExecuteQueryOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
 	}
 
 	if serviceResp.JSON200 == nil {
