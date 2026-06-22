@@ -309,6 +309,33 @@ All configuration options also have corresponding `TIGER_` environment variables
 For a complete list of global command-line flags, see `internal/tiger/cmd/root.go`.
 Note that not all config options have corresponding global flags, and not all global flags correspond to config options.
 
+### Experimental Feature Gating
+
+Some surfaces (currently `tiger service metrics …` CLI commands and the
+`service_metrics_*` MCP tools) call gateway endpoints marked `x-preview: true`
+in `openapi.yaml` — their request/response shape is still in flux. Upstream
+(`savannah-gateway/internal/rest/openapi.yaml`) uses the same marker; the
+Stainless SDK pipeline drops `x-preview` operations entirely, but
+oapi-codegen ignores the extension, so tiger-cli's generated v1 client
+includes them. We gate access at registration time, behind an
+intentionally-undocumented env var — `TIGER_EXPERIMENTAL` (default `false`).
+
+**This is env-var only** — deliberately not a config-file key, not a flag, and
+not surfaced by `tiger config show`. It mirrors ghost's `GHOST_EXPERIMENTAL`
+pattern: `strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))` is read once at
+build time in `buildRootCmd` (CLI) and once at `NewServer` (MCP), and
+threaded through to the subtree/tool registration sites as a plain bool.
+
+- CLI: `buildServiceCmd(experimental bool)` guards `cmd.AddCommand(buildServiceMetricsCmd())` with `if experimental { … }`. When the env var is unset, the `metrics` subtree isn't added to the command tree at all — the command literally does not exist (no help entry, no tab completion, `unknown command` error like any typo).
+- MCP: `registerServiceTools(readOnly, experimental bool)` guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
+
+**Do not mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, spec
+files, or error messages.** When a feature graduates, remove the `x-preview:
+true` marker upstream, delete the `if experimental { … }` wrapper (both
+CLI and MCP), and drop the `experimental bool` parameter from the affected
+builder. The call sites already use the normal `cfg.Client` (v1) — no client
+wiring needs to change.
+
 ### MCP Server Architecture
 
 The Tiger MCP server provides AI assistants with programmatic access to Tiger resources through the Model Context Protocol (MCP).

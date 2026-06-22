@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -27,16 +28,18 @@ const (
 // MCP tool names. Centralized so the read-only gate (see errors.go) and the
 // tool registrations share a single source of truth.
 const (
-	toolServiceList           = "service_list"
-	toolServiceGet            = "service_get"
-	toolServiceCreate         = "service_create"
-	toolServiceFork           = "service_fork"
-	toolServiceStart          = "service_start"
-	toolServiceStop           = "service_stop"
-	toolServiceResize         = "service_resize"
-	toolServiceUpdatePassword = "service_update_password"
-	toolServiceLogs           = "service_logs"
-	toolDBExecuteQuery        = "db_execute_query"
+	toolServiceList             = "service_list"
+	toolServiceGet              = "service_get"
+	toolServiceCreate           = "service_create"
+	toolServiceFork             = "service_fork"
+	toolServiceStart            = "service_start"
+	toolServiceStop             = "service_stop"
+	toolServiceResize           = "service_resize"
+	toolServiceUpdatePassword   = "service_update_password"
+	toolServiceLogs             = "service_logs"
+	toolServiceMetricsAvailable = "service_metrics_available"
+	toolServiceMetricsSeries    = "service_metrics_series"
+	toolDBExecuteQuery          = "db_execute_query"
 )
 
 // Wait timeout for MCP tool operations
@@ -417,8 +420,102 @@ func (ServiceLogsOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceLogsOutput](nil))
 }
 
+// ServiceMetricsAvailableInput represents input for service_metrics_available
+type ServiceMetricsAvailableInput struct {
+	ServiceID string `json:"service_id"`
+}
+
+func (ServiceMetricsAvailableInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceMetricsAvailableInput](nil))
+	setServiceIDSchemaProperties(schema)
+	return schema
+}
+
+// ServiceMetricsAvailableOutput represents output for service_metrics_available
+type ServiceMetricsAvailableOutput struct {
+	Series []string `json:"series"`
+}
+
+func (ServiceMetricsAvailableOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceMetricsAvailableOutput](nil))
+}
+
+// MetricLabelFilterInput mirrors api.MetricLabelFilter for the tool schema.
+type MetricLabelFilterInput struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// ServiceMetricsSeriesInput represents input for service_metrics_series
+type ServiceMetricsSeriesInput struct {
+	ServiceID     string                   `json:"service_id"`
+	MetricName    string                   `json:"metric_name"`
+	From          string                   `json:"from"`
+	To            string                   `json:"to"`
+	Role          string                   `json:"role,omitempty"`
+	Filters       []MetricLabelFilterInput `json:"filters,omitempty"`
+	BucketSeconds int                      `json:"bucket_seconds,omitempty"`
+	Mode          string                   `json:"mode,omitempty"`
+}
+
+func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceMetricsSeriesInput](nil))
+
+	setServiceIDSchemaProperties(schema)
+
+	schema.Properties["metric_name"].Description = "Name of the metric series to fetch. Use service_metrics_available to discover valid names."
+	schema.Properties["metric_name"].Examples = []any{
+		"timescale_cloud_system_cpu_usage_millicores",
+		"timescale_cloud_system_memory_usage_bytes",
+		"timescale_cloud_system_disk_usage_bytes",
+		"timescale_cloud_database_qps",
+		"timescale_cloud_database_num_connections",
+	}
+
+	schema.Properties["from"].Description = "Start of the time window (RFC3339 format)."
+	schema.Properties["from"].Examples = []any{"2026-05-13T00:00:00Z", "2026-05-13T09:00:00Z"}
+
+	schema.Properties["to"].Description = "End of the time window (RFC3339 format)."
+	schema.Properties["to"].Examples = []any{"2026-05-13T01:00:00Z", "2026-05-13T10:00:00Z"}
+
+	schema.Properties["role"].Description = "Convenience filter for the 'role' label. Omit to include all roles. Equivalent to passing {key:\"role\", value:\"primary\"|\"replica\"} via filters."
+	schema.Properties["role"].Enum = []any{"PRIMARY", "REPLICA"}
+
+	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
+
+	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. When 0 or omitted, auto-selected: 60s for windows ≤1 hour, 3600s for longer windows."
+	schema.Properties["bucket_seconds"].Minimum = util.Ptr(1.0)
+	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
+
+	schema.Properties["mode"].Description = "Output mode. 'summary' (default) returns aggregated stats (min/max/avg/p50/p95) per labeled series — efficient for triage. 'full' returns the raw labeled series with all individual data points."
+	schema.Properties["mode"].Enum = []any{"summary", "full"}
+	schema.Properties["mode"].Default = util.Must(json.Marshal("summary"))
+
+	return schema
+}
+
+// ServiceMetricsSummaryOutput is returned when mode=summary. The endpoint
+// returns one MetricSeries per distinct label set (e.g. one per replica), so
+// the output is a list of per-series summaries rather than a single rollup.
+type ServiceMetricsSummaryOutput struct {
+	Summaries []util.MetricSummary `json:"summaries"`
+}
+
+func (ServiceMetricsSummaryOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceMetricsSummaryOutput](nil))
+}
+
+// ServiceMetricsFullOutput is returned when mode=full
+type ServiceMetricsFullOutput struct {
+	Series []api.MetricSeries `json:"series"`
+}
+
+func (ServiceMetricsFullOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceMetricsFullOutput](nil))
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
-func (s *Server) registerServiceTools(readOnly bool) {
+func (s *Server) registerServiceTools(readOnly, experimental bool) {
 	// service_list
 	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceList,
@@ -590,6 +687,52 @@ Supports filtering by time (via since/until parameters) and node (for services w
 			Title:         "Get Service Logs",
 		},
 	}, s.handleServiceLogs)
+
+	// Metrics tools target gateway endpoints marked `x-preview: true`. They
+	// are registered only when the experimental gate is on at server startup;
+	// the user must restart the MCP server after toggling the gate. Handler
+	// bodies re-check the gate defensively in case config changes mid-session.
+	if experimental {
+		// service_metrics_available
+		addTool(s, readOnly, &mcp.Tool{
+			Name:  toolServiceMetricsAvailable,
+			Title: "List Available Metric Series",
+			Description: "List the names of all metric series available for a service. " +
+				"Call this first to discover what metrics exist before fetching data with service_metrics_series.",
+			InputSchema:  ServiceMetricsAvailableInput{}.Schema(),
+			OutputSchema: ServiceMetricsAvailableOutput{}.Schema(),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint:  true,
+				OpenWorldHint: util.Ptr(false),
+				Title:         "List Available Metric Series",
+			},
+		}, s.handleServiceMetricsAvailable)
+
+		// service_metrics_series
+		addTool(s, readOnly, &mcp.Tool{
+			Name:  toolServiceMetricsSeries,
+			Title: "Get Metric Series Data",
+			Description: `Fetch time-series data for a named metric over a specified time window.
+
+Use service_metrics_available first to discover valid metric names.
+
+The response groups data points by their label set — a single request may
+return multiple labeled series (e.g. one per replica, one per worker ordinal).
+
+Two modes:
+- summary (default): Returns per-series aggregated stats (count, min/max with timestamps, avg, p50, p95). Efficient for triage — minimal token usage.
+- full: Returns each labeled series with its full data point list. Use when you need the raw time series.
+
+Available metrics include: CPU usage/allocation, memory usage/total, disk usage, disk I/O (read/write bytes and ops), queries per second, and active connections.`,
+			InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
+			OutputSchema: ServiceMetricsSummaryOutput{}.Schema(),
+			Annotations: &mcp.ToolAnnotations{
+				ReadOnlyHint:  true,
+				OpenWorldHint: util.Ptr(false),
+				Title:         "Get Metric Series Data",
+			},
+		}, s.handleServiceMetricsSeries)
+	}
 }
 
 // handleServiceList handles the service_list MCP tool
@@ -1228,4 +1371,130 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	return nil, ServiceLogsOutput{Logs: logs}, nil
+}
+
+// handleServiceMetricsAvailable handles the service_metrics_available MCP tool
+func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsAvailableInput) (*mcp.CallToolResult, ServiceMetricsAvailableOutput, error) {
+	cfg, err := common.LoadConfig(ctx)
+	if err != nil {
+		return nil, ServiceMetricsAvailableOutput{}, err
+	}
+
+	logging.Debug("MCP: Listing available metric series",
+		zap.String("project_id", cfg.ProjectID),
+		zap.String("service_id", input.ServiceID),
+	)
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := cfg.Client.GetServiceMetricsAvailableSeriesWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceMetricsAvailableOutput{}, fmt.Errorf("failed to list metric series: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, ServiceMetricsAvailableOutput{}, resp.JSON4XX
+	}
+
+	if resp.JSON200 == nil {
+		return nil, ServiceMetricsAvailableOutput{Series: []string{}}, nil
+	}
+
+	return nil, ServiceMetricsAvailableOutput{Series: *resp.JSON200}, nil
+}
+
+// handleServiceMetricsSeries handles the service_metrics_series MCP tool
+func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsSeriesInput) (*mcp.CallToolResult, any, error) {
+	cfg, err := common.LoadConfig(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logging.Debug("MCP: Fetching metric series",
+		zap.String("project_id", cfg.ProjectID),
+		zap.String("service_id", input.ServiceID),
+		zap.String("metric", input.MetricName),
+		zap.String("from", input.From),
+		zap.String("to", input.To),
+	)
+
+	fromTime, err := time.Parse(time.RFC3339, input.From)
+	if err != nil {
+		return nil, nil, fmt.Errorf("from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): %w", err)
+	}
+	toTime, err := time.Parse(time.RFC3339, input.To)
+	if err != nil {
+		return nil, nil, fmt.Errorf("to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): %w", err)
+	}
+
+	filters := buildMetricFilters(input.Role, input.Filters)
+
+	body := api.MetricsSeriesRequest{
+		Name: input.MetricName,
+		From: fromTime,
+		To:   toTime,
+	}
+	bs := input.BucketSeconds
+	if bs <= 0 {
+		bs = util.DefaultBucketSeconds(fromTime, toTime)
+	}
+	body.BucketSeconds = &bs
+	if len(filters) > 0 {
+		body.Filters = &filters
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := cfg.Client.GetServiceMetricsSeriesWithResponse(ctx, cfg.ProjectID, input.ServiceID, body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fetch metric series: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, nil, resp.JSON4XX
+	}
+
+	var series []api.MetricSeries
+	if resp.JSON200 != nil {
+		series = *resp.JSON200
+	}
+
+	if input.Mode == "full" {
+		return nil, ServiceMetricsFullOutput{Series: series}, nil
+	}
+
+	// Default: per-series summaries.
+	summaries := make([]util.MetricSummary, 0, len(series))
+	for _, ms := range series {
+		pts := make([]util.MetricPoint, len(ms.Data))
+		for i, p := range ms.Data {
+			pts[i] = util.MetricPoint{Time: p.Time, Value: p.Value}
+		}
+		if summary := util.SummarizeMetrics(input.MetricName, ms.Labels, pts, fromTime, toTime); summary != nil {
+			summaries = append(summaries, *summary)
+		}
+	}
+	if len(summaries) == 0 {
+		return nil, ServiceMetricsSummaryOutput{}, fmt.Errorf("no data points returned for the requested time window")
+	}
+	return nil, ServiceMetricsSummaryOutput{Summaries: summaries}, nil
+}
+
+// buildMetricFilters merges the convenience Role input with the arbitrary
+// Filters slice into the preview label filter list. Role values are
+// lowercased to match the gateway's response normalization.
+func buildMetricFilters(role string, filters []MetricLabelFilterInput) []api.MetricLabelFilter {
+	var out []api.MetricLabelFilter
+	if role != "" {
+		out = append(out, api.MetricLabelFilter{Key: "role", Value: strings.ToLower(role)})
+	}
+	for _, f := range filters {
+		if f.Key == "" || f.Value == "" {
+			continue
+		}
+		out = append(out, api.MetricLabelFilter{Key: f.Key, Value: f.Value})
+	}
+	return out
 }
