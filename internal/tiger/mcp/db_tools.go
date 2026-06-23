@@ -19,37 +19,22 @@ import (
 )
 
 const (
-	// mcpMaxRowsCeiling is the hard upper bound on rows returned per result set,
-	// regardless of the configured or per-call max_rows.
-	mcpMaxRowsCeiling = 10000
-
-	// mcpMaxResponseBytes caps the total serialized row data across a response,
-	// guarding the model's context against a few very wide rows that the row cap
-	// alone would miss. Not user-configurable.
+	// mcpMaxResponseBytes caps total serialized row data per response, catching a
+	// few very wide rows the row cap alone would miss. Not user-configurable.
 	mcpMaxResponseBytes = 256 * 1024
 )
 
-// resolveMaxRows returns the effective per-result-set row cap: the per-call
-// value if > 0, else the configured value, else the default, clamped to
-// mcpMaxRowsCeiling. It also sanitizes non-positive config-file/env values
-// (which bypass `tiger config set` validation) to the default.
-func resolveMaxRows(configured, requested int) int {
-	n := configured
-	if requested > 0 {
-		n = requested
+// resolveMaxRows returns the row cap from mcp_max_rows, falling back to the
+// default for non-positive config-file/env values (which skip set validation).
+func resolveMaxRows(configured int) int {
+	if configured <= 0 {
+		return config.DefaultMCPMaxRows
 	}
-	if n <= 0 {
-		n = config.DefaultMCPMaxRows
-	}
-	if n > mcpMaxRowsCeiling {
-		n = mcpMaxRowsCeiling
-	}
-	return n
+	return configured
 }
 
-// approxRowSize estimates the serialized size, in bytes, of a single row's
-// values. It is used to enforce the overall response byte budget. The estimate
-// mirrors how the row is ultimately serialized to JSON for the client.
+// approxRowSize estimates a row's serialized size in bytes for the byte budget,
+// mirroring how it is ultimately marshaled to JSON for the client.
 func approxRowSize(values []any) int {
 	if b, err := json.Marshal(values); err == nil {
 		return len(b)
@@ -61,7 +46,7 @@ func approxRowSize(values []any) int {
 // truncationNotice builds the actionable guidance returned to the model when a
 // response is truncated.
 func truncationNotice(maxRows int) string {
-	return fmt.Sprintf("Results were truncated to limit the amount of data returned (max_rows=%d per result set, plus an overall response size cap). More rows exist. Do the work in the database instead of re-running this query: aggregate (GROUP BY, COUNT, SUM, AVG), filter (WHERE), or paginate (LIMIT/OFFSET). To pull more raw rows in a single call, set max_rows (up to %d).", maxRows, mcpMaxRowsCeiling)
+	return fmt.Sprintf("Results were truncated to limit the amount of data returned (the configured mcp_max_rows=%d per result set, plus an overall response size cap). More rows exist. Do the work in the database instead of re-running this query: aggregate (GROUP BY, COUNT, SUM, AVG), filter (WHERE), or paginate (LIMIT/OFFSET).", maxRows)
 }
 
 // DBExecuteQueryInput represents input for db_execute_query
@@ -72,7 +57,6 @@ type DBExecuteQueryInput struct {
 	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
 	Role           string   `json:"role,omitempty"`
 	Pooled         bool     `json:"pooled,omitempty"`
-	MaxRows        int      `json:"max_rows,omitempty"`
 }
 
 func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
@@ -99,12 +83,6 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema.Properties["pooled"].Description = "Use connection pooling (if available)"
 	schema.Properties["pooled"].Default = util.Must(json.Marshal(false))
 	schema.Properties["pooled"].Examples = []any{false, true}
-
-	// No schema Default: it would be injected by the SDK and shadow the
-	// configured mcp_max_rows fallback when max_rows is omitted.
-	schema.Properties["max_rows"].Description = fmt.Sprintf("Maximum number of rows to return per result set. When the query produces more, the result set is truncated (the response indicates this) and the in-flight query is aborted to avoid streaming and buffering data the model won't use. Defaults to the configured mcp_max_rows (%d). Hard-capped at %d. Prefer aggregating or filtering in SQL over raising this.", config.DefaultMCPMaxRows, mcpMaxRowsCeiling)
-	schema.Properties["max_rows"].Minimum = util.Ptr(1.0)
-	schema.Properties["max_rows"].Examples = []any{100, 500}
 
 	return schema
 }
@@ -153,10 +131,10 @@ func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	resultSetSchema.Properties["rows"].Description = "Result rows as arrays of values. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
 	resultSetSchema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
 
-	resultSetSchema.Properties["rows_affected"].Description = "Number of rows affected. For SELECT, this is the number of rows returned (which equals the number of rows in this response; when truncated is true, more rows existed but were not returned). For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
+	resultSetSchema.Properties["rows_affected"].Description = "Number of rows affected. For SELECT, this is the total number of rows the query produced; when truncated is true this exceeds the number of rows actually returned in this response. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
 	resultSetSchema.Properties["rows_affected"].Examples = []any{5, 42, 1000}
 
-	resultSetSchema.Properties["truncated"].Description = "True when this result set was capped (by max_rows or the overall response size limit) and additional rows exist that were not returned. Refine the query in SQL to get the data you need."
+	resultSetSchema.Properties["truncated"].Description = "True when this result set was capped (by the configured mcp_max_rows row limit or the overall response size limit) and additional rows exist that were not returned. Refine the query in SQL to get the data you need."
 
 	schema.Properties["execution_time"].Description = "Execution time as a human-readable duration string"
 	schema.Properties["execution_time"].Examples = []any{"123ms", "1.5s", "45.2µs"}
@@ -179,9 +157,7 @@ Connects to a PostgreSQL database service in Tiger Cloud and executes the provid
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
-DO THE WORK IN THE DATABASE. PostgreSQL is far more efficient at processing data than fetching raw rows and computing in your context. Push computation into SQL: aggregate with GROUP BY / COUNT / SUM / AVG / MIN / MAX, filter with WHERE, sort and take the top N with ORDER BY ... LIMIT, and join/transform server-side. Avoid SELECT * on large tables; project only the columns you need.
-
-RESULTS ARE CAPPED. Each result set returns at most max_rows rows (default 100, configurable via mcp_max_rows), and the total response size is bounded. If a result set is truncated, the response sets "truncated": true and includes a "notice" — refine the query in SQL (aggregate, filter, or paginate with LIMIT/OFFSET) rather than re-running it to pull everything. Only raise max_rows when you genuinely need more raw rows in a single call.
+Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows. Results are capped per result set (default 100 rows, configurable via mcp_max_rows) and by total size; a truncated response sets "truncated": true with a "notice" on how to refine the query.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
@@ -376,7 +352,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	defer conn.Close(context.Background())
 
 	// Bound how much data this call returns to the model's context.
-	maxRows := resolveMaxRows(cfg.MCPMaxRows, input.MaxRows)
+	maxRows := resolveMaxRows(cfg.MCPMaxRows)
 	remainingBytes := mcpMaxResponseBytes
 
 	// Execute query and measure time
@@ -411,7 +387,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		}
 
 		// Process this result set, capping rows and the shared byte budget.
-		result, err := processResultSet(cancel, conn, rows, maxRows, &remainingBytes)
+		result, err := processResultSet(conn, rows, maxRows, &remainingBytes)
 		if err != nil {
 			return nil, DBExecuteQueryOutput{}, err
 		}
@@ -420,15 +396,15 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		resultSets = append(resultSets, result)
 
 		if result.Truncated {
-			// processResultSet already aborted the query (via cancel); stop
-			// reading the batch.
+			// Stop reading further sets; br.Close() below discards them. The
+			// query isn't cancelled, so all statements still run server-side.
 			truncated = true
 			break
 		}
 	}
 
-	// After an abort, br.Close() returns the expected cancellation error.
-	if err := br.Close(); err != nil && !truncated {
+	// Close the batch, discarding any result sets we didn't read.
+	if err := br.Close(); err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
 
@@ -445,11 +421,9 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	return nil, output, nil
 }
 
-// processResultSet reads a pgx.Rows result set, capping at maxRows and at the
-// shared byte budget (remainingBytes). The returned ResultSet.Truncated reports
-// whether rows were dropped; on truncation it cancels to abort the query rather
-// than let pgx drain the rest.
-func processResultSet(cancel context.CancelFunc, conn *pgx.Conn, rows pgx.Rows, maxRows int, remainingBytes *int) (ResultSet, error) {
+// processResultSet reads a result set, capping at maxRows and the shared byte
+// budget. ResultSet.Truncated reports whether rows were dropped.
+func processResultSet(conn *pgx.Conn, rows pgx.Rows, maxRows int, remainingBytes *int) (ResultSet, error) {
 	defer rows.Close()
 
 	// Get column metadata from field descriptions
@@ -496,36 +470,32 @@ func processResultSet(cancel context.CancelFunc, conn *pgx.Conn, rows pgx.Rows, 
 
 		// Byte safety net for wide rows, but always keep at least one row so an
 		// oversized first row doesn't yield an empty result.
-		size := approxRowSize(values)
-		if len(resultRows) > 0 && *remainingBytes-size < 0 {
+		remaining := *remainingBytes - approxRowSize(values)
+		if len(resultRows) > 0 && remaining < 0 {
 			truncated = true
 			break
 		}
-		*remainingBytes -= size
+		*remainingBytes = remaining
 
 		resultRows = append(resultRows, values)
 	}
 
 	if truncated {
-		// Cancel before the deferred rows.Close() so pgx aborts the query
-		// instead of draining the remaining rows.
-		cancel()
+		// Drain so the command tag (and true row count) is available.
+		rows.Close()
 	} else if err := rows.Err(); err != nil {
 		return ResultSet{}, err
 	}
 
+	// After a full drain the command tag reports the true row count, even when
+	// we returned fewer.
 	commandTag := rows.CommandTag()
-	rowsAffected := commandTag.RowsAffected()
-	if truncated {
-		// The command tag is unreliable after an abort; report rows returned.
-		rowsAffected = int64(len(resultRows))
-	}
 
 	return ResultSet{
 		CommandTag:   commandTag.String(),
 		Columns:      columns,
 		Rows:         util.PtrIfNonNil(resultRows),
-		RowsAffected: rowsAffected,
+		RowsAffected: commandTag.RowsAffected(),
 		Truncated:    truncated,
 	}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -101,6 +102,7 @@ password_storage: pgpass
 		"password_storage": "pgpass",
 		"debug":            "false",
 		"config_dir":       tmpDir,
+		"mcp_max_rows":     strconv.Itoa(config.DefaultMCPMaxRows),
 	}
 
 	for key, expectedLine := range expectedLines {

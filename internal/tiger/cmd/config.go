@@ -203,6 +203,9 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.GatewayURL != nil {
 		table.Append("gateway_url", *cfg.GatewayURL)
 	}
+	if cfg.MCPMaxRows != nil {
+		table.Append("mcp_max_rows", fmt.Sprintf("%d", *cfg.MCPMaxRows))
+	}
 	if cfg.Color != nil {
 		table.Append("color", fmt.Sprintf("%t", *cfg.Color))
 	}
