@@ -26,6 +26,7 @@ type Config struct {
 	DocsMCP         bool         `mapstructure:"docs_mcp"`
 	DocsMCPURL      string       `mapstructure:"docs_mcp_url"`
 	GatewayURL      string       `mapstructure:"gateway_url"`
+	MCPMaxRows      int          `mapstructure:"mcp_max_rows"`
 	Output          string       `mapstructure:"output"`
 	PasswordStorage string       `mapstructure:"password_storage"`
 	ReadOnly        bool         `mapstructure:"read_only"`
@@ -45,6 +46,7 @@ type ConfigOutput struct {
 	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
 	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
 	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
+	MCPMaxRows      *int    `mapstructure:"mcp_max_rows" json:"mcp_max_rows,omitempty"`
 	Output          *string `mapstructure:"output" json:"output,omitempty"`
 	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty"`
 	ReadOnly        *bool   `mapstructure:"read_only" json:"read_only,omitempty"`
@@ -63,6 +65,7 @@ const (
 	DefaultDocsMCP         = true
 	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database"
 	DefaultGatewayURL      = "https://console.cloud.tigerdata.com/api"
+	DefaultMCPMaxRows      = 100
 	DefaultOutput          = "table"
 	DefaultPasswordStorage = "keyring"
 	DefaultReadOnly        = false
@@ -84,6 +87,7 @@ var defaultValues = map[string]any{
 	"docs_mcp":         DefaultDocsMCP,
 	"docs_mcp_url":     DefaultDocsMCPURL,
 	"gateway_url":      DefaultGatewayURL,
+	"mcp_max_rows":     DefaultMCPMaxRows,
 	"output":           DefaultOutput,
 	"password_storage": DefaultPasswordStorage,
 	"read_only":        DefaultReadOnly,
@@ -282,6 +286,14 @@ func setBool(key, val string) (bool, error) {
 	return b, nil
 }
 
+func setInt(key, val string) (int, error) {
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s value: %s (must be an integer)", key, val)
+	}
+	return n, nil
+}
+
 // UpdateField updates the field in the Config struct corresponding to the given key.
 // It accepts either a string (from user input) or a typed value (string/bool from defaults).
 // The function validates the value and updates both the struct field and viper state.
@@ -454,6 +466,26 @@ func (c *Config) UpdateField(key string, value any) (any, error) {
 		default:
 			return nil, fmt.Errorf("version_check must be string or bool, got %T", value)
 		}
+
+	case "mcp_max_rows":
+		var n int
+		switch v := value.(type) {
+		case int:
+			n = v
+		case string:
+			parsed, err := setInt("mcp_max_rows", v)
+			if err != nil {
+				return nil, err
+			}
+			n = parsed
+		default:
+			return nil, fmt.Errorf("mcp_max_rows must be string or int, got %T", value)
+		}
+		if n < 1 {
+			return nil, fmt.Errorf("mcp_max_rows must be at least 1, got %d", n)
+		}
+		c.MCPMaxRows = n
+		validated = n
 
 	default:
 		return nil, fmt.Errorf("unknown configuration key: %s", key)

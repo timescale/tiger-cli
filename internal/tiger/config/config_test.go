@@ -73,6 +73,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.ReadOnly != DefaultReadOnly {
 		t.Errorf("Expected ReadOnly %t, got %t", DefaultReadOnly, cfg.ReadOnly)
 	}
+	if cfg.MCPMaxRows != DefaultMCPMaxRows {
+		t.Errorf("Expected MCPMaxRows %d, got %d", DefaultMCPMaxRows, cfg.MCPMaxRows)
+	}
 	if cfg.ConfigDir != tmpDir {
 		t.Errorf("Expected ConfigDir %s, got %s", tmpDir, cfg.ConfigDir)
 	}
@@ -416,6 +419,28 @@ func TestSet(t *testing.T) {
 		{
 			key:           "analytics",
 			value:         "invalid",
+			expectedError: true,
+		},
+		{
+			key:   "mcp_max_rows",
+			value: "250",
+			checkFunc: func() bool {
+				return cfg.MCPMaxRows == 250
+			},
+		},
+		{
+			key:           "mcp_max_rows",
+			value:         "0",
+			expectedError: true,
+		},
+		{
+			key:           "mcp_max_rows",
+			value:         "-5",
+			expectedError: true,
+		},
+		{
+			key:           "mcp_max_rows",
+			value:         "notanumber",
 			expectedError: true,
 		},
 		{

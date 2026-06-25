@@ -353,6 +353,8 @@ Execute a SQL query on a service database.
 
 **Returns:** Query results with rows, columns (including types), rows affected count, and execution metadata.
 
+**Result limiting (context-window protection):** To keep large query results from overflowing an AI agent's context window, results are capped. Each result set returns at most the configured `mcp_max_rows` rows (default 100), and the total serialized row data across all result sets is bounded by a built-in safety net. When a cap is hit, the affected result set's `truncated` field is set to `true`, the top-level response sets `truncated: true`, and a `notice` field returns guidance to refine the query in SQL (aggregate, filter, or paginate with `LIMIT`/`OFFSET`) rather than re-running it. The query is not cancelled, so any writes and later statements in a multi-statement query still complete, and the result set's `rows_affected` reports the true number of rows the query produced even when fewer are returned. The tool description also instructs agents to push computation (aggregation, filtering, sorting, joins) into SQL instead of fetching raw rows. This limiting applies only to the MCP tool, not to CLI commands.
+
 **Example Response:**
 ```json
 {
@@ -375,6 +377,7 @@ Execute a SQL query on a service database.
 - `columns` includes both the column name and PostgreSQL data type for each column
 - Empty `rows` array for commands that don't return rows (INSERT, UPDATE, DELETE, DDL commands)
 - For parity with `tiger db connect` command, supports custom roles and connection pooling
+- `truncated` (per result set and top-level) and `notice` are present only when results were capped; see "Result limiting" above
 
 ### High-Availability Management
 

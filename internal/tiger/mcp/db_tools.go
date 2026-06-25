@@ -13,9 +13,41 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/tiger/common"
+	"github.com/timescale/tiger-cli/internal/tiger/config"
 	"github.com/timescale/tiger-cli/internal/tiger/logging"
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
+
+const (
+	// mcpMaxResponseBytes caps total serialized row data per response, catching a
+	// few very wide rows the row cap alone would miss. Not user-configurable.
+	mcpMaxResponseBytes = 256 * 1024
+)
+
+// resolveMaxRows returns the row cap from mcp_max_rows, falling back to the
+// default for non-positive config-file/env values (which skip set validation).
+func resolveMaxRows(configured int) int {
+	if configured <= 0 {
+		return config.DefaultMCPMaxRows
+	}
+	return configured
+}
+
+// approxRowSize estimates a row's serialized size in bytes for the byte budget,
+// mirroring how it is ultimately marshaled to JSON for the client.
+func approxRowSize(values []any) int {
+	if b, err := json.Marshal(values); err == nil {
+		return len(b)
+	}
+	// Fallback for the rare value that isn't JSON-marshalable.
+	return len(fmt.Sprint(values...))
+}
+
+// truncationNotice builds the actionable guidance returned to the model when a
+// response is truncated.
+func truncationNotice(maxRows int) string {
+	return fmt.Sprintf("Results were truncated to limit the amount of data returned (the configured mcp_max_rows=%d per result set, plus an overall response size cap). More rows exist. Do the work in the database instead of re-running this query: aggregate (GROUP BY, COUNT, SUM, AVG), filter (WHERE), or paginate (LIMIT/OFFSET).", maxRows)
+}
 
 // DBExecuteQueryInput represents input for db_execute_query
 type DBExecuteQueryInput struct {
@@ -67,12 +99,15 @@ type ResultSet struct {
 	Columns      []DBExecuteQueryColumn `json:"columns,omitempty"`
 	Rows         *[][]any               `json:"rows,omitempty"`
 	RowsAffected int64                  `json:"rows_affected"`
+	Truncated    bool                   `json:"truncated,omitempty"`
 }
 
 // DBExecuteQueryOutput represents output for db_execute_query
 type DBExecuteQueryOutput struct {
 	ResultSets    []ResultSet `json:"result_sets"`
 	ExecutionTime string      `json:"execution_time"`
+	Truncated     bool        `json:"truncated,omitempty"`
+	Notice        string      `json:"notice,omitempty"`
 }
 
 func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
@@ -96,11 +131,17 @@ func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	resultSetSchema.Properties["rows"].Description = "Result rows as arrays of values. Omitted for commands that don't return rows (INSERT, UPDATE, DELETE, etc.)"
 	resultSetSchema.Properties["rows"].Examples = []any{[][]any{{1, "alice", "2024-01-01"}, {2, "bob", "2024-01-02"}}}
 
-	resultSetSchema.Properties["rows_affected"].Description = "Number of rows affected. For SELECT, this is the number of rows returned. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
+	resultSetSchema.Properties["rows_affected"].Description = "Number of rows affected. For SELECT, this is the total number of rows the query produced; when truncated is true this exceeds the number of rows actually returned in this response. For INSERT/UPDATE/DELETE, this is the number of rows modified. Returns 0 for statements that don't return or modify rows (e.g. CREATE TABLE)."
 	resultSetSchema.Properties["rows_affected"].Examples = []any{5, 42, 1000}
+
+	resultSetSchema.Properties["truncated"].Description = "True when this result set was capped (by the configured mcp_max_rows row limit or the overall response size limit) and additional rows exist that were not returned. Refine the query in SQL to get the data you need."
 
 	schema.Properties["execution_time"].Description = "Execution time as a human-readable duration string"
 	schema.Properties["execution_time"].Examples = []any{"123ms", "1.5s", "45.2µs"}
+
+	schema.Properties["truncated"].Description = "True when any result set was truncated to limit the amount of data returned. See notice for guidance."
+
+	schema.Properties["notice"].Description = "Present only when results were truncated. Actionable guidance for getting the needed data via SQL (aggregate, filter, paginate) instead of re-running the query."
 
 	return schema
 }
@@ -115,6 +156,8 @@ func (s *Server) registerDatabaseTools() {
 Connects to a PostgreSQL database service in Tiger Cloud and executes the provided SQL query, returning the results with column information, row data, and execution metadata.
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
+
+Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
@@ -308,6 +351,10 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 	defer conn.Close(context.Background())
 
+	// Bound how much data this call returns to the model's context.
+	maxRows := resolveMaxRows(cfg.MCPMaxRows)
+	remainingBytes := mcpMaxResponseBytes
+
 	// Execute query and measure time
 	startTime := time.Now()
 
@@ -324,6 +371,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 
 	// Process all result sets, collecting them all
 	resultSets := make([]ResultSet, 0)
+	truncated := false
 	for {
 		rows, err := br.Query()
 		if err != nil {
@@ -338,16 +386,24 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 			return nil, DBExecuteQueryOutput{}, err
 		}
 
-		// Process this result set
-		result, err := processResultSet(conn, rows)
+		// Process this result set, capping rows and the shared byte budget.
+		result, err := processResultSet(conn, rows, maxRows, &remainingBytes)
 		if err != nil {
 			return nil, DBExecuteQueryOutput{}, err
 		}
 
 		// Collect this result set
 		resultSets = append(resultSets, result)
+
+		if result.Truncated {
+			// Stop reading further sets; br.Close() below discards them. The
+			// query isn't cancelled, so all statements still run server-side.
+			truncated = true
+			break
+		}
 	}
 
+	// Close the batch, discarding any result sets we didn't read.
 	if err := br.Close(); err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -357,12 +413,17 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		ResultSets:    resultSets,
 		ExecutionTime: time.Since(startTime).String(),
 	}
+	if truncated {
+		output.Truncated = true
+		output.Notice = truncationNotice(maxRows)
+	}
 
 	return nil, output, nil
 }
 
-// processResultSet reads all data from a pgx.Rows result set
-func processResultSet(conn *pgx.Conn, rows pgx.Rows) (ResultSet, error) {
+// processResultSet reads a result set, capping at maxRows and the shared byte
+// budget. ResultSet.Truncated reports whether rows were dropped.
+func processResultSet(conn *pgx.Conn, rows pgx.Rows, maxRows int, remainingBytes *int) (ResultSet, error) {
 	defer rows.Close()
 
 	// Get column metadata from field descriptions
@@ -381,7 +442,7 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows) (ResultSet, error) {
 		}
 	}
 
-	// Collect all rows from this result set
+	// Collect rows from this result set
 	var resultRows [][]any
 	if len(columns) > 0 {
 		// If any columns were returned, initialize resultRows to an empty
@@ -392,25 +453,47 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows) (ResultSet, error) {
 		// so we leave resultRows nil so it gets omitted from the JSON result.
 		resultRows = make([][]any, 0)
 	}
+
+	truncated := false
 	for rows.Next() {
+		// Row cap: another row exists but we already hold maxRows.
+		if len(resultRows) >= maxRows {
+			truncated = true
+			break
+		}
+
 		// Scan values into generic interface slice
 		values, err := rows.Values()
 		if err != nil {
 			return ResultSet{}, err
 		}
+
+		// Byte safety net for wide rows, but always keep at least one row so an
+		// oversized first row doesn't yield an empty result.
+		remaining := *remainingBytes - approxRowSize(values)
+		if len(resultRows) > 0 && remaining < 0 {
+			truncated = true
+			break
+		}
+		*remainingBytes = remaining
+
 		resultRows = append(resultRows, values)
 	}
 
-	// Check for errors during iteration
+	// Drain so the command tag reports the true row count even when truncated.
+	rows.Close()
+
 	if err := rows.Err(); err != nil {
 		return ResultSet{}, err
 	}
 
 	commandTag := rows.CommandTag()
+
 	return ResultSet{
 		CommandTag:   commandTag.String(),
 		Columns:      columns,
 		Rows:         util.PtrIfNonNil(resultRows),
 		RowsAffected: commandTag.RowsAffected(),
+		Truncated:    truncated,
 	}, nil
 }

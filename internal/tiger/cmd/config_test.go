@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -101,6 +102,7 @@ password_storage: pgpass
 		"password_storage": "pgpass",
 		"debug":            "false",
 		"config_dir":       tmpDir,
+		"mcp_max_rows":     strconv.Itoa(config.DefaultMCPMaxRows),
 	}
 
 	for key, expectedLine := range expectedLines {
@@ -155,6 +157,7 @@ password_storage: keyring
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,
+		"mcp_max_rows":     float64(config.DefaultMCPMaxRows),
 	}
 
 	for key, expectedValue := range expectedValues {
@@ -212,6 +215,7 @@ password_storage: keyring
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,
+		"mcp_max_rows":     config.DefaultMCPMaxRows,
 	}
 
 	for key, expectedValue := range expectedValues {
