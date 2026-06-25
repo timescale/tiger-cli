@@ -27,15 +27,11 @@ const (
 type Server struct {
 	mcpServer       *mcp.Server
 	docsProxyClient *ProxyClient
-
-	// readOnly is captured from config at construction time. Handlers still call
-	// common.CheckReadOnly in case read_only is toggled on mid-session.
-	readOnly bool
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
-func addTool[In, Out any](s *Server, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
-	if s.readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
+func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	if readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
 		logging.Debug("Skipping write tool in read-only mode", zap.String("tool", t.Name))
 		return
 	}
@@ -69,11 +65,12 @@ func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
 
 	server := &Server{
 		mcpServer: mcpServer,
-		readOnly:  cfg != nil && cfg.ReadOnly,
 	}
 
-	// Register all tools (including proxied docs tools)
-	server.registerTools(ctx)
+	// Register all tools (including proxied docs tools). readOnly is captured
+	// here and threaded through registration only.
+	readOnly := cfg != nil && cfg.ReadOnly
+	server.registerTools(ctx, readOnly)
 
 	// Add analytics tracking middleware
 	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
@@ -96,12 +93,12 @@ func (s *Server) HTTPHandler() http.Handler {
 }
 
 // registerTools registers all available MCP tools
-func (s *Server) registerTools(ctx context.Context) {
+func (s *Server) registerTools(ctx context.Context, readOnly bool) {
 	// Service management tools
-	s.registerServiceTools()
+	s.registerServiceTools(readOnly)
 
 	// Database operation tools
-	s.registerDatabaseTools()
+	s.registerDatabaseTools(readOnly)
 
 	// TODO: Register more tool groups
 

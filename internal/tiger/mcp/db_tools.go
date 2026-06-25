@@ -147,8 +147,8 @@ func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
-func (s *Server) registerDatabaseTools() {
-	addTool(s, &mcp.Tool{
+func (s *Server) registerDatabaseTools(readOnly bool) {
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolDBExecuteQuery,
 		Title: "Execute SQL Query",
 		Description: `Execute SQL queries against a service database.

@@ -418,9 +418,9 @@ func (ServiceLogsOutput) Schema() *jsonschema.Schema {
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
-func (s *Server) registerServiceTools() {
+func (s *Server) registerServiceTools(readOnly bool) {
 	// service_list
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
@@ -435,7 +435,7 @@ func (s *Server) registerServiceTools() {
 	}, s.handleServiceList)
 
 	// service_get
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceGet,
 		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
@@ -450,7 +450,7 @@ func (s *Server) registerServiceTools() {
 	}, s.handleServiceGet)
 
 	// service_create
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceCreate,
 		Title: "Create Database Service",
 		Description: `Create a new database service in Tiger Cloud with specified type, compute resources, region, and HA options.
@@ -472,7 +472,7 @@ WARNING: Creates billable resources.`,
 	}, s.handleServiceCreate)
 
 	// service_fork
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
 		Description: `Fork an existing database service to create a new independent copy.
@@ -500,7 +500,7 @@ WARNING: Creates billable resources.`,
 	}, s.handleServiceFork)
 
 	// service_update_password
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceUpdatePassword,
 		Title: "Update Service Password",
 		Description: "Update master password for 'tsdbadmin' user of a database service. " +
@@ -517,7 +517,7 @@ WARNING: Creates billable resources.`,
 	}, s.handleServiceUpdatePassword)
 
 	// service_start
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceStart,
 		Title: "Start Database Service",
 		Description: `Start a stopped database service.
@@ -535,7 +535,7 @@ This operation starts a service that is currently in a stopped/paused state. The
 	}, s.handleServiceStart)
 
 	// service_stop
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceStop,
 		Title: "Stop Database Service",
 		Description: `Stop a running database service.
@@ -553,7 +553,7 @@ This operation stops a service that is currently running. The service will trans
 	}, s.handleServiceStop)
 
 	// service_resize
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceResize,
 		Title: "Resize Database Service",
 		Description: `Resize a database service by changing its CPU and memory allocation.
@@ -574,7 +574,7 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 	}, s.handleServiceResize)
 
 	// service_logs
-	addTool(s, &mcp.Tool{
+	addTool(s, readOnly, &mcp.Tool{
 		Name:  toolServiceLogs,
 		Title: "Get Service Logs",
 		Description: `View logs for a database service.
