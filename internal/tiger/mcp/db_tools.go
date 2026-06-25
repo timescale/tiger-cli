@@ -157,7 +157,7 @@ Connects to a PostgreSQL database service in Tiger Cloud and executes the provid
 
 Multi-statement queries (semicolon-separated) are supported when no parameters are provided. All result sets are returned. By default, statements execute in an implicit transaction that automatically commits on success or rolls back on error. Explicit transactions (opened with BEGIN) must be explicitly committed with COMMIT, or they roll back when the connection closes.
 
-Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows. Results are capped per result set (default 100 rows, configurable via mcp_max_rows) and by total size; a truncated response sets "truncated": true with a "notice" on how to refine the query.
+Process data in the database, not in your context: aggregate, filter, sort/limit, and join in SQL rather than fetching raw rows.
 
 WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL commands. Always review queries before execution.`,
 		InputSchema:  DBExecuteQueryInput{}.Schema(),
@@ -480,15 +480,13 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows, maxRows int, remainingBytes
 		resultRows = append(resultRows, values)
 	}
 
-	if truncated {
-		// Drain so the command tag (and true row count) is available.
-		rows.Close()
-	} else if err := rows.Err(); err != nil {
+	// Drain so the command tag reports the true row count even when truncated.
+	rows.Close()
+
+	if err := rows.Err(); err != nil {
 		return ResultSet{}, err
 	}
 
-	// After a full drain the command tag reports the true row count, even when
-	// we returned fewer.
 	commandTag := rows.CommandTag()
 
 	return ResultSet{
