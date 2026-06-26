@@ -63,7 +63,7 @@ The MCP server will automatically use the CLI's stored authentication and config
 
 When `read_only` is `true` (or `TIGER_READ_ONLY=true`), Tiger refuses any mutating operation:
 
-- **Tiger MCP** — write tools (`service_create`, `service_fork`, `service_start`, `service_stop`, `service_resize`, `service_update_password`) return an error.
+- **Tiger MCP** — write tools (`service_create`, `service_fork`, `service_start`, `service_stop`, `service_resize`, `service_update_password`) are not registered, so they don't appear in `tools/list` and can't be called. Handlers still gate on `read_only` as a backstop for mid-session toggling.
 - **Tiger CLI** — the matching `tiger service` subcommands (plus `service delete`) return an error.
 - **Database sessions** — `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open with `tsdb_admin.read_only_connection=true` even without `--read-only`.
 
@@ -71,7 +71,7 @@ Intended for AI agents that should be able to read Tiger Cloud resources without
 
 To toggle: `tiger config set read_only true` / `tiger config unset read_only`.
 
-When read-only mode is enabled, the MCP server includes a warning in its `initialize` response `instructions` field listing the gated tools and asking the LLM to inform the user before gathering inputs for them. The instructions are read at server start; if the user toggles `read_only` mid-session, the warning is stale until the MCP client restarts (the gate and the GUC injection are both unaffected because handlers reload config per call).
+When read-only mode is enabled, the `initialize` response `instructions` announce that read-only mode is on but describe only the read tools, never naming the gated write tools. Both tool registration and instructions are evaluated once at server start, so toggling `read_only` mid-session leaves them stale until the MCP client restarts (the handler-level gate and GUC injection are unaffected, since handlers reload config per call).
 
 ### CLI MCP Commands
 
