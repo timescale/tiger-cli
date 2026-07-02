@@ -232,6 +232,10 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 				http.Error(w, "Missing required parameters", http.StatusBadRequest)
 				return
 			}
+			// Exchange must carry the CLI User-Agent (recorded as device_name).
+			if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "tiger-cli/") {
+				t.Errorf("code exchange User-Agent = %q, want \"tiger-cli/\" prefix", ua)
+			}
 		}
 
 		tokenResponse := map[string]interface{}{

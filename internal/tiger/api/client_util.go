@@ -44,7 +44,7 @@ func NewTigerClient(cfg *config.Config, apiKey string) (*ClientWithResponses, er
 	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(apiKey))
 	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(getHTTPClient()), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", authHeader)
-		req.Header.Set("User-Agent", fmt.Sprintf("tiger-cli/%s", config.Version))
+		req.Header.Set("User-Agent", config.UserAgent())
 		return nil
 	}))
 	if err != nil {
@@ -82,7 +82,7 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 	httpClient.Timeout = 30 * time.Second
 
 	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
-		req.Header.Set("User-Agent", fmt.Sprintf("tiger-cli/%s", config.Version))
+		req.Header.Set("User-Agent", config.UserAgent())
 		return nil
 	}))
 	if err != nil {
