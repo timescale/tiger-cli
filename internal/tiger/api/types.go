@@ -110,7 +110,7 @@ type AuthInfo struct {
 		PublicKey string `json:"public_key"`
 	} `json:"apiKey,omitempty"`
 
-	// Oauth OAuth user details. Present for OAuth (PKCE) user callers.
+	// Oauth OAuth user details. Present for OAuth user callers.
 	Oauth *struct {
 		User struct {
 			// Email The user's email
@@ -125,12 +125,12 @@ type AuthInfo struct {
 	} `json:"oauth,omitempty"`
 
 	// Type Discriminator for the credential shape. `apiKey` for PAT callers;
-	// `oauth` for OAuth (PKCE) user callers.
+	// `oauth` for OAuth user callers.
 	Type AuthInfoType `json:"type"`
 }
 
 // AuthInfoType Discriminator for the credential shape. `apiKey` for PAT callers;
-// `oauth` for OAuth (PKCE) user callers.
+// `oauth` for OAuth user callers.
 type AuthInfoType string
 
 // ConnectionPooler defines model for ConnectionPooler.
@@ -207,6 +207,62 @@ type HAReplica struct {
 
 	// SyncReplicaCount Number of synchronous high-availability replicas.
 	SyncReplicaCount *int `json:"sync_replica_count,omitempty"`
+}
+
+// MetricDataPoint A single time/value pair within a MetricSeries.
+type MetricDataPoint struct {
+	// Time The bucket start timestamp.
+	Time time.Time `json:"time"`
+
+	// Value The aggregated value at this bucket. Buckets without collected
+	// data are omitted from the parent series' `data` array; the API
+	// does not currently emit null values.
+	Value *float64 `json:"value,omitempty"`
+}
+
+// MetricLabelFilter A single key/value label match applied to a metric series query.
+type MetricLabelFilter struct {
+	// Key Label key to match against, e.g. `role` or `job_id`.
+	Key string `json:"key"`
+
+	// Value Label value to match. Case sensitivity follows the underlying metric's storage convention.
+	Value string `json:"value"`
+}
+
+// MetricSeries One labeled time series — the label set plus its per-bucket data points.
+type MetricSeries struct {
+	// Data Per-bucket data points for this label set.
+	Data []MetricDataPoint `json:"data"`
+
+	// Labels Label set identifying this series. The key set depends on the
+	// metric (e.g. `role`, `ordinal`).
+	Labels map[string]string `json:"labels"`
+}
+
+// MetricsSeriesRequest Parameters for a single getServiceMetricsSeries query. Sent as a JSON
+// body so callers can pass an unbounded filter set without query-string
+// length pressure.
+type MetricsSeriesRequest struct {
+	// BucketSeconds Aggregation bucket size in seconds. Defaults to 60 for windows ≤1
+	// hour, 3600 for longer windows. Clamped to [1, window_seconds].
+	BucketSeconds *int `json:"bucket_seconds,omitempty"`
+
+	// Filters Label filters applied to the series query. Recognized label names
+	// depend on the metric. The most common is `role` (value `primary` or
+	// `replica`). When `role` is omitted, some metrics default to primary
+	// and others return data for all roles (one series per role); pass an
+	// explicit role for deterministic results. Role label values in the
+	// response are lowercased.
+	Filters *[]MetricLabelFilter `json:"filters,omitempty"`
+
+	// From Start of the time window (RFC3339; nanosecond precision accepted).
+	From time.Time `json:"from"`
+
+	// Name Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
+	Name string `json:"name"`
+
+	// To End of the time window (RFC3339; nanosecond precision accepted).
+	To time.Time `json:"to"`
 }
 
 // Peering defines model for Peering.
@@ -533,6 +589,9 @@ type DetachServiceFromVPCJSONRequestBody = ServiceVPCInput
 
 // ForkServiceJSONRequestBody defines body for ForkService for application/json ContentType.
 type ForkServiceJSONRequestBody = ForkServiceCreate
+
+// GetServiceMetricsSeriesJSONRequestBody defines body for GetServiceMetricsSeries for application/json ContentType.
+type GetServiceMetricsSeriesJSONRequestBody = MetricsSeriesRequest
 
 // CreateReplicaSetJSONRequestBody defines body for CreateReplicaSet for application/json ContentType.
 type CreateReplicaSetJSONRequestBody = ReadReplicaSetCreate

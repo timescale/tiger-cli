@@ -684,6 +684,70 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/metrics/available-series:
+    get:
+      operationId: getServiceMetricsAvailableSeries
+      x-preview: true
+      tags:
+        - Services
+      summary: List available metric series
+      description: |
+        **Preview — this endpoint is experimental and may change without notice.**
+
+        Returns the names of all metric series available for a service.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: Available metric series names.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/metrics/series:
+    post:
+      operationId: getServiceMetricsSeries
+      x-preview: true
+      tags:
+        - Services
+      summary: Get a metric series
+      description: |
+        **Preview — this endpoint is experimental and may change without notice.**
+
+        Returns time-series data points for a named metric within a time window.
+        Use getServiceMetricsAvailableSeries to discover valid metric names.
+
+        Parameters are sent as a JSON body so callers can pass an unbounded
+        filter set without query-string length pressure. The response is a list
+        of MetricSeries, each carrying its label set as a structured map
+        alongside its per-bucket data points.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricsSeriesRequest'
+      responses:
+        '200':
+          description: Metric series matching the request.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetricSeries'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/setHA:
     post:
       operationId: setHAReplica
@@ -1453,6 +1517,111 @@ components:
         lastCursor:
           type: string
           description: Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
+
+    MetricsSeriesRequest:
+      x-preview: true
+      type: object
+      description: |
+        Parameters for a single getServiceMetricsSeries query. Sent as a JSON
+        body so callers can pass an unbounded filter set without query-string
+        length pressure.
+      required:
+        - name
+        - from
+        - to
+      properties:
+        name:
+          type: string
+          description: Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
+          example: "timescale_cloud_system_cpu_usage_millicores"
+        from:
+          type: string
+          format: date-time
+          description: Start of the time window (RFC3339; nanosecond precision accepted).
+          example: "2026-06-25T10:00:00Z"
+        to:
+          type: string
+          format: date-time
+          description: End of the time window (RFC3339; nanosecond precision accepted).
+          example: "2026-06-25T11:00:00Z"
+        bucket_seconds:
+          type: integer
+          minimum: 1
+          description: |
+            Aggregation bucket size in seconds. Defaults to 60 for windows ≤1
+            hour, 3600 for longer windows. Clamped to [1, window_seconds].
+          example: 60
+        filters:
+          type: array
+          description: |
+            Label filters applied to the series query. Recognized label names
+            depend on the metric. The most common is `role` (value `primary` or
+            `replica`). When `role` is omitted, some metrics default to primary
+            and others return data for all roles (one series per role); pass an
+            explicit role for deterministic results. Role label values in the
+            response are lowercased.
+          items:
+            $ref: '#/components/schemas/MetricLabelFilter'
+
+    MetricLabelFilter:
+      x-preview: true
+      type: object
+      description: A single key/value label match applied to a metric series query.
+      required:
+        - key
+        - value
+      properties:
+        key:
+          type: string
+          description: Label key to match against, e.g. `role` or `job_id`.
+          example: "role"
+        value:
+          type: string
+          description: Label value to match. Case sensitivity follows the underlying metric's storage convention.
+          example: "primary"
+
+    MetricSeries:
+      x-preview: true
+      type: object
+      description: One labeled time series — the label set plus its per-bucket data points.
+      required:
+        - labels
+        - data
+      properties:
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: |
+            Label set identifying this series. The key set depends on the
+            metric (e.g. `role`, `ordinal`).
+        data:
+          type: array
+          description: Per-bucket data points for this label set.
+          items:
+            $ref: '#/components/schemas/MetricDataPoint'
+
+    MetricDataPoint:
+      x-preview: true
+      type: object
+      description: A single time/value pair within a MetricSeries.
+      required:
+        - time
+      properties:
+        time:
+          type: string
+          format: date-time
+          description: The bucket start timestamp.
+          example: "2026-06-25T10:00:00Z"
+        value:
+          type: number
+          format: double
+          description: |
+            The aggregated value at this bucket. Buckets without collected
+            data are omitted from the parent series' `data` array; the API
+            does not currently emit null values.
+          example: 247.5
+
     Project:
       type: object
       required:

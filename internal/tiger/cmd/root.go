@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +23,14 @@ import (
 )
 
 func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
+	// TIGER_EXPERIMENTAL toggles preview-stage commands and MCP tools. Read at
+	// build time so ungated subtrees are never added to the command tree — the
+	// command literally does not exist when the env var is unset/false, so it
+	// won't appear in help, tab-completion, or `unknown command` disambiguation.
+	// This is intentionally undocumented (env var only, no config key); see
+	// CLAUDE.md's "Experimental Feature Gating" section.
+	experimental, _ := strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))
+
 	var configDir string
 	var debug bool
 	var serviceID string
@@ -145,7 +155,7 @@ tiger auth login
 	cmd.AddCommand(buildUpgradeCmd())
 	cmd.AddCommand(buildConfigCmd())
 	cmd.AddCommand(buildAuthCmd())
-	cmd.AddCommand(buildServiceCmd())
+	cmd.AddCommand(buildServiceCmd(experimental))
 	cmd.AddCommand(buildDbCmd())
 	cmd.AddCommand(buildMCPCmd())
 
