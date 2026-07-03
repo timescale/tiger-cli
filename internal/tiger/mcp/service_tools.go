@@ -514,6 +514,18 @@ func (ServiceMetricsFullOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceMetricsFullOutput](nil))
 }
 
+// serviceMetricsSeriesOutputSchema is the union of the summary and full output
+// shapes. The handler returns one or the other depending on the requested mode.
+func serviceMetricsSeriesOutputSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type: "object",
+		AnyOf: []*jsonschema.Schema{
+			ServiceMetricsSummaryOutput{}.Schema(),
+			ServiceMetricsFullOutput{}.Schema(),
+		},
+	}
+}
+
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools(readOnly, experimental bool) {
 	// service_list
@@ -725,7 +737,7 @@ Two modes:
 
 Available metrics include: CPU usage/allocation, memory usage/total, disk usage, disk I/O (read/write bytes and ops), queries per second, and active connections.`,
 			InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
-			OutputSchema: ServiceMetricsSummaryOutput{}.Schema(),
+			OutputSchema: serviceMetricsSeriesOutputSchema(),
 			Annotations: &mcp.ToolAnnotations{
 				ReadOnlyHint:  true,
 				OpenWorldHint: util.Ptr(false),
