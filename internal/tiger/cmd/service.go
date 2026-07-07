@@ -1822,7 +1822,6 @@ func buildServiceMetricsSeriesCmd() *cobra.Command {
 	var role string
 	var filters []string
 	var bucketSeconds int
-	var mode string
 	var output string
 
 	cmd := &cobra.Command{
@@ -1832,23 +1831,19 @@ func buildServiceMetricsSeriesCmd() *cobra.Command {
 
 Use 'tiger service metrics available-series' to discover valid metric names.
 
-By default, returns a per-series summary (min/max/avg/p50/p95) over the time
-window. Use --mode=full to get individual data points.
-
-Each labeled series (e.g. one per replica) is returned independently; the
-output shows one summary block per series, identified by its label set.
+Each labeled series (e.g. one per replica) is returned independently with its
+full list of raw data points.
 
 Examples:
-  # Summarize CPU usage for the last hour
+  # Fetch CPU usage for the last hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
 
-  # Get all memory data points as JSON
+  # Get memory data points as JSON
   tiger service metrics series --metric timescale_cloud_system_memory_usage_bytes \
-    --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
-    --mode full --output json
+    --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z --output json
 
-  # Summarize only the primary instance
+  # Fetch data for the primary instance only
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z --role PRIMARY
 
@@ -1903,9 +1898,6 @@ Examples:
 			if bucketSeconds > 0 {
 				bs := bucketSeconds
 				body.BucketSeconds = &bs
-			} else {
-				bs := util.DefaultBucketSeconds(fromTime, toTime)
-				body.BucketSeconds = &bs
 			}
 			if len(labelFilters) > 0 {
 				body.Filters = &labelFilters
@@ -1927,13 +1919,7 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 
-			series := *resp.JSON200
-			out := cmd.OutOrStdout()
-
-			if strings.ToLower(mode) == "full" {
-				return renderMetricsFull(out, cfg.Output, series)
-			}
-			return renderMetricsSummary(out, cfg.Output, metric, fromTime, toTime, series)
+			return renderMetricSeries(cmd.OutOrStdout(), cfg.Output, *resp.JSON200)
 		},
 	}
 
@@ -1942,8 +1928,7 @@ Examples:
 	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339, required)")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
-	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (default: auto)")
-	cmd.Flags().StringVar(&mode, "mode", "summary", "Output mode: summary (default) or full")
+	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
@@ -1985,7 +1970,7 @@ func labelString(labels map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
-func renderMetricsFull(out io.Writer, output string, series []api.MetricSeries) error {
+func renderMetricSeries(out io.Writer, output string, series []api.MetricSeries) error {
 	switch strings.ToLower(output) {
 	case "json":
 		return util.SerializeToJSON(out, series)
@@ -2006,56 +1991,6 @@ func renderMetricsFull(out io.Writer, output string, series []api.MetricSeries) 
 		}
 		return table.Render()
 	}
-}
-
-func renderMetricsSummary(out io.Writer, output, metric string, from, to time.Time, series []api.MetricSeries) error {
-	summaries := summarizeSeries(metric, from, to, series)
-
-	switch strings.ToLower(output) {
-	case "json":
-		return util.SerializeToJSON(out, summaries)
-	case "yaml":
-		return util.SerializeToYAML(out, summaries)
-	}
-
-	if len(summaries) == 0 {
-		fmt.Fprintln(out, "No data points returned for the requested time window.")
-		return nil
-	}
-
-	for i, s := range summaries {
-		if i > 0 {
-			fmt.Fprintln(out)
-		}
-		fmt.Fprintf(out, "metric:   %s\n", s.Name)
-		fmt.Fprintf(out, "labels:   %s\n", labelString(s.Labels))
-		fmt.Fprintf(out, "from:     %s\n", s.From.UTC().Format(time.RFC3339))
-		fmt.Fprintf(out, "to:       %s\n", s.To.UTC().Format(time.RFC3339))
-		fmt.Fprintf(out, "count:    %d\n", s.Count)
-		fmt.Fprintf(out, "min:      %.3f  (at %s)\n", s.Min, s.MinTime.UTC().Format(time.RFC3339))
-		fmt.Fprintf(out, "max:      %.3f  (at %s)\n", s.Max, s.MaxTime.UTC().Format(time.RFC3339))
-		fmt.Fprintf(out, "avg:      %.3f\n", s.Avg)
-		fmt.Fprintf(out, "p50:      %.3f\n", s.P50)
-		fmt.Fprintf(out, "p95:      %.3f\n", s.P95)
-	}
-	return nil
-}
-
-// summarizeSeries collapses each labeled series into its own MetricSummary so
-// that aggregates (min/avg/etc.) are computed per replica rather than across
-// every role at once.
-func summarizeSeries(metric string, from, to time.Time, series []api.MetricSeries) []util.MetricSummary {
-	summaries := make([]util.MetricSummary, 0, len(series))
-	for _, s := range series {
-		pts := make([]util.MetricPoint, len(s.Data))
-		for i, p := range s.Data {
-			pts[i] = util.MetricPoint{Time: p.Time, Value: p.Value}
-		}
-		if summary := util.SummarizeMetrics(metric, s.Labels, pts, from, to); summary != nil {
-			summaries = append(summaries, *summary)
-		}
-	}
-	return summaries
 }
 
 // getServiceID determines the service ID from args or config

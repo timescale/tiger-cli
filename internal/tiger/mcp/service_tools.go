@@ -455,7 +455,6 @@ type ServiceMetricsSeriesInput struct {
 	Role          string                   `json:"role,omitempty"`
 	Filters       []MetricLabelFilterInput `json:"filters,omitempty"`
 	BucketSeconds int                      `json:"bucket_seconds,omitempty"`
-	Mode          string                   `json:"mode,omitempty"`
 }
 
 func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
@@ -483,47 +482,22 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
 
-	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. When 0 or omitted, auto-selected: 60s for windows ≤1 hour, 3600s for longer windows."
+	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server automatically selects a bucket size based on the size of the time window."
 	schema.Properties["bucket_seconds"].Minimum = util.Ptr(1.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
-
-	schema.Properties["mode"].Description = "Output mode. 'summary' (default) returns aggregated stats (min/max/avg/p50/p95) per labeled series — efficient for triage. 'full' returns the raw labeled series with all individual data points."
-	schema.Properties["mode"].Enum = []any{"summary", "full"}
-	schema.Properties["mode"].Default = util.Must(json.Marshal("summary"))
 
 	return schema
 }
 
-// ServiceMetricsSummaryOutput is returned when mode=summary. The endpoint
-// returns one MetricSeries per distinct label set (e.g. one per replica), so
-// the output is a list of per-series summaries rather than a single rollup.
-type ServiceMetricsSummaryOutput struct {
-	Summaries []util.MetricSummary `json:"summaries"`
-}
-
-func (ServiceMetricsSummaryOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceMetricsSummaryOutput](nil))
-}
-
-// ServiceMetricsFullOutput is returned when mode=full
-type ServiceMetricsFullOutput struct {
+// ServiceMetricsSeriesOutput is the response from service_metrics_series. The
+// endpoint returns one MetricSeries per distinct label set (e.g. one per
+// replica).
+type ServiceMetricsSeriesOutput struct {
 	Series []api.MetricSeries `json:"series"`
 }
 
-func (ServiceMetricsFullOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceMetricsFullOutput](nil))
-}
-
-// serviceMetricsSeriesOutputSchema is the union of the summary and full output
-// shapes. The handler returns one or the other depending on the requested mode.
-func serviceMetricsSeriesOutputSchema() *jsonschema.Schema {
-	return &jsonschema.Schema{
-		Type: "object",
-		AnyOf: []*jsonschema.Schema{
-			ServiceMetricsSummaryOutput{}.Schema(),
-			ServiceMetricsFullOutput{}.Schema(),
-		},
-	}
+func (ServiceMetricsSeriesOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceMetricsSeriesOutput](nil))
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -730,14 +704,11 @@ Use service_metrics_available first to discover valid metric names.
 
 The response groups data points by their label set — a single request may
 return multiple labeled series (e.g. one per replica, one per worker ordinal).
-
-Two modes:
-- summary (default): Returns per-series aggregated stats (count, min/max with timestamps, avg, p50, p95). Efficient for triage — minimal token usage.
-- full: Returns each labeled series with its full data point list. Use when you need the raw time series.
+Each series contains its full list of raw data points.
 
 Available metrics include: CPU usage/allocation, memory usage/total, disk usage, disk I/O (read/write bytes and ops), queries per second, and active connections.`,
 			InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
-			OutputSchema: serviceMetricsSeriesOutputSchema(),
+			OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 			Annotations: &mcp.ToolAnnotations{
 				ReadOnlyHint:  true,
 				OpenWorldHint: util.Ptr(false),
@@ -1447,11 +1418,10 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		From: fromTime,
 		To:   toTime,
 	}
-	bs := input.BucketSeconds
-	if bs <= 0 {
-		bs = util.DefaultBucketSeconds(fromTime, toTime)
+	if input.BucketSeconds > 0 {
+		bs := input.BucketSeconds
+		body.BucketSeconds = &bs
 	}
-	body.BucketSeconds = &bs
 	if len(filters) > 0 {
 		body.Filters = &filters
 	}
@@ -1473,25 +1443,7 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		series = *resp.JSON200
 	}
 
-	if input.Mode == "full" {
-		return nil, ServiceMetricsFullOutput{Series: series}, nil
-	}
-
-	// Default: per-series summaries.
-	summaries := make([]util.MetricSummary, 0, len(series))
-	for _, ms := range series {
-		pts := make([]util.MetricPoint, len(ms.Data))
-		for i, p := range ms.Data {
-			pts[i] = util.MetricPoint{Time: p.Time, Value: p.Value}
-		}
-		if summary := util.SummarizeMetrics(input.MetricName, ms.Labels, pts, fromTime, toTime); summary != nil {
-			summaries = append(summaries, *summary)
-		}
-	}
-	if len(summaries) == 0 {
-		return nil, ServiceMetricsSummaryOutput{}, fmt.Errorf("no data points returned for the requested time window")
-	}
-	return nil, ServiceMetricsSummaryOutput{Summaries: summaries}, nil
+	return nil, ServiceMetricsSeriesOutput{Series: series}, nil
 }
 
 // buildMetricFilters merges the convenience Role input with the arbitrary
