@@ -1854,15 +1854,6 @@ Examples:
 		Args:    cobra.MaximumNArgs(1),
 		PreRunE: bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if metric == "" {
-				return fmt.Errorf("--metric is required")
-			}
-			if from == "" {
-				return fmt.Errorf("--from is required")
-			}
-			if to == "" {
-				return fmt.Errorf("--to is required")
-			}
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
 				return fmt.Errorf("--from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): %w", err)
@@ -1923,13 +1914,17 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&metric, "metric", "", "Metric series name (required)")
-	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339, required)")
-	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339, required)")
+	cmd.Flags().StringVar(&metric, "metric", "", "Metric series name")
+	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339)")
+	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339)")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted)")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
+
+	cmd.MarkFlagRequired("metric")
+	cmd.MarkFlagRequired("from")
+	cmd.MarkFlagRequired("to")
 
 	return cmd
 }

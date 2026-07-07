@@ -467,8 +467,6 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 		"timescale_cloud_system_cpu_usage_millicores",
 		"timescale_cloud_system_memory_usage_bytes",
 		"timescale_cloud_system_disk_usage_bytes",
-		"timescale_cloud_database_qps",
-		"timescale_cloud_database_num_connections",
 	}
 
 	schema.Properties["from"].Description = "Start of the time window (RFC3339 format)."
@@ -706,7 +704,7 @@ The response groups data points by their label set — a single request may
 return multiple labeled series (e.g. one per replica, one per worker ordinal).
 Each series contains its full list of raw data points.
 
-Available metrics include: CPU usage/allocation, memory usage/total, disk usage, disk I/O (read/write bytes and ops), queries per second, and active connections.`,
+Available metrics include: CPU usage/allocation, memory usage/total, disk usage, and disk I/O (read/write bytes and ops).`,
 			InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
 			OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 			Annotations: &mcp.ToolAnnotations{
