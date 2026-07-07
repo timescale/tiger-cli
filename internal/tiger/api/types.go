@@ -243,8 +243,12 @@ type MetricSeries struct {
 // body so callers can pass an unbounded filter set without query-string
 // length pressure.
 type MetricsSeriesRequest struct {
-	// BucketSeconds Aggregation bucket size in seconds. Defaults to 60 for windows ≤1
-	// hour, 3600 for longer windows. Clamped to [1, window_seconds].
+	// BucketSeconds Aggregation bucket size in seconds. Optional: when omitted the
+	// server picks a default that matches the window (roughly 1m for
+	// windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum is
+	// 60s (finer buckets don't add resolution given scrape intervals).
+	// Must be coarse enough for the window's tier; requests that ask
+	// for a finer bucket than the tier can produce are rejected.
 	BucketSeconds *int `json:"bucket_seconds,omitempty"`
 
 	// Filters Label filters applied to the series query. Recognized label names

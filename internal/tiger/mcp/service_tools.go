@@ -480,8 +480,8 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
 
-	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server automatically selects a bucket size based on the size of the time window."
-	schema.Properties["bucket_seconds"].Minimum = util.Ptr(1.0)
+	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
+	schema.Properties["bucket_seconds"].Minimum = util.Ptr(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
 
 	return schema

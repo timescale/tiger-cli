@@ -1546,11 +1546,15 @@ components:
           example: "2026-06-25T11:00:00Z"
         bucket_seconds:
           type: integer
-          minimum: 1
+          minimum: 60
           description: |
-            Aggregation bucket size in seconds. Defaults to 60 for windows ≤1
-            hour, 3600 for longer windows. Clamped to [1, window_seconds].
-          example: 60
+            Aggregation bucket size in seconds. Optional: when omitted the
+            server picks a default that matches the window (roughly 1m for
+            windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum is
+            60s (finer buckets don't add resolution given scrape intervals).
+            Must be coarse enough for the window's tier; requests that ask
+            for a finer bucket than the tier can produce are rejected.
+          example: 3600
         filters:
           type: array
           description: |
