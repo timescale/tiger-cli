@@ -1375,7 +1375,7 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceMetricsAvailableOutput{}, resp.JSON4XX
+		return nil, ServiceMetricsAvailableOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	if resp.JSON200 == nil {
@@ -1433,11 +1433,13 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return nil, nil, resp.JSON4XX
+		return nil, nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	var series []api.MetricSeries
-	if resp.JSON200 != nil {
+	// Default to a non-nil slice so an empty result marshals to `[]` rather
+	// than `null`, which would fail the required-array output-schema validation.
+	series := []api.MetricSeries{}
+	if resp.JSON200 != nil && *resp.JSON200 != nil {
 		series = *resp.JSON200
 	}
 

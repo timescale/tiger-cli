@@ -1972,10 +1972,20 @@ func renderMetricSeries(out io.Writer, output string, series []api.MetricSeries)
 	case "yaml":
 		return util.SerializeToYAML(out, series)
 	default:
+		if len(series) == 0 {
+			fmt.Fprintln(out, "No metric data returned for the requested window.")
+			return nil
+		}
 		table := tablewriter.NewWriter(out)
 		table.Header("SERIES", "TIME", "VALUE")
 		for _, s := range series {
 			label := labelString(s.Labels)
+			if len(s.Data) == 0 {
+				// Keep matched-but-empty series visible instead of dropping
+				// them: emit one placeholder row for the label.
+				table.Append(label, "", "(no data)")
+				continue
+			}
 			for _, p := range s.Data {
 				val := "null"
 				if p.Value != nil {
