@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -67,10 +69,13 @@ func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
 		mcpServer: mcpServer,
 	}
 
-	// Register all tools (including proxied docs tools). readOnly is captured
-	// here and threaded through registration only.
+	// Register all tools (including proxied docs tools). readOnly and
+	// experimental are captured here and threaded through registration only.
+	// experimental follows the ghost pattern — env-var only, undocumented; see
+	// CLAUDE.md's "Experimental Feature Gating".
 	readOnly := cfg != nil && cfg.ReadOnly
-	server.registerTools(ctx, readOnly)
+	experimental, _ := strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))
+	server.registerTools(ctx, readOnly, experimental)
 
 	// Add analytics tracking middleware
 	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
@@ -93,9 +98,9 @@ func (s *Server) HTTPHandler() http.Handler {
 }
 
 // registerTools registers all available MCP tools
-func (s *Server) registerTools(ctx context.Context, readOnly bool) {
+func (s *Server) registerTools(ctx context.Context, readOnly, experimental bool) {
 	// Service management tools
-	s.registerServiceTools(readOnly)
+	s.registerServiceTools(readOnly, experimental)
 
 	// Database operation tools
 	s.registerDatabaseTools(readOnly)

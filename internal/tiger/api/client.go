@@ -148,6 +148,14 @@ type ClientInterface interface {
 	// GetServiceLogs request
 	GetServiceLogs(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetServiceMetricsAvailableSeries request
+	GetServiceMetricsAvailableSeries(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetServiceMetricsSeriesWithBody request with any body
+	GetServiceMetricsSeriesWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	GetServiceMetricsSeries(ctx context.Context, projectId ProjectId, serviceId ServiceId, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetReplicaSets request
 	GetReplicaSets(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -489,6 +497,42 @@ func (c *Client) ForkService(ctx context.Context, projectId ProjectId, serviceId
 
 func (c *Client) GetServiceLogs(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServiceLogsRequest(c.Server, projectId, serviceId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetServiceMetricsAvailableSeries(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceMetricsAvailableSeriesRequest(c.Server, projectId, serviceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetServiceMetricsSeriesWithBody(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceMetricsSeriesRequestWithBody(c.Server, projectId, serviceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetServiceMetricsSeries(ctx context.Context, projectId ProjectId, serviceId ServiceId, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceMetricsSeriesRequest(c.Server, projectId, serviceId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1587,6 +1631,101 @@ func NewGetServiceLogsRequest(server string, projectId ProjectId, serviceId Serv
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetServiceMetricsAvailableSeriesRequest generates requests for GetServiceMetricsAvailableSeries
+func NewGetServiceMetricsAvailableSeriesRequest(server string, projectId ProjectId, serviceId ServiceId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/metrics/available-series", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetServiceMetricsSeriesRequest calls the generic GetServiceMetricsSeries builder with application/json body
+func NewGetServiceMetricsSeriesRequest(server string, projectId ProjectId, serviceId ServiceId, body GetServiceMetricsSeriesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewGetServiceMetricsSeriesRequestWithBody(server, projectId, serviceId, "application/json", bodyReader)
+}
+
+// NewGetServiceMetricsSeriesRequestWithBody generates requests for GetServiceMetricsSeries with any type of body
+func NewGetServiceMetricsSeriesRequestWithBody(server string, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/metrics/series", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2760,6 +2899,14 @@ type ClientWithResponsesInterface interface {
 	// GetServiceLogsWithResponse request
 	GetServiceLogsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, params *GetServiceLogsParams, reqEditors ...RequestEditorFn) (*GetServiceLogsResponse, error)
 
+	// GetServiceMetricsAvailableSeriesWithResponse request
+	GetServiceMetricsAvailableSeriesWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetServiceMetricsAvailableSeriesResponse, error)
+
+	// GetServiceMetricsSeriesWithBodyWithResponse request with any body
+	GetServiceMetricsSeriesWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error)
+
+	GetServiceMetricsSeriesWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error)
+
 	// GetReplicaSetsWithResponse request
 	GetReplicaSetsWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error)
 
@@ -3184,6 +3331,52 @@ func (r GetServiceLogsResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetServiceLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetServiceMetricsAvailableSeriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]string
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServiceMetricsAvailableSeriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServiceMetricsAvailableSeriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetServiceMetricsSeriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]MetricSeries
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServiceMetricsSeriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServiceMetricsSeriesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3880,6 +4073,32 @@ func (c *ClientWithResponses) GetServiceLogsWithResponse(ctx context.Context, pr
 		return nil, err
 	}
 	return ParseGetServiceLogsResponse(rsp)
+}
+
+// GetServiceMetricsAvailableSeriesWithResponse request returning *GetServiceMetricsAvailableSeriesResponse
+func (c *ClientWithResponses) GetServiceMetricsAvailableSeriesWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, reqEditors ...RequestEditorFn) (*GetServiceMetricsAvailableSeriesResponse, error) {
+	rsp, err := c.GetServiceMetricsAvailableSeries(ctx, projectId, serviceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceMetricsAvailableSeriesResponse(rsp)
+}
+
+// GetServiceMetricsSeriesWithBodyWithResponse request with arbitrary body returning *GetServiceMetricsSeriesResponse
+func (c *ClientWithResponses) GetServiceMetricsSeriesWithBodyWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error) {
+	rsp, err := c.GetServiceMetricsSeriesWithBody(ctx, projectId, serviceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceMetricsSeriesResponse(rsp)
+}
+
+func (c *ClientWithResponses) GetServiceMetricsSeriesWithResponse(ctx context.Context, projectId ProjectId, serviceId ServiceId, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error) {
+	rsp, err := c.GetServiceMetricsSeries(ctx, projectId, serviceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceMetricsSeriesResponse(rsp)
 }
 
 // GetReplicaSetsWithResponse request returning *GetReplicaSetsResponse
@@ -4624,6 +4843,72 @@ func ParseGetServiceLogsResponse(rsp *http.Response) (*GetServiceLogsResponse, e
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ServiceLogs
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServiceMetricsAvailableSeriesResponse parses an HTTP response from a GetServiceMetricsAvailableSeriesWithResponse call
+func ParseGetServiceMetricsAvailableSeriesResponse(rsp *http.Response) (*GetServiceMetricsAvailableSeriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServiceMetricsAvailableSeriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []string
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServiceMetricsSeriesResponse parses an HTTP response from a GetServiceMetricsSeriesWithResponse call
+func ParseGetServiceMetricsSeriesResponse(rsp *http.Response) (*GetServiceMetricsSeriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServiceMetricsSeriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []MetricSeries
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

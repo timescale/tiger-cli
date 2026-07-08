@@ -622,6 +622,66 @@ func (mr *MockClientInterfaceMockRecorder) GetServiceLogs(ctx, projectId, servic
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceLogs", reflect.TypeOf((*MockClientInterface)(nil).GetServiceLogs), varargs...)
 }
 
+// GetServiceMetricsAvailableSeries mocks base method.
+func (m *MockClientInterface) GetServiceMetricsAvailableSeries(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsAvailableSeries", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsAvailableSeries indicates an expected call of GetServiceMetricsAvailableSeries.
+func (mr *MockClientInterfaceMockRecorder) GetServiceMetricsAvailableSeries(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsAvailableSeries", reflect.TypeOf((*MockClientInterface)(nil).GetServiceMetricsAvailableSeries), varargs...)
+}
+
+// GetServiceMetricsSeries mocks base method.
+func (m *MockClientInterface) GetServiceMetricsSeries(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.GetServiceMetricsSeriesJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsSeries", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsSeries indicates an expected call of GetServiceMetricsSeries.
+func (mr *MockClientInterfaceMockRecorder) GetServiceMetricsSeries(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsSeries", reflect.TypeOf((*MockClientInterface)(nil).GetServiceMetricsSeries), varargs...)
+}
+
+// GetServiceMetricsSeriesWithBody mocks base method.
+func (m *MockClientInterface) GetServiceMetricsSeriesWithBody(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsSeriesWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsSeriesWithBody indicates an expected call of GetServiceMetricsSeriesWithBody.
+func (mr *MockClientInterfaceMockRecorder) GetServiceMetricsSeriesWithBody(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsSeriesWithBody", reflect.TypeOf((*MockClientInterface)(nil).GetServiceMetricsSeriesWithBody), varargs...)
+}
+
 // GetServices mocks base method.
 func (m *MockClientInterface) GetServices(ctx context.Context, projectId api.ProjectId, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -1704,6 +1764,66 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceLogsWithRespon
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectId, serviceId, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceLogsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServiceLogsWithResponse), varargs...)
+}
+
+// GetServiceMetricsAvailableSeriesWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetServiceMetricsAvailableSeriesWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, reqEditors ...api.RequestEditorFn) (*api.GetServiceMetricsAvailableSeriesResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsAvailableSeriesWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetServiceMetricsAvailableSeriesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsAvailableSeriesWithResponse indicates an expected call of GetServiceMetricsAvailableSeriesWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceMetricsAvailableSeriesWithResponse(ctx, projectId, serviceId any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsAvailableSeriesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServiceMetricsAvailableSeriesWithResponse), varargs...)
+}
+
+// GetServiceMetricsSeriesWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetServiceMetricsSeriesWithBodyWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.GetServiceMetricsSeriesResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsSeriesWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetServiceMetricsSeriesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsSeriesWithBodyWithResponse indicates an expected call of GetServiceMetricsSeriesWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceMetricsSeriesWithBodyWithResponse(ctx, projectId, serviceId, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsSeriesWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServiceMetricsSeriesWithBodyWithResponse), varargs...)
+}
+
+// GetServiceMetricsSeriesWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetServiceMetricsSeriesWithResponse(ctx context.Context, projectId api.ProjectId, serviceId api.ServiceId, body api.GetServiceMetricsSeriesJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.GetServiceMetricsSeriesResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectId, serviceId, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetServiceMetricsSeriesWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetServiceMetricsSeriesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceMetricsSeriesWithResponse indicates an expected call of GetServiceMetricsSeriesWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceMetricsSeriesWithResponse(ctx, projectId, serviceId, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectId, serviceId, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMetricsSeriesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServiceMetricsSeriesWithResponse), varargs...)
 }
 
 // GetServiceWithResponse mocks base method.
