@@ -167,6 +167,14 @@ type oauthCallback struct {
 	resultChan    chan<- oauthResult
 }
 
+// userAgentTransport sets the CLI User-Agent on outgoing requests.
+type userAgentTransport struct{}
+
+func (userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("User-Agent", config.UserAgent())
+	return http.DefaultTransport.RoundTrip(req)
+}
+
 func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
@@ -188,8 +196,10 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Exchange authorization code for tokens
-	token, err := c.oauthCfg.Exchange(r.Context(), code, oauth2.VerifierOption(c.codeVerifier))
+	// The exchange's User-Agent is recorded as the CLI session's user_agent.
+	ctx := context.WithValue(r.Context(), oauth2.HTTPClient,
+		&http.Client{Transport: userAgentTransport{}})
+	token, err := c.oauthCfg.Exchange(ctx, code, oauth2.VerifierOption(c.codeVerifier))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Failed to exchange authorization code for tokens")

@@ -50,7 +50,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	}
 
 	// Verify the User-Agent header was set correctly
-	expectedUserAgent := "tiger-cli/" + config.Version
+	expectedUserAgent := config.UserAgent()
 	if capturedUserAgent != expectedUserAgent {
 		t.Errorf("Expected User-Agent %q, got %q", expectedUserAgent, capturedUserAgent)
 	}
