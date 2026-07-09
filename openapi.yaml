@@ -1555,6 +1555,27 @@ components:
             Must be coarse enough for the window's tier; requests that ask
             for a finer bucket than the tier can produce are rejected.
           example: 3600
+        fn:
+          type: string
+          enum:
+            - RATE
+            - INCREASE
+            - SUM
+            - AVG
+            - MIN
+            - MAX
+            - COUNT
+            - P50
+            - P90
+            - P99
+            - LAST
+          description: |
+            Aggregation function applied per bucket. Only applies to
+            metrics-store-backed series (e.g. `pg_*`, `pgex_*`, `pgbouncer_*`,
+            `timescaledb_*`); setting it on a legacy `timescale_cloud_*`
+            series is rejected with INVALID_REQUEST. When omitted, the server
+            picks a sensible default for the metric (typically LAST).
+          example: "RATE"
         filters:
           type: array
           description: |

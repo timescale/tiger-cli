@@ -43,6 +43,21 @@ const (
 	PITR         ForkStrategy = "PITR"
 )
 
+// Defines values for MetricsSeriesRequestFn.
+const (
+	AVG      MetricsSeriesRequestFn = "AVG"
+	COUNT    MetricsSeriesRequestFn = "COUNT"
+	INCREASE MetricsSeriesRequestFn = "INCREASE"
+	LAST     MetricsSeriesRequestFn = "LAST"
+	MAX      MetricsSeriesRequestFn = "MAX"
+	MIN      MetricsSeriesRequestFn = "MIN"
+	P50      MetricsSeriesRequestFn = "P50"
+	P90      MetricsSeriesRequestFn = "P90"
+	P99      MetricsSeriesRequestFn = "P99"
+	RATE     MetricsSeriesRequestFn = "RATE"
+	SUM      MetricsSeriesRequestFn = "SUM"
+)
+
 // Defines values for ReadReplicaSetStatus.
 const (
 	ReadReplicaSetStatusActive   ReadReplicaSetStatus = "active"
@@ -259,6 +274,13 @@ type MetricsSeriesRequest struct {
 	// response are lowercased.
 	Filters *[]MetricLabelFilter `json:"filters,omitempty"`
 
+	// Fn Aggregation function applied per bucket. Only applies to
+	// metrics-store-backed series (e.g. `pg_*`, `pgex_*`, `pgbouncer_*`,
+	// `timescaledb_*`); setting it on a legacy `timescale_cloud_*`
+	// series is rejected with INVALID_REQUEST. When omitted, the server
+	// picks a sensible default for the metric (typically LAST).
+	Fn *MetricsSeriesRequestFn `json:"fn,omitempty"`
+
 	// From Start of the time window (RFC3339; nanosecond precision accepted).
 	From time.Time `json:"from"`
 
@@ -268,6 +290,13 @@ type MetricsSeriesRequest struct {
 	// To End of the time window (RFC3339; nanosecond precision accepted).
 	To time.Time `json:"to"`
 }
+
+// MetricsSeriesRequestFn Aggregation function applied per bucket. Only applies to
+// metrics-store-backed series (e.g. `pg_*`, `pgex_*`, `pgbouncer_*`,
+// `timescaledb_*`); setting it on a legacy `timescale_cloud_*`
+// series is rejected with INVALID_REQUEST. When omitted, the server
+// picks a sensible default for the metric (typically LAST).
+type MetricsSeriesRequestFn string
 
 // Peering defines model for Peering.
 type Peering struct {

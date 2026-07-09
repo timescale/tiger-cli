@@ -455,6 +455,7 @@ type ServiceMetricsSeriesInput struct {
 	Role          string                   `json:"role,omitempty"`
 	Filters       []MetricLabelFilterInput `json:"filters,omitempty"`
 	BucketSeconds int                      `json:"bucket_seconds,omitempty"`
+	Fn            string                   `json:"fn,omitempty"`
 }
 
 func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
@@ -483,6 +484,10 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
 	schema.Properties["bucket_seconds"].Minimum = util.Ptr(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
+
+	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Only applies to metrics-store-backed series (e.g. pg_*, pgex_*, pgbouncer_*, timescaledb_*); setting it on a legacy timescale_cloud_* series returns INVALID_REQUEST. When omitted, the server picks a sensible default for the metric (typically LAST)."
+	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "COUNT", "P50", "P90", "P99", "LAST"}
+	schema.Properties["fn"].Examples = []any{"RATE"}
 
 	return schema
 }
@@ -1419,6 +1424,10 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	if input.BucketSeconds > 0 {
 		bs := input.BucketSeconds
 		body.BucketSeconds = &bs
+	}
+	if input.Fn != "" {
+		fn := api.MetricsSeriesRequestFn(strings.ToUpper(input.Fn))
+		body.Fn = &fn
 	}
 	if len(filters) > 0 {
 		body.Filters = &filters
