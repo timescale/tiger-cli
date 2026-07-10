@@ -485,7 +485,7 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["bucket_seconds"].Minimum = util.Ptr(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
 
-	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Only applies to metrics-store-backed series (e.g. pg_*, pgex_*, pgbouncer_*, timescaledb_*); setting it on a legacy timescale_cloud_* series returns INVALID_REQUEST. When omitted, the server picks a sensible default for the metric (typically LAST)."
+	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST)."
 	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "COUNT", "P50", "P90", "P99", "LAST"}
 	schema.Properties["fn"].Examples = []any{"RATE"}
 

@@ -1925,7 +1925,7 @@ Examples:
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
-	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. Only applies to metrics-store-backed series (pg_*, pgex_*, pgbouncer_*, timescaledb_*); rejected on legacy timescale_cloud_* metrics. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST")
+	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
 
 	cmd.MarkFlagRequired("metric")
