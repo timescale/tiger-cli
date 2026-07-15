@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,90 +9,95 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// ResolvedTarget is a connection ID resolved to either a primary service or one
-// of its read replica sets. Service is always the parent (credentials and
-// password resets operate on it, since replicas share the primary's
-// credentials); Replica is non-nil when the ID named a read replica, whose
-// endpoint connections should target.
-type ResolvedTarget struct {
-	Service api.Service
-	Replica *api.ReadReplicaSet
+// ConnectionTarget describes where to connect and whose credentials to use.
+// Connect supplies the endpoint/pooler, Credential the password — the same
+// service for a primary; for a read replica, Connect is the replica and
+// Credential is the parent primary whose credentials it shares.
+type ConnectionTarget struct {
+	Connect    api.Service
+	Credential api.Service
+	IsReplica  bool
 }
 
-// ErrReplicaNotFound is returned by FindReplicaByID when no replica matches the
-// ID — distinct from a match that can't be used or an API failure — so callers
-// can fall back instead of surfacing it.
-var ErrReplicaNotFound = errors.New("no matching read replica")
+// Details builds connection details for the target — endpoint/pooler from
+// Connect, password from Credential. A requested-but-unavailable pooler is a
+// hard error for a primary but silently falls back to direct for a replica.
+func (t *ConnectionTarget) Details(opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	details, err := GetConnectionDetailsFor(t.Connect, t.Credential, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build connection string: %w", err)
+	}
+	if !t.IsReplica {
+		if err := details.RequirePooler(opts.Pooled); err != nil {
+			return nil, err
+		}
+	}
+	return details, nil
+}
 
-// ResolveServiceOrReplica resolves id to a primary service or a read replica of
-// some service in the project. It tries a direct service lookup first; on
-// failure it scans services for a replica with that ID (read replicas aren't
-// addressable on their own). If neither matches, the original service-lookup
-// error is returned.
-func ResolveServiceOrReplica(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ResolvedTarget, error) {
+// GetService fetches a single service by ID. The API resolves both primary
+// service IDs and read replica set IDs here; a read replica comes back as a
+// service whose endpoint is the replica's and whose ForkedFrom links to its
+// parent.
+func GetService(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Service, error) {
 	resp, err := client.GetServiceWithResponse(ctx, projectID, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch service details: %w", err)
 	}
-	if resp.StatusCode() == http.StatusOK {
-		if resp.JSON200 == nil {
-			return nil, fmt.Errorf("empty response from API")
-		}
-		return &ResolvedTarget{Service: *resp.JSON200}, nil
-	}
-
-	// Only a not-found might instead be a read replica; other failures aren't
-	// worth scanning every service for. A matched-but-unusable replica surfaces
-	// its own error; a true no-match falls through to the service error below.
-	if resp.StatusCode() == http.StatusNotFound {
-		if target, scanErr := FindReplicaByID(ctx, client, projectID, id); !errors.Is(scanErr, ErrReplicaNotFound) {
-			return target, scanErr
-		}
-	}
-
-	return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-}
-
-// FindReplicaByID scans the project's services for a read replica whose ID
-// matches id and returns it with its parent service. A matched replica must be
-// active and expose an endpoint; a match that isn't returns a descriptive
-// error. It returns ErrReplicaNotFound when no replica matches. Use it to fall
-// back to replica resolution once a direct service lookup has failed.
-func FindReplicaByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ResolvedTarget, error) {
-	resp, err := client.GetServicesWithResponse(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
-	}
 	if resp.StatusCode() != http.StatusOK {
 		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("empty response from API")
+	}
+	return resp.JSON200, nil
+}
 
-	if resp.JSON200 != nil {
-		services := *resp.JSON200
-		for i := range services {
-			if services[i].ReadReplicaSets == nil {
-				continue
-			}
-			replicas := *services[i].ReadReplicaSets
-			for j := range replicas {
-				replica := &replicas[j]
-				if util.DerefStr(replica.Id) != id {
-					continue
-				}
-				if replica.Status == nil || *replica.Status != api.ReadReplicaSetStatusActive {
-					status := "unknown"
-					if replica.Status != nil {
-						status = string(*replica.Status)
-					}
-					return nil, fmt.Errorf("read replica %q is not active (status: %s)", id, status)
-				}
-				if replica.Endpoint == nil {
-					return nil, fmt.Errorf("read replica %q has no endpoint available", id)
-				}
-				return &ResolvedTarget{Service: services[i], Replica: replica}, nil
-			}
-		}
+// ResolveConnectionTarget turns a fetched service into a ConnectionTarget. When
+// the service is a standby read replica (ForkedFrom.IsStandby), it connects to
+// the replica but resolves credentials against the parent primary, which is
+// fetched here. Everything else (primary, or an independent fork with its own
+// credentials) connects with its own credentials.
+func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
+	fork := service.ForkedFrom
+	if fork == nil || !util.Deref(fork.IsStandby) {
+		return &ConnectionTarget{Connect: service, Credential: service}, nil
 	}
 
-	return nil, fmt.Errorf("no service or read replica found with ID %q: %w", id, ErrReplicaNotFound)
+	parentID := util.DerefStr(fork.ServiceId)
+	if parentID == "" {
+		return &ConnectionTarget{Connect: service, Credential: service, IsReplica: true}, nil
+	}
+
+	parent, err := GetService(ctx, client, projectID, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
+	}
+	return &ConnectionTarget{Connect: service, Credential: *parent, IsReplica: true}, nil
+}
+
+// ResolveConnectionTargetByID fetches a service (which may be a read replica) by
+// ID and resolves its ConnectionTarget.
+func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
+	service, err := GetService(ctx, client, projectID, id)
+	if err != nil {
+		return nil, err
+	}
+	return ResolveConnectionTarget(ctx, client, projectID, *service)
+}
+
+// NewReplicaConnectionTarget builds a ConnectionTarget for connecting to one of
+// a service's read replica sets (as listed via the /replicaSets endpoint). The
+// replica supplies the endpoint; the primary supplies the credentials.
+func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet) *ConnectionTarget {
+	return &ConnectionTarget{
+		Connect: api.Service{
+			ServiceId:        replica.Id,
+			Name:             replica.Name,
+			Endpoint:         replica.Endpoint,
+			ConnectionPooler: replica.ConnectionPooler,
+		},
+		Credential: primary,
+		IsReplica:  true,
+	}
 }

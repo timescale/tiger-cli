@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -95,12 +94,12 @@ Examples:
 				return err
 			}
 
-			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := buildConnectionDetailsForTarget(cmd, service, replica, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
@@ -209,7 +208,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			service, replica, err := resolveConnectionTarget(cmd, cfg, serviceArgs)
+			target, err := resolveConnectionTarget(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -226,30 +225,19 @@ Examples:
 				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			}
 
-			var details *common.ConnectionDetails
-			if replica != nil {
-				// A replica ID was named directly — connect straight to it.
-				details, err = buildConnectionDetailsForTarget(cmd, service, replica, opts)
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(replica.Name))
-			} else {
-				// A primary ID — offer the interactive replica menu (a no-op that
-				// returns the primary when non-interactive or no replicas exist).
-				details, err = resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt)
-				if err != nil {
-					return err
-				}
-				if details == nil {
-					// User cancelled the connection.
-					return nil
-				}
+			// Connects straight to a replica named by ID, or offers the interactive
+			// replica menu for a primary. Returns nil details if the user cancels.
+			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, target, opts, dbConnectNoReplicaPrompt)
+			if err != nil {
+				return err
+			}
+			if details == nil {
+				return nil
 			}
 
-			// Replicas share the primary's credentials, so password storage and
-			// recovery always operate on the primary service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, service, details, psqlPath, psqlFlags)
+			// Read replicas share the primary's credentials, so password storage
+			// and recovery always operate on the credential service.
+			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, target.Credential, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -309,13 +297,13 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := buildConnectionDetailsForTarget(cmd, service, replica, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
@@ -859,14 +847,14 @@ Examples:
 				return err
 			}
 
-			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			warnReplicaPooler(cmd, replica, dbSchemaPooled)
+			warnReplicaPooler(cmd, target, dbSchemaPooled)
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), service, replica, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
+			schema, err := common.FetchServiceSchema(cmd.Context(), target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
 				Schema:             dbSchemaSchema,
 				IncludeInternal:    dbSchemaInternal,
 				IncludeDefinitions: dbSchemaDefinitions,
@@ -909,71 +897,34 @@ func buildDbCmd() *cobra.Command {
 }
 
 // resolveConnectionTarget looks up the target named by args, which may be a
-// primary service ID or a read replica set ID. For a replica, the returned
-// service is its parent (for credentials) and replica is non-nil. This lets a
-// replica ID work anywhere a service ID does across the db connection commands.
-func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, *api.ReadReplicaSet, error) {
-	// Service lookup is the common case (and what tests stub), so try it first.
+// primary service ID or a read replica set ID. This lets a replica ID work
+// anywhere a service ID does across the db connection commands.
+func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (*common.ConnectionTarget, error) {
 	service, err := getServiceDetailsFunc(cmd, cfg, args)
-	if err == nil {
-		return service, nil, nil
+	if err != nil {
+		return nil, err
 	}
 
-	// Only a not-found could instead be a read replica; other failures (auth,
-	// network, 5xx) aren't worth a full service-list scan.
-	if !common.IsNotFound(err) {
-		return api.Service{}, nil, err
-	}
-
-	serviceID, idErr := getServiceID(cfg.Config, args)
-	if idErr != nil {
-		return api.Service{}, nil, err
-	}
-
+	// The API resolves both primary and read replica IDs via GetService; a read
+	// replica comes back linked to its parent, whose credentials it shares.
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
-
-	target, scanErr := common.FindReplicaByID(ctx, cfg.Client, cfg.ProjectID, serviceID)
-	switch {
-	case scanErr == nil:
-		return target.Service, target.Replica, nil
-	case errors.Is(scanErr, common.ErrReplicaNotFound):
-		// Neither a service nor a replica: surface the original not-found error.
-		return api.Service{}, nil, err
-	default:
-		return api.Service{}, nil, scanErr
-	}
+	return common.ResolveConnectionTarget(ctx, cfg.Client, cfg.ProjectID, service)
 }
 
 // warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
-// any. It is a no-op for the primary (nil replica) or when nothing to warn.
-func warnReplicaPooler(cmd *cobra.Command, replica *api.ReadReplicaSet, pooled bool) {
-	if warning := common.ReplicaPoolerWarning(replica, pooled); warning != "" {
+// any. It is a no-op for a primary target or when there's nothing to warn.
+func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pooled bool) {
+	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
 		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", warning)
 	}
 }
 
-// buildConnectionDetailsForTarget builds connection details for the primary or
-// a read replica. A requested-but-unavailable pooler is a hard error for the
-// primary, but a warn-and-fall-back-to-direct for a replica.
-func buildConnectionDetailsForTarget(cmd *cobra.Command, service api.Service, replica *api.ReadReplicaSet, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
-	if replica != nil {
-		warnReplicaPooler(cmd, replica, opts.Pooled)
-		details, err := common.GetReplicaConnectionDetails(service, *replica, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build connection string: %w", err)
-		}
-		return details, nil
-	}
-
-	details, err := common.GetConnectionDetails(service, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build connection string: %w", err)
-	}
-	if err := details.RequirePooler(opts.Pooled); err != nil {
-		return nil, err
-	}
-	return details, nil
+// buildConnectionDetailsForTarget builds connection details for a target,
+// warning first when a replica falls back from a requested pooler.
+func buildConnectionDetailsForTarget(cmd *cobra.Command, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
+	warnReplicaPooler(cmd, target, opts.Pooled)
+	return target.Details(opts)
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
@@ -986,25 +937,14 @@ func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (a
 
 	cmd.SilenceUsage = true
 
-	// Fetch service details
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
+	service, err := common.GetService(ctx, cfg.Client, cfg.ProjectID, serviceID)
 	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
+		return api.Service{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return api.Service{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return api.Service{}, fmt.Errorf("empty response from API")
-	}
-
-	return *resp.JSON200, nil
+	return *service, nil
 }
 
 // ArgsLenAtDashProvider defines the interface for getting ArgsLenAtDash

@@ -125,7 +125,8 @@ func TestResolveConnectTarget_NoReplicasSkipsPrompt(t *testing.T) {
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 
-	details, err := resolveConnectTarget(context.Background(), cmd, client, "proj-1", primary,
+	target := &common.ConnectionTarget{Connect: primary, Credential: primary}
+	details, err := resolveConnectTarget(context.Background(), cmd, client, "proj-1", target,
 		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

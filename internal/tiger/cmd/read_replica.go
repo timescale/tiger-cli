@@ -15,67 +15,64 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// resolveConnectTarget prompts the user to connect to a read replica instead of
-// the primary, returning the chosen target (nil if cancelled). It returns the
-// primary without prompting when there's nothing to choose: non-interactive
-// stdin, prompting disabled, or no connectable replicas.
+// resolveConnectTarget resolves the connection details for `tiger db connect`.
+// A target that is already a read replica (named directly by ID) connects
+// straight to it. A primary, on an interactive terminal, is offered a menu to
+// connect to the primary or one of its read replicas. It returns nil details
+// when the user cancels. The menu is skipped for non-interactive stdin, when
+// prompting is disabled, or when the service has no connectable replicas.
 func resolveConnectTarget(
 	ctx context.Context,
 	cmd *cobra.Command,
 	client *api.ClientWithResponses,
 	projectID string,
-	primary api.Service,
+	target *common.ConnectionTarget,
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
-	returnPrimary := func() (*common.ConnectionDetails, error) {
-		return buildConnectionDetailsForTarget(cmd, primary, nil, opts)
-	}
+	// chosen is what we connect to; the menu below may replace it with a replica.
+	chosen := target
 
-	// Only prompt on an interactive terminal.
-	if noReplicaPrompt || !checkStdinIsTTY() {
-		return returnPrimary()
-	}
-
-	replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
-	if err != nil {
-		// Don't block the connection if we can't list replicas.
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
-		return returnPrimary()
-	}
-
-	// Only active replicas with an endpoint are connectable.
-	var connectable []api.ReadReplicaSet
-	for _, r := range replicas {
-		if r.Status != nil && *r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
-			connectable = append(connectable, r)
+	// Offer the replica menu only for a primary on an interactive terminal.
+	if !target.IsReplica && !noReplicaPrompt && checkStdinIsTTY() {
+		primary := target.Connect
+		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
+		if err != nil {
+			// Don't block the connection if we can't list replicas.
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
+		} else if connectable := connectableReplicas(replicas); len(connectable) > 0 {
+			choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
+			if err != nil {
+				return nil, err
+			}
+			switch choice.kind {
+			case targetCancel:
+				return nil, nil
+			case targetReplica:
+				chosen = common.NewReplicaConnectionTarget(primary, *choice.replica)
+			}
 		}
 	}
 
-	// Nothing to choose between, so skip the menu and use the primary.
-	if len(connectable) == 0 {
-		return returnPrimary()
-	}
-
-	choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
+	details, err := buildConnectionDetailsForTarget(cmd, chosen, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	switch choice.kind {
-	case targetCancel:
-		return nil, nil
-	case targetPrimary:
-		return returnPrimary()
+	if chosen.IsReplica {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.Connect.Name))
 	}
-
-	replica := choice.replica
-	details, err := buildConnectionDetailsForTarget(cmd, primary, replica, opts)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(replica.Name))
 	return details, nil
+}
+
+// connectableReplicas filters to active read replicas that expose an endpoint.
+func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
+	var out []api.ReadReplicaSet
+	for _, r := range replicas {
+		if r.Status != nil && *r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // fetchReplicaSets retrieves the read replica sets for a service.

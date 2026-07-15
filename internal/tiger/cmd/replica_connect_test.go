@@ -19,21 +19,21 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// replicaConnectTestConfig builds a Config whose client is backed by an
-// httptest server that 404s on getService (so resolution falls back to the
-// scan) and returns the given services from the list endpoint.
-func replicaConnectTestConfig(t *testing.T, list []api.Service) *common.Config {
+// serviceClientConfig builds a Config whose client serves the getService
+// endpoint from the given services keyed by ID (404 when absent).
+func serviceClientConfig(t *testing.T, services map[string]api.Service) *common.Config {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if strings.HasSuffix(r.URL.Path, "/services") {
-			_ = json.NewEncoder(w).Encode(list)
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		svc, ok := services[parts[len(parts)-1]]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "service not found"})
 			return
 		}
-		// getService for a replica ID is a miss.
-		w.WriteHeader(http.StatusNotFound)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "service not found"})
+		_ = json.NewEncoder(w).Encode(svc)
 	}))
 	t.Cleanup(srv.Close)
 
@@ -44,28 +44,39 @@ func replicaConnectTestConfig(t *testing.T, list []api.Service) *common.Config {
 	return &common.Config{Config: &config.Config{}, ProjectID: "proj1", Client: client}
 }
 
-func replicaConnectTestService() api.Service {
-	rhost := "replica.example.com"
-	rport := 5432
+func primarySvc() api.Service {
+	host := "svcprimary.example.com"
+	port := 5432
 	return api.Service{
 		ServiceId: util.Ptr("svcprimary"),
 		ProjectId: util.Ptr("proj1"),
 		Name:      util.Ptr("my-db"),
-		ReadReplicaSets: &[]api.ReadReplicaSet{{
-			Id:       util.Ptr("rep1234567"),
-			Name:     util.Ptr("reporting-replica"),
-			Status:   util.Ptr(api.ReadReplicaSetStatusActive),
-			Endpoint: &api.Endpoint{Host: &rhost, Port: &rport},
-		}},
+		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
 }
 
-// TestResolveConnectionTarget_Primary: when the service lookup succeeds, the ID
-// is a primary and no replica is returned.
+func standbySvc() api.Service {
+	host := "replica.example.com"
+	port := 5432
+	return api.Service{
+		ServiceId: util.Ptr("rep1234567"),
+		ProjectId: util.Ptr("proj1"),
+		Name:      util.Ptr("reporting-replica"),
+		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
+		ForkedFrom: &api.ForkSpec{
+			IsStandby: util.Ptr(true),
+			ProjectId: util.Ptr("proj1"),
+			ServiceId: util.Ptr("svcprimary"),
+		},
+	}
+}
+
+// TestResolveConnectionTarget_Primary: a plain service resolves to a primary
+// target (connect == credential, no parent fetch, so no client needed).
 func TestResolveConnectionTarget_Primary(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{ServiceId: util.Ptr("svcprimary")}, nil
+		return primarySvc(), nil
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
@@ -73,94 +84,60 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	service, replica, err := resolveConnectionTarget(cmd, cfg, []string{"svcprimary"})
+	target, err := resolveConnectionTarget(cmd, cfg, []string{"svcprimary"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if replica != nil {
-		t.Fatalf("expected no replica for a primary ID, got %+v", replica)
+	if target.IsReplica {
+		t.Fatal("expected a primary target")
 	}
-	if util.DerefStr(service.ServiceId) != "svcprimary" {
-		t.Errorf("expected primary svcprimary, got %q", util.DerefStr(service.ServiceId))
+	if util.DerefStr(target.Connect.ServiceId) != "svcprimary" {
+		t.Errorf("expected connect svcprimary, got %q", util.DerefStr(target.Connect.ServiceId))
 	}
 }
 
-// TestResolveConnectionTarget_ReplicaFallback: when the service lookup fails,
-// the ID is scanned against the project's read replicas, and the matching
-// replica plus its parent service is returned.
-func TestResolveConnectionTarget_ReplicaFallback(t *testing.T) {
+// TestResolveConnectionTarget_Replica: a standby service connects to the replica
+// but resolves credentials against the parent (fetched via the client).
+func TestResolveConnectionTarget_Replica(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusNotFound, fmt.Errorf("service not found"))
+		return standbySvc(), nil
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
-	cfg := replicaConnectTestConfig(t, []api.Service{replicaConnectTestService()})
+	cfg := serviceClientConfig(t, map[string]api.Service{"svcprimary": primarySvc()})
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	service, replica, err := resolveConnectionTarget(cmd, cfg, []string{"rep1234567"})
+	target, err := resolveConnectionTarget(cmd, cfg, []string{"rep1234567"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if replica == nil {
-		t.Fatal("expected a replica to be resolved, got nil")
+	if !target.IsReplica {
+		t.Fatal("expected a replica target")
 	}
-	if util.DerefStr(replica.Id) != "rep1234567" {
-		t.Errorf("expected replica rep1234567, got %q", util.DerefStr(replica.Id))
+	if util.DerefStr(target.Connect.ServiceId) != "rep1234567" {
+		t.Errorf("expected connect rep1234567, got %q", util.DerefStr(target.Connect.ServiceId))
 	}
-	// Parent service (used for credentials) is returned alongside the replica.
-	if util.DerefStr(service.ServiceId) != "svcprimary" {
-		t.Errorf("expected parent svcprimary, got %q", util.DerefStr(service.ServiceId))
-	}
-}
-
-// TestResolveConnectionTarget_UnknownReturnsOriginalError: a not-found ID that
-// matches neither a service nor a replica surfaces the original (service)
-// lookup error rather than the replica-scan's not-found error.
-func TestResolveConnectionTarget_UnknownReturnsOriginalError(t *testing.T) {
-	orig := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusNotFound, fmt.Errorf("original lookup error"))
-	}
-	defer func() { getServiceDetailsFunc = orig }()
-
-	cfg := replicaConnectTestConfig(t, []api.Service{replicaConnectTestService()})
-	cmd := &cobra.Command{}
-	cmd.SetContext(context.Background())
-
-	_, _, err := resolveConnectionTarget(cmd, cfg, []string{"missing999"})
-	if err == nil {
-		t.Fatal("expected an error for an unknown ID, got nil")
-	}
-	if !strings.Contains(err.Error(), "original lookup error") {
-		t.Errorf("expected the original lookup error to be surfaced, got %v", err)
+	if util.DerefStr(target.Credential.ServiceId) != "svcprimary" {
+		t.Errorf("expected credential svcprimary, got %q", util.DerefStr(target.Credential.ServiceId))
 	}
 }
 
-// TestResolveConnectionTarget_NonNotFoundSkipsScan: a non-not-found service
-// error (e.g. auth) is surfaced as-is without a replica scan, even though the
-// ID would match a replica if scanned.
-func TestResolveConnectionTarget_NonNotFoundSkipsScan(t *testing.T) {
+// TestResolveConnectionTarget_LookupError: a service-lookup failure is surfaced.
+func TestResolveConnectionTarget_LookupError(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusUnauthorized, fmt.Errorf("auth failed"))
+		return api.Service{}, fmt.Errorf("lookup failed")
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
-	cfg := replicaConnectTestConfig(t, []api.Service{replicaConnectTestService()})
+	cfg := &common.Config{Config: &config.Config{}, ProjectID: "proj1"}
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	_, replica, err := resolveConnectionTarget(cmd, cfg, []string{"rep1234567"})
-	if err == nil {
-		t.Fatal("expected the original auth error, got nil")
-	}
-	if replica != nil {
-		t.Fatal("expected no replica scan for a non-not-found error")
-	}
-	if !strings.Contains(err.Error(), "auth failed") {
-		t.Errorf("expected the original auth error to be surfaced, got %v", err)
+	if _, err := resolveConnectionTarget(cmd, cfg, []string{"x"}); err == nil {
+		t.Fatal("expected an error, got nil")
 	}
 }
 
@@ -169,22 +146,22 @@ func TestResolveConnectionTarget_NonNotFoundSkipsScan(t *testing.T) {
 func TestBuildConnectionDetailsForTarget_ReplicaPoolerFallback(t *testing.T) {
 	rhost := "replica.example.com"
 	rport := 5432
-	replica := &api.ReadReplicaSet{
-		Id:       util.Ptr("rep1234567"),
-		Name:     util.Ptr("reporting-replica"),
-		Endpoint: &api.Endpoint{Host: &rhost, Port: &rport},
+	target := &common.ConnectionTarget{
+		Connect: api.Service{
+			ServiceId: util.Ptr("rep1234567"),
+			Name:      util.Ptr("reporting-replica"),
+			Endpoint:  &api.Endpoint{Host: &rhost, Port: &rport},
+		},
+		Credential: api.Service{ServiceId: util.Ptr("svcprimary"), ProjectId: util.Ptr("proj1")},
+		IsReplica:  true,
 	}
-	primary := api.Service{ServiceId: util.Ptr("svcprimary"), ProjectId: util.Ptr("proj1")}
 
 	buf := &bytes.Buffer{}
 	cmd := &cobra.Command{}
 	cmd.SetErr(buf)
 	cmd.SetOut(io.Discard)
 
-	details, err := buildConnectionDetailsForTarget(cmd, primary, replica, common.ConnectionDetailsOptions{
-		Pooled: true,
-		Role:   "tsdbadmin",
-	})
+	details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -204,20 +181,17 @@ func TestBuildConnectionDetailsForTarget_ReplicaPoolerFallback(t *testing.T) {
 func TestBuildConnectionDetailsForTarget_PrimaryRequiresPooler(t *testing.T) {
 	host := "primary.example.com"
 	port := 5432
-	primary := api.Service{
+	svc := api.Service{
 		ServiceId: util.Ptr("svcprimary"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
+	target := &common.ConnectionTarget{Connect: svc, Credential: svc}
 
 	cmd := &cobra.Command{}
 	cmd.SetErr(io.Discard)
 	cmd.SetOut(io.Discard)
 
-	_, err := buildConnectionDetailsForTarget(cmd, primary, nil, common.ConnectionDetailsOptions{
-		Pooled: true,
-		Role:   "tsdbadmin",
-	})
-	if err == nil {
+	if _, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"}); err == nil {
 		t.Fatal("expected an error when a pooler is unavailable for the primary, got nil")
 	}
 }

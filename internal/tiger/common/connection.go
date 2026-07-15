@@ -10,19 +10,19 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// replicaHasPooler reports whether a read replica exposes a pooler endpoint.
-func replicaHasPooler(replica *api.ReadReplicaSet) bool {
-	return replica != nil && replica.ConnectionPooler != nil && replica.ConnectionPooler.Endpoint != nil
+// hasPooler reports whether a connection pooler exposes an endpoint.
+func hasPooler(pooler *api.ConnectionPooler) bool {
+	return pooler != nil && pooler.Endpoint != nil
 }
 
-// ReplicaPoolerWarning returns the single-sourced warning shown when pooling was
-// requested for a replica with no pooler (the connection then falls back to
-// direct, handled by buildConnectionDetails).
-func ReplicaPoolerWarning(replica *api.ReadReplicaSet, pooled bool) string {
-	if pooled && replica != nil && !replicaHasPooler(replica) {
-		return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(replica.Name))
+// ReplicaPoolerWarning returns the warning to show when pooling was requested
+// for a read replica with no pooler (the connection falls back to direct), or ""
+// otherwise — including for a non-replica target, so callers need no IsReplica guard.
+func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
+	if !target.IsReplica || !pooled || hasPooler(target.Connect.ConnectionPooler) {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(target.Connect.Name))
 }
 
 // ConnectionDetailsOptions configures how the connection string is built
@@ -74,42 +74,27 @@ func (d *ConnectionDetails) RequirePooler(requested bool) error {
 const readOnlyConnectionOption = "options=-c%20tsdb_admin.read_only_connection%3Dtrue"
 
 func GetConnectionDetails(service api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	if service.Endpoint == nil {
+	return GetConnectionDetailsFor(service, service, opts)
+}
+
+// GetConnectionDetailsFor builds connection details using connService for the
+// endpoint/pooler and credService for the password lookup. For a primary the
+// two are the same; for a read replica connService is the replica (its own
+// endpoint) and credService is the parent primary whose credentials it shares.
+func GetConnectionDetailsFor(connService, credService api.Service, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	if connService.Endpoint == nil {
 		return nil, fmt.Errorf("service endpoint not available")
 	}
-	return buildConnectionDetails(service.Endpoint, service.ConnectionPooler, service, opts)
+	return buildConnectionDetails(connService.Endpoint, connService.ConnectionPooler, credService, opts)
 }
 
-// ConnectToService resolves the service's connection details and opens a pgx
-// connection using the given query execution mode. It is the shared
-// service-to-connection path used by the query and schema tools. The caller
-// owns the returned connection and must Close it.
-func ConnectToService(ctx context.Context, service api.Service, opts ConnectionDetailsOptions, mode pgx.QueryExecMode) (*pgx.Conn, error) {
-	details, err := GetConnectionDetails(service, opts)
+// ConnectTarget opens a pgx connection to the target (see
+// ConnectionTarget.Details for the pooler policy). The caller owns the returned
+// connection and must Close it.
+func ConnectTarget(ctx context.Context, target *ConnectionTarget, opts ConnectionDetailsOptions, mode pgx.QueryExecMode) (*pgx.Conn, error) {
+	details, err := target.Details(opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build connection string: %w", err)
-	}
-	if err := details.RequirePooler(opts.Pooled); err != nil {
 		return nil, err
-	}
-
-	return connectWithDetails(ctx, details, mode)
-}
-
-// ConnectToTarget opens a pgx connection to the primary service, or to a read
-// replica when replica is non-nil (credentials still resolve against the
-// primary). A requested pooler that the replica lacks falls back to a direct
-// connection; this function does not warn — callers surface that via
-// common.ReplicaPoolerWarning. The caller owns the returned connection and must
-// Close it.
-func ConnectToTarget(ctx context.Context, primary api.Service, replica *api.ReadReplicaSet, opts ConnectionDetailsOptions, mode pgx.QueryExecMode) (*pgx.Conn, error) {
-	if replica == nil {
-		return ConnectToService(ctx, primary, opts, mode)
-	}
-
-	details, err := GetReplicaConnectionDetails(primary, *replica, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}
 	return connectWithDetails(ctx, details, mode)
 }
@@ -124,16 +109,6 @@ func connectWithDetails(ctx context.Context, details *ConnectionDetails, mode pg
 	connConfig.DefaultQueryExecMode = mode
 
 	return pgx.ConnectConfig(ctx, connConfig)
-}
-
-// GetReplicaConnectionDetails builds connection details for a read replica set.
-// Host/port come from the replica's endpoint, but the password is looked up via
-// the primary, since replicas share the primary's credentials.
-func GetReplicaConnectionDetails(primary api.Service, replica api.ReadReplicaSet, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	if replica.Endpoint == nil {
-		return nil, fmt.Errorf("read replica endpoint not available")
-	}
-	return buildConnectionDetails(replica.Endpoint, replica.ConnectionPooler, primary, opts)
 }
 
 // buildConnectionDetails selects the endpoint (pooler when requested and

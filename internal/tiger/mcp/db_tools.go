@@ -267,15 +267,15 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	)
 
 	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveServiceOrReplica(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
+	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
 
 	// A replica without a pooler connects directly; surface that as a warning.
-	warning := common.ReplicaPoolerWarning(target.Replica, input.Pooled)
+	warning := common.ReplicaPoolerWarning(target, input.Pooled)
 
-	schema, err := common.FetchServiceSchema(ctx, target.Service, target.Replica, input.Role, input.Pooled, common.SchemaOptions{
+	schema, err := common.FetchServiceSchema(ctx, target, input.Role, input.Pooled, common.SchemaOptions{
 		Schema:             input.SchemaName,
 		IncludeInternal:    input.Internal,
 		IncludeDefinitions: input.Definitions,
@@ -309,13 +309,13 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveServiceOrReplica(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
+	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
 
 	// A replica without a pooler connects directly; surface that as a warning.
-	poolerWarning := common.ReplicaPoolerWarning(target.Replica, input.Pooled)
+	poolerWarning := common.ReplicaPoolerWarning(target, input.Pooled)
 
 	// Create query context with timeout
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -336,7 +336,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	// Connect to database
-	conn, err := common.ConnectToTarget(queryCtx, target.Service, target.Replica, common.ConnectionDetailsOptions{
+	conn, err := common.ConnectTarget(queryCtx, target, common.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,
