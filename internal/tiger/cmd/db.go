@@ -919,8 +919,12 @@ func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []stri
 		return service, nil, nil
 	}
 
-	// Not a service — the ID might be a read replica, reachable only by
-	// scanning its parent. On any failure, keep the original lookup error.
+	// Only a not-found could instead be a read replica; other failures (auth,
+	// network, 5xx) aren't worth a full service-list scan.
+	if !common.IsNotFound(err) {
+		return api.Service{}, nil, err
+	}
+
 	serviceID, idErr := getServiceID(cfg.Config, args)
 	if idErr != nil {
 		return api.Service{}, nil, err
@@ -930,11 +934,15 @@ func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []stri
 	defer cancel()
 
 	target, scanErr := common.FindReplicaByID(ctx, cfg.Client, cfg.ProjectID, serviceID)
-	if scanErr != nil {
+	switch {
+	case scanErr == nil:
+		return target.Service, target.Replica, nil
+	case errors.Is(scanErr, common.ErrReplicaNotFound):
+		// Neither a service nor a replica: surface the original not-found error.
 		return api.Service{}, nil, err
+	default:
+		return api.Service{}, nil, scanErr
 	}
-
-	return target.Service, target.Replica, nil
 }
 
 // warnReplicaPooler prints the replica pooler-fallback warning to stderr, if

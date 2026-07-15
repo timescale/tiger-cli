@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -161,7 +162,66 @@ func TestFindReplicaByID(t *testing.T) {
 		t.Errorf("expected to find replica rep1234567, got %+v", target)
 	}
 
-	if _, err := FindReplicaByID(context.Background(), client, "proj1", "missing999"); err == nil {
-		t.Error("expected an error when no replica matches, got nil")
+	_, err = FindReplicaByID(context.Background(), client, "proj1", "missing999")
+	if !errors.Is(err, ErrReplicaNotFound) {
+		t.Errorf("expected ErrReplicaNotFound when no replica matches, got %v", err)
+	}
+}
+
+// TestFindReplicaByID_NotActive: a matched replica that isn't active returns a
+// descriptive error (not ErrReplicaNotFound), so callers surface it.
+func TestFindReplicaByID_NotActive(t *testing.T) {
+	primary := api.Service{
+		ServiceId: util.Ptr("svcprimary"),
+		ProjectId: util.Ptr("proj1"),
+		ReadReplicaSets: &[]api.ReadReplicaSet{{
+			Id:     util.Ptr("rep1234567"),
+			Name:   util.Ptr("still-creating"),
+			Status: util.Ptr(api.ReadReplicaSetStatusCreating),
+		}},
+	}
+	client := replicaTestClient(t, map[string]api.Service{"svcprimary": primary}, []api.Service{primary})
+
+	_, err := FindReplicaByID(context.Background(), client, "proj1", "rep1234567")
+	if err == nil {
+		t.Fatal("expected an error for a non-active replica, got nil")
+	}
+	if errors.Is(err, ErrReplicaNotFound) {
+		t.Errorf("expected a descriptive not-active error, got ErrReplicaNotFound: %v", err)
+	}
+	if !strings.Contains(err.Error(), "not active") {
+		t.Errorf("expected a 'not active' error, got %v", err)
+	}
+}
+
+// TestResolveServiceOrReplica_NonNotFoundSkipsScan: a non-404 service lookup
+// error is surfaced without listing services to look for a replica.
+func TestResolveServiceOrReplica_NonNotFoundSkipsScan(t *testing.T) {
+	primary := testReplicaService()
+	listed := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.HasSuffix(r.URL.Path, "/services") {
+			listed = true
+			_ = json.NewEncoder(w).Encode([]api.Service{primary})
+			return
+		}
+		// GET service → permission denied (not a 404).
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "forbidden"})
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := api.NewClientWithResponses(srv.URL)
+	if err != nil {
+		t.Fatalf("failed to build client: %v", err)
+	}
+
+	// "rep1234567" would match a replica if scanned, but a 403 must skip the scan.
+	if _, err := ResolveServiceOrReplica(context.Background(), client, "proj1", "rep1234567"); err == nil {
+		t.Fatal("expected the 403 error to be surfaced, got nil")
+	}
+	if listed {
+		t.Error("expected no service-list scan for a non-404 service error")
 	}
 }

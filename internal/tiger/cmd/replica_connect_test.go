@@ -91,7 +91,7 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 func TestResolveConnectionTarget_ReplicaFallback(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{}, fmt.Errorf("service not found")
+		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusNotFound, fmt.Errorf("service not found"))
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
@@ -115,12 +115,13 @@ func TestResolveConnectionTarget_ReplicaFallback(t *testing.T) {
 	}
 }
 
-// TestResolveConnectionTarget_UnknownReturnsOriginalError: an ID that is neither
-// a service nor a replica surfaces the original service-lookup error.
+// TestResolveConnectionTarget_UnknownReturnsOriginalError: a not-found ID that
+// matches neither a service nor a replica surfaces the original (service)
+// lookup error rather than the replica-scan's not-found error.
 func TestResolveConnectionTarget_UnknownReturnsOriginalError(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
-		return api.Service{}, fmt.Errorf("original lookup error")
+		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusNotFound, fmt.Errorf("original lookup error"))
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
@@ -134,6 +135,32 @@ func TestResolveConnectionTarget_UnknownReturnsOriginalError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "original lookup error") {
 		t.Errorf("expected the original lookup error to be surfaced, got %v", err)
+	}
+}
+
+// TestResolveConnectionTarget_NonNotFoundSkipsScan: a non-not-found service
+// error (e.g. auth) is surfaced as-is without a replica scan, even though the
+// ID would match a replica if scanned.
+func TestResolveConnectionTarget_NonNotFoundSkipsScan(t *testing.T) {
+	orig := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+		return api.Service{}, common.ExitWithErrorFromStatusCode(http.StatusUnauthorized, fmt.Errorf("auth failed"))
+	}
+	defer func() { getServiceDetailsFunc = orig }()
+
+	cfg := replicaConnectTestConfig(t, []api.Service{replicaConnectTestService()})
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+
+	_, replica, err := resolveConnectionTarget(cmd, cfg, []string{"rep1234567"})
+	if err == nil {
+		t.Fatal("expected the original auth error, got nil")
+	}
+	if replica != nil {
+		t.Fatal("expected no replica scan for a non-not-found error")
+	}
+	if !strings.Contains(err.Error(), "auth failed") {
+		t.Errorf("expected the original auth error to be surfaced, got %v", err)
 	}
 }
 

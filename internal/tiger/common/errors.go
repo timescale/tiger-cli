@@ -57,6 +57,13 @@ func ExitWithCode(code int, err error) error {
 	return ExitCodeError{code: code, err: err}
 }
 
+// IsNotFound reports whether err represents an HTTP 404 "not found" API failure,
+// as produced by ExitWithErrorFromStatusCode.
+func IsNotFound(err error) bool {
+	var exitErr ExitCodeError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == ExitServiceNotFound
+}
+
 // ExitWithErrorFromStatusCode maps HTTP status codes to CLI exit codes
 func ExitWithErrorFromStatusCode(statusCode int, err error) error {
 	if err == nil {
