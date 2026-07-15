@@ -56,6 +56,9 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. The connection string includes all necessary parameters
 for establishing a database connection to the TimescaleDB/PostgreSQL service.
 
+You can also pass a read replica set ID in place of the service ID to get a
+connection string for that read replica.
+
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
 
@@ -92,27 +95,23 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, service, replica, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
 				ReadOnly:     dbConnectionStringReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to build connection string: %w", err)
+				return err
 			}
 
 			if dbConnectionStringWithPassword && details.Password == "" {
 				return fmt.Errorf("password not available to include in connection string")
-			}
-
-			if err := details.RequirePooler(dbConnectionStringPooled); err != nil {
-				return err
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -163,10 +162,18 @@ primary. Use --no-replica-prompt to skip this prompt and always connect to the
 requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
+You can also pass a read replica set ID directly in place of the service ID to
+connect straight to that read replica without the prompt.
+Read replicas are read-only, may lag the primary, and share the primary
+service's credentials.
+
 Examples:
   # Connect to default service
   tiger db connect
   tiger db psql
+
+  # Connect directly to a read replica by its ID
+  tiger db connect rep1234567
 
   # Connect without the read replica prompt
   tiger db connect svc-12345 --no-replica-prompt
@@ -202,7 +209,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			service, err := getServiceDetailsFunc(cmd, cfg, serviceArgs)
+			service, replica, err := resolveConnectionTarget(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -219,18 +226,25 @@ Examples:
 				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			}
 
-			// Optionally offer to connect to an existing read replica instead of
-			// the primary service. In non-interactive contexts, or when the
-			// service has no read replicas, this returns the primary's details
-			// without prompting. Pooler availability is validated here: a hard
-			// error for the primary, warn-and-fall-back for replicas.
-			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt)
-			if err != nil {
-				return err
-			}
-			if details == nil {
-				// User cancelled the connection.
-				return nil
+			var details *common.ConnectionDetails
+			if replica != nil {
+				// A replica ID was named directly — connect straight to it.
+				details, err = buildConnectionDetailsForTarget(cmd, service, replica, opts)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(replica.Name))
+			} else {
+				// A primary ID — offer the interactive replica menu (a no-op that
+				// returns the primary when non-interactive or no replicas exist).
+				details, err = resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt)
+				if err != nil {
+					return err
+				}
+				if details == nil {
+					// User cancelled the connection.
+					return nil
+				}
 			}
 
 			// Replicas share the primary's credentials, so password storage and
@@ -262,6 +276,9 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
+You can also pass a read replica set ID in place of the service ID to test
+connectivity to that read replica.
+
 Return Codes:
   0: Server is accepting connections normally
   1: Server is rejecting connections (e.g., during startup)
@@ -292,22 +309,18 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, service, replica, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
 			})
 			if err != nil {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
-			}
-
-			if err := details.RequirePooler(dbTestConnectionPooled); err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
@@ -813,8 +826,10 @@ indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration. Only objects the connecting role can access are
-returned. The connection is opened in Tiger Cloud's immutable read-only mode.
+from your configuration. You can also pass a read replica set ID in place of the
+service ID to introspect that read replica. Only objects the connecting role can
+access are returned. The connection is opened in Tiger Cloud's immutable
+read-only mode.
 
 By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
@@ -844,12 +859,14 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			service, replica, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), service, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
+			warnReplicaPooler(cmd, replica, dbSchemaPooled)
+
+			schema, err := common.FetchServiceSchema(cmd.Context(), service, replica, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
 				Schema:             dbSchemaSchema,
 				IncludeInternal:    dbSchemaInternal,
 				IncludeDefinitions: dbSchemaDefinitions,
@@ -889,6 +906,66 @@ func buildDbCmd() *cobra.Command {
 	cmd.AddCommand(buildDbSchemaCmd())
 
 	return cmd
+}
+
+// resolveConnectionTarget looks up the target named by args, which may be a
+// primary service ID or a read replica set ID. For a replica, the returned
+// service is its parent (for credentials) and replica is non-nil. This lets a
+// replica ID work anywhere a service ID does across the db connection commands.
+func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, *api.ReadReplicaSet, error) {
+	// Service lookup is the common case (and what tests stub), so try it first.
+	service, err := getServiceDetailsFunc(cmd, cfg, args)
+	if err == nil {
+		return service, nil, nil
+	}
+
+	// Not a service — the ID might be a read replica, reachable only by
+	// scanning its parent. On any failure, keep the original lookup error.
+	serviceID, idErr := getServiceID(cfg.Config, args)
+	if idErr != nil {
+		return api.Service{}, nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer cancel()
+
+	target, scanErr := common.FindReplicaByID(ctx, cfg.Client, cfg.ProjectID, serviceID)
+	if scanErr != nil {
+		return api.Service{}, nil, err
+	}
+
+	return target.Service, target.Replica, nil
+}
+
+// warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
+// any. It is a no-op for the primary (nil replica) or when nothing to warn.
+func warnReplicaPooler(cmd *cobra.Command, replica *api.ReadReplicaSet, pooled bool) {
+	if warning := common.ReplicaPoolerWarning(replica, pooled); warning != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", warning)
+	}
+}
+
+// buildConnectionDetailsForTarget builds connection details for the primary or
+// a read replica. A requested-but-unavailable pooler is a hard error for the
+// primary, but a warn-and-fall-back-to-direct for a replica.
+func buildConnectionDetailsForTarget(cmd *cobra.Command, service api.Service, replica *api.ReadReplicaSet, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
+	if replica != nil {
+		warnReplicaPooler(cmd, replica, opts.Pooled)
+		details, err := common.GetReplicaConnectionDetails(service, *replica, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build connection string: %w", err)
+		}
+		return details, nil
+	}
+
+	details, err := common.GetConnectionDetails(service, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build connection string: %w", err)
+	}
+	if err := details.RequirePooler(opts.Pooled); err != nil {
+		return nil, err
+	}
+	return details, nil
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details

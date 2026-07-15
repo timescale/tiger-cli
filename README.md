@@ -110,7 +110,7 @@ Tiger CLI provides the following commands:
   - `delete` - Delete a service
   - `update-password` - Update service master password
   - `logs` - View service logs
-- `tiger db` - Database operations
+- `tiger db` - Database operations (each command below also accepts a read replica set ID in place of the service ID)
   - `connect` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip)
   - `connection-string` - Get connection string for a service
   - `test-connection` - Test database connectivity

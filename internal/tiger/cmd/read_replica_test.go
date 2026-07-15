@@ -91,27 +91,6 @@ func TestConnectTargetModel_KeySelection(t *testing.T) {
 	}
 }
 
-func TestReplicaHasPooler(t *testing.T) {
-	host := "h"
-	port := 6432
-
-	cases := []struct {
-		name    string
-		replica *api.ReadReplicaSet
-		want    bool
-	}{
-		{"nil replica", nil, false},
-		{"no pooler", &api.ReadReplicaSet{}, false},
-		{"pooler without endpoint", &api.ReadReplicaSet{ConnectionPooler: &api.ConnectionPooler{}}, false},
-		{"pooler with endpoint", &api.ReadReplicaSet{ConnectionPooler: &api.ConnectionPooler{Endpoint: &api.Endpoint{Host: &host, Port: &port}}}, true},
-	}
-	for _, tc := range cases {
-		if got := replicaHasPooler(tc.replica); got != tc.want {
-			t.Errorf("%s: replicaHasPooler = %v, want %v", tc.name, got, tc.want)
-		}
-	}
-}
-
 // TestResolveConnectTarget_NoReplicasSkipsPrompt verifies that, with no
 // connectable replicas, resolveConnectTarget connects to the primary directly
 // instead of showing a single-option menu (which would block on TTY input in

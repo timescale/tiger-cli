@@ -7,7 +7,23 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/timescale/tiger-cli/internal/tiger/api"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
+
+// replicaHasPooler reports whether a read replica exposes a pooler endpoint.
+func replicaHasPooler(replica *api.ReadReplicaSet) bool {
+	return replica != nil && replica.ConnectionPooler != nil && replica.ConnectionPooler.Endpoint != nil
+}
+
+// ReplicaPoolerWarning returns the single-sourced warning shown when pooling was
+// requested for a replica with no pooler (the connection then falls back to
+// direct, handled by buildConnectionDetails).
+func ReplicaPoolerWarning(replica *api.ReadReplicaSet, pooled bool) string {
+	if pooled && replica != nil && !replicaHasPooler(replica) {
+		return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(replica.Name))
+	}
+	return ""
+}
 
 // ConnectionDetailsOptions configures how the connection string is built
 type ConnectionDetailsOptions struct {
@@ -77,6 +93,30 @@ func ConnectToService(ctx context.Context, service api.Service, opts ConnectionD
 		return nil, err
 	}
 
+	return connectWithDetails(ctx, details, mode)
+}
+
+// ConnectToTarget opens a pgx connection to the primary service, or to a read
+// replica when replica is non-nil (credentials still resolve against the
+// primary). A requested pooler that the replica lacks falls back to a direct
+// connection; this function does not warn — callers surface that via
+// common.ReplicaPoolerWarning. The caller owns the returned connection and must
+// Close it.
+func ConnectToTarget(ctx context.Context, primary api.Service, replica *api.ReadReplicaSet, opts ConnectionDetailsOptions, mode pgx.QueryExecMode) (*pgx.Conn, error) {
+	if replica == nil {
+		return ConnectToService(ctx, primary, opts, mode)
+	}
+
+	details, err := GetReplicaConnectionDetails(primary, *replica, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build connection string: %w", err)
+	}
+	return connectWithDetails(ctx, details, mode)
+}
+
+// connectWithDetails parses connection details and opens a pgx connection using
+// the given query execution mode.
+func connectWithDetails(ctx context.Context, details *ConnectionDetails, mode pgx.QueryExecMode) (*pgx.Conn, error) {
 	connConfig, err := pgx.ParseConfig(details.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)

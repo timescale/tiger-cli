@@ -28,17 +28,8 @@ func resolveConnectTarget(
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
-	// returnPrimary builds the primary's details. Requesting --pooled when no
-	// pooler exists is a hard error.
 	returnPrimary := func() (*common.ConnectionDetails, error) {
-		details, err := common.GetConnectionDetails(primary, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build connection string: %w", err)
-		}
-		if err := details.RequirePooler(opts.Pooled); err != nil {
-			return nil, err
-		}
-		return details, nil
+		return buildConnectionDetailsForTarget(cmd, primary, nil, opts)
 	}
 
 	// Only prompt on an interactive terminal.
@@ -79,25 +70,12 @@ func resolveConnectTarget(
 	}
 
 	replica := choice.replica
-
-	// --pooled is best-effort on replicas: warn and connect directly if the
-	// chosen replica has no pooler.
-	if opts.Pooled && !replicaHasPooler(replica) {
-		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: read replica '%s' has no connection pooler; connecting directly instead.\n", util.DerefStr(replica.Name))
-		opts.Pooled = false
-	}
-
-	details, err := common.GetReplicaConnectionDetails(primary, *replica, opts)
+	details, err := buildConnectionDetailsForTarget(cmd, primary, replica, opts)
 	if err != nil {
 		return nil, err
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(replica.Name))
 	return details, nil
-}
-
-// replicaHasPooler reports whether a replica set exposes a pooler endpoint.
-func replicaHasPooler(replica *api.ReadReplicaSet) bool {
-	return replica != nil && replica.ConnectionPooler != nil && replica.ConnectionPooler.Endpoint != nil
 }
 
 // fetchReplicaSets retrieves the read replica sets for a service.
