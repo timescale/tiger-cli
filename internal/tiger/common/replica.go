@@ -56,8 +56,7 @@ func GetService(ctx context.Context, client api.ClientWithResponsesInterface, pr
 // ResolveConnectionTarget turns a fetched service into a ConnectionTarget. When
 // the service is a standby read replica (ForkedFrom.IsStandby), it connects to
 // the replica but resolves credentials against the parent primary, which is
-// fetched here. Everything else (primary, or an independent fork with its own
-// credentials) connects with its own credentials.
+// fetched here.
 func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
 	fork := service.ForkedFrom
 	if fork == nil || !util.Deref(fork.IsStandby) {

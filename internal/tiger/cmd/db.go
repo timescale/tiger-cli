@@ -55,8 +55,7 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. The connection string includes all necessary parameters
 for establishing a database connection to the TimescaleDB/PostgreSQL service.
 
-You can also pass a read replica set ID in place of the service ID to get a
-connection string for that read replica.
+You can also pass a read replica set ID to get a connection string for that replica.
 
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
@@ -161,10 +160,8 @@ primary. Use --no-replica-prompt to skip this prompt and always connect to the
 requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
-You can also pass a read replica set ID directly in place of the service ID to
-connect straight to that read replica without the prompt.
-Read replicas are read-only, may lag the primary, and share the primary
-service's credentials.
+You can also pass a read replica set ID to connect straight to that replica,
+skipping the prompt. Read replicas share the primary's credentials.
 
 Examples:
   # Connect to default service
@@ -264,8 +261,7 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
-You can also pass a read replica set ID in place of the service ID to test
-connectivity to that read replica.
+You can also pass a read replica set ID to test connectivity to that replica.
 
 Return Codes:
   0: Server is accepting connections normally
@@ -814,10 +810,9 @@ indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration. You can also pass a read replica set ID in place of the
-service ID to introspect that read replica. Only objects the connecting role can
-access are returned. The connection is opened in Tiger Cloud's immutable
-read-only mode.
+from your configuration. You can also pass a read replica set ID to introspect
+that replica. Only objects the connecting role can access are returned. The
+connection is opened in Tiger Cloud's immutable read-only mode.
 
 By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
