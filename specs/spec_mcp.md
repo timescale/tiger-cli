@@ -344,7 +344,7 @@ Test database connectivity.
 Execute a SQL query on a service database.
 
 **Parameters:**
-- `service_id` (string, required): Service ID. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only and may lag the primary) instead of the primary service. Credentials resolve against the parent service.
+- `service_id` (string, required): Service ID. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service. Credentials resolve against the parent service.
 - `query` (string, required): SQL query to execute
 - `parameters` (array, optional): Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query.
 - `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)

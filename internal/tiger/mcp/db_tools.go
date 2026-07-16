@@ -61,7 +61,7 @@ type DBExecuteQueryInput struct {
 func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only and may lag the primary) instead of the primary service."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
