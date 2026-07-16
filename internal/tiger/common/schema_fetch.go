@@ -16,7 +16,7 @@ import (
 // The connection is forced read-only: introspection only issues SELECTs, so
 // this is always safe and guards against accidental writes.
 func FetchServiceSchema(ctx context.Context, target *ConnectionTarget, role string, pooled bool, opts SchemaOptions) (*DatabaseSchema, error) {
-	if err := CheckServiceReady(target.Connect); err != nil {
+	if err := CheckServiceReady(target.ConnectionService); err != nil {
 		return nil, err
 	}
 
@@ -33,8 +33,8 @@ func FetchServiceSchema(ctx context.Context, target *ConnectionTarget, role stri
 	defer conn.Close(context.Background())
 
 	ident := SchemaIdent{
-		ID:   util.DerefStr(target.Connect.ServiceId),
-		Name: util.DerefStr(target.Connect.Name),
+		ID:   util.DerefStr(target.ConnectionService.ServiceId),
+		Name: util.DerefStr(target.ConnectionService.Name),
 	}
 	return FetchSchemaFromConn(ctx, conn, ident, opts)
 }

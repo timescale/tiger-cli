@@ -234,7 +234,7 @@ Examples:
 
 			// Read replicas share the primary's credentials, so password storage
 			// and recovery always operate on the credential service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, target.Credential, details, psqlPath, psqlFlags)
+			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, target.CredentialService, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -376,7 +376,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			service := target.Credential
+			service := target.CredentialService
 
 			// Determine password based on precedence:
 			// 1. --password flag with value

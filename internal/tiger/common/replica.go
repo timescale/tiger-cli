@@ -9,21 +9,20 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// ConnectionTarget describes where to connect and whose credentials to use.
-// Connect supplies the endpoint/pooler, Credential the password — the same
-// service for a primary; for a read replica, Connect is the replica and
-// Credential is the parent primary whose credentials it shares.
+// ConnectionTarget is the service to connect to plus the service whose
+// credentials to use. They're the same for a primary; for a read replica the
+// CredentialService is the parent primary, whose credentials it shares.
 type ConnectionTarget struct {
-	Connect    api.Service
-	Credential api.Service
-	IsReplica  bool
+	ConnectionService api.Service
+	CredentialService api.Service
+	IsReplica         bool
 }
 
-// Details builds connection details for the target — endpoint/pooler from
-// Connect, password from Credential. A requested-but-unavailable pooler is a
-// hard error for a primary but silently falls back to direct for a replica.
+// Details builds the target's connection details. A requested-but-unavailable
+// pooler is a hard error for a primary but silently falls back to direct for a
+// replica.
 func (t *ConnectionTarget) Details(opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	details, err := GetConnectionDetailsFor(t.Connect, t.Credential, opts)
+	details, err := GetConnectionDetailsFor(t.ConnectionService, t.CredentialService, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}
@@ -64,19 +63,19 @@ func IsReadReplica(service api.Service) bool {
 // credentials against the parent primary, which is fetched here.
 func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
 	if !IsReadReplica(service) {
-		return &ConnectionTarget{Connect: service, Credential: service}, nil
+		return &ConnectionTarget{ConnectionService: service, CredentialService: service}, nil
 	}
 
 	parentID := util.DerefStr(service.ForkedFrom.ServiceId)
 	if parentID == "" {
-		return &ConnectionTarget{Connect: service, Credential: service, IsReplica: true}, nil
+		return &ConnectionTarget{ConnectionService: service, CredentialService: service, IsReplica: true}, nil
 	}
 
 	parent, err := GetService(ctx, client, projectID, parentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
 	}
-	return &ConnectionTarget{Connect: service, Credential: *parent, IsReplica: true}, nil
+	return &ConnectionTarget{ConnectionService: service, CredentialService: *parent, IsReplica: true}, nil
 }
 
 // ResolveConnectionTargetByID fetches a service (which may be a read replica) by
@@ -94,13 +93,13 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 // replica supplies the endpoint; the primary supplies the credentials.
 func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet) *ConnectionTarget {
 	return &ConnectionTarget{
-		Connect: api.Service{
+		ConnectionService: api.Service{
 			ServiceId:        replica.Id,
 			Name:             replica.Name,
 			Endpoint:         replica.Endpoint,
 			ConnectionPooler: replica.ConnectionPooler,
 		},
-		Credential: primary,
-		IsReplica:  true,
+		CredentialService: primary,
+		IsReplica:         true,
 	}
 }

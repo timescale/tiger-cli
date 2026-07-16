@@ -35,7 +35,7 @@ func resolveConnectTarget(
 
 	// Offer the replica menu only for a primary on an interactive terminal.
 	if !target.IsReplica && !noReplicaPrompt && checkStdinIsTTY() {
-		primary := target.Connect
+		primary := target.ConnectionService
 		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
@@ -59,7 +59,7 @@ func resolveConnectTarget(
 		return nil, err
 	}
 	if chosen.IsReplica {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.Connect.Name))
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
 	}
 	return details, nil
 }

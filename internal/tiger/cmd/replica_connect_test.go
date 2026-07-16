@@ -91,8 +91,8 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 	if target.IsReplica {
 		t.Fatal("expected a primary target")
 	}
-	if util.DerefStr(target.Connect.ServiceId) != "svcprimary" {
-		t.Errorf("expected connect svcprimary, got %q", util.DerefStr(target.Connect.ServiceId))
+	if util.DerefStr(target.ConnectionService.ServiceId) != "svcprimary" {
+		t.Errorf("expected connect svcprimary, got %q", util.DerefStr(target.ConnectionService.ServiceId))
 	}
 }
 
@@ -116,11 +116,11 @@ func TestResolveConnectionTarget_Replica(t *testing.T) {
 	if !target.IsReplica {
 		t.Fatal("expected a replica target")
 	}
-	if util.DerefStr(target.Connect.ServiceId) != "rep1234567" {
-		t.Errorf("expected connect rep1234567, got %q", util.DerefStr(target.Connect.ServiceId))
+	if util.DerefStr(target.ConnectionService.ServiceId) != "rep1234567" {
+		t.Errorf("expected connect rep1234567, got %q", util.DerefStr(target.ConnectionService.ServiceId))
 	}
-	if util.DerefStr(target.Credential.ServiceId) != "svcprimary" {
-		t.Errorf("expected credential svcprimary, got %q", util.DerefStr(target.Credential.ServiceId))
+	if util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
+		t.Errorf("expected credential svcprimary, got %q", util.DerefStr(target.CredentialService.ServiceId))
 	}
 }
 
@@ -147,13 +147,13 @@ func TestBuildConnectionDetailsForTarget_ReplicaPoolerFallback(t *testing.T) {
 	rhost := "replica.example.com"
 	rport := 5432
 	target := &common.ConnectionTarget{
-		Connect: api.Service{
+		ConnectionService: api.Service{
 			ServiceId: util.Ptr("rep1234567"),
 			Name:      util.Ptr("reporting-replica"),
 			Endpoint:  &api.Endpoint{Host: &rhost, Port: &rport},
 		},
-		Credential: api.Service{ServiceId: util.Ptr("svcprimary"), ProjectId: util.Ptr("proj1")},
-		IsReplica:  true,
+		CredentialService: api.Service{ServiceId: util.Ptr("svcprimary"), ProjectId: util.Ptr("proj1")},
+		IsReplica:         true,
 	}
 
 	buf := &bytes.Buffer{}
@@ -185,7 +185,7 @@ func TestBuildConnectionDetailsForTarget_PrimaryRequiresPooler(t *testing.T) {
 		ServiceId: util.Ptr("svcprimary"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
-	target := &common.ConnectionTarget{Connect: svc, Credential: svc}
+	target := &common.ConnectionTarget{ConnectionService: svc, CredentialService: svc}
 
 	cmd := &cobra.Command{}
 	cmd.SetErr(io.Discard)

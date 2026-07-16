@@ -20,10 +20,10 @@ func hasPooler(pooler *api.ConnectionPooler) bool {
 // for a read replica with no pooler (the connection falls back to direct), or ""
 // otherwise — including for a non-replica target, so callers need no IsReplica guard.
 func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
-	if !target.IsReplica || !pooled || hasPooler(target.Connect.ConnectionPooler) {
+	if !target.IsReplica || !pooled || hasPooler(target.ConnectionService.ConnectionPooler) {
 		return ""
 	}
-	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(target.Connect.Name))
+	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(target.ConnectionService.Name))
 }
 
 // ConnectionDetailsOptions configures how the connection string is built
