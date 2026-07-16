@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -62,7 +61,7 @@ type DBExecuteQueryInput struct {
 func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBExecuteQueryInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -108,6 +107,7 @@ type DBExecuteQueryOutput struct {
 	ExecutionTime string      `json:"execution_time"`
 	Truncated     bool        `json:"truncated,omitempty"`
 	Notice        string      `json:"notice,omitempty"`
+	Warning       string      `json:"warning,omitempty"`
 }
 
 func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
@@ -142,6 +142,8 @@ func (DBExecuteQueryOutput) Schema() *jsonschema.Schema {
 	schema.Properties["truncated"].Description = "True when any result set was truncated to limit the amount of data returned. See notice for guidance."
 
 	schema.Properties["notice"].Description = "Present only when results were truncated. Actionable guidance for getting the needed data via SQL (aggregate, filter, paginate) instead of re-running the query."
+
+	schema.Properties["warning"].Description = "Present when connection pooling was requested for a read replica that has none; the query ran over a direct connection instead."
 
 	return schema
 }
@@ -203,7 +205,7 @@ type DBSchemaInput struct {
 func (DBSchemaInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBSchemaInput](nil))
 
-	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
+	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs. A read replica set ID is also accepted here — passing one introspects that read replica instead of the primary service."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
 	schema.Properties["service_id"].Pattern = "^[a-z0-9]{10}$"
 
@@ -233,12 +235,15 @@ func (DBSchemaInput) Schema() *jsonschema.Schema {
 // DBSchemaOutput represents output for db_schema
 type DBSchemaOutput struct {
 	SchemaText string `json:"schema"`
+	Warning    string `json:"warning,omitempty"`
 }
 
 func (DBSchemaOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[DBSchemaOutput](nil))
 
 	schema.Properties["schema"].Description = "The database schema rendered as human-readable text, grouped under a SCHEMA header per namespace."
+
+	schema.Properties["warning"].Description = "Present when connection pooling was requested for a read replica that has none; the schema was read over a direct connection instead."
 
 	return schema
 }
@@ -261,18 +266,16 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		zap.Bool("pooled", input.Pooled),
 	)
 
-	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	// service_id may name a service or one of its read replicas.
+	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
 	if err != nil {
-		return nil, DBSchemaOutput{}, fmt.Errorf("failed to get service details: %w", err)
-	}
-	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, DBSchemaOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
-	}
-	if serviceResp.JSON200 == nil {
-		return nil, DBSchemaOutput{}, fmt.Errorf("empty response from API")
+		return nil, DBSchemaOutput{}, err
 	}
 
-	schema, err := common.FetchServiceSchema(ctx, *serviceResp.JSON200, input.Role, input.Pooled, common.SchemaOptions{
+	// A replica without a pooler connects directly; surface that as a warning.
+	warning := common.ReplicaPoolerWarning(target, input.Pooled)
+
+	schema, err := common.FetchServiceSchema(ctx, target, input.Role, input.Pooled, common.SchemaOptions{
 		Schema:             input.SchemaName,
 		IncludeInternal:    input.Internal,
 		IncludeDefinitions: input.Definitions,
@@ -282,7 +285,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, DBSchemaOutput{}, err
 	}
 
-	return nil, DBSchemaOutput{SchemaText: common.FormatSchema(schema)}, nil
+	return nil, DBSchemaOutput{SchemaText: common.FormatSchema(schema), Warning: warning}, nil
 }
 
 // handleDBExecuteQuery handles the db_execute_query MCP tool
@@ -305,21 +308,14 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		zap.Bool("read_only", cfg.ReadOnly),
 	)
 
-	// Get service details to construct connection string
-	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	// service_id may name a service or one of its read replicas.
+	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
 	if err != nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("failed to get service details: %w", err)
+		return nil, DBExecuteQueryOutput{}, err
 	}
 
-	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, DBExecuteQueryOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
-	}
-
-	if serviceResp.JSON200 == nil {
-		return nil, DBExecuteQueryOutput{}, fmt.Errorf("empty response from API")
-	}
-
-	service := *serviceResp.JSON200
+	// A replica without a pooler connects directly; surface that as a warning.
+	poolerWarning := common.ReplicaPoolerWarning(target, input.Pooled)
 
 	// Create query context with timeout
 	queryCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -340,7 +336,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	// Connect to database
-	conn, err := common.ConnectToService(queryCtx, service, common.ConnectionDetailsOptions{
+	conn, err := common.ConnectTarget(queryCtx, target, common.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,
@@ -412,6 +408,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	output := DBExecuteQueryOutput{
 		ResultSets:    resultSets,
 		ExecutionTime: time.Since(startTime).String(),
+		Warning:       poolerWarning,
 	}
 	if truncated {
 		output.Truncated = true

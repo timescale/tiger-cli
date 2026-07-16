@@ -215,7 +215,7 @@ Manage database services.
 - `detach-vpc`: Detach service from VPC
 - `enable-pooler`: Enable connection pooling
 - `disable-pooler`: Disable connection pooling
-- `update-password`: Update service master password
+- `update-password`: Update service master password (rejects a read replica ID; update the primary instead)
 - `set-default`: Set default service
 
 **Commands with Wait/Timeout Behavior:**
@@ -568,8 +568,11 @@ The `save-password` command accepts passwords through three methods (in order of
 **Advanced psql Usage:**
 The `connect` and `psql` commands support passing additional flags directly to the psql client using the `--` separator. Any flags after `--` are passed through to psql unchanged, allowing full access to psql's functionality while maintaining tiger's connection and authentication handling.
 
+**Read Replica ID as a Connection Target (all db connection commands):**
+The `db connection-string`, `db connect` / `db psql`, `db test-connection`, and `db schema` commands accept a read replica set ID anywhere a service ID is accepted (as the positional argument or the default service). The command connects to the replica's endpoint but resolves credentials (and any password reset) against the parent primary, since read replicas share the primary's credentials.
+
 **Read Replica Prompt (connect/psql):**
-When `tiger db connect` / `tiger db psql` runs in an interactive terminal, it checks whether the target service has any read replicas (read replica sets). If the service has one or more active read replicas, it presents a menu offering to connect to the primary (default) or to one of the existing replicas. If the service has no read replicas, no menu is shown and the command connects to the primary directly.
+When `tiger db connect` / `tiger db psql` runs in an interactive terminal and is given a *primary service* ID, it checks whether that service has any read replicas (read replica sets). If the service has one or more active read replicas, it presents a menu offering to connect to the primary (default) or to one of the existing replicas. If the service has no read replicas, no menu is shown and the command connects to the primary directly.
 
 A read replica shares the primary service's credentials, so stored passwords and password recovery work transparently against the replica. The prompt is automatically skipped when stdin is not a TTY (e.g. in scripts/automation), in which case the command connects to the requested service as before. Use `--no-replica-prompt` to skip the prompt even in an interactive terminal.
 

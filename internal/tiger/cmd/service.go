@@ -431,6 +431,9 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
+A read replica ID is rejected — read replicas share the primary's credentials,
+so update the password on the primary instead.
+
 Examples:
   # Update password for default service, interactively prompts
   tiger service update-password
@@ -499,6 +502,12 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 			service := *serviceResp.JSON200
+
+			// A read replica has no separate password to rotate.
+			if common.IsReadReplica(service) {
+				return fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
+					serviceID, util.DerefStr(service.ForkedFrom.ServiceId))
+			}
 
 			statusOutput := cmd.ErrOrStderr()
 

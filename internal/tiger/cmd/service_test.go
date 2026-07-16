@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +18,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/api"
 	"github.com/timescale/tiger-cli/internal/tiger/common"
 	"github.com/timescale/tiger-cli/internal/tiger/config"
+	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
 func setupServiceTest(t *testing.T) string {
@@ -965,6 +968,38 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "authentication required") {
 		t.Errorf("Expected authentication error, got: %v", err)
+	}
+}
+
+// update-password on a read replica ID is rejected, pointing at the primary.
+func TestServiceUpdatePassword_ReadReplicaRejected(t *testing.T) {
+	tmpDir := setupServiceTest(t)
+
+	// getService resolves the replica ID to a standby linked to its parent.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(api.Service{
+			ServiceId:  util.Ptr("rep1234567"),
+			ProjectId:  util.Ptr("test-project-123"),
+			ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceId: util.Ptr("svcprimary")},
+		})
+	}))
+	defer srv.Close()
+
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    srv.URL,
+		"project_id": "test-project-123",
+	}); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	mockTestPAT(t)
+
+	_, err, _ := executeServiceCommand(t.Context(), "service", "update-password", "rep1234567", "--new-password", "irrelevant")
+	if err == nil {
+		t.Fatal("expected update-password on a read replica to be rejected")
+	}
+	if !strings.Contains(err.Error(), "read replica") || !strings.Contains(err.Error(), "svcprimary") {
+		t.Errorf("expected guidance pointing at the primary service, got: %v", err)
 	}
 }
 

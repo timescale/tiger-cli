@@ -313,7 +313,7 @@ Detach a service from a VPC.
 Update the master password for a service.
 
 **Parameters:**
-- `service_id` (string, required): Service ID
+- `service_id` (string, required): Service ID. A read replica ID is rejected; update the password on the primary instead.
 - `password` (string, required): New password for the service
 
 **Returns:** Operation status confirmation.
@@ -344,7 +344,7 @@ Test database connectivity.
 Execute a SQL query on a service database.
 
 **Parameters:**
-- `service_id` (string, required): Service ID
+- `service_id` (string, required): Service ID. A read replica set ID is also accepted here — passing one runs the query against that read replica (which is read-only) instead of the primary service. Credentials resolve against the parent service.
 - `query` (string, required): SQL query to execute
 - `parameters` (array, optional): Query parameters for parameterized queries. Values are substituted for $1, $2, etc. placeholders in the query.
 - `timeout_seconds` (number, optional): Query timeout in seconds (default: 30)
@@ -378,6 +378,7 @@ Execute a SQL query on a service database.
 - Empty `rows` array for commands that don't return rows (INSERT, UPDATE, DELETE, DDL commands)
 - For parity with `tiger db connect` command, supports custom roles and connection pooling
 - `truncated` (per result set and top-level) and `notice` are present only when results were capped; see "Result limiting" above
+- `warning` is present only when `pooled` was requested for a read replica that has no connection pooler; the query ran over a direct connection instead
 
 ### High-Availability Management
 

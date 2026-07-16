@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -56,6 +55,8 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. The connection string includes all necessary parameters
 for establishing a database connection to the TimescaleDB/PostgreSQL service.
 
+You can also pass a read replica set ID to get a connection string for that replica.
+
 By default, passwords are excluded from the connection string for security.
 Use --with-password to include the password directly in the connection string.
 
@@ -92,27 +93,23 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,
 				ReadOnly:     dbConnectionStringReadOnly || cfg.ReadOnly,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to build connection string: %w", err)
+				return err
 			}
 
 			if dbConnectionStringWithPassword && details.Password == "" {
 				return fmt.Errorf("password not available to include in connection string")
-			}
-
-			if err := details.RequirePooler(dbConnectionStringPooled); err != nil {
-				return err
 			}
 
 			fmt.Fprintln(cmd.OutOrStdout(), details.String())
@@ -163,10 +160,16 @@ primary. Use --no-replica-prompt to skip this prompt and always connect to the
 requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
+You can also pass a read replica set ID to connect straight to that replica,
+skipping the prompt. Read replicas share the primary's credentials.
+
 Examples:
   # Connect to default service
   tiger db connect
   tiger db psql
+
+  # Connect directly to a read replica by its ID
+  tiger db connect rep1234567
 
   # Connect without the read replica prompt
   tiger db connect svc-12345 --no-replica-prompt
@@ -202,7 +205,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			service, err := getServiceDetailsFunc(cmd, cfg, serviceArgs)
+			target, err := lookupConnectionTarget(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -219,23 +222,19 @@ Examples:
 				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
 			}
 
-			// Optionally offer to connect to an existing read replica instead of
-			// the primary service. In non-interactive contexts, or when the
-			// service has no read replicas, this returns the primary's details
-			// without prompting. Pooler availability is validated here: a hard
-			// error for the primary, warn-and-fall-back for replicas.
-			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, service, opts, dbConnectNoReplicaPrompt)
+			// Connects straight to a replica named by ID, or offers the interactive
+			// replica menu for a primary. Returns nil details if the user cancels.
+			details, err := selectConnection(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, target, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
 			if details == nil {
-				// User cancelled the connection.
 				return nil
 			}
 
-			// Replicas share the primary's credentials, so password storage and
-			// recovery always operate on the primary service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, service, details, psqlPath, psqlFlags)
+			// Read replicas share the primary's credentials, so password storage
+			// and recovery always operate on the credential service.
+			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, target.CredentialService, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -261,6 +260,8 @@ func buildDbTestConnectionCmd() *cobra.Command {
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
+
+You can also pass a read replica set ID to test connectivity to that replica.
 
 Return Codes:
   0: Server is accepting connections normally
@@ -292,22 +293,18 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,
 			})
 			if err != nil {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("failed to build connection string: %w", err))
-			}
-
-			if err := details.RequirePooler(dbTestConnectionPooled); err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
@@ -372,10 +369,14 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			// Resolve the target so a read replica id stores the password against
+			// its parent primary: replicas share the primary's credentials, and
+			// connect/test-connection look the password up against the primary.
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
+			service := target.CredentialService
 
 			// Determine password based on precedence:
 			// 1. --password flag with value
@@ -415,6 +416,10 @@ Examples:
 				return fmt.Errorf("failed to save password: %w", err)
 			}
 
+			if target.IsReplica {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Read replicas share the primary's credentials; saving against primary %s.\n",
+					*service.ServiceId)
+			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "Password saved successfully for service %s (role: %s)\n",
 				*service.ServiceId, dbSavePasswordRole)
 			return nil
@@ -653,7 +658,8 @@ func buildDbCreateRoleCmd() *cobra.Command {
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
+from your configuration. A read replica ID is rejected, since replicas are
+read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -725,6 +731,12 @@ PostgreSQL Configuration Parameters That May Be Set:
 			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
+			}
+
+			// A read replica is read-only, so a role can't be created there.
+			if common.IsReadReplica(service) {
+				return fmt.Errorf("%q is a read replica; create the role on its primary service %q instead",
+					util.Deref(service.ServiceId), util.DerefStr(service.ForkedFrom.ServiceId))
 			}
 
 			// Get password
@@ -813,8 +825,9 @@ indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration. Only objects the connecting role can access are
-returned. The connection is opened in Tiger Cloud's immutable read-only mode.
+from your configuration. You can also pass a read replica set ID to introspect
+that replica. Only objects the connecting role can access are returned. The
+connection is opened in Tiger Cloud's immutable read-only mode.
 
 By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
@@ -844,12 +857,14 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), service, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
+			warnReplicaPooler(cmd, target, dbSchemaPooled)
+
+			schema, err := common.FetchServiceSchema(cmd.Context(), target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
 				Schema:             dbSchemaSchema,
 				IncludeInternal:    dbSchemaInternal,
 				IncludeDefinitions: dbSchemaDefinitions,
@@ -891,6 +906,37 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
+// lookupConnectionTarget looks up the target named by args, which may be a
+// primary service ID or a read replica set ID. This lets a replica ID work
+// anywhere a service ID does across the db connection commands.
+func lookupConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (*common.ConnectionTarget, error) {
+	service, err := getServiceDetailsFunc(cmd, cfg, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// The API resolves both primary and read replica IDs via GetService; a read
+	// replica comes back linked to its parent, whose credentials it shares.
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer cancel()
+	return common.ResolveConnectionTarget(ctx, cfg.Client, cfg.ProjectID, service)
+}
+
+// warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
+// any. It is a no-op for a primary target or when there's nothing to warn.
+func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pooled bool) {
+	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", warning)
+	}
+}
+
+// buildConnectionDetailsForTarget builds connection details for a target,
+// warning first when a replica falls back from a requested pooler.
+func buildConnectionDetailsForTarget(cmd *cobra.Command, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
+	warnReplicaPooler(cmd, target, opts.Pooled)
+	return target.Details(opts)
+}
+
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details
 func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 	// Determine service ID
@@ -901,25 +947,14 @@ func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (a
 
 	cmd.SilenceUsage = true
 
-	// Fetch service details
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
+	service, err := common.GetService(ctx, cfg.Client, cfg.ProjectID, serviceID)
 	if err != nil {
-		return api.Service{}, fmt.Errorf("failed to fetch service details: %w", err)
+		return api.Service{}, err
 	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return api.Service{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil {
-		return api.Service{}, fmt.Errorf("empty response from API")
-	}
-
-	return *resp.JSON200, nil
+	return *service, nil
 }
 
 // ArgsLenAtDashProvider defines the interface for getting ArgsLenAtDash

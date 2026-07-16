@@ -15,89 +15,62 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// resolveConnectTarget prompts the user to connect to a read replica instead of
-// the primary, returning the chosen target (nil if cancelled). It returns the
-// primary without prompting when there's nothing to choose: non-interactive
-// stdin, prompting disabled, or no connectable replicas.
-func resolveConnectTarget(
+// selectConnection returns the connection details for `tiger db connect`. A
+// replica target connects straight through; a primary in an interactive
+// terminal is offered a menu to pick the primary or one of its replicas (nil
+// details means the user cancelled).
+func selectConnection(
 	ctx context.Context,
 	cmd *cobra.Command,
 	client *api.ClientWithResponses,
 	projectID string,
-	primary api.Service,
+	target *common.ConnectionTarget,
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
-	// returnPrimary builds the primary's details. Requesting --pooled when no
-	// pooler exists is a hard error.
-	returnPrimary := func() (*common.ConnectionDetails, error) {
-		details, err := common.GetConnectionDetails(primary, opts)
+	// chosen is what we connect to; the menu below may replace it with a replica.
+	chosen := target
+
+	// Offer the replica menu only for a primary on an interactive terminal.
+	if !target.IsReplica && !noReplicaPrompt && checkStdinIsTTY() {
+		primary := target.ConnectionService
+		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
-			return nil, fmt.Errorf("failed to build connection string: %w", err)
-		}
-		if err := details.RequirePooler(opts.Pooled); err != nil {
-			return nil, err
-		}
-		return details, nil
-	}
-
-	// Only prompt on an interactive terminal.
-	if noReplicaPrompt || !checkStdinIsTTY() {
-		return returnPrimary()
-	}
-
-	replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
-	if err != nil {
-		// Don't block the connection if we can't list replicas.
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
-		return returnPrimary()
-	}
-
-	// Only active replicas with an endpoint are connectable.
-	var connectable []api.ReadReplicaSet
-	for _, r := range replicas {
-		if r.Status != nil && *r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
-			connectable = append(connectable, r)
+			// Don't block the connection if we can't list replicas.
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
+		} else if connectable := connectableReplicas(replicas); len(connectable) > 0 {
+			choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
+			if err != nil {
+				return nil, err
+			}
+			switch choice.kind {
+			case targetCancel:
+				return nil, nil
+			case targetReplica:
+				chosen = common.NewReplicaConnectionTarget(primary, *choice.replica)
+			}
 		}
 	}
 
-	// Nothing to choose between, so skip the menu and use the primary.
-	if len(connectable) == 0 {
-		return returnPrimary()
-	}
-
-	choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
+	details, err := buildConnectionDetailsForTarget(cmd, chosen, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	switch choice.kind {
-	case targetCancel:
-		return nil, nil
-	case targetPrimary:
-		return returnPrimary()
+	if chosen.IsReplica {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
 	}
-
-	replica := choice.replica
-
-	// --pooled is best-effort on replicas: warn and connect directly if the
-	// chosen replica has no pooler.
-	if opts.Pooled && !replicaHasPooler(replica) {
-		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: read replica '%s' has no connection pooler; connecting directly instead.\n", util.DerefStr(replica.Name))
-		opts.Pooled = false
-	}
-
-	details, err := common.GetReplicaConnectionDetails(primary, *replica, opts)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(replica.Name))
 	return details, nil
 }
 
-// replicaHasPooler reports whether a replica set exposes a pooler endpoint.
-func replicaHasPooler(replica *api.ReadReplicaSet) bool {
-	return replica != nil && replica.ConnectionPooler != nil && replica.ConnectionPooler.Endpoint != nil
+// connectableReplicas filters to active read replicas that expose an endpoint.
+func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
+	var out []api.ReadReplicaSet
+	for _, r := range replicas {
+		if r.Status != nil && *r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // fetchReplicaSets retrieves the read replica sets for a service.

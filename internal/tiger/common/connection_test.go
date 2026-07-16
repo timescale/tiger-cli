@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -314,6 +315,29 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	}
 }
 
+// A password with URL-special characters must still produce a parseable URL.
+func TestConnectionDetailsString_EncodesSpecialCharPassword(t *testing.T) {
+	details := &ConnectionDetails{
+		Role:     "tsdbadmin",
+		Password: "p@ss/w:rd? #[x]",
+		Host:     "host.example.com",
+		Port:     5432,
+		Database: "tsdb",
+	}
+
+	s := details.String()
+	u, err := url.Parse(s)
+	if err != nil {
+		t.Fatalf("connection string should be a parseable URL, got error: %v (%q)", err, s)
+	}
+	if got := u.User.Username(); got != details.Role {
+		t.Errorf("role did not round-trip: got %q, want %q", got, details.Role)
+	}
+	if pw, _ := u.User.Password(); pw != details.Password {
+		t.Errorf("password did not round-trip: got %q, want %q", pw, details.Password)
+	}
+}
+
 func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	// Set no storage as the password storage method for this test
 	originalStorage := viper.GetString("password_storage")
@@ -475,13 +499,15 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	}
 }
 
-func TestGetReplicaConnectionDetails(t *testing.T) {
+func TestGetConnectionDetailsFor(t *testing.T) {
 	primaryHost := "primary.example.com"
 	replicaHost := "replica.example.com"
 	poolerHost := "replica-pooler.example.com"
 	port := 5432
 	poolerPort := 6432
 
+	// credService supplies credentials only; endpoint selection is driven by
+	// connService. WithPassword is off here, so credService is not exercised.
 	primary := api.Service{
 		ServiceId: util.Ptr("svc-primary"),
 		ProjectId: util.Ptr("proj-1"),
@@ -492,13 +518,13 @@ func TestGetReplicaConnectionDetails(t *testing.T) {
 	}
 
 	t.Run("direct endpoint", func(t *testing.T) {
-		replica := api.ReadReplicaSet{
-			Id:       util.Ptr("rep-1"),
-			Name:     util.Ptr("my-replica"),
-			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+		conn := api.Service{
+			ServiceId: util.Ptr("rep-1"),
+			Name:      util.Ptr("my-replica"),
+			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin"})
+		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -517,16 +543,16 @@ func TestGetReplicaConnectionDetails(t *testing.T) {
 	})
 
 	t.Run("pooled endpoint when available", func(t *testing.T) {
-		replica := api.ReadReplicaSet{
-			Id:       util.Ptr("rep-1"),
-			Name:     util.Ptr("my-replica"),
-			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+		conn := api.Service{
+			ServiceId: util.Ptr("rep-1"),
+			Name:      util.Ptr("my-replica"),
+			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 			ConnectionPooler: &api.ConnectionPooler{
 				Endpoint: &api.Endpoint{Host: &poolerHost, Port: &poolerPort},
 			},
 		}
 
-		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -539,12 +565,12 @@ func TestGetReplicaConnectionDetails(t *testing.T) {
 	})
 
 	t.Run("falls back to direct when pooler requested but unavailable", func(t *testing.T) {
-		replica := api.ReadReplicaSet{
-			Id:       util.Ptr("rep-1"),
-			Endpoint: &api.Endpoint{Host: &replicaHost, Port: &port},
+		conn := api.Service{
+			ServiceId: util.Ptr("rep-1"),
+			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -557,9 +583,9 @@ func TestGetReplicaConnectionDetails(t *testing.T) {
 	})
 
 	t.Run("error when endpoint missing", func(t *testing.T) {
-		replica := api.ReadReplicaSet{Id: util.Ptr("rep-1")}
-		if _, err := GetReplicaConnectionDetails(primary, replica, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
-			t.Fatal("expected error for missing replica endpoint")
+		conn := api.Service{ServiceId: util.Ptr("rep-1")}
+		if _, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
+			t.Fatal("expected error for missing connection endpoint")
 		}
 	})
 }

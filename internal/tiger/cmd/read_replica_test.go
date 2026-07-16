@@ -91,32 +91,11 @@ func TestConnectTargetModel_KeySelection(t *testing.T) {
 	}
 }
 
-func TestReplicaHasPooler(t *testing.T) {
-	host := "h"
-	port := 6432
-
-	cases := []struct {
-		name    string
-		replica *api.ReadReplicaSet
-		want    bool
-	}{
-		{"nil replica", nil, false},
-		{"no pooler", &api.ReadReplicaSet{}, false},
-		{"pooler without endpoint", &api.ReadReplicaSet{ConnectionPooler: &api.ConnectionPooler{}}, false},
-		{"pooler with endpoint", &api.ReadReplicaSet{ConnectionPooler: &api.ConnectionPooler{Endpoint: &api.Endpoint{Host: &host, Port: &port}}}, true},
-	}
-	for _, tc := range cases {
-		if got := replicaHasPooler(tc.replica); got != tc.want {
-			t.Errorf("%s: replicaHasPooler = %v, want %v", tc.name, got, tc.want)
-		}
-	}
-}
-
-// TestResolveConnectTarget_NoReplicasSkipsPrompt verifies that, with no
-// connectable replicas, resolveConnectTarget connects to the primary directly
+// TestSelectConnection_NoReplicasSkipsPrompt verifies that, with no
+// connectable replicas, selectConnection connects to the primary directly
 // instead of showing a single-option menu (which would block on TTY input in
 // this test).
-func TestResolveConnectTarget_NoReplicasSkipsPrompt(t *testing.T) {
+func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -146,7 +125,8 @@ func TestResolveConnectTarget_NoReplicasSkipsPrompt(t *testing.T) {
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 
-	details, err := resolveConnectTarget(context.Background(), cmd, client, "proj-1", primary,
+	target := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
+	details, err := selectConnection(context.Background(), cmd, client, "proj-1", target,
 		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
