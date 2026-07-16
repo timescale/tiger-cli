@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -311,6 +312,29 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	// Verify the password is actually in the connection string
 	if !strings.Contains(result, testPassword) {
 		t.Errorf("Password '%s' not found in connection string: %s", testPassword, result)
+	}
+}
+
+// A password with URL-special characters must still produce a parseable URL.
+func TestConnectionDetailsString_EncodesSpecialCharPassword(t *testing.T) {
+	details := &ConnectionDetails{
+		Role:     "tsdbadmin",
+		Password: "p@ss/w:rd? #[x]",
+		Host:     "host.example.com",
+		Port:     5432,
+		Database: "tsdb",
+	}
+
+	s := details.String()
+	u, err := url.Parse(s)
+	if err != nil {
+		t.Fatalf("connection string should be a parseable URL, got error: %v (%q)", err, s)
+	}
+	if got := u.User.Username(); got != details.Role {
+		t.Errorf("role did not round-trip: got %q, want %q", got, details.Role)
+	}
+	if pw, _ := u.User.Password(); pw != details.Password {
+		t.Errorf("password did not round-trip: got %q, want %q", pw, details.Password)
 	}
 }
 

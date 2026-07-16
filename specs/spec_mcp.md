@@ -313,7 +313,7 @@ Detach a service from a VPC.
 Update the master password for a service.
 
 **Parameters:**
-- `service_id` (string, required): Service ID
+- `service_id` (string, required): Service ID. A read replica ID is rejected; update the password on the primary instead.
 - `password` (string, required): New password for the service
 
 **Returns:** Operation status confirmation.

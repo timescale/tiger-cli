@@ -53,17 +53,21 @@ func GetService(ctx context.Context, client api.ClientWithResponsesInterface, pr
 	return resp.JSON200, nil
 }
 
+// IsReadReplica reports whether the service is a standby read replica (which
+// shares its parent primary's credentials).
+func IsReadReplica(service api.Service) bool {
+	return service.ForkedFrom != nil && util.Deref(service.ForkedFrom.IsStandby)
+}
+
 // ResolveConnectionTarget turns a fetched service into a ConnectionTarget. When
-// the service is a standby read replica (ForkedFrom.IsStandby), it connects to
-// the replica but resolves credentials against the parent primary, which is
-// fetched here.
+// the service is a standby read replica, it connects to the replica but resolves
+// credentials against the parent primary, which is fetched here.
 func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
-	fork := service.ForkedFrom
-	if fork == nil || !util.Deref(fork.IsStandby) {
+	if !IsReadReplica(service) {
 		return &ConnectionTarget{Connect: service, Credential: service}, nil
 	}
 
-	parentID := util.DerefStr(fork.ServiceId)
+	parentID := util.DerefStr(service.ForkedFrom.ServiceId)
 	if parentID == "" {
 		return &ConnectionTarget{Connect: service, Credential: service, IsReplica: true}, nil
 	}

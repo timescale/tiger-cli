@@ -369,10 +369,14 @@ Examples:
 				return err
 			}
 
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			// Resolve the target so a read replica id stores the password against
+			// its parent primary: replicas share the primary's credentials, and
+			// connect/test-connection look the password up against the primary.
+			target, err := resolveConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
+			service := target.Credential
 
 			// Determine password based on precedence:
 			// 1. --password flag with value
@@ -412,6 +416,10 @@ Examples:
 				return fmt.Errorf("failed to save password: %w", err)
 			}
 
+			if target.IsReplica {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Read replicas share the primary's credentials; saving against primary %s.\n",
+					*service.ServiceId)
+			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "Password saved successfully for service %s (role: %s)\n",
 				*service.ServiceId, dbSavePasswordRole)
 			return nil
@@ -650,7 +658,8 @@ func buildDbCreateRoleCmd() *cobra.Command {
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
+from your configuration. A read replica ID is rejected, since replicas are
+read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -722,6 +731,12 @@ PostgreSQL Configuration Parameters That May Be Set:
 			service, err := getServiceDetailsFunc(cmd, cfg, args)
 			if err != nil {
 				return err
+			}
+
+			// A read replica is read-only, so a role can't be created there.
+			if common.IsReadReplica(service) {
+				return fmt.Errorf("%q is a read replica; create the role on its primary service %q instead",
+					util.Deref(service.ServiceId), util.DerefStr(service.ForkedFrom.ServiceId))
 			}
 
 			// Get password

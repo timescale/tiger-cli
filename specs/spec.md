@@ -215,7 +215,7 @@ Manage database services.
 - `detach-vpc`: Detach service from VPC
 - `enable-pooler`: Enable connection pooling
 - `disable-pooler`: Disable connection pooling
-- `update-password`: Update service master password
+- `update-password`: Update service master password (rejects a read replica ID; update the primary instead)
 - `set-default`: Set default service
 
 **Commands with Wait/Timeout Behavior:**

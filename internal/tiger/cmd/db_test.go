@@ -3,7 +3,10 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -91,6 +94,38 @@ func executeDBCommand(ctx context.Context, args ...string) (string, error) {
 
 	err = testRoot.Execute()
 	return buf.String(), err
+}
+
+// db create role on a read replica ID is rejected (replicas are read-only).
+func TestDBCreateRole_ReadReplicaRejected(t *testing.T) {
+	tmpDir := setupDBTest(t)
+
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    "http://localhost:9999",
+		"project_id": "test-project-123",
+	}); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+	mockTestPAT(t)
+
+	standby := api.Service{
+		ServiceId:  util.Ptr("rep1234567"),
+		ProjectId:  util.Ptr("test-project-123"),
+		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceId: util.Ptr("svcprimary")},
+	}
+	orig := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+		return standby, nil
+	}
+	defer func() { getServiceDetailsFunc = orig }()
+
+	_, err := executeDBCommand(t.Context(), "db", "create", "role", "rep1234567", "--name", "ai_analyst")
+	if err == nil {
+		t.Fatal("expected create role on a read replica to be rejected")
+	}
+	if !strings.Contains(err.Error(), "read replica") || !strings.Contains(err.Error(), "svcprimary") {
+		t.Errorf("expected guidance pointing at the primary service, got: %v", err)
+	}
 }
 
 func TestDBConnectionString_NoServiceID(t *testing.T) {
@@ -1006,6 +1041,92 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 
 	if retrievedPassword != testPassword {
 		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
+	}
+}
+
+// TestDBSavePassword_ReplicaResolvesToParent verifies that passing a read
+// replica id stores the password against the parent primary, so it is found by
+// the connect/test-connection read path.
+func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
+	config.SetTestServiceName(t)
+	tmpDir := setupDBTest(t)
+
+	originalStorage := viper.GetString("password_storage")
+	viper.Set("password_storage", "keyring")
+	defer viper.Set("password_storage", originalStorage)
+
+	const projectID = "test-project-123"
+	port := 5432
+	primaryHost := "svcprimary.example.com"
+	replicaHost := "replica.example.com"
+	primary := api.Service{
+		ServiceId: util.Ptr("svcprimary"),
+		ProjectId: util.Ptr(projectID),
+		Endpoint:  &api.Endpoint{Host: &primaryHost, Port: &port},
+	}
+	replica := api.Service{
+		ServiceId: util.Ptr("rep1234567"),
+		ProjectId: util.Ptr(projectID),
+		Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
+		ForkedFrom: &api.ForkSpec{
+			IsStandby: util.Ptr(true),
+			ProjectId: util.Ptr(projectID),
+			ServiceId: util.Ptr("svcprimary"),
+		},
+	}
+
+	// Serve the parent primary lookup; the replica itself comes from the mocked
+	// getServiceDetailsFunc, so only the parent fetch reaches the API.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if parts[len(parts)-1] == "svcprimary" {
+			_ = json.NewEncoder(w).Encode(primary)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "not found"})
+	}))
+	defer srv.Close()
+
+	_, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":    srv.URL,
+		"project_id": projectID,
+		"service_id": "rep1234567",
+	})
+	if err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	mockTestPAT(t)
+	originalGetServiceDetails := getServiceDetailsFunc
+	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+		return replica, nil
+	}
+	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+
+	const testPassword = "replica-parent-pw"
+	output, err := executeDBCommand(t.Context(), "db", "save-password", "rep1234567", "--password="+testPassword)
+	if err != nil {
+		t.Fatalf("Expected save-password to succeed, got error: %v", err)
+	}
+	if !strings.Contains(output, "svcprimary") {
+		t.Errorf("expected parent primary id in output, got: %s", output)
+	}
+
+	storage := common.GetPasswordStorage()
+	// Stored against the parent primary, matching the connect read path.
+	got, err := storage.Get(primary, "tsdbadmin")
+	if err != nil {
+		t.Fatalf("expected password stored under primary, got error: %v", err)
+	}
+	defer storage.Remove(primary, "tsdbadmin")
+	if got != testPassword {
+		t.Errorf("expected %q under primary, got %q", testPassword, got)
+	}
+	// Not stored under the replica id.
+	if pw, err := storage.Get(replica, "tsdbadmin"); err == nil && pw != "" {
+		t.Errorf("expected no password under replica, got %q", pw)
 	}
 }
 

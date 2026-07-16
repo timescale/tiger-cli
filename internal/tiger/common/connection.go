@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/jackc/pgx/v5"
 
@@ -156,12 +157,13 @@ func (d *ConnectionDetails) String() string {
 		query += "&" + readOnlyConnectionOption
 	}
 
-	if d.Password == "" {
-		// Build connection string without password (default behavior)
-		return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", d.Role, d.Host, d.Port, d.Database, query)
+	// url.User* percent-encodes the role/password so URL-special characters (e.g.
+	// in a manually entered password) don't break connection-string parsing.
+	userinfo := url.User(d.Role)
+	if d.Password != "" {
+		userinfo = url.UserPassword(d.Role, d.Password)
 	}
-	// Include password in connection string
-	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?%s", d.Role, d.Password, d.Host, d.Port, d.Database, query)
+	return fmt.Sprintf("postgresql://%s@%s:%d/%s?%s", userinfo, d.Host, d.Port, d.Database, query)
 }
 
 // GetPassword fetches the password for the specified service from the

@@ -1074,32 +1074,42 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		Password: input.Password,
 	}
 
-	// Make API call to update password
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+
+	// Fetch first so we can reject read replicas and reuse the service for
+	// password storage below.
+	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to get service details: %w", err)
+	}
+	if serviceResp.StatusCode() != http.StatusOK {
+		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
+	}
+	if serviceResp.JSON200 == nil {
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("empty response from API")
+	}
+	service := *serviceResp.JSON200
+	if common.IsReadReplica(service) {
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
+			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceId))
+	}
 
 	resp, err := cfg.Client.UpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
-
-	// Handle API response
 	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
 		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	// Get service details for password storage (similar to CLI implementation)
-	var passwordStorage *common.PasswordStorageResult
-	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
-	if err == nil && serviceResp.StatusCode() == http.StatusOK && serviceResp.JSON200 != nil {
-		// Save the new password using the shared util function
-		result, err := common.SavePasswordWithResult(api.Service(*serviceResp.JSON200), input.Password, "tsdbadmin")
-		passwordStorage = &result
-		if err != nil {
-			logging.Debug("MCP: Password storage failed", zap.Error(err))
-		} else {
-			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
-		}
+	// Save the new password using the service we already fetched.
+	result, saveErr := common.SavePasswordWithResult(service, input.Password, "tsdbadmin")
+	passwordStorage := &result
+	if saveErr != nil {
+		logging.Debug("MCP: Password storage failed", zap.Error(saveErr))
+	} else {
+		logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
 	}
 
 	output := ServiceUpdatePasswordOutput{
