@@ -91,11 +91,11 @@ func TestConnectTargetModel_KeySelection(t *testing.T) {
 	}
 }
 
-// TestResolveConnectTarget_NoReplicasSkipsPrompt verifies that, with no
-// connectable replicas, resolveConnectTarget connects to the primary directly
+// TestSelectConnection_NoReplicasSkipsPrompt verifies that, with no
+// connectable replicas, selectConnection connects to the primary directly
 // instead of showing a single-option menu (which would block on TTY input in
 // this test).
-func TestResolveConnectTarget_NoReplicasSkipsPrompt(t *testing.T) {
+func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -126,7 +126,7 @@ func TestResolveConnectTarget_NoReplicasSkipsPrompt(t *testing.T) {
 	cmd.SetErr(io.Discard)
 
 	target := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
-	details, err := resolveConnectTarget(context.Background(), cmd, client, "proj-1", target,
+	details, err := selectConnection(context.Background(), cmd, client, "proj-1", target,
 		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

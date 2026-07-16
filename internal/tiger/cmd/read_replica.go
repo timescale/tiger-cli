@@ -15,13 +15,11 @@ import (
 	"github.com/timescale/tiger-cli/internal/tiger/util"
 )
 
-// resolveConnectTarget resolves the connection details for `tiger db connect`.
-// A target that is already a read replica (named directly by ID) connects
-// straight to it. A primary, on an interactive terminal, is offered a menu to
-// connect to the primary or one of its read replicas. It returns nil details
-// when the user cancels. The menu is skipped for non-interactive stdin, when
-// prompting is disabled, or when the service has no connectable replicas.
-func resolveConnectTarget(
+// selectConnection returns the connection details for `tiger db connect`. A
+// replica target connects straight through; a primary in an interactive
+// terminal is offered a menu to pick the primary or one of its replicas (nil
+// details means the user cancelled).
+func selectConnection(
 	ctx context.Context,
 	cmd *cobra.Command,
 	client *api.ClientWithResponses,

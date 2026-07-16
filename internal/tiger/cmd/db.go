@@ -93,7 +93,7 @@ Examples:
 				return err
 			}
 
-			target, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -205,7 +205,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			target, err := resolveConnectionTarget(cmd, cfg, serviceArgs)
+			target, err := lookupConnectionTarget(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -224,7 +224,7 @@ Examples:
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := resolveConnectTarget(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, target, opts, dbConnectNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, target, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -293,7 +293,7 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
@@ -372,7 +372,7 @@ Examples:
 			// Resolve the target so a read replica id stores the password against
 			// its parent primary: replicas share the primary's credentials, and
 			// connect/test-connection look the password up against the primary.
-			target, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -857,7 +857,7 @@ Examples:
 				return err
 			}
 
-			target, err := resolveConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -906,10 +906,10 @@ func buildDbCmd() *cobra.Command {
 	return cmd
 }
 
-// resolveConnectionTarget looks up the target named by args, which may be a
+// lookupConnectionTarget looks up the target named by args, which may be a
 // primary service ID or a read replica set ID. This lets a replica ID work
 // anywhere a service ID does across the db connection commands.
-func resolveConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (*common.ConnectionTarget, error) {
+func lookupConnectionTarget(cmd *cobra.Command, cfg *common.Config, args []string) (*common.ConnectionTarget, error) {
 	service, err := getServiceDetailsFunc(cmd, cfg, args)
 	if err != nil {
 		return nil, err

@@ -71,9 +71,9 @@ func standbySvc() api.Service {
 	}
 }
 
-// TestResolveConnectionTarget_Primary: a plain service resolves to a primary
+// TestLookupConnectionTarget_Primary: a plain service resolves to a primary
 // target (connect == credential, no parent fetch, so no client needed).
-func TestResolveConnectionTarget_Primary(t *testing.T) {
+func TestLookupConnectionTarget_Primary(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return primarySvc(), nil
@@ -84,7 +84,7 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	target, err := resolveConnectionTarget(cmd, cfg, []string{"svcprimary"})
+	target, err := lookupConnectionTarget(cmd, cfg, []string{"svcprimary"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,9 +96,9 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 	}
 }
 
-// TestResolveConnectionTarget_Replica: a standby service connects to the replica
+// TestLookupConnectionTarget_Replica: a standby service connects to the replica
 // but resolves credentials against the parent (fetched via the client).
-func TestResolveConnectionTarget_Replica(t *testing.T) {
+func TestLookupConnectionTarget_Replica(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return standbySvc(), nil
@@ -109,7 +109,7 @@ func TestResolveConnectionTarget_Replica(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	target, err := resolveConnectionTarget(cmd, cfg, []string{"rep1234567"})
+	target, err := lookupConnectionTarget(cmd, cfg, []string{"rep1234567"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,8 +124,8 @@ func TestResolveConnectionTarget_Replica(t *testing.T) {
 	}
 }
 
-// TestResolveConnectionTarget_LookupError: a service-lookup failure is surfaced.
-func TestResolveConnectionTarget_LookupError(t *testing.T) {
+// TestLookupConnectionTarget_LookupError: a service-lookup failure is surfaced.
+func TestLookupConnectionTarget_LookupError(t *testing.T) {
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
 		return api.Service{}, fmt.Errorf("lookup failed")
@@ -136,7 +136,7 @@ func TestResolveConnectionTarget_LookupError(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	if _, err := resolveConnectionTarget(cmd, cfg, []string{"x"}); err == nil {
+	if _, err := lookupConnectionTarget(cmd, cfg, []string{"x"}); err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 }
