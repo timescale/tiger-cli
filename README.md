@@ -110,11 +110,13 @@ Tiger CLI provides the following commands:
   - `delete` - Delete a service
   - `update-password` - Update service master password
   - `logs` - View service logs
-- `tiger db` - Database operations (each command below also accepts a read replica set ID)
+- `tiger db` - Database operations
   - `connect` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip)
   - `connection-string` - Get connection string for a service
   - `test-connection` - Test database connectivity
   - `schema` - Display database schema information (tables, views, indexes, functions, TimescaleDB hypertables, and more)
+  - `save-password` - Save a database password to configured password storage (keyring, pgpass, or none)
+  - `create role` - Create a new database role, with optional read-only enforcement, inherited grants (`--from`), and statement timeout
 - `tiger config` - Configuration management
   - `show` - Show current configuration
   - `set` - Set configuration value
