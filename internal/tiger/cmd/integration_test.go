@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -1747,6 +1748,57 @@ func TestServiceForkIntegration(t *testing.T) {
 	var sourceServiceID string
 	var forkedServiceID string
 
+	// On a fork wait-timeout, keep the source and forked services instead of
+	// deleting them so the timeout can be investigated. The stale-service sweeper
+	// reclaims them after 1h.
+	var keepForDebug bool
+
+	// handleForkErr fails the test on a fork error, keeping services on a timeout.
+	handleForkErr := func(t *testing.T, err error, output string) {
+		if err == nil {
+			return
+		}
+		var ece common.ExitCodeError
+		if errors.As(err, &ece) && ece.ExitCode() == common.ExitTimeout {
+			forkID := extractServiceIDFromCreateOutput(t, output)
+			if forkID != "" {
+				forkedServiceID = forkID
+			}
+			keepForDebug = true
+			t.Fatalf("Fork timed out — KEEPING source %q and fork %q for debugging "+
+				"(stale-service sweeper reclaims after 1h): %v\nOutput: %s",
+				sourceServiceID, forkID, err, output)
+		}
+		t.Fatalf("Service fork failed: %v\nOutput: %s", err, output)
+	}
+
+	// skipIfKeeping skips remaining subtests once a fork has timed out.
+	skipIfKeeping := func(t *testing.T) {
+		if keepForDebug {
+			t.Skip("a prior fork timed out; preserving services for debugging")
+		}
+	}
+
+	// cleanupService deletes *id at test end, unless a fork timeout flagged the run
+	// to keep services for debugging. The ID is read at cleanup time so it picks up
+	// the value assigned during the subtests.
+	cleanupService := func(label string, id *string) func() {
+		return func() {
+			if keepForDebug {
+				t.Logf("⚠️  KEEPING %s service %s for debugging (a fork timed out); stale sweeper reclaims after 1h", label, *id)
+				return
+			}
+			if *id == "" {
+				return
+			}
+			t.Logf("Cleaning up %s service: %s", label, *id)
+			if _, err := executeIntegrationCommand(t.Context(),
+				"service", "delete", *id, "--confirm", "--wait-timeout", "5m"); err != nil {
+				t.Logf("Warning: Failed to cleanup %s service %s: %v", label, *id, err)
+			}
+		}
+	}
+
 	// Always logout at the end to clean up credentials
 	defer func() {
 		t.Logf("Cleaning up authentication")
@@ -1756,37 +1808,9 @@ func TestServiceForkIntegration(t *testing.T) {
 		}
 	}()
 
-	// Cleanup function to ensure source service is deleted
-	defer func() {
-		if sourceServiceID != "" {
-			t.Logf("Cleaning up source service: %s", sourceServiceID)
-			_, err := executeIntegrationCommand(
-				t.Context(),
-				"service", "delete", sourceServiceID,
-				"--confirm",
-				"--wait-timeout", "5m",
-			)
-			if err != nil {
-				t.Logf("Warning: Failed to cleanup source service %s: %v", sourceServiceID, err)
-			}
-		}
-	}()
-
-	// Cleanup function to ensure forked service is deleted
-	defer func() {
-		if forkedServiceID != "" {
-			t.Logf("Cleaning up forked service: %s", forkedServiceID)
-			_, err := executeIntegrationCommand(
-				t.Context(),
-				"service", "delete", forkedServiceID,
-				"--confirm",
-				"--wait-timeout", "5m",
-			)
-			if err != nil {
-				t.Logf("Warning: Failed to cleanup forked service %s: %v", forkedServiceID, err)
-			}
-		}
-	}()
+	// Delete the source and forked services at test end (kept on a fork timeout).
+	defer cleanupService("source", &sourceServiceID)()
+	defer cleanupService("forked", &forkedServiceID)()
 
 	t.Run("Login", func(t *testing.T) {
 		t.Logf("Logging in with public key: %s", publicKey[:8]+"...") // Only show first 8 chars
@@ -1917,9 +1941,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--output", "json",
 		)
 
-		if err != nil {
-			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
-		}
+		handleForkErr(t, err, output)
 
 		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
 		if extractedServiceID == "" {
@@ -1946,6 +1968,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("ForkService_Now", func(t *testing.T) {
+		skipIfKeeping(t)
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
 		}
@@ -1961,9 +1984,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--output", "json",
 		)
 
-		if err != nil {
-			t.Fatalf("Service fork failed: %v\nOutput: %s", err, output)
-		}
+		handleForkErr(t, err, output)
 
 		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
 		if extractedServiceID == "" {
@@ -1975,6 +1996,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("VerifyForkedData", func(t *testing.T) {
+		skipIfKeeping(t)
 		if forkedServiceID == "" {
 			t.Skip("No forked service ID available")
 		}
@@ -2006,6 +2028,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("VerifyDataIndependence", func(t *testing.T) {
+		skipIfKeeping(t)
 		if sourceServiceID == "" || forkedServiceID == "" {
 			t.Skip("Source or forked service ID not available")
 		}
@@ -2076,6 +2099,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("DeleteForkedService_Now", func(t *testing.T) {
+		skipIfKeeping(t)
 		if forkedServiceID == "" {
 			t.Skip("No forked service ID available")
 		}
@@ -2099,6 +2123,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
+		skipIfKeeping(t)
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
 		}
@@ -2117,9 +2142,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--output", "json",
 		)
 
-		if err != nil {
-			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
-		}
+		handleForkErr(t, err, output)
 
 		extractedServiceID := extractServiceIDFromCreateOutput(t, output)
 		if extractedServiceID == "" {
@@ -2131,6 +2154,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("VerifyLastSnapshotForkWorks", func(t *testing.T) {
+		skipIfKeeping(t)
 		if forkedServiceID == "" {
 			t.Skip("No forked service ID available")
 		}
@@ -2155,6 +2179,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("DeleteForkedService_LastSnapshot", func(t *testing.T) {
+		skipIfKeeping(t)
 		if forkedServiceID == "" {
 			t.Skip("No forked service ID available")
 		}
@@ -2178,6 +2203,7 @@ func TestServiceForkIntegration(t *testing.T) {
 	})
 
 	t.Run("DeleteSourceService", func(t *testing.T) {
+		skipIfKeeping(t)
 		if sourceServiceID == "" {
 			t.Skip("No source service ID available")
 		}
