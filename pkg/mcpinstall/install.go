@@ -3,7 +3,7 @@
 package mcpinstall
 
 import (
-	"github.com/timescale/tiger-cli/internal/tiger/cmd"
+	"github.com/timescale/tiger-cli/internal/cmd"
 )
 
 // Options configures the MCP server installation behavior.

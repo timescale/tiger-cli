@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/tiger/cmd"
-	"github.com/timescale/tiger-cli/internal/tiger/logging"
+	"github.com/timescale/tiger-cli/internal/cmd"
+	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 func main() {

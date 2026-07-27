@@ -1,0 +1,88 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/timescale/tiger-cli/internal/common"
+)
+
+// buildServiceGetCmd represents the get command under service
+func buildServiceGetCmd() *cobra.Command {
+	var withPassword bool
+	var output string
+
+	cmd := &cobra.Command{
+		Use:     "get [service-id]",
+		Aliases: []string{"describe", "show"},
+		Short:   "Show detailed information about a service",
+		Long: `Show detailed information about a specific database service.
+
+The service ID can be provided as an argument or will use the default service
+from your configuration. This command displays comprehensive information about
+the service including configuration, status, endpoints, and resource usage.
+
+Examples:
+  # Get default service details
+  tiger service get
+
+  # Get specific service details
+  tiger service get svc-12345
+
+  # Get service details in JSON format
+  tiger service get svc-12345 --output json
+
+  # Get service details in YAML format
+  tiger service get svc-12345 --output yaml`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion,
+		PreRunE:           bindFlags("output"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Load config and API client
+			cfg, err := common.LoadConfig(cmd.Context())
+			if err != nil {
+				cmd.SilenceUsage = true
+				return err
+			}
+
+			// Determine service ID
+			serviceID, err := getServiceID(cfg.Config, args)
+			if err != nil {
+				return err
+			}
+
+			cmd.SilenceUsage = true
+
+			// Make API call to get service details
+			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+			defer cancel()
+
+			resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
+			if err != nil {
+				return fmt.Errorf("failed to get service details: %w", err)
+			}
+
+			// Handle API response
+			if resp.StatusCode() != http.StatusOK {
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			if resp.JSON200 == nil {
+				return fmt.Errorf("empty response from API")
+			}
+			service := *resp.JSON200
+
+			// Output service in requested format
+			return outputService(cmd, service, cfg.Output, withPassword, true)
+		},
+	}
+
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
+	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+
+	return cmd
+}
