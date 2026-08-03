@@ -189,8 +189,7 @@ After making changes to commands, tools, configuration, or flags, always check a
 
 - **README.md** - User-facing documentation (installation, usage, configuration)
 - **CLAUDE.md** - Developer guidance (this file)
-- **specs/spec.md** - CLI specification and requirements
-- **specs/spec_mcp.md** - MCP server specification and tool documentation
+- **docs/development.md** - Development guide (building, testing, contributing)
 
 Keep these files in sync with the actual implementation. When adding a new flag, config option, or command, update all relevant documentation files.
 
@@ -469,15 +468,12 @@ tiger-cli/
 │   └── version/            # Version check / update notification
 ├── docs/                   # Documentation
 │   └── development.md      # Development guide (building, testing, contributing)
-├── specs/                  # CLI specifications and API documentation
-│   ├── spec.md             # Basic project specification
-│   └── spec_mcp.md         # MCP server specification
 ├── .github/workflows/      # GitHub Actions CI/CD
 │   ├── test.yml            # Test workflow (runs on PRs and main)
 │   └── release.yml         # Release workflow (runs on semver tags)
 ├── bin/                    # Built binaries (created during build)
 ├── openapi.yaml            # OpenAPI 3.0 specification for Tiger API
-├── .goreleaser.yml         # GoReleaser configuration for building releases
+├── .goreleaser.yaml         # GoReleaser configuration for building releases
 ├── tools.go                # Build-time dependencies
 ├── README.md               # User-facing documentation
 └── CLAUDE.md               # Developer guidance for Claude Code
@@ -991,13 +987,7 @@ VERSION=1.2.3 && git tag -a v${VERSION} -m "${VERSION}" && git push origin v${VE
 3. **S3 Bucket** - Uploads binaries to `tiger-cli-releases` S3 bucket (behind `https://cli.tigerdata.com` CloudFront CDN) for install script and Homebrew downloads
 4. **PackageCloud** - Publishes Debian (.deb) and RPM packages to `timescale/tiger-cli` repository
 
-**Build Tool:** Uses [GoReleaser](https://goreleaser.com) to build and publish across all platforms. Configuration is in `.goreleaser.yml`.
-
-## Specifications
-
-The project specifications are located in the `specs/` directory:
-- `spec.md` - Basic project specification and CLI requirements
-- `spec_mcp.md` - MCP (Model Context Protocol) specification for integration
+**Build Tool:** Uses [GoReleaser](https://goreleaser.com) to build and publish across all platforms. Configuration is in `.goreleaser.yaml`.
 
 ## Testing Guidelines
 
