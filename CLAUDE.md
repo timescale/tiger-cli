@@ -51,7 +51,7 @@ go test -v ./...
 export $(cat .env | xargs)
 
 # Run integration tests with environment variables from .env file
-export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run TestServiceLifecycleIntegration
+export $(cat .env | xargs) && go test ./internal/cmd -v -run TestServiceLifecycleIntegration
 ```
 
 ### Running Locally
@@ -95,7 +95,7 @@ The script automatically:
 go test ./...
 
 # Run only integration tests
-go test ./internal/tiger/cmd -run Integration
+go test ./internal/cmd -run Integration
 
 # To run integration tests with real API calls, set environment variables:
 export TIGER_PUBLIC_KEY_INTEGRATION=your-public-key
@@ -109,13 +109,13 @@ export TIGER_EXISTING_SERVICE_ID_INTEGRATION=existing-service-id
 export TIGER_UPGRADE_INTEGRATION=1
 
 # Then run tests normally
-go test ./internal/tiger/cmd -v -run Integration
+go test ./internal/cmd -v -run Integration
 ```
 
 ### Code Generation
 ```bash
 # Generate OpenAPI client code and mocks from openapi.yaml
-go generate ./internal/tiger/api
+go generate ./internal/api
 
 # This runs automatically as part of normal Go tooling when needed
 # Generates:
@@ -178,10 +178,10 @@ When implementing or updating functionality:
 
 2. **Check for intentional differences** - Some discrepancies between CLI and MCP are intentional (e.g., different default behaviors, different output formats). Before making changes to sync them, ask whether the difference is intentional. Document intentional differences in code comments.
 
-3. **Share code between CLI and MCP** - Code that needs to be used by both CLI commands and MCP tools should be moved to a shared package (not in `internal/tiger/cmd` or `internal/tiger/mcp`). Current examples:
-   - `internal/tiger/common/` - Shared business logic, password storage, wait operations, error handling, and other utilities that have dependencies on config/api packages
-   - `internal/tiger/util/` - Small utility functions with minimal dependencies (formatting, validation, etc.)
-   - `internal/tiger/api/` - API client used by both
+3. **Share code between CLI and MCP** - Code that needs to be used by both CLI commands and MCP tools should be moved to a shared package (not in `internal/cmd` or `internal/mcp`). Current examples:
+   - `internal/common/` - Shared business logic, password storage, wait operations, error handling, and other utilities that have dependencies on config/api packages
+   - `internal/util/` - Small utility functions with minimal dependencies (formatting, validation, etc.)
+   - `internal/api/` - API client used by both
 
 ### Documentation Synchronization
 
@@ -200,7 +200,7 @@ Tiger CLI tracks usage analytics to help improve the product. Analytics are auto
 
 #### Automatic Tracking via Middleware
 
-**CLI Commands** - All commands are automatically wrapped with analytics middleware in `internal/tiger/cmd/root.go:134`
+**CLI Commands** - All commands are automatically wrapped with analytics middleware in `wrapCommandsWithAnalytics()` in `internal/cmd/root.go`
 
 This middleware:
 - Automatically tracks all CLI commands with event name like `"Run tiger service create"`
@@ -209,7 +209,7 @@ This middleware:
 - Records success/failure status and error messages
 - Uses `analytics.TryInit()` to gracefully handle cases where credentials aren't available
 
-**MCP Tools** - All MCP tool calls are automatically tracked via middleware in `internal/tiger/mcp/server.go:102`
+**MCP Tools** - All MCP tool calls are automatically tracked via middleware in `analyticsMiddleware()` in `internal/mcp/server.go`
 
 This middleware:
 - Automatically tracks all MCP tool calls with event name like `"Call service_create tool"`
@@ -235,7 +235,7 @@ The middleware follows these automatic naming conventions:
 
 #### Excluding Sensitive Data
 
-The middleware automatically excludes sensitive fields using a centralized ignore list in `internal/tiger/analytics/analytics.go`.
+The middleware automatically excludes sensitive fields using a centralized ignore list in `internal/analytics/analytics.go`.
 
 **Current ignore list:**
 - `password` - User passwords
@@ -248,12 +248,12 @@ The middleware automatically excludes sensitive fields using a centralized ignor
 
 **IMPORTANT:** When adding new commands or MCP tools, review whether they introduce new sensitive flags, input parameters, or positional arguments:
 
-1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/tiger/analytics/analytics.go`
+1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/analytics/analytics.go`
    - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
 
 2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
    - Refactor to use a flag instead
-   - Add filtering logic in `wrapCommandsWithAnalytics()` in `internal/tiger/cmd/root.go` to sanitize or omit the args from tracking
+   - Add filtering logic in `wrapCommandsWithAnalytics()` in `internal/cmd/root.go` to sanitize or omit the args from tracking
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -267,33 +267,32 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 ### Key Components
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
-- **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
-  - `root.go` - Root command with global flags and configuration initialization
-  - `auth.go` - Authentication commands (login, logout, status)
-  - `service.go` - Service management commands (list, create, get, fork, start, stop, resize, delete, update-password, logs)
-  - `db.go` - Database operation commands (connection-string, connect, test-connection)
+- **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
+  CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
+  Each command lives in its own file, named to match the command in snake_case
+  (see "One File Per Command" below). `root.go` holds the root command, global
+  flags, and configuration initialization. Helper files hold shared utilities
+  (`completion.go`, `flag.go`) and self-contained interactive flows
+  (`oauth.go`, `read_replica.go`, `password_recovery.go`, `mcp_install.go`).
   - `read_replica.go` - Read replica selection flow for `db connect`/`psql`: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas.
-  - `config.go` - Configuration management commands (show, set, unset, reset)
-  - `mcp.go` - MCP server commands (install, start, list, get)
-  - `version.go` - Version command
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
-- **Configuration**: `internal/tiger/config/config.go` - Centralized config with Viper integration
-- **Logging**: `internal/tiger/logging/logging.go` - Structured logging with zap
-- **API Client**: `internal/tiger/api/` - Generated OpenAPI client with mocks
-- **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
-  - `server.go` - MCP server initialization, tool registration, and lifecycle management
-  - `service_tools.go` - Service management tools (list, get, create, fork, start, stop, resize, update-password, logs)
-  - `db_tools.go` - Database operation tools (execute-query)
-  - `proxy.go` - Proxy client that forwards tools/resources/prompts from remote docs MCP server
-  - `capabilities.go` - Lists all available MCP capabilities (tools, prompts, resources, resource templates)
-- **Common Package**: `internal/tiger/common/` - Shared business logic used by both CLI and MCP
+- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+- **Logging**: `internal/logging/logging.go` - Structured logging with zap
+- **API Client**: `internal/api/` - Generated OpenAPI client with mocks
+- **MCP Server**: `internal/mcp/` - Model Context Protocol server implementation.
+  Each MCP tool lives in its own file, named to match the tool (see "One File Per
+  MCP Tool" below). `server.go` holds server initialization, tool registration,
+  and lifecycle management. Helper files hold shared utilities (`utils.go`,
+  `errors.go`), the remote docs proxy (`proxy.go`), and capability listing
+  (`capabilities.go`).
+- **Common Package**: `internal/common/` - Shared business logic used by both CLI and MCP
   - Password storage utilities (keyring, pgpass, validation)
   - Wait operations and polling logic (WaitForService)
   - Connection detail helpers (GetConnectionDetails, GetReplicaConnectionDetails for read replicas)
   - Error handling and exit code utilities
   - Service detail conversion helpers
   - Log fetching with pagination (FetchServiceLogs)
-- **Utilities**: `internal/tiger/util/` - Small utility functions with minimal dependencies
+- **Utilities**: `internal/util/` - Small utility functions with minimal dependencies
 
 ### Configuration System
 
@@ -303,10 +302,10 @@ The CLI uses a layered configuration approach:
 3. Environment variables with `TIGER_` prefix
 4. Command-line flags (highest precedence)
 
-For a complete list of valid configuration options, see `internal/tiger/config/config.go`.
+For a complete list of valid configuration options, see `internal/config/config.go`.
 All configuration options also have corresponding `TIGER_` environment variables.
 
-For a complete list of global command-line flags, see `internal/tiger/cmd/root.go`.
+For a complete list of global command-line flags, see `internal/cmd/root.go`.
 Note that not all config options have corresponding global flags, and not all global flags correspond to config options.
 
 ### Experimental Feature Gating
@@ -342,14 +341,27 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 **Two Types of Tools:**
 
-1. **Direct Tiger Tools** - Native tools for Tiger operations
-   - `service_tools.go` - Service management (list, get, create, fork, start, stop, update-password, logs)
-   - `db_tools.go` - Database operations (execute-query)
+1. **Direct Tiger Tools** - Native tools for Tiger service management and database operations, one file per tool
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
+
+**One File Per MCP Tool:**
+
+Every tool gets its own file in `internal/mcp/`, named to match the tool:
+`service_create` → `service_create.go`, `db_execute_query` → `db_execute_query.go`.
+Each tool file is laid out in this order:
+
+1. The `<Tool>Input`/`<Tool>Output` structs and their `Schema()` methods
+2. The `new<Tool>Tool()` function returning the `*mcp.Tool`
+3. The `handle<Tool>` handler method on `*Server`
+4. Helper functions used only by that tool
+
+Registration lives in `server.go` (`registerServiceTools`, `registerDatabaseTools`),
+so adding a tool means adding one file plus one `addTool` line. Shared schema
+helpers and API-to-output conversion live in `utils.go`.
 
 **Read-Only Mode Gate:**
 
-Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg.Config)` (defined in `internal/tiger/common/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
+Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg.Config)` (defined in `internal/common/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
 
 **Tool Definition Pattern:**
 
@@ -391,13 +403,20 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 }
 ```
 
-3. **Register tool with enhanced schema**:
+3. **Define a `new*Tool()` constructor** returning the tool with its enhanced schema:
 ```go
-mcp.AddTool(s.mcpServer, &mcp.Tool{
-    Name:        "service_create",
-    Description: `Detailed multi-line description...`,
-    InputSchema: ServiceCreateInput{}.Schema(),  // Uses our enhanced schema
-}, s.handleServiceCreate)
+func newServiceCreateTool() *mcp.Tool {
+    return &mcp.Tool{
+        Name:        "service_create",
+        Description: `Detailed multi-line description...`,
+        InputSchema: ServiceCreateInput{}.Schema(),  // Uses our enhanced schema
+    }
+}
+```
+
+4. **Register the tool** in `registerServiceTools`/`registerDatabaseTools` in `server.go`:
+```go
+addTool(s, readOnly, newServiceCreateTool(), s.handleServiceCreate)
 ```
 
 **Key Benefits of This Pattern:**
@@ -437,15 +456,17 @@ Two-mode logging system using zap:
 ```
 tiger-cli/
 ├── cmd/tiger/              # Main CLI entry point
-├── internal/tiger/         # Internal packages
+├── internal/               # Internal packages
+│   ├── analytics/          # Usage analytics tracking
 │   ├── api/                # Generated OpenAPI client (oapi-codegen)
 │   │   └── mocks/          # Generated mocks for testing
 │   ├── config/             # Configuration management
 │   ├── logging/            # Structured logging utilities
-│   ├── mcp/                # MCP server implementation
+│   ├── mcp/                # MCP server implementation (one file per tool)
 │   ├── common/             # Shared business logic (password storage, wait ops, error handling, log fetching)
-│   ├── cmd/                # CLI commands (Cobra)
-│   └── util/               # Small utility functions with minimal dependencies
+│   ├── cmd/                # CLI commands (Cobra, one file per command)
+│   ├── util/               # Small utility functions with minimal dependencies
+│   └── version/            # Version check / update notification
 ├── docs/                   # Documentation
 │   └── development.md      # Development guide (building, testing, contributing)
 ├── specs/                  # CLI specifications and API documentation
@@ -511,40 +532,31 @@ Tiger CLI uses a pure functional builder pattern with **zero global command stat
 
 ### Architecture Overview
 
-```
-buildRootCmd() → Complete CLI with all commands and flags
-├── buildVersionCmd()
-├── buildUpgradeCmd()
-├── buildConfigCmd()
-│   ├── buildConfigShowCmd()
-│   ├── buildConfigSetCmd()
-│   ├── buildConfigUnsetCmd()
-│   └── buildConfigResetCmd()
-├── buildAuthCmd()
-│   ├── buildLoginCmd()
-│   ├── buildLogoutCmd()
-│   └── buildStatusCmd()
-├── buildServiceCmd()
-│   ├── buildServiceListCmd()
-│   ├── buildServiceGetCmd()
-│   ├── buildServiceCreateCmd()
-│   ├── buildServiceForkCmd()
-│   ├── buildServiceStartCmd()
-│   ├── buildServiceStopCmd()
-│   ├── buildServiceDeleteCmd()
-│   ├── buildServiceUpdatePasswordCmd()
-│   └── buildServiceLogsCmd()
-├── buildDbCmd()
-│   ├── buildDbConnectionStringCmd()
-│   ├── buildDbConnectCmd()
-│   ├── buildDbTestConnectionCmd()
-│   └── buildDbSchemaCmd()
-└── buildMCPCmd()
-    ├── buildMCPInstallCmd()
-    └── buildMCPStartCmd()
-        ├── buildMCPStdioCmd()
-        └── buildMCPHTTPCmd()
-```
+`buildRootCmd()` builds the whole tree: it adds a `build*Cmd()` per top-level
+command, and each group command adds its own subcommand builders. To see the
+current tree, read `buildRootCmd()` in `root.go` and follow the builders down.
+
+### One File Per Command
+
+Every command gets its own file in `internal/cmd/`, named to match the command in
+snake_case: `tiger service create` → `service_create.go`, `tiger db create role`
+→ `db_create_role.go`. Group commands with no `RunE` of their own still get a
+file (`tiger service` → `service.go`).
+
+Within a command's file:
+
+1. Constants and package-level variables (if any) come first
+2. The `build*Cmd()` function comes next
+3. Helper functions used only by that command follow it
+
+Helpers shared by several commands in a group live in the group's file (e.g. the
+service ID completion and output helpers live in `service.go`). Larger
+self-contained flows keep their own non-command file.
+
+Tests mirror this layout: `service_create.go` → `service_create_test.go`.
+Package-wide test scaffolding (`TestMain`, auth mocks, shared command runners)
+lives in `main_test.go`; per-group test helpers live in the group's test file.
+`integration_test.go` stays a single cross-command suite.
 
 ### Root Command Builder
 
@@ -589,7 +601,7 @@ func buildRootCmd() *cobra.Command {
 }
 ```
 
-See `internal/tiger/cmd/root.go` for the complete implementation.
+See `internal/cmd/root.go` for the complete implementation.
 
 ### Simple Command Pattern
 
@@ -670,7 +682,7 @@ func buildMyConfigurableFlagCmd() *cobra.Command {
 }
 ```
 
-The `bindFlags()` helper (defined in `internal/tiger/cmd/flag.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+The `bindFlags()` helper (defined in `internal/cmd/flag.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
 
 **Why bind flags in PreRunE?**
 

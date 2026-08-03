@@ -75,13 +75,13 @@ Integration tests execute real API calls against a Tiger environment to validate
 
 ```bash
 # Load environment variables and run all integration tests
-export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run Integration
+export $(cat .env | xargs) && go test ./internal/cmd -v -run Integration
 
 # Run specific integration test
-export $(cat .env | xargs) && go test ./internal/tiger/cmd -v -run TestServiceLifecycleIntegration
+export $(cat .env | xargs) && go test ./internal/cmd -v -run TestServiceLifecycleIntegration
 
 # Integration tests will skip automatically if credentials are not set
-go test ./internal/tiger/cmd -v -run Integration
+go test ./internal/cmd -v -run Integration
 ```
 
 ### What Integration Tests Cover
@@ -101,14 +101,14 @@ go test ./internal/tiger/cmd -v -run Integration
 ```
 tiger-cli/
 ├── cmd/tiger/              # Main CLI entry point
-├── internal/tiger/         # Internal packages
+├── internal/               # Internal packages
 │   ├── api/                # Generated OpenAPI client (oapi-codegen)
 │   │   └── mocks/          # Generated mocks for testing
 │   ├── config/             # Configuration management
 │   ├── logging/            # Structured logging utilities
-│   ├── mcp/                # MCP server implementation
-│   ├── password/           # Password storage utilities
-│   ├── cmd/                # CLI commands (Cobra)
+│   ├── mcp/                # MCP server implementation (one file per tool)
+│   ├── common/             # Shared business logic used by CLI and MCP
+│   ├── cmd/                # CLI commands (Cobra, one file per command)
 │   └── util/               # Shared utilities
 ├── docs/                   # Documentation
 ├── specs/                  # CLI specifications and API documentation
@@ -125,18 +125,17 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
 ### Key Components
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
-- **Command Structure**: `internal/tiger/cmd/` - Cobra-based command definitions
-  - `root.go` - Root command with global flags and configuration initialization
-  - `auth.go` - Authentication commands
-  - `service.go` - Service management commands
-  - `db.go` - Database operation commands
-  - `mcp.go` - MCP server commands
-  - `config.go` - Configuration management commands
-  - `version.go` - Version command
-- **Configuration**: `internal/tiger/config/config.go` - Centralized config with Viper integration
-- **Logging**: `internal/tiger/logging/logging.go` - Structured logging with zap
-- **API Client**: `internal/tiger/api/` - Generated OpenAPI client
-- **MCP Server**: `internal/tiger/mcp/` - Model Context Protocol server implementation
+- **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
+  CLI commands (auth, service, db, config, mcp, version, upgrade). Each command
+  lives in its own file, named to match the command in snake_case
+  (`tiger service create` → `service_create.go`). `root.go` holds the root
+  command, global flags, and configuration initialization.
+- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+- **Logging**: `internal/logging/logging.go` - Structured logging with zap
+- **API Client**: `internal/api/` - Generated OpenAPI client
+- **MCP Server**: `internal/mcp/` - Model Context Protocol server
+  implementation. Each MCP tool lives in its own file, named to match the tool
+  (`service_create` → `service_create.go`).
 
 ### Configuration System
 
@@ -156,7 +155,7 @@ Two-mode logging system using zap:
 
 ```bash
 # Generate OpenAPI client code and mocks from openapi.yaml
-go generate ./internal/tiger/api
+go generate ./internal/api
 
 # Generates:
 # - client.go: HTTP client implementation
