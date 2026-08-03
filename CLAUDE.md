@@ -555,12 +555,12 @@ Place a helper by who calls it, working down this list until one matches:
 
 1. **One command** → that command's file.
 2. **Several commands in one group** → the group file (`service.go`, `db.go`).
-3. **Across groups, and it needs to stay in `package cmd`** (test-override vars,
-   cobra types, anything touching a `*cobra.Command`) → a named package-level
-   file: `completion.go`, `flag.go`, `terminal.go`, `password.go`.
-4. **Across groups, with no dependency on `cmd`** → `internal/util` (small, few
-   dependencies) or `internal/common` (needs config/api).
-5. **Both CLI and MCP** → `internal/common`.
+3. **Across groups** → a named package-level file: `completion.go`, `flag.go`,
+   `terminal.go`, `password.go`.
+4. **A genuine standalone utility** — small and isolated, with no notion of a
+   command (`util.GenerateSecurePassword`) → `internal/util`. Anything shaped
+   around the CLI stays in `cmd` even if its signature looks generic.
+5. **Used by both CLI and MCP** → `internal/common`.
 
 Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
 `db connect` flow — argument splitting, read replica selection, password
