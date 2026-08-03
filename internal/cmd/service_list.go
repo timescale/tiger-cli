@@ -3,12 +3,17 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // serviceListCmd represents the list command under service
@@ -72,4 +77,57 @@ func buildServiceListCmd() *cobra.Command {
 	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
+}
+
+// outputServices formats and outputs the services list based on the specified format
+func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
+	outputWriter := cmd.OutOrStdout()
+
+	switch strings.ToLower(format) {
+	case "json":
+		return util.SerializeToJSON(outputWriter, outputServices)
+	case "yaml":
+		return util.SerializeToYAML(outputWriter, outputServices)
+	case "env":
+		return fmt.Errorf("environment variable output is not supported for multiple services")
+	default: // table format (default)
+		return outputServicesTable(outputServices, outputWriter)
+	}
+}
+
+// prepareServicesForOutput creates copies of services with sensitive fields removed
+func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
+	prepared := make([]OutputService, len(services))
+	for i, service := range services {
+		prepared[i] = prepareServiceForOutput(service, false, output)
+	}
+	return prepared
+}
+
+// outputServicesTable outputs services in a formatted table using tablewriter
+func outputServicesTable(services []OutputService, output io.Writer) error {
+	table := tablewriter.NewWriter(output)
+	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
+
+	for _, service := range services {
+		table.Append(
+			util.Deref(service.ServiceId),
+			util.Deref(service.Name),
+			util.DerefStr(service.Status),
+			util.DerefStr(service.ServiceType),
+			util.Deref(service.RegionCode),
+			formatTimePtr(service.Created),
+		)
+	}
+
+	return table.Render()
+}
+
+// formatTimePtr formats a time pointer, returning empty string if nil
+func formatTimePtr(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04")
 }

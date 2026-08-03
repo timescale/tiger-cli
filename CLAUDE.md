@@ -271,10 +271,10 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
   Each command lives in its own file, named to match the command in snake_case
   (see "One File Per Command" below). `root.go` holds the root command, global
-  flags, and configuration initialization. Helper files hold shared utilities
-  (`completion.go`, `flag.go`) and self-contained interactive flows
-  (`oauth.go`, `read_replica.go`, `password_recovery.go`, `mcp_install.go`).
-  - `read_replica.go` - Read replica selection flow for `db connect`/`psql`: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas.
+  flags, and configuration initialization. Helper files hold cross-group
+  utilities (`completion.go`, `flag.go`, `terminal.go`, `password.go`) — see
+  "Where Helpers Go" below.
+  - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
@@ -292,7 +292,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - Error handling and exit code utilities
   - Service detail conversion helpers
   - Log fetching with pagination (FetchServiceLogs)
-- **Utilities**: `internal/util/` - Small utility functions with minimal dependencies
+- **Utilities**: `internal/util/` - Small utility functions with minimal dependencies (formatting, validation, password generation)
 
 ### Configuration System
 
@@ -477,7 +477,7 @@ tiger-cli/
 │   └── release.yml         # Release workflow (runs on semver tags)
 ├── bin/                    # Built binaries (created during build)
 ├── openapi.yaml            # OpenAPI 3.0 specification for Tiger API
-├── .goreleaser.yml         # GoReleaser configuration for building releases
+├── .goreleaser.yaml        # GoReleaser configuration for building releases
 ├── tools.go                # Build-time dependencies
 ├── README.md               # User-facing documentation
 └── CLAUDE.md               # Developer guidance for Claude Code
@@ -549,9 +549,24 @@ Within a command's file:
 2. The `build*Cmd()` function comes next
 3. Helper functions used only by that command follow it
 
-Helpers shared by several commands in a group live in the group's file (e.g. the
-service ID completion and output helpers live in `service.go`). Larger
-self-contained flows keep their own non-command file.
+### Where Helpers Go
+
+Place a helper by who calls it, working down this list until one matches:
+
+1. **One command** → that command's file.
+2. **Several commands in one group** → the group file (`service.go`, `db.go`).
+3. **Across groups, and it needs to stay in `package cmd`** (test-override vars,
+   cobra types, anything touching a `*cobra.Command`) → a named package-level
+   file: `completion.go`, `flag.go`, `terminal.go`, `password.go`.
+4. **Across groups, with no dependency on `cmd`** → `internal/util` (small, few
+   dependencies) or `internal/common` (needs config/api).
+5. **Both CLI and MCP** → `internal/common`.
+
+Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
+`db connect` flow — argument splitting, read replica selection, password
+recovery, and the psql handoff, bubbletea models and all — because nothing else
+calls into it. A long file whose contents all serve one command is easier to
+follow than several short files with entry points scattered across them.
 
 Tests mirror this layout: `service_create.go` → `service_create_test.go`.
 Package-wide test scaffolding (`TestMain`, auth mocks, shared command runners)
@@ -991,7 +1006,7 @@ VERSION=1.2.3 && git tag -a v${VERSION} -m "${VERSION}" && git push origin v${VE
 3. **S3 Bucket** - Uploads binaries to `tiger-cli-releases` S3 bucket (behind `https://cli.tigerdata.com` CloudFront CDN) for install script and Homebrew downloads
 4. **PackageCloud** - Publishes Debian (.deb) and RPM packages to `timescale/tiger-cli` repository
 
-**Build Tool:** Uses [GoReleaser](https://goreleaser.com) to build and publish across all platforms. Configuration is in `.goreleaser.yml`.
+**Build Tool:** Uses [GoReleaser](https://goreleaser.com) to build and publish across all platforms. Configuration is in `.goreleaser.yaml`.
 
 ## Specifications
 
