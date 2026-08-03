@@ -11,6 +11,8 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
 func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -59,6 +61,47 @@ func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	}
 
 	return *resp.JSON200, nil
+}
+
+func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Config option is always first positional argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+// mcpGetCompletion provides custom completions for the get command
+func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	// Capability name is always first positional argument
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Create MCP server to get capabilities
+	server, err := mcp.NewServer(cmd.Context(), cfg)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	defer server.Close()
+
+	capabilities, err := server.ListCapabilities(cmd.Context())
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Close the MCP server when finished
+	if err := server.Close(); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return filterCompletionsByPrefix(capabilities.Names(), toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
 // filterCompletionsByPrefix filters a slice of strings to only include items

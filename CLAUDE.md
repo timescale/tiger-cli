@@ -562,6 +562,9 @@ Place a helper by who calls it, working down this list until one matches:
    around the CLI stays in `cmd` even if its signature looks generic.
 5. **Used by both CLI and MCP** → `internal/common`.
 
+Shell completion functions are an exception to rule 1: they all live in
+`completion.go`, however many commands use them.
+
 Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
 `db connect` flow — argument splitting, read replica selection, password
 recovery, and the psql handoff, bubbletea models and all — because nothing else
