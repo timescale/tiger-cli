@@ -2,38 +2,17 @@ package cmd
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
-var (
-	// getServiceDetailsFunc can be overridden for testing
-	getServiceDetailsFunc = getServiceDetails
-
-	// checkStdinIsTTY can be overridden for testing to bypass TTY detection
-	checkStdinIsTTY = func() bool {
-		return util.IsTerminal(os.Stdin)
-	}
-
-	// readPasswordFromTerminal can be overridden for testing to inject password input
-	readPasswordFromTerminal = func() (string, error) {
-		val, err := term.ReadPassword(int(os.Stdin.Fd()))
-		if err != nil {
-			return "", err
-		}
-		return string(val), nil
-	}
-)
+// getServiceDetailsFunc can be overridden for testing
+var getServiceDetailsFunc = getServiceDetails
 
 func buildDbCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -101,23 +80,4 @@ func getServiceDetails(cmd *cobra.Command, cfg *common.Config, args []string) (a
 		return api.Service{}, err
 	}
 	return *service, nil
-}
-
-// generateSecurePassword generates a cryptographically secure random password
-func generateSecurePassword(length int) (string, error) {
-	// Generate random bytes
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random password: %w", err)
-	}
-
-	// Encode as base64 (URL-safe variant to avoid special characters that might need escaping)
-	encodedPassword := base64.URLEncoding.EncodeToString(bytes)
-
-	// Trim to desired length (base64 encoding makes it slightly longer)
-	if len(encodedPassword) > length {
-		encodedPassword = encodedPassword[:length]
-	}
-
-	return encodedPassword, nil
 }

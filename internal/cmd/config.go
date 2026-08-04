@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func buildConfigCmd() *cobra.Command {
@@ -19,13 +17,4 @@ func buildConfigCmd() *cobra.Command {
 	cmd.AddCommand(buildConfigResetCmd())
 
 	return cmd
-}
-
-func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// Config option is always first positional argument
-	if len(args) > 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
 }

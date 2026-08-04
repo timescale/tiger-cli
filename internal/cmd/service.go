@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
-	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -75,23 +72,6 @@ func outputService(cmd *cobra.Command, service api.Service, format string, withP
 		return outputServiceEnv(outputSvc, outputWriter)
 	default: // table format (default)
 		return outputServiceTable(outputSvc, outputWriter)
-	}
-}
-
-// outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
-	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
-	outputWriter := cmd.OutOrStdout()
-
-	switch strings.ToLower(format) {
-	case "json":
-		return util.SerializeToJSON(outputWriter, outputServices)
-	case "yaml":
-		return util.SerializeToYAML(outputWriter, outputServices)
-	case "env":
-		return fmt.Errorf("environment variable output is not supported for multiple services")
-	default: // table format (default)
-		return outputServicesTable(outputServices, outputWriter)
 	}
 }
 
@@ -199,25 +179,6 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	return table.Render()
 }
 
-// outputServicesTable outputs services in a formatted table using tablewriter
-func outputServicesTable(services []OutputService, output io.Writer) error {
-	table := tablewriter.NewWriter(output)
-	table.Header("SERVICE ID", "NAME", "STATUS", "TYPE", "REGION", "CREATED")
-
-	for _, service := range services {
-		table.Append(
-			util.Deref(service.ServiceId),
-			util.Deref(service.Name),
-			util.DerefStr(service.Status),
-			util.DerefStr(service.ServiceType),
-			util.Deref(service.RegionCode),
-			formatTimePtr(service.Created),
-		)
-	}
-
-	return table.Render()
-}
-
 func prepareServiceForOutput(service api.Service, withPassword bool, output io.Writer) OutputService {
 	outputSvc := OutputService{
 		Service: service,
@@ -246,23 +207,6 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 
 	return outputSvc
-}
-
-// prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
-	prepared := make([]OutputService, len(services))
-	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, false, output)
-	}
-	return prepared
-}
-
-// formatTimePtr formats a time pointer, returning empty string if nil
-func formatTimePtr(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
 }
 
 // handlePasswordSaving handles saving password using the configured storage
@@ -311,54 +255,6 @@ func printConnectMessage(output io.Writer, passwordSaved, noSetDefault bool, ser
 		// If the service was set as the default, no need to include the serviceID in the command
 		fmt.Fprintf(output, "🔌 Run 'tiger db connect' to connect to your new service\n")
 	}
-}
-
-func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// Service ID is always first positional argument
-	if len(args) > 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	services, err := listServices(cmd)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	results := make([]string, 0, len(services))
-	for _, service := range services {
-		if service.ServiceId != nil && strings.HasPrefix(*service.ServiceId, toComplete) {
-			results = append(results, cobra.CompletionWithDesc(*service.ServiceId, *service.Name))
-		}
-	}
-	return results, cobra.ShellCompDirectiveNoFileComp
-}
-
-func listServices(cmd *cobra.Command) ([]api.Service, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(cmd.Context())
-	if err != nil {
-		return nil, err
-	}
-
-	// Make API call to list services
-	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-	defer cancel()
-
-	resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
-	}
-
-	// Handle API response
-	if resp.StatusCode() != http.StatusOK {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-
-	if resp.JSON200 == nil || len(*resp.JSON200) == 0 {
-		return []api.Service{}, nil
-	}
-
-	return *resp.JSON200, nil
 }
 
 // getServiceID determines the service ID from args or config
