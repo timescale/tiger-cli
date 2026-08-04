@@ -82,7 +82,6 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
@@ -118,7 +117,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.SilenceUsage = true
 
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				return err
 			}
@@ -175,7 +174,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cfg.Config, service, util.Deref(service.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is specified
 			if !createNoSetDefault {
@@ -211,7 +210,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 			}
 
-			if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
+			if err := outputService(cmd, cfg.Config, service, cfg.Output, createWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 

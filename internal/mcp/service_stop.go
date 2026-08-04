@@ -66,7 +66,7 @@ This operation stops a service that is currently running. The service will trans
 // handleServiceStop handles the service_stop MCP tool
 func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest, input ServiceStopInput) (*mcp.CallToolResult, ServiceStopOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceStopOutput{}, err
 	}

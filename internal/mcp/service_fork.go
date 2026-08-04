@@ -103,7 +103,7 @@ WARNING: Creates billable resources.`,
 // handleServiceFork handles the service_fork MCP tool
 func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest, input ServiceForkInput) (*mcp.CallToolResult, ServiceForkOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
@@ -181,7 +181,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg.Config, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -222,7 +222,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceForkOutput{
-		Service:         s.convertToServiceDetail(service, input.WithPassword),
+		Service:         s.convertToServiceDetail(cfg.Config, service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}

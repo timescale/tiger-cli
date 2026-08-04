@@ -68,7 +68,7 @@ func newServiceListTool() *mcp.Tool {
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}

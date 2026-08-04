@@ -37,7 +37,7 @@ func serviceIDCompletion(cmd *cobra.Command, args []string, toComplete string) (
 
 func listServices(cmd *cobra.Command) ([]api.Service, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(cmd.Context())
+	cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 	if err != nil {
 		return nil, err
 	}
@@ -79,13 +79,13 @@ func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	cfg, err := config.Load()
+	cfg, err := config.Load(cmd.Flags())
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
 	// Create MCP server to get capabilities
-	server, err := mcp.NewServer(cmd.Context(), cfg)
+	server, err := mcp.NewServer(cmd.Context(), cfg, cmd.Flags())
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

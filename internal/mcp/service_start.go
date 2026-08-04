@@ -66,7 +66,7 @@ This operation starts a service that is currently in a stopped/paused state. The
 // handleServiceStart handles the service_start MCP tool
 func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolRequest, input ServiceStartInput) (*mcp.CallToolResult, ServiceStartOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceStartOutput{}, err
 	}

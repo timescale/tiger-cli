@@ -28,12 +28,11 @@ func buildStatusCmd() *cobra.Command {
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				if errors.Is(err, config.ErrNotLoggedIn) {
 					return common.ExitWithCode(common.ExitAuthenticationError, config.ErrNotLoggedIn)

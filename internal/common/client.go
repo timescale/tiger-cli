@@ -15,7 +15,9 @@ var (
 	// GetStoredCredentials loads the stored credentials (PAT or OAuth) from the
 	// keyring or fallback file. It's a package var so tests can override it to
 	// inject credentials of either shape.
-	GetStoredCredentials = config.GetStoredCredentials
+	GetStoredCredentials = func(cfg *config.Config) (*config.Credentials, error) {
+		return cfg.GetStoredCredentials()
+	}
 
 	// Cache of validated API Keys. Useful for avoided unnecessary calls to the
 	// /auth/info and /analytics/identify endpoints when the API client is
@@ -40,7 +42,7 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 
 	// If there were no credentials in the environment, try to load stored credentials
 	if publicKey == "" && secretKey == "" {
-		stored, err := GetStoredCredentials()
+		stored, err := GetStoredCredentials(cfg)
 		if err != nil {
 			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 		}

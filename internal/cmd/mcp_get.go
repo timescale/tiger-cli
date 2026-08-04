@@ -40,20 +40,19 @@ Examples:
   tiger mcp get service_create -o yaml`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: mcpGetCompletion,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			capabilityName := args[0]
 
 			cmd.SilenceUsage = true
 
 			// Get config
-			cfg, err := config.Load()
+			cfg, err := config.Load(cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), cfg)
+			server, err := mcp.NewServer(cmd.Context(), cfg, cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}

@@ -41,7 +41,7 @@ func TestAuthLogin_KeyFlags(t *testing.T) {
 	expectedAPIKey := "test-public-key:test-secret-key"
 	expectedProjectID := "test-project-id" // Comes from mock validation function
 
-	creds, err := config.GetStoredCredentials()
+	creds, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestAuthLogin_KeyEnvironmentVariables(t *testing.T) {
 	// Verify credentials were stored
 	expectedAPIKey := "env-public-key:env-secret-key"
 	expectedProjectID := "test-project-id" // Auto-detected from mock
-	creds, err := config.GetStoredCredentials()
+	creds, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
@@ -113,17 +113,17 @@ func TestAuthLogin_KeyringFallback(t *testing.T) {
 	credentialsFile := filepath.Join(tmpDir, "credentials")
 
 	// If keyring worked, manually create file scenario by clearing all credentials and adding to file
-	config.RemoveCredentials()
+	testConfig(t).RemoveCredentials()
 
 	// Store to file manually to simulate fallback
 	expectedAPIKey := "fallback-public:fallback-secret"
 	expectedProjectID := "test-project-id"
-	if err := config.StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
+	if err := testConfig(t).StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
 		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
 	// Verify file storage works
-	creds, err := config.GetStoredCredentials()
+	creds, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file fallback: %v", err)
 	}
@@ -172,19 +172,19 @@ func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
 	}
 
 	// Clear all credentials to ensure we're testing file-only retrieval
-	config.RemoveCredentials()
+	testConfig(t).RemoveCredentials()
 
 	// Verify credentials were stored in file (since we'll manually write to file only)
 	expectedAPIKey := "env-file-public:env-file-secret"
 	expectedProjectID := "test-project-id"
 
 	// Store to file manually to simulate fallback scenario
-	if err := config.StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
+	if err := testConfig(t).StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
 		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
 	// Verify getCredentials works with file-only storage
-	creds, err := config.GetStoredCredentials()
+	creds, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
@@ -219,15 +219,14 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 		validateAPIKey = originalValidator
 	}()
 
-	// Initialize viper with test directory BEFORE calling RemoveCredentials()
-	// This ensures RemoveCredentials() operates on the test directory, not the user's real directory
+	// Write an empty config file in the test directory
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
 	// Clean up credentials
-	config.RemoveCredentials()
-	defer config.RemoveCredentials()
+	testConfig(t).RemoveCredentials()
+	defer testConfig(t).RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should fail validation
 	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret")
@@ -246,7 +245,7 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 
 	// Verify that no credentials were stored
-	if _, err := config.GetStoredCredentials(); err == nil {
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
 		t.Error("Credentials should not be stored when validation fails")
 	}
 }
@@ -275,15 +274,14 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 		validateAPIKey = originalValidator
 	}()
 
-	// Initialize viper with test directory BEFORE calling RemoveCredentials()
-	// This ensures RemoveCredentials() operates on the test directory, not the user's real directory
+	// Write an empty config file in the test directory
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
 	// Clean up credentials
-	config.RemoveCredentials()
-	defer config.RemoveCredentials()
+	testConfig(t).RemoveCredentials()
+	defer testConfig(t).RemoveCredentials()
 
 	// Execute login command with public and secret key flags - should succeed
 	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret")
@@ -299,7 +297,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Verify that credentials were stored
 	expectedAPIKey := "valid-public:valid-secret"
 	expectedProjectID := "test-project-valid"
-	creds, err := config.GetStoredCredentials()
+	creds, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Credentials not stored in keyring or file: %v", err)
 	}
@@ -337,7 +335,7 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	stored, err := config.GetStoredCredentials()
+	stored, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
@@ -396,7 +394,7 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
 	}
 
-	stored, err := config.GetStoredCredentials()
+	stored, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
@@ -436,12 +434,14 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 		RefreshToken: "mock-refresh-token-67890",
 		Expiry:       time.Now().Add(-time.Hour),
 	}
-	if err := config.StoreOAuthCredentials(expired, "project-789"); err != nil {
+	// The config file above points api_url/gateway_url at the mock server, and
+	// carries the test config dir so the refreshed token is persisted there.
+	cfg := testConfig(t)
+	if err := cfg.StoreOAuthCredentials(expired, "project-789"); err != nil {
 		t.Fatalf("Failed to store oauth credentials: %v", err)
 	}
 
-	cfg := &config.Config{APIURL: mockServer.URL, GatewayURL: mockServer.URL}
-	stored, err := config.GetStoredCredentials()
+	stored, err := cfg.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to load stored credentials: %v", err)
 	}
@@ -458,7 +458,7 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 		t.Fatalf("Request failed: %v", err)
 	}
 
-	reloaded, err := config.GetStoredCredentials()
+	reloaded, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to reload credentials: %v", err)
 	}

@@ -91,7 +91,7 @@ By default only user-facing schemas and objects are shown; view/routine definiti
 
 // handleDBSchema handles the db_schema MCP tool
 func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, input DBSchemaInput) (*mcp.CallToolResult, DBSchemaOutput, error) {
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
@@ -116,7 +116,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	// A replica without a pooler connects directly; surface that as a warning.
 	warning := common.ReplicaPoolerWarning(target, input.Pooled)
 
-	schema, err := common.FetchServiceSchema(ctx, target, input.Role, input.Pooled, common.SchemaOptions{
+	schema, err := common.FetchServiceSchema(ctx, cfg.Config, target, input.Role, input.Pooled, common.SchemaOptions{
 		Schema:             input.SchemaName,
 		IncludeInternal:    input.Internal,
 		IncludeDefinitions: input.Definitions,

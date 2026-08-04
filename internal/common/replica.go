@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -21,8 +22,8 @@ type ConnectionTarget struct {
 // Details builds the target's connection details. A requested-but-unavailable
 // pooler is a hard error for a primary but silently falls back to direct for a
 // replica.
-func (t *ConnectionTarget) Details(opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	details, err := GetConnectionDetailsFor(t.ConnectionService, t.CredentialService, opts)
+func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
+	details, err := GetConnectionDetailsFor(cfg, t.ConnectionService, t.CredentialService, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}

@@ -55,8 +55,7 @@ Examples:
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --filter ordinal=0`,
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: bindFlags("output"),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
@@ -72,7 +71,7 @@ Examples:
 				return err
 			}
 
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err

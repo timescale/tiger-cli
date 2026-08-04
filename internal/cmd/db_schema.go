@@ -51,7 +51,7 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -64,7 +64,7 @@ Examples:
 
 			warnReplicaPooler(cmd, target, dbSchemaPooled)
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
+			schema, err := common.FetchServiceSchema(cmd.Context(), cfg.Config, target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
 				Schema:             dbSchemaSchema,
 				IncludeInternal:    dbSchemaInternal,
 				IncludeDefinitions: dbSchemaDefinitions,

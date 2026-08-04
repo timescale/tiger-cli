@@ -18,13 +18,12 @@ func buildServiceMetricsAvailableSeriesCmd() *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
-		Use:     "available-series [service-id]",
-		Short:   "List available metric series",
-		Long:    `List the names of all metric series available for a service.`,
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: bindFlags("output"),
+		Use:   "available-series [service-id]",
+		Short: "List available metric series",
+		Long:  `List the names of all metric series available for a service.`,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err

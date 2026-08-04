@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/config"
@@ -37,7 +38,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context())
+			return startStdioServer(cmd.Context(), cmd.Flags())
 		},
 	}
 
@@ -49,16 +50,16 @@ Examples:
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context) error {
+func startStdioServer(ctx context.Context, flags *pflag.FlagSet) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
-	cfg, err := config.Load()
+	cfg, err := config.Load(flags)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, cfg)
+	server, err := mcp.NewServer(ctx, cfg, flags)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}

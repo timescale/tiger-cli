@@ -55,9 +55,9 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, service api.Service, format string, withPassword bool, strict bool) error {
+func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
-	outputSvc := prepareServiceForOutput(service, withPassword, cmd.ErrOrStderr())
+	outputSvc := prepareServiceForOutput(cfg, service, withPassword, cmd.ErrOrStderr())
 	if strict && withPassword && outputSvc.Password == "" {
 		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceId))
 	}
@@ -179,7 +179,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	return table.Render()
 }
 
-func prepareServiceForOutput(service api.Service, withPassword bool, output io.Writer) OutputService {
+func prepareServiceForOutput(cfg *config.Config, service api.Service, withPassword bool, output io.Writer) OutputService {
 	outputSvc := OutputService{
 		Service: service,
 	}
@@ -191,7 +191,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 		InitialPassword: util.Deref(service.InitialPassword),
 	}
 
-	if connectionDetails, err := common.GetConnectionDetails(service, opts); err != nil {
+	if connectionDetails, err := common.GetConnectionDetails(cfg, service, opts); err != nil {
 		if output != nil {
 			fmt.Fprintf(output, "⚠️  Warning: Failed to get connection details: %v\n", err)
 		}
@@ -201,10 +201,7 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 	}
 
 	// Build console URL
-	if cfg, err := config.Load(); err == nil {
-		url := fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
-		outputSvc.ConsoleURL = url
-	}
+	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
 
 	return outputSvc
 }
@@ -212,10 +209,10 @@ func prepareServiceForOutput(service api.Service, withPassword bool, output io.W
 // handlePasswordSaving handles saving password using the configured storage
 // method and displaying appropriate messages. Returns true if the password was
 // successfully saved, or false if not.
-func handlePasswordSaving(service api.Service, initialPassword string, output io.Writer) bool {
+func handlePasswordSaving(cfg *config.Config, service api.Service, initialPassword string, output io.Writer) bool {
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
-	result, _ := common.SavePasswordWithResult(service, initialPassword, "tsdbadmin")
+	result, _ := common.SavePasswordWithResult(cfg, service, initialPassword, "tsdbadmin")
 
 	if result.Method == "none" && result.Message == "No password provided" {
 		// Don't output anything for empty password

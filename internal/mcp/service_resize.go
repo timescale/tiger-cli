@@ -74,7 +74,7 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 // handleServiceResize handles the service_resize MCP tool
 func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolRequest, input ServiceResizeInput) (*mcp.CallToolResult, ServiceResizeOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
@@ -142,7 +142,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Return status, resources, and message (after wait so status is accurate)
-	detail := s.convertToServiceDetail(service, false)
+	detail := s.convertToServiceDetail(cfg.Config, service, false)
 	output := ServiceResizeOutput{
 		Status:    detail.Status,
 		Resources: detail.Resources,

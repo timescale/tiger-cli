@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -23,9 +22,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
@@ -75,7 +72,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -94,9 +91,7 @@ func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
 	config.SetTestServiceName(t)
 	tmpDir := setupDBTest(t)
 
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	const projectID = "test-project-123"
 	port := 5432
@@ -157,7 +152,7 @@ func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
 		t.Errorf("expected parent primary id in output, got: %s", output)
 	}
 
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	// Stored against the parent primary, matching the connect read path.
 	got, err := storage.Get(primary, "tsdbadmin")
 	if err != nil {
@@ -179,9 +174,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
@@ -231,7 +224,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -249,9 +242,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
@@ -321,7 +312,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	}
 
 	// Verify password was actually saved
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password: %v", err)
@@ -396,9 +387,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
@@ -449,7 +438,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	}
 
 	// Verify password was saved for the custom role
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	retrievedPassword, err := storage.Get(mockService, customRole)
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
@@ -526,9 +515,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	tmpDir := setupDBTest(t)
 
 	// Set pgpass as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "pgpass")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "pgpass")
 
 	// Set up config
 	_, err := config.UseTestConfig(tmpDir, map[string]any{
@@ -575,7 +562,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	}
 
 	// Verify password was saved in pgpass storage
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)

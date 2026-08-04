@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
@@ -58,25 +56,10 @@ tiger auth login
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SetContext(ctx)
 
-			// Bind persistent flags to viper
-			// Use cmd.Flags() which includes inherited persistent flags from parents
-			if err := errors.Join(
-				viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
-				viper.BindPFlag("service_id", cmd.Flags().Lookup("service-id")),
-				viper.BindPFlag("analytics", cmd.Flags().Lookup("analytics")),
-				viper.BindPFlag("password_storage", cmd.Flags().Lookup("password-storage")),
-				viper.BindPFlag("color", cmd.Flags().Lookup("color")),
-			); err != nil {
-				return fmt.Errorf("failed to bind flags: %w", err)
-			}
-
-			// Setup configuration initialization
-			configDirFlag := cmd.Flags().Lookup("config-dir")
-			if err := config.SetupViper(config.GetEffectiveConfigDir(configDirFlag)); err != nil {
-				return fmt.Errorf("error setting up config: %w", err)
-			}
-
-			cfg, err := config.Load()
+			// Load the config for the command being run. cmd.Flags() includes
+			// the persistent flags inherited from parents, so the flags in
+			// config.Load's binding table take precedence over env and file.
+			cfg, err := config.Load(cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
@@ -121,7 +104,7 @@ tiger auth login
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
+			cfg, err := config.Load(cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
@@ -174,7 +157,7 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 				// Reload config after command to account for config changes
 				// during command (e.g. `tiger config set analytics false`
 				// should not result in an analytics event being sent).
-				cfg, err := config.Load()
+				cfg, err := config.Load(c.Flags())
 				if err != nil {
 					return
 				}

@@ -84,14 +84,13 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -116,7 +115,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(cfg.Config, service, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -141,7 +140,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(service, rolePassword, roleName)
+			result, err := common.SavePasswordWithResult(cfg.Config, service, rolePassword, roleName)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", result.Message)
 			} else if !result.Success {

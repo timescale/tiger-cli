@@ -60,7 +60,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err

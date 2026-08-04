@@ -40,10 +40,9 @@ Examples:
   tiger service get svc-12345 --output yaml`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -77,7 +76,7 @@ Examples:
 			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword, true)
+			return outputService(cmd, cfg.Config, service, cfg.Output, withPassword, true)
 		},
 	}
 

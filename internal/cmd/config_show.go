@@ -6,7 +6,6 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -23,35 +22,18 @@ func buildConfigShowCmd() *cobra.Command {
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load()
+			cfg, err := config.Load(cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			configFile, err := cfg.EnsureConfigDir()
-			if err != nil {
-				return err
-			}
-
-			// a new viper, free from env and cli flags
-			v := viper.New()
-			v.SetConfigFile(configFile)
-			if withEnv {
-				config.ApplyEnvOverrides(v)
-			}
-			if !noDefaults {
-				config.ApplyDefaults(v)
-			}
-			if err := config.ReadInConfig(v); err != nil {
-				return err
-			}
-			config.MigrateVersionCheck(v)
-
-			cfgOut, err := config.ForOutputFromViper(v)
+			// Values are re-read free of env and CLI flags (unless --with-env
+			// is given), so `config show -o json` reports the configured
+			// `output` value rather than the flag's.
+			cfgOut, err := config.LoadForOutput(cfg.ConfigDir, withEnv, noDefaults)
 			if err != nil {
 				return err
 			}

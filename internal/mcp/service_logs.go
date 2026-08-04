@@ -77,7 +77,7 @@ Supports filtering by time (via since/until parameters) and node (for services w
 // handleServiceLogs handles the service_logs MCP tool
 func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest, input ServiceLogsInput) (*mcp.CallToolResult, ServiceLogsOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}

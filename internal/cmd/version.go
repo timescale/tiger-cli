@@ -46,7 +46,7 @@ func buildVersionCmd() *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
-				cfg, err := config.Load()
+				cfg, err := config.Load(cmd.Flags())
 				if err != nil {
 					return fmt.Errorf("Error loading config: %w", err)
 				}

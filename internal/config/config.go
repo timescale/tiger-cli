@@ -16,45 +16,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-type Config struct {
-	APIURL          string       `mapstructure:"api_url"`
-	Analytics       bool         `mapstructure:"analytics"`
-	Color           bool         `mapstructure:"color"`
-	ConfigDir       string       `mapstructure:"config_dir"`
-	ConsoleURL      string       `mapstructure:"console_url"`
-	Debug           bool         `mapstructure:"debug"`
-	DocsMCP         bool         `mapstructure:"docs_mcp"`
-	DocsMCPURL      string       `mapstructure:"docs_mcp_url"`
-	GatewayURL      string       `mapstructure:"gateway_url"`
-	MCPMaxRows      int          `mapstructure:"mcp_max_rows"`
-	Output          string       `mapstructure:"output"`
-	PasswordStorage string       `mapstructure:"password_storage"`
-	ReadOnly        bool         `mapstructure:"read_only"`
-	ReleasesURL     string       `mapstructure:"releases_url"`
-	ServiceID       string       `mapstructure:"service_id"`
-	VersionCheck    bool         `mapstructure:"version_check"`
-	viper           *viper.Viper `mapstructure:"-"`
-}
-
-type ConfigOutput struct {
-	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
-	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty"`
-	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
-	ConfigDir       *string `mapstructure:"config_dir" json:"config_dir,omitempty"`
-	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
-	Debug           *bool   `mapstructure:"debug" json:"debug,omitempty"`
-	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
-	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
-	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
-	MCPMaxRows      *int    `mapstructure:"mcp_max_rows" json:"mcp_max_rows,omitempty"`
-	Output          *string `mapstructure:"output" json:"output,omitempty"`
-	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty"`
-	ReadOnly        *bool   `mapstructure:"read_only" json:"read_only,omitempty"`
-	ReleasesURL     *string `mapstructure:"releases_url" json:"releases_url,omitempty"`
-	ServiceID       *string `mapstructure:"service_id" json:"service_id,omitempty"`
-	VersionCheck    *bool   `mapstructure:"version_check" json:"version_check,omitempty"`
-}
-
 const (
 	ConfigFileName         = "config.yaml"
 	DefaultAPIURL          = "https://console.cloud.tigerdata.com/public/api/v1"
@@ -96,92 +57,97 @@ var defaultValues = map[string]any{
 	"version_check":    DefaultVersionCheck,
 }
 
-func ValidConfigOptions() []string {
-	return slices.Collect(maps.Keys(defaultValues))
+// flagBindings maps CLI flag names to the config keys they override. Flags
+// missing from a caller's flag set are skipped, so command-local flags (e.g.
+// --output) bind only for the commands that define them.
+var flagBindings = map[string]string{
+	"analytics":        "analytics",
+	"color":            "color",
+	"debug":            "debug",
+	"output":           "output",
+	"password-storage": "password_storage",
+	"service-id":       "service_id",
 }
 
-func ApplyDefaults(v *viper.Viper) {
-	for key, value := range defaultValues {
-		v.SetDefault(key, value)
-	}
+// Config holds the effective configuration for a single command invocation,
+// resolved through viper's normal precedence (flag > env > file > default).
+type Config struct {
+	APIURL          string `mapstructure:"api_url"`
+	Analytics       bool   `mapstructure:"analytics"`
+	Color           bool   `mapstructure:"color"`
+	ConsoleURL      string `mapstructure:"console_url"`
+	Debug           bool   `mapstructure:"debug"`
+	DocsMCP         bool   `mapstructure:"docs_mcp"`
+	DocsMCPURL      string `mapstructure:"docs_mcp_url"`
+	GatewayURL      string `mapstructure:"gateway_url"`
+	MCPMaxRows      int    `mapstructure:"mcp_max_rows"`
+	Output          string `mapstructure:"output"`
+	PasswordStorage string `mapstructure:"password_storage"`
+	ReadOnly        bool   `mapstructure:"read_only"`
+	ReleasesURL     string `mapstructure:"releases_url"`
+	ServiceID       string `mapstructure:"service_id"`
+	VersionCheck    bool   `mapstructure:"version_check"`
+
+	ConfigDir string         `mapstructure:"-"`
+	flags     *pflag.FlagSet `mapstructure:"-"`
 }
 
-func ApplyEnvOverrides(v *viper.Viper) {
-	v.SetEnvPrefix("TIGER")
-	v.AutomaticEnv()
+// ConfigOutput is the shape `tiger config show` renders. Every field is a
+// pointer so unset values can be omitted when defaults are suppressed.
+type ConfigOutput struct {
+	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
+	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty"`
+	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
+	ConfigDir       *string `mapstructure:"-" json:"config_dir,omitempty"`
+	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
+	Debug           *bool   `mapstructure:"debug" json:"debug,omitempty"`
+	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
+	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
+	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
+	MCPMaxRows      *int    `mapstructure:"mcp_max_rows" json:"mcp_max_rows,omitempty"`
+	Output          *string `mapstructure:"output" json:"output,omitempty"`
+	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty"`
+	ReadOnly        *bool   `mapstructure:"read_only" json:"read_only,omitempty"`
+	ReleasesURL     *string `mapstructure:"releases_url" json:"releases_url,omitempty"`
+	ServiceID       *string `mapstructure:"service_id" json:"service_id,omitempty"`
+	VersionCheck    *bool   `mapstructure:"version_check" json:"version_check,omitempty"`
 }
 
-func ReadInConfig(v *viper.Viper) error {
-	// Try to read config file if it exists
-	// If file doesn't exist, that's okay - we'll use defaults and env vars
-	if err := v.ReadInConfig(); err != nil &&
-		!errors.As(err, &viper.ConfigFileNotFoundError{}) &&
-		!errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
-}
-
-// SetupViper configures the global Viper instance with defaults, env vars, and config file
-func SetupViper(configDir string) error {
-	v := viper.GetViper()
-
-	// Configure viper to read from config file
-	configFile := GetConfigFile(configDir)
-	v.SetConfigFile(configFile)
-
-	// Configure viper to read from env vars
-	ApplyEnvOverrides(v)
-
-	// Set defaults for all config values
-	ApplyDefaults(v)
-
-	if err := ReadInConfig(v); err != nil {
-		return err
-	}
-
-	MigrateVersionCheck(v)
-	return nil
-}
-
-// MigrateVersionCheck preserves backward compatibility with configs written by
-// older CLI versions, which used a `version_check_interval` duration (0 to
-// disable) instead of the current `version_check` bool. If a pre-existing
-// config file set the old key and not the new one, we derive the new value
-// from it (0 → false, any non-zero interval → true) so a user who had disabled
-// update checks doesn't have them silently re-enabled on upgrade.
-//
-// The derived value is applied via SetDefault, so an explicit `version_check`
-// from the config file or a TIGER_VERSION_CHECK env var still takes precedence.
-// It must be called after ApplyDefaults so the derived value overrides the
-// generic default, and after ReadInConfig so InConfig can see the file keys.
-// This is an in-memory shim only; the old key remains in the file until it is
-// rewritten (e.g. via `tiger config set`/`unset`).
-func MigrateVersionCheck(v *viper.Viper) {
-	if v.InConfig("version_check_interval") && !v.InConfig("version_check") {
-		v.SetDefault("version_check", v.GetDuration("version_check_interval") != 0)
-	}
-}
-
-func FromViper(v *viper.Viper) (*Config, error) {
+// Load creates a new Config instance. The provided flag set is used to resolve
+// the effective config directory (via the config-dir flag) and to bind the CLI
+// flags in flagBindings so they override file/env values. It may be nil for
+// callers that have no flags to apply.
+func Load(flags *pflag.FlagSet) (*Config, error) {
 	cfg := &Config{
-		ConfigDir: filepath.Dir(v.ConfigFileUsed()),
-		viper:     v,
+		ConfigDir: getEffectiveConfigDir(flags),
+		flags:     flags,
 	}
-
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("error unmarshaling config: %w", err)
+	if err := cfg.reload(); err != nil {
+		return nil, err
 	}
-
 	return cfg, nil
 }
 
-func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
-	configDir := filepath.Dir(v.ConfigFileUsed())
-	cfg := &ConfigOutput{
-		ConfigDir: &configDir,
+// LoadForOutput loads config values for display purposes using a fresh viper
+// instance, independent of CLI flags. This keeps `tiger config show -o json`
+// from reporting the flag's format as the configured `output` value.
+func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutput, error) {
+	v := viper.New()
+	v.SetConfigFile(GetConfigFile(configDir))
+
+	if withEnv {
+		applyEnvOverrides(v)
+	}
+	if !noDefaults {
+		applyDefaults(v)
 	}
 
+	if err := readInConfig(v); err != nil {
+		return nil, err
+	}
+	migrateVersionCheck(v)
+
+	cfg := &ConfigOutput{ConfigDir: &configDir}
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
@@ -189,73 +155,33 @@ func ForOutputFromViper(v *viper.Viper) (*ConfigOutput, error) {
 	return cfg, nil
 }
 
-// Load creates a new Config instance from the current viper state
-// This function should be called after SetupViper has been called to initialize viper
-func Load() (*Config, error) {
-	v := viper.GetViper()
-
-	// Try to read config file into viper to ensure we're unmarshaling the most
-	// up-to-date values into the config struct.
-	if err := ReadInConfig(v); err != nil {
-		return nil, err
-	}
-
-	return FromViper(v)
-}
-
-func ensureConfigDir(configDir string) (string, error) {
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return "", fmt.Errorf("error creating config directory: %w (set TIGER_CONFIG_DIR or --config-dir to a writable path)", err)
-	}
-	return GetConfigFile(configDir), nil
-}
-
-func (c *Config) EnsureConfigDir() (string, error) {
-	return ensureConfigDir(c.ConfigDir)
-}
-
-// UseTestConfig writes only the specified key-value pairs to the config file and
-// returns a Config instance with those values set.
-// This function is intended for testing purposes only, where you need to set up
-// specific config file state without writing default values for unspecified keys.
-func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
-	configFile, err := ensureConfigDir(configDir)
-	if err != nil {
-		return nil, err
-	}
-
+// reload reads the config file and resolves effective values through viper's
+// normal precedence (flag > env > file > default). Called by Load for the
+// initial load, and by Set/Unset/Reset after writing the config file.
+func (c *Config) reload() error {
 	v := viper.New()
-	v.SetConfigFile(configFile)
+	v.SetConfigFile(c.GetConfigFile())
+	applyEnvOverrides(v)
+	applyDefaults(v)
 
-	// Write only the specified key-value pairs
-	for key, value := range values {
-		v.Set(key, value)
+	if err := bindFlags(v, c.flags); err != nil {
+		return fmt.Errorf("failed to bind flags: %w", err)
 	}
 
-	if err := v.WriteConfigAs(configFile); err != nil {
-		return nil, fmt.Errorf("error writing config file: %w", err)
+	if err := readInConfig(v); err != nil {
+		return err
 	}
+	migrateVersionCheck(v)
 
-	viper.Reset()
-	if err := SetupViper(configDir); err != nil {
-		return nil, err
+	if err := v.Unmarshal(c); err != nil {
+		return fmt.Errorf("error unmarshaling config: %w", err)
 	}
-
-	// Construct and return a Config instance with the values
-	cfg := &Config{
-		ConfigDir: configDir,
-	}
-
-	if err := viper.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("error unmarshaling config: %w", err)
-	}
-
-	return cfg, nil
+	return nil
 }
 
 func (c *Config) Set(key, value string) error {
-	// Validate and update the field
-	validated, err := c.UpdateField(key, value)
+	// Validate and convert the value to the correct type for the config file
+	validated, err := validateValue(key, value)
 	if err != nil {
 		return err
 	}
@@ -275,228 +201,8 @@ func (c *Config) Set(key, value string) error {
 	if err := v.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
-	return nil
-}
 
-func setBool(key, val string) (bool, error) {
-	b, err := strconv.ParseBool(val)
-	if err != nil {
-		return false, fmt.Errorf("invalid %s value: %s (must be true or false)", key, val)
-	}
-	return b, nil
-}
-
-func setInt(key, val string) (int, error) {
-	n, err := strconv.Atoi(val)
-	if err != nil {
-		return 0, fmt.Errorf("invalid %s value: %s (must be an integer)", key, val)
-	}
-	return n, nil
-}
-
-// UpdateField updates the field in the Config struct corresponding to the given key.
-// It accepts either a string (from user input) or a typed value (string/bool from defaults).
-// The function validates the value and updates both the struct field and viper state.
-func (c *Config) UpdateField(key string, value any) (any, error) {
-	var validated any
-
-	switch key {
-	case "api_url":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("api_url must be string, got %T", value)
-		}
-		c.APIURL = s
-		validated = s
-
-	case "console_url":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("console_url must be string, got %T", value)
-		}
-		c.ConsoleURL = s
-		validated = s
-
-	case "gateway_url":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("gateway_url must be string, got %T", value)
-		}
-		c.GatewayURL = s
-		validated = s
-
-	case "docs_mcp":
-		switch v := value.(type) {
-		case bool:
-			c.DocsMCP = v
-			validated = v
-		case string:
-			b, err := setBool("docs_mcp", v)
-			if err != nil {
-				return nil, err
-			}
-			c.DocsMCP = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("docs_mcp must be string or bool, got %T", value)
-		}
-
-	case "docs_mcp_url":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("docs_mcp_url must be string, got %T", value)
-		}
-		c.DocsMCPURL = s
-		validated = s
-
-	case "service_id":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("service_id must be string, got %T", value)
-		}
-		c.ServiceID = s
-		validated = s
-
-	case "color":
-		switch v := value.(type) {
-		case bool:
-			c.Color = v
-			validated = v
-		case string:
-			b, err := setBool("color", v)
-			if err != nil {
-				return nil, err
-			}
-			c.Color = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("color must be string or bool, got %T", value)
-		}
-
-	case "output":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("output must be string, got %T", value)
-		}
-		if err := ValidateOutputFormat(s, false); err != nil {
-			return nil, err
-		}
-		c.Output = s
-		validated = s
-
-	case "analytics":
-		switch v := value.(type) {
-		case bool:
-			c.Analytics = v
-			validated = v
-		case string:
-			b, err := setBool("analytics", v)
-			if err != nil {
-				return nil, err
-			}
-			c.Analytics = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("analytics must be string or bool, got %T", value)
-		}
-
-	case "password_storage":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("password_storage must be string, got %T", value)
-		}
-		if s != "keyring" && s != "pgpass" && s != "none" {
-			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", s)
-		}
-		c.PasswordStorage = s
-		validated = s
-
-	case "read_only":
-		switch v := value.(type) {
-		case bool:
-			c.ReadOnly = v
-			validated = v
-		case string:
-			b, err := setBool("read_only", v)
-			if err != nil {
-				return nil, err
-			}
-			c.ReadOnly = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("read_only must be string or bool, got %T", value)
-		}
-
-	case "debug":
-		switch v := value.(type) {
-		case bool:
-			c.Debug = v
-			validated = v
-		case string:
-			b, err := setBool("debug", v)
-			if err != nil {
-				return nil, err
-			}
-			c.Debug = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("debug must be string or bool, got %T", value)
-		}
-
-	case "releases_url":
-		s, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("releases_url must be string, got %T", value)
-		}
-		c.ReleasesURL = s
-		validated = s
-
-	case "version_check":
-		switch v := value.(type) {
-		case bool:
-			c.VersionCheck = v
-			validated = v
-		case string:
-			b, err := setBool("version_check", v)
-			if err != nil {
-				return nil, err
-			}
-			c.VersionCheck = b
-			validated = b
-		default:
-			return nil, fmt.Errorf("version_check must be string or bool, got %T", value)
-		}
-
-	case "mcp_max_rows":
-		var n int
-		switch v := value.(type) {
-		case int:
-			n = v
-		case string:
-			parsed, err := setInt("mcp_max_rows", v)
-			if err != nil {
-				return nil, err
-			}
-			n = parsed
-		default:
-			return nil, fmt.Errorf("mcp_max_rows must be string or int, got %T", value)
-		}
-		if n < 1 {
-			return nil, fmt.Errorf("mcp_max_rows must be at least 1, got %d", n)
-		}
-		c.MCPMaxRows = n
-		validated = n
-
-	default:
-		return nil, fmt.Errorf("unknown configuration key: %s", key)
-	}
-
-	if c.viper == nil {
-		viper.Set(key, validated)
-	} else {
-		c.viper.Set(key, validated)
-	}
-	return validated, nil
+	return c.reload()
 }
 
 func (c *Config) Unset(key string) error {
@@ -525,17 +231,11 @@ func (c *Config) Unset(key string) error {
 		return fmt.Errorf("unknown configuration key: %s", key)
 	}
 
-	// Apply the default to the current global viper state
-	if def, ok := defaultValues[key]; ok {
-		if _, err := c.UpdateField(key, def); err != nil {
-			return err
-		}
-	}
-
 	if err := vNew.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
-	return nil
+
+	return c.reload()
 }
 
 func (c *Config) Reset() error {
@@ -551,29 +251,25 @@ func (c *Config) Reset() error {
 		return fmt.Errorf("error writing config file: %w", err)
 	}
 
-	// Apply all defaults to the current global viper state
-	for key, value := range defaultValues {
-		if _, err := c.UpdateField(key, value); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return c.reload()
 }
 
-func GetConfigFile(dir string) string {
-	return filepath.Join(dir, ConfigFileName)
+// EnsureConfigDir creates the config directory if it does not already exist
+// and returns the path to the config file within it.
+func (c *Config) EnsureConfigDir() (string, error) {
+	return ensureConfigDir(c.ConfigDir)
 }
 
 func (c *Config) GetConfigFile() string {
 	return GetConfigFile(c.ConfigDir)
 }
 
-// TODO: This function is currently used to get the directory that the API
-// key fallback file should be stored in (see credentials.go). But ideally, those
-// functions would take a Config struct and use the ConfigDir field instead.
-func GetConfigDir() string {
-	return filepath.Dir(viper.ConfigFileUsed())
+func ValidConfigOptions() []string {
+	return slices.Collect(maps.Keys(defaultValues))
+}
+
+func GetConfigFile(dir string) string {
+	return filepath.Join(dir, ConfigFileName)
 }
 
 func GetDefaultConfigDir() string {
@@ -585,9 +281,13 @@ func GetDefaultConfigDir() string {
 	return filepath.Join(homeDir, ".config", "tiger")
 }
 
-func GetEffectiveConfigDir(configDirFlag *pflag.Flag) string {
-	if configDirFlag.Changed {
-		return util.ExpandPath(configDirFlag.Value.String())
+// getEffectiveConfigDir resolves the config directory from the --config-dir
+// flag, then TIGER_CONFIG_DIR, then the default location.
+func getEffectiveConfigDir(flags *pflag.FlagSet) string {
+	if flags != nil {
+		if flag := flags.Lookup("config-dir"); flag != nil && flag.Changed {
+			return util.ExpandPath(flag.Value.String())
+		}
 	}
 
 	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
@@ -597,8 +297,140 @@ func GetEffectiveConfigDir(configDirFlag *pflag.Flag) string {
 	return GetDefaultConfigDir()
 }
 
-// ResetGlobalConfig clears the global viper state for testing
-// This is mainly used to reset viper configuration between test runs
-func ResetGlobalConfig() {
-	viper.Reset()
+func ensureConfigDir(configDir string) (string, error) {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return "", fmt.Errorf("error creating config directory: %w (set TIGER_CONFIG_DIR or --config-dir to a writable path)", err)
+	}
+	return GetConfigFile(configDir), nil
+}
+
+func applyDefaults(v *viper.Viper) {
+	for key, value := range defaultValues {
+		v.SetDefault(key, value)
+	}
+}
+
+func applyEnvOverrides(v *viper.Viper) {
+	v.SetEnvPrefix("TIGER")
+	v.AutomaticEnv()
+}
+
+func readInConfig(v *viper.Viper) error {
+	// Try to read config file if it exists
+	// If file doesn't exist, that's okay - we'll use defaults and env vars
+	if err := v.ReadInConfig(); err != nil &&
+		!errors.As(err, &viper.ConfigFileNotFoundError{}) &&
+		!errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func bindFlags(v *viper.Viper, flags *pflag.FlagSet) error {
+	if flags == nil {
+		return nil
+	}
+
+	var errs []error
+	for name, key := range flagBindings {
+		if flag := flags.Lookup(name); flag != nil {
+			errs = append(errs, v.BindPFlag(key, flag))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// migrateVersionCheck preserves backward compatibility with configs written by
+// older CLI versions, which used a `version_check_interval` duration (0 to
+// disable) instead of the current `version_check` bool. If a pre-existing
+// config file set the old key and not the new one, we derive the new value
+// from it (0 → false, any non-zero interval → true) so a user who had disabled
+// update checks doesn't have them silently re-enabled on upgrade.
+//
+// The derived value is applied via SetDefault, so an explicit `version_check`
+// from the config file or a TIGER_VERSION_CHECK env var still takes precedence.
+// It must be called after applyDefaults so the derived value overrides the
+// generic default, and after readInConfig so InConfig can see the file keys.
+// This is an in-memory shim only; the old key remains in the file until it is
+// rewritten (e.g. via `tiger config set`/`unset`).
+func migrateVersionCheck(v *viper.Viper) {
+	if v.InConfig("version_check_interval") && !v.InConfig("version_check") {
+		v.SetDefault("version_check", v.GetDuration("version_check_interval") != 0)
+	}
+}
+
+// validateValue validates and converts a user-provided value for the given
+// config key. String values are returned as-is (after any key-specific
+// validation); bool and int keys are parsed from their string form. Returns
+// the converted value suitable for writing to the config file.
+func validateValue(key, value string) (any, error) {
+	switch key {
+	case "api_url", "console_url", "docs_mcp_url", "gateway_url", "releases_url", "service_id":
+		return value, nil
+	case "analytics", "color", "debug", "docs_mcp", "read_only", "version_check":
+		return parseBool(key, value)
+	case "mcp_max_rows":
+		return parsePositiveInt(key, value)
+	case "output":
+		if err := ValidateOutputFormat(value, false); err != nil {
+			return nil, err
+		}
+		return value, nil
+	case "password_storage":
+		if value != "keyring" && value != "pgpass" && value != "none" {
+			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
+		}
+		return value, nil
+	default:
+		return nil, fmt.Errorf("unknown configuration key: %s", key)
+	}
+}
+
+func parseBool(key, value string) (bool, error) {
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s value: %s (must be true or false)", key, value)
+	}
+	return b, nil
+}
+
+func parsePositiveInt(key, value string) (int, error) {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s value: %s (must be an integer)", key, value)
+	}
+	if n < 1 {
+		return 0, fmt.Errorf("%s must be at least 1, got %d", key, n)
+	}
+	return n, nil
+}
+
+// UseTestConfig writes only the specified key-value pairs to the config file in
+// the given directory and returns a Config instance loaded from it.
+// This function is intended for testing purposes only, where you need to set up
+// specific config file state without writing default values for unspecified keys.
+func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
+	configFile, err := ensureConfigDir(configDir)
+	if err != nil {
+		return nil, err
+	}
+
+	v := viper.New()
+	v.SetConfigFile(configFile)
+
+	// Write only the specified key-value pairs
+	for key, value := range values {
+		v.Set(key, value)
+	}
+
+	if err := v.WriteConfigAs(configFile); err != nil {
+		return nil, fmt.Errorf("error writing config file: %w", err)
+	}
+
+	cfg := &Config{ConfigDir: configDir}
+	if err := cfg.reload(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }

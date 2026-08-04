@@ -101,7 +101,7 @@ WARNING: Creates billable resources.`,
 // handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
@@ -179,7 +179,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg.Config, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -210,7 +210,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceCreateOutput{
-		Service:         s.convertToServiceDetail(service, input.WithPassword),
+		Service:         s.convertToServiceDetail(cfg.Config, service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}

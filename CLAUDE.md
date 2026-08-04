@@ -136,18 +136,20 @@ go generate ./internal/api
 
 **IMPORTANT:** Follow these rules when working with configuration:
 
-1. **Always use the Config struct** - Never read configuration values directly from the global viper instance. Always load a `Config` struct and use its fields.
+1. **There is no global config** - `config.Load(flags)` builds a fresh `viper` instance per call and unmarshals it into a `Config`. Nothing reads the global viper instance, and nothing should: always take a `*config.Config` (or `*common.Config`) and use its fields.
 
-2. **Load once, pass down** - Load the config once at the start of a command or operation, then pass it down to functions that need it. Do not reload the config if one is already available higher in the call chain.
+2. **Pass the command's flag set to Load** - `config.Load(cmd.Flags())` binds the flags in `flagBindings` (`internal/config/config.go`) so precedence stays flag > env > file > default. `cmd.Flags()` includes the persistent flags inherited from parents, and flags a command doesn't define are skipped, so command-local flags (e.g. `--output`) bind only where they exist. Pass `nil` when there are no flags to apply.
 
-3. **MCP tools reload per-call** - In MCP tool implementations, always load a fresh config at the start of each tool call. This ensures that configuration changes made by the user (via `tiger config set`) take effect immediately for the next tool call, without requiring the MCP server to be restarted.
+3. **Load once, pass down** - Load the config once at the start of a command or operation, then pass it down to functions that need it. Do not reload the config if one is already available higher in the call chain.
+
+4. **MCP tools reload per-call** - In MCP tool implementations, always load a fresh config at the start of each tool call, using the flag set the server was started with (`s.flags`). This ensures that configuration changes made by the user (via `tiger config set`) take effect immediately for the next tool call, without requiring the MCP server to be restarted.
 
 **Example:**
 ```go
 // ✅ Good: Load config once and pass it down
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
     // Load fresh config at start of MCP tool call
-    cfg, err := s.loadConfigWithProjectID()
+    cfg, err := common.LoadConfig(ctx, s.flags)
     if err != nil {
         return nil, ServiceListOutput{}, err
     }
@@ -156,17 +158,33 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
     return doWork(cfg)
 }
 
+// ✅ Good: A CLI command loads with its own flag set
+func run(cmd *cobra.Command, args []string) error {
+    cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+    // ...
+}
+
 // ❌ Bad: Reading from viper directly
 func handleCommand() {
     projectID := viper.GetString("project_id") // Don't do this
 }
 
+// ❌ Bad: Dropping the flag set, so --config-dir/--service-id are ignored
+func run(cmd *cobra.Command, args []string) error {
+    cfg, err := config.Load(nil) // Don't do this in a command
+}
+
 // ❌ Bad: Reloading config when already available
 func processData(cfg *config.Config) {
-    freshCfg, _ := config.Load() // Don't reload if cfg is already available
+    freshCfg, _ := config.Load(nil) // Don't reload if cfg is already available
     // Use cfg instead
 }
 ```
+
+Config-derived state lives on the `Config` too: credential storage is a set of
+methods on it (`cfg.StoreCredentials`, `cfg.GetStoredCredentials`,
+`cfg.RemoveCredentials`), keyed off `cfg.ConfigDir`, and `cfg.Set`/`Unset`/`Reset`
+write the config file and then reload the struct through the same precedence.
 
 ### CLI and MCP Synchronization
 
@@ -274,7 +292,9 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
-- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+- **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
+  helpers. Each `Load` uses its own viper instance (no global state); see
+  "Configuration Management" above
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server implementation.
@@ -592,15 +612,14 @@ func buildRootCmd() *cobra.Command {
         Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
         Long:  `Complete CLI description...`,
         PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-            // Bind persistent flags to viper at execution time
-            if err := errors.Join(
-                viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
-                // ... bind remaining flags
-            ); err != nil {
-                return fmt.Errorf("failed to bind flags: %w", err)
+            // Load the config for the command being run; cmd.Flags() carries
+            // the persistent flags inherited from parents
+            cfg, err := config.Load(cmd.Flags())
+            if err != nil {
+                return fmt.Errorf("failed to load config: %w", err)
             }
 
-            // Setup configuration and initialize logging
+            // Initialize logging
             // ... rest of initialization
         },
     }
@@ -676,21 +695,22 @@ func buildMyFlaggedCmd() *cobra.Command {
 }
 ```
 
-### Commands with Flags That Need Viper Binding
+### Commands with Flags That Override Config Values
 
-For commands that need their flags bound to viper for configuration precedence (flag > env > config > default), use the `bindFlags()` helper:
+A flag that should override a config value needs no wiring in the command: pass
+the command's flag set to `config.Load` and the binding table in
+`internal/config/config.go` does the rest.
 
 ```go
 func buildMyConfigurableFlagCmd() *cobra.Command {
     var output string
 
     cmd := &cobra.Command{
-        Use:     "my-command",
-        Short:   "Command with configurable flag",
-        PreRunE: bindFlags("output"),  // Binds flag to viper
+        Use:   "my-command",
+        Short: "Command with configurable flag",
         RunE: func(cmd *cobra.Command, args []string) error {
             cmd.SilenceUsage = true
-            cfg, err := config.Load()  // Now includes bound flag value
+            cfg, err := config.Load(cmd.Flags())
             // ... use cfg.Output which respects: flag > env > config > default
         },
     }
@@ -700,17 +720,15 @@ func buildMyConfigurableFlagCmd() *cobra.Command {
 }
 ```
 
-The `bindFlags()` helper (defined in `internal/cmd/flag_helper.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+To make a *new* flag override a config value, add it to `flagBindings`, which
+maps flag names to config keys (e.g. `"password-storage"` → `"password_storage"`).
+Bindings are applied per load against the flag set passed in, so a flag bound for
+one command never leaks into another, and a command that doesn't define the flag
+simply skips it.
 
-**Why bind flags in PreRunE?**
-
-Flags must be bound to viper at **execution time**, not at **build time**, for two critical reasons:
-
-1. **Prevents binding conflicts**: When all commands are built at startup (the builder pattern), binding flags at build time can cause commands' flags to bind to the same viper keys, silently overwriting each other. Only the last binding wins.
-
-2. **Ensures correct precedence**: Viper must bind flags after the command tree is built but before `config.Load()` is called. This happens in `PreRunE` (or `PersistentPreRunE` for persistent flags), ensuring the precedence order works correctly: command-line flags > environment variables > config file > defaults.
-
-**Note:** Use `PreRunE` for command-specific flags, and `PersistentPreRunE` for persistent flags on the root command that apply to all subcommands.
+Flags that aren't config values (e.g. `--auto-generate`) stay as plain local
+variables; a flag that only needs an env-var fallback can read it directly (see
+`--new-password` and `TIGER_NEW_PASSWORD` in `service_update_password.go`).
 
 ### Parent Commands with Subcommands
 
@@ -846,7 +864,7 @@ When adding new commands to this architecture:
 
 1. **Create a builder function** following the `buildXXXCmd()` pattern
 2. **Declare flags locally** within the builder function scope
-3. **Bind flags to viper in PreRunE** if the flag needs to be configurable via config file or environment variables
+3. **Add the flag to `flagBindings`** (in `internal/config/config.go`) if it should override a config value, and load with `config.Load(cmd.Flags())`
 4. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
 5. **No init() function** required - everything goes through the root builder
 6. **Test with `buildRootCmd()`** instead of recreating flag setup

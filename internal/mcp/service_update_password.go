@@ -64,7 +64,7 @@ func newServiceUpdatePasswordTool() *mcp.Tool {
 // handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
@@ -112,7 +112,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	// Save the new password using the service we already fetched.
-	result, saveErr := common.SavePasswordWithResult(service, input.Password, "tsdbadmin")
+	result, saveErr := common.SavePasswordWithResult(cfg.Config, service, input.Password, "tsdbadmin")
 	passwordStorage := &result
 	if saveErr != nil {
 		logging.Debug("MCP: Password storage failed", zap.Error(saveErr))

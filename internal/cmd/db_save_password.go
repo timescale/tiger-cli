@@ -46,7 +46,7 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -94,7 +94,7 @@ Examples:
 			}
 
 			// Save password using configured storage
-			storage := common.GetPasswordStorage()
+			storage := common.GetPasswordStorage(cfg.Config)
 			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}

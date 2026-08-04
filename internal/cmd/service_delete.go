@@ -54,7 +54,7 @@ Examples:
 
 			// Load config before the confirmation prompt so read-only mode
 			// refuses without asking the user to type the service ID.
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				return err
 			}

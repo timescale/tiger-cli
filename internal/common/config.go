@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/pflag"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -19,8 +21,11 @@ type Config struct {
 	ProjectID string                   `json:"-"`
 }
 
-func LoadConfig(ctx context.Context) (*Config, error) {
-	cfg, err := config.Load()
+// LoadConfig loads the config and API client. The flag set of the command being
+// run is passed through to [config.Load] so that CLI flags take precedence over
+// env vars and the config file; it may be nil when there are no flags to apply.
+func LoadConfig(ctx context.Context, flags *pflag.FlagSet) (*Config, error) {
+	cfg, err := config.Load(flags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}

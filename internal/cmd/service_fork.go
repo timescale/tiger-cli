@@ -72,7 +72,6 @@ Examples:
   tiger service fork svc-12345 --now --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -101,7 +100,7 @@ Examples:
 			}
 
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -196,7 +195,7 @@ Examples:
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cfg.Config, forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is used
 			if !forkNoSetDefault {
@@ -232,7 +231,7 @@ Examples:
 				}
 			}
 
-			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword, false); err != nil {
+			if err := outputService(cmd, cfg.Config, forkedService, cfg.Output, forkWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 

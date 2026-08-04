@@ -77,7 +77,7 @@ If Tiger CLI was installed via a package manager (Homebrew, apt, yum/dnf), the u
 }
 
 func runUpgrade(cmd *cobra.Command, requestedVersion string, force bool) error {
-	cfg, err := config.Load()
+	cfg, err := config.Load(cmd.Flags())
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

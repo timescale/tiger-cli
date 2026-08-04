@@ -91,7 +91,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load()
+			cfg, err := config.Load(cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
@@ -114,7 +114,7 @@ Examples:
 				if err != nil {
 					return err
 				}
-				if err := config.StoreOAuthCredentials(token, projectID); err != nil {
+				if err := cfg.StoreOAuthCredentials(token, projectID); err != nil {
 					return fmt.Errorf("failed to store credentials: %w", err)
 				}
 				// Identify the user for analytics.
@@ -142,7 +142,7 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
-			if err := config.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
+			if err := cfg.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
 			finishLogin(cmd, authInfo.ApiKey.Project.Id)

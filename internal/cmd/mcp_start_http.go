@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/config"
@@ -42,7 +43,7 @@ Examples:
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startHTTPServer(cmd.Context(), httpHost, httpPort)
+			return startHTTPServer(cmd.Context(), cmd.Flags(), httpHost, httpPort)
 		},
 	}
 
@@ -54,16 +55,16 @@ Examples:
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, host string, port int) error {
+func startHTTPServer(ctx context.Context, flags *pflag.FlagSet, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
-	cfg, err := config.Load()
+	cfg, err := config.Load(flags)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, cfg)
+	server, err := mcp.NewServer(ctx, cfg, flags)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}

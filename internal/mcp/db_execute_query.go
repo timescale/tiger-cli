@@ -152,7 +152,7 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 // handleDBExecuteQuery handles the db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -197,7 +197,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	// Connect to database
-	conn, err := common.ConnectTarget(queryCtx, target, common.ConnectionDetailsOptions{
+	conn, err := common.ConnectTarget(queryCtx, cfg.Config, target, common.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,

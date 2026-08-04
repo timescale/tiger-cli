@@ -18,7 +18,7 @@ Examples:
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context())
+			return startStdioServer(cmd.Context(), cmd.Flags())
 		},
 	}
 }

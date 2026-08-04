@@ -43,7 +43,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 	}
 
 	// Store credentials first
-	err := config.StoreCredentials("test-api-key-789", "test-project-789")
+	err := testConfig(t).StoreCredentials("test-api-key-789", "test-project-789")
 	if err != nil {
 		t.Fatalf("Failed to store credentials: %v", err)
 	}

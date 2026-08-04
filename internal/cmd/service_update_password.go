@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -54,10 +54,9 @@ Examples:
   tiger service update-password --auto-generate`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("new-password"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -74,8 +73,11 @@ Examples:
 				return err
 			}
 
-			// Get password from flag or environment variable via viper
-			password := viper.GetString("new_password")
+			// The password comes from the flag, falling back to the env var
+			password := updatePasswordValue
+			if password == "" {
+				password = os.Getenv("TIGER_NEW_PASSWORD")
+			}
 			if autoGenerate && password != "" {
 				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
@@ -109,7 +111,7 @@ Examples:
 
 			if autoGenerate {
 				// Auto-generate password using existing function
-				if _, err := resetServicePassword(ctx, cfg.Client, service, "tsdbadmin", "", statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cfg.Config, cfg.Client, service, "tsdbadmin", "", statusOutput); err != nil {
 					return err
 				}
 			} else if password == "" {
@@ -119,6 +121,7 @@ Examples:
 				}
 				_, err := promptAndResetPassword(
 					ctx,
+					cfg.Config,
 					statusOutput,
 					cfg.Client,
 					service,
@@ -128,7 +131,7 @@ Examples:
 					return err
 				}
 			} else {
-				if _, err := resetServicePassword(ctx, cfg.Client, service, "tsdbadmin", password, statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cfg.Config, cfg.Client, service, "tsdbadmin", password, statusOutput); err != nil {
 					return err
 				}
 			}

@@ -129,7 +129,9 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
   lives in its own file, named to match the command in snake_case
   (`tiger service create` → `service_create.go`). `root.go` holds the root
   command, global flags, and configuration initialization.
-- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+- **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
+  helpers. `config.Load(flags)` resolves values through a per-call viper
+  instance (flag > env > file > default); there is no global config state
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server

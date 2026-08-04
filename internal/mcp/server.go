@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
@@ -46,6 +47,12 @@ const (
 type Server struct {
 	mcpServer       *mcp.Server
 	docsProxyClient *ProxyClient
+
+	// flags is the flag set of the command that started the server. Tool
+	// handlers pass it to [common.LoadConfig] on every call so the flags given
+	// to `tiger mcp start` (e.g. --config-dir, --service-id) keep taking
+	// precedence over the config file, which is re-read per call.
+	flags *pflag.FlagSet
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
@@ -74,8 +81,10 @@ func buildServerInstructions(cfg *config.Config) string {
 }
 
 // NewServer creates a new Tiger MCP server instance. The caller-supplied cfg
-// is used only to render the read-only warning in server instructions.
-func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
+// is used only to render the read-only warning in server instructions and to
+// gate tool registration; flags is retained so each tool call reloads the
+// config with the same flag precedence (see Server.flags).
+func NewServer(ctx context.Context, cfg *config.Config, flags *pflag.FlagSet) (*Server, error) {
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
@@ -84,6 +93,7 @@ func NewServer(ctx context.Context, cfg *config.Config) (*Server, error) {
 
 	server := &Server{
 		mcpServer: mcpServer,
+		flags:     flags,
 	}
 
 	// Register all tools (including proxied docs tools). readOnly and
@@ -165,7 +175,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 		start := time.Now()
 
 		// Load config for analytics
-		cfg, err := config.Load()
+		cfg, err := config.Load(s.flags)
 		if err != nil {
 			// If we can't load config, just skip analytics and continue
 			return next(ctx, method, req)

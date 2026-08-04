@@ -10,7 +10,6 @@ import (
 
 func TestMain(m *testing.M) {
 	// Clean up any global state before tests
-	config.ResetGlobalConfig()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -34,7 +33,6 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 		os.Unsetenv("TIGER_ANALYTICS")
-		config.ResetGlobalConfig()
 	}
 
 	t.Cleanup(cleanup)
@@ -42,12 +40,24 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	return tmpDir, cleanup
 }
 
+// testConfig loads the config for the test's config directory, which the setup
+// helpers point at via TIGER_CONFIG_DIR. Use it where a test needs the config
+// itself (credential storage, password storage) rather than running a command.
+func testConfig(t *testing.T) *config.Config {
+	t.Helper()
+	cfg, err := config.Load(nil)
+	if err != nil {
+		t.Fatalf("Failed to load test config: %v", err)
+	}
+	return cfg
+}
+
 // mockStoredCredentials overrides the common.GetStoredCredentials seam for the
 // duration of the test, restoring the original automatically via t.Cleanup.
 func mockStoredCredentials(t *testing.T, creds *config.Credentials, err error) {
 	t.Helper()
 	original := common.GetStoredCredentials
-	common.GetStoredCredentials = func() (*config.Credentials, error) {
+	common.GetStoredCredentials = func(*config.Config) (*config.Credentials, error) {
 		return creds, err
 	}
 	t.Cleanup(func() { common.GetStoredCredentials = original })

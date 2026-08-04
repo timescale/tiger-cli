@@ -43,7 +43,6 @@ func setupUpgradeTest(t *testing.T, releasesURL string) string {
 	t.Setenv("TIGER_ANALYTICS", "false")
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
-		config.ResetGlobalConfig()
 	})
 
 	return tmpDir

@@ -9,6 +9,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // getServiceDetailsFunc can be overridden for testing
@@ -57,9 +58,9 @@ func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pool
 
 // buildConnectionDetailsForTarget builds connection details for a target,
 // warning first when a replica falls back from a requested pooler.
-func buildConnectionDetailsForTarget(cmd *cobra.Command, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
+func buildConnectionDetailsForTarget(cmd *cobra.Command, cfg *config.Config, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
 	warnReplicaPooler(cmd, target, opts.Pooled)
-	return target.Details(opts)
+	return target.Details(cfg, opts)
 }
 
 // getServiceDetails is a helper that handles common service lookup logic and returns the service details

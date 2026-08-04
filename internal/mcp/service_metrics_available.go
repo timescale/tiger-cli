@@ -53,7 +53,7 @@ func newServiceMetricsAvailableTool() *mcp.Tool {
 
 // handleServiceMetricsAvailable handles the service_metrics_available MCP tool
 func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsAvailableInput) (*mcp.CallToolResult, ServiceMetricsAvailableOutput, error) {
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceMetricsAvailableOutput{}, err
 	}

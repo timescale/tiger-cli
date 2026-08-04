@@ -38,12 +38,7 @@ func setupDBTest(t *testing.T) string {
 	// Disable analytics for DB tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 
-	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-
 	t.Cleanup(func() {
-		// Reset global config and viper first
-		config.ResetGlobalConfig()
 		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_ANALYTICS")
@@ -212,7 +207,7 @@ func TestBuildConnectionDetailsForTarget_ReplicaPoolerFallback(t *testing.T) {
 	cmd.SetErr(buf)
 	cmd.SetOut(io.Discard)
 
-	details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"})
+	details, err := buildConnectionDetailsForTarget(cmd, testConfig(t), target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -242,7 +237,7 @@ func TestBuildConnectionDetailsForTarget_PrimaryRequiresPooler(t *testing.T) {
 	cmd.SetErr(io.Discard)
 	cmd.SetOut(io.Discard)
 
-	if _, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"}); err == nil {
+	if _, err := buildConnectionDetailsForTarget(cmd, testConfig(t), target, common.ConnectionDetailsOptions{Pooled: true, Role: "tsdbadmin"}); err == nil {
 		t.Fatal("expected an error when a pooler is unavailable for the primary, got nil")
 	}
 }

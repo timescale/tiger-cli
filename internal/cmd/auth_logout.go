@@ -21,9 +21,14 @@ func buildLogoutCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			revokeOAuthSession(cmd)
+			cfg, err := config.Load(cmd.Flags())
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
 
-			if err := config.RemoveCredentials(); err != nil {
+			revokeOAuthSession(cmd, cfg)
+
+			if err := cfg.RemoveCredentials(); err != nil {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
@@ -36,13 +41,9 @@ func buildLogoutCmd() *cobra.Command {
 // revokeOAuthSession asks the server to revoke the refresh token for an OAuth
 // session. Failures are intentionally non-fatal — local credential removal
 // must always succeed even if the server is unreachable or returns 501.
-func revokeOAuthSession(cmd *cobra.Command) {
-	stored, err := config.GetStoredCredentials()
+func revokeOAuthSession(cmd *cobra.Command, cfg *config.Config) {
+	stored, err := cfg.GetStoredCredentials()
 	if err != nil || stored.OAuth == nil {
-		return
-	}
-	cfg, err := config.Load()
-	if err != nil {
 		return
 	}
 	client, err := api.NewTigerClientWithToken(cfg, stored.OAuth, nil)

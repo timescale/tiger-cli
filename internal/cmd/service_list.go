@@ -13,6 +13,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -26,12 +27,11 @@ func buildServiceListCmd() *cobra.Command {
 		Long:              `List all database services in the current project.`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
 			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				return err
 			}
@@ -70,7 +70,7 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output)
+			return outputServices(cmd, cfg.Config, services, cfg.Output)
 		},
 	}
 
@@ -80,8 +80,8 @@ func buildServiceListCmd() *cobra.Command {
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
-	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
+func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(cfg, services, cmd.ErrOrStderr())
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -97,10 +97,10 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string) e
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
+func prepareServicesForOutput(cfg *config.Config, services []api.Service, output io.Writer) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, false, output)
+		prepared[i] = prepareServiceForOutput(cfg, service, false, output)
 	}
 	return prepared
 }

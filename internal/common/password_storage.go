@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/zalando/go-keyring"
@@ -331,9 +330,8 @@ func (n *NoStorage) GetStorageResult(err error, password string) PasswordStorage
 }
 
 // GetPasswordStorage returns the appropriate PasswordStorage implementation based on configuration
-func GetPasswordStorage() PasswordStorage {
-	storageMethod := viper.GetString("password_storage")
-	switch storageMethod {
+func GetPasswordStorage(cfg *config.Config) PasswordStorage {
+	switch cfg.PasswordStorage {
 	case "keyring":
 		return &KeyringStorage{}
 	case "pgpass":
@@ -346,7 +344,7 @@ func GetPasswordStorage() PasswordStorage {
 }
 
 // SavePasswordWithResult handles saving a password and returns both error and result info
-func SavePasswordWithResult(service api.Service, password string, role string) (PasswordStorageResult, error) {
+func SavePasswordWithResult(cfg *config.Config, service api.Service, password string, role string) (PasswordStorageResult, error) {
 	if password == "" {
 		return PasswordStorageResult{
 			Success: false,
@@ -362,7 +360,7 @@ func SavePasswordWithResult(service api.Service, password string, role string) (
 		}, fmt.Errorf("role is required")
 	}
 
-	storage := GetPasswordStorage()
+	storage := GetPasswordStorage(cfg)
 	err := storage.Save(service, password, role)
 	result := storage.GetStorageResult(err, password)
 

@@ -11,13 +11,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func TestMain(m *testing.M) {
-	// Reset viper state before each test run
-	ResetGlobalConfig()
-	code := m.Run()
-	os.Exit(code)
-}
-
 func setupTestConfig(t *testing.T) string {
 	t.Helper()
 
@@ -32,32 +25,21 @@ func setupTestConfig(t *testing.T) string {
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
-		ResetGlobalConfig()
 	})
 
 	return tmpDir
 }
 
-func setupViper(t *testing.T, tmpDir string) {
-	t.Helper()
-
-	// Set up Viper configuration using the shared function
-	if err := SetupViper(tmpDir); err != nil {
-		t.Fatalf("Failed to setup Viper: %v", err)
-	}
-}
-
 func TestLoad_DefaultValues(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	cfg, err := Load()
+	cfg, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 
 	// Verify default values
@@ -96,15 +78,13 @@ read_only: true
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	setupViper(t, tmpDir)
-
 	// Set temporary config directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	cfg, err := Load()
+	cfg, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 
 	// Verify loaded values
@@ -166,11 +146,9 @@ func TestLoad_MigrateVersionCheck(t *testing.T) {
 				t.Cleanup(func() { os.Unsetenv(k) })
 			}
 
-			setupViper(t, tmpDir)
-
-			cfg, err := Load()
+			cfg, err := Load(nil)
 			if err != nil {
-				t.Fatalf("Load() failed: %v", err)
+				t.Fatalf("Load(nil) failed: %v", err)
 			}
 			if cfg.VersionCheck != tt.want {
 				t.Errorf("VersionCheck = %t, want %t", cfg.VersionCheck, tt.want)
@@ -190,8 +168,6 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	os.Setenv("TIGER_ANALYTICS", "false")
 	os.Setenv("TIGER_READ_ONLY", "true")
 
-	setupViper(t, tmpDir)
-
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_API_URL")
@@ -201,9 +177,9 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 		os.Unsetenv("TIGER_READ_ONLY")
 	}()
 
-	cfg, err := Load()
+	cfg, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 
 	// Verify environment values
@@ -241,16 +217,14 @@ analytics: true
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	os.Setenv("TIGER_OUTPUT", "json")
 
-	setupViper(t, tmpDir)
-
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_OUTPUT")
 	}()
 
-	cfg, err := Load()
+	cfg, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 
 	// Environment should override config file
@@ -269,21 +243,20 @@ analytics: true
 
 func TestLoad_IndependentInstances(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
 	// First load
-	cfg1, err := Load()
+	cfg1, err := Load(nil)
 	if err != nil {
-		t.Fatalf("First Load() failed: %v", err)
+		t.Fatalf("First Load(nil) failed: %v", err)
 	}
 
 	// Second load should return new independent instance
-	cfg2, err := Load()
+	cfg2, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Second Load() failed: %v", err)
+		t.Fatalf("Second Load(nil) failed: %v", err)
 	}
 
 	// Should be different instances but same values
@@ -299,7 +272,6 @@ func TestLoad_IndependentInstances(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	cfg, err := UseTestConfig(tmpDir, map[string]any{
 		"api_url":    "https://test.api.com/v1",
@@ -321,12 +293,7 @@ func TestSave(t *testing.T) {
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	ResetGlobalConfig()
-
-	// Setup Viper again to read the saved config file
-	setupViper(t, tmpDir)
-
-	loadedCfg, err := Load()
+	loadedCfg, err := Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load saved config: %v", err)
 	}
@@ -347,7 +314,6 @@ func TestSave(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	cfg := &Config{
 		APIURL:    DefaultAPIURL,
@@ -475,7 +441,6 @@ func TestSet(t *testing.T) {
 
 func TestUnset(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
@@ -545,7 +510,6 @@ func TestUnset(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	cfg := &Config{
 		APIURL:    "https://custom.api.com/v1",
@@ -577,18 +541,17 @@ func TestReset(t *testing.T) {
 
 func TestLoad_WithMissingConfigFile(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
 	// Test Load succeeds with missing file
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	cfg, err := Load()
+	cfg, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 	if cfg == nil {
-		t.Error("Load() returned nil config")
+		t.Error("Load(nil) returned nil config")
 	}
 
 	// Should return defaults when config file is missing
@@ -603,12 +566,12 @@ func TestLoad_WithMissingConfigFile(t *testing.T) {
 	}
 
 	// Second load should create new instance with same values
-	cfg2, err := Load()
+	cfg2, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Second Load() failed: %v", err)
+		t.Fatalf("Second Load(nil) failed: %v", err)
 	}
 	if cfg == cfg2 {
-		t.Error("Expected Load() to create new instances, got same instance")
+		t.Error("Expected Load(nil) to create new instances, got same instance")
 	}
 	if cfg.APIURL != cfg2.APIURL {
 		t.Error("Expected same configuration values across different instances")
@@ -616,7 +579,7 @@ func TestLoad_WithMissingConfigFile(t *testing.T) {
 }
 
 func TestLoad_ErrorHandling(t *testing.T) {
-	// Test SetupViper() when it fails due to invalid config file
+	// Test Load() when it fails due to invalid config file
 	tmpDir := setupTestConfig(t)
 
 	// Create invalid YAML config file
@@ -631,9 +594,9 @@ invalid yaml content [
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
-	// SetupViper should fail with invalid config file
-	if err := SetupViper(tmpDir); err == nil {
-		t.Error("Expected SetupViper() to fail with invalid config file, but it succeeded")
+	// Load should fail with invalid config file
+	if _, err := Load(nil); err == nil {
+		t.Error("Expected Load() to fail with invalid config file, but it succeeded")
 	}
 }
 
@@ -644,11 +607,18 @@ func TestGetEffectiveConfigDir(t *testing.T) {
 		name      string
 		envVar    string
 		flagValue string
+		noFlags   bool
 		expected  string
 	}{
 		{
 			name:     "default behavior",
 			expected: GetDefaultConfigDir(),
+		},
+		{
+			name:     "no flag set",
+			noFlags:  true,
+			envVar:   "/env/config/path",
+			expected: "/env/config/path",
 		},
 		{
 			name:     "env var normal path",
@@ -685,17 +655,19 @@ func TestGetEffectiveConfigDir(t *testing.T) {
 				defer os.Unsetenv("TIGER_CONFIG_DIR")
 			}
 
-			// Create mock flag
-			var flagVar string
-			fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-			fs.StringVar(&flagVar, "config-dir", "", "config directory")
-			if tt.flagValue != "" {
-				fs.Set("config-dir", tt.flagValue)
+			// Create mock flag set
+			var fs *pflag.FlagSet
+			if !tt.noFlags {
+				var flagVar string
+				fs = pflag.NewFlagSet("test", pflag.ContinueOnError)
+				fs.StringVar(&flagVar, "config-dir", "", "config directory")
+				if tt.flagValue != "" {
+					fs.Set("config-dir", tt.flagValue)
+				}
 			}
-			flag := fs.Lookup("config-dir")
 
 			// Test the function
-			result := GetEffectiveConfigDir(flag)
+			result := getEffectiveConfigDir(fs)
 			if result != tt.expected {
 				t.Errorf("Expected %s, got %s", tt.expected, result)
 			}
@@ -752,52 +724,50 @@ func TestSave_CreateDirectory(t *testing.T) {
 	}
 }
 
-func TestResetGlobalConfig(t *testing.T) {
+// Each Load uses its own viper instance, so there's no global state to carry a
+// stale value across loads.
+func TestLoad_RereadsEnvironment(t *testing.T) {
 	tmpDir := setupTestConfig(t)
-	setupViper(t, tmpDir)
 
-	// Set environment variable for test
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-	os.Setenv("TIGER_SERVICE_ID", "test-service-before-reset")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-before")
 	defer func() {
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_SERVICE_ID")
 	}()
 
 	// Load config first
-	cfg1, err := Load()
+	cfg1, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Load() failed: %v", err)
+		t.Fatalf("Load(nil) failed: %v", err)
 	}
 
 	// Verify environment was used
-	if cfg1.ServiceID != "test-service-before-reset" {
+	if cfg1.ServiceID != "test-service-before" {
 		t.Errorf("Expected service ID from env, got %s", cfg1.ServiceID)
 	}
 
-	// Reset global viper state
-	ResetGlobalConfig()
-
-	// Re-setup viper after reset
-	setupViper(t, tmpDir)
-
 	// Change env var
-	os.Setenv("TIGER_SERVICE_ID", "test-service-after-reset")
+	os.Setenv("TIGER_SERVICE_ID", "test-service-after")
 
 	// Load again should pick up new env value
-	cfg2, err := Load()
+	cfg2, err := Load(nil)
 	if err != nil {
-		t.Fatalf("Second Load() failed: %v", err)
+		t.Fatalf("Second Load(nil) failed: %v", err)
 	}
 
 	// Should be different instances
 	if cfg1 == cfg2 {
-		t.Error("Expected different config instances after reset, got same instance")
+		t.Error("Expected different config instances, got same instance")
 	}
 
 	// Should have new env value
-	if cfg2.ServiceID != "test-service-after-reset" {
-		t.Errorf("Expected new service ID after reset, got %s", cfg2.ServiceID)
+	if cfg2.ServiceID != "test-service-after" {
+		t.Errorf("Expected new service ID, got %s", cfg2.ServiceID)
+	}
+	// The first instance is untouched by the second load
+	if cfg1.ServiceID != "test-service-before" {
+		t.Errorf("Expected first config to keep its value, got %s", cfg1.ServiceID)
 	}
 }
 

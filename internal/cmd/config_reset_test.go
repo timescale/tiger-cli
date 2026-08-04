@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -8,10 +9,10 @@ import (
 )
 
 func TestConfigReset(t *testing.T) {
-	_, _ = setupConfigTest(t)
+	tmpDir, _ := setupConfigTest(t)
 
 	// First set some custom values
-	cfg, err := config.Load()
+	cfg, err := config.Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -30,7 +31,7 @@ func TestConfigReset(t *testing.T) {
 		t.Errorf("Expected output to contain reset message, got '%s'", strings.TrimSpace(output))
 	}
 
-	cfg, err = config.Load()
+	cfg, err = config.Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -45,7 +46,14 @@ func TestConfigReset(t *testing.T) {
 	if cfg.Output != config.DefaultOutput {
 		t.Errorf("Expected default Output %s, got %s", config.DefaultOutput, cfg.Output)
 	}
-	if cfg.Analytics != config.DefaultAnalytics {
-		t.Errorf("Expected default Analytics %t, got %t", config.DefaultAnalytics, cfg.Analytics)
+
+	// Reset empties the config file rather than writing defaults into it, so
+	// env vars still apply afterwards (setupConfigTest sets TIGER_ANALYTICS).
+	contents, err := os.ReadFile(config.GetConfigFile(tmpDir))
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+	if strings.TrimSpace(string(contents)) != "{}" {
+		t.Errorf("Expected an empty config file, got %q", string(contents))
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func setupCredentialTest(t *testing.T) string {
+func setupCredentialTest(t *testing.T) (string, *Config) {
 	t.Helper()
 
 	// Use a unique service name for this test to avoid conflicts
@@ -18,35 +18,27 @@ func setupCredentialTest(t *testing.T) string {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Reset viper completely and set up with test directory
-	// This ensures proper test isolation by resetting all viper state
-	// MUST be done before RemoveCredentials() so it uses the test directory!
-	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
+	cfg, err := UseTestConfig(tmpDir, map[string]any{})
+	if err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
 	// Clean up any existing credentials in the test directory
-	RemoveCredentials()
+	cfg.RemoveCredentials()
 
 	t.Cleanup(func() {
-		// Clean up credentials
-		RemoveCredentials()
-
-		// Reset global config to ensure test isolation
-		ResetGlobalConfig()
-
-		// Clean up file system
+		cfg.RemoveCredentials()
 		os.RemoveAll(tmpDir)
 	})
 
-	return tmpDir
+	return tmpDir, cfg
 }
 
 func TestStoreCredentialsToFile(t *testing.T) {
-	tmpDir := setupCredentialTest(t)
+	tmpDir, cfg := setupCredentialTest(t)
 
 	// Store credentials in new JSON format
-	if err := StoreCredentialsToFile("public:secret", "project123"); err != nil {
+	if err := cfg.StoreCredentialsToFile("public:secret", "project123"); err != nil {
 		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
@@ -75,7 +67,7 @@ func TestStoreCredentialsToFile(t *testing.T) {
 }
 
 func TestGetCredentialsFromFile(t *testing.T) {
-	tmpDir := setupCredentialTest(t)
+	tmpDir, cfg := setupCredentialTest(t)
 
 	// Write credentials to file in JSON format
 	credentialsFile := filepath.Join(tmpDir, "credentials")
@@ -86,7 +78,7 @@ func TestGetCredentialsFromFile(t *testing.T) {
 
 	// Get credentials - should get from file since keyring is empty
 	// (each test uses a unique keyring service name)
-	creds, err := GetStoredCredentials()
+	creds, err := cfg.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)
 	}
@@ -101,10 +93,10 @@ func TestGetCredentialsFromFile(t *testing.T) {
 }
 
 func TestGetCredentialsFromFile_NotExists(t *testing.T) {
-	setupCredentialTest(t)
+	_, cfg := setupCredentialTest(t)
 
 	// Try to get credentials when file doesn't exist
-	_, err := GetStoredCredentials()
+	_, err := cfg.GetStoredCredentials()
 	if err == nil {
 		t.Fatal("Expected error when credentials file doesn't exist")
 	}
@@ -115,7 +107,7 @@ func TestGetCredentialsFromFile_NotExists(t *testing.T) {
 }
 
 func TestRemoveCredentialsFromFile(t *testing.T) {
-	tmpDir := setupCredentialTest(t)
+	tmpDir, cfg := setupCredentialTest(t)
 
 	// Write credentials to file
 	credentialsFile := filepath.Join(tmpDir, "credentials")
@@ -124,7 +116,7 @@ func TestRemoveCredentialsFromFile(t *testing.T) {
 	}
 
 	// Remove credentials file
-	if err := RemoveCredentials(); err != nil {
+	if err := cfg.RemoveCredentials(); err != nil {
 		t.Fatalf("Failed to remove credentials file: %v", err)
 	}
 
@@ -135,10 +127,10 @@ func TestRemoveCredentialsFromFile(t *testing.T) {
 }
 
 func TestRemoveCredentialsFromFile_NotExists(t *testing.T) {
-	setupCredentialTest(t)
+	_, cfg := setupCredentialTest(t)
 
 	// Try to remove credentials file when it doesn't exist (should not error)
-	if err := RemoveCredentials(); err != nil {
+	if err := cfg.RemoveCredentials(); err != nil {
 		t.Fatalf("Should not error when removing non-existent file: %v", err)
 	}
 }

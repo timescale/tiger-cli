@@ -53,7 +53,7 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
 			if err != nil {
 				cmd.SilenceUsage = true
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
@@ -65,7 +65,7 @@ Examples:
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := buildConnectionDetailsForTarget(cmd, target, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, cfg.Config, target, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,

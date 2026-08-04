@@ -57,7 +57,7 @@ func newServiceGetTool() *mcp.Tool {
 // handleServiceGet handles the service_get MCP tool
 func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
 	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
@@ -85,7 +85,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(*resp.JSON200, input.WithPassword),
+		Service: s.convertToServiceDetail(cfg.Config, *resp.JSON200, input.WithPassword),
 	}
 
 	// Check if password was requested but not available

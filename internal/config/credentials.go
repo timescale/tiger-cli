@@ -64,14 +64,13 @@ func SetTestServiceName(t *testing.T) {
 	})
 }
 
-func getCredentialsFileName() string {
-	configDir := GetConfigDir()
-	return fmt.Sprintf("%s/credentials", configDir)
+func (c *Config) credentialsFileName() string {
+	return fmt.Sprintf("%s/credentials", c.ConfigDir)
 }
 
 // StoreCredentials stores a PAT credential.
-func StoreCredentials(apiKey, projectID string) error {
-	return storeCredentials(storedCredentials{
+func (c *Config) StoreCredentials(apiKey, projectID string) error {
+	return c.storeCredentials(storedCredentials{
 		APIKey:    apiKey,
 		ProjectID: projectID,
 	})
@@ -79,18 +78,18 @@ func StoreCredentials(apiKey, projectID string) error {
 
 // StoreOAuthCredentials stores an OAuth token (access + refresh + expiry) and
 // project ID. Use this for the PKCE login path; use StoreCredentials for PAT.
-func StoreOAuthCredentials(token *oauth2.Token, projectID string) error {
+func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) error {
 	if token == nil {
 		return fmt.Errorf("oauth token must not be nil")
 	}
-	return storeCredentials(storedCredentials{
+	return c.storeCredentials(storedCredentials{
 		OAuth:     token,
 		ProjectID: projectID,
 	})
 }
 
 // StoreCredentialsToFile stores credentials to file (test helper)
-func StoreCredentialsToFile(apiKey, projectID string) error {
+func (c *Config) StoreCredentialsToFile(apiKey, projectID string) error {
 	creds := storedCredentials{
 		APIKey:    apiKey,
 		ProjectID: projectID,
@@ -101,10 +100,10 @@ func StoreCredentialsToFile(apiKey, projectID string) error {
 		return fmt.Errorf("failed to marshal credentials: %w", err)
 	}
 
-	return storeToFile(string(credentialsJSON))
+	return c.storeToFile(string(credentialsJSON))
 }
 
-func storeCredentials(creds storedCredentials) error {
+func (c *Config) storeCredentials(creds storedCredentials) error {
 	credentialsJSON, err := json.Marshal(creds)
 	if err != nil {
 		return fmt.Errorf("failed to marshal credentials: %w", err)
@@ -113,7 +112,7 @@ func storeCredentials(creds storedCredentials) error {
 	if err := storeToKeyring(string(credentialsJSON)); err == nil {
 		return nil
 	}
-	return storeToFile(string(credentialsJSON))
+	return c.storeToFile(string(credentialsJSON))
 }
 
 func storeToKeyring(credentials string) error {
@@ -121,8 +120,8 @@ func storeToKeyring(credentials string) error {
 }
 
 // storeToFile stores credentials to ~/.config/tiger/credentials with restricted permissions
-func storeToFile(credentials string) error {
-	credentialsFile := getCredentialsFileName()
+func (c *Config) storeToFile(credentials string) error {
+	credentialsFile := c.credentialsFileName()
 	if err := os.MkdirAll(filepath.Dir(credentialsFile), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
@@ -146,8 +145,8 @@ func storeToFile(credentials string) error {
 
 var ErrNotLoggedIn = errors.New("not logged in")
 
-func GetStoredCredentials() (*Credentials, error) {
-	raw, err := loadCredentialsBlob()
+func (c *Config) GetStoredCredentials() (*Credentials, error) {
+	raw, err := c.loadCredentialsBlob()
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +170,7 @@ func GetStoredCredentials() (*Credentials, error) {
 }
 
 // loadCredentialsBlob returns the raw JSON blob from keyring or file fallback.
-func loadCredentialsBlob() (string, error) {
+func (c *Config) loadCredentialsBlob() (string, error) {
 	if blob, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
 		if blob == "" {
 			return "", ErrNotLoggedIn
@@ -179,7 +178,7 @@ func loadCredentialsBlob() (string, error) {
 		return blob, nil
 	}
 
-	credentialsFile := getCredentialsFileName()
+	credentialsFile := c.credentialsFileName()
 	data, err := os.ReadFile(credentialsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -194,10 +193,10 @@ func loadCredentialsBlob() (string, error) {
 }
 
 // RemoveCredentials removes stored credentials from keyring and file fallback
-func RemoveCredentials() error {
+func (c *Config) RemoveCredentials() error {
 	// Remove from keyring (ignore errors as it might not exist)
 	removeCredentialsFromKeyring()
-	return removeCredentialsFile()
+	return c.removeCredentialsFile()
 }
 
 // removeCredentialsFromKeyring removes credentials from keyring (test helper)
@@ -206,8 +205,8 @@ func removeCredentialsFromKeyring() {
 }
 
 // removeCredentialsFile removes credentials file
-func removeCredentialsFile() error {
-	credentialsFile := getCredentialsFileName()
+func (c *Config) removeCredentialsFile() error {
+	credentialsFile := c.credentialsFileName()
 	if err := os.Remove(credentialsFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove credentials file: %w", err)
 	}

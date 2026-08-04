@@ -105,7 +105,7 @@ Available metrics include: CPU usage/allocation, memory usage/total, disk usage,
 
 // handleServiceMetricsSeries handles the service_metrics_series MCP tool
 func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsSeriesInput) (*mcp.CallToolResult, any, error) {
-	cfg, err := common.LoadConfig(ctx)
+	cfg, err := common.LoadConfig(ctx, s.flags)
 	if err != nil {
 		return nil, nil, err
 	}
