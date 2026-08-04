@@ -514,35 +514,3 @@ func formatPromptArguments(arguments []*mcpsdk.PromptArgument) string {
 
 	return strings.Join(lines, "\n")
 }
-
-// mcpGetCompletion provides custom completions for the get command
-func mcpGetCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// Capability name is always first positional argument
-	if len(args) > 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Create MCP server to get capabilities
-	server, err := mcp.NewServer(cmd.Context(), cfg)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-	defer server.Close()
-
-	capabilities, err := server.ListCapabilities(cmd.Context())
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Close the MCP server when finished
-	if err := server.Close(); err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	return filterCompletionsByPrefix(capabilities.Names(), toComplete), cobra.ShellCompDirectiveNoFileComp
-}

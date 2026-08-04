@@ -270,10 +270,9 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
   Each command lives in its own file, named to match the command in snake_case
   (see "One File Per Command" below). `root.go` holds the root command, global
-  flags, and configuration initialization. Helper files hold shared utilities
-  (`completion.go`, `flag.go`) and self-contained interactive flows
-  (`oauth.go`, `read_replica.go`, `password_recovery.go`, `mcp_install.go`).
-  - `read_replica.go` - Read replica selection flow for `db connect`/`psql`: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas.
+  flags, and configuration initialization. Files ending in `_helper.go` hold
+  cross-group helpers rather than commands — see "Where Helpers Go" below.
+  - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
@@ -291,7 +290,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - Error handling and exit code utilities
   - Service detail conversion helpers
   - Log fetching with pagination (FetchServiceLogs)
-- **Utilities**: `internal/util/` - Small utility functions with minimal dependencies
+- **Utilities**: `internal/util/` - Small utility functions with minimal dependencies (formatting, validation, password generation)
 
 ### Configuration System
 
@@ -473,7 +472,7 @@ tiger-cli/
 │   └── release.yml         # Release workflow (runs on semver tags)
 ├── bin/                    # Built binaries (created during build)
 ├── openapi.yaml            # OpenAPI 3.0 specification for Tiger API
-├── .goreleaser.yaml         # GoReleaser configuration for building releases
+├── .goreleaser.yaml        # GoReleaser configuration for building releases
 ├── tools.go                # Build-time dependencies
 ├── README.md               # User-facing documentation
 └── CLAUDE.md               # Developer guidance for Claude Code
@@ -545,9 +544,32 @@ Within a command's file:
 2. The `build*Cmd()` function comes next
 3. Helper functions used only by that command follow it
 
-Helpers shared by several commands in a group live in the group's file (e.g. the
-service ID completion and output helpers live in `service.go`). Larger
-self-contained flows keep their own non-command file.
+### Where Helpers Go
+
+Place a helper by who calls it, working down this list until one matches:
+
+1. **One command** → that command's file.
+2. **Several commands in one group** → the group file (`service.go`, `db.go`).
+3. **Across groups** → a package-level `<topic>_helper.go` file:
+   `completion_helper.go`, `flag_helper.go`, `terminal_helper.go`,
+   `password_helper.go`.
+4. **A genuine standalone utility** — small and isolated, with no notion of a
+   command (`util.GenerateSecurePassword`) → `internal/util`. Anything shaped
+   around the CLI stays in `cmd` even if its signature looks generic.
+5. **Used by both CLI and MCP** → `internal/common`.
+
+The `_helper.go` suffix is reserved for rule 3, so every other file in
+`internal/cmd` is named after a command and contains a `build*Cmd()`.
+
+Shell completion functions are an exception to rule 1: they all live in
+`completion_helper.go`, however many commands use them.
+
+Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
+`db connect` flow — argument splitting, read replica selection, password
+recovery, and the psql handoff, bubbletea models and all — because nothing else
+calls into it. `auth_login.go` likewise holds the entire OAuth flow. A long file
+whose contents all serve one command is easier to follow than several short files
+with entry points scattered across them.
 
 Tests mirror this layout: `service_create.go` → `service_create_test.go`.
 Package-wide test scaffolding (`TestMain`, auth mocks, shared command runners)
@@ -678,7 +700,7 @@ func buildMyConfigurableFlagCmd() *cobra.Command {
 }
 ```
 
-The `bindFlags()` helper (defined in `internal/cmd/flag.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+The `bindFlags()` helper (defined in `internal/cmd/flag_helper.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
 
 **Why bind flags in PreRunE?**
 

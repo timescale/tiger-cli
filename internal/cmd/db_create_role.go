@@ -310,7 +310,7 @@ func getPasswordForRole(passwordFlag string) (string, error) {
 	}
 
 	// Auto-generate secure password
-	return generateSecurePassword(32)
+	return util.GenerateSecurePassword(32)
 }
 
 // CreateRoleResult represents the output of a create role operation
