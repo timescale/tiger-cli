@@ -206,7 +206,7 @@ func TestDBConnectionString_ReadOnlyConfig(t *testing.T) {
 			mockTestPAT(t)
 
 			originalGetServiceDetails := getServiceDetailsFunc
-			getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+			getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 				host := "test-host.com"
 				port := 5432
 				return api.Service{

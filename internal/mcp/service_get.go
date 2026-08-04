@@ -56,21 +56,20 @@ func newServiceGetTool() *mcp.Tool {
 
 // handleServiceGet handles the service_get MCP tool
 func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest, input ServiceGetInput) (*mcp.CallToolResult, ServiceGetOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceGetOutput{}, err
 	}
 
 	logging.Debug("MCP: Getting service details",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	resp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceGetOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -85,7 +84,7 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 	}
 
 	output := ServiceGetOutput{
-		Service: s.convertToServiceDetail(cfg.Config, *resp.JSON200, input.WithPassword),
+		Service: s.convertToServiceDetail(cfg, *resp.JSON200, input.WithPassword),
 	}
 
 	// Check if password was requested but not available

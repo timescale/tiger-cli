@@ -73,18 +73,17 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 
 // handleServiceResize handles the service_resize MCP tool
 func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolRequest, input ServiceResizeInput) (*mcp.CallToolResult, ServiceResizeOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 
 	logging.Debug("MCP: Resizing service",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("cpu_memory", input.CPUMemory),
 	)
@@ -105,7 +104,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.ResizeServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID, resizeReq)
+	resp, err := client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)
 	}
@@ -125,8 +124,8 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	message := "Resize request accepted. The service may still be resizing."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    cfg.Client,
-			ProjectID: cfg.ProjectID,
+			Client:    client,
+			ProjectID: projectID,
 			ServiceID: input.ServiceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -142,7 +141,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Return status, resources, and message (after wait so status is accurate)
-	detail := s.convertToServiceDetail(cfg.Config, service, false)
+	detail := s.convertToServiceDetail(cfg, service, false)
 	output := ServiceResizeOutput{
 		Status:    detail.Status,
 		Resources: detail.Resources,

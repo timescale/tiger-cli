@@ -19,7 +19,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildStatusCmd() *cobra.Command {
+func buildStatusCmd(app *common.App) *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
@@ -31,8 +31,7 @@ func buildStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, client, _, err := app.GetAll()
 			if err != nil {
 				if errors.Is(err, config.ErrNotLoggedIn) {
 					return common.ExitWithCode(common.ExitAuthenticationError, config.ErrNotLoggedIn)
@@ -44,7 +43,7 @@ func buildStatusCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetAuthInfoWithResponse(ctx)
+			resp, err := client.GetAuthInfoWithResponse(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to get auth information: %w", err)
 			}

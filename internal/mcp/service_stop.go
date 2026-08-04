@@ -65,25 +65,24 @@ This operation stops a service that is currently running. The service will trans
 
 // handleServiceStop handles the service_stop MCP tool
 func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest, input ServiceStopInput) (*mcp.CallToolResult, ServiceStopOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg); err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
 
 	logging.Debug("MCP: Stopping service",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
 	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.StopServiceWithResponse(stopCtx, cfg.ProjectID, input.ServiceID)
+	resp, err := client.StopServiceWithResponse(stopCtx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
 	}
@@ -103,8 +102,8 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service stop request accepted. The service may still be stopping."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    cfg.Client,
-			ProjectID: cfg.ProjectID,
+			Client:    client,
+			ProjectID: projectID,
 			ServiceID: input.ServiceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "PAUSED",

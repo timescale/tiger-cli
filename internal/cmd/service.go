@@ -18,7 +18,7 @@ import (
 // experimental gates preview-stage subcommands (currently `metrics`); when
 // false, those subtrees are not added to the tree at all — matching ghost's
 // TIGER_EXPERIMENTAL pattern. See CLAUDE.md's "Experimental Feature Gating".
-func buildServiceCmd(experimental bool) *cobra.Command {
+func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
 		Aliases: []string{"services", "svc"},
@@ -27,20 +27,20 @@ func buildServiceCmd(experimental bool) *cobra.Command {
 	}
 
 	// Add all subcommands
-	cmd.AddCommand(buildServiceGetCmd())
-	cmd.AddCommand(buildServiceListCmd())
-	cmd.AddCommand(buildServiceCreateCmd())
-	cmd.AddCommand(buildServiceDeleteCmd())
-	cmd.AddCommand(buildServiceStartCmd())
-	cmd.AddCommand(buildServiceStopCmd())
-	cmd.AddCommand(buildServiceUpdatePasswordCmd())
-	cmd.AddCommand(buildServiceForkCmd())
-	cmd.AddCommand(buildServiceResizeCmd())
-	cmd.AddCommand(buildServiceLogsCmd())
+	cmd.AddCommand(buildServiceGetCmd(app))
+	cmd.AddCommand(buildServiceListCmd(app))
+	cmd.AddCommand(buildServiceCreateCmd(app))
+	cmd.AddCommand(buildServiceDeleteCmd(app))
+	cmd.AddCommand(buildServiceStartCmd(app))
+	cmd.AddCommand(buildServiceStopCmd(app))
+	cmd.AddCommand(buildServiceUpdatePasswordCmd(app))
+	cmd.AddCommand(buildServiceForkCmd(app))
+	cmd.AddCommand(buildServiceResizeCmd(app))
+	cmd.AddCommand(buildServiceLogsCmd(app))
 
 	// Experimental commands, unregistered until the preview graduates.
-	if experimental {
-		cmd.AddCommand(buildServiceMetricsCmd())
+	if app.Experimental {
+		cmd.AddCommand(buildServiceMetricsCmd(app))
 	}
 
 	return cmd

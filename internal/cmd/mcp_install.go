@@ -19,13 +19,14 @@ import (
 	"github.com/tailscale/hujson"
 	"go.uber.org/zap"
 
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildMCPInstallCmd creates the install subcommand for configuring editors
-func buildMCPInstallCmd() *cobra.Command {
+func buildMCPInstallCmd(app *common.App) *cobra.Command {
 	var noBackup bool
 	var configPath string
 

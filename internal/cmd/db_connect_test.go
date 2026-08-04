@@ -306,8 +306,8 @@ func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	cmd.SetErr(io.Discard)
 
 	target := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
-	cfg := &common.Config{Config: testConfig(t), Client: client, ProjectID: "proj-1"}
-	details, err := selectConnection(context.Background(), cmd, cfg, target,
+	app := newTestApp(t, client, "proj-1")
+	details, err := selectConnection(context.Background(), cmd, app, target,
 		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

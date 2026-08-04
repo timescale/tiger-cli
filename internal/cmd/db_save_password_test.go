@@ -50,7 +50,7 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -138,7 +138,7 @@ func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
 
 	mockTestPAT(t)
 	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return replica, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -202,7 +202,7 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -270,7 +270,7 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -347,7 +347,7 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -415,7 +415,7 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
@@ -543,7 +543,7 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 
 	originalGetServiceDetails := getServiceDetailsFunc
 	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return mockService, nil
 	}
 	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()

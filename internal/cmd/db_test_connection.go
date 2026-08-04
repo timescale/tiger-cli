@@ -13,7 +13,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbTestConnectionCmd() *cobra.Command {
+func buildDbTestConnectionCmd(app *common.App) *cobra.Command {
 	var dbTestConnectionTimeout time.Duration
 	var dbTestConnectionPooled bool
 	var dbTestConnectionRole string
@@ -51,21 +51,21 @@ Examples:
   # Test connection with no timeout (wait indefinitely)
   tiger db test-connection svc-12345 --timeout 0`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := lookupConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, app, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
 			// Build connection string for testing with password (if available)
-			details, err := buildConnectionDetailsForTarget(cmd, cfg.Config, target, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, cfg, target, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,

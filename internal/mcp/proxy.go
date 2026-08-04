@@ -52,11 +52,7 @@ func isMethodNotFoundError(err error) bool {
 // the server. Does not connect if the docs MCP server is disabled in the
 // config or there is no URL in the config.
 func (s *Server) registerDocsProxy(ctx context.Context) {
-	cfg, err := config.Load(s.flags)
-	if err != nil {
-		logging.Error("Failed to load config", zap.Error(err))
-		return
-	}
+	cfg := s.app.GetConfig()
 
 	if !cfg.DocsMCP || cfg.DocsMCPURL == "" {
 		logging.Debug("Docs MCP proxy is disabled")

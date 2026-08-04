@@ -65,9 +65,9 @@ func executeDBCommand(ctx context.Context, args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// serviceClientConfig builds a Config whose client serves the getService
-// endpoint from the given services keyed by ID (404 when absent).
-func serviceClientConfig(t *testing.T, services map[string]api.Service) *common.Config {
+// serviceClientApp builds an App whose client serves the getService endpoint
+// from the given services keyed by ID (404 when absent).
+func serviceClientApp(t *testing.T, services map[string]api.Service) *common.App {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func serviceClientConfig(t *testing.T, services map[string]api.Service) *common.
 	if err != nil {
 		t.Fatalf("failed to build client: %v", err)
 	}
-	return &common.Config{Config: &config.Config{}, ProjectID: "proj1", Client: client}
+	return newTestApp(t, client, "proj1")
 }
 
 func primarySvc() api.Service {
@@ -121,16 +121,16 @@ func standbySvc() api.Service {
 // target (connect == credential, no parent fetch, so no client needed).
 func TestLookupConnectionTarget_Primary(t *testing.T) {
 	orig := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return primarySvc(), nil
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
-	cfg := &common.Config{Config: &config.Config{}, ProjectID: "proj1"}
+	app := newTestApp(t, nil, "proj1")
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	target, err := lookupConnectionTarget(cmd, cfg, []string{"svcprimary"})
+	target, err := lookupConnectionTarget(cmd, app, []string{"svcprimary"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,16 +146,16 @@ func TestLookupConnectionTarget_Primary(t *testing.T) {
 // but resolves credentials against the parent (fetched via the client).
 func TestLookupConnectionTarget_Replica(t *testing.T) {
 	orig := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return standbySvc(), nil
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
-	cfg := serviceClientConfig(t, map[string]api.Service{"svcprimary": primarySvc()})
+	app := serviceClientApp(t, map[string]api.Service{"svcprimary": primarySvc()})
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	target, err := lookupConnectionTarget(cmd, cfg, []string{"rep1234567"})
+	target, err := lookupConnectionTarget(cmd, app, []string{"rep1234567"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -173,16 +173,16 @@ func TestLookupConnectionTarget_Replica(t *testing.T) {
 // TestLookupConnectionTarget_LookupError: a service-lookup failure is surfaced.
 func TestLookupConnectionTarget_LookupError(t *testing.T) {
 	orig := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return api.Service{}, fmt.Errorf("lookup failed")
 	}
 	defer func() { getServiceDetailsFunc = orig }()
 
-	cfg := &common.Config{Config: &config.Config{}, ProjectID: "proj1"}
+	app := newTestApp(t, nil, "proj1")
 	cmd := &cobra.Command{}
 	cmd.SetContext(context.Background())
 
-	if _, err := lookupConnectionTarget(cmd, cfg, []string{"x"}); err == nil {
+	if _, err := lookupConnectionTarget(cmd, app, []string{"x"}); err == nil {
 		t.Fatal("expected an error, got nil")
 	}
 }

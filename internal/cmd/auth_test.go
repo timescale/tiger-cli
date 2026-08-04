@@ -19,7 +19,7 @@ func setupAuthTest(t *testing.T) string {
 
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKey
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{}
 		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-id"}}}`), authInfo)
 		return authInfo, nil

@@ -8,7 +8,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbConnectionStringCmd() *cobra.Command {
+func buildDbConnectionStringCmd(app *common.App) *cobra.Command {
 	var dbConnectionStringPooled bool
 	var dbConnectionStringRole string
 	var dbConnectionStringWithPassword bool
@@ -53,20 +53,20 @@ Examples:
   # Get connection string with password included (less secure)
   tiger db connection-string svc-12345 --with-password`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			target, err := lookupConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, app, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := buildConnectionDetailsForTarget(cmd, cfg.Config, target, common.ConnectionDetailsOptions{
+			details, err := buildConnectionDetailsForTarget(cmd, cfg, target, common.ConnectionDetailsOptions{
 				Pooled:       dbConnectionStringPooled,
 				Role:         dbConnectionStringRole,
 				WithPassword: dbConnectionStringWithPassword,

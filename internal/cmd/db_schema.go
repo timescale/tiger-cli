@@ -8,7 +8,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbSchemaCmd() *cobra.Command {
+func buildDbSchemaCmd(app *common.App) *cobra.Command {
 	var dbSchemaSchema string
 	var dbSchemaInternal bool
 	var dbSchemaDefinitions bool
@@ -49,22 +49,22 @@ Examples:
   # Include catalog, TimescaleDB internals, and extension-owned objects
   tiger db schema svc-12345 --internal`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			target, err := lookupConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, app, args)
 			if err != nil {
 				return err
 			}
 
 			warnReplicaPooler(cmd, target, dbSchemaPooled)
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), cfg.Config, target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
+			schema, err := common.FetchServiceSchema(cmd.Context(), cfg, target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
 				Schema:             dbSchemaSchema,
 				IncludeInternal:    dbSchemaInternal,
 				IncludeDefinitions: dbSchemaDefinitions,

@@ -14,7 +14,7 @@ import (
 )
 
 // buildServiceLogsCmd creates the logs command for viewing service logs
-func buildServiceLogsCmd() *cobra.Command {
+func buildServiceLogsCmd(app *common.App) *cobra.Command {
 	var tail int
 	var since time.Time
 	var until time.Time
@@ -52,17 +52,16 @@ Examples:
   # View last 1000 lines
   tiger service logs --tail 1000`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -91,7 +90,15 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
 			defer cancel()
 
-			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, sincePtr, untilPtr, nodePtr)
+			logs, err := common.FetchServiceLogs(ctx, common.FetchServiceLogsArgs{
+				Client:    client,
+				ProjectID: projectID,
+				ServiceID: serviceID,
+				Tail:      tail,
+				Since:     sincePtr,
+				Until:     untilPtr,
+				Node:      nodePtr,
+			})
 			if err != nil {
 				return err
 			}

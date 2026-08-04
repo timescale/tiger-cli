@@ -28,18 +28,17 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 	// CLAUDE.md's "Experimental Feature Gating" section.
 	experimental, _ := strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))
 
+	app := &common.App{
+		Experimental: experimental,
+	}
+
 	var configDir string
 	var debug bool
 	var serviceID string
-	var analytics bool
+	var analyticsEnabled bool
 	var passwordStorage string
 	var skipUpdateCheck bool
 	var colorFlag bool
-
-	// versionCheckCh receives the result of the background update check started
-	// in PersistentPreRunE and drained in PersistentPostRunE. nil when no check
-	// was launched (disabled, non-interactive, CI, or --skip-update-check).
-	var versionCheckCh chan *version.CheckResult
 
 	cmd := &cobra.Command{
 		Use:   "tiger",
@@ -53,20 +52,64 @@ To get started, run:
 tiger auth login
 
 `,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SetContext(ctx)
+	}
 
-			// Load the config for the command being run. cmd.Flags() includes
-			// the persistent flags inherited from parents, so the flags in
-			// config.Load's binding table take precedence over env and file.
-			cfg, err := config.Load(cmd.Flags())
+	// Every command runs with this context — cobra copies it onto the command it
+	// executes — so handlers can use cmd.Context() for cancellation.
+	cmd.SetContext(ctx)
+
+	// Add persistent flags
+	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
+	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
+	cmd.PersistentFlags().BoolVar(&analyticsEnabled, "analytics", true, "enable/disable usage analytics")
+	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
+	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
+
+	// Add all subcommands
+	cmd.AddCommand(buildVersionCmd(app))
+	cmd.AddCommand(buildUpgradeCmd(app))
+	cmd.AddCommand(buildConfigCmd(app))
+	cmd.AddCommand(buildAuthCmd(app))
+	cmd.AddCommand(buildServiceCmd(app))
+	cmd.AddCommand(buildDbCmd(app))
+	cmd.AddCommand(buildMCPCmd(app))
+
+	wrapCommands(cmd, app, &skipUpdateCheck)
+
+	return cmd, nil
+}
+
+// wrapCommands recursively wraps the RunE of every command in the tree rooted at
+// cmd with the shared per-invocation lifecycle: loading the config and API
+// client, initializing logging, configuring color output, checking for a newer
+// release, and tracking analytics.
+//
+// Commands added to the tree after this runs (cobra's built-in help, completion,
+// and __complete commands) are not wrapped and so skip the load entirely, which
+// keeps `tiger --help` and tab completion away from the config file, the system
+// keyring, and the network. Completion functions that do need the config or
+// client load on demand via withAppLoad. Group commands (`tiger service`) have no
+// RunE of their own and only print help, so they're skipped as well.
+func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
+	// Wrap this command's RunE if it exists
+	if cmd.RunE != nil {
+		originalRunE := cmd.RunE
+		cmd.RunE = func(c *cobra.Command, args []string) (runErr error) {
+			// Load the config and API client once for the whole invocation.
+			// c.Flags() carries the persistent flags inherited from parents, so
+			// flags take precedence over env vars and the config file.
+			app.SetFlags(c.Flags())
+			cfg, _, _, err := app.Load(c.Context())
 			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
+				return err
 			}
 
 			if err := logging.Init(cfg.Debug); err != nil {
 				return fmt.Errorf("failed to initialize logging: %w", err)
 			}
+			defer logging.Sync()
 
 			logging.Debug("CLI initialized",
 				zap.String("config_dir", cfg.ConfigDir),
@@ -78,94 +121,17 @@ tiger auth login
 				color.NoColor = true
 			}
 
-			// Kick off a background check for a newer release so the network
-			// fetch overlaps with the command's actual work; the result is
-			// printed in PersistentPostRunE. Gated to interactive, non-CI
-			// terminals. `version --check` runs its own synchronous check, and
-			// `upgrade` is excluded because it performs its own check.
-			isVersionCheckCmd := cmd.Name() == "version" && cmd.Flag("check") != nil && cmd.Flag("check").Changed
-			isUpgradeCmd := cmd.Name() == "upgrade"
-			if cfg.VersionCheck && !skipUpdateCheck && !isVersionCheckCmd && !isUpgradeCmd &&
-				!util.IsCI() && util.IsTerminal(cmd.ErrOrStderr()) {
-				versionCheckCh = make(chan *version.CheckResult, 1)
-				go func() {
-					result, err := version.CheckForUpdate(cfg)
-					if err != nil {
-						// A failed check (e.g. offline) shouldn't spam a warning
-						// on every command; surface it only in debug logs.
-						logging.Debug("background version check failed", zap.Error(err))
-						versionCheckCh <- nil
-						return
-					}
-					versionCheckCh <- result
-				}()
-			}
+			// Check for a newer release in the background, printing the result
+			// after the command's own output.
+			defer versionCheck(c, cfg, *skipUpdateCheck)()
 
-			return nil
-		},
-		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(cmd.Flags())
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-
-			// Print the result of the background check started in
-			// PersistentPreRunE, if one was launched. Re-check cfg.VersionCheck
-			// in case the command itself toggled it off (e.g.
-			// `tiger config set version_check false`).
-			if versionCheckCh != nil && cfg.VersionCheck {
-				output := cmd.ErrOrStderr()
-				version.PrintUpdateWarning(<-versionCheckCh, cfg, &output)
-			}
-
-			logging.Sync()
-			return nil
-		},
-	}
-
-	// Add persistent flags
-	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
-	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
-	cmd.PersistentFlags().BoolVar(&analytics, "analytics", true, "enable/disable usage analytics")
-	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
-	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
-	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
-
-	// Add all subcommands
-	cmd.AddCommand(buildVersionCmd())
-	cmd.AddCommand(buildUpgradeCmd())
-	cmd.AddCommand(buildConfigCmd())
-	cmd.AddCommand(buildAuthCmd())
-	cmd.AddCommand(buildServiceCmd(experimental))
-	cmd.AddCommand(buildDbCmd())
-	cmd.AddCommand(buildMCPCmd())
-
-	wrapCommandsWithAnalytics(cmd)
-
-	return cmd, nil
-}
-
-func wrapCommandsWithAnalytics(cmd *cobra.Command) {
-	// Wrap this command's RunE if it exists
-	if cmd.RunE != nil {
-		originalRunE := cmd.RunE
-		cmd.RunE = func(c *cobra.Command, args []string) (runErr error) {
+			// Track analytics. The config and client are re-read from the App so
+			// changes the command made are reflected: `tiger config set analytics
+			// false` sends no event, and `tiger auth login` is attributed to the
+			// credentials it just stored.
 			start := time.Now()
-
 			defer func() {
-				// Reload config after command to account for config changes
-				// during command (e.g. `tiger config set analytics false`
-				// should not result in an analytics event being sent).
-				cfg, err := config.Load(c.Flags())
-				if err != nil {
-					return
-				}
-
-				// Reload credentials after command to account for credentials
-				// changes during command (e.g. `tiger auth login` should
-				// record an analytics event).
-				client, projectID, _ := common.NewAPIClient(cmd.Context(), cfg)
+				cfg, client, projectID := app.TryGetAll()
 				a := analytics.New(cfg, client, projectID)
 				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
 					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
@@ -181,7 +147,50 @@ func wrapCommandsWithAnalytics(cmd *cobra.Command) {
 
 	// Recursively wrap all children
 	for _, child := range cmd.Commands() {
-		wrapCommandsWithAnalytics(child)
+		wrapCommands(child, app, skipUpdateCheck)
+	}
+}
+
+// versionCheck starts a background check for a newer release and returns the
+// function that prints the result. Deferring the returned function lets the
+// network fetch overlap with the command's own work.
+//
+// The check is limited to interactive, non-CI terminals. `tiger version --check`
+// runs its own synchronous check and `tiger upgrade` performs its own version
+// comparison, so both are excluded to avoid a duplicate notice.
+func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) func() {
+	isVersionCheckCmd := cmd.Name() == "version" && cmd.Flag("check") != nil && cmd.Flag("check").Changed
+	isUpgradeCmd := cmd.Name() == "upgrade"
+	if !cfg.VersionCheck || skipUpdateCheck || isVersionCheckCmd || isUpgradeCmd ||
+		util.IsCI() || !util.IsTerminal(cmd.ErrOrStderr()) {
+		return func() {}
+	}
+
+	resultCh := make(chan *version.CheckResult, 1)
+	go func() {
+		result, err := version.CheckForUpdate(cfg)
+		if err != nil {
+			// A failed check (e.g. offline) shouldn't spam a warning on every
+			// command; surface it only in debug logs.
+			logging.Debug("background version check failed", zap.Error(err))
+			resultCh <- nil
+			return
+		}
+		resultCh <- result
+	}()
+
+	return func() {
+		result := <-resultCh
+
+		// Re-check cfg.VersionCheck: the command may have turned checks off in
+		// place (e.g. `tiger config set version_check false`, which reloads the
+		// config struct rather than replacing it).
+		if !cfg.VersionCheck {
+			return
+		}
+
+		output := cmd.ErrOrStderr()
+		version.PrintUpdateWarning(result, cfg, &output)
 	}
 }
 

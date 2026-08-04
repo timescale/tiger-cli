@@ -21,7 +21,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildDbConnectCmd() *cobra.Command {
+func buildDbConnectCmd(app *common.App) *cobra.Command {
 	var dbConnectPooled bool
 	var dbConnectRole string
 	var dbConnectReadOnly bool
@@ -88,11 +88,11 @@ Examples:
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
 		Args:              cobra.ArbitraryArgs,
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				return err
 			}
@@ -100,7 +100,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			target, err := lookupConnectionTarget(cmd, cfg, serviceArgs)
+			target, err := lookupConnectionTarget(cmd, app, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -119,7 +119,7 @@ Examples:
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := selectConnection(cmd.Context(), cmd, cfg, target, opts, dbConnectNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, app, target, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -129,7 +129,7 @@ Examples:
 
 			// Read replicas share the primary's credentials, so password storage
 			// and recovery always operate on the credential service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, cfg, target.CredentialService, details, psqlPath, psqlFlags)
+			return connectWithPasswordMenu(cmd.Context(), cmd, app, target.CredentialService, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -172,18 +172,23 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 func selectConnection(
 	ctx context.Context,
 	cmd *cobra.Command,
-	cfg *common.Config,
+	app *common.App,
 	target *common.ConnectionTarget,
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
+	cfg, client, projectID, err := app.GetAll()
+	if err != nil {
+		return nil, err
+	}
+
 	// chosen is what we connect to; the menu below may replace it with a replica.
 	chosen := target
 
 	// Offer the replica menu only for a primary on an interactive terminal.
 	if !target.IsReplica && !noReplicaPrompt && checkStdinIsTTY() {
 		primary := target.ConnectionService
-		replicas, err := fetchReplicaSets(ctx, cfg.Client, cfg.ProjectID, util.DerefStr(primary.ServiceId))
+		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
@@ -201,10 +206,11 @@ func selectConnection(
 		}
 	}
 
-	details, err := buildConnectionDetailsForTarget(cmd, cfg.Config, chosen, opts)
+	details, err := buildConnectionDetailsForTarget(cmd, cfg, chosen, opts)
 	if err != nil {
 		return nil, err
 	}
+
 	if chosen.IsReplica {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
 	}
@@ -223,7 +229,7 @@ func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
 }
 
 // fetchReplicaSets retrieves the read replica sets for a service.
-func fetchReplicaSets(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
+func fetchReplicaSets(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -359,14 +365,19 @@ func selectConnectTargetOption(out io.Writer, primary api.Service, replicas []ap
 func connectWithPasswordMenu(
 	ctx context.Context,
 	cmd *cobra.Command,
-	cfg *common.Config,
+	app *common.App,
 	service api.Service,
 	details *common.ConnectionDetails,
 	psqlPath string,
 	psqlFlags []string,
 ) error {
+	cfg, client, _, err := app.GetAll()
+	if err != nil {
+		return err
+	}
+
 	// Interactive mode: Get stored password (if any)
-	storage := common.GetPasswordStorage(cfg.Config)
+	storage := common.GetPasswordStorage(cfg)
 	storedPassword, err := storage.Get(service, details.Role)
 	if err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not retrieve stored password: %v\n", err)
@@ -376,7 +387,7 @@ func connectWithPasswordMenu(
 	err = testConnectionWithPassword(ctx, details, storedPassword)
 	if err == nil {
 		// Password works, launch psql
-		return launchPsql(cfg.Config, details, psqlPath, psqlFlags, service, cmd)
+		return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
 	}
 
 	// Check if it's an auth error
@@ -417,7 +428,7 @@ func connectWithPasswordMenu(
 
 			// Test, save, and launch
 			details.Password = password
-			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg.Config, details, psqlPath, psqlFlags, service); err != nil {
+			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
 				if isAuthenticationError(err) {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Password incorrect. Please try again.\n\n")
 					continue
@@ -428,7 +439,7 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cfg.Config, cmd.ErrOrStderr(), cfg.Client, service, details.Role)
+			password, err := promptAndResetPassword(ctx, cfg, cmd.ErrOrStderr(), client, service, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
@@ -439,7 +450,7 @@ func connectWithPasswordMenu(
 			fmt.Fprintf(cmd.ErrOrStderr(), "✅ Master password for '%s' user updated successfully\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
-			return launchPsql(cfg.Config, details, psqlPath, psqlFlags, service, cmd)
+			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
 
 		case optionExit:
 			return nil

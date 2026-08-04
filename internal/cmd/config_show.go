@@ -7,11 +7,12 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildConfigShowCmd() *cobra.Command {
+func buildConfigShowCmd(app *common.App) *cobra.Command {
 	var output string
 	var noDefaults bool
 	var withEnv bool
@@ -25,10 +26,7 @@ func buildConfigShowCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load(cmd.Flags())
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			// Values are re-read free of env and CLI flags (unless --with-env
 			// is given), so `config show -o json` reports the configured

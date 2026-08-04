@@ -13,7 +13,7 @@ import (
 )
 
 // buildServiceStopCmd creates the stop subcommand
-func buildServiceStopCmd() *cobra.Command {
+func buildServiceStopCmd(app *common.App) *cobra.Command {
 	var stopNoWait bool
 	var stopWaitTimeout time.Duration
 
@@ -33,23 +33,22 @@ Examples:
 
   # Stop service with custom wait timeout
   tiger service stop svc-12345 --wait-timeout 10m`,
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine source service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -57,9 +56,9 @@ Examples:
 			cmd.SilenceUsage = true
 
 			// Make the stop request
-			resp, err := cfg.Client.StopServiceWithResponse(
+			resp, err := client.StopServiceWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
@@ -88,8 +87,8 @@ Examples:
 			// Wait for service to become paused
 			fmt.Fprintf(statusOutput, "⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    cfg.Client,
-				ProjectID: cfg.ProjectID,
+				Client:    client,
+				ProjectID: projectID,
 				ServiceID: serviceID,
 				Handler: &common.StatusWaitHandler{
 					TargetStatus: "PAUSED",

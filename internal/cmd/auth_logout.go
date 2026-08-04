@@ -8,10 +8,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func buildLogoutCmd() *cobra.Command {
+func buildLogoutCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:               "logout",
 		Short:             "Remove stored credentials",
@@ -21,10 +22,7 @@ func buildLogoutCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load(cmd.Flags())
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			revokeOAuthSession(cmd, cfg)
 

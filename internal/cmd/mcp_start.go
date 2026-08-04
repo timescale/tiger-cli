@@ -6,16 +6,15 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
 // buildMCPStartCmd creates the start subcommand with transport options
-func buildMCPStartCmd() *cobra.Command {
+func buildMCPStartCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the Tiger MCP server",
@@ -38,28 +37,23 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context(), cmd.Flags())
+			return startStdioServer(cmd.Context(), app)
 		},
 	}
 
 	// Add transport subcommands
-	cmd.AddCommand(buildMCPStdioCmd())
-	cmd.AddCommand(buildMCPHTTPCmd())
+	cmd.AddCommand(buildMCPStdioCmd(app))
+	cmd.AddCommand(buildMCPHTTPCmd(app))
 
 	return cmd
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context, flags *pflag.FlagSet) error {
+func startStdioServer(ctx context.Context, app *common.App) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
 
-	cfg, err := config.Load(flags)
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, cfg, flags)
+	server, err := mcp.NewServer(ctx, app)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}

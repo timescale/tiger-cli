@@ -18,7 +18,7 @@ import (
 )
 
 // buildServiceMetricsSeriesCmd fetches time-series data for a named metric
-func buildServiceMetricsSeriesCmd() *cobra.Command {
+func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var metric string
 	var from string
 	var to string
@@ -71,13 +71,13 @@ Examples:
 				return err
 			}
 
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -104,7 +104,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServiceMetricsSeriesWithResponse(ctx, cfg.ProjectID, serviceID, body)
+			resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, serviceID, body)
 			if err != nil {
 				return fmt.Errorf("failed to fetch metric series: %w", err)
 			}

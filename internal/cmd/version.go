@@ -23,7 +23,7 @@ type VersionOutput struct {
 	UpdateAvailable *bool  `json:"update_available,omitempty"`
 }
 
-func buildVersionCmd() *cobra.Command {
+func buildVersionCmd(app *common.App) *cobra.Command {
 	var checkVersion bool
 	var outputFormat string
 
@@ -46,10 +46,7 @@ func buildVersionCmd() *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
-				cfg, err := config.Load(cmd.Flags())
-				if err != nil {
-					return fmt.Errorf("Error loading config: %w", err)
-				}
+				cfg := app.GetConfig()
 				result, err := version.CheckForUpdate(cfg)
 				if err != nil {
 					// A failed check shouldn't fail the version command; warn and

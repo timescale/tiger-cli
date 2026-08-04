@@ -91,13 +91,13 @@ By default only user-facing schemas and objects are shown; view/routine definiti
 
 // handleDBSchema handles the db_schema MCP tool
 func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, input DBSchemaInput) (*mcp.CallToolResult, DBSchemaOutput, error) {
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
 
 	logging.Debug("MCP: Getting database schema",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("schema", input.SchemaName),
 		zap.Bool("internal", input.Internal),
@@ -108,7 +108,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	)
 
 	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
 	if err != nil {
 		return nil, DBSchemaOutput{}, err
 	}
@@ -116,7 +116,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	// A replica without a pooler connects directly; surface that as a warning.
 	warning := common.ReplicaPoolerWarning(target, input.Pooled)
 
-	schema, err := common.FetchServiceSchema(ctx, cfg.Config, target, input.Role, input.Pooled, common.SchemaOptions{
+	schema, err := common.FetchServiceSchema(ctx, cfg, target, input.Role, input.Pooled, common.SchemaOptions{
 		Schema:             input.SchemaName,
 		IncludeInternal:    input.Internal,
 		IncludeDefinitions: input.Definitions,

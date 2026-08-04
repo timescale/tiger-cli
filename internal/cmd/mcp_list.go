@@ -7,13 +7,13 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/mcp"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
-func buildMCPListCmd() *cobra.Command {
+func buildMCPListCmd(app *common.App) *cobra.Command {
 	var outputFormat string
 
 	cmd := &cobra.Command{
@@ -37,14 +37,10 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Get config
-			cfg, err := config.Load(cmd.Flags())
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), cfg, cmd.Flags())
+			server, err := mcp.NewServer(cmd.Context(), app)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}

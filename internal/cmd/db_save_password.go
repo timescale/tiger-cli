@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbSavePasswordCmd() *cobra.Command {
+func buildDbSavePasswordCmd(app *common.App) *cobra.Command {
 	var dbSavePasswordRole string
 	var dbSavePasswordValue string
 
@@ -44,9 +44,9 @@ Examples:
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
@@ -55,7 +55,7 @@ Examples:
 			// Resolve the target so a read replica id stores the password against
 			// its parent primary: replicas share the primary's credentials, and
 			// connect/test-connection look the password up against the primary.
-			target, err := lookupConnectionTarget(cmd, cfg, args)
+			target, err := lookupConnectionTarget(cmd, app, args)
 			if err != nil {
 				return err
 			}
@@ -94,7 +94,7 @@ Examples:
 			}
 
 			// Save password using configured storage
-			storage := common.GetPasswordStorage(cfg.Config)
+			storage := common.GetPasswordStorage(cfg)
 			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}

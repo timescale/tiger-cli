@@ -100,13 +100,12 @@ WARNING: Creates billable resources.`,
 
 // handleServiceCreate handles the service_create MCP tool
 func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolRequest, input ServiceCreateInput) (*mcp.CallToolResult, ServiceCreateOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
@@ -125,7 +124,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	logging.Debug("MCP: Creating service",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("name", input.Name),
 		zap.Strings("addons", input.Addons),
 		zap.Stringp("region", input.Region),
@@ -148,7 +147,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.CreateServiceWithResponse(createCtx, cfg.ProjectID, serviceCreateReq)
+	resp, err := client.CreateServiceWithResponse(createCtx, projectID, serviceCreateReq)
 	if err != nil {
 		return nil, ServiceCreateOutput{}, fmt.Errorf("failed to create service: %w", err)
 	}
@@ -179,7 +178,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(cfg.Config, api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -192,8 +191,8 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	message := "Service creation request accepted. The service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    cfg.Client,
-			ProjectID: cfg.ProjectID,
+			Client:    client,
+			ProjectID: projectID,
 			ServiceID: serviceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -210,7 +209,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceCreateOutput{
-		Service:         s.convertToServiceDetail(cfg.Config, service, input.WithPassword),
+		Service:         s.convertToServiceDetail(cfg, service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}

@@ -205,13 +205,16 @@ func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Point the command under test (and testConfig) at the test directory
+	t.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
 	originalValidator := validateAPIKey
 
 	// Mock the validator to return an error
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 		return nil, errors.New("invalid API key: authentication failed")
 	}
 
@@ -258,13 +261,16 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Point the command under test (and testConfig) at the test directory
+	t.Setenv("TIGER_CONFIG_DIR", tmpDir)
+
 	// Use a unique service name for this test
 	config.SetTestServiceName(t)
 
 	originalValidator := validateAPIKey
 
 	// Mock the validator to return success
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{}
 		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
 		return authInfo, nil // Success

@@ -6,13 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
@@ -48,11 +45,11 @@ type Server struct {
 	mcpServer       *mcp.Server
 	docsProxyClient *ProxyClient
 
-	// flags is the flag set of the command that started the server. Tool
-	// handlers pass it to [common.LoadConfig] on every call so the flags given
-	// to `tiger mcp start` (e.g. --config-dir, --service-id) keep taking
-	// precedence over the config file, which is re-read per call.
-	flags *pflag.FlagSet
+	// app holds the config and API client. The analytics middleware reloads it
+	// once per request, so config changes and logins made while the session is
+	// open take effect on the next request; handlers then read that state via
+	// s.app.GetAll and friends.
+	app *common.App
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
@@ -80,11 +77,12 @@ func buildServerInstructions(cfg *config.Config) string {
 		"db_execute_query connects read-only, so writes and DDL are rejected by the server."
 }
 
-// NewServer creates a new Tiger MCP server instance. The caller-supplied cfg
-// is used only to render the read-only warning in server instructions and to
-// gate tool registration; flags is retained so each tool call reloads the
-// config with the same flag precedence (see Server.flags).
-func NewServer(ctx context.Context, cfg *config.Config, flags *pflag.FlagSet) (*Server, error) {
+// NewServer creates a new Tiger MCP server instance. The app must already be
+// loaded: its config renders the read-only warning in the server instructions
+// and gates which tools are registered, both evaluated once here at startup.
+func NewServer(ctx context.Context, app *common.App) (*Server, error) {
+	cfg := app.GetConfig()
+
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
@@ -93,16 +91,14 @@ func NewServer(ctx context.Context, cfg *config.Config, flags *pflag.FlagSet) (*
 
 	server := &Server{
 		mcpServer: mcpServer,
-		flags:     flags,
+		app:       app,
 	}
 
 	// Register all tools (including proxied docs tools). readOnly and
 	// experimental are captured here and threaded through registration only.
 	// experimental follows the ghost pattern — env-var only, undocumented; see
 	// CLAUDE.md's "Experimental Feature Gating".
-	readOnly := cfg != nil && cfg.ReadOnly
-	experimental, _ := strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))
-	server.registerTools(ctx, readOnly, experimental)
+	server.registerTools(ctx, cfg.ReadOnly, app.Experimental)
 
 	// Add analytics tracking middleware
 	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
@@ -174,14 +170,15 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 	return func(ctx context.Context, method string, req mcp.Request) (result mcp.Result, runErr error) {
 		start := time.Now()
 
-		// Load config for analytics
-		cfg, err := config.Load(s.flags)
+		// Reload the config and API client for this request, so config changes
+		// and logins/logouts made while the session is open take effect. Handlers
+		// read the result via s.app.
+		cfg, client, projectID, err := s.app.Load(ctx)
 		if err != nil {
 			// If we can't load config, just skip analytics and continue
 			return next(ctx, method, req)
 		}
 
-		client, projectID, _ := common.NewAPIClient(ctx, cfg)
 		a := analytics.New(cfg, client, projectID)
 
 		switch r := req.(type) {

@@ -18,7 +18,7 @@ import (
 )
 
 // serviceListCmd represents the list command under service
-func buildServiceListCmd() *cobra.Command {
+func buildServiceListCmd(app *common.App) *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
@@ -30,8 +30,7 @@ func buildServiceListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context(), cmd.Flags())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
@@ -40,7 +39,7 @@ func buildServiceListCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
+			resp, err := client.GetServicesWithResponse(ctx, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to list services: %w", err)
 			}
@@ -70,7 +69,7 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, cfg.Config, services, cfg.Output)
+			return outputServices(cmd, cfg, services, cfg.Output)
 		},
 	}
 

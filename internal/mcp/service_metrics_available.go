@@ -53,20 +53,20 @@ func newServiceMetricsAvailableTool() *mcp.Tool {
 
 // handleServiceMetricsAvailable handles the service_metrics_available MCP tool
 func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsAvailableInput) (*mcp.CallToolResult, ServiceMetricsAvailableOutput, error) {
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	client, projectID, err := s.app.GetClient()
 	if err != nil {
 		return nil, ServiceMetricsAvailableOutput{}, err
 	}
 
 	logging.Debug("MCP: Listing available metric series",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 	)
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServiceMetricsAvailableSeriesWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceMetricsAvailableOutput{}, fmt.Errorf("failed to list metric series: %w", err)
 	}

@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"context"
+	"io"
 	"os"
 	"testing"
+
+	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -31,6 +35,44 @@ func loadEffectiveConfig(t *testing.T, args ...string) *config.Config {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 	return cfg
+}
+
+// The context passed to buildRootCmd must reach the command that runs, so
+// handlers can rely on cmd.Context() for cancellation. It's set on the root at
+// build time (cobra copies it onto the executed command) rather than in a
+// PersistentPreRunE hook.
+func TestContextReachesCommand(t *testing.T) {
+	setupTestCommand(t)
+
+	type ctxKey struct{}
+	ctx := context.WithValue(t.Context(), ctxKey{}, "from-execute")
+
+	rootCmd, err := buildRootCmd(ctx)
+	if err != nil {
+		t.Fatalf("Failed to build root command: %v", err)
+	}
+
+	var got any
+	versionCmd, _, err := rootCmd.Find([]string{"version"})
+	if err != nil {
+		t.Fatalf("Failed to find version command: %v", err)
+	}
+	inner := versionCmd.RunE
+	versionCmd.RunE = func(c *cobra.Command, args []string) error {
+		got = c.Context().Value(ctxKey{})
+		return inner(c, args)
+	}
+
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	rootCmd.SetArgs([]string{"version"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Command execution failed: %v", err)
+	}
+
+	if got != "from-execute" {
+		t.Errorf("Expected the command to run with the context passed to buildRootCmd, got value %v", got)
+	}
 }
 
 func writeTestConfigFile(t *testing.T, dir, contents string) {

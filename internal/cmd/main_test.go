@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"testing"
 
+	"github.com/spf13/pflag"
+
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -40,16 +44,58 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	return tmpDir, cleanup
 }
 
-// testConfig loads the config for the test's config directory, which the setup
-// helpers point at via TIGER_CONFIG_DIR. Use it where a test needs the config
-// itself (credential storage, password storage) rather than running a command.
+// testConfigDir returns the config directory the test is using: the one its setup
+// helper exported via TIGER_CONFIG_DIR, or an isolated empty directory when the
+// test set none — so a config never leaks in from the machine running the tests.
+// Tests that exercise credential storage need the former, since credentials live
+// in this directory (the auth setup helpers set it).
+func testConfigDir(t *testing.T) string {
+	t.Helper()
+	if dir := os.Getenv("TIGER_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	return t.TempDir()
+}
+
+// testFlags returns a flag set shaped like a command's, with --config-dir pointed
+// at dir, so config.Load resolves the same way it would for a real command.
+func testFlags(t *testing.T, dir string) *pflag.FlagSet {
+	t.Helper()
+	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	flags.String("config-dir", "", "config directory")
+	if err := flags.Set("config-dir", dir); err != nil {
+		t.Fatalf("Failed to set config-dir flag: %v", err)
+	}
+	return flags
+}
+
+// testConfig loads the config for the test's config directory. Use it where a
+// test needs the config itself (credential storage, password storage) rather than
+// running a command.
 func testConfig(t *testing.T) *config.Config {
 	t.Helper()
-	cfg, err := config.Load(nil)
+	cfg, err := config.Load(testFlags(t, testConfigDir(t)))
 	if err != nil {
 		t.Fatalf("Failed to load test config: %v", err)
 	}
 	return cfg
+}
+
+// newTestApp returns an App loaded against the test's config directory, with API
+// client creation stubbed out to return the given client. Load still runs, so
+// config resolution and flag precedence go through the real code path — only the
+// client is injected (see common.App.SetClientFactory).
+func newTestApp(t *testing.T, client api.ClientWithResponsesInterface, projectID string) *common.App {
+	t.Helper()
+	app := &common.App{}
+	app.SetFlags(testFlags(t, testConfigDir(t)))
+	app.SetClientFactory(func(context.Context, *config.Config) (api.ClientWithResponsesInterface, string, error) {
+		return client, projectID, nil
+	})
+	if _, _, _, err := app.Load(t.Context()); err != nil {
+		t.Fatalf("Failed to load test app: %v", err)
+	}
+	return app
 }
 
 // mockStoredCredentials overrides the common.GetStoredCredentials seam for the

@@ -102,13 +102,12 @@ WARNING: Creates billable resources.`,
 
 // handleServiceFork handles the service_fork MCP tool
 func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest, input ServiceForkInput) (*mcp.CallToolResult, ServiceForkOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx, s.flags)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -135,7 +134,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	logging.Debug("MCP: Forking service",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("name", input.Name),
 		zap.String("fork_strategy", string(input.ForkStrategy)),
@@ -160,7 +159,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.ForkServiceWithResponse(forkCtx, cfg.ProjectID, input.ServiceID, forkReq)
+	resp, err := client.ForkServiceWithResponse(forkCtx, projectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}
@@ -181,7 +180,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// This ensures the password is stored even if the wait fails or is interrupted
 	var passwordStorage *common.PasswordStorageResult
 	if service.InitialPassword != nil {
-		result, err := common.SavePasswordWithResult(cfg.Config, api.Service(service), *service.InitialPassword, "tsdbadmin")
+		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
 			logging.Debug("MCP: Password storage failed", zap.Error(err))
@@ -204,8 +203,8 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service fork request accepted. The forked service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    cfg.Client,
-			ProjectID: cfg.ProjectID,
+			Client:    client,
+			ProjectID: projectID,
 			ServiceID: serviceID,
 			Handler: &common.StatusWaitHandler{
 				TargetStatus: "READY",
@@ -222,7 +221,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Convert service to output format (after wait so status is accurate)
 	output := ServiceForkOutput{
-		Service:         s.convertToServiceDetail(cfg.Config, service, input.WithPassword),
+		Service:         s.convertToServiceDetail(cfg, service, input.WithPassword),
 		Message:         message,
 		PasswordStorage: passwordStorage,
 	}

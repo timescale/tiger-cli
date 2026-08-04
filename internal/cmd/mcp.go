@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 // buildMCPCmd creates the MCP server command with subcommands
-func buildMCPCmd() *cobra.Command {
+func buildMCPCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Tiger Model Context Protocol (MCP) server",
@@ -28,10 +30,10 @@ Use 'tiger mcp start' to launch the MCP server.`,
 	}
 
 	// Add subcommands
-	cmd.AddCommand(buildMCPInstallCmd())
-	cmd.AddCommand(buildMCPStartCmd())
-	cmd.AddCommand(buildMCPListCmd())
-	cmd.AddCommand(buildMCPGetCmd())
+	cmd.AddCommand(buildMCPInstallCmd(app))
+	cmd.AddCommand(buildMCPStartCmd(app))
+	cmd.AddCommand(buildMCPListCmd(app))
+	cmd.AddCommand(buildMCPGetCmd(app))
 
 	return cmd
 }
