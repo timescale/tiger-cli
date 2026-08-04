@@ -111,7 +111,6 @@ tiger-cli/
 │   ├── cmd/                # CLI commands (Cobra, one file per command)
 │   └── util/               # Shared utilities
 ├── docs/                   # Documentation
-├── specs/                  # CLI specifications and API documentation
 ├── openapi.yaml            # OpenAPI 3.0 specification for Tiger API
 └── tools.go                # Build-time dependencies
 ```
@@ -206,7 +205,7 @@ VERSION=X.X.X && git tag -a v${VERSION} -m "${VERSION}" && git push origin v${VE
 ## Getting Help
 
 - **GitHub Issues**: Report bugs or request features at https://github.com/timescale/tiger-cli/issues
-- **Documentation**: Check the specs/ directory for detailed specifications
+- **Documentation**: See [README.md](../README.md) for user-facing docs
 
 ## License
 
