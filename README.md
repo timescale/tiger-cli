@@ -245,7 +245,6 @@ All configuration options can be set via `tiger config set <key> <value>`:
 
 - `analytics` - Enable/disable analytics (default: `true`)
 - `color` - Enable/disable colored output (default: `true`)
-- `debug` - Enable/disable debug logging (default: `false`)
 - `docs_mcp` - Enable/disable docs MCP proxy (default: `true`)
 - `mcp_max_rows` - Maximum number of rows the `db_execute_query` MCP tool returns per result set before truncating, to limit how much data lands in an AI agent's context. Only applies to the MCP tool, not CLI commands. Default: `100`
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
@@ -261,7 +260,6 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_ANALYTICS` - Enable/disable analytics
 - `TIGER_COLOR` - Enable/disable colored output
 - `TIGER_CONFIG_DIR` - Path to configuration directory (default: `~/.config/tiger`)
-- `TIGER_DEBUG` - Enable/disable debug logging
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
@@ -278,7 +276,6 @@ These flags are available on all commands and take precedence over both environm
 - `--analytics` - Enable/disable analytics
 - `--color` - Enable/disable colored output
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
-- `--debug` - Enable/disable debug logging
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
 - `--service-id <id>` - Specify service ID
 - `--skip-update-check` - Skip checking for updates on startup (default: `false`)

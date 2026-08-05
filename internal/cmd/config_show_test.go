@@ -45,7 +45,6 @@ password_storage: pgpass
 		"output":           "table",
 		"analytics":        "false",
 		"password_storage": "pgpass",
-		"debug":            "false",
 		"config_dir":       tmpDir,
 		"mcp_max_rows":     strconv.Itoa(config.DefaultMCPMaxRows),
 	}
@@ -98,7 +97,6 @@ password_storage: keyring
 		"analytics":        false,
 		"password_storage": "keyring",
 		"read_only":        false,
-		"debug":            false,
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,
@@ -156,7 +154,6 @@ password_storage: keyring
 		"analytics":        false,
 		"password_storage": "keyring",
 		"read_only":        false,
-		"debug":            false,
 		"config_dir":       tmpDir,
 		"releases_url":     "https://cli.tigerdata.com",
 		"version_check":    true,

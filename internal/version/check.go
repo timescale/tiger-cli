@@ -224,9 +224,6 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 		return
 	}
 	if !result.UpdateAvailable {
-		if cfg.Debug {
-			fmt.Fprintf(*output, "No update available\n")
-		}
 		return
 	}
 

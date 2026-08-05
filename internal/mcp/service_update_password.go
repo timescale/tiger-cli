@@ -3,16 +3,15 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -72,9 +71,9 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	logging.Debug("MCP: Updating service password",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID))
+	s.logger.Info("MCP: Updating service password",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID))
 
 	// Prepare password update request
 	updateReq := api.UpdatePasswordInput{
@@ -114,9 +113,9 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	result, saveErr := common.SavePasswordWithResult(cfg, service, input.Password, "tsdbadmin")
 	passwordStorage := &result
 	if saveErr != nil {
-		logging.Debug("MCP: Password storage failed", zap.Error(saveErr))
+		s.logger.Warn("MCP: Password storage failed", slog.Any("error", saveErr))
 	} else {
-		logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+		s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
 	}
 
 	output := ServiceUpdatePasswordOutput{

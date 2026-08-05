@@ -6,8 +6,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
-	"go.uber.org/zap"
 )
 
 // Capabilities holds all MCP server capabilities
@@ -26,7 +24,9 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    ServerName,
 		Version: config.Version,
-	}, nil)
+	}, &mcp.ClientOptions{
+		Logger: s.logger,
+	})
 
 	serverSession, err := s.mcpServer.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -76,11 +76,11 @@ func (s *Server) ListCapabilities(ctx context.Context) (*Capabilities, error) {
 	}
 
 	if err := clientSession.Close(); err != nil {
-		logging.Error("Error closing client session", zap.Error(err))
+		return nil, fmt.Errorf("error closing client session: %w", err)
 	}
 
 	if err := serverSession.Close(); err != nil {
-		logging.Error("Error closing server session", zap.Error(err))
+		return nil, fmt.Errorf("error closing server session: %w", err)
 	}
 
 	return capabilities, nil

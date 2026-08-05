@@ -3,15 +3,14 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -58,9 +57,9 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 		return nil, ServiceMetricsAvailableOutput{}, err
 	}
 
-	logging.Debug("MCP: Listing available metric series",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
+	s.logger.Info("MCP: Listing available metric series",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
 	)
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)

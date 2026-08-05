@@ -12,16 +12,11 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 // TestNewAPIClient_OAuthCredentials verifies that when stored credentials are
 // OAuth-shaped, NewAPIClient builds a Bearer-authenticated client and returns the stored project ID.
 func TestNewAPIClient_OAuthCredentials(t *testing.T) {
-	if err := logging.Init(false); err != nil {
-		t.Fatalf("Failed to initialize logging: %v", err)
-	}
-
 	// Ensure env-var credentials don't take precedence over the stored override.
 	t.Setenv("TIGER_PUBLIC_KEY", "")
 	t.Setenv("TIGER_SECRET_KEY", "")
@@ -63,10 +58,6 @@ func TestNewAPIClient_OAuthCredentials(t *testing.T) {
 
 func TestValidateAPIKey(t *testing.T) {
 	// Initialize logger for analytics code
-	if err := logging.Init(false); err != nil {
-		t.Fatalf("Failed to initialize logging: %v", err)
-	}
-
 	tests := []struct {
 		name              string
 		setupServer       func() *httptest.Server

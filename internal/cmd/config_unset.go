@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 func buildConfigUnsetCmd(app *common.App) *cobra.Command {
@@ -27,7 +25,6 @@ func buildConfigUnsetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to unset config: %w", err)
 			}
 
-			logging.Info("Configuration updated", zap.String("key", key))
 			fmt.Fprintf(cmd.OutOrStdout(), "Unset %s\n", key)
 			return nil
 		},

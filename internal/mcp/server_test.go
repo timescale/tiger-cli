@@ -34,6 +34,7 @@ func registeredToolNames(t *testing.T, readOnly bool) []string {
 			Title:   serverTitle,
 			Version: config.Version,
 		}, nil),
+		logger: ensureLogger(nil),
 	}
 	s.registerServiceTools(readOnly, false)
 	s.registerDatabaseTools(readOnly)

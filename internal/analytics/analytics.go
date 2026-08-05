@@ -13,8 +13,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
-	"go.uber.org/zap"
 )
 
 // A list of properties that should never be recorded in analytics events.
@@ -132,20 +130,14 @@ func (a *Analytics) Identify(options ...Option) {
 		properties["project_id"] = a.projectID
 	}
 
-	logger := logging.GetLogger().With(
-		zap.Any("properties", properties),
-	)
-
 	// Check if analytics is disabled
 	if !a.Enabled() {
-		logger.Debug("Analytics identify skipped (analytics disabled)")
 		return
 	}
 
 	// Check for cases where the client was not initialized
 	// (e.g. because API credentials are not available)
 	if a.client == nil {
-		logger.Debug("Analytics identify skipped (client not initialized)")
 		return
 	}
 
@@ -155,22 +147,10 @@ func (a *Analytics) Identify(options ...Option) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Send the event
-	resp, err := a.client.IdentifyUserWithResponse(ctx, api.IdentifyUserJSONRequestBody{
+	// Send the event, ignoring failures - analytics should never block user actions
+	a.client.IdentifyUserWithResponse(ctx, api.IdentifyUserJSONRequestBody{
 		Properties: &properties,
 	})
-	if err != nil {
-		// Log error but don't fail the operation - analytics should never block user actions
-		logger.Debug("Failed to send analytics identify", zap.Error(err))
-		return
-	}
-
-	if resp.JSON200 == nil || resp.JSON200.Status == nil {
-		logger.Debug("Failed to retrieve response from analytics endpoint")
-		return
-	}
-
-	logger.Debug("Analytics identify sent", zap.String("status", *resp.JSON200.Status))
 }
 
 // Track sends an analytics event with the provided event name and properties.
@@ -196,21 +176,14 @@ func (a *Analytics) Track(event string, options ...Option) {
 		properties["project_id"] = a.projectID
 	}
 
-	logger := logging.GetLogger().With(
-		zap.String("event", event),
-		zap.Any("properties", properties),
-	)
-
 	// Check if analytics is disabled
 	if !a.Enabled() {
-		logger.Debug("Analytics event skipped (analytics disabled)")
 		return
 	}
 
 	// Check for cases where the client was not initialized
 	// (e.g. because API credentials are not available)
 	if a.client == nil {
-		logger.Debug("Analytics event skipped (client not initialized)")
 		return
 	}
 
@@ -220,23 +193,11 @@ func (a *Analytics) Track(event string, options ...Option) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Send the event
-	resp, err := a.client.TrackEventWithResponse(ctx, api.TrackEventJSONRequestBody{
+	// Send the event, ignoring failures - analytics should never block user actions
+	a.client.TrackEventWithResponse(ctx, api.TrackEventJSONRequestBody{
 		Event:      event,
 		Properties: &properties,
 	})
-	if err != nil {
-		// Log error but don't fail the operation - analytics should never block user actions
-		logger.Debug("Failed to send analytics event", zap.Error(err))
-		return
-	}
-
-	if resp.JSON200 == nil || resp.JSON200.Status == nil {
-		logger.Debug("Failed to retrieve response from analytics endpoint")
-		return
-	}
-
-	logger.Debug("Analytics event sent", zap.String("status", *resp.JSON200.Status))
 }
 
 // Enabled reports whether analytics events will actually be sent given the

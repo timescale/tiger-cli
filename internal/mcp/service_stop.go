@@ -4,15 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -74,9 +73,9 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceStopOutput{}, err
 	}
 
-	logging.Debug("MCP: Stopping service",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID))
+	s.logger.Info("MCP: Stopping service",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
 	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)

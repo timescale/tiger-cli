@@ -3,13 +3,12 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -96,15 +95,15 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, DBSchemaOutput{}, err
 	}
 
-	logging.Debug("MCP: Getting database schema",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.String("schema", input.SchemaName),
-		zap.Bool("internal", input.Internal),
-		zap.Bool("definitions", input.Definitions),
-		zap.Bool("comments", input.Comments),
-		zap.String("role", input.Role),
-		zap.Bool("pooled", input.Pooled),
+	s.logger.Info("MCP: Getting database schema",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.String("schema", input.SchemaName),
+		slog.Bool("internal", input.Internal),
+		slog.Bool("definitions", input.Definitions),
+		slog.Bool("comments", input.Comments),
+		slog.String("role", input.Role),
+		slog.Bool("pooled", input.Pooled),
 	)
 
 	// service_id may name a service or one of its read replicas.

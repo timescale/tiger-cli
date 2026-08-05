@@ -3,14 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
@@ -42,7 +41,7 @@ Examples:
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startHTTPServer(cmd.Context(), app, httpHost, httpPort)
+			return startHTTPServer(cmd, app, httpHost, httpPort)
 		},
 	}
 
@@ -54,11 +53,14 @@ Examples:
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, app *common.App, host string, port int) error {
-	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
+func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int) error {
+	ctx := cmd.Context()
+	logger := newLogger(cmd.ErrOrStderr())
+
+	logger.Info("Starting Tiger MCP server", slog.String("transport", "http"))
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, app)
+	server, err := mcp.NewServer(ctx, app, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
@@ -72,9 +74,9 @@ func startHTTPServer(ctx context.Context, app *common.App, host string, port int
 	defer listener.Close()
 
 	if actualPort != port {
-		logging.Info("Specified port was busy, using alternative port",
-			zap.Int("requested_port", port),
-			zap.Int("actual_port", actualPort),
+		logger.Info("Specified port was busy, using alternative port",
+			slog.Int("requested_port", port),
+			slog.Int("actual_port", actualPort),
 		)
 	}
 
@@ -85,13 +87,13 @@ func startHTTPServer(ctx context.Context, app *common.App, host string, port int
 		Handler: server.HTTPHandler(),
 	}
 
-	fmt.Printf("🚀 Tiger MCP server listening on http://%s\n", address)
-	fmt.Printf("💡 Use Ctrl+C to stop the server\n")
+	logger.Info("Tiger MCP server started", slog.String("address", address))
+	logger.Info("Use Ctrl+C to stop the server")
 
 	// Start server in goroutine using the existing listener
 	go func() {
 		if err := httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
-			logging.Error("HTTP server error", zap.Error(err))
+			logger.Error("HTTP server error", slog.Any("error", err))
 		}
 	}()
 
@@ -104,7 +106,7 @@ func startHTTPServer(ctx context.Context, app *common.App, host string, port int
 	<-ctx.Done()
 
 	// Shutdown server gracefully
-	logging.Info("Gracefully shutting down HTTP server..., press control-C twice to immediately shutdown")
+	logger.Info("Gracefully shutting down HTTP server, press control-C twice to immediately shutdown")
 	if err := httpServer.Shutdown(context.Background()); err != nil {
 		return fmt.Errorf("failed to shut down HTTP server: %w", err)
 	}

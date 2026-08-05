@@ -9,12 +9,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 	"github.com/timescale/tiger-cli/internal/version"
 )
@@ -56,7 +54,6 @@ tiger auth login
 	cmd.PersistentFlags().Bool("analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().Bool("color", true, "enable colored output")
 	cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
-	cmd.PersistentFlags().Bool("debug", false, "enable debug logging")
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().String("service-id", "", "service ID")
 	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
@@ -77,8 +74,8 @@ tiger auth login
 
 // wrapCommands recursively wraps the RunE of every command in the tree rooted at
 // cmd with the shared per-invocation lifecycle: loading the config and API
-// client, initializing logging, configuring color output, checking for a newer
-// release, and tracking analytics.
+// client, configuring color output, checking for a newer release, and tracking
+// analytics.
 //
 // Commands added to the tree after this runs (cobra's built-in help, completion,
 // and __complete commands) are not wrapped and so skip the load entirely, which
@@ -100,17 +97,6 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 				return err
 			}
 
-			if err := logging.Init(cfg.Debug); err != nil {
-				return fmt.Errorf("failed to initialize logging: %w", err)
-			}
-			defer logging.Sync()
-
-			logging.Debug("CLI initialized",
-				zap.String("config_dir", cfg.ConfigDir),
-				zap.String("output", cfg.Output),
-				zap.Bool("debug", cfg.Debug),
-			)
-
 			if !cfg.Color {
 				color.NoColor = true
 			}
@@ -127,7 +113,8 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 			defer func() {
 				cfg, client, projectID := app.TryGetAll()
 				a := analytics.New(cfg, client, projectID)
-				a.Track(fmt.Sprintf("Run %s", c.CommandPath()),
+				a.Track(
+					fmt.Sprintf("Run %s", c.CommandPath()),
 					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags()),
@@ -160,21 +147,18 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 		return func() {}
 	}
 
-	resultCh := make(chan *version.CheckResult, 1)
+	type checkResult struct {
+		result *version.CheckResult
+		err    error
+	}
+	resultCh := make(chan checkResult, 1)
 	go func() {
 		result, err := version.CheckForUpdate(cfg)
-		if err != nil {
-			// A failed check (e.g. offline) shouldn't spam a warning on every
-			// command; surface it only in debug logs.
-			logging.Debug("background version check failed", zap.Error(err))
-			resultCh <- nil
-			return
-		}
-		resultCh <- result
+		resultCh <- checkResult{result: result, err: err}
 	}()
 
 	return func() {
-		result := <-resultCh
+		res := <-resultCh
 
 		// Re-check cfg.VersionCheck: the command may have turned checks off in
 		// place (e.g. `tiger config set version_check false`, which reloads the
@@ -183,8 +167,13 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 			return
 		}
 
+		if res.err != nil {
+			cmd.PrintErrf("Warning: failed to check for updates: %v\n", res.err)
+			return
+		}
+
 		output := cmd.ErrOrStderr()
-		version.PrintUpdateWarning(result, cfg, &output)
+		version.PrintUpdateWarning(res.result, cfg, &output)
 	}
 }
 

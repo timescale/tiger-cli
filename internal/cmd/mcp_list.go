@@ -39,7 +39,7 @@ Examples:
 			cfg := app.GetConfig()
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), app)
+			server, err := mcp.NewServer(cmd.Context(), app, nil)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}

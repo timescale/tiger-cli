@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -133,13 +132,13 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
-	logging.Debug("MCP: Forking service",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.String("name", input.Name),
-		zap.String("fork_strategy", string(input.ForkStrategy)),
-		zap.Stringp("cpu", cpuMillis),
-		zap.Stringp("memory", memoryGBs),
+	s.logger.Info("MCP: Forking service",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.String("name", input.Name),
+		slog.String("fork_strategy", string(input.ForkStrategy)),
+		slog.Any("cpu", cpuMillis),
+		slog.Any("memory", memoryGBs),
 	)
 
 	// Prepare service fork request
@@ -183,9 +182,9 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
-			logging.Debug("MCP: Password storage failed", zap.Error(err))
+			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 		} else {
-			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+			s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
 		}
 	}
 
@@ -193,9 +192,9 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	if input.SetDefault {
 		if err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service fork
-			logging.Debug("MCP: Failed to set service as default", zap.Error(err))
+			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
 		} else {
-			logging.Debug("MCP: Set service as default", zap.String("service_id", serviceID))
+			s.logger.Info("MCP: Set service as default", slog.String("service_id", serviceID))
 		}
 	}
 
