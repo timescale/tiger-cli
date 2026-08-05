@@ -24,7 +24,7 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 
 			cfg := app.GetConfig()
 
-			revokeOAuthSession(cmd, cfg)
+			revokeOAuthSession(cmd, app, cfg)
 
 			if err := cfg.RemoveCredentials(); err != nil {
 				return fmt.Errorf("failed to remove credentials: %w", err)
@@ -39,7 +39,14 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 // revokeOAuthSession asks the server to revoke the refresh token for an OAuth
 // session. Failures are intentionally non-fatal — local credential removal
 // must always succeed even if the server is unreachable or returns 501.
-func revokeOAuthSession(cmd *cobra.Command, cfg *config.Config) {
+//
+// It also replaces the App's client with one that has no persist callback. The
+// new client will still renew an expired access token (which is required
+// because /auth/logout and the analytics endpoint are authenticated), but it
+// won't persist the token back to storage, ensuring that we don't
+// unintentionally restore the credentials after deleting them (the analytics
+// event deferred by wrapCommands reuses the App's client after the deletion).
+func revokeOAuthSession(cmd *cobra.Command, app *common.App, cfg *config.Config) {
 	stored, err := cfg.GetStoredCredentials()
 	if err != nil || stored.OAuth == nil {
 		return
@@ -48,6 +55,7 @@ func revokeOAuthSession(cmd *cobra.Command, cfg *config.Config) {
 	if err != nil {
 		return
 	}
+	app.SetClient(client, stored.ProjectID)
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
 	defer cancel()
