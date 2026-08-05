@@ -55,7 +55,6 @@ type Server struct {
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
 func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	if readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
-		s.logger.Info("Skipping write tool in read-only mode", slog.String("tool", t.Name))
 		return
 	}
 	mcp.AddTool(s.mcpServer, t, h)
@@ -145,8 +144,6 @@ func (s *Server) registerTools(ctx context.Context, readOnly, experimental bool)
 
 	// Register remote docs MCP server proxy
 	s.registerDocsProxy(ctx)
-
-	s.logger.Info("MCP tools registered successfully")
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -242,8 +239,6 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 
 // Close gracefully shuts down the MCP server and all proxy connections
 func (s *Server) Close() error {
-	s.logger.Info("Closing MCP server and proxy connections")
-
 	// Close docs proxy connection
 	if err := s.docsProxyClient.Close(); err != nil {
 		return fmt.Errorf("failed to close docs proxy client: %w", err)

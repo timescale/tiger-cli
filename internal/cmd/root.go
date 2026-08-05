@@ -158,12 +158,12 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 	}()
 
 	return func() {
-		res := <-resultCh
+		res, ok := <-resultCh
 
 		// Re-check cfg.VersionCheck: the command may have turned checks off in
 		// place (e.g. `tiger config set version_check false`, which reloads the
 		// config struct rather than replacing it).
-		if !cfg.VersionCheck {
+		if !ok || !cfg.VersionCheck {
 			return
 		}
 

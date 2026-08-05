@@ -484,6 +484,11 @@ anything below `Info` unless `slog.SetLogLoggerLevel` is called, so log at `Info
 or above; a `Debug` call would silently go nowhere. Attach errors with
 `slog.Any("error", err)`, not `slog.String("error", err.Error())`.
 
+Because every statement is visible by default, keep them sparse: log failures
+that would otherwise be swallowed (the docs-proxy registration errors are the
+model), not per-step tracing of work that succeeded. Startup registration emits
+nothing — `tiger mcp start` should be silent until something goes wrong.
+
 Everything outside `internal/mcp` writes to stdout/stderr directly rather than
 logging. Don't add log statements to CLI commands — print to
 `cmd.OutOrStdout()`/`cmd.ErrOrStderr()`, or return an error.

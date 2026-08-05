@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -51,8 +50,6 @@ Examples:
 func startStdioServer(cmd *cobra.Command, app *common.App) error {
 	ctx := cmd.Context()
 	logger := newLogger(cmd.ErrOrStderr())
-
-	logger.Info("Starting Tiger MCP server", slog.String("transport", "stdio"))
 
 	// Create MCP server
 	server, err := mcp.NewServer(ctx, app, logger)
