@@ -206,7 +206,20 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}); waitErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 				} else {
-					fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+					// READY only means the control plane finished reconciling. Confirm
+					// the endpoint serves before claiming the service is usable.
+					if common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
+						Client:          cfg.Client,
+						ProjectID:       cfg.ProjectID,
+						ServiceID:       serviceID,
+						Role:            "tsdbadmin",
+						InitialPassword: util.Deref(service.InitialPassword),
+						Output:          statusOutput,
+					}) {
+						fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
+					} else {
+						fmt.Fprintf(statusOutput, "✅ Service provisioned.\n")
+					}
 					printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
 				}
 			}

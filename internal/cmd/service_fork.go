@@ -227,6 +227,15 @@ Examples:
 				}); waitErr != nil {
 					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
 				} else {
+					// A fresh fork reports READY before its endpoint is up, same as create.
+					common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
+						Client:          cfg.Client,
+						ProjectID:       cfg.ProjectID,
+						ServiceID:       forkedServiceID,
+						Role:            "tsdbadmin",
+						InitialPassword: util.Deref(forkedService.InitialPassword),
+						Output:          statusOutput,
+					})
 					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
 					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
 				}

@@ -105,6 +105,16 @@ Examples:
 				return err
 			}
 
+			// A resumed service reports READY before its endpoint is back up, so
+			// confirm it serves before handing control back.
+			common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
+				Client:    cfg.Client,
+				ProjectID: cfg.ProjectID,
+				ServiceID: serviceID,
+				Role:      "tsdbadmin",
+				Output:    statusOutput,
+			})
+
 			fmt.Fprintf(statusOutput, "✅ Service has been successfully started!\n")
 			return nil
 		},
