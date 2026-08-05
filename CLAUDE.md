@@ -648,11 +648,6 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
     // Per-invocation state, threaded through every builder
     app := &common.App{Experimental: experimental}
 
-    // Declare ALL flag variables locally within this function
-    var configDir string
-    var debug bool
-    // ... other flag variables
-
     cmd := &cobra.Command{
         Use:   "tiger",
         Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
@@ -663,8 +658,9 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
     cmd.SetContext(ctx)
 
     // Set up persistent flags
-    cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
-    cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+    cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
+    cmd.PersistentFlags().Bool("debug", false, "enable debug logging")
+    skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
     // ... add remaining persistent flags
 
     // Add all subcommands (complete tree building)
@@ -673,7 +669,7 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
     // ... add remaining subcommands
 
     // Wrap every RunE in the tree with the shared lifecycle
-    wrapCommands(cmd, app, &skipUpdateCheck)
+    wrapCommands(cmd, app, skipUpdateCheck)
 
     return cmd, nil
 }
@@ -746,10 +742,15 @@ A flag that should override a config value needs no wiring in the command: the
 lifecycle wrapper already hands the command's flag set to `config.Load`, and the
 binding table in `internal/config/config.go` does the rest.
 
+Don't bind such a flag to a variable — use `String`/`Bool`/`Var` rather than
+`StringVar`/`BoolVar`/`VarP(&x, …)`. The command must read the value from the
+config, and a variable in scope is an invitation to read the raw flag instead,
+which silently bypasses the env var and config file. `tiger version` had exactly
+that bug. Flag types that validate at parse time (`outputFlag` and friends in
+`flag_helper.go`) still work: register them with `new(outputFlag)`.
+
 ```go
 func buildMyConfigurableFlagCmd(app *common.App) *cobra.Command {
-    var output string
-
     cmd := &cobra.Command{
         Use:   "my-command",
         Short: "Command with configurable flag",
@@ -760,7 +761,7 @@ func buildMyConfigurableFlagCmd(app *common.App) *cobra.Command {
         },
     }
 
-    cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format")
+    cmd.Flags().VarP(new(outputFlag), "output", "o", "output format")
     return cmd
 }
 ```
@@ -914,7 +915,7 @@ When adding new commands to this architecture:
 2. **Declare flags locally** within the builder function scope
 3. **Use `RunE`** (not `Run`) so the command gets the shared lifecycle from `wrapCommands`
 4. **Read config and client from the App** (`app.GetAll()`/`GetConfig()`/`GetClient()`) rather than loading them
-5. **Add the flag to `flagBindings`** (in `internal/config/config.go`) if it should override a config value
+5. **Add the flag to `flagBindings`** (in `internal/config/config.go`) if it should override a config value, and declare it without a variable so it can only be read back from the config
 6. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd(app))` in `buildRootCmd()`
 7. **No init() function** required - everything goes through the root builder
 8. **Test with `buildRootCmd(ctx)`** instead of recreating flag setup

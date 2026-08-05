@@ -13,7 +13,6 @@ import (
 )
 
 func buildConfigShowCmd(app *common.App) *cobra.Command {
-	var output string
 	var noDefaults bool
 	var withEnv bool
 
@@ -52,7 +51,7 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
 	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
 

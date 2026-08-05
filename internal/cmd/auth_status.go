@@ -20,7 +20,6 @@ import (
 )
 
 func buildStatusCmd(app *common.App) *cobra.Command {
-	var output string
 
 	cmd := &cobra.Command{
 		Use:               "status",
@@ -64,7 +63,7 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }

@@ -25,7 +25,6 @@ type VersionOutput struct {
 
 func buildVersionCmd(app *common.App) *cobra.Command {
 	var checkVersion bool
-	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:               "version",
@@ -35,6 +34,8 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
+
+			cfg := app.GetConfig()
 
 			versionOutput := VersionOutput{
 				Version:   config.Version,
@@ -46,7 +47,6 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
-				cfg := app.GetConfig()
 				result, err := version.CheckForUpdate(cfg)
 				if err != nil {
 					// A failed check shouldn't fail the version command; warn and
@@ -62,7 +62,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 			}
 
 			output := cmd.OutOrStdout()
-			switch outputFormat {
+			switch cfg.Output {
 			case "json":
 				if err := util.SerializeToJSON(output, versionOutput); err != nil {
 					return err
@@ -87,7 +87,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
-	cmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "Output format (table, json, yaml, bare)")
+	cmd.Flags().VarP(new(outputWithBareFlag), "output", "o", "Output format (table, json, yaml, bare)")
 
 	return cmd
 }

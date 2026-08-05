@@ -14,7 +14,6 @@ import (
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
 func buildMCPListCmd(app *common.App) *cobra.Command {
-	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -70,7 +69,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }

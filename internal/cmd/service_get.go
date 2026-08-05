@@ -14,7 +14,6 @@ import (
 // buildServiceGetCmd represents the get command under service
 func buildServiceGetCmd(app *common.App) *cobra.Command {
 	var withPassword bool
-	var output string
 
 	cmd := &cobra.Command{
 		Use:     "get [service-id]",
@@ -80,7 +79,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }

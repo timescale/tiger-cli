@@ -20,7 +20,6 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 	var fromRoles []string
 	var statementTimeout time.Duration
 	var passwordFlag string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "role [service-id]",
@@ -158,7 +157,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().StringSliceVar(&fromRoles, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&passwordFlag, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	cmd.MarkFlagRequired("name")
 

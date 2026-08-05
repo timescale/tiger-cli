@@ -19,7 +19,6 @@ import (
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd(app *common.App) *cobra.Command {
-	var output string
 
 	cmd := &cobra.Command{
 		Use:               "list",
@@ -73,7 +72,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
 }

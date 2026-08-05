@@ -27,7 +27,6 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var forkMemory string
 	var forkWithPassword bool
 	var forkEnvironment string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -256,7 +255,7 @@ Examples:
 	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }

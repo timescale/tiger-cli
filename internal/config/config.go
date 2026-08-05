@@ -372,7 +372,7 @@ func validateValue(key, value string) (any, error) {
 	case "mcp_max_rows":
 		return parsePositiveInt(key, value)
 	case "output":
-		if err := ValidateOutputFormat(value, false); err != nil {
+		if err := ValidateOutputFormat(value); err != nil {
 			return nil, err
 		}
 		return value, nil

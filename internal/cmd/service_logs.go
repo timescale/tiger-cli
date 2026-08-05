@@ -19,7 +19,6 @@ func buildServiceLogsCmd(app *common.App) *cobra.Command {
 	var since time.Time
 	var until time.Time
 	var node int
-	var output string
 
 	cmd := &cobra.Command{
 		Use:     "logs [service-id]",
@@ -139,7 +138,7 @@ Examples:
 	cmd.Flags().TimeVar(&since, "since", time.Time{}, []string{time.RFC3339}, "Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z)")
 	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
 	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd
 }

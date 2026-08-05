@@ -32,14 +32,6 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 		Experimental: experimental,
 	}
 
-	var configDir string
-	var debug bool
-	var serviceID string
-	var analyticsEnabled bool
-	var passwordStorage string
-	var skipUpdateCheck bool
-	var colorFlag bool
-
 	cmd := &cobra.Command{
 		Use:   "tiger",
 		Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
@@ -58,14 +50,16 @@ tiger auth login
 	// executes — so handlers can use cmd.Context() for cancellation.
 	cmd.SetContext(ctx)
 
-	// Add persistent flags
-	cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
-	cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	cmd.PersistentFlags().StringVar(&serviceID, "service-id", "", "service ID")
-	cmd.PersistentFlags().BoolVar(&analyticsEnabled, "analytics", true, "enable/disable usage analytics")
-	cmd.PersistentFlags().StringVar(&passwordStorage, "password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
-	cmd.PersistentFlags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "skip checking for updates on startup")
-	cmd.PersistentFlags().BoolVar(&colorFlag, "color", true, "enable colored output")
+	// Add persistent flags. Values are read back from the config (see
+	// flagBindings in internal/config) rather than from the flag variables, so
+	// only --skip-update-check — which isn't a config value — is captured here.
+	cmd.PersistentFlags().Bool("analytics", true, "enable/disable usage analytics")
+	cmd.PersistentFlags().Bool("color", true, "enable colored output")
+	cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
+	cmd.PersistentFlags().Bool("debug", false, "enable debug logging")
+	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
+	cmd.PersistentFlags().String("service-id", "", "service ID")
+	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd(app))
@@ -76,7 +70,7 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
 
-	wrapCommands(cmd, app, &skipUpdateCheck)
+	wrapCommands(cmd, app, skipUpdateCheck)
 
 	return cmd, nil
 }

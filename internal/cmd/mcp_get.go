@@ -18,7 +18,6 @@ import (
 
 // buildMCPGetCmd creates the get subcommand for displaying detailed info on a specific MCP capability
 func buildMCPGetCmd(app *common.App) *cobra.Command {
-	var outputFormat string
 
 	cmd := &cobra.Command{
 		Use:     "get <name>",
@@ -95,7 +94,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }
