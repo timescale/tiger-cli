@@ -63,18 +63,17 @@ func newServiceUpdatePasswordTool() *mcp.Tool {
 
 // handleServiceUpdatePassword handles the service_update_password MCP tool
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg.Config); err != nil {
+	if err := common.CheckReadOnly(cfg); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	logging.Debug("MCP: Updating service password",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID))
 
 	// Prepare password update request
@@ -87,7 +86,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	// Fetch first so we can reject read replicas and reuse the service for
 	// password storage below.
-	serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, input.ServiceID)
+	serviceResp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to get service details: %w", err)
 	}
@@ -103,7 +102,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceId))
 	}
 
-	resp, err := cfg.Client.UpdatePasswordWithResponse(ctx, cfg.ProjectID, input.ServiceID, updateReq)
+	resp, err := client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -112,7 +111,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	// Save the new password using the service we already fetched.
-	result, saveErr := common.SavePasswordWithResult(service, input.Password, "tsdbadmin")
+	result, saveErr := common.SavePasswordWithResult(cfg, service, input.Password, "tsdbadmin")
 	passwordStorage := &result
 	if saveErr != nil {
 		logging.Debug("MCP: Password storage failed", zap.Error(saveErr))

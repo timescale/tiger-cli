@@ -36,12 +36,7 @@ func setupServiceTest(t *testing.T) string {
 	// Disable analytics for service tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 
-	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-
 	t.Cleanup(func() {
-		// Reset global config and viper first
-		config.ResetGlobalConfig()
 		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_ANALYTICS")
@@ -193,7 +188,7 @@ func TestOutputService_JSON(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test JSON output
-	err := outputService(cmd, service, "json", false, false)
+	err := outputService(cmd, testConfig(t), service, "json", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -262,7 +257,7 @@ func TestOutputService_YAML(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test YAML output
-	err := outputService(cmd, service, "yaml", false, false)
+	err := outputService(cmd, testConfig(t), service, "yaml", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -362,7 +357,7 @@ func TestOutputService_Table(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table", false, false)
+	err := outputService(cmd, testConfig(t), service, "table", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -447,7 +442,7 @@ func TestOutputService_FreeTier(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputService(cmd, service, "table", false, false)
+	err := outputService(cmd, testConfig(t), service, "table", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -492,7 +487,7 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	cmd.SetErr(buf)
 
 	// Prepare service for output without password
-	outputSvc := prepareServiceForOutput(service, false, cmd.ErrOrStderr())
+	outputSvc := prepareServiceForOutput(testConfig(t), service, false, cmd.ErrOrStderr())
 
 	// Verify that password is removed
 	if outputSvc.InitialPassword != nil {
@@ -536,7 +531,7 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	cmd.SetErr(buf)
 
 	// Prepare service for output with password
-	outputSvc := prepareServiceForOutput(service, true, cmd.ErrOrStderr())
+	outputSvc := prepareServiceForOutput(testConfig(t), service, true, cmd.ErrOrStderr())
 
 	// Verify that password is preserved
 	if outputSvc.InitialPassword != nil {

@@ -14,23 +14,21 @@ import (
 )
 
 // buildServiceMetricsAvailableSeriesCmd lists the metric series available for a service
-func buildServiceMetricsAvailableSeriesCmd() *cobra.Command {
-	var output string
+func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:     "available-series [service-id]",
-		Short:   "List available metric series",
-		Long:    `List the names of all metric series available for a service.`,
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: bindFlags("output"),
+		Use:   "available-series [service-id]",
+		Short: "List available metric series",
+		Long:  `List the names of all metric series available for a service.`,
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -40,7 +38,7 @@ func buildServiceMetricsAvailableSeriesCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServiceMetricsAvailableSeriesWithResponse(ctx, cfg.ProjectID, serviceID)
+			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to list metric series: %w", err)
 			}
@@ -70,6 +68,6 @@ func buildServiceMetricsAvailableSeriesCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	return cmd
 }

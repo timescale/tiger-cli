@@ -15,7 +15,7 @@ import (
 )
 
 // serviceCreateCmd represents the create command under service
-func buildServiceCreateCmd() *cobra.Command {
+func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	var createServiceName string
 	var createAddons []string
 	var createRegionCode string
@@ -27,7 +27,6 @@ func buildServiceCreateCmd() *cobra.Command {
 	var createNoSetDefault bool
 	var createWithPassword bool
 	var createEnvironment string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -82,7 +81,6 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
@@ -117,13 +115,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			cmd.SilenceUsage = true
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				return err
 			}
 
@@ -154,7 +151,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			} else {
 				fmt.Fprintf(statusOutput, "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
 			}
-			resp, err := cfg.Client.CreateServiceWithResponse(ctx, cfg.ProjectID, serviceCreateReq)
+			resp, err := client.CreateServiceWithResponse(ctx, projectID, serviceCreateReq)
 			if err != nil {
 				return fmt.Errorf("failed to create Service: %w", err)
 			}
@@ -175,11 +172,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(service, util.Deref(service.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cfg, service, util.Deref(service.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is specified
 			if !createNoSetDefault {
-				if err := setDefaultService(cfg.Config, serviceID, statusOutput); err != nil {
+				if err := setDefaultService(cfg, serviceID, statusOutput); err != nil {
 					// Log warning but don't fail the command
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
 				}
@@ -193,8 +190,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-					Client:    cfg.Client,
-					ProjectID: cfg.ProjectID,
+					Client:    client,
+					ProjectID: projectID,
 					ServiceID: serviceID,
 					Handler: &common.StatusWaitHandler{
 						TargetStatus: "READY",
@@ -211,7 +208,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 			}
 
-			if err := outputService(cmd, service, cfg.Output, createWithPassword, false); err != nil {
+			if err := outputService(cmd, cfg, service, cfg.Output, createWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -233,7 +230,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().DurationVar(&createWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }

@@ -43,7 +43,7 @@ func TestNewAPIClient_OAuthCredentials(t *testing.T) {
 
 	// Override the credential seam with an OAuth token.
 	original := GetStoredCredentials
-	GetStoredCredentials = func() (*config.Credentials, error) {
+	GetStoredCredentials = func(*config.Config) (*config.Credentials, error) {
 		return &config.Credentials{
 			OAuth:     &oauth2.Token{AccessToken: "test-access-token", Expiry: time.Now().Add(time.Hour)},
 			ProjectID: "proj-oauth-123",

@@ -32,7 +32,7 @@ func TestDBCreateRole_ReadReplicaRejected(t *testing.T) {
 		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceId: util.Ptr("svcprimary")},
 	}
 	orig := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return standby, nil
 	}
 	defer func() { getServiceDetailsFunc = orig }()

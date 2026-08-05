@@ -91,7 +91,7 @@ func TestOutputServices_JSON(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test JSON output
-	err := outputServices(cmd, services, "json")
+	err := outputServices(cmd, testConfig(t), services, "json")
 	if err != nil {
 		t.Fatalf("Failed to output JSON: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestOutputServices_YAML(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test YAML output
-	err := outputServices(cmd, services, "yaml")
+	err := outputServices(cmd, testConfig(t), services, "yaml")
 	if err != nil {
 		t.Fatalf("Failed to output YAML: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestOutputServices_Table(t *testing.T) {
 	cmd.SetOut(buf)
 
 	// Test table output
-	err := outputServices(cmd, services, "table")
+	err := outputServices(cmd, testConfig(t), services, "table")
 	if err != nil {
 		t.Fatalf("Failed to output table: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 	}
 
 	// Sanitize the services
-	sanitized := prepareServicesForOutput(services, nil)
+	sanitized := prepareServicesForOutput(testConfig(t), services, nil)
 
 	// Verify that we have the same number of services
 	if len(sanitized) != len(services) {

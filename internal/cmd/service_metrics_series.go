@@ -18,7 +18,7 @@ import (
 )
 
 // buildServiceMetricsSeriesCmd fetches time-series data for a named metric
-func buildServiceMetricsSeriesCmd() *cobra.Command {
+func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var metric string
 	var from string
 	var to string
@@ -26,7 +26,6 @@ func buildServiceMetricsSeriesCmd() *cobra.Command {
 	var filters []string
 	var bucketSeconds int
 	var fn string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "series [service-id]",
@@ -55,8 +54,7 @@ Examples:
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --filter ordinal=0`,
-		Args:    cobra.MaximumNArgs(1),
-		PreRunE: bindFlags("output"),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
@@ -72,13 +70,13 @@ Examples:
 				return err
 			}
 
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -105,7 +103,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServiceMetricsSeriesWithResponse(ctx, cfg.ProjectID, serviceID, body)
+			resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, serviceID, body)
 			if err != nil {
 				return fmt.Errorf("failed to fetch metric series: %w", err)
 			}
@@ -129,7 +127,7 @@ Examples:
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 
 	cmd.MarkFlagRequired("metric")
 	cmd.MarkFlagRequired("from")

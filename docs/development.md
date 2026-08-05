@@ -128,8 +128,16 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
   CLI commands (auth, service, db, config, mcp, version, upgrade). Each command
   lives in its own file, named to match the command in snake_case
   (`tiger service create` → `service_create.go`). `root.go` holds the root
-  command, global flags, and configuration initialization.
-- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+  command, global flags, and `wrapCommands`, which gives every command the same
+  per-invocation lifecycle: load config + API client once into a `common.App`,
+  initialize logging, apply color settings, check for a newer release, and track
+  analytics.
+- **App**: `internal/common/app.go` - per-invocation config and API client, built
+  once by `wrapCommands` (or per request by the MCP analytics middleware) and read
+  by commands, MCP tool handlers, and completion functions
+- **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
+  helpers. `config.Load(flags)` resolves values through a per-call viper
+  instance (flag > env > file > default); there is no global config state
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server

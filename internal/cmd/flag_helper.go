@@ -1,19 +1,16 @@
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// outputFlag implements the [github.com/spf13/pflag.Value] interface.
+// outputFlag implements the [github.com/spf13/pflag.Value] interface. These
+// types only validate the value at parse time — commands read the result from
+// cfg.Output — so they're registered with `new(outputFlag)` and no variable.
 type outputFlag string
 
 func (o *outputFlag) Set(val string) error {
-	if err := config.ValidateOutputFormat(val, false); err != nil {
+	if err := config.ValidateOutputFormat(val); err != nil {
 		return err
 	}
 	*o = outputFlag(val)
@@ -32,7 +29,7 @@ func (o *outputFlag) Type() string {
 type outputWithEnvFlag string
 
 func (o *outputWithEnvFlag) Set(val string) error {
-	if err := config.ValidateOutputFormat(val, true); err != nil {
+	if err := config.ValidateOutputFormat(val, "env"); err != nil {
 		return err
 	}
 	*o = outputWithEnvFlag(val)
@@ -47,18 +44,21 @@ func (o *outputWithEnvFlag) Type() string {
 	return "string"
 }
 
-type runE func(cmd *cobra.Command, args []string) error
+// outputWithBareFlag implements the [github.com/spf13/pflag.Value] interface.
+type outputWithBareFlag string
 
-var flagNameReplacer = strings.NewReplacer("-", "_")
-
-func bindFlags(flags ...string) runE {
-	return func(cmd *cobra.Command, args []string) error {
-		for _, flag := range flags {
-			key := flagNameReplacer.Replace(flag)
-			if err := viper.BindPFlag(key, cmd.Flags().Lookup(flag)); err != nil {
-				return fmt.Errorf("failed to bind %s flag: %w", flag, err)
-			}
-		}
-		return nil
+func (o *outputWithBareFlag) Set(val string) error {
+	if err := config.ValidateOutputFormat(val, "bare"); err != nil {
+		return err
 	}
+	*o = outputWithBareFlag(val)
+	return nil
+}
+
+func (o *outputWithBareFlag) String() string {
+	return string(*o)
+}
+
+func (o *outputWithBareFlag) Type() string {
+	return "string"
 }

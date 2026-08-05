@@ -13,12 +13,12 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // serviceListCmd represents the list command under service
-func buildServiceListCmd() *cobra.Command {
-	var output string
+func buildServiceListCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "list",
@@ -26,12 +26,10 @@ func buildServiceListCmd() *cobra.Command {
 		Long:              `List all database services in the current project.`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
@@ -40,7 +38,7 @@ func buildServiceListCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
+			resp, err := client.GetServicesWithResponse(ctx, projectID)
 			if err != nil {
 				return fmt.Errorf("failed to list services: %w", err)
 			}
@@ -70,18 +68,18 @@ func buildServiceListCmd() *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, services, cfg.Output)
+			return outputServices(cmd, cfg, services, cfg.Output)
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 
 	return cmd
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, services []api.Service, format string) error {
-	outputServices := prepareServicesForOutput(services, cmd.ErrOrStderr())
+func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Service, format string) error {
+	outputServices := prepareServicesForOutput(cfg, services, cmd.ErrOrStderr())
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -97,10 +95,10 @@ func outputServices(cmd *cobra.Command, services []api.Service, format string) e
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(services []api.Service, output io.Writer) []OutputService {
+func prepareServicesForOutput(cfg *config.Config, services []api.Service, output io.Writer) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(service, false, output)
+		prepared[i] = prepareServiceForOutput(cfg, service, false, output)
 	}
 	return prepared
 }

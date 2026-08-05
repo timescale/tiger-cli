@@ -76,14 +76,13 @@ Supports filtering by time (via since/until parameters) and node (for services w
 
 // handleServiceLogs handles the service_logs MCP tool
 func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest, input ServiceLogsInput) (*mcp.CallToolResult, ServiceLogsOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	client, projectID, err := s.app.GetClient()
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}
 
 	logging.Debug("MCP: Fetching service logs",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Intp("node", input.Node),
 		zap.Int("tail", input.Tail),
@@ -95,7 +94,15 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	logsCtx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	entries, err := common.FetchServiceLogs(logsCtx, cfg, input.ServiceID, input.Tail, input.Since, input.Until, input.Node)
+	entries, err := common.FetchServiceLogs(logsCtx, common.FetchServiceLogsArgs{
+		Client:    client,
+		ProjectID: projectID,
+		ServiceID: input.ServiceID,
+		Tail:      input.Tail,
+		Since:     input.Since,
+		Until:     input.Until,
+		Node:      input.Node,
+	})
 	if err != nil {
 		return nil, ServiceLogsOutput{}, err
 	}

@@ -19,8 +19,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildStatusCmd() *cobra.Command {
-	var output string
+func buildStatusCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "status",
@@ -28,12 +27,10 @@ func buildStatusCmd() *cobra.Command {
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, _, err := app.GetAll()
 			if err != nil {
 				if errors.Is(err, config.ErrNotLoggedIn) {
 					return common.ExitWithCode(common.ExitAuthenticationError, config.ErrNotLoggedIn)
@@ -45,7 +42,7 @@ func buildStatusCmd() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetAuthInfoWithResponse(ctx)
+			resp, err := client.GetAuthInfoWithResponse(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to get auth information: %w", err)
 			}
@@ -66,7 +63,7 @@ func buildStatusCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }

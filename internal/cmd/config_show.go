@@ -6,14 +6,13 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildConfigShowCmd() *cobra.Command {
-	var output string
+func buildConfigShowCmd(app *common.App) *cobra.Command {
 	var noDefaults bool
 	var withEnv bool
 
@@ -23,35 +22,15 @@ func buildConfigShowCmd() *cobra.Command {
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
-			configFile, err := cfg.EnsureConfigDir()
-			if err != nil {
-				return err
-			}
-
-			// a new viper, free from env and cli flags
-			v := viper.New()
-			v.SetConfigFile(configFile)
-			if withEnv {
-				config.ApplyEnvOverrides(v)
-			}
-			if !noDefaults {
-				config.ApplyDefaults(v)
-			}
-			if err := config.ReadInConfig(v); err != nil {
-				return err
-			}
-			config.MigrateVersionCheck(v)
-
-			cfgOut, err := config.ForOutputFromViper(v)
+			// Values are re-read free of env and CLI flags (unless --with-env
+			// is given), so `config show -o json` reports the configured
+			// `output` value rather than the flag's.
+			cfgOut, err := config.LoadForOutput(cfg.ConfigDir, withEnv, noDefaults)
 			if err != nil {
 				return err
 			}
@@ -72,7 +51,7 @@ func buildConfigShowCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
 	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
 

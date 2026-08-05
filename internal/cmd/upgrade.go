@@ -20,7 +20,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
@@ -45,7 +45,7 @@ func normalizeTag(v string) string {
 	return "v" + strings.TrimPrefix(v, "v")
 }
 
-func buildUpgradeCmd() *cobra.Command {
+func buildUpgradeCmd(app *common.App) *cobra.Command {
 	var force bool
 	var requestedVersion string
 
@@ -60,7 +60,7 @@ If Tiger CLI was installed via a package manager (Homebrew, apt, yum/dnf), the u
 		ValidArgsFunction: cobra.NoFileCompletions,
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUpgrade(cmd, requestedVersion, force)
+			return runUpgrade(cmd, app, requestedVersion, force)
 		},
 	}
 
@@ -76,11 +76,8 @@ If Tiger CLI was installed via a package manager (Homebrew, apt, yum/dnf), the u
 	return cmd
 }
 
-func runUpgrade(cmd *cobra.Command, requestedVersion string, force bool) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
+func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, force bool) error {
+	cfg := app.GetConfig()
 
 	ctx := cmd.Context()
 	releasesURL := strings.TrimRight(cfg.ReleasesURL, "/")

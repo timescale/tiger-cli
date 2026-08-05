@@ -10,6 +10,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -76,7 +77,7 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 }
 
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
-func (s *Server) convertToServiceDetail(service api.Service, withPassword bool) ServiceDetail {
+func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service, withPassword bool) ServiceDetail {
 	detail := ServiceDetail{
 		ServiceID: util.Deref(service.ServiceId),
 		Name:      util.Deref(service.Name),
@@ -149,7 +150,7 @@ func (s *Server) convertToServiceDetail(service api.Service, withPassword bool) 
 
 	// Always include connection string in ServiceDetail
 	// Password is embedded in connection string only if with_password=true
-	if details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+	if details, err := common.GetConnectionDetails(cfg, service, common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),

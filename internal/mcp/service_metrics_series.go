@@ -105,13 +105,13 @@ Available metrics include: CPU usage/allocation, memory usage/total, disk usage,
 
 // handleServiceMetricsSeries handles the service_metrics_series MCP tool
 func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallToolRequest, input ServiceMetricsSeriesInput) (*mcp.CallToolResult, any, error) {
-	cfg, err := common.LoadConfig(ctx)
+	client, projectID, err := s.app.GetClient()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	logging.Debug("MCP: Fetching metric series",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.String("metric", input.MetricName),
 		zap.String("from", input.From),
@@ -149,7 +149,7 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServiceMetricsSeriesWithResponse(ctx, cfg.ProjectID, input.ServiceID, body)
+	resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch metric series: %w", err)
 	}

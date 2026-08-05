@@ -67,19 +67,18 @@ func newServiceListTool() *mcp.Tool {
 
 // handleServiceList handles the service_list MCP tool
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	client, projectID, err := s.app.GetClient()
 	if err != nil {
 		return nil, ServiceListOutput{}, err
 	}
 
-	logging.Debug("MCP: Listing services", zap.String("project_id", cfg.ProjectID))
+	logging.Debug("MCP: Listing services", zap.String("project_id", projectID))
 
 	// Make API call to list services
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	resp, err := cfg.Client.GetServicesWithResponse(ctx, cfg.ProjectID)
+	resp, err := client.GetServicesWithResponse(ctx, projectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}

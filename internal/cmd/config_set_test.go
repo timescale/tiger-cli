@@ -39,7 +39,7 @@ func TestConfigSet_ValidValues(t *testing.T) {
 			}
 
 			// Verify the value was actually set
-			cfg, err := config.Load()
+			cfg, err := config.Load(nil)
 			if err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
@@ -191,7 +191,7 @@ func TestConfigSet_OutputDoesPersist(t *testing.T) {
 	}
 
 	// Also verify by loading config
-	cfg, err := config.Load()
+	cfg, err := config.Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}

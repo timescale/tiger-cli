@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildServiceUpdatePasswordCmd creates a new update-password command
-func buildServiceUpdatePasswordCmd() *cobra.Command {
+func buildServiceUpdatePasswordCmd(app *common.App) *cobra.Command {
 	var updatePasswordValue string
 	var autoGenerate bool
 
@@ -53,29 +53,30 @@ Examples:
   # Auto-generate a secure password
   tiger service update-password --auto-generate`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("new-password"),
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
 
-			// Get password from flag or environment variable via viper
-			password := viper.GetString("new_password")
+			// The password comes from the flag, falling back to the env var
+			password := updatePasswordValue
+			if password == "" {
+				password = os.Getenv("TIGER_NEW_PASSWORD")
+			}
 			if autoGenerate && password != "" {
 				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
@@ -86,7 +87,7 @@ Examples:
 			defer cancel()
 
 			// Fetch service details
-			serviceResp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
+			serviceResp, err := client.GetServiceWithResponse(ctx, projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
@@ -109,7 +110,7 @@ Examples:
 
 			if autoGenerate {
 				// Auto-generate password using existing function
-				if _, err := resetServicePassword(ctx, cfg.Client, service, "tsdbadmin", "", statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cfg, client, service, "tsdbadmin", "", statusOutput); err != nil {
 					return err
 				}
 			} else if password == "" {
@@ -119,8 +120,9 @@ Examples:
 				}
 				_, err := promptAndResetPassword(
 					ctx,
+					cfg,
 					statusOutput,
-					cfg.Client,
+					client,
 					service,
 					"tsdbadmin",
 				)
@@ -128,7 +130,7 @@ Examples:
 					return err
 				}
 			} else {
-				if _, err := resetServicePassword(ctx, cfg.Client, service, "tsdbadmin", password, statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cfg, client, service, "tsdbadmin", password, statusOutput); err != nil {
 					return err
 				}
 			}

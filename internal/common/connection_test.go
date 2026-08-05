@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
-
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -183,7 +181,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := GetConnectionDetails(tc.service, tc.opts)
+			result, err := GetConnectionDetails(testConfig(""), tc.service, tc.opts)
 
 			if tc.expectError {
 				if err == nil {
@@ -212,10 +210,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	// Use a unique service name for this test to avoid conflicts
 	config.SetTestServiceName(t)
 
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("keyring")
 
 	// Create a test service
 	serviceID := "test-password-service"
@@ -234,14 +229,14 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	// Store a test password in keyring
 	testPassword := "test-password-keyring-123"
 	role := "tsdbadmin"
-	storage := GetPasswordStorage()
+	storage := GetPasswordStorage(cfg)
 	err := storage.Save(service, testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
 	defer storage.Remove(service, role) // Clean up after test
 
-	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -264,10 +259,7 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
-	// Set pgpass as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "pgpass")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("pgpass")
 
 	// Create a test service with endpoint information (required for pgpass)
 	serviceID := "test-pgpass-service"
@@ -286,14 +278,14 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	// Store a test password in pgpass
 	testPassword := "test-password-pgpass-456"
 	role := "tsdbadmin"
-	storage := GetPasswordStorage()
+	storage := GetPasswordStorage(cfg)
 	err := storage.Save(service, testPassword, role)
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
 	defer storage.Remove(service, role) // Clean up after test
 
-	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -340,9 +332,7 @@ func TestConnectionDetailsString_EncodesSpecialCharPassword(t *testing.T) {
 
 func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	// Set no storage as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "none")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("none")
 
 	// Create a test service
 	serviceID := "test-nostorage-service"
@@ -358,7 +348,7 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 		},
 	}
 
-	result, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -381,10 +371,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	// Use a unique service name for this test to avoid conflicts
 	config.SetTestServiceName(t)
 
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("keyring")
 
 	// Create a test service (but don't store any password for it)
 	serviceID := "test-nopassword-service"
@@ -400,7 +387,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 		},
 	}
 
-	result, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	result, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -422,9 +409,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
 	config.SetTestServiceName(t)
 
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("keyring")
 
 	serviceID := "test-readonly-service"
 	projectID := "test-readonly-project"
@@ -441,13 +426,13 @@ func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
 
 	testPassword := "test-password-readonly-789"
 	role := "tsdbadmin"
-	storage := GetPasswordStorage()
+	storage := GetPasswordStorage(cfg)
 	if err := storage.Save(service, testPassword, role); err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
 	}
 	defer storage.Remove(service, role)
 
-	details, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         role,
 		WithPassword: true,
 		ReadOnly:     true,
@@ -469,10 +454,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	// Use a unique service name for this test to avoid conflicts
 	config.SetTestServiceName(t)
 
-	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	cfg := testConfig("keyring")
 
 	// Create a test service without endpoint (invalid)
 	serviceID := "test-invalid-service"
@@ -483,7 +465,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 		Endpoint:  nil, // Invalid - no endpoint
 	}
 
-	_, err := GetConnectionDetails(service, ConnectionDetailsOptions{
+	_, err := GetConnectionDetails(cfg, service, ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -524,7 +506,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"})
+		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -552,7 +534,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			},
 		}
 
-		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -570,7 +552,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -584,7 +566,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 
 	t.Run("error when endpoint missing", func(t *testing.T) {
 		conn := api.Service{ServiceId: util.Ptr("rep-1")}
-		if _, err := GetConnectionDetailsFor(conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
+		if _, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
 			t.Fatal("expected error for missing connection endpoint")
 		}
 	})

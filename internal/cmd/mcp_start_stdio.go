@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 // buildMCPStdioCmd creates the stdio subcommand
-func buildMCPStdioCmd() *cobra.Command {
+func buildMCPStdioCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stdio",
 		Short: "Start MCP server with stdio transport",
@@ -18,7 +20,7 @@ Examples:
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context())
+			return startStdioServer(cmd.Context(), app)
 		},
 	}
 }

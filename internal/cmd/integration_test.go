@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
@@ -34,13 +32,6 @@ func setupIntegrationTest(t *testing.T) string {
 	// Disable analytics for integration tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 
-	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-
-	// Re-establish viper environment configuration after reset
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
-
 	// Set API URL in temporary config if integration URL is provided
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
@@ -56,8 +47,6 @@ func setupIntegrationTest(t *testing.T) string {
 	}
 
 	t.Cleanup(func() {
-		// Reset global config and viper first
-		config.ResetGlobalConfig()
 		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_ANALYTICS")
@@ -70,14 +59,6 @@ func setupIntegrationTest(t *testing.T) string {
 
 // executeIntegrationCommand executes a CLI command for integration testing
 func executeIntegrationCommand(ctx context.Context, args ...string) (string, error) {
-	// Reset both global config and viper before each command execution
-	// This ensures fresh config loading with proper flag precedence
-	config.ResetGlobalConfig()
-
-	// Re-establish viper environment configuration after reset
-	viper.SetEnvPrefix("TIGER")
-	viper.AutomaticEnv()
-
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot, err := buildRootCmd(ctx)
 	if err != nil {

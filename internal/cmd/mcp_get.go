@@ -11,14 +11,13 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/mcp"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildMCPGetCmd creates the get subcommand for displaying detailed info on a specific MCP capability
-func buildMCPGetCmd() *cobra.Command {
-	var outputFormat string
+func buildMCPGetCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "get <name>",
@@ -39,21 +38,16 @@ Examples:
   # Get details as YAML
   tiger mcp get service_create -o yaml`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: mcpGetCompletion,
-		PreRunE:           bindFlags("output"),
+		ValidArgsFunction: mcpGetCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			capabilityName := args[0]
 
 			cmd.SilenceUsage = true
 
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), cfg)
+			server, err := mcp.NewServer(cmd.Context(), app)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}
@@ -100,7 +94,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }

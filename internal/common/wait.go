@@ -30,7 +30,7 @@ type WaitHandler interface {
 }
 
 type WaitForServiceArgs struct {
-	Client     *api.ClientWithResponses
+	Client     api.ClientWithResponsesInterface
 	ProjectID  string
 	ServiceID  string
 	Handler    WaitHandler

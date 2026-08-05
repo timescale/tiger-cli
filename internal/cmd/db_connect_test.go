@@ -12,7 +12,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -307,7 +306,8 @@ func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	cmd.SetErr(io.Discard)
 
 	target := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
-	details, err := selectConnection(context.Background(), cmd, client, "proj-1", target,
+	app := newTestApp(t, client, "proj-1")
+	details, err := selectConnection(context.Background(), cmd, app, target,
 		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -395,7 +395,7 @@ func TestLaunchPsqlWithConnectionString(t *testing.T) {
 	}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(connectionDetails, psqlPath, []string{}, service, cmd)
+	err := launchPsql(testConfig(t), connectionDetails, psqlPath, []string{}, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -432,7 +432,7 @@ func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
 	}
 
 	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(connectionDetails, psqlPath, additionalFlags, service, cmd)
+	err := launchPsql(testConfig(t), connectionDetails, psqlPath, additionalFlags, service, cmd)
 
 	// Should fail with exec error since fake psql path doesn't exist
 	if err == nil {
@@ -451,9 +451,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	config.SetTestServiceName(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Create a test service
 	serviceID := "test-psql-service"
@@ -465,7 +463,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 	// Store a test password in keyring
 	testPassword := "test-password-12345"
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -487,7 +485,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, additionalFlags, service, testCmd)
+	psqlCmd := buildPsqlCommand(testConfig(t), connectionDetails, psqlPath, additionalFlags, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")
@@ -510,9 +508,7 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 
 func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	// Set pgpass as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "pgpass")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "pgpass")
 
 	// Create a test service
 	serviceID := "test-service-id"
@@ -536,7 +532,7 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	testCmd := &cobra.Command{}
 
 	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(connectionDetails, psqlPath, []string{}, service, testCmd)
+	psqlCmd := buildPsqlCommand(testConfig(t), connectionDetails, psqlPath, []string{}, service, testCmd)
 
 	if psqlCmd == nil {
 		t.Fatal("buildPsqlCommand returned nil")

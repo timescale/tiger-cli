@@ -96,7 +96,7 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 func NewTigerClientForCredentials(cfg *config.Config, creds *config.Credentials) (*ClientWithResponses, error) {
 	if creds.OAuth != nil {
 		persist := func(t *oauth2.Token) error {
-			return config.StoreOAuthCredentials(t, creds.ProjectID)
+			return cfg.StoreOAuthCredentials(t, creds.ProjectID)
 		}
 		return NewTigerClientWithToken(cfg, creds.OAuth, persist)
 	}

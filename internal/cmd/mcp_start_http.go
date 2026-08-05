@@ -9,13 +9,13 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
 // buildMCPHTTPCmd creates the http subcommand with port/host flags
-func buildMCPHTTPCmd() *cobra.Command {
+func buildMCPHTTPCmd(app *common.App) *cobra.Command {
 	var httpPort int
 	var httpHost string
 
@@ -42,7 +42,7 @@ Examples:
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			return startHTTPServer(cmd.Context(), httpHost, httpPort)
+			return startHTTPServer(cmd.Context(), app, httpHost, httpPort)
 		},
 	}
 
@@ -54,16 +54,11 @@ Examples:
 }
 
 // startHTTPServer starts the MCP server with HTTP transport
-func startHTTPServer(ctx context.Context, host string, port int) error {
+func startHTTPServer(ctx context.Context, app *common.App, host string, port int) error {
 	logging.Info("Starting Tiger MCP server", zap.String("transport", "http"))
 
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, cfg)
+	server, err := mcp.NewServer(ctx, app)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}

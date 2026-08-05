@@ -7,8 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // setupMCPTest sets up a test environment for MCP command tests.
@@ -31,12 +29,7 @@ func setupMCPTest(t *testing.T) (*cobra.Command, string) {
 	// Disable analytics for tests
 	os.Setenv("TIGER_ANALYTICS", "false")
 
-	// Reset global config and viper to ensure test isolation
-	config.ResetGlobalConfig()
-
 	t.Cleanup(func() {
-		// Reset global config and viper first
-		config.ResetGlobalConfig()
 		// Clean up environment variables BEFORE cleaning up file system
 		os.Unsetenv("TIGER_CONFIG_DIR")
 		os.Unsetenv("TIGER_ANALYTICS")
