@@ -1014,11 +1014,22 @@ Ctrl-C unblocks a waiting prompt instead of hanging until the user hits enter.
 `ReadPassword` also saves and restores the terminal state, so a cancelled prompt
 doesn't leave the shell in raw mode.
 
-Gate an interactive prompt on `util.IsTerminal(cmd.InOrStdin())` and return an
-error naming the non-interactive alternative when it's false — see
-`service update-password` ("use --new-password flag, --auto-generate flag, or
-TIGER_NEW_PASSWORD environment variable"). `util.IsTerminal` takes `any` so it
-works for both readers and writers.
+**Every read that prompts the user in real time must be gated on
+`util.IsTerminal(cmd.InOrStdin())`**, and must return an error naming the
+non-interactive alternative when it's false — see `service update-password`
+("use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD
+environment variable") and `service delete` ("use --confirm to skip the
+prompt"). That covers confirmations, password prompts, and every BubbleTea menu
+(see "Interactive Terminal UIs"). Ungated, they fail on an unhelpful EOF, or
+block forever, when the command runs in CI or with stdin redirected.
+
+The gate is about *prompts*, not about reading stdin as such. A read whose whole
+point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
+gated, since a TTY is exactly what it doesn't expect.
+
+Put the gate immediately before the prompt in the command body rather than
+inside the shared helper, so the error can name the flag or env var that command
+offers. `util.IsTerminal` takes `any`, so it works for both readers and writers.
 
 `util.IsTerminal` and `util.ReadPassword` are `var`s so tests can replace them:
 `stubIsTerminal(t, true)` and `stubReadPassword(t, "pw")` in `main_test.go` do
