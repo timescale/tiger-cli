@@ -486,8 +486,10 @@ or above; a `Debug` call would silently go nowhere. Attach errors with
 
 Because every statement is visible by default, keep them sparse: log failures
 that would otherwise be swallowed (the docs-proxy registration errors are the
-model), not per-step tracing of work that succeeded. Startup registration emits
-nothing — `tiger mcp start` should be silent until something goes wrong.
+model), not per-step tracing of work that succeeded. A default `tiger mcp start`
+is silent; the startup lines that do exist report configuration that removes
+capabilities — the docs proxy being disabled, and each write tool skipped in
+read-only mode — so a client can see why a tool it expected is missing.
 
 Everything outside `internal/mcp` writes to stdout/stderr directly rather than
 logging. Don't add log statements to CLI commands — print to

@@ -55,6 +55,7 @@ type Server struct {
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
 func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	if readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
+		s.logger.Info("Skipping write tool in read-only mode", slog.String("tool", t.Name))
 		return
 	}
 	mcp.AddTool(s.mcpServer, t, h)
