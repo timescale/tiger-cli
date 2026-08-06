@@ -1048,7 +1048,7 @@ if len(args) < 1 {
 
 // Interactive confirmation unless --confirm
 if !confirmFlag {
-    fmt.Fprintf(cmd.ErrOrStderr(), "Type the service ID '%s' to confirm: ", serviceID)
+    cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
     var confirmation string
     fmt.Scanln(&confirmation)
     if confirmation != serviceID {
