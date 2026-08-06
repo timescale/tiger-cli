@@ -1026,6 +1026,33 @@ this with `t.Cleanup`. `ReadPassword` needs stdin to be a real `*os.File`, so a
 password prompt can't be driven with `cmd.SetIn`; `ReadLine`/`ReadAll` take any
 `io.Reader` and work fine with it.
 
+### Interactive Terminal UIs
+
+Interactive menus use BubbleTea (`github.com/charmbracelet/bubbletea`). When
+creating a `tea.NewProgram`, always pass both streams:
+
+```go
+program := tea.NewProgram(model,
+    tea.WithInput(cmd.InOrStdin()),
+    tea.WithOutput(cmd.ErrOrStderr()))
+```
+
+`tea.WithInput` is easy to forget and there is no compile error if you do:
+BubbleTea silently defaults to `os.Stdin`, so the program reads real stdin no
+matter what the command was given. Pass it even when the model looks write-only.
+The one deliberate exception is `common.NewSpinner`, which passes
+`tea.WithInput(nil)` because it never reads keys.
+
+Output goes to **stderr** — a menu is interactive UI, not the command's result
+(see "Output Streams").
+
+Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin())` and return an
+error naming the non-interactive alternative when it's false. Without the gate
+the program fails deep inside BubbleTea with an opaque error, or blocks.
+
+Because these helpers need both streams, they take the `*cobra.Command` rather
+than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`.
+
 ### Boolean Flag Patterns
 
 When implementing boolean flags that can be enabled or disabled, follow the GitHub CLI pattern:
@@ -1076,8 +1103,10 @@ if len(args) < 1 {
 // Interactive confirmation unless --confirm
 if !confirmFlag {
     cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
-    var confirmation string
-    fmt.Scanln(&confirmation)
+    confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
+    if err != nil {
+        return fmt.Errorf("failed to read confirmation: %w", err)
+    }
     if confirmation != serviceID {
         return fmt.Errorf("confirmation did not match")
     }

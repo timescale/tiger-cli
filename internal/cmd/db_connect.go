@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -193,7 +192,7 @@ func selectConnection(
 			// Don't block the connection if we can't list replicas.
 			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
 		} else if connectable := connectableReplicas(replicas); len(connectable) > 0 {
-			choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
+			choice, err := selectConnectTargetOption(cmd, primary, connectable)
 			if err != nil {
 				return nil, err
 			}
@@ -348,10 +347,10 @@ func (m connectTargetModel) View() string {
 
 // selectConnectTargetOption shows the interactive menu for choosing a
 // connection target.
-func selectConnectTargetOption(out io.Writer, primary api.Service, replicas []api.ReadReplicaSet) (connectTargetChoice, error) {
+func selectConnectTargetOption(cmd *cobra.Command, primary api.Service, replicas []api.ReadReplicaSet) (connectTargetChoice, error) {
 	model := newConnectTargetModel(primary, replicas)
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
 	finalModel, err := program.Run()
 	if err != nil {
 		return connectTargetChoice{kind: targetCancel}, fmt.Errorf("failed to run connect menu: %w", err)
@@ -407,7 +406,7 @@ func connectWithPasswordMenu(
 	// Only allow password reset for admin role
 	canResetPassword := details.Role == "tsdbadmin"
 	for {
-		option, err := selectPasswordRecoveryOption(cmd.ErrOrStderr(), canResetPassword)
+		option, err := selectPasswordRecoveryOption(cmd, canResetPassword)
 		if err != nil {
 			return err
 		}
@@ -581,10 +580,10 @@ func (m passwordRecoveryModel) View() string {
 
 // selectPasswordRecoveryOption shows the interactive menu for password recovery
 // canResetPassword controls whether the "Update/reset password" option is shown
-func selectPasswordRecoveryOption(out io.Writer, canResetPassword bool) (passwordRecoveryOption, error) {
+func selectPasswordRecoveryOption(cmd *cobra.Command, canResetPassword bool) (passwordRecoveryOption, error) {
 	model := newPasswordRecoveryModel(canResetPassword)
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
 	finalModel, err := program.Run()
 	if err != nil {
 		return optionExit, fmt.Errorf("failed to run password recovery menu: %w", err)

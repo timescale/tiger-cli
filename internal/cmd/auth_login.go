@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -103,7 +102,7 @@ Examples:
 					authURL:    cfg.ConsoleURL + "/oauth/authorize",
 					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
 					successURL: cfg.ConsoleURL + "/oauth/code/success",
-					out:        cmd.ErrOrStderr(),
+					cmd:        cmd,
 				}
 
 				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
@@ -206,7 +205,7 @@ type oauthLogin struct {
 	authURL    string
 	tokenURL   string
 	successURL string
-	out        io.Writer
+	cmd        *cobra.Command
 }
 
 func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
@@ -245,15 +244,15 @@ func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 	}
 	defer func() {
 		if err := server.server.Shutdown(ctx); err != nil {
-			fmt.Fprintf(l.out, "Failed to close local server: %s\n", err)
+			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
 		}
 	}()
 
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
-	fmt.Fprintf(l.out, "Auth URL is: %s\n", authURL)
-	fmt.Fprintln(l.out, "Opening browser for authentication...")
+	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
+	l.cmd.PrintErrln("Opening browser for authentication...")
 	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(l.out, "Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
+		l.cmd.PrintErrf("Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
 	}
 
 	select {
@@ -421,18 +420,21 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	case 1:
 		return projects[0].Id, nil
 	default:
-		return selectProjectInteractively(projects, l.out)
+		if !util.IsTerminal(l.cmd.InOrStdin()) {
+			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
+		}
+		return selectProjectInteractively(l.cmd, projects)
 	}
 }
 
 // selectProjectInteractivelyImpl is the default implementation for project selection using Bubble Tea
-func selectProjectInteractivelyImpl(projects []api.Project, out io.Writer) (string, error) {
+func selectProjectInteractivelyImpl(cmd *cobra.Command, projects []api.Project) (string, error) {
 	model := projectSelectModel{
 		projects: projects,
 		cursor:   0,
 	}
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
 	finalModel, err := program.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed to run project selection: %w", err)
