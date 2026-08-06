@@ -48,6 +48,12 @@ tiger auth login
 	// executes — so handlers can use cmd.Context() for cancellation.
 	cmd.SetContext(ctx)
 
+	// Wire up the output streams explicitly. Cobra's cmd.Print* helpers write to
+	// OutOrStderr(), which falls back to stderr when no out writer is set, so
+	// without this every cmd.Printf would land on stderr.
+	cmd.SetOut(os.Stdout)
+	cmd.SetErr(os.Stderr)
+
 	// Add persistent flags. Values are read back from the config (see
 	// flagBindings in internal/config) rather than from the flag variables, so
 	// only --skip-update-check — which isn't a config value — is captured here.
@@ -172,8 +178,7 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 			return
 		}
 
-		output := cmd.ErrOrStderr()
-		version.PrintUpdateWarning(res.result, cfg, &output)
+		version.PrintUpdateWarning(res.result, cfg, cmd.ErrOrStderr())
 	}
 }
 

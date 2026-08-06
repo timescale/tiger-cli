@@ -53,9 +53,10 @@ Examples:
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
 			cfg, _, _, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
@@ -94,6 +95,9 @@ Examples:
 
 // testDatabaseConnection tests the database connection and returns appropriate exit codes
 func testDatabaseConnection(ctx context.Context, connectionString string, timeout time.Duration, cmd *cobra.Command) error {
+	// Every failure below is reported here, so don't let cobra print it again.
+	cmd.SilenceErrors = true
+
 	// Create context with timeout if specified
 	var cancel context.CancelFunc
 	if timeout > 0 {
@@ -107,17 +111,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
+			cmd.PrintErrf("Connection timeout after %v\n", timeout)
 			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
+			cmd.PrintErrf("Connection rejected: %v\n", err)
 			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
-		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
+		cmd.PrintErrf("Connection failed: %v\n", err)
 		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 	defer conn.Close(ctx)
@@ -127,22 +131,22 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 	if err != nil {
 		// Determine the appropriate exit code based on error type
 		if isContextDeadlineExceeded(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection timeout after %v\n", timeout)
+			cmd.PrintErrf("Connection timeout after %v\n", timeout)
 			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
 
 		// Check if it's a connection rejection vs unreachable
 		if isConnectionRejected(err) {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Connection rejected: %v\n", err)
+			cmd.PrintErrf("Connection rejected: %v\n", err)
 			return common.ExitWithCode(common.ExitGeneralError, err) // Server is rejecting connections
 		}
 
-		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed: %v\n", err)
+		cmd.PrintErrf("Connection failed: %v\n", err)
 		return common.ExitWithCode(2, err) // No response to connection attempt
 	}
 
 	// Connection successful
-	fmt.Fprintf(cmd.OutOrStdout(), "Connection successful\n")
+	cmd.Printf("Connection successful\n")
 	return nil // Server is accepting connections normally
 }
 

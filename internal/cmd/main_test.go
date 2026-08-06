@@ -2,15 +2,27 @@ package cmd
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
+
+// discardCmd returns a bare command whose output streams are discarded, for
+// tests that call a helper taking a *cobra.Command without caring what it
+// prints.
+func discardCmd() *cobra.Command {
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	return cmd
+}
 
 func TestMain(m *testing.M) {
 	// Clean up any global state before tests

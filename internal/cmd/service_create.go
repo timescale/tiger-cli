@@ -144,12 +144,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			defer cancel()
 
 			// All status messages go to stderr
-			statusOutput := cmd.ErrOrStderr()
-
 			if cmd.Flags().Changed("name") {
-				fmt.Fprintf(statusOutput, "🚀 Creating service '%s'...\n", createServiceName)
+				cmd.PrintErrf("🚀 Creating service '%s'...\n", createServiceName)
 			} else {
-				fmt.Fprintf(statusOutput, "🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
+				cmd.PrintErrf("🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
 			}
 			resp, err := client.CreateServiceWithResponse(ctx, projectID, serviceCreateReq)
 			if err != nil {
@@ -167,28 +165,28 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			service := *resp.JSON202
 			serviceID := util.Deref(service.ServiceId)
 
-			fmt.Fprintf(statusOutput, "✅ Service creation request accepted!\n")
-			fmt.Fprintf(statusOutput, "📋 Service ID: %s\n", serviceID)
+			cmd.PrintErrf("✅ Service creation request accepted!\n")
+			cmd.PrintErrf("📋 Service ID: %s\n", serviceID)
 
 			// Save password immediately after service creation, before any waiting
 			// This ensures users have access even if they interrupt the wait or it fails
-			passwordSaved := handlePasswordSaving(cfg, service, util.Deref(service.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cmd, cfg, service, util.Deref(service.InitialPassword))
 
 			// Set as default service unless --no-set-default is specified
 			if !createNoSetDefault {
-				if err := setDefaultService(cfg, serviceID, statusOutput); err != nil {
+				if err := setDefaultService(cmd, cfg, serviceID); err != nil {
 					// Log warning but don't fail the command
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+					cmd.PrintErrf("⚠️  Warning: Failed to set service as default: %v\n", err)
 				}
 			}
 
 			// Handle wait behavior
 			var waitErr error
 			if createNoWait {
-				fmt.Fprintf(statusOutput, "⏳ Service is being created. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("⏳ Service is being created. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
-				fmt.Fprintf(statusOutput, "⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
+				cmd.PrintErrf("⏳ Waiting for service to be ready (wait timeout: %v)...\n", createWaitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 					Client:    client,
 					ProjectID: projectID,
@@ -197,19 +195,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 						TargetStatus: "READY",
 						Service:      &service,
 					},
-					Output:     statusOutput,
+					Output:     cmd.ErrOrStderr(),
 					Timeout:    createWaitTimeout,
 					TimeoutMsg: "service may still be provisioning",
 				}); waitErr != nil {
-					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
+					cmd.PrintErrf("❌ Error: %s\n", waitErr)
 				} else {
-					fmt.Fprintf(statusOutput, "🎉 Service is ready and running!\n")
-					printConnectMessage(statusOutput, passwordSaved, createNoSetDefault, serviceID)
+					cmd.PrintErrf("🎉 Service is ready and running!\n")
+					printConnectMessage(cmd, passwordSaved, createNoSetDefault, serviceID)
 				}
 			}
 
 			if err := outputService(cmd, cfg, service, cfg.Output, createWithPassword, false); err != nil {
-				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+				cmd.PrintErrf("⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
 			// Return error for sake of exit code, but silence it since it was already output above

@@ -81,7 +81,7 @@ Examples:
 				clientName = args[0]
 			}
 
-			return installTigerMCPForClient(clientName, !noBackup, configPath)
+			return installTigerMCPForClient(cmd, clientName, !noBackup, configPath)
 		},
 	}
 
@@ -345,7 +345,7 @@ func InstallMCPForClient(opts InstallOptions) error {
 
 // installTigerMCPForClient installs the Tiger MCP server configuration for the specified client.
 // This is the Tiger-specific wrapper used by the CLI that handles defaults and success messages.
-func installTigerMCPForClient(clientName string, createBackup bool, customConfigPath string) error {
+func installTigerMCPForClient(cmd *cobra.Command, clientName string, createBackup bool, customConfigPath string) error {
 	// Get the Tiger executable path
 	command, err := getTigerExecutablePath()
 	if err != nil {
@@ -374,33 +374,33 @@ func installTigerMCPForClient(clientName string, createBackup bool, customConfig
 		}
 	}
 
-	fmt.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", clientName)
+	cmd.Printf("✅ Successfully installed Tiger MCP server configuration for %s\n", clientName)
 	if configPath != "" {
-		fmt.Printf("📁 Configuration file: %s\n", configPath)
+		cmd.Printf("📁 Configuration file: %s\n", configPath)
 	} else {
-		fmt.Printf("⚙️  Configuration managed by %s\n", clientName)
+		cmd.Printf("⚙️  Configuration managed by %s\n", clientName)
 	}
 
-	fmt.Printf("\n💡 Next steps:\n")
-	fmt.Printf("   1. Restart %s to load the new configuration\n", clientName)
-	fmt.Printf("   2. The Tiger MCP server will be available as '%s'\n", mcp.ServerName)
-	fmt.Printf("\n🤖 Try asking your AI assistant:\n")
-	fmt.Printf("\n   📊 List and manage your Tiger Cloud services:\n")
-	fmt.Printf("   • \"List my Tiger Cloud services\"\n")
-	fmt.Printf("   • \"Show me details for service xyz-123\"\n")
-	fmt.Printf("   • \"Create a new database service called my-app-db\"\n")
-	fmt.Printf("   • \"Update the password for my database service\"\n")
-	fmt.Printf("   • \"What Tiger Cloud services do I have access to?\"\n")
-	fmt.Printf("\n   📚 Ask questions from the PostgreSQL and Tiger Cloud documentation:\n")
-	fmt.Printf("   • \"Show me Tiger Cloud documentation about hypertables?\"\n")
-	fmt.Printf("   • \"What are the best practices for PostgreSQL indexing?\"\n")
-	fmt.Printf("   • \"What is the command for renaming a table?\"\n")
-	fmt.Printf("   • \"Help me optimize my PostgreSQL queries\"\n")
-	fmt.Printf("\n   📋 Make use of our optimized AI guides for common workflows:\n")
-	fmt.Printf("   • \"Help me create a new database schema for my application\"\n")
-	fmt.Printf("   • \"Help me set up hypertables for the device_readings table\"\n")
-	fmt.Printf("   • \"Help me figure out which tables should be hypertables\"\n")
-	fmt.Printf("   • \"What's the best way to structure time-series data?\"\n")
+	cmd.Printf("\n💡 Next steps:\n")
+	cmd.Printf("   1. Restart %s to load the new configuration\n", clientName)
+	cmd.Printf("   2. The Tiger MCP server will be available as '%s'\n", mcp.ServerName)
+	cmd.Printf("\n🤖 Try asking your AI assistant:\n")
+	cmd.Printf("\n   📊 List and manage your Tiger Cloud services:\n")
+	cmd.Printf("   • \"List my Tiger Cloud services\"\n")
+	cmd.Printf("   • \"Show me details for service xyz-123\"\n")
+	cmd.Printf("   • \"Create a new database service called my-app-db\"\n")
+	cmd.Printf("   • \"Update the password for my database service\"\n")
+	cmd.Printf("   • \"What Tiger Cloud services do I have access to?\"\n")
+	cmd.Printf("\n   📚 Ask questions from the PostgreSQL and Tiger Cloud documentation:\n")
+	cmd.Printf("   • \"Show me Tiger Cloud documentation about hypertables?\"\n")
+	cmd.Printf("   • \"What are the best practices for PostgreSQL indexing?\"\n")
+	cmd.Printf("   • \"What is the command for renaming a table?\"\n")
+	cmd.Printf("   • \"Help me optimize my PostgreSQL queries\"\n")
+	cmd.Printf("\n   📋 Make use of our optimized AI guides for common workflows:\n")
+	cmd.Printf("   • \"Help me create a new database schema for my application\"\n")
+	cmd.Printf("   • \"Help me set up hypertables for the device_readings table\"\n")
+	cmd.Printf("   • \"Help me figure out which tables should be hypertables\"\n")
+	cmd.Printf("   • \"What's the best way to structure time-series data?\"\n")
 
 	return nil
 }

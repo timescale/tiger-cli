@@ -105,7 +105,7 @@ Examples:
 					authURL:    cfg.ConsoleURL + "/oauth/authorize",
 					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
 					successURL: cfg.ConsoleURL + "/oauth/code/success",
-					out:        cmd.OutOrStdout(),
+					out:        cmd.ErrOrStderr(),
 				}
 
 				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
@@ -124,7 +124,7 @@ Examples:
 				finishLogin(cmd, projectID)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
-				creds, err = promptForCredentials(cmd.Context(), cfg.ConsoleURL, creds)
+				creds, err = promptForCredentials(cmd, cfg.ConsoleURL, creds)
 				if err != nil {
 					return fmt.Errorf("failed to get credentials: %w", err)
 				}
@@ -139,7 +139,7 @@ Examples:
 				return fmt.Errorf("failed to create client: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), "Validating API key...")
+			cmd.PrintErrln("Validating API key...")
 			authInfo, err := validateAPIKey(cmd.Context(), cfg, client)
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
@@ -162,8 +162,8 @@ Examples:
 }
 
 func finishLogin(cmd *cobra.Command, projectID string) {
-	fmt.Fprintf(cmd.OutOrStdout(), "Successfully logged in (project: %s)\n", projectID)
-	fmt.Fprint(cmd.OutOrStdout(), nextStepsMessage)
+	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
+	cmd.Print(nextStepsMessage)
 }
 
 func flagOrEnvVar(flagVal, envVarName string) string {
@@ -173,17 +173,18 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 	return os.Getenv(envVarName)
 }
 
-func promptForCredentials(ctx context.Context, consoleURL string, creds credentials) (credentials, error) {
+func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
 	if !util.IsTerminal(os.Stdin) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
 	}
 
-	fmt.Printf("You can find your API credentials at: %s/dashboard/settings\n\n", consoleURL)
+	ctx := cmd.Context()
+	cmd.PrintErrf("You can find your API credentials at: %s/dashboard/settings\n\n", consoleURL)
 
 	reader := bufio.NewReader(os.Stdin)
 
 	if creds.publicKey == "" {
-		fmt.Print("Enter your public key: ")
+		cmd.PrintErr("Enter your public key: ")
 		publicKey, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
 		if err != nil {
 			return credentials{}, err
@@ -192,7 +193,7 @@ func promptForCredentials(ctx context.Context, consoleURL string, creds credenti
 	}
 
 	if creds.secretKey == "" {
-		fmt.Print("Enter your secret key: ")
+		cmd.PrintErr("Enter your secret key: ")
 		password, err := readString(ctx, func() (string, error) {
 			val, err := term.ReadPassword(int(os.Stdin.Fd()))
 			return string(val), err
@@ -200,7 +201,7 @@ func promptForCredentials(ctx context.Context, consoleURL string, creds credenti
 		if err != nil {
 			return credentials{}, err
 		}
-		fmt.Println()
+		cmd.PrintErrln()
 		creds.secretKey = password
 	}
 

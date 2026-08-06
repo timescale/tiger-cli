@@ -52,8 +52,8 @@ func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 			}
 
 			series := *resp.JSON200
-			out := cmd.OutOrStdout()
 
+			out := cmd.OutOrStdout()
 			switch strings.ToLower(cfg.Output) {
 			case "json":
 				return util.SerializeToJSON(out, series)
@@ -61,7 +61,7 @@ func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 				return util.SerializeToYAML(out, series)
 			default:
 				for _, s := range series {
-					fmt.Fprintln(out, s)
+					cmd.Println(s)
 				}
 			}
 			return nil

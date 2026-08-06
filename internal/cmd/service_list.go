@@ -43,8 +43,6 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to list services: %w", err)
 			}
 
-			statusOutput := cmd.ErrOrStderr()
-
 			// Handle API response
 			if resp.StatusCode() != http.StatusOK {
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
@@ -56,14 +54,14 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			services := *resp.JSON200
 
 			if len(services) == 0 {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				cmd.PrintErrln("🏜️  No services found! Your project is looking a bit empty.")
+				cmd.PrintErrln("🚀 Ready to get started? Create your first service with: tiger service create")
 				return nil
 			}
 
 			if resp.JSON200 == nil {
-				fmt.Fprintln(statusOutput, "🏜️  No services found! Your project is looking a bit empty.")
-				fmt.Fprintln(statusOutput, "🚀 Ready to get started? Create your first service with: tiger service create")
+				cmd.PrintErrln("🏜️  No services found! Your project is looking a bit empty.")
+				cmd.PrintErrln("🚀 Ready to get started? Create your first service with: tiger service create")
 				return nil
 			}
 
@@ -79,7 +77,8 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 
 // outputServices formats and outputs the services list based on the specified format
 func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Service, format string) error {
-	outputServices := prepareServicesForOutput(cfg, services, cmd.ErrOrStderr())
+	outputServices := prepareServicesForOutput(cmd, cfg, services)
+
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {
@@ -95,10 +94,10 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(cfg *config.Config, services []api.Service, output io.Writer) []OutputService {
+func prepareServicesForOutput(cmd *cobra.Command, cfg *config.Config, services []api.Service) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(cfg, service, false, output)
+		prepared[i] = prepareServiceForOutput(cmd, cfg, service, false)
 	}
 	return prepared
 }

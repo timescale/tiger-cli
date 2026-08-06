@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -125,7 +124,7 @@ Examples:
 						// Local timezone for terminal output; MCP and public API use UTC.
 						line = entry.Timestamp.Local().Format("2006-01-02 15:04:05 MST") + " " + line
 					}
-					fmt.Fprintln(outputWriter, colorizeLogEntry(line, entry.Severity, shouldColorize))
+					cmd.Println(colorizeLogEntry(line, entry.Severity, shouldColorize))
 				}
 			}
 

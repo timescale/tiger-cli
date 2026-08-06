@@ -154,8 +154,7 @@ Examples:
 			if !cmd.Flags().Changed("name") {
 				displayName = "(auto-generated)"
 			}
-			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
+			cmd.PrintErrf("🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
 
 			// Create ForkServiceCreate request
 			environmentTag := api.EnvironmentTag(forkEnvironment)
@@ -189,27 +188,27 @@ Examples:
 			forkedService := *forkResp.JSON202
 			forkedServiceID := util.DerefStr(forkedService.ServiceId)
 
-			fmt.Fprintf(statusOutput, "✅ Fork request accepted!\n")
-			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
+			cmd.PrintErrf("✅ Fork request accepted!\n")
+			cmd.PrintErrf("📋 New Service ID: %s\n", forkedServiceID)
 
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(cfg, forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cmd, cfg, forkedService, util.Deref(forkedService.InitialPassword))
 
 			// Set as default service unless --no-set-default is used
 			if !forkNoSetDefault {
-				if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
+				if err := setDefaultService(cmd, cfg, forkedServiceID); err != nil {
 					// Log warning but don't fail the command
-					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
+					cmd.PrintErrf("⚠️  Warning: Failed to set service as default: %v\n", err)
 				}
 			}
 
 			// Handle wait behavior
 			var waitErr error
 			if forkNoWait {
-				fmt.Fprintf(statusOutput, "⏳ Service is being forked. Use 'tiger service list' to check status.\n")
+				cmd.PrintErrf("⏳ Service is being forked. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
-				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+				cmd.PrintErrf("⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 					Client:    client,
 					ProjectID: projectID,
@@ -218,19 +217,19 @@ Examples:
 						TargetStatus: "READY",
 						Service:      &forkedService,
 					},
-					Output:     statusOutput,
+					Output:     cmd.ErrOrStderr(),
 					Timeout:    forkWaitTimeout,
 					TimeoutMsg: "service may still be provisioning",
 				}); waitErr != nil {
-					fmt.Fprintf(statusOutput, "❌ Error: %s\n", waitErr)
+					cmd.PrintErrf("❌ Error: %s\n", waitErr)
 				} else {
-					fmt.Fprintf(statusOutput, "🎉 Service fork completed successfully!\n")
-					printConnectMessage(statusOutput, passwordSaved, forkNoSetDefault, forkedServiceID)
+					cmd.PrintErrf("🎉 Service fork completed successfully!\n")
+					printConnectMessage(cmd, passwordSaved, forkNoSetDefault, forkedServiceID)
 				}
 			}
 
 			if err := outputService(cmd, cfg, forkedService, cfg.Output, forkWithPassword, false); err != nil {
-				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
+				cmd.PrintErrf("⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
 			// Return error for sake of exit code, but silence it since it was already output above

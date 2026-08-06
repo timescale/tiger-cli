@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -57,7 +56,7 @@ func lookupConnectionTarget(cmd *cobra.Command, app *common.App, args []string) 
 // any. It is a no-op for a primary target or when there's nothing to warn.
 func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pooled bool) {
 	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
-		fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", warning)
+		cmd.PrintErrf("⚠️  Warning: %s\n", warning)
 	}
 }
 

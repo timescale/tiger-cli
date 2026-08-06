@@ -82,12 +82,12 @@ Examples:
 					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
 
-				fmt.Fprint(cmd.OutOrStdout(), "Enter password: ")
+				cmd.PrintErr("Enter password: ")
 				passwordToSave, err = readString(cmd.Context(), readPasswordFromTerminal)
 				if err != nil {
 					return fmt.Errorf("failed to read password: %w", err)
 				}
-				fmt.Fprintln(cmd.OutOrStdout()) // Print newline after hidden input
+				cmd.PrintErrln() // Print newline after hidden input
 				if passwordToSave == "" {
 					return fmt.Errorf("password cannot be empty")
 				}
@@ -100,10 +100,10 @@ Examples:
 			}
 
 			if target.IsReplica {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Read replicas share the primary's credentials; saving against primary %s.\n",
+				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
 					*service.ServiceId)
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "Password saved successfully for service %s (role: %s)\n",
+			cmd.PrintErrf("Password saved successfully for service %s (role: %s)\n",
 				*service.ServiceId, dbSavePasswordRole)
 			return nil
 		},

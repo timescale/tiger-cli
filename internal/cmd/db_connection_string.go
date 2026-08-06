@@ -80,7 +80,7 @@ Examples:
 				return fmt.Errorf("password not available to include in connection string")
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), details.String())
+			cmd.Println(details.String())
 			return nil
 		},
 	}

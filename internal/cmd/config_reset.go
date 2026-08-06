@@ -24,7 +24,7 @@ func buildConfigResetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to reset config: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), "Configuration reset to defaults")
+			cmd.Println("Configuration reset to defaults")
 			return nil
 		},
 	}

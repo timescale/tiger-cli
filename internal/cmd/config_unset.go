@@ -25,7 +25,7 @@ func buildConfigUnsetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to unset config: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Unset %s\n", key)
+			cmd.Printf("Unset %s\n", key)
 			return nil
 		},
 	}

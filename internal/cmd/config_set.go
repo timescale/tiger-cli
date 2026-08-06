@@ -25,7 +25,7 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Set %s = %s\n", key, value)
+			cmd.Printf("Set %s = %s\n", key, value)
 			return nil
 		},
 	}

@@ -191,7 +191,7 @@ func selectConnection(
 		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not list read replicas: %v\n", err)
+			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
 		} else if connectable := connectableReplicas(replicas); len(connectable) > 0 {
 			choice, err := selectConnectTargetOption(cmd.ErrOrStderr(), primary, connectable)
 			if err != nil {
@@ -212,7 +212,7 @@ func selectConnection(
 	}
 
 	if chosen.IsReplica {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
+		cmd.PrintErrf("Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
 	}
 	return details, nil
 }
@@ -380,7 +380,7 @@ func connectWithPasswordMenu(
 	storage := common.GetPasswordStorage(cfg)
 	storedPassword, err := storage.Get(service, details.Role)
 	if err != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not retrieve stored password: %v\n", err)
+		cmd.PrintErrf("Warning: could not retrieve stored password: %v\n", err)
 	}
 
 	// Try to connect with stored password first
@@ -396,7 +396,7 @@ func connectWithPasswordMenu(
 		return err
 	}
 	// Auth failed with stored password, continue to recovery menu
-	fmt.Fprintf(cmd.ErrOrStderr(), "%s\nStored password is likely invalid or expired.\n\n", err.Error())
+	cmd.PrintErrf("%s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
 	if !checkStdinIsTTY() {
@@ -415,14 +415,14 @@ func connectWithPasswordMenu(
 		switch option {
 		case optionEnterPassword:
 			// Prompt for password
-			fmt.Fprint(cmd.ErrOrStderr(), "Enter password: ")
+			cmd.PrintErr("Enter password: ")
 			password, err := readString(ctx, readPasswordFromTerminal)
-			fmt.Fprintln(cmd.ErrOrStderr()) // newline after password entry
+			cmd.PrintErrln() // newline after password entry
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
 				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error reading password: %v\n\n", err)
+				cmd.PrintErrf("Error reading password: %v\n\n", err)
 				continue
 			}
 
@@ -430,7 +430,7 @@ func connectWithPasswordMenu(
 			details.Password = password
 			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
 				if isAuthenticationError(err) {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Password incorrect. Please try again.\n\n")
+					cmd.PrintErrf("Password incorrect. Please try again.\n\n")
 					continue
 				}
 				return fmt.Errorf("connection failed: %w", err)
@@ -439,15 +439,15 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cfg, cmd.ErrOrStderr(), client, service, details.Role)
+			password, err := promptAndResetPassword(ctx, cmd, cfg, client, service, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
 				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Error resetting password: %v\n\n", err)
+				cmd.PrintErrf("Error resetting password: %v\n\n", err)
 				continue
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "✅ Master password for '%s' user updated successfully\n", details.Role)
+			cmd.PrintErrf("✅ Master password for '%s' user updated successfully\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
 			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
@@ -613,9 +613,9 @@ func testSaveAndLaunchPsqlWithPassword(
 	// Password works! Save it
 	result, saveErr := common.SavePasswordWithResult(cfg, service, details.Password, details.Role)
 	if saveErr != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not save password: %v\n", saveErr)
+		cmd.PrintErrf("Warning: could not save password: %v\n", saveErr)
 	} else if result.Success {
-		fmt.Fprintf(cmd.ErrOrStderr(), "%s\n", result.Message)
+		cmd.PrintErrf("%s\n", result.Message)
 	}
 
 	// Launch psql
