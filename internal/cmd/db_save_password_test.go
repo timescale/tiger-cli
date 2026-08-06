@@ -282,18 +282,10 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	testPassword := "interactive-password-999"
 
 	// Mock TTY check to return true (simulate terminal)
-	originalCheckStdinIsTTY := checkStdinIsTTY
-	checkStdinIsTTY = func() bool {
-		return true
-	}
-	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+	stubIsTerminal(t, true)
 
 	// Mock password reading to return our test password
-	originalReadPasswordFromTerminal := readPasswordFromTerminal
-	readPasswordFromTerminal = func() (string, error) {
-		return testPassword, nil
-	}
-	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+	stubReadPassword(t, testPassword)
 
 	// Execute save-password without --password flag or env var
 	output, err := executeDBCommand(t.Context(), "db", "save-password")
@@ -356,18 +348,10 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	os.Unsetenv("TIGER_NEW_PASSWORD")
 
 	// Mock TTY check to return true (simulate terminal)
-	originalCheckStdinIsTTY := checkStdinIsTTY
-	checkStdinIsTTY = func() bool {
-		return true
-	}
-	defer func() { checkStdinIsTTY = originalCheckStdinIsTTY }()
+	stubIsTerminal(t, true)
 
 	// Mock password reading to return empty password
-	originalReadPasswordFromTerminal := readPasswordFromTerminal
-	readPasswordFromTerminal = func() (string, error) {
-		return "", nil
-	}
-	defer func() { readPasswordFromTerminal = originalReadPasswordFromTerminal }()
+	stubReadPassword(t, "")
 
 	// Execute the command
 	_, err = executeDBCommand(t.Context(), "db", "save-password")

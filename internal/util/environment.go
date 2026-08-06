@@ -1,16 +1,16 @@
 package util
 
 import (
-	"io"
 	"os"
 
 	"golang.org/x/term"
 )
 
-// IsTerminal is a helper method for detecting whether an [io.Writer] is a
-// interactive terminal / TTY.
-func IsTerminal(w io.Writer) bool {
-	if f, ok := w.(*os.File); ok {
+// IsTerminal is a helper for detecting whether an [io.Writer] or [io.Reader]
+// is an interactive terminal / TTY. It is a variable so that tests can
+// override it.
+var IsTerminal = func(v any) bool {
+	if f, ok := v.(*os.File); ok {
 		return term.IsTerminal(int(f.Fd()))
 	}
 	return false

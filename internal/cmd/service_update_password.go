@@ -113,7 +113,7 @@ Examples:
 				}
 			} else if password == "" {
 				// Interactive prompt - check if we're in a terminal
-				if !checkStdinIsTTY() {
+				if !util.IsTerminal(cmd.InOrStdin()) {
 					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
 				_, err := promptAndResetPassword(ctx, cmd, cfg, client, service, "tsdbadmin")

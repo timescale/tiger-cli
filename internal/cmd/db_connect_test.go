@@ -297,9 +297,7 @@ func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	}
 
 	// Pretend we're on a TTY so the prompt would normally run.
-	orig := checkStdinIsTTY
-	checkStdinIsTTY = func() bool { return true }
-	defer func() { checkStdinIsTTY = orig }()
+	stubIsTerminal(t, true)
 
 	cmd := &cobra.Command{}
 	cmd.SetOut(io.Discard)

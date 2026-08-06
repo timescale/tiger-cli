@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -20,7 +19,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -174,18 +172,16 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 }
 
 func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
-	if !util.IsTerminal(os.Stdin) {
+	if !util.IsTerminal(cmd.InOrStdin()) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
 	}
 
 	ctx := cmd.Context()
 	cmd.PrintErrf("You can find your API credentials at: %s/dashboard/settings\n\n", consoleURL)
 
-	reader := bufio.NewReader(os.Stdin)
-
 	if creds.publicKey == "" {
 		cmd.PrintErr("Enter your public key: ")
-		publicKey, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
+		publicKey, err := util.ReadLine(ctx, cmd.InOrStdin())
 		if err != nil {
 			return credentials{}, err
 		}
@@ -194,10 +190,7 @@ func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentia
 
 	if creds.secretKey == "" {
 		cmd.PrintErr("Enter your secret key: ")
-		password, err := readString(ctx, func() (string, error) {
-			val, err := term.ReadPassword(int(os.Stdin.Fd()))
-			return string(val), err
-		})
+		password, err := util.ReadPassword(ctx, cmd.InOrStdin())
 		if err != nil {
 			return credentials{}, err
 		}

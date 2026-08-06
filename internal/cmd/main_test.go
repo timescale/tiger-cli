@@ -12,6 +12,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // discardCmd returns a bare command whose output streams are discarded, for
@@ -22,6 +23,25 @@ func discardCmd() *cobra.Command {
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	return cmd
+}
+
+// stubIsTerminal makes util.IsTerminal report val for the duration of the test,
+// so commands take their interactive path against a non-TTY stdin.
+func stubIsTerminal(t *testing.T, val bool) {
+	t.Helper()
+	original := util.IsTerminal
+	util.IsTerminal = func(any) bool { return val }
+	t.Cleanup(func() { util.IsTerminal = original })
+}
+
+// stubReadPassword makes util.ReadPassword return password for the duration of
+// the test. The real implementation needs stdin to be an *os.File, so password
+// prompts can't be driven with cmd.SetIn.
+func stubReadPassword(t *testing.T, password string) {
+	t.Helper()
+	original := util.ReadPassword
+	util.ReadPassword = func(context.Context, io.Reader) (string, error) { return password, nil }
+	t.Cleanup(func() { util.ReadPassword = original })
 }
 
 func TestMain(m *testing.M) {

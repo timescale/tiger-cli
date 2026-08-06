@@ -186,7 +186,7 @@ func selectConnection(
 	chosen := target
 
 	// Offer the replica menu only for a primary on an interactive terminal.
-	if !target.IsReplica && !noReplicaPrompt && checkStdinIsTTY() {
+	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) {
 		primary := target.ConnectionService
 		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
@@ -399,7 +399,7 @@ func connectWithPasswordMenu(
 	cmd.PrintErrf("%s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
-	if !checkStdinIsTTY() {
+	if !util.IsTerminal(cmd.InOrStdin()) {
 		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
 	}
 
@@ -416,7 +416,7 @@ func connectWithPasswordMenu(
 		case optionEnterPassword:
 			// Prompt for password
 			cmd.PrintErr("Enter password: ")
-			password, err := readString(ctx, readPasswordFromTerminal)
+			password, err := util.ReadPassword(ctx, cmd.InOrStdin())
 			cmd.PrintErrln() // newline after password entry
 			if err != nil {
 				if errors.Is(err, context.Canceled) {

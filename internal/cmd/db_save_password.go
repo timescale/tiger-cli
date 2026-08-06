@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func buildDbSavePasswordCmd(app *common.App) *cobra.Command {
@@ -78,12 +79,12 @@ Examples:
 				passwordToSave = envPassword
 			} else {
 				// Interactive prompt - check if we're in a terminal
-				if !checkStdinIsTTY() {
+				if !util.IsTerminal(cmd.InOrStdin()) {
 					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
 
 				cmd.PrintErr("Enter password: ")
-				passwordToSave, err = readString(cmd.Context(), readPasswordFromTerminal)
+				passwordToSave, err = util.ReadPassword(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read password: %w", err)
 				}
