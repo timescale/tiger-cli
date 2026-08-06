@@ -150,12 +150,12 @@ func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
 	if tool.InputSchema != nil {
 		raw, err := json.Marshal(tool.InputSchema)
 		if err != nil {
-			return fmt.Errorf("Error marshaling input schema to JSON: %w", err)
+			return fmt.Errorf("error marshaling input schema to JSON: %w", err)
 		}
 
 		var inputSchema *jsonschema.Schema
 		if err := json.Unmarshal(raw, &inputSchema); err != nil {
-			return fmt.Errorf("Error unmarshaling input schema from JSON: %w", err)
+			return fmt.Errorf("error unmarshaling input schema from JSON: %w", err)
 		}
 
 		formatted := formatJSONSchema(inputSchema, 1)
@@ -170,12 +170,12 @@ func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
 	if tool.OutputSchema != nil {
 		raw, err := json.Marshal(tool.OutputSchema)
 		if err != nil {
-			return fmt.Errorf("Error marshaling output schema to JSON: %w", err)
+			return fmt.Errorf("error marshaling output schema to JSON: %w", err)
 		}
 
 		var outputSchema *jsonschema.Schema
 		if err := json.Unmarshal(raw, &outputSchema); err != nil {
-			return fmt.Errorf("Error unmarshaling output schema from JSON: %w", err)
+			return fmt.Errorf("error unmarshaling output schema from JSON: %w", err)
 		}
 
 		formatted := formatJSONSchema(outputSchema, 1)

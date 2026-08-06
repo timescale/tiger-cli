@@ -62,7 +62,7 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 	// Create MCP server
 	server, err := mcp.NewServer(ctx, app, logger)
 	if err != nil {
-		logger.Error("failed to create MCP server", slog.Any("error", err))
+		logger.Error("Failed to create MCP server", slog.Any("error", err))
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}
 	defer server.Close()
@@ -70,7 +70,7 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 	// Find available port and get the listener
 	listener, actualPort, err := getListener(host, port)
 	if err != nil {
-		logger.Error("failed to get listener",
+		logger.Error("Failed to get listener",
 			slog.String("host", host),
 			slog.Int("port", port),
 			slog.Any("error", err),
@@ -120,13 +120,13 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 	// Shutdown server gracefully
 	logger.Info("Gracefully shutting down HTTP server, press control-C twice to immediately shutdown")
 	if err := httpServer.Shutdown(context.Background()); err != nil {
-		logger.Error("failed to shut down HTTP server", slog.Any("error", err))
+		logger.Error("Failed to shut down HTTP server", slog.Any("error", err))
 		return fmt.Errorf("failed to shut down HTTP server: %w", err)
 	}
 
 	// Close the MCP server when finished
 	if err := server.Close(); err != nil {
-		logger.Error("failed to close MCP server", slog.Any("error", err))
+		logger.Error("Failed to close MCP server", slog.Any("error", err))
 		return fmt.Errorf("failed to close MCP server: %w", err)
 	}
 	return nil

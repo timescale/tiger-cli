@@ -96,7 +96,6 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 			slog.Any("error", err),
 		)
 	}
-
 }
 
 // ProxyClient manages connection to a remote MCP server and forwards requests

@@ -283,16 +283,16 @@ func SupportedClients() []ClientInfo {
 func InstallMCPForClient(opts InstallOptions) error {
 	// Validate required options
 	if opts.ClientName == "" {
-		return fmt.Errorf("ClientName is required")
+		return fmt.Errorf("missing required option: ClientName")
 	}
 	if opts.ServerName == "" {
-		return fmt.Errorf("ServerName is required")
+		return fmt.Errorf("missing required option: ServerName")
 	}
 	if opts.Command == "" {
-		return fmt.Errorf("Command is required")
+		return fmt.Errorf("missing required option: Command")
 	}
 	if opts.Args == nil {
-		return fmt.Errorf("Args is required")
+		return fmt.Errorf("missing required option: Args")
 	}
 
 	// Find the client configuration by name
