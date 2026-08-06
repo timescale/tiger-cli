@@ -132,6 +132,17 @@ go generate ./internal/api
 - Run `go vet ./...` to catch potential issues before committing
 - Run `go test ./...` to ensure all tests pass
 
+### Error Messages
+
+Error strings start with a **lowercase** letter, so they read correctly when a
+caller wraps them: `fmt.Errorf("failed to get service: %w", err)`. Log messages
+are the opposite — they start with a capital letter (see "Logging Architecture").
+
+The exception is a leading proper noun or initialism, which keeps its
+capitalization (`fmt.Errorf("API key validation failed: %w", err)`). If that
+reads awkwardly, reword so the identifier isn't first — `missing required option:
+ClientName` rather than `ClientName is required`.
+
 ### Configuration Management
 
 **IMPORTANT:** Follow these rules when working with configuration:
@@ -482,7 +493,9 @@ discards the output via `slog.New(slog.DiscardHandler)`.
 There is no level configuration and no `--debug` flag. `slog.Default()` drops
 anything below `Info` unless `slog.SetLogLoggerLevel` is called, so log at `Info`
 or above; a `Debug` call would silently go nowhere. Attach errors with
-`slog.Any("error", err)`, not `slog.String("error", err.Error())`.
+`slog.Any("error", err)`, not `slog.String("error", err.Error())`. Log messages
+start with a capital letter — error strings do the opposite (see "Error
+Messages").
 
 Because every statement is visible by default, keep them sparse: log failures
 that would otherwise be swallowed (the docs-proxy registration errors are the
@@ -568,6 +581,11 @@ RunE: func(cmd *cobra.Command, args []string) error {
 - Operational errors after arguments are validated → don't show usage (avoids cluttering output with irrelevant usage info)
 
 This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
+
+`SilenceErrors` is a separate setting and is rarely needed: set it only on a
+command that already reports its own errors, so cobra doesn't print them a second
+time. `tiger mcp start http` sets it because the MCP server logs failures through
+slog before returning them.
 
 ## Command Architecture: Pure Functional Builder Pattern
 
