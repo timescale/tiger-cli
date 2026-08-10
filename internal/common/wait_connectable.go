@@ -15,14 +15,17 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 )
 
-// A READY status means the control plane finished reconciling, which is not the
-// same as Postgres having bound its port: on a fast provision the endpoint still
-// refuses connections for a few seconds after the status flips. ready.go already
-// documents READY as "accepting connections", so waiting on the status alone
-// leaves that promise unkept, and any caller that connects immediately (rather
-// than after some incidental latency) races it.
+// A READY status means the control plane finished reconciling. savannah-deployer
+// gates it on in-cluster signals (the leader pod serving, post-deploy runners
+// passing) and never on the customer-facing endpoint, so the allocated port, DNS
+// and load balancer can all still be catching up when the status flips.
+// ready.go documents READY as "accepting connections", so waiting on the status
+// alone leaves that promise unkept, and any caller that connects immediately
+// (rather than after some incidental latency) races it.
 //
 // WaitForConnectable closes that gap by probing the endpoint until it answers.
+// No control-plane gate can fully replace this: readiness is a property of the
+// path between a particular client and the service, not of the service alone.
 
 // DefaultConnectableTimeout bounds the endpoint probe. It is deliberately much
 // shorter than the provisioning wait: once the control plane reports READY the
