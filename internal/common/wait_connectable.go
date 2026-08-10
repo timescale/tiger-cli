@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // A READY status means the control plane finished reconciling. savannah-deployer
@@ -38,7 +39,8 @@ const DefaultConnectableTimeout = 2 * time.Minute
 const connectableProbeTimeout = 5 * time.Second
 
 type ConnectableWaitArgs struct {
-	Client    *api.ClientWithResponses
+	Client    api.ClientWithResponsesInterface
+	Config    *config.Config
 	ProjectID string
 	ServiceID string
 
@@ -127,7 +129,7 @@ func (args ConnectableWaitArgs) probe(ctx context.Context) (probeVerdict, error)
 		return probeNotYet, fmt.Errorf("unexpected %s while fetching service", resp.Status())
 	}
 
-	details, err := GetConnectionDetails(*resp.JSON200, ConnectionDetailsOptions{
+	details, err := GetConnectionDetails(args.Config, *resp.JSON200, ConnectionDetailsOptions{
 		Role:            args.Role,
 		WithPassword:    true,
 		InitialPassword: args.InitialPassword,

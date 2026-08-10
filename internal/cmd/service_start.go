@@ -107,8 +107,9 @@ Examples:
 			// A resumed service reports READY before its endpoint is back up, so
 			// confirm it serves before handing control back.
 			common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
-				Client:    cfg.Client,
-				ProjectID: cfg.ProjectID,
+				Client:    client,
+				Config:    cfg,
+				ProjectID: projectID,
 				ServiceID: serviceID,
 				Role:      "tsdbadmin",
 				Output:    statusOutput,

@@ -206,8 +206,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					// READY only means the control plane finished reconciling. Confirm
 					// the endpoint serves before claiming the service is usable.
 					if common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
-						Client:          cfg.Client,
-						ProjectID:       cfg.ProjectID,
+						Client:          client,
+						Config:          cfg,
+						ProjectID:       projectID,
 						ServiceID:       serviceID,
 						Role:            "tsdbadmin",
 						InitialPassword: util.Deref(service.InitialPassword),

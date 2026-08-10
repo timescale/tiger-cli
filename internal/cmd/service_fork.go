@@ -226,8 +226,9 @@ Examples:
 				} else {
 					// A fresh fork reports READY before its endpoint is up, same as create.
 					common.WaitForConnectable(cmd.Context(), common.ConnectableWaitArgs{
-						Client:          cfg.Client,
-						ProjectID:       cfg.ProjectID,
+						Client:          client,
+						Config:          cfg,
+						ProjectID:       projectID,
 						ServiceID:       forkedServiceID,
 						Role:            "tsdbadmin",
 						InitialPassword: util.Deref(forkedService.InitialPassword),
