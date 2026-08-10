@@ -12,9 +12,8 @@ import (
 )
 
 // buildServiceGetCmd represents the get command under service
-func buildServiceGetCmd() *cobra.Command {
+func buildServiceGetCmd(app *common.App) *cobra.Command {
 	var withPassword bool
-	var output string
 
 	cmd := &cobra.Command{
 		Use:     "get [service-id]",
@@ -39,18 +38,16 @@ Examples:
   # Get service details in YAML format
   tiger service get svc-12345 --output yaml`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -61,7 +58,7 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.GetServiceWithResponse(ctx, cfg.ProjectID, serviceID)
+			resp, err := client.GetServiceWithResponse(ctx, projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}
@@ -77,12 +74,12 @@ Examples:
 			service := *resp.JSON200
 
 			// Output service in requested format
-			return outputService(cmd, service, cfg.Output, withPassword, true)
+			return outputService(cmd, cfg, service, cfg.Output, withPassword, true)
 		},
 	}
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }

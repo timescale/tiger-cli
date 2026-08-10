@@ -10,24 +10,26 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 )
 
+type FetchServiceLogsArgs struct {
+	Client    api.ClientWithResponsesInterface
+	ProjectID string
+	ServiceID string
+	Tail      int
+	Since     *time.Time
+	Until     *time.Time
+
+	// Node selects a specific service node to fetch logs from, for services
+	// with HA replicas. If nil, the backend returns logs for the primary.
+	Node *int
+}
+
 // FetchServiceLogs fetches service logs with cursor-based pagination up to the specified
 // tail limit. Returns entries in ascending order by timestamp (oldest first, newest last).
-// NOTE: The node parameter specifies the specific service node to fetch logs
-// from, for services with HA replicas. If nil, the backend automatically
-// returns logs for the primary.
-func FetchServiceLogs(
-	ctx context.Context,
-	cfg *Config,
-	serviceID string,
-	tail int,
-	since *time.Time,
-	until *time.Time,
-	node *int,
-) ([]api.ServiceLogEntry, error) {
+func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.ServiceLogEntry, error) {
 	params := &api.GetServiceLogsParams{
-		Node:  node,
-		Since: since,
-		Until: until,
+		Node:  args.Node,
+		Since: args.Since,
+		Until: args.Until,
 	}
 
 	// Fix the upper time bound so that all paginated requests share the same
@@ -40,7 +42,7 @@ func FetchServiceLogs(
 
 	var entries []api.ServiceLogEntry
 	for {
-		resp, err := cfg.Client.GetServiceLogsWithResponse(ctx, cfg.ProjectID, serviceID, params)
+		resp, err := args.Client.GetServiceLogsWithResponse(ctx, args.ProjectID, args.ServiceID, params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch logs: %w", err)
 		}
@@ -58,7 +60,7 @@ func FetchServiceLogs(
 		}
 
 		// Stop when we have enough logs or the server signals no further pages.
-		if len(entries) >= tail || resp.JSON200.LastCursor == nil {
+		if len(entries) >= args.Tail || resp.JSON200.LastCursor == nil {
 			break
 		}
 
@@ -66,8 +68,8 @@ func FetchServiceLogs(
 	}
 
 	// Trim to the requested tail count.
-	if len(entries) > tail {
-		entries = entries[:tail]
+	if len(entries) > args.Tail {
+		entries = entries[:args.Tail]
 	}
 
 	// Reverse: the API returns logs newest-first; terminal output is oldest-first.

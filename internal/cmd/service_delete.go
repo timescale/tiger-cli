@@ -14,7 +14,7 @@ import (
 )
 
 // buildServiceDeleteCmd creates the delete subcommand
-func buildServiceDeleteCmd() *cobra.Command {
+func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 	var deleteNoWait bool
 	var deleteWaitTimeout time.Duration
 	var deleteConfirm bool
@@ -42,7 +42,7 @@ Examples:
   # Delete service with custom wait timeout
   tiger service delete svc-12345 --wait-timeout 15m`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require explicit service ID for safety
 			if len(args) < 1 {
@@ -52,14 +52,14 @@ Examples:
 
 			cmd.SilenceUsage = true
 
-			// Load config before the confirmation prompt so read-only mode
-			// refuses without asking the user to type the service ID.
-			cfg, err := common.LoadConfig(cmd.Context())
+			// Check read-only mode before the confirmation prompt, so it refuses
+			// without asking the user to type the service ID.
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				return err
 			}
 
@@ -83,9 +83,9 @@ Examples:
 			}
 
 			// Make the delete request
-			resp, err := cfg.Client.DeleteServiceWithResponse(
+			resp, err := client.DeleteServiceWithResponse(
 				cmd.Context(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
@@ -107,8 +107,8 @@ Examples:
 
 			// Wait for deletion to complete
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    cfg.Client,
-				ProjectID: cfg.ProjectID,
+				Client:    client,
+				ProjectID: projectID,
 				ServiceID: serviceID,
 				Handler: &common.DeletionWaitHandler{
 					ServiceID: serviceID,

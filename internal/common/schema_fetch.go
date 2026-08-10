@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -15,13 +16,13 @@ import (
 //
 // The connection is forced read-only: introspection only issues SELECTs, so
 // this is always safe and guards against accidental writes.
-func FetchServiceSchema(ctx context.Context, target *ConnectionTarget, role string, pooled bool, opts SchemaOptions) (*DatabaseSchema, error) {
+func FetchServiceSchema(ctx context.Context, cfg *config.Config, target *ConnectionTarget, role string, pooled bool, opts SchemaOptions) (*DatabaseSchema, error) {
 	if err := CheckServiceReady(target.ConnectionService); err != nil {
 		return nil, err
 	}
 
 	// Introspection runs parameterless statements, so the simple protocol fits.
-	conn, err := ConnectTarget(ctx, target, ConnectionDetailsOptions{
+	conn, err := ConnectTarget(ctx, cfg, target, ConnectionDetailsOptions{
 		Pooled:       pooled,
 		Role:         role,
 		WithPassword: true,

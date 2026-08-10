@@ -11,7 +11,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 	_, _ = setupConfigTest(t)
 
 	// First set some values
-	cfg, err := config.Load()
+	cfg, err := config.Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestConfigUnset_ValidKeys(t *testing.T) {
 			}
 
 			// Verify the value was actually unset
-			cfg, err := config.Load()
+			cfg, err := config.Load(nil)
 			if err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}

@@ -13,7 +13,7 @@ import (
 )
 
 // buildServiceResizeCmd creates the resize subcommand
-func buildServiceResizeCmd() *cobra.Command {
+func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var resizeCPU string
 	var resizeMemory string
 	var resizeNoWait bool
@@ -57,22 +57,21 @@ Allowed CPU/Memory Configurations:
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -104,7 +103,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()
 
-			resp, err := cfg.Client.ResizeServiceWithResponse(ctx, cfg.ProjectID, serviceID, resizeReq)
+			resp, err := client.ResizeServiceWithResponse(ctx, projectID, serviceID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize service: %w", err)
 			}
@@ -130,8 +129,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Wait for resize to complete
 			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    cfg.Client,
-				ProjectID: cfg.ProjectID,
+				Client:    client,
+				ProjectID: projectID,
 				ServiceID: serviceID,
 				Handler: &common.StatusWaitHandler{
 					TargetStatus: "READY",

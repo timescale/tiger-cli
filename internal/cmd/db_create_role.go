@@ -14,13 +14,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildDbCreateRoleCmd() *cobra.Command {
+func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 	var roleName string
 	var readOnly bool
 	var fromRoles []string
 	var statementTimeout time.Duration
 	var passwordFlag string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "role [service-id]",
@@ -83,22 +82,21 @@ PostgreSQL Configuration Parameters That May Be Set:
   - statement_timeout: Set when --statement-timeout flag is provided
     (kills queries that exceed the specified duration, in milliseconds)`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
 				return fmt.Errorf("--name is required")
 			}
 
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Get service details
-			service, err := getServiceDetailsFunc(cmd, cfg, args)
+			service, err := getServiceDetailsFunc(cmd, app, args)
 			if err != nil {
 				return err
 			}
@@ -116,7 +114,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Build connection string
-			details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+			details, err := common.GetConnectionDetails(cfg, service, common.ConnectionDetailsOptions{
 				Pooled:       false,
 				Role:         "tsdbadmin", // Use admin role to create new roles
 				WithPassword: true,
@@ -141,7 +139,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(service, rolePassword, roleName)
+			result, err := common.SavePasswordWithResult(cfg, service, rolePassword, roleName)
 			if err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⚠️  Warning: %s\n", result.Message)
 			} else if !result.Success {
@@ -159,7 +157,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().StringSliceVar(&fromRoles, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&passwordFlag, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	cmd.MarkFlagRequired("name")
 

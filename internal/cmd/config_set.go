@@ -6,11 +6,11 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/logging"
 )
 
-func buildConfigSetCmd() *cobra.Command {
+func buildConfigSetCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:               "set <key> <value>",
 		Short:             "Set configuration value",
@@ -20,10 +20,7 @@ func buildConfigSetCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			key, value := args[0], args[1]
 			if err := cfg.Set(key, value); err != nil {

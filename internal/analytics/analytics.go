@@ -34,13 +34,13 @@ var ignore = []string{
 type Analytics struct {
 	config    *config.Config
 	projectID string
-	client    *api.ClientWithResponses
+	client    api.ClientWithResponsesInterface
 }
 
 // New initializes a new [Analytics] instance. The [config.Config] parameters
 // is required, but the others are optional. Analytics won't be sent if the
 // [api.ClientWithResponses] is nil.
-func New(cfg *config.Config, client *api.ClientWithResponses, projectID string) *Analytics {
+func New(cfg *config.Config, client api.ClientWithResponsesInterface, projectID string) *Analytics {
 	return &Analytics{
 		config:    cfg,
 		projectID: projectID,

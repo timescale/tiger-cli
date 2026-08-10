@@ -14,12 +14,11 @@ import (
 )
 
 // buildServiceLogsCmd creates the logs command for viewing service logs
-func buildServiceLogsCmd() *cobra.Command {
+func buildServiceLogsCmd(app *common.App) *cobra.Command {
 	var tail int
 	var since time.Time
 	var until time.Time
 	var node int
-	var output string
 
 	cmd := &cobra.Command{
 		Use:     "logs [service-id]",
@@ -52,18 +51,16 @@ Examples:
   # View last 1000 lines
   tiger service logs --tail 1000`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -92,7 +89,15 @@ Examples:
 			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
 			defer cancel()
 
-			logs, err := common.FetchServiceLogs(ctx, cfg, serviceID, tail, sincePtr, untilPtr, nodePtr)
+			logs, err := common.FetchServiceLogs(ctx, common.FetchServiceLogsArgs{
+				Client:    client,
+				ProjectID: projectID,
+				ServiceID: serviceID,
+				Tail:      tail,
+				Since:     sincePtr,
+				Until:     untilPtr,
+				Node:      nodePtr,
+			})
 			if err != nil {
 				return err
 			}
@@ -133,7 +138,7 @@ Examples:
 	cmd.Flags().TimeVar(&since, "since", time.Time{}, []string{time.RFC3339}, "Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z)")
 	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
 	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
-	cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "Output format (text, json, yaml)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (text, json, yaml)")
 
 	return cmd
 }

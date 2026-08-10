@@ -19,7 +19,7 @@ func setupAuthTest(t *testing.T) string {
 
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKey
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{}
 		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-id"}}}`), authInfo)
 		return authInfo, nil
@@ -31,28 +31,24 @@ func setupAuthTest(t *testing.T) string {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Set TIGER_CONFIG_DIR environment variable so that when commands execute
-	// and reinitialize viper, they use the test directory
+	// Set TIGER_CONFIG_DIR environment variable so that commands executed by
+	// the test load their config from the test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
 	// Disable analytics for auth tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 
-	// Reset global config and viper to ensure test isolation
-	// This ensures proper test isolation by resetting all viper state
-	// MUST be done before RemoveCredentials() so it uses the test directory!
+	// Write an empty config file in the test directory
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
 		t.Fatalf("Failed to use test config: %v", err)
 	}
 
 	// Clean up any existing test credentials
-	config.RemoveCredentials()
+	testConfig(t).RemoveCredentials()
 
 	t.Cleanup(func() {
 		// Clean up test credentials
-		config.RemoveCredentials()
-		// Reset global config and viper first
-		config.ResetGlobalConfig()
+		testConfig(t).RemoveCredentials()
 		validateAPIKey = originalValidator // Restore original validator
 		// Remove config file explicitly
 		configFile := config.GetConfigFile(tmpDir)

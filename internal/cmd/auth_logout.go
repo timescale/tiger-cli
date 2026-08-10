@@ -8,10 +8,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func buildLogoutCmd() *cobra.Command {
+func buildLogoutCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:               "logout",
 		Short:             "Remove stored credentials",
@@ -21,9 +22,11 @@ func buildLogoutCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			revokeOAuthSession(cmd)
+			cfg := app.GetConfig()
 
-			if err := config.RemoveCredentials(); err != nil {
+			revokeOAuthSession(cmd, app, cfg)
+
+			if err := cfg.RemoveCredentials(); err != nil {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
@@ -36,19 +39,23 @@ func buildLogoutCmd() *cobra.Command {
 // revokeOAuthSession asks the server to revoke the refresh token for an OAuth
 // session. Failures are intentionally non-fatal — local credential removal
 // must always succeed even if the server is unreachable or returns 501.
-func revokeOAuthSession(cmd *cobra.Command) {
-	stored, err := config.GetStoredCredentials()
+//
+// It also replaces the App's client with one that has no persist callback. The
+// new client will still renew an expired access token (which is required
+// because /auth/logout and the analytics endpoint are authenticated), but it
+// won't persist the token back to storage, ensuring that we don't
+// unintentionally restore the credentials after deleting them (the analytics
+// event deferred by wrapCommands reuses the App's client after the deletion).
+func revokeOAuthSession(cmd *cobra.Command, app *common.App, cfg *config.Config) {
+	stored, err := cfg.GetStoredCredentials()
 	if err != nil || stored.OAuth == nil {
-		return
-	}
-	cfg, err := config.Load()
-	if err != nil {
 		return
 	}
 	client, err := api.NewTigerClientWithToken(cfg, stored.OAuth, nil)
 	if err != nil {
 		return
 	}
+	app.SetClient(client, stored.ProjectID)
 
 	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
 	defer cancel()

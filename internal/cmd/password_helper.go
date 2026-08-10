@@ -7,6 +7,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -14,6 +15,7 @@ import (
 // It handles the API call and password storage.
 func updateAndSaveServicePassword(
 	ctx context.Context,
+	cfg *config.Config,
 	client api.ClientWithResponsesInterface,
 	service api.Service,
 	newPassword string,
@@ -32,7 +34,7 @@ func updateAndSaveServicePassword(
 	}
 
 	// Save password locally
-	if result, err := common.SavePasswordWithResult(service, newPassword, role); err != nil {
+	if result, err := common.SavePasswordWithResult(cfg, service, newPassword, role); err != nil {
 		fmt.Fprintf(statusOut, "Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		fmt.Fprintf(statusOut, "%s\n", result.Message)
@@ -43,7 +45,7 @@ func updateAndSaveServicePassword(
 }
 
 // resetServicePassword resets the password via API. If newPassword is empty, generates one.
-func resetServicePassword(ctx context.Context, client api.ClientWithResponsesInterface, service api.Service, role string, newPassword string, statusOut io.Writer) (string, error) {
+func resetServicePassword(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, service api.Service, role string, newPassword string, statusOut io.Writer) (string, error) {
 	// Generate password if not provided
 	if newPassword == "" {
 		var err error
@@ -54,7 +56,7 @@ func resetServicePassword(ctx context.Context, client api.ClientWithResponsesInt
 	}
 
 	// Update and save password
-	if err := updateAndSaveServicePassword(ctx, client, service, newPassword, role, statusOut); err != nil {
+	if err := updateAndSaveServicePassword(ctx, cfg, client, service, newPassword, role, statusOut); err != nil {
 		return "", err
 	}
 	return newPassword, nil
@@ -65,6 +67,7 @@ func resetServicePassword(ctx context.Context, client api.ClientWithResponsesInt
 // Returns the new password on success.
 func promptAndResetPassword(
 	ctx context.Context,
+	cfg *config.Config,
 	out io.Writer,
 	client api.ClientWithResponsesInterface,
 	service api.Service,
@@ -77,5 +80,5 @@ func promptAndResetPassword(
 		return "", fmt.Errorf("error reading password: %w", err)
 	}
 
-	return resetServicePassword(ctx, client, service, role, newPassword, out)
+	return resetServicePassword(ctx, cfg, client, service, role, newPassword, out)
 }

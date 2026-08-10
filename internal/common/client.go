@@ -15,7 +15,9 @@ var (
 	// GetStoredCredentials loads the stored credentials (PAT or OAuth) from the
 	// keyring or fallback file. It's a package var so tests can override it to
 	// inject credentials of either shape.
-	GetStoredCredentials = config.GetStoredCredentials
+	GetStoredCredentials = func(cfg *config.Config) (*config.Credentials, error) {
+		return cfg.GetStoredCredentials()
+	}
 
 	// Cache of validated API Keys. Useful for avoided unnecessary calls to the
 	// /auth/info and /analytics/identify endpoints when the API client is
@@ -40,7 +42,7 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 
 	// If there were no credentials in the environment, try to load stored credentials
 	if publicKey == "" && secretKey == "" {
-		stored, err := GetStoredCredentials()
+		stored, err := GetStoredCredentials(cfg)
 		if err != nil {
 			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
 		}
@@ -81,7 +83,7 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 // returns the caller's identity. It also identifies the user for the sake of
 // analytics. Only PAT credentials reach this path, so the response always
 // carries the apiKey branch.
-func ValidateAPIKey(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses) (*api.AuthInfo, error) {
+func ValidateAPIKey(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -120,7 +122,7 @@ func ValidateAPIKey(ctx context.Context, cfg *config.Config, client *api.ClientW
 // IdentifyOAuthUser sends an analytics Identify for an OAuth (PKCE) login,
 // using the token-authenticated client built during login. It fetches the
 // caller's identity via /auth/info. Best-effort.
-func IdentifyOAuthUser(ctx context.Context, cfg *config.Config, client *api.ClientWithResponses, projectID string) {
+func IdentifyOAuthUser(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID string) {
 	// Skip the /auth/info round-trip entirely when analytics is disabled.
 	a := analytics.New(cfg, client, projectID)
 	if !a.Enabled() {

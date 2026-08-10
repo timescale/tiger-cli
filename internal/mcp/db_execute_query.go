@@ -151,8 +151,7 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 
 // handleDBExecuteQuery handles the db_execute_query MCP tool
 func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequest, input DBExecuteQueryInput) (*mcp.CallToolResult, DBExecuteQueryOutput, error) {
-	// Load config and API client
-	cfg, err := common.LoadConfig(ctx)
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -161,7 +160,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
 
 	logging.Debug("MCP: Executing database query",
-		zap.String("project_id", cfg.ProjectID),
+		zap.String("project_id", projectID),
 		zap.String("service_id", input.ServiceID),
 		zap.Duration("timeout", timeout),
 		zap.String("role", input.Role),
@@ -170,7 +169,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	)
 
 	// service_id may name a service or one of its read replicas.
-	target, err := common.ResolveConnectionTargetByID(ctx, cfg.Client, cfg.ProjectID, input.ServiceID)
+	target, err := common.ResolveConnectionTargetByID(ctx, client, projectID, input.ServiceID)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
@@ -197,7 +196,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	// Connect to database
-	conn, err := common.ConnectTarget(queryCtx, target, common.ConnectionDetailsOptions{
+	conn, err := common.ConnectTarget(queryCtx, cfg, target, common.ConnectionDetailsOptions{
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,

@@ -136,24 +136,32 @@ go generate ./internal/api
 
 **IMPORTANT:** Follow these rules when working with configuration:
 
-1. **Always use the Config struct** - Never read configuration values directly from the global viper instance. Always load a `Config` struct and use its fields.
+1. **There is no global config** - `config.Load(flags)` builds a fresh `viper` instance per call and unmarshals it into a `Config`. Nothing reads the global viper instance, and nothing should: always take a `*config.Config` and use its fields.
 
-2. **Load once, pass down** - Load the config once at the start of a command or operation, then pass it down to functions that need it. Do not reload the config if one is already available higher in the call chain.
+2. **Read the config from the App, don't load it yourself** - `common.App` (`internal/common/app.go`) holds the config and the API client built from it. `wrapCommands` loads it once per CLI invocation (and the MCP analytics middleware once per request); command bodies and helpers then read it with `app.GetAll()`, `app.GetConfig()`, or `app.GetClient()`. Call `config.Load` directly only where there is no App: `config.LoadForOutput` for `tiger config show`, and tests.
 
-3. **MCP tools reload per-call** - In MCP tool implementations, always load a fresh config at the start of each tool call. This ensures that configuration changes made by the user (via `tiger config set`) take effect immediately for the next tool call, without requiring the MCP server to be restarted.
+3. **The App owns flag precedence** - `app.SetFlags(cmd.Flags())` runs before `app.Load`, and `config.Load` binds the flags in `flagBindings` (`internal/config/config.go`) so precedence stays flag > env > file > default. `cmd.Flags()` includes the persistent flags inherited from parents, and flags a command doesn't define are skipped, so command-local flags (e.g. `--output`) bind only where they exist.
+
+4. **Pass what you read down the call chain** - Pass the `*config.Config` (plus client and project ID where needed) to the functions that need them. Don't reload, and don't pass the App into `internal/common` helpers — they take the values they use, so they stay usable from both CLI and MCP.
+
+5. **MCP reloads per request** - The analytics middleware in `internal/mcp/server.go` calls `s.app.Load(ctx)` on every request, so configuration changes (via `tiger config set`) and logins/logouts take effect on the next tool call without restarting the server. Tool handlers then read that state via `s.app.GetAll()`/`GetClient()` — they must not load it again.
 
 **Example:**
 ```go
-// ✅ Good: Load config once and pass it down
+// ✅ Good: an MCP handler reads what the middleware loaded for this request
 func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest, input ServiceListInput) (*mcp.CallToolResult, ServiceListOutput, error) {
-    // Load fresh config at start of MCP tool call
-    cfg, err := s.loadConfigWithProjectID()
+    client, projectID, err := s.app.GetClient()
     if err != nil {
         return nil, ServiceListOutput{}, err
     }
 
-    // Use cfg.ProjectID, cfg.ServiceID, etc.
-    return doWork(cfg)
+    return doWork(ctx, client, projectID)
+}
+
+// ✅ Good: a CLI command reads what wrapCommands loaded for this invocation
+func run(cmd *cobra.Command, args []string) error {
+    cfg, client, projectID, err := app.GetAll()
+    // ...
 }
 
 // ❌ Bad: Reading from viper directly
@@ -161,12 +169,26 @@ func handleCommand() {
     projectID := viper.GetString("project_id") // Don't do this
 }
 
+// ❌ Bad: Loading again when the App already holds it — this also drops flag
+// precedence, so --config-dir/--service-id are ignored
+func run(cmd *cobra.Command, args []string) error {
+    cfg, err := config.Load(nil) // Don't do this in a command
+}
+
 // ❌ Bad: Reloading config when already available
 func processData(cfg *config.Config) {
-    freshCfg, _ := config.Load() // Don't reload if cfg is already available
+    freshCfg, _ := config.Load(nil) // Don't reload if cfg is already available
     // Use cfg instead
 }
 ```
+
+Config-derived state lives on the `Config` too: credential storage is a set of
+methods on it (`cfg.StoreCredentials`, `cfg.GetStoredCredentials`,
+`cfg.RemoveCredentials`), keyed off `cfg.ConfigDir`, and `cfg.Set`/`Unset`/`Reset`
+write the config file and then reload the struct **in place**. Reloading in place
+is what lets a command change the config mid-run and have the App's readers see
+it — that's how `tiger config set analytics false` suppresses its own analytics
+event, and how `version_check false` suppresses the update notice.
 
 ### CLI and MCP Synchronization
 
@@ -199,7 +221,7 @@ Tiger CLI tracks usage analytics to help improve the product. Analytics are auto
 
 #### Automatic Tracking via Middleware
 
-**CLI Commands** - All commands are automatically wrapped with analytics middleware in `wrapCommandsWithAnalytics()` in `internal/cmd/root.go`
+**CLI Commands** - All commands are automatically wrapped with the per-invocation lifecycle in `wrapCommands()` in `internal/cmd/root.go`, which tracks analytics as one of its steps
 
 This middleware:
 - Automatically tracks all CLI commands with event name like `"Run tiger service create"`
@@ -252,7 +274,7 @@ The middleware automatically excludes sensitive fields using a centralized ignor
 
 2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
    - Refactor to use a flag instead
-   - Add filtering logic in `wrapCommandsWithAnalytics()` in `internal/cmd/root.go` to sanitize or omit the args from tracking
+   - Add filtering logic in `wrapCommands()` in `internal/cmd/root.go` to sanitize or omit the args from tracking
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -274,7 +296,9 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
-- **Configuration**: `internal/config/config.go` - Centralized config with Viper integration
+- **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
+  helpers. Each `Load` uses its own viper instance (no global state); see
+  "Configuration Management" above
 - **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server implementation.
@@ -284,6 +308,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   `errors.go`), the remote docs proxy (`proxy.go`), and capability listing
   (`capabilities.go`).
 - **Common Package**: `internal/common/` - Shared business logic used by both CLI and MCP
+  - `App` (`app.go`) - per-invocation config + API client, shared by CLI commands and MCP handlers
   - Password storage utilities (keyring, pgpass, validation)
   - Wait operations and polling logic (WaitForService)
   - Connection detail helpers (GetConnectionDetails, GetReplicaConnectionDetails for read replicas)
@@ -319,19 +344,19 @@ intentionally-undocumented env var — `TIGER_EXPERIMENTAL` (default `false`).
 
 **This is env-var only** — deliberately not a config-file key, not a flag, and
 not surfaced by `tiger config show`. It mirrors ghost's `GHOST_EXPERIMENTAL`
-pattern: `strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))` is read once at
-build time in `buildRootCmd` (CLI) and once at `NewServer` (MCP), and
-threaded through to the subtree/tool registration sites as a plain bool.
+pattern: `strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))` is read once in
+`buildRootCmd` and stored on the `App` as `app.Experimental`, which both the CLI
+and the MCP server read at registration time.
 
-- CLI: `buildServiceCmd(experimental bool)` guards `cmd.AddCommand(buildServiceMetricsCmd())` with `if experimental { … }`. When the env var is unset, the `metrics` subtree isn't added to the command tree at all — the command literally does not exist (no help entry, no tab completion, `unknown command` error like any typo).
-- MCP: `registerServiceTools(readOnly, experimental bool)` guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
+- CLI: `buildServiceCmd` guards `cmd.AddCommand(buildServiceMetricsCmd(app))` with `if app.Experimental { … }`. When the env var is unset, the `metrics` subtree isn't added to the command tree at all — the command literally does not exist (no help entry, no tab completion, `unknown command` error like any typo).
+- MCP: `NewServer` passes `app.Experimental` to `registerServiceTools(readOnly, experimental bool)`, which guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
 
 **Do not mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, spec
 files, or error messages.** When a feature graduates, remove the `x-preview:
-true` marker upstream, delete the `if experimental { … }` wrapper (both
-CLI and MCP), and drop the `experimental bool` parameter from the affected
-builder. The call sites already use the normal `cfg.Client` (v1) — no client
-wiring needs to change.
+true` marker upstream, delete the `if app.Experimental { … }` / `if experimental
+{ … }` wrappers (both CLI and MCP), drop the `experimental bool` parameter from
+`registerServiceTools`, and remove the `Experimental` field from `common.App`. The
+call sites already use the normal v1 client — no client wiring needs to change.
 
 ### MCP Server Architecture
 
@@ -341,6 +366,16 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 1. **Direct Tiger Tools** - Native tools for Tiger service management and database operations, one file per tool
 2. **Proxied Documentation Tools** (`proxy.go`) - Tools forwarded from a remote docs MCP server (see `proxy.go` for implementation)
+
+**Server State:**
+
+`NewServer(ctx, app)` takes the already-loaded `*common.App` and keeps it on the
+`Server`. Read-only mode, the experimental gate, and the docs-proxy settings are
+read once here at startup (a client must restart the server to pick those up),
+while the analytics middleware calls `s.app.Load(ctx)` on every request so tool
+handlers see current config and credentials. Handlers therefore never load
+anything themselves — they read `s.app.GetAll()`, `s.app.GetClient()`, or
+`s.app.GetConfig()`.
 
 **One File Per MCP Tool:**
 
@@ -359,7 +394,7 @@ helpers and API-to-output conversion live in `utils.go`.
 
 **Read-Only Mode Gate:**
 
-Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg.Config)` (defined in `internal/common/errors.go`) immediately after `common.LoadConfig(ctx)`. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
+Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg)` (defined in `internal/common/errors.go`) immediately after reading the config from the App. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
 
 **Tool Definition Pattern:**
 
@@ -527,9 +562,37 @@ Tiger CLI uses a pure functional builder pattern with **zero global command stat
 
 ### Architecture Overview
 
-`buildRootCmd()` builds the whole tree: it adds a `build*Cmd()` per top-level
-command, and each group command adds its own subcommand builders. To see the
-current tree, read `buildRootCmd()` in `root.go` and follow the builders down.
+`buildRootCmd(ctx)` builds the whole tree: it creates the `*common.App` that
+carries per-invocation state, adds a `build*Cmd(app)` per top-level command, and
+each group command adds its own subcommand builders. To see the current tree,
+read `buildRootCmd()` in `root.go` and follow the builders down.
+
+Every builder takes the `*common.App` and passes it to its children, so any
+command body can reach the config and API client without loading them itself. The
+App is what makes "load once per invocation" possible while keeping commands
+free of global state.
+
+### Per-Invocation Lifecycle
+
+There are no `PersistentPreRunE`/`PersistentPostRunE` hooks. `wrapCommands()`
+wraps the `RunE` of every command in the tree with the shared lifecycle, in this
+order:
+
+1. `app.SetFlags(cmd.Flags())` then `app.Load(ctx)` — the single config + API
+   client load for the invocation
+2. `logging.Init(cfg.Debug)`, with `logging.Sync()` deferred
+3. `color.NoColor` from `cfg.Color`
+4. `versionCheck(...)` — starts a background release check, deferring the print
+   so it lands after the command's own output
+5. analytics — deferred, so it records the command's outcome and re-reads the App
+   (see "Configuration Management")
+
+Commands cobra adds after `wrapCommands` runs — `help`, `completion`, and the
+`__complete` command behind tab completion — are deliberately **not** wrapped, so
+they never touch the config file, the system keyring, or the network. Group
+commands (`tiger service`) have no `RunE` and are skipped for the same reason.
+Completion functions that do need the config or client wrap themselves with
+`withAppLoad` (`completion_helper.go`).
 
 ### One File Per Command
 
@@ -581,41 +644,34 @@ lives in `main_test.go`; per-group test helpers live in the group's test file.
 The root command builder creates the complete CLI structure:
 
 ```go
-func buildRootCmd() *cobra.Command {
-    // Declare ALL flag variables locally within this function
-    var configDir string
-    var debug bool
-    // ... other flag variables
+func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
+    // Per-invocation state, threaded through every builder
+    app := &common.App{Experimental: experimental}
 
     cmd := &cobra.Command{
         Use:   "tiger",
         Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
         Long:  `Complete CLI description...`,
-        PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-            // Bind persistent flags to viper at execution time
-            if err := errors.Join(
-                viper.BindPFlag("debug", cmd.Flags().Lookup("debug")),
-                // ... bind remaining flags
-            ); err != nil {
-                return fmt.Errorf("failed to bind flags: %w", err)
-            }
-
-            // Setup configuration and initialize logging
-            // ... rest of initialization
-        },
     }
 
+    // Cobra copies this onto the command it executes
+    cmd.SetContext(ctx)
+
     // Set up persistent flags
-    cmd.PersistentFlags().StringVar(&configDir, "config-dir", config.GetDefaultConfigDir(), "config directory")
-    cmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+    cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
+    cmd.PersistentFlags().Bool("debug", false, "enable debug logging")
+    skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
     // ... add remaining persistent flags
 
     // Add all subcommands (complete tree building)
-    cmd.AddCommand(buildVersionCmd())
-    cmd.AddCommand(buildConfigCmd())
+    cmd.AddCommand(buildVersionCmd(app))
+    cmd.AddCommand(buildConfigCmd(app))
     // ... add remaining subcommands
 
-    return cmd
+    // Wrap every RunE in the tree with the shared lifecycle
+    wrapCommands(cmd, app, skipUpdateCheck)
+
+    return cmd, nil
 }
 ```
 
@@ -626,25 +682,29 @@ See `internal/cmd/root.go` for the complete implementation.
 For commands without flags:
 
 ```go
-func buildVersionCmd() *cobra.Command {
+func buildVersionCmd(app *common.App) *cobra.Command {
     return &cobra.Command{
         Use:   "version",
         Short: "Show version information",
         Long:  `Display version, build time, and git commit information.`,
-        Run: func(cmd *cobra.Command, args []string) {
+        RunE: func(cmd *cobra.Command, args []string) error {
             fmt.Printf("Tiger CLI %s\n", Version)
             // ... version output
+            return nil
         },
     }
 }
 ```
+
+Use `RunE`, not `Run`: only `RunE` commands are wrapped by `wrapCommands`, so a
+`Run` command would silently skip the config load, analytics, and version check.
 
 ### Commands with Local Flags
 
 For commands that need their own flags:
 
 ```go
-func buildMyFlaggedCmd() *cobra.Command {
+func buildMyFlaggedCmd(app *common.App) *cobra.Command {
     // Declare flag variables locally (NEVER globally!)
     var myFlag string
     var enableFeature bool
@@ -676,48 +736,52 @@ func buildMyFlaggedCmd() *cobra.Command {
 }
 ```
 
-### Commands with Flags That Need Viper Binding
+### Commands with Flags That Override Config Values
 
-For commands that need their flags bound to viper for configuration precedence (flag > env > config > default), use the `bindFlags()` helper:
+A flag that should override a config value needs no wiring in the command: the
+lifecycle wrapper already hands the command's flag set to `config.Load`, and the
+binding table in `internal/config/config.go` does the rest.
+
+Don't bind such a flag to a variable — use `String`/`Bool`/`Var` rather than
+`StringVar`/`BoolVar`/`VarP(&x, …)`. The command must read the value from the
+config, and a variable in scope is an invitation to read the raw flag instead,
+which silently bypasses the env var and config file. `tiger version` had exactly
+that bug. Flag types that validate at parse time (`outputFlag` and friends in
+`flag_helper.go`) still work: register them with `new(outputFlag)`.
 
 ```go
-func buildMyConfigurableFlagCmd() *cobra.Command {
-    var output string
-
+func buildMyConfigurableFlagCmd(app *common.App) *cobra.Command {
     cmd := &cobra.Command{
-        Use:     "my-command",
-        Short:   "Command with configurable flag",
-        PreRunE: bindFlags("output"),  // Binds flag to viper
+        Use:   "my-command",
+        Short: "Command with configurable flag",
         RunE: func(cmd *cobra.Command, args []string) error {
             cmd.SilenceUsage = true
-            cfg, err := config.Load()  // Now includes bound flag value
+            cfg := app.GetConfig()
             // ... use cfg.Output which respects: flag > env > config > default
         },
     }
 
-    cmd.Flags().VarP((*outputFlag)(&output), "output", "o", "output format")
+    cmd.Flags().VarP(new(outputFlag), "output", "o", "output format")
     return cmd
 }
 ```
 
-The `bindFlags()` helper (defined in `internal/cmd/flag_helper.go`) automatically converts flag names to config keys (e.g., `"new-password"` → `"new_password"`) and supports binding multiple flags: `bindFlags("output", "new-password")`.
+To make a *new* flag override a config value, add it to `flagBindings`, which
+maps flag names to config keys (e.g. `"password-storage"` → `"password_storage"`).
+Bindings are applied per load against the flag set passed in, so a flag bound for
+one command never leaks into another, and a command that doesn't define the flag
+simply skips it.
 
-**Why bind flags in PreRunE?**
-
-Flags must be bound to viper at **execution time**, not at **build time**, for two critical reasons:
-
-1. **Prevents binding conflicts**: When all commands are built at startup (the builder pattern), binding flags at build time can cause commands' flags to bind to the same viper keys, silently overwriting each other. Only the last binding wins.
-
-2. **Ensures correct precedence**: Viper must bind flags after the command tree is built but before `config.Load()` is called. This happens in `PreRunE` (or `PersistentPreRunE` for persistent flags), ensuring the precedence order works correctly: command-line flags > environment variables > config file > defaults.
-
-**Note:** Use `PreRunE` for command-specific flags, and `PersistentPreRunE` for persistent flags on the root command that apply to all subcommands.
+Flags that aren't config values (e.g. `--auto-generate`) stay as plain local
+variables; a flag that only needs an env-var fallback can read it directly (see
+`--new-password` and `TIGER_NEW_PASSWORD` in `service_update_password.go`).
 
 ### Parent Commands with Subcommands
 
 For commands that contain subcommands, build the complete tree:
 
 ```go
-func buildParentCmd() *cobra.Command {
+func buildParentCmd(app *common.App) *cobra.Command {
     cmd := &cobra.Command{
         Use:   "parent",
         Short: "Parent command with subcommands",
@@ -738,17 +802,14 @@ func buildParentCmd() *cobra.Command {
 The main application uses a single builder call:
 
 ```go
-func Execute() {
+func Execute(ctx context.Context) error {
     // Build complete command tree fresh each time
-    rootCmd := buildRootCmd()
-
-    err := rootCmd.Execute()
+    rootCmd, err := buildRootCmd(ctx)
     if err != nil {
-        if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-            os.Exit(exitErr.ExitCode())
-        }
-        os.Exit(1)
+        return err
     }
+
+    return rootCmd.Execute()
 }
 ```
 
@@ -772,22 +833,25 @@ func init() {
 Tests use the full root command builder:
 
 ```go
-func executeCommand(args ...string) (string, error) {
-    // Build complete CLI fresh for each test
-    rootCmd := buildRootCmd()
+func executeCommand(ctx context.Context, args ...string) (string, error) {
+    // Build complete CLI fresh for each test, including its App
+    rootCmd, err := buildRootCmd(ctx)
+    if err != nil {
+        return "", err
+    }
 
     buf := new(bytes.Buffer)
     rootCmd.SetOut(buf)
     rootCmd.SetErr(buf)
     rootCmd.SetArgs(args)
 
-    err := rootCmd.Execute()
+    err = rootCmd.Execute()
     return buf.String(), err
 }
 
 func TestMyCommand(t *testing.T) {
     // Each test gets completely fresh CLI instance
-    output, err := executeCommand("my-command", "--flag", "value")
+    output, err := executeCommand(t.Context(), "my-command", "--flag", "value")
 
     if err != nil {
         t.Fatalf("Command failed: %v", err)
@@ -804,19 +868,22 @@ func TestMyCommand(t *testing.T) {
 For tests that need to verify flag values:
 
 ```go
-func executeAndReturnRoot(args ...string) (*cobra.Command, string, error) {
-    rootCmd := buildRootCmd()
+func executeAndReturnRoot(ctx context.Context, args ...string) (*cobra.Command, string, error) {
+    rootCmd, err := buildRootCmd(ctx)
+    if err != nil {
+        return nil, "", err
+    }
 
     buf := new(bytes.Buffer)
     rootCmd.SetOut(buf)
     rootCmd.SetArgs(args)
 
-    err := rootCmd.Execute()
+    err = rootCmd.Execute()
     return rootCmd, buf.String(), err
 }
 
 func TestFlagValues(t *testing.T) {
-    rootCmd, output, err := executeAndReturnRoot("service", "create", "--name", "test")
+    rootCmd, output, err := executeAndReturnRoot(t.Context(), "service", "create", "--name", "test")
 
     // Navigate to specific command
     serviceCmd, _, _ := rootCmd.Find([]string{"service"})
@@ -844,12 +911,14 @@ func TestFlagValues(t *testing.T) {
 
 When adding new commands to this architecture:
 
-1. **Create a builder function** following the `buildXXXCmd()` pattern
+1. **Create a builder function** following the `buildXXXCmd(app *common.App)` pattern
 2. **Declare flags locally** within the builder function scope
-3. **Bind flags to viper in PreRunE** if the flag needs to be configurable via config file or environment variables
-4. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd())` in `buildRootCmd()`
-5. **No init() function** required - everything goes through the root builder
-6. **Test with `buildRootCmd()`** instead of recreating flag setup
+3. **Use `RunE`** (not `Run`) so the command gets the shared lifecycle from `wrapCommands`
+4. **Read config and client from the App** (`app.GetAll()`/`GetConfig()`/`GetClient()`) rather than loading them
+5. **Add the flag to `flagBindings`** (in `internal/config/config.go`) if it should override a config value, and declare it without a variable so it can only be read back from the config
+6. **Add to root command** by calling `cmd.AddCommand(buildXXXCmd(app))` in `buildRootCmd()`
+7. **No init() function** required - everything goes through the root builder
+8. **Test with `buildRootCmd(ctx)`** instead of recreating flag setup
 
 This architecture ensures Tiger CLI remains maintainable and testable as it grows.
 

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -286,6 +285,12 @@ func TestPgpassStorage_Get_NoFile(t *testing.T) {
 	}
 }
 
+// testConfig returns a config that selects the given password storage method.
+// An empty method exercises GetPasswordStorage's default.
+func testConfig(passwordStorage string) *config.Config {
+	return &config.Config{PasswordStorage: passwordStorage}
+}
+
 func TestGetPasswordStorage(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -301,18 +306,12 @@ func TestGetPasswordStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set up viper for this test
-			viper.Set("password_storage", tt.storageMethod)
-
-			storage := GetPasswordStorage()
+			storage := GetPasswordStorage(testConfig(tt.storageMethod))
 			actualType := fmt.Sprintf("%T", storage)
 
 			if actualType != tt.expectedType {
 				t.Errorf("GetPasswordStorage() with %s = %v, want %v", tt.storageMethod, actualType, tt.expectedType)
 			}
-
-			// Clean up
-			viper.Set("password_storage", "")
 		})
 	}
 }
@@ -620,7 +619,7 @@ func TestPgpassStorage_GetStorageResult_Error(t *testing.T) {
 func TestSavePasswordWithResult_EmptyPassword(t *testing.T) {
 	service := createTestService("test-service-123")
 
-	result, err := SavePasswordWithResult(service, "", "tsdbadmin")
+	result, err := SavePasswordWithResult(testConfig(""), service, "", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() with empty password should not return error, got: %v", err)
 	}
@@ -638,11 +637,8 @@ func TestSavePasswordWithResult_EmptyPassword(t *testing.T) {
 func TestSavePasswordWithResult_WithPassword(t *testing.T) {
 	service := createTestService("test-service-123")
 
-	// Set up viper to use NoStorage for predictable behavior
-	viper.Set("password_storage", "none")
-	defer viper.Set("password_storage", "")
-
-	result, err := SavePasswordWithResult(service, "test-password", "tsdbadmin")
+	// Use NoStorage for predictable behavior
+	result, err := SavePasswordWithResult(testConfig("none"), service, "test-password", "tsdbadmin")
 	if err != nil {
 		t.Errorf("SavePasswordWithResult() should not return error with NoStorage, got: %v", err)
 	}

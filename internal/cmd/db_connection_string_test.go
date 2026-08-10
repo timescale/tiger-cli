@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -79,7 +78,7 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	}
 
 	// Request pooled connection when pooler is not available
-	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(testConfig(t), service, common.ConnectionDetailsOptions{
 		Pooled: true,
 		Role:   "tsdbadmin",
 	})
@@ -107,9 +106,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	config.SetTestServiceName(t)
 
 	// Set keyring as the password storage method for this test
-	originalStorage := viper.GetString("password_storage")
-	viper.Set("password_storage", "keyring")
-	defer viper.Set("password_storage", originalStorage)
+	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
 
 	// Create a test service
 	serviceID := "test-e2e-service"
@@ -127,7 +124,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 
 	// Store a test password
 	testPassword := "test-e2e-password-789"
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(testConfig(t))
 	err := storage.Save(service, testPassword, "tsdbadmin")
 	if err != nil {
 		t.Fatalf("Failed to save test password: %v", err)
@@ -135,7 +132,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	defer storage.Remove(service, "tsdbadmin") // Clean up after test
 
 	// Test connection string without password (default behavior)
-	details, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+	details, err := common.GetConnectionDetails(testConfig(t), service, common.ConnectionDetailsOptions{
 		Role: "tsdbadmin",
 	})
 	if err != nil {
@@ -154,7 +151,7 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	}
 
 	// Test connection string with password (simulating --with-password flag)
-	details2, err := common.GetConnectionDetails(service, common.ConnectionDetailsOptions{
+	details2, err := common.GetConnectionDetails(testConfig(t), service, common.ConnectionDetailsOptions{
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
@@ -209,7 +206,7 @@ func TestDBConnectionString_ReadOnlyConfig(t *testing.T) {
 			mockTestPAT(t)
 
 			originalGetServiceDetails := getServiceDetailsFunc
-			getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+			getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 				host := "test-host.com"
 				port := 5432
 				return api.Service{

@@ -39,7 +39,6 @@ func setupConfigTest(t *testing.T) (string, func()) {
 		// Reset global config in the config package
 		// This is important for test isolation
 		// We need to clear the singleton
-		config.ResetGlobalConfig()
 	}
 
 	t.Cleanup(cleanup)
@@ -120,7 +119,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 	}
 
 	// 6. Verify everything is back to defaults
-	cfg, err := config.Load()
+	cfg, err := config.Load(nil)
 	if err != nil {
 		t.Fatalf("Failed to load config after reset: %v", err)
 	}

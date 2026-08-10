@@ -13,7 +13,7 @@ import (
 )
 
 // buildServiceStartCmd creates the start subcommand
-func buildServiceStartCmd() *cobra.Command {
+func buildServiceStartCmd(app *common.App) *cobra.Command {
 	var startNoWait bool
 	var startWaitTimeout time.Duration
 
@@ -33,23 +33,22 @@ Examples:
 
   # Start service with custom wait timeout
   tiger service start svc-12345 --wait-timeout 10m`,
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		Args:              cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine source service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -57,9 +56,9 @@ Examples:
 			cmd.SilenceUsage = true
 
 			// Make the start request
-			resp, err := cfg.Client.StartServiceWithResponse(
+			resp, err := client.StartServiceWithResponse(
 				context.Background(),
-				api.ProjectId(cfg.ProjectID),
+				api.ProjectId(projectID),
 				api.ServiceId(serviceID),
 			)
 			if err != nil {
@@ -88,8 +87,8 @@ Examples:
 			// Wait for service to become ready
 			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    cfg.Client,
-				ProjectID: cfg.ProjectID,
+				Client:    client,
+				ProjectID: projectID,
 				ServiceID: serviceID,
 				Handler: &common.StatusWaitHandler{
 					TargetStatus: "READY",

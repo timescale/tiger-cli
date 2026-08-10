@@ -17,10 +17,11 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildDbConnectCmd() *cobra.Command {
+func buildDbConnectCmd(app *common.App) *cobra.Command {
 	var dbConnectPooled bool
 	var dbConnectRole string
 	var dbConnectReadOnly bool
@@ -87,11 +88,11 @@ Examples:
   tiger db connect svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
 		Args:              cobra.ArbitraryArgs,
-		ValidArgsFunction: serviceIDCompletion,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				return err
 			}
@@ -99,7 +100,7 @@ Examples:
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			target, err := lookupConnectionTarget(cmd, cfg, serviceArgs)
+			target, err := lookupConnectionTarget(cmd, app, serviceArgs)
 			if err != nil {
 				return err
 			}
@@ -118,7 +119,7 @@ Examples:
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := selectConnection(cmd.Context(), cmd, cfg.Client, cfg.ProjectID, target, opts, dbConnectNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, app, target, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -128,7 +129,7 @@ Examples:
 
 			// Read replicas share the primary's credentials, so password storage
 			// and recovery always operate on the credential service.
-			return connectWithPasswordMenu(cmd.Context(), cmd, cfg.Client, target.CredentialService, details, psqlPath, psqlFlags)
+			return connectWithPasswordMenu(cmd.Context(), cmd, app, target.CredentialService, details, psqlPath, psqlFlags)
 		},
 	}
 
@@ -171,12 +172,16 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 func selectConnection(
 	ctx context.Context,
 	cmd *cobra.Command,
-	client *api.ClientWithResponses,
-	projectID string,
+	app *common.App,
 	target *common.ConnectionTarget,
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
+	cfg, client, projectID, err := app.GetAll()
+	if err != nil {
+		return nil, err
+	}
+
 	// chosen is what we connect to; the menu below may replace it with a replica.
 	chosen := target
 
@@ -201,10 +206,11 @@ func selectConnection(
 		}
 	}
 
-	details, err := buildConnectionDetailsForTarget(cmd, chosen, opts)
+	details, err := buildConnectionDetailsForTarget(cmd, cfg, chosen, opts)
 	if err != nil {
 		return nil, err
 	}
+
 	if chosen.IsReplica {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
 	}
@@ -223,7 +229,7 @@ func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
 }
 
 // fetchReplicaSets retrieves the read replica sets for a service.
-func fetchReplicaSets(ctx context.Context, client *api.ClientWithResponses, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
+func fetchReplicaSets(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -359,14 +365,19 @@ func selectConnectTargetOption(out io.Writer, primary api.Service, replicas []ap
 func connectWithPasswordMenu(
 	ctx context.Context,
 	cmd *cobra.Command,
-	client *api.ClientWithResponses,
+	app *common.App,
 	service api.Service,
 	details *common.ConnectionDetails,
 	psqlPath string,
 	psqlFlags []string,
 ) error {
+	cfg, client, _, err := app.GetAll()
+	if err != nil {
+		return err
+	}
+
 	// Interactive mode: Get stored password (if any)
-	storage := common.GetPasswordStorage()
+	storage := common.GetPasswordStorage(cfg)
 	storedPassword, err := storage.Get(service, details.Role)
 	if err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not retrieve stored password: %v\n", err)
@@ -376,7 +387,7 @@ func connectWithPasswordMenu(
 	err = testConnectionWithPassword(ctx, details, storedPassword)
 	if err == nil {
 		// Password works, launch psql
-		return launchPsql(details, psqlPath, psqlFlags, service, cmd)
+		return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
 	}
 
 	// Check if it's an auth error
@@ -417,7 +428,7 @@ func connectWithPasswordMenu(
 
 			// Test, save, and launch
 			details.Password = password
-			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, details, psqlPath, psqlFlags, service); err != nil {
+			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
 				if isAuthenticationError(err) {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Password incorrect. Please try again.\n\n")
 					continue
@@ -428,7 +439,7 @@ func connectWithPasswordMenu(
 
 		case optionResetPassword:
 			// Prompt and reset
-			password, err := promptAndResetPassword(ctx, cmd.ErrOrStderr(), client, service, details.Role)
+			password, err := promptAndResetPassword(ctx, cfg, cmd.ErrOrStderr(), client, service, details.Role)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return nil // user cancelled
@@ -439,7 +450,7 @@ func connectWithPasswordMenu(
 			fmt.Fprintf(cmd.ErrOrStderr(), "✅ Master password for '%s' user updated successfully\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
-			return launchPsql(details, psqlPath, psqlFlags, service, cmd)
+			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
 
 		case optionExit:
 			return nil
@@ -588,6 +599,7 @@ func selectPasswordRecoveryOption(out io.Writer, canResetPassword bool) (passwor
 func testSaveAndLaunchPsqlWithPassword(
 	ctx context.Context,
 	cmd *cobra.Command,
+	cfg *config.Config,
 	details *common.ConnectionDetails,
 	psqlPath string,
 	psqlFlags []string,
@@ -599,7 +611,7 @@ func testSaveAndLaunchPsqlWithPassword(
 	}
 
 	// Password works! Save it
-	result, saveErr := common.SavePasswordWithResult(service, details.Password, details.Role)
+	result, saveErr := common.SavePasswordWithResult(cfg, service, details.Password, details.Role)
 	if saveErr != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not save password: %v\n", saveErr)
 	} else if result.Success {
@@ -607,18 +619,18 @@ func testSaveAndLaunchPsqlWithPassword(
 	}
 
 	// Launch psql
-	return launchPsql(details, psqlPath, psqlFlags, service, cmd)
+	return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)
 }
 
 // launchPsql launches psql using the connection string and additional flags.
 // It retrieves the password from storage and sets PGPASSWORD environment variable.
-func launchPsql(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
-	psqlCmd := buildPsqlCommand(details, psqlPath, additionalFlags, service, cmd)
+func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
+	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, service, cmd)
 	return psqlCmd.Run()
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup
-func buildPsqlCommand(details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
+func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) *exec.Cmd {
 	password := details.Password
 	// Ensure we don't include password in the connection string to make it not show up in process lists
 	// Passwords are passed via PGPASSWORD environment variable (see below)
@@ -640,7 +652,7 @@ func buildPsqlCommand(details *common.ConnectionDetails, psqlPath string, additi
 	if password != "" {
 		psqlCmd.Env = append(os.Environ(), "PGPASSWORD="+password)
 	} else {
-		storage := common.GetPasswordStorage()
+		storage := common.GetPasswordStorage(cfg)
 		// Only set PGPASSWORD for keyring storage method
 		// pgpass storage relies on psql automatically reading ~/.pgpass file
 		if _, isKeyring := storage.(*common.KeyringStorage); isKeyring {

@@ -7,14 +7,13 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/config"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/mcp"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
-func buildMCPListCmd() *cobra.Command {
-	var outputFormat string
+func buildMCPListCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -34,18 +33,13 @@ Examples:
   tiger mcp list -o yaml`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
-		PreRunE:           bindFlags("output"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			// Get config
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
 			// Create MCP server
-			server, err := mcp.NewServer(cmd.Context(), cfg)
+			server, err := mcp.NewServer(cmd.Context(), app)
 			if err != nil {
 				return fmt.Errorf("failed to create MCP server: %w", err)
 			}
@@ -75,7 +69,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().VarP((*outputFlag)(&outputFormat), "output", "o", "output format (json, yaml, table)")
+	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 
 	return cmd
 }

@@ -60,7 +60,7 @@ func TestDBSchema_NoAuth(t *testing.T) {
 func withMockService(t *testing.T, service api.Service) {
 	t.Helper()
 	original := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, cfg *common.Config, args []string) (api.Service, error) {
+	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 		return service, nil
 	}
 	t.Cleanup(func() { getServiceDetailsFunc = original })

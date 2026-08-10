@@ -53,7 +53,7 @@ type credentials struct {
 	secretKey string
 }
 
-func buildLoginCmd() *cobra.Command {
+func buildLoginCmd(app *common.App) *cobra.Command {
 	var flags credentials
 
 	cmd := &cobra.Command{
@@ -91,11 +91,9 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			cfg, err := config.Load()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
+			cfg := app.GetConfig()
 
+			var err error
 			creds := credentials{
 				publicKey: flagOrEnvVar(flags.publicKey, "TIGER_PUBLIC_KEY"),
 				secretKey: flagOrEnvVar(flags.secretKey, "TIGER_SECRET_KEY"),
@@ -114,9 +112,13 @@ Examples:
 				if err != nil {
 					return err
 				}
-				if err := config.StoreOAuthCredentials(token, projectID); err != nil {
+				if err := cfg.StoreOAuthCredentials(token, projectID); err != nil {
 					return fmt.Errorf("failed to store credentials: %w", err)
 				}
+				// Hand the freshly authenticated client to the App so later
+				// readers — analytics in particular — use the new credentials
+				// instead of the pre-login state.
+				app.SetClient(client, projectID)
 				// Identify the user for analytics.
 				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
 				finishLogin(cmd, projectID)
@@ -142,9 +144,12 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
-			if err := config.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
+			if err := cfg.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
+			// See the OAuth branch above: keep the App's client in sync with the
+			// credentials we just stored.
+			app.SetClient(client, authInfo.ApiKey.Project.Id)
 			finishLogin(cmd, authInfo.ApiKey.Project.Id)
 			return nil
 		},

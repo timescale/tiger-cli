@@ -15,7 +15,7 @@ import (
 )
 
 // buildServiceForkCmd creates the fork subcommand
-func buildServiceForkCmd() *cobra.Command {
+func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var forkServiceName string
 	var forkNoWait bool
 	var forkNoSetDefault bool
@@ -27,7 +27,6 @@ func buildServiceForkCmd() *cobra.Command {
 	var forkMemory string
 	var forkWithPassword bool
 	var forkEnvironment string
-	var output string
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -71,8 +70,7 @@ Examples:
   # Fork with custom wait timeout
   tiger service fork svc-12345 --now --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion,
-		PreRunE:           bindFlags("output"),
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -100,20 +98,19 @@ Examples:
 				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", forkEnvironment)
 			}
 
-			// Load config and API client
-			cfg, err := common.LoadConfig(cmd.Context())
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg.Config); err != nil {
+			if err := common.CheckReadOnly(cfg); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
 
 			// Determine source service ID
-			serviceID, err := getServiceID(cfg.Config, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -176,7 +173,7 @@ Examples:
 			}
 
 			// Make API call to fork service
-			forkResp, err := cfg.Client.ForkServiceWithResponse(ctx, cfg.ProjectID, serviceID, forkReq)
+			forkResp, err := client.ForkServiceWithResponse(ctx, projectID, serviceID, forkReq)
 			if err != nil {
 				return fmt.Errorf("failed to fork Service: %w", err)
 			}
@@ -196,11 +193,11 @@ Examples:
 			fmt.Fprintf(statusOutput, "📋 New Service ID: %s\n", forkedServiceID)
 
 			// Save password immediately after service fork
-			passwordSaved := handlePasswordSaving(forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
+			passwordSaved := handlePasswordSaving(cfg, forkedService, util.Deref(forkedService.InitialPassword), statusOutput)
 
 			// Set as default service unless --no-set-default is used
 			if !forkNoSetDefault {
-				if err := setDefaultService(cfg.Config, forkedServiceID, statusOutput); err != nil {
+				if err := setDefaultService(cfg, forkedServiceID, statusOutput); err != nil {
 					// Log warning but don't fail the command
 					fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to set service as default: %v\n", err)
 				}
@@ -214,8 +211,8 @@ Examples:
 				// Wait for service to be ready
 				fmt.Fprintf(statusOutput, "⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-					Client:    cfg.Client,
-					ProjectID: cfg.ProjectID,
+					Client:    client,
+					ProjectID: projectID,
 					ServiceID: forkedServiceID,
 					Handler: &common.StatusWaitHandler{
 						TargetStatus: "READY",
@@ -241,7 +238,7 @@ Examples:
 				}
 			}
 
-			if err := outputService(cmd, forkedService, cfg.Output, forkWithPassword, false); err != nil {
+			if err := outputService(cmd, cfg, forkedService, cfg.Output, forkWithPassword, false); err != nil {
 				fmt.Fprintf(statusOutput, "⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -267,7 +264,7 @@ Examples:
 	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
-	cmd.Flags().VarP((*outputWithEnvFlag)(&output), "output", "o", "Output format (json, yaml, env, table)")
+	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
 	return cmd
 }
