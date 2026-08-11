@@ -1,16 +1,15 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // buildServiceDeleteCmd creates the delete subcommand
@@ -65,12 +64,12 @@ Examples:
 
 			// Prompt for confirmation unless --confirm is used
 			if !deleteConfirm {
+				if !util.IsTerminal(cmd.InOrStdin()) {
+					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+				}
 				cmd.PrintErrf("Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
 				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
-				confirmation, err := readString(cmd.Context(), func() (string, error) {
-					reader := bufio.NewReader(os.Stdin)
-					return reader.ReadString('\n')
-				})
+				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -69,8 +68,11 @@ Examples:
 			var clientName string
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
+				if !util.IsTerminal(cmd.InOrStdin()) {
+					return fmt.Errorf("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
+				}
 				var err error
-				clientName, err = selectClientInteractively(cmd.ErrOrStderr())
+				clientName, err = selectClientInteractively(cmd)
 				if err != nil {
 					return fmt.Errorf("failed to select client: %w", err)
 				}
@@ -488,7 +490,7 @@ type ClientOption struct {
 }
 
 // selectClientInteractively prompts the user to select a client using Bubble Tea
-func selectClientInteractively(out io.Writer) (string, error) {
+func selectClientInteractively(cmd *cobra.Command) (string, error) {
 	// Build client options from supportedClients
 	var options []ClientOption
 	for _, cfg := range supportedClients {
@@ -510,7 +512,7 @@ func selectClientInteractively(out io.Writer) (string, error) {
 		cursor:  0,
 	}
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
 	finalModel, err := program.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed to run editor selection: %w", err)

@@ -75,7 +75,7 @@ func promptAndResetPassword(
 	role string,
 ) (string, error) {
 	cmd.PrintErr("Enter new password (leave empty to generate): ")
-	newPassword, err := readString(ctx, readPasswordFromTerminal)
+	newPassword, err := util.ReadPassword(ctx, cmd.InOrStdin())
 	cmd.PrintErrln() // newline after password entry
 	if err != nil {
 		return "", fmt.Errorf("error reading password: %w", err)

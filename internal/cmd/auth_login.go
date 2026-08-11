@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -20,7 +18,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"golang.org/x/term"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -105,7 +102,7 @@ Examples:
 					authURL:    cfg.ConsoleURL + "/oauth/authorize",
 					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
 					successURL: cfg.ConsoleURL + "/oauth/code/success",
-					out:        cmd.ErrOrStderr(),
+					cmd:        cmd,
 				}
 
 				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
@@ -174,18 +171,16 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 }
 
 func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
-	if !util.IsTerminal(os.Stdin) {
+	if !util.IsTerminal(cmd.InOrStdin()) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
 	}
 
 	ctx := cmd.Context()
 	cmd.PrintErrf("You can find your API credentials at: %s/dashboard/settings\n\n", consoleURL)
 
-	reader := bufio.NewReader(os.Stdin)
-
 	if creds.publicKey == "" {
 		cmd.PrintErr("Enter your public key: ")
-		publicKey, err := readString(ctx, func() (string, error) { return reader.ReadString('\n') })
+		publicKey, err := util.ReadLine(ctx, cmd.InOrStdin())
 		if err != nil {
 			return credentials{}, err
 		}
@@ -194,10 +189,7 @@ func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentia
 
 	if creds.secretKey == "" {
 		cmd.PrintErr("Enter your secret key: ")
-		password, err := readString(ctx, func() (string, error) {
-			val, err := term.ReadPassword(int(os.Stdin.Fd()))
-			return string(val), err
-		})
+		password, err := util.ReadPassword(ctx, cmd.InOrStdin())
 		if err != nil {
 			return credentials{}, err
 		}
@@ -213,7 +205,7 @@ type oauthLogin struct {
 	authURL    string
 	tokenURL   string
 	successURL string
-	out        io.Writer
+	cmd        *cobra.Command
 }
 
 func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
@@ -252,15 +244,15 @@ func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 	}
 	defer func() {
 		if err := server.server.Shutdown(ctx); err != nil {
-			fmt.Fprintf(l.out, "Failed to close local server: %s\n", err)
+			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
 		}
 	}()
 
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
-	fmt.Fprintf(l.out, "Auth URL is: %s\n", authURL)
-	fmt.Fprintln(l.out, "Opening browser for authentication...")
+	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
+	l.cmd.PrintErrln("Opening browser for authentication...")
 	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(l.out, "Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
+		l.cmd.PrintErrf("Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
 	}
 
 	select {
@@ -428,18 +420,21 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	case 1:
 		return projects[0].Id, nil
 	default:
-		return selectProjectInteractively(projects, l.out)
+		if !util.IsTerminal(l.cmd.InOrStdin()) {
+			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
+		}
+		return selectProjectInteractively(l.cmd, projects)
 	}
 }
 
 // selectProjectInteractivelyImpl is the default implementation for project selection using Bubble Tea
-func selectProjectInteractivelyImpl(projects []api.Project, out io.Writer) (string, error) {
+func selectProjectInteractivelyImpl(cmd *cobra.Command, projects []api.Project) (string, error) {
 	model := projectSelectModel{
 		projects: projects,
 		cursor:   0,
 	}
 
-	program := tea.NewProgram(model, tea.WithOutput(out))
+	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
 	finalModel, err := program.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed to run project selection: %w", err)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -368,13 +368,16 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		{Id: "project-789", Name: "Test Project 3"},
 	}, "project-789")
 
+	// The picker only runs on a TTY
+	stubIsTerminal(t, true)
+
 	// Mock the project selection to simulate user selecting the third project (index 2)
 	originalSelectProjectInteractively := selectProjectInteractively
 	defer func() {
 		selectProjectInteractively = originalSelectProjectInteractively
 	}()
 
-	selectProjectInteractively = func(projects []api.Project, out io.Writer) (string, error) {
+	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
 		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].Id)
 		// Simulate user pressing down arrow twice and then enter (selects third project)
 		return projects[2].Id, nil

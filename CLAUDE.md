@@ -653,7 +653,7 @@ Place a helper by who calls it, working down this list until one matches:
 2. **Several commands in one group** → the group file (`service.go`, `db.go`).
 3. **Across groups** → a package-level `<topic>_helper.go` file:
    `completion_helper.go`, `flag_helper.go`, `logger_helper.go`,
-   `terminal_helper.go`, `password_helper.go`.
+   `password_helper.go`.
 4. **A genuine standalone utility** — small and isolated, with no notion of a
    command (`util.GenerateSecurePassword`) → `internal/util`. Anything shaped
    around the CLI stays in `cmd` even if its signature looks generic.
@@ -999,6 +999,71 @@ cobra. Those take an `io.Writer` (`common.WaitForServiceArgs.Output`,
 `common.NewSpinner`, `version.PrintUpdateWarning`) and the caller in
 `internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`.
 
+### Reading Stdin
+
+Read through `cmd.InOrStdin()`, never `os.Stdin`, and use the helpers in
+`internal/util/read.go` rather than driving `bufio`/`term` directly:
+
+- `util.ReadLine(ctx, cmd.InOrStdin())` — one line, trimmed. Confirmation
+  prompts and plain text input.
+- `util.ReadPassword(ctx, cmd.InOrStdin())` — reads without echoing.
+- `util.ReadAll(ctx, cmd.InOrStdin())` — everything, for piped input.
+
+All three run the blocking read on a goroutine and select on `ctx.Done()`, so
+Ctrl-C unblocks a waiting prompt instead of hanging until the user hits enter.
+`ReadPassword` also saves and restores the terminal state, so a cancelled prompt
+doesn't leave the shell in raw mode.
+
+**Every read that prompts the user in real time must be gated on
+`util.IsTerminal(cmd.InOrStdin())`**, and must return an error naming the
+non-interactive alternative when it's false — see `service update-password`
+("use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD
+environment variable") and `service delete` ("use --confirm to skip the
+prompt"). That covers confirmations, password prompts, and every BubbleTea menu
+(see "Interactive Terminal UIs"). Ungated, they fail on an unhelpful EOF, or
+block forever, when the command runs in CI or with stdin redirected.
+
+The gate is about *prompts*, not about reading stdin as such. A read whose whole
+point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
+gated, since a TTY is exactly what it doesn't expect.
+
+Put the gate immediately before the prompt in the command body rather than
+inside the shared helper, so the error can name the flag or env var that command
+offers. `util.IsTerminal` takes `any`, so it works for both readers and writers.
+
+`util.IsTerminal` and `util.ReadPassword` are `var`s so tests can replace them:
+`stubIsTerminal(t, true)` and `stubReadPassword(t, "pw")` in `main_test.go` do
+this with `t.Cleanup`. `ReadPassword` needs stdin to be a real `*os.File`, so a
+password prompt can't be driven with `cmd.SetIn`; `ReadLine`/`ReadAll` take any
+`io.Reader` and work fine with it.
+
+### Interactive Terminal UIs
+
+Interactive menus use BubbleTea (`github.com/charmbracelet/bubbletea`). When
+creating a `tea.NewProgram`, always pass both streams:
+
+```go
+program := tea.NewProgram(model,
+    tea.WithInput(cmd.InOrStdin()),
+    tea.WithOutput(cmd.ErrOrStderr()))
+```
+
+`tea.WithInput` is easy to forget and there is no compile error if you do:
+BubbleTea silently defaults to `os.Stdin`, so the program reads real stdin no
+matter what the command was given. Pass it even when the model looks write-only.
+The one deliberate exception is `common.NewSpinner`, which passes
+`tea.WithInput(nil)` because it never reads keys.
+
+Output goes to **stderr** — a menu is interactive UI, not the command's result
+(see "Output Streams").
+
+Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin())` and return an
+error naming the non-interactive alternative when it's false. Without the gate
+the program fails deep inside BubbleTea with an opaque error, or blocks.
+
+Because these helpers need both streams, they take the `*cobra.Command` rather
+than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`.
+
 ### Boolean Flag Patterns
 
 When implementing boolean flags that can be enabled or disabled, follow the GitHub CLI pattern:
@@ -1049,8 +1114,10 @@ if len(args) < 1 {
 // Interactive confirmation unless --confirm
 if !confirmFlag {
     cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
-    var confirmation string
-    fmt.Scanln(&confirmation)
+    confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
+    if err != nil {
+        return fmt.Errorf("failed to read confirmation: %w", err)
+    }
     if confirmation != serviceID {
         return fmt.Errorf("confirmation did not match")
     }
