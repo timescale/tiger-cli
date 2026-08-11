@@ -3,14 +3,13 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -81,13 +80,13 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceLogsOutput{}, err
 	}
 
-	logging.Debug("MCP: Fetching service logs",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.Intp("node", input.Node),
-		zap.Int("tail", input.Tail),
-		zap.Timep("since", input.Since),
-		zap.Timep("until", input.Until),
+	s.logger.Info("MCP: Fetching service logs",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.Any("node", input.Node),
+		slog.Int("tail", input.Tail),
+		slog.Any("since", input.Since),
+		slog.Any("until", input.Until),
 	)
 
 	// Fetch logs with pagination support

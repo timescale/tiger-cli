@@ -105,7 +105,6 @@ tiger-cli/
 │   ├── api/                # Generated OpenAPI client (oapi-codegen)
 │   │   └── mocks/          # Generated mocks for testing
 │   ├── config/             # Configuration management
-│   ├── logging/            # Structured logging utilities
 │   ├── mcp/                # MCP server implementation (one file per tool)
 │   ├── common/             # Shared business logic used by CLI and MCP
 │   ├── cmd/                # CLI commands (Cobra, one file per command)
@@ -130,15 +129,13 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
   (`tiger service create` → `service_create.go`). `root.go` holds the root
   command, global flags, and `wrapCommands`, which gives every command the same
   per-invocation lifecycle: load config + API client once into a `common.App`,
-  initialize logging, apply color settings, check for a newer release, and track
-  analytics.
+  apply color settings, check for a newer release, and track analytics.
 - **App**: `internal/common/app.go` - per-invocation config and API client, built
   once by `wrapCommands` (or per request by the MCP analytics middleware) and read
   by commands, MCP tool handlers, and completion functions
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. `config.Load(flags)` resolves values through a per-call viper
   instance (flag > env > file > default); there is no global config state
-- **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server
   implementation. Each MCP tool lives in its own file, named to match the tool
@@ -154,9 +151,12 @@ The CLI uses a layered configuration approach (listed from lowest to highest pre
 
 ### Logging Architecture
 
-Two-mode logging system using zap:
-- **Production mode**: Minimal output, warn level and above, clean formatting
-- **Debug mode**: Full development logging with colors and debug level. Enable with `--debug` or `TIGER_DEBUG=true`.
+Only the MCP server logs. `tiger mcp start` builds a `*slog.Logger` with
+`newLogger(cmd.ErrOrStderr())` (`internal/cmd/logger_helper.go`), which points
+the standard `log` package at that writer and returns `slog.Default()`. That
+logger is passed to `mcp.NewServer`, which uses it for its own output and hands
+it to the MCP SDK (`mcp.ServerOptions.Logger`); a nil logger is discarded.
+Everything else writes to stdout/stderr directly rather than logging.
 
 ## Code Generation
 

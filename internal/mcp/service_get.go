@@ -3,15 +3,14 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -61,9 +60,9 @@ func (s *Server) handleServiceGet(ctx context.Context, req *mcp.CallToolRequest,
 		return nil, ServiceGetOutput{}, err
 	}
 
-	logging.Debug("MCP: Getting service details",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID))
+	s.logger.Info("MCP: Getting service details",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID))
 
 	// Make API call to get service details
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)

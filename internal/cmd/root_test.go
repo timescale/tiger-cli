@@ -110,15 +110,11 @@ analytics: true
 		"--config-dir", tmpDir,
 		"--service-id", "flag-service",
 		"--analytics=false",
-		"--debug",
 		"version", // Need a subcommand to execute
 	)
 
 	if cfg.ServiceID != "flag-service" {
 		t.Errorf("Expected service_id 'flag-service', got '%s'", cfg.ServiceID)
-	}
-	if !cfg.Debug {
-		t.Error("Expected debug true from flag, got false")
 	}
 	if cfg.ConfigDir != tmpDir {
 		t.Errorf("Expected config dir '%s' from flag, got '%s'", tmpDir, cfg.ConfigDir)

@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 func buildConfigSetCmd(app *common.App) *cobra.Command {
@@ -27,7 +25,6 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
 
-			logging.Info("Configuration updated", zap.String("key", key), zap.String("value", value))
 			fmt.Fprintf(cmd.OutOrStdout(), "Set %s = %s\n", key, value)
 			return nil
 		},

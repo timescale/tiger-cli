@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/jackc/pgx/v5"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -159,13 +158,13 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	// Convert timeout in seconds to time.Duration
 	timeout := time.Duration(input.TimeoutSeconds) * time.Second
 
-	logging.Debug("MCP: Executing database query",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.Duration("timeout", timeout),
-		zap.String("role", input.Role),
-		zap.Bool("pooled", input.Pooled),
-		zap.Bool("read_only", cfg.ReadOnly),
+	s.logger.Info("MCP: Executing database query",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.Duration("timeout", timeout),
+		slog.String("role", input.Role),
+		slog.Bool("pooled", input.Pooled),
+		slog.Bool("read_only", cfg.ReadOnly),
 	)
 
 	// service_id may name a service or one of its read replicas.

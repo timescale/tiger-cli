@@ -17,10 +17,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/hujson"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -285,16 +283,16 @@ func SupportedClients() []ClientInfo {
 func InstallMCPForClient(opts InstallOptions) error {
 	// Validate required options
 	if opts.ClientName == "" {
-		return fmt.Errorf("ClientName is required")
+		return fmt.Errorf("missing required option: ClientName")
 	}
 	if opts.ServerName == "" {
-		return fmt.Errorf("ServerName is required")
+		return fmt.Errorf("missing required option: ServerName")
 	}
 	if opts.Command == "" {
-		return fmt.Errorf("Command is required")
+		return fmt.Errorf("missing required option: Command")
 	}
 	if opts.Args == nil {
-		return fmt.Errorf("Args is required")
+		return fmt.Errorf("missing required option: Args")
 	}
 
 	// Find the client configuration by name
@@ -320,16 +318,6 @@ func InstallMCPForClient(opts InstallOptions) error {
 		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", opts.ClientName)
 	}
 	// else: CLI-only client - configPath remains empty, will use buildInstallCommand
-
-	logging.Info("Installing MCP server configuration",
-		zap.String("client", opts.ClientName),
-		zap.String("server_name", opts.ServerName),
-		zap.String("command", opts.Command),
-		zap.Strings("args", opts.Args),
-		zap.String("config_path", configPath),
-		zap.String("mcp_servers_path", mcpServersPathPrefix),
-		zap.Bool("create_backup", opts.CreateBackup),
-	)
 
 	// Create backup if requested and we have a config file
 	if opts.CreateBackup && configPath != "" {
@@ -456,7 +444,6 @@ func findClientConfigFile(configPaths []string) (string, error) {
 
 		// Check if file exists
 		if _, err := os.Stat(expandedPath); err == nil {
-			logging.Info("Found existing config file", zap.String("path", expandedPath))
 			return expandedPath, nil
 		}
 	}
@@ -467,8 +454,6 @@ func findClientConfigFile(configPaths []string) (string, error) {
 	}
 
 	defaultPath := util.ExpandPath(configPaths[0]) // Use first path as default
-	logging.Info("No existing config found, will create at default location",
-		zap.String("path", defaultPath))
 	return defaultPath, nil
 }
 
@@ -641,10 +626,6 @@ func addMCPServerViaCLI(clientCfg *clientConfig, serverName, command string, arg
 		return fmt.Errorf("failed to build install command: %w", err)
 	}
 
-	logging.Info("Adding MCP server using CLI",
-		zap.String("client", clientCfg.Name),
-		zap.Strings("command", installCommand))
-
 	// Run the configured CLI command
 	cmd := exec.Command(installCommand[0], installCommand[1:]...)
 
@@ -658,10 +639,6 @@ func addMCPServerViaCLI(clientCfg *clientConfig, serverName, command string, arg
 		return fmt.Errorf("failed to run %s installation command: %w\nCommand: %s", clientCfg.Name, err, cmdStr)
 	}
 
-	logging.Info("Successfully added MCP server via CLI",
-		zap.String("client", clientCfg.Name),
-		zap.String("output", string(output)))
-
 	return nil
 }
 
@@ -670,7 +647,6 @@ func createConfigBackup(configPath string) (string, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); errors.Is(err, fs.ErrNotExist) {
 		// No existing config file, no backup needed
-		logging.Info("No existing configuration file found, skipping backup")
 		return "", nil
 	}
 
@@ -694,7 +670,6 @@ func createConfigBackup(configPath string) (string, error) {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
-	logging.Info("Created configuration backup", zap.String("backup_path", backupPath))
 	return backupPath, nil
 }
 
@@ -724,7 +699,6 @@ func addMCPServerViaJSON(configPath, mcpServersPathPrefix, serverName, command s
 		if !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
-		logging.Info("Config file not found, creating new one")
 		content = []byte("{}")
 	}
 
@@ -773,12 +747,6 @@ func addMCPServerViaJSON(configPath, mcpServersPathPrefix, serverName, command s
 	if err := os.WriteFile(configPath, formatted, fileMode); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
-
-	logging.Info("Added MCP server to configuration",
-		zap.String("server_name", serverName),
-		zap.String("command", serverConfig.Command),
-		zap.Strings("args", serverConfig.Args),
-	)
 
 	return nil
 }

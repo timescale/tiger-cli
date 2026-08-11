@@ -6,10 +6,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
@@ -37,7 +35,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			cmd.SilenceUsage = true
-			return startStdioServer(cmd.Context(), app)
+			return startStdioServer(cmd, app)
 		},
 	}
 
@@ -49,11 +47,12 @@ Examples:
 }
 
 // startStdioServer starts the MCP server with stdio transport
-func startStdioServer(ctx context.Context, app *common.App) error {
-	logging.Info("Starting Tiger MCP server", zap.String("transport", "stdio"))
+func startStdioServer(cmd *cobra.Command, app *common.App) error {
+	ctx := cmd.Context()
+	logger := newLogger(cmd.ErrOrStderr())
 
 	// Create MCP server
-	server, err := mcp.NewServer(ctx, app)
+	server, err := mcp.NewServer(ctx, app, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)
 	}

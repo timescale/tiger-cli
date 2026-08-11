@@ -22,7 +22,6 @@ const (
 	DefaultAnalytics       = true
 	DefaultColor           = true
 	DefaultConsoleURL      = "https://console.cloud.tigerdata.com"
-	DefaultDebug           = false
 	DefaultDocsMCP         = true
 	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database"
 	DefaultGatewayURL      = "https://console.cloud.tigerdata.com/api"
@@ -44,7 +43,6 @@ var defaultValues = map[string]any{
 	"api_url":          DefaultAPIURL,
 	"color":            DefaultColor,
 	"console_url":      DefaultConsoleURL,
-	"debug":            DefaultDebug,
 	"docs_mcp":         DefaultDocsMCP,
 	"docs_mcp_url":     DefaultDocsMCPURL,
 	"gateway_url":      DefaultGatewayURL,
@@ -63,7 +61,6 @@ var defaultValues = map[string]any{
 var flagBindings = map[string]string{
 	"analytics":        "analytics",
 	"color":            "color",
-	"debug":            "debug",
 	"output":           "output",
 	"password-storage": "password_storage",
 	"service-id":       "service_id",
@@ -76,7 +73,6 @@ type Config struct {
 	Analytics       bool   `mapstructure:"analytics"`
 	Color           bool   `mapstructure:"color"`
 	ConsoleURL      string `mapstructure:"console_url"`
-	Debug           bool   `mapstructure:"debug"`
 	DocsMCP         bool   `mapstructure:"docs_mcp"`
 	DocsMCPURL      string `mapstructure:"docs_mcp_url"`
 	GatewayURL      string `mapstructure:"gateway_url"`
@@ -100,7 +96,6 @@ type ConfigOutput struct {
 	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
 	ConfigDir       *string `mapstructure:"-" json:"config_dir,omitempty"`
 	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
-	Debug           *bool   `mapstructure:"debug" json:"debug,omitempty"`
 	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
 	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
 	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
@@ -367,7 +362,7 @@ func validateValue(key, value string) (any, error) {
 	switch key {
 	case "api_url", "console_url", "docs_mcp_url", "gateway_url", "releases_url", "service_id":
 		return value, nil
-	case "analytics", "color", "debug", "docs_mcp", "read_only", "version_check":
+	case "analytics", "color", "docs_mcp", "read_only", "version_check":
 		return parseBool(key, value)
 	case "mcp_max_rows":
 		return parsePositiveInt(key, value)

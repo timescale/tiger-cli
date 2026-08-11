@@ -3,15 +3,14 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -155,10 +154,10 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
 	}); err != nil {
-		logging.Error("MCP: Failed to build connection string", zap.Error(err))
+		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
 	} else {
 		if withPassword && details.Password == "" {
-			logging.Error("MCP: Requested password but password not available")
+			s.logger.Error("MCP: Requested password but password not available")
 		}
 		detail.ConnectionString = details.String()
 		detail.Password = details.Password

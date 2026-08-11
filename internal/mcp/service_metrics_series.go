@@ -3,17 +3,16 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -110,12 +109,12 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		return nil, nil, err
 	}
 
-	logging.Debug("MCP: Fetching metric series",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.String("metric", input.MetricName),
-		zap.String("from", input.From),
-		zap.String("to", input.To),
+	s.logger.Info("MCP: Fetching metric series",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.String("metric", input.MetricName),
+		slog.String("from", input.From),
+		slog.String("to", input.To),
 	)
 
 	fromTime, err := time.Parse(time.RFC3339, input.From)

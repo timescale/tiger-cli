@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 func buildConfigResetCmd(app *common.App) *cobra.Command {
@@ -25,7 +24,6 @@ func buildConfigResetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to reset config: %w", err)
 			}
 
-			logging.Info("Configuration reset to defaults")
 			fmt.Fprintln(cmd.OutOrStdout(), "Configuration reset to defaults")
 			return nil
 		},

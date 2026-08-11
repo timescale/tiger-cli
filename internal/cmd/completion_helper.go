@@ -99,7 +99,7 @@ func mcpGetCompletion(app *common.App) cobra.CompletionFunc {
 		}
 
 		// Create MCP server to get capabilities
-		server, err := mcp.NewServer(cmd.Context(), app)
+		server, err := mcp.NewServer(cmd.Context(), app, nil)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

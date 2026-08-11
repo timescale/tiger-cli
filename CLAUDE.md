@@ -132,6 +132,17 @@ go generate ./internal/api
 - Run `go vet ./...` to catch potential issues before committing
 - Run `go test ./...` to ensure all tests pass
 
+### Error Messages
+
+Error strings start with a **lowercase** letter, so they read correctly when a
+caller wraps them: `fmt.Errorf("failed to get service: %w", err)`. Log messages
+are the opposite — they start with a capital letter (see "Logging Architecture").
+
+The exception is a leading proper noun or initialism, which keeps its
+capitalization (`fmt.Errorf("API key validation failed: %w", err)`). If that
+reads awkwardly, reword so the identifier isn't first — `missing required option:
+ClientName` rather than `ClientName is required`.
+
 ### Configuration Management
 
 **IMPORTANT:** Follow these rules when working with configuration:
@@ -299,7 +310,6 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see
   "Configuration Management" above
-- **Logging**: `internal/logging/logging.go` - Structured logging with zap
 - **API Client**: `internal/api/` - Generated OpenAPI client with mocks
 - **MCP Server**: `internal/mcp/` - Model Context Protocol server implementation.
   Each MCP tool lives in its own file, named to match the tool (see "One File Per
@@ -369,13 +379,14 @@ The Tiger MCP server provides AI assistants with programmatic access to Tiger re
 
 **Server State:**
 
-`NewServer(ctx, app)` takes the already-loaded `*common.App` and keeps it on the
-`Server`. Read-only mode, the experimental gate, and the docs-proxy settings are
-read once here at startup (a client must restart the server to pick those up),
-while the analytics middleware calls `s.app.Load(ctx)` on every request so tool
-handlers see current config and credentials. Handlers therefore never load
-anything themselves — they read `s.app.GetAll()`, `s.app.GetClient()`, or
-`s.app.GetConfig()`.
+`NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it
+on the `Server`, along with the logger (nil is replaced with a discarding one;
+see "Logging Architecture"). Read-only mode, the experimental gate, and the
+docs-proxy settings are read once here at startup (a client must restart the
+server to pick those up), while the analytics middleware calls `s.app.Load(ctx)`
+on every request so tool handlers see current config and credentials. Handlers
+therefore never load anything themselves — they read `s.app.GetAll()`,
+`s.app.GetClient()`, or `s.app.GetConfig()`, and log via `s.logger`.
 
 **One File Per MCP Tool:**
 
@@ -469,15 +480,39 @@ addTool(s, readOnly, newServiceCreateTool(), s.handleServiceCreate)
 
 ### Logging Architecture
 
-Two-mode logging system using zap:
-- **Production mode**: Minimal output, warn level and above, clean formatting
-- **Debug mode**: Full development logging with colors and debug level
+Only the MCP server logs. `newLogger(w io.Writer)`
+(`internal/cmd/logger_helper.go`) points the standard `log` package at `w` and
+returns `slog.Default()`; `tiger mcp start` (stdio and http) calls it with
+`cmd.ErrOrStderr()` and passes the result to `mcp.NewServer`, which uses it for
+its own output and hands it to the MCP SDK (`mcp.ServerOptions.Logger` and the
+docs proxy's `mcp.ClientOptions.Logger`) — so the SDK's own session-lifecycle
+lines land on the same stream. `mcp.NewServer(ctx, app, nil)` — used by
+`mcp list`, `mcp get`, and completion, which only enumerate capabilities —
+discards the output via `slog.New(slog.DiscardHandler)`.
+
+There is no level configuration and no `--debug` flag. `slog.Default()` drops
+anything below `Info` unless `slog.SetLogLoggerLevel` is called, so log at `Info`
+or above; a `Debug` call would silently go nowhere. Attach errors with
+`slog.Any("error", err)`, not `slog.String("error", err.Error())`. Log messages
+start with a capital letter — error strings do the opposite (see "Error
+Messages").
+
+Because every statement is visible by default, keep them sparse: log failures
+that would otherwise be swallowed (the docs-proxy registration errors are the
+model), not per-step tracing of work that succeeded. A default `tiger mcp start`
+is silent; the startup lines that do exist report configuration that removes
+capabilities — the docs proxy being disabled, and each write tool skipped in
+read-only mode — so a client can see why a tool it expected is missing.
+
+Everything outside `internal/mcp` writes to stdout/stderr directly rather than
+logging. Don't add log statements to CLI commands — print to
+`cmd.OutOrStdout()`/`cmd.ErrOrStderr()`, or return an error.
 
 ### Dependencies
 
 - **Cobra**: CLI framework and command structure
 - **Viper**: Configuration management with multiple sources
-- **Zap**: Structured logging
+- **slog**: Structured logging for the MCP server
 - **oapi-codegen**: OpenAPI client generation (build-time dependency)
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
@@ -494,7 +529,6 @@ tiger-cli/
 │   ├── api/                # Generated OpenAPI client (oapi-codegen)
 │   │   └── mocks/          # Generated mocks for testing
 │   ├── config/             # Configuration management
-│   ├── logging/            # Structured logging utilities
 │   ├── mcp/                # MCP server implementation (one file per tool)
 │   ├── common/             # Shared business logic (password storage, wait ops, error handling, log fetching)
 │   ├── cmd/                # CLI commands (Cobra, one file per command)
@@ -548,6 +582,11 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
 
+`SilenceErrors` is a separate setting and is rarely needed: set it only on a
+command that already reports its own errors, so cobra doesn't print them a second
+time. `tiger mcp start http` sets it because the MCP server logs failures through
+slog before returning them.
+
 ## Command Architecture: Pure Functional Builder Pattern
 
 Tiger CLI uses a pure functional builder pattern with **zero global command state**. This architecture ensures perfect test isolation, eliminates shared state issues, and provides a clean, maintainable command structure.
@@ -580,11 +619,10 @@ order:
 
 1. `app.SetFlags(cmd.Flags())` then `app.Load(ctx)` — the single config + API
    client load for the invocation
-2. `logging.Init(cfg.Debug)`, with `logging.Sync()` deferred
-3. `color.NoColor` from `cfg.Color`
-4. `versionCheck(...)` — starts a background release check, deferring the print
+2. `color.NoColor` from `cfg.Color`
+3. `versionCheck(...)` — starts a background release check, deferring the print
    so it lands after the command's own output
-5. analytics — deferred, so it records the command's outcome and re-reads the App
+4. analytics — deferred, so it records the command's outcome and re-reads the App
    (see "Configuration Management")
 
 Commands cobra adds after `wrapCommands` runs — `help`, `completion`, and the
@@ -614,8 +652,8 @@ Place a helper by who calls it, working down this list until one matches:
 1. **One command** → that command's file.
 2. **Several commands in one group** → the group file (`service.go`, `db.go`).
 3. **Across groups** → a package-level `<topic>_helper.go` file:
-   `completion_helper.go`, `flag_helper.go`, `terminal_helper.go`,
-   `password_helper.go`.
+   `completion_helper.go`, `flag_helper.go`, `logger_helper.go`,
+   `terminal_helper.go`, `password_helper.go`.
 4. **A genuine standalone utility** — small and isolated, with no notion of a
    command (`util.GenerateSecurePassword`) → `internal/util`. Anything shaped
    around the CLI stays in `cmd` even if its signature looks generic.
@@ -659,7 +697,6 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
 
     // Set up persistent flags
     cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
-    cmd.PersistentFlags().Bool("debug", false, "enable debug logging")
     skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
     // ... add remaining persistent flags
 

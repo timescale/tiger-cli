@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -82,10 +81,10 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceResizeOutput{}, err
 	}
 
-	logging.Debug("MCP: Resizing service",
-		zap.String("project_id", projectID),
-		zap.String("service_id", input.ServiceID),
-		zap.String("cpu_memory", input.CPUMemory),
+	s.logger.Info("MCP: Resizing service",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID),
+		slog.String("cpu_memory", input.CPUMemory),
 	)
 
 	// Parse CPU/Memory combination

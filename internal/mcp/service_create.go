@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/logging"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -123,14 +122,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
-	logging.Debug("MCP: Creating service",
-		zap.String("project_id", projectID),
-		zap.String("name", input.Name),
-		zap.Strings("addons", input.Addons),
-		zap.Stringp("region", input.Region),
-		zap.Stringp("cpu", cpuMillis),
-		zap.Stringp("memory", memoryGBs),
-		zap.Int("replicas", input.Replicas),
+	s.logger.Info("MCP: Creating service",
+		slog.String("project_id", projectID),
+		slog.String("name", input.Name),
+		slog.Any("addons", input.Addons),
+		slog.Any("region", input.Region),
+		slog.Any("cpu", cpuMillis),
+		slog.Any("memory", memoryGBs),
+		slog.Int("replicas", input.Replicas),
 	)
 
 	// Prepare service creation request
@@ -168,9 +167,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	if input.SetDefault {
 		if err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service creation
-			logging.Debug("MCP: Failed to set service as default", zap.Error(err))
+			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
 		} else {
-			logging.Debug("MCP: Set service as default", zap.String("service_id", serviceID))
+			s.logger.Info("MCP: Set service as default", slog.String("service_id", serviceID))
 		}
 	}
 
@@ -181,9 +180,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		result, err := common.SavePasswordWithResult(cfg, api.Service(service), *service.InitialPassword, "tsdbadmin")
 		passwordStorage = &result
 		if err != nil {
-			logging.Debug("MCP: Password storage failed", zap.Error(err))
+			s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 		} else {
-			logging.Debug("MCP: Password saved successfully", zap.String("method", result.Method))
+			s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
 		}
 	}
 

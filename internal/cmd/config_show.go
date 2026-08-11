@@ -73,9 +73,6 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	if cfg.ConsoleURL != nil {
 		table.Append("console_url", *cfg.ConsoleURL)
 	}
-	if cfg.Debug != nil {
-		table.Append("debug", fmt.Sprintf("%t", *cfg.Debug))
-	}
 	if cfg.DocsMCP != nil {
 		table.Append("docs_mcp", fmt.Sprintf("%t", *cfg.DocsMCP))
 	}

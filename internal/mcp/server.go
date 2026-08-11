@@ -5,17 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/logging"
 )
 
 const (
@@ -44,6 +43,7 @@ const (
 type Server struct {
 	mcpServer       *mcp.Server
 	docsProxyClient *ProxyClient
+	logger          *slog.Logger
 
 	// app holds the config and API client. The analytics middleware reloads it
 	// once per request, so config changes and logins made while the session is
@@ -55,7 +55,7 @@ type Server struct {
 // addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
 func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
 	if readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
-		logging.Debug("Skipping write tool in read-only mode", zap.String("tool", t.Name))
+		s.logger.Info("Skipping write tool in read-only mode", slog.String("tool", t.Name))
 		return
 	}
 	mcp.AddTool(s.mcpServer, t, h)
@@ -80,17 +80,23 @@ func buildServerInstructions(cfg *config.Config) string {
 // NewServer creates a new Tiger MCP server instance. The app must already be
 // loaded: its config renders the read-only warning in the server instructions
 // and gates which tools are registered, both evaluated once here at startup.
-func NewServer(ctx context.Context, app *common.App) (*Server, error) {
+// A nil logger discards the server's log output.
+func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Server, error) {
 	cfg := app.GetConfig()
+	logger = ensureLogger(logger)
 
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    ServerName,
 		Title:   serverTitle,
 		Version: config.Version,
-	}, &mcp.ServerOptions{Instructions: buildServerInstructions(cfg)})
+	}, &mcp.ServerOptions{
+		Instructions: buildServerInstructions(cfg),
+		Logger:       logger,
+	})
 
 	server := &Server{
 		mcpServer: mcpServer,
+		logger:    logger,
 		app:       app,
 	}
 
@@ -104,6 +110,13 @@ func NewServer(ctx context.Context, app *common.App) (*Server, error) {
 	server.mcpServer.AddReceivingMiddleware(server.analyticsMiddleware)
 
 	return server, nil
+}
+
+func ensureLogger(logger *slog.Logger) *slog.Logger {
+	if logger != nil {
+		return logger
+	}
+	return slog.New(slog.DiscardHandler)
 }
 
 // StartStdio starts the MCP server with the stdio transport
@@ -132,8 +145,6 @@ func (s *Server) registerTools(ctx context.Context, readOnly, experimental bool)
 
 	// Register remote docs MCP server proxy
 	s.registerDocsProxy(ctx)
-
-	logging.Info("MCP tools registered successfully")
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
@@ -187,7 +198,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			var args map[string]any
 			if len(r.Params.Arguments) > 0 {
 				if err := json.Unmarshal(r.Params.Arguments, &args); err != nil {
-					logging.Error("Error unmarshaling tool call arguments", zap.Error(err))
+					s.logger.Error("Error unmarshaling tool call arguments", slog.Any("error", err))
 				}
 			}
 
@@ -229,8 +240,6 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 
 // Close gracefully shuts down the MCP server and all proxy connections
 func (s *Server) Close() error {
-	logging.Debug("Closing MCP server and proxy connections")
-
 	// Close docs proxy connection
 	if err := s.docsProxyClient.Close(); err != nil {
 		return fmt.Errorf("failed to close docs proxy client: %w", err)

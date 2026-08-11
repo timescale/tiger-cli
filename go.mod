@@ -26,7 +26,6 @@ require (
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zalando/go-keyring v0.2.6
 	go.uber.org/mock v0.6.0
-	go.uber.org/zap v1.27.1
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0
@@ -172,6 +171,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.ngrok.com/muxado/v2 v2.0.1 // indirect
