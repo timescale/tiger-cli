@@ -195,7 +195,7 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 	}
 
 	// Sanitize the services
-	sanitized := prepareServicesForOutput(testConfig(t), services, nil)
+	sanitized := prepareServicesForOutput(nil, testConfig(t), services)
 
 	// Verify that we have the same number of services
 	if len(sanitized) != len(services) {

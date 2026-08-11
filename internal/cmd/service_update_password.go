@@ -106,11 +106,9 @@ Examples:
 					serviceID, util.DerefStr(service.ForkedFrom.ServiceId))
 			}
 
-			statusOutput := cmd.ErrOrStderr()
-
 			if autoGenerate {
 				// Auto-generate password using existing function
-				if _, err := resetServicePassword(ctx, cfg, client, service, "tsdbadmin", "", statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cmd, cfg, client, service, "tsdbadmin", ""); err != nil {
 					return err
 				}
 			} else if password == "" {
@@ -118,24 +116,17 @@ Examples:
 				if !checkStdinIsTTY() {
 					return fmt.Errorf("TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable")
 				}
-				_, err := promptAndResetPassword(
-					ctx,
-					cfg,
-					statusOutput,
-					client,
-					service,
-					"tsdbadmin",
-				)
+				_, err := promptAndResetPassword(ctx, cmd, cfg, client, service, "tsdbadmin")
 				if err != nil {
 					return err
 				}
 			} else {
-				if _, err := resetServicePassword(ctx, cfg, client, service, "tsdbadmin", password, statusOutput); err != nil {
+				if _, err := resetServicePassword(ctx, cmd, cfg, client, service, "tsdbadmin", password); err != nil {
 					return err
 				}
 			}
 
-			fmt.Fprintf(statusOutput, "✅ Master password for 'tsdbadmin' user updated successfully\n")
+			cmd.PrintErrf("✅ Master password for 'tsdbadmin' user updated successfully\n")
 			return nil
 		},
 	}

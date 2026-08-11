@@ -51,13 +51,13 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 				if err != nil {
 					// A failed check shouldn't fail the version command; warn and
 					// continue printing the local version info.
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to check for updates: %v\n", err)
+					cmd.PrintErrf("Warning: failed to check for updates: %v\n", err)
 				} else if result != nil {
 					versionOutput.LatestVersion = result.LatestVersion
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
 					updateAvailable = result.UpdateAvailable
 					// Print warning _after_ other output
-					defer version.PrintUpdateWarning(result, cfg, util.Ptr(cmd.ErrOrStderr()))
+					defer version.PrintUpdateWarning(result, cfg, cmd.ErrOrStderr())
 				}
 			}
 
@@ -72,7 +72,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 					return err
 				}
 			case "bare":
-				fmt.Fprintln(output, versionOutput.Version)
+				cmd.Println(versionOutput.Version)
 			default:
 				if err := outputVersionTable(output, versionOutput); err != nil {
 					return err

@@ -63,12 +63,10 @@ Examples:
 				return err
 			}
 
-			statusOutput := cmd.ErrOrStderr()
-
 			// Prompt for confirmation unless --confirm is used
 			if !deleteConfirm {
-				fmt.Fprintf(statusOutput, "Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
-				fmt.Fprintf(statusOutput, "Type the service ID '%s' to confirm: ", serviceID)
+				cmd.PrintErrf("Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
+				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
 				confirmation, err := readString(cmd.Context(), func() (string, error) {
 					reader := bufio.NewReader(os.Stdin)
 					return reader.ReadString('\n')
@@ -77,7 +75,7 @@ Examples:
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
 				if confirmation != serviceID {
-					fmt.Fprintln(statusOutput, "❌ Delete operation cancelled.")
+					cmd.PrintErrln("❌ Delete operation cancelled.")
 					return nil
 				}
 			}
@@ -97,11 +95,11 @@ Examples:
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			fmt.Fprintf(statusOutput, "🗑️  Delete request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("🗑️  Delete request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if deleteNoWait {
-				fmt.Fprintln(statusOutput, "💡 Use 'tiger service list' to check deletion status.")
+				cmd.PrintErrln("💡 Use 'tiger service list' to check deletion status.")
 				return nil
 			}
 
@@ -113,17 +111,17 @@ Examples:
 				Handler: &common.DeletionWaitHandler{
 					ServiceID: serviceID,
 				},
-				Output:     statusOutput,
+				Output:     cmd.ErrOrStderr(),
 				Timeout:    deleteWaitTimeout,
 				TimeoutMsg: "service may still be deleting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
-				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.PrintErrf("❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "✅ Service '%s' has been successfully deleted.\n", serviceID)
+			cmd.PrintErrf("✅ Service '%s' has been successfully deleted.\n", serviceID)
 			return nil
 		},
 	}

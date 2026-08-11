@@ -90,8 +90,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.SilenceUsage = true
 
 			// Display resize information
-			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
 
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
@@ -118,16 +117,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			service := *resp.JSON202
 
-			fmt.Fprintf(statusOutput, "✅ Resize request accepted for service '%s'!\n", serviceID)
+			cmd.PrintErrf("✅ Resize request accepted for service '%s'!\n", serviceID)
 
 			// If not waiting, return early
 			if resizeNoWait {
-				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
+				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for resize to complete
-			fmt.Fprintf(statusOutput, "⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
+			cmd.PrintErrf("⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -136,17 +135,17 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 					TargetStatus: "READY",
 					Service:      &service,
 				},
-				Output:     statusOutput,
+				Output:     cmd.ErrOrStderr(),
 				Timeout:    resizeWaitTimeout,
 				TimeoutMsg: "service may still be resizing",
 			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
-				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.PrintErrf("❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "🎉 Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("🎉 Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
 			return nil
 		},
 	}

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/common"
@@ -74,7 +72,7 @@ Examples:
 				return err
 			}
 
-			fmt.Fprint(cmd.OutOrStdout(), common.FormatSchema(schema))
+			cmd.Print(common.FormatSchema(schema))
 			return nil
 		},
 	}

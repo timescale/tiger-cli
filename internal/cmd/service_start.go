@@ -75,17 +75,16 @@ Examples:
 			}
 			service := *resp.JSON202
 
-			statusOutput := cmd.ErrOrStderr()
-			fmt.Fprintf(statusOutput, "▶️  Start request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("▶️  Start request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if startNoWait {
-				fmt.Fprintln(statusOutput, "💡 Use 'tiger service get' to check service status.")
+				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become ready
-			fmt.Fprintf(statusOutput, "⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
+			cmd.PrintErrf("⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -94,17 +93,17 @@ Examples:
 					TargetStatus: "READY",
 					Service:      &service,
 				},
-				Output:     statusOutput,
+				Output:     cmd.ErrOrStderr(),
 				Timeout:    startWaitTimeout,
 				TimeoutMsg: "service may still be starting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
-				fmt.Fprintf(statusOutput, "❌ Error: %s\n", err)
+				cmd.PrintErrf("❌ Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			fmt.Fprintf(statusOutput, "✅ Service has been successfully started!\n")
+			cmd.PrintErrf("✅ Service has been successfully started!\n")
 			return nil
 		},
 	}

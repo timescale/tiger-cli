@@ -505,8 +505,8 @@ capabilities — the docs proxy being disabled, and each write tool skipped in
 read-only mode — so a client can see why a tool it expected is missing.
 
 Everything outside `internal/mcp` writes to stdout/stderr directly rather than
-logging. Don't add log statements to CLI commands — print to
-`cmd.OutOrStdout()`/`cmd.ErrOrStderr()`, or return an error.
+logging. Don't add log statements to CLI commands — print with `cmd.Print*` /
+`cmd.PrintErr*` (see "Output Streams"), or return an error.
 
 ### Dependencies
 
@@ -963,6 +963,42 @@ This architecture ensures Tiger CLI remains maintainable and testable as it grow
 
 Tiger CLI follows established command-line interface patterns, particularly inspired by the GitHub CLI (`gh`) for consistency with modern CLI tools.
 
+### Output Streams
+
+`buildRootCmd` calls `cmd.SetOut(os.Stdout)` and `cmd.SetErr(os.Stderr)`. This is
+required: cobra's `cmd.Print*` helpers write to `OutOrStderr()`, which falls back
+to **stderr** when no out writer is set, so without it every `cmd.Printf` would
+land on the wrong stream.
+
+Commands print with the cobra helpers — `cmd.Print`/`Printf`/`Println` for
+stdout, `cmd.PrintErr`/`PrintErrf`/`PrintErrln` for stderr. Don't use
+`fmt.Print*` (bypasses the command's writers entirely, so tests can't capture it)
+and don't spell out `fmt.Fprintf(cmd.OutOrStdout(), …)`. Reach for
+`cmd.OutOrStdout()`/`cmd.ErrOrStderr()` only where an `io.Writer` is genuinely
+required: `util.SerializeToJSON`/`SerializeToYAML`, `tablewriter.NewWriter`,
+`tea.WithOutput`, and helpers in other packages (see below). Likewise use
+`cmd.InOrStdin()` rather than `os.Stdin`.
+
+What goes where:
+
+1. **stdout** — the command's primary output: the data payload (table, JSON,
+   YAML, env vars) and, in the plain-text path, the result text itself.
+2. **stderr** — errors and warnings; interactive UI (confirmation prompts,
+   password prompts, spinners); and progress/status messages that accompany
+   structured output, so they never pollute a piped stream. `tiger service
+   create` is the model: every status line is `cmd.PrintErrf` and only the final
+   service payload goes to stdout.
+
+Helper functions inside `internal/cmd` take the `*cobra.Command` and print
+through it. The exception is a helper whose whole job is rendering into a writer
+— `outputServiceTable`, `outputVersionTable`, `outputCapabilitiesTable` — which
+keeps an `io.Writer` parameter because `tablewriter` needs one anyway.
+
+Code in other packages (`internal/common`, `internal/version`) must not import
+cobra. Those take an `io.Writer` (`common.WaitForServiceArgs.Output`,
+`common.NewSpinner`, `version.PrintUpdateWarning`) and the caller in
+`internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`.
+
 ### Boolean Flag Patterns
 
 When implementing boolean flags that can be enabled or disabled, follow the GitHub CLI pattern:
@@ -1012,7 +1048,7 @@ if len(args) < 1 {
 
 // Interactive confirmation unless --confirm
 if !confirmFlag {
-    fmt.Fprintf(cmd.ErrOrStderr(), "Type the service ID '%s' to confirm: ", serviceID)
+    cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
     var confirmation string
     fmt.Scanln(&confirmation)
     if confirmation != serviceID {

@@ -3,7 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
+
+	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -15,12 +16,12 @@ import (
 // It handles the API call and password storage.
 func updateAndSaveServicePassword(
 	ctx context.Context,
+	cmd *cobra.Command,
 	cfg *config.Config,
 	client api.ClientWithResponsesInterface,
 	service api.Service,
 	newPassword string,
 	role string,
-	statusOut io.Writer,
 ) error {
 	// Call API to update password
 	updateReq := api.UpdatePasswordInput{Password: newPassword}
@@ -35,28 +36,28 @@ func updateAndSaveServicePassword(
 
 	// Save password locally
 	if result, err := common.SavePasswordWithResult(cfg, service, newPassword, role); err != nil {
-		fmt.Fprintf(statusOut, "Warning: could not save password: %v\n", err)
+		cmd.PrintErrf("Warning: could not save password: %v\n", err)
 	} else if result.Success {
-		fmt.Fprintf(statusOut, "%s\n", result.Message)
-		fmt.Fprintf(statusOut, "To view your new password, run: \n\t tiger service get %s --with-password\n", util.Deref(service.ServiceId))
+		cmd.PrintErrf("%s\n", result.Message)
+		cmd.PrintErrf("To view your new password, run: \n\t tiger service get %s --with-password\n", util.Deref(service.ServiceId))
 	}
 
 	return nil
 }
 
 // resetServicePassword resets the password via API. If newPassword is empty, generates one.
-func resetServicePassword(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, service api.Service, role string, newPassword string, statusOut io.Writer) (string, error) {
+func resetServicePassword(ctx context.Context, cmd *cobra.Command, cfg *config.Config, client api.ClientWithResponsesInterface, service api.Service, role string, newPassword string) (string, error) {
 	// Generate password if not provided
 	if newPassword == "" {
 		var err error
 		if newPassword, err = util.GenerateSecurePassword(32); err != nil {
 			return "", fmt.Errorf("failed to generate new password: %w", err)
 		}
-		fmt.Fprintf(statusOut, "Successfully generated a new password.\n")
+		cmd.PrintErrf("Successfully generated a new password.\n")
 	}
 
 	// Update and save password
-	if err := updateAndSaveServicePassword(ctx, cfg, client, service, newPassword, role, statusOut); err != nil {
+	if err := updateAndSaveServicePassword(ctx, cmd, cfg, client, service, newPassword, role); err != nil {
 		return "", err
 	}
 	return newPassword, nil
@@ -67,18 +68,18 @@ func resetServicePassword(ctx context.Context, cfg *config.Config, client api.Cl
 // Returns the new password on success.
 func promptAndResetPassword(
 	ctx context.Context,
+	cmd *cobra.Command,
 	cfg *config.Config,
-	out io.Writer,
 	client api.ClientWithResponsesInterface,
 	service api.Service,
 	role string,
 ) (string, error) {
-	fmt.Fprint(out, "Enter new password (leave empty to generate): ")
+	cmd.PrintErr("Enter new password (leave empty to generate): ")
 	newPassword, err := readString(ctx, readPasswordFromTerminal)
-	fmt.Fprintln(out) // newline after password entry
+	cmd.PrintErrln() // newline after password entry
 	if err != nil {
 		return "", fmt.Errorf("error reading password: %w", err)
 	}
 
-	return resetServicePassword(ctx, cfg, client, service, role, newPassword, out)
+	return resetServicePassword(ctx, cmd, cfg, client, service, role, newPassword)
 }

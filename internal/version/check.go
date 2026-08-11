@@ -218,8 +218,9 @@ func CheckForUpdate(cfg *config.Config) (*CheckResult, error) {
 	return checkVersionForUpdate(config.Version, cfg)
 }
 
-// PrintUpdateWarning prints a warning message to stderr if an update is available
-func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writer) {
+// PrintUpdateWarning writes a warning to output if an update is available.
+// Callers pass the command's stderr writer.
+func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output io.Writer) {
 	if result == nil || output == nil {
 		return
 	}
@@ -228,12 +229,12 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output *io.Writ
 	}
 
 	// need to set color.NoColor correctly for the `output` (stderr)
-	if cfg.Color && util.IsTerminal(*output) {
+	if cfg.Color && util.IsTerminal(output) {
 		original := color.NoColor
 		defer func() { color.NoColor = original }()
 		color.NoColor = false
 	}
-	fmt.Fprintf(*output, "\n\n%s %s → %s\nTo upgrade: %s\n",
+	fmt.Fprintf(output, "\n\n%s %s → %s\nTo upgrade: %s\n",
 		color.YellowString("A new release of tiger-cli is available:"),
 		color.CyanString(result.CurrentVersion),
 		color.CyanString(result.LatestVersion),

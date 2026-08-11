@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 
@@ -80,13 +79,13 @@ Examples:
 			default:
 				switch c := capability.(type) {
 				case *mcpsdk.Tool:
-					return outputToolText(output, c)
+					return outputToolText(cmd, c)
 				case *mcpsdk.Prompt:
-					return outputPromptText(output, c)
+					return outputPromptText(cmd, c)
 				case *mcpsdk.Resource:
-					return outputResourceText(output, c)
+					return outputResourceText(cmd, c)
 				case *mcpsdk.ResourceTemplate:
-					return outputResourceTemplateText(output, c)
+					return outputResourceTemplateText(cmd, c)
 				default:
 					return fmt.Errorf("unsupported capability type: %T", c)
 				}
@@ -100,7 +99,7 @@ Examples:
 }
 
 // outputToolText outputs a tool in text format
-func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
+func outputToolText(cmd *cobra.Command, tool *mcpsdk.Tool) error {
 	var lines []string
 
 	// Title line with annotation tags
@@ -187,12 +186,12 @@ func outputToolText(output io.Writer, tool *mcpsdk.Tool) error {
 	}
 
 	// Write output
-	_, err := fmt.Fprintln(output, strings.Join(lines, "\n"))
-	return err
+	cmd.Println(strings.Join(lines, "\n"))
+	return nil
 }
 
 // outputPromptText outputs a prompt in text format
-func outputPromptText(output io.Writer, prompt *mcpsdk.Prompt) error {
+func outputPromptText(cmd *cobra.Command, prompt *mcpsdk.Prompt) error {
 	var lines []string
 
 	// Title line
@@ -223,12 +222,12 @@ func outputPromptText(output io.Writer, prompt *mcpsdk.Prompt) error {
 	}
 
 	// Write output
-	_, err := fmt.Fprintln(output, strings.Join(lines, "\n"))
-	return err
+	cmd.Println(strings.Join(lines, "\n"))
+	return nil
 }
 
 // outputResourceText outputs a resource in text format
-func outputResourceText(output io.Writer, resource *mcpsdk.Resource) error {
+func outputResourceText(cmd *cobra.Command, resource *mcpsdk.Resource) error {
 	var lines []string
 
 	// Title line
@@ -293,12 +292,12 @@ func outputResourceText(output io.Writer, resource *mcpsdk.Resource) error {
 	}
 
 	// Write output
-	_, err := fmt.Fprintln(output, strings.Join(lines, "\n"))
-	return err
+	cmd.Println(strings.Join(lines, "\n"))
+	return nil
 }
 
 // outputResourceTemplateText outputs a resource template in text format
-func outputResourceTemplateText(output io.Writer, template *mcpsdk.ResourceTemplate) error {
+func outputResourceTemplateText(cmd *cobra.Command, template *mcpsdk.ResourceTemplate) error {
 	var lines []string
 
 	// Title line
@@ -358,8 +357,8 @@ func outputResourceTemplateText(output io.Writer, template *mcpsdk.ResourceTempl
 	}
 
 	// Write output
-	_, err := fmt.Fprintln(output, strings.Join(lines, "\n"))
-	return err
+	cmd.Println(strings.Join(lines, "\n"))
+	return nil
 }
 
 // formatSchemaType recursively formats a JSON schema type into TypeScript-style syntax

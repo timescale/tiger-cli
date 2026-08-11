@@ -487,7 +487,7 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	cmd.SetErr(buf)
 
 	// Prepare service for output without password
-	outputSvc := prepareServiceForOutput(testConfig(t), service, false, cmd.ErrOrStderr())
+	outputSvc := prepareServiceForOutput(cmd, testConfig(t), service, false)
 
 	// Verify that password is removed
 	if outputSvc.InitialPassword != nil {
@@ -531,7 +531,7 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	cmd.SetErr(buf)
 
 	// Prepare service for output with password
-	outputSvc := prepareServiceForOutput(testConfig(t), service, true, cmd.ErrOrStderr())
+	outputSvc := prepareServiceForOutput(cmd, testConfig(t), service, true)
 
 	// Verify that password is preserved
 	if outputSvc.InitialPassword != nil {

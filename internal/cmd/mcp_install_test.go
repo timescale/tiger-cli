@@ -833,7 +833,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		require.NoError(t, err, "should create initial config file")
 
 		// Call installTigerMCPForClient to install Tiger MCP server
-		err = installTigerMCPForClient("cursor", false, configPath)
+		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
 		require.NoError(t, err, "installTigerMCPForClient should succeed")
 
 		// Verify the config file was modified
@@ -869,7 +869,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call installTigerMCPForClient with backup enabled for Cursor
-		err = installTigerMCPForClient("cursor", true, configPath)
+		err = installTigerMCPForClient(discardCmd(), "cursor", true, configPath)
 		require.NoError(t, err, "installTigerMCPForClient should succeed with backup")
 
 		// Check that a backup file was created
@@ -898,7 +898,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 	})
 
 	t.Run("handles unsupported editor", func(t *testing.T) {
-		err := installTigerMCPForClient("unsupported-editor", false, "")
+		err := installTigerMCPForClient(discardCmd(), "unsupported-editor", false, "")
 		assert.Error(t, err, "should error for unsupported editor")
 		assert.Contains(t, err.Error(), "unsupported client", "error should mention unsupported client")
 	})
@@ -928,7 +928,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// First installation (should update existing tiger entry)
-		err = installTigerMCPForClient("cursor", false, configPath)
+		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
 		require.NoError(t, err, "first installation should succeed")
 
 		// Read config after first installation
@@ -953,7 +953,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		assert.Equal(t, "start", args[1], "second arg should be 'start'")
 
 		// Second installation (should be idempotent, no changes)
-		err = installTigerMCPForClient("cursor", false, configPath)
+		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
 		require.NoError(t, err, "second installation should succeed")
 
 		// Read config after second installation

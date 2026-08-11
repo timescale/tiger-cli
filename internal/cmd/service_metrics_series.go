@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -116,7 +115,7 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 
-			return renderMetricSeries(cmd.OutOrStdout(), cfg.Output, *resp.JSON200)
+			return renderMetricSeries(cmd, cfg.Output, *resp.JSON200)
 		},
 	}
 
@@ -172,7 +171,9 @@ func labelString(labels map[string]string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
-func renderMetricSeries(out io.Writer, output string, series []api.MetricSeries) error {
+func renderMetricSeries(cmd *cobra.Command, output string, series []api.MetricSeries) error {
+	out := cmd.OutOrStdout()
+
 	switch strings.ToLower(output) {
 	case "json":
 		return util.SerializeToJSON(out, series)
@@ -180,7 +181,7 @@ func renderMetricSeries(out io.Writer, output string, series []api.MetricSeries)
 		return util.SerializeToYAML(out, series)
 	default:
 		if len(series) == 0 {
-			fmt.Fprintln(out, "No metric data returned for the requested window.")
+			cmd.Println("No metric data returned for the requested window.")
 			return nil
 		}
 		table := tablewriter.NewWriter(out)
