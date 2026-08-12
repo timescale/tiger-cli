@@ -998,9 +998,7 @@ keeps an `io.Writer` parameter because `tablewriter` needs one anyway.
 Code in other packages (`internal/common`, `internal/version`) must not import
 cobra. Those take an `io.Writer` (`common.WaitForServiceArgs.Output`,
 `common.SpinnerArgs.Output`, `version.PrintUpdateWarning`) and the caller in
-`internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`. An
-interactive helper needs the reader too, hence the matching `Input` fields on
-`WaitForServiceArgs` and `SpinnerArgs`.
+`internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`.
 
 ### Reading Stdin
 
@@ -1018,14 +1016,15 @@ Ctrl-C unblocks a waiting prompt instead of hanging until the user hits enter.
 doesn't leave the shell in raw mode.
 
 **Every read that prompts the user in real time must be gated on
-`util.IsTerminal(cmd.InOrStdin())`**, and must return an error naming the
-non-interactive alternative when it's false — see `service update-password`
-("use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD
-environment variable") and `service delete` ("use --confirm to skip the
-prompt"). That covers confirmations and password prompts. Ungated, they fail on
-an unhelpful EOF, or block forever, when the command runs in CI or with stdin
-redirected. BubbleTea menus need the same gate plus an output check — see
-"Interactive Terminal UIs".
+`util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr())`**, and
+must return an error naming the non-interactive alternative when either is false
+— see `service update-password` ("use --new-password flag, --auto-generate flag,
+or TIGER_NEW_PASSWORD environment variable") and `service delete` ("use --confirm
+to skip the prompt"). Both streams have to be terminals: stdin so the user can
+answer, stderr so they can see what they're being asked. A prompt nobody can see
+reads as a hang, and can be answered by accident — a stray Enter at `service
+update-password` rotates the password. Confirmations, password prompts, and
+BubbleTea programs all follow this rule.
 
 The gate is about *prompts*, not about reading stdin as such. A read whose whole
 point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
@@ -1043,8 +1042,8 @@ password prompt can't be driven with `cmd.SetIn`; `ReadLine`/`ReadAll` take any
 
 ### Interactive Terminal UIs
 
-Interactive menus and spinners use BubbleTea (`charm.land/bubbletea/v2`). When
-creating a `tea.NewProgram`, always pass all four of these:
+Interactive menus and spinners use BubbleTea (`charm.land/bubbletea/v2`). Always
+pass all four of these to `tea.NewProgram`:
 
 ```go
 program := tea.NewProgram(model,
@@ -1054,51 +1053,34 @@ program := tea.NewProgram(model,
     tea.WithoutSignalHandler())
 ```
 
-- `tea.WithInput` — **always**, even for a write-only UI like a spinner. On
-  startup BubbleTea asks the terminal for keyboard disambiguation (the Kitty
-  keyboard protocol), which modern terminals (Ghostty, Kitty, WezTerm) honor.
-  With it enabled Ctrl+C arrives as an escape sequence on stdin instead of as a
-  SIGINT, so a program with no stdin attached leaves the keypress with nowhere
-  to go and Ctrl+C silently does nothing. It is easy to forget and there is no
-  compile error if you do: BubbleTea quietly defaults to `os.Stdin`, so the
-  program reads real stdin no matter what the command was given.
-- `tea.WithOutput` — **stderr**, since a menu is interactive UI and not the
-  command's result (see "Output Streams").
-- `tea.WithContext` — so a SIGTERM caught by `main.go` unwinds the program.
-  `Run()` then returns an error wrapping `tea.ErrProgramKilled`. Skip this only
-  when the model already has its own cancellation mechanism, which would
-  otherwise race it — `common.NewSpinner` is the one such case: the polling loop
-  in `WaitForService` owns the shutdown and stops the spinner itself.
-- `tea.WithoutSignalHandler` — Ctrl+C is already handled as a key press, and
-  out-of-band signals go to `main.go`'s handler, which cancels the command
-  context. Letting BubbleTea install its own handler for the same signals gives
-  one shutdown two racing owners.
+- `tea.WithInput` — **always**, even for a write-only UI like a spinner.
+  BubbleTea asks the terminal for keyboard disambiguation (the Kitty keyboard
+  protocol), so Ctrl+C arrives as a key press on stdin rather than as a SIGINT;
+  with no stdin attached it has nowhere to go and Ctrl+C does nothing. Easy to
+  omit with no compile error, since BubbleTea quietly falls back to `os.Stdin`.
+- `tea.WithOutput` — **stderr**: a menu is interactive UI, not the command's
+  result (see "Output Streams").
+- `tea.WithContext` — so a SIGTERM caught by `main.go` unwinds the program. Skip
+  it only when the model already has its own cancellation path that would race
+  it, as `common.NewSpinner` does: `WaitForService`'s polling loop owns that
+  shutdown and stops the spinner itself.
+- `tea.WithoutSignalHandler` — Ctrl+C is handled as a key press and other
+  signals reach `main.go`'s handler, so BubbleTea's own handler would only be a
+  second owner of the same shutdown.
 
-**Every model must handle `tea.KeyPressMsg` for `"ctrl+c"`** — nothing else
-will. Match on `tea.KeyPressMsg`, not the `tea.KeyMsg` interface, which also
-matches key *releases* and would fire each binding twice. A write-only program
-translates the keypress into a `context.CancelFunc` call so background
-goroutines unwind cleanly; `spinnerModel` in `internal/common/spinner.go` is the
-model for that, and it's what makes Ctrl+C work during a `--wait`.
+**Every model must handle `"ctrl+c"` itself** — nothing else will. A write-only
+program turns it into a `context.CancelFunc` call so background goroutines unwind
+cleanly; `spinnerModel` in `internal/common/spinner.go` is the model for that,
+and it's what makes Ctrl+C work during a `--wait`.
 
-Keystrokes come from `msg.String()`. Note that space is `"space"`, not `" "`:
-`Key.String()` falls back to `Keystroke()` whenever the key's text is a space.
-
-Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin()) &&
-util.IsTerminal(cmd.ErrOrStderr())` and return an error naming the
-non-interactive alternative when either is false. Both have to be TTYs: stdin so
-the terminal can be put in raw mode for key input, stderr so the rendered UI is
-actually visible — a menu on a redirected stream reads the user's keypresses
-while showing them nothing. Without the gate the program fails deep inside
-BubbleTea with an opaque error, or blocks. `common.NewSpinner` applies the same
-rule and falls back to printing one message per line when either stream isn't a
-TTY.
+Gate every program on both streams, as "Reading Stdin" describes.
+`common.NewSpinner` follows the same rule, printing one message per line instead
+when either stream isn't a terminal.
 
 Because these helpers need both streams, they take the `*cobra.Command` rather
-than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`. The
-exception is `internal/common`, which can't import cobra: `WaitForServiceArgs`
-carries `Input` and `Output` fields that the CLI fills with `cmd.InOrStdin()`
-and `cmd.ErrOrStderr()`, and MCP leaves nil to get a silent no-op spinner.
+than an `io.Writer` — which is why `oauthLogin` holds one. Code in
+`internal/common` can't import cobra, so `WaitForServiceArgs` and `SpinnerArgs`
+carry the `Input`/`Output` fields the caller fills in instead.
 
 ### Boolean Flag Patterns
 
@@ -1149,6 +1131,9 @@ if len(args) < 1 {
 
 // Interactive confirmation unless --confirm
 if !confirmFlag {
+    if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+        return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+    }
     cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
     confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
     if err != nil {
