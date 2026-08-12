@@ -64,7 +64,7 @@ Examples:
 
 			// Prompt for confirmation unless --confirm is used
 			if !deleteConfirm {
-				if !util.IsTerminal(cmd.InOrStdin()) {
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
 				cmd.PrintErrf("Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)

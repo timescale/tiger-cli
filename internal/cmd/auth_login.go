@@ -171,7 +171,7 @@ func flagOrEnvVar(flagVal, envVarName string) string {
 }
 
 func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentials) (credentials, error) {
-	if !util.IsTerminal(cmd.InOrStdin()) {
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 		return credentials{}, fmt.Errorf("TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)")
 	}
 
