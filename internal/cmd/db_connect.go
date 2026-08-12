@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
@@ -185,7 +185,7 @@ func selectConnection(
 	chosen := target
 
 	// Offer the replica menu only for a primary on an interactive terminal.
-	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) {
+	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
 		primary := target.ConnectionService
 		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
 		if err != nil {
@@ -300,7 +300,7 @@ func (m connectTargetModel) Init() tea.Cmd {
 
 func (m connectTargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch key := msg.String(); key {
 		case "ctrl+c", "q":
 			m.chosen = connectTargetChoice{kind: targetCancel}
@@ -313,7 +313,7 @@ func (m connectTargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
-		case "enter", " ":
+		case "enter", "space":
 			m.chosen = m.choices[m.cursor]
 			return m, tea.Quit
 		default:
@@ -330,7 +330,7 @@ func (m connectTargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m connectTargetModel) View() string {
+func (m connectTargetModel) View() tea.View {
 	s := "How would you like to connect?\n\n"
 
 	for i, choice := range m.choices {
@@ -342,7 +342,7 @@ func (m connectTargetModel) View() string {
 	}
 
 	s += "\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to cancel"
-	return s
+	return tea.NewView(s)
 }
 
 // selectConnectTargetOption shows the interactive menu for choosing a
@@ -350,7 +350,11 @@ func (m connectTargetModel) View() string {
 func selectConnectTargetOption(cmd *cobra.Command, primary api.Service, replicas []api.ReadReplicaSet) (connectTargetChoice, error) {
 	model := newConnectTargetModel(primary, replicas)
 
-	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
 	finalModel, err := program.Run()
 	if err != nil {
 		return connectTargetChoice{kind: targetCancel}, fmt.Errorf("failed to run connect menu: %w", err)
@@ -398,7 +402,7 @@ func connectWithPasswordMenu(
 	cmd.PrintErrf("%s\nStored password is likely invalid or expired.\n\n", err.Error())
 
 	// Check if we're in a TTY for interactive menu
-	if !util.IsTerminal(cmd.InOrStdin()) {
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
 	}
 
@@ -532,7 +536,7 @@ func (m passwordRecoveryModel) Init() tea.Cmd {
 
 func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			m.selected = optionExit
@@ -545,7 +549,7 @@ func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.options)-1 {
 				m.cursor++
 			}
-		case "enter", " ":
+		case "enter", "space":
 			m.selected = m.optionMap[m.cursor]
 			return m, tea.Quit
 		default:
@@ -563,7 +567,7 @@ func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m passwordRecoveryModel) View() string {
+func (m passwordRecoveryModel) View() tea.View {
 	s := "What would you like to do?\n\n"
 
 	for i, option := range m.options {
@@ -575,7 +579,7 @@ func (m passwordRecoveryModel) View() string {
 	}
 
 	s += "\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to quit"
-	return s
+	return tea.NewView(s)
 }
 
 // selectPasswordRecoveryOption shows the interactive menu for password recovery
@@ -583,7 +587,11 @@ func (m passwordRecoveryModel) View() string {
 func selectPasswordRecoveryOption(cmd *cobra.Command, canResetPassword bool) (passwordRecoveryOption, error) {
 	model := newPasswordRecoveryModel(canResetPassword)
 
-	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
 	finalModel, err := program.Run()
 	if err != nil {
 		return optionExit, fmt.Errorf("failed to run password recovery menu: %w", err)

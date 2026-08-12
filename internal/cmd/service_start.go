@@ -93,6 +93,7 @@ Examples:
 					TargetStatus: "READY",
 					Service:      &service,
 				},
+				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
 				Timeout:    startWaitTimeout,
 				TimeoutMsg: "service may still be starting",

@@ -513,6 +513,7 @@ logging. Don't add log statements to CLI commands — print with `cmd.Print*` /
 - **Cobra**: CLI framework and command structure
 - **Viper**: Configuration management with multiple sources
 - **slog**: Structured logging for the MCP server
+- **BubbleTea v2**: Interactive terminal menus and spinners (`charm.land/bubbletea/v2`)
 - **oapi-codegen**: OpenAPI client generation (build-time dependency)
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
@@ -996,8 +997,10 @@ keeps an `io.Writer` parameter because `tablewriter` needs one anyway.
 
 Code in other packages (`internal/common`, `internal/version`) must not import
 cobra. Those take an `io.Writer` (`common.WaitForServiceArgs.Output`,
-`common.NewSpinner`, `version.PrintUpdateWarning`) and the caller in
-`internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`.
+`common.SpinnerArgs.Output`, `version.PrintUpdateWarning`) and the caller in
+`internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`. An
+interactive helper needs the reader too, hence the matching `Input` fields on
+`WaitForServiceArgs` and `SpinnerArgs`.
 
 ### Reading Stdin
 
@@ -1019,9 +1022,10 @@ doesn't leave the shell in raw mode.
 non-interactive alternative when it's false — see `service update-password`
 ("use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD
 environment variable") and `service delete` ("use --confirm to skip the
-prompt"). That covers confirmations, password prompts, and every BubbleTea menu
-(see "Interactive Terminal UIs"). Ungated, they fail on an unhelpful EOF, or
-block forever, when the command runs in CI or with stdin redirected.
+prompt"). That covers confirmations and password prompts. Ungated, they fail on
+an unhelpful EOF, or block forever, when the command runs in CI or with stdin
+redirected. BubbleTea menus need the same gate plus an output check — see
+"Interactive Terminal UIs".
 
 The gate is about *prompts*, not about reading stdin as such. A read whose whole
 point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
@@ -1039,30 +1043,62 @@ password prompt can't be driven with `cmd.SetIn`; `ReadLine`/`ReadAll` take any
 
 ### Interactive Terminal UIs
 
-Interactive menus use BubbleTea (`github.com/charmbracelet/bubbletea`). When
-creating a `tea.NewProgram`, always pass both streams:
+Interactive menus and spinners use BubbleTea (`charm.land/bubbletea/v2`). When
+creating a `tea.NewProgram`, always pass all four of these:
 
 ```go
 program := tea.NewProgram(model,
     tea.WithInput(cmd.InOrStdin()),
-    tea.WithOutput(cmd.ErrOrStderr()))
+    tea.WithOutput(cmd.ErrOrStderr()),
+    tea.WithContext(cmd.Context()),
+    tea.WithoutSignalHandler())
 ```
 
-`tea.WithInput` is easy to forget and there is no compile error if you do:
-BubbleTea silently defaults to `os.Stdin`, so the program reads real stdin no
-matter what the command was given. Pass it even when the model looks write-only.
-The one deliberate exception is `common.NewSpinner`, which passes
-`tea.WithInput(nil)` because it never reads keys.
+- `tea.WithInput` — **always**, even for a write-only UI like a spinner. On
+  startup BubbleTea asks the terminal for keyboard disambiguation (the Kitty
+  keyboard protocol), which modern terminals (Ghostty, Kitty, WezTerm) honor.
+  With it enabled Ctrl+C arrives as an escape sequence on stdin instead of as a
+  SIGINT, so a program with no stdin attached leaves the keypress with nowhere
+  to go and Ctrl+C silently does nothing. It is easy to forget and there is no
+  compile error if you do: BubbleTea quietly defaults to `os.Stdin`, so the
+  program reads real stdin no matter what the command was given.
+- `tea.WithOutput` — **stderr**, since a menu is interactive UI and not the
+  command's result (see "Output Streams").
+- `tea.WithContext` — so a SIGTERM caught by `main.go` unwinds the program.
+  `Run()` then returns an error wrapping `tea.ErrProgramKilled`. Skip this only
+  when the model already has its own cancellation mechanism, which would
+  otherwise race it — `common.NewSpinner` is the one such case: the polling loop
+  in `WaitForService` owns the shutdown and stops the spinner itself.
+- `tea.WithoutSignalHandler` — Ctrl+C is already handled as a key press, and
+  out-of-band signals go to `main.go`'s handler, which cancels the command
+  context. Letting BubbleTea install its own handler for the same signals gives
+  one shutdown two racing owners.
 
-Output goes to **stderr** — a menu is interactive UI, not the command's result
-(see "Output Streams").
+**Every model must handle `tea.KeyPressMsg` for `"ctrl+c"`** — nothing else
+will. Match on `tea.KeyPressMsg`, not the `tea.KeyMsg` interface, which also
+matches key *releases* and would fire each binding twice. A write-only program
+translates the keypress into a `context.CancelFunc` call so background
+goroutines unwind cleanly; `spinnerModel` in `internal/common/spinner.go` is the
+model for that, and it's what makes Ctrl+C work during a `--wait`.
 
-Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin())` and return an
-error naming the non-interactive alternative when it's false. Without the gate
-the program fails deep inside BubbleTea with an opaque error, or blocks.
+Keystrokes come from `msg.String()`. Note that space is `"space"`, not `" "`:
+`Key.String()` falls back to `Keystroke()` whenever the key's text is a space.
+
+Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin()) &&
+util.IsTerminal(cmd.ErrOrStderr())` and return an error naming the
+non-interactive alternative when either is false. Both have to be TTYs: stdin so
+the terminal can be put in raw mode for key input, stderr so the rendered UI is
+actually visible — a menu on a redirected stream reads the user's keypresses
+while showing them nothing. Without the gate the program fails deep inside
+BubbleTea with an opaque error, or blocks. `common.NewSpinner` applies the same
+rule and falls back to printing one message per line when either stream isn't a
+TTY.
 
 Because these helpers need both streams, they take the `*cobra.Command` rather
-than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`.
+than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`. The
+exception is `internal/common`, which can't import cobra: `WaitForServiceArgs`
+carries `Input` and `Output` fields that the CLI fills with `cmd.InOrStdin()`
+and `cmd.ErrOrStderr()`, and MCP leaves nil to get a silent no-op spinner.
 
 ### Boolean Flag Patterns
 

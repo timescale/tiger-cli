@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
@@ -420,7 +420,7 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	case 1:
 		return projects[0].Id, nil
 	default:
-		if !util.IsTerminal(l.cmd.InOrStdin()) {
+		if !util.IsTerminal(l.cmd.InOrStdin()) || !util.IsTerminal(l.cmd.ErrOrStderr()) {
 			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
 		}
 		return selectProjectInteractively(l.cmd, projects)
@@ -434,7 +434,11 @@ func selectProjectInteractivelyImpl(cmd *cobra.Command, projects []api.Project) 
 		cursor:   0,
 	}
 
-	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
 	finalModel, err := program.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed to run project selection: %w", err)
@@ -461,7 +465,7 @@ func (m projectSelectModel) Init() tea.Cmd {
 
 func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -477,7 +481,7 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.projects)-1 {
 				m.cursor++
 			}
-		case "enter", " ":
+		case "enter", "space":
 			m.selected = m.projects[m.cursor].Id
 			return m, tea.Quit
 		case "backspace":
@@ -517,7 +521,7 @@ func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
 	}
 }
 
-func (m projectSelectModel) View() string {
+func (m projectSelectModel) View() tea.View {
 	s := "Select a project:\n\n"
 
 	for i, project := range m.projects {
@@ -534,5 +538,5 @@ func (m projectSelectModel) View() string {
 	}
 
 	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return s
+	return tea.NewView(s)
 }

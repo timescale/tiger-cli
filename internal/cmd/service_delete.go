@@ -110,6 +110,7 @@ Examples:
 				Handler: &common.DeletionWaitHandler{
 					ServiceID: serviceID,
 				},
+				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
 				Timeout:    deleteWaitTimeout,
 				TimeoutMsg: "service may still be deleting",
