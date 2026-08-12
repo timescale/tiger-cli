@@ -94,7 +94,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
-				CpuMillis: *cpuMemoryCfg.CPUMillisString(),
+				CPUMillis: *cpuMemoryCfg.CPUMillisString(),
 				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
 			}
 

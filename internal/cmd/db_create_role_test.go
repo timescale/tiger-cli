@@ -27,9 +27,9 @@ func TestDBCreateRole_ReadReplicaRejected(t *testing.T) {
 	mockTestPAT(t)
 
 	standby := api.Service{
-		ServiceId:  util.Ptr("rep1234567"),
-		ProjectId:  util.Ptr("test-project-123"),
-		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceId: util.Ptr("svcprimary")},
+		ServiceID:  util.Ptr("rep1234567"),
+		ProjectID:  util.Ptr("test-project-123"),
+		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceID: util.Ptr("svcprimary")},
 	}
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {

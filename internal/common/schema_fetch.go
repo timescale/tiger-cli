@@ -34,7 +34,7 @@ func FetchServiceSchema(ctx context.Context, cfg *config.Config, target *Connect
 	defer conn.Close(context.Background())
 
 	ident := SchemaIdent{
-		ID:   util.DerefStr(target.ConnectionService.ServiceId),
+		ID:   util.DerefStr(target.ConnectionService.ServiceID),
 		Name: util.DerefStr(target.ConnectionService.Name),
 	}
 	return FetchSchemaFromConn(ctx, conn, ident, opts)

@@ -83,7 +83,7 @@ func createTestServices() []api.Service {
 
 	return []api.Service{
 		{
-			ServiceId:   &testServiceID1,
+			ServiceID:   &testServiceID1,
 			Name:        &name1,
 			RegionCode:  &region1,
 			Status:      &status1,
@@ -91,7 +91,7 @@ func createTestServices() []api.Service {
 			Created:     &created1,
 		},
 		{
-			ServiceId:   &testServiceID2,
+			ServiceID:   &testServiceID2,
 			Name:        &name2,
 			RegionCode:  &region2,
 			Status:      &status2,
@@ -166,14 +166,14 @@ func TestOutputService_JSON(t *testing.T) {
 	// Create a test service object
 	serviceID := "svc-12345"
 	serviceName := "test-service"
-	serviceType := api.TIMESCALEDB
+	serviceType := api.ServiceTypeTIMESCALEDB
 	regionCode := "us-east-1"
-	status := api.READY
+	status := api.DeployStatusREADY
 	created := time.Now()
 	initialPassword := "secret-password-123"
 
 	service := api.Service{
-		ServiceId:       &serviceID,
+		ServiceID:       &serviceID,
 		Name:            &serviceName,
 		ServiceType:     &serviceType,
 		RegionCode:      &regionCode,
@@ -235,14 +235,14 @@ func TestOutputService_YAML(t *testing.T) {
 	// Create a test service object
 	serviceID := "svc-12345"
 	serviceName := "test-service"
-	serviceType := api.TIMESCALEDB
+	serviceType := api.ServiceTypeTIMESCALEDB
 	regionCode := "us-east-1"
-	status := api.READY
+	status := api.DeployStatusREADY
 	created := time.Now()
 	initialPassword := "secret-password-123"
 
 	service := api.Service{
-		ServiceId:       &serviceID,
+		ServiceID:       &serviceID,
 		Name:            &serviceName,
 		ServiceType:     &serviceType,
 		RegionCode:      &regionCode,
@@ -304,9 +304,9 @@ func TestOutputService_Table(t *testing.T) {
 	// Create a test service object with resource information
 	serviceID := "svc-12345"
 	serviceName := "test-service"
-	serviceType := api.TIMESCALEDB
+	serviceType := api.ServiceTypeTIMESCALEDB
 	regionCode := "us-east-1"
-	status := api.READY
+	status := api.DeployStatusREADY
 	created := time.Now()
 	cpuMillis := 2000
 	memoryGbs := 8
@@ -316,7 +316,7 @@ func TestOutputService_Table(t *testing.T) {
 	initialPassword := "secret-password-123"
 
 	service := api.Service{
-		ServiceId:       &serviceID,
+		ServiceID:       &serviceID,
 		Name:            &serviceName,
 		ServiceType:     &serviceType,
 		RegionCode:      &regionCode,
@@ -324,20 +324,20 @@ func TestOutputService_Table(t *testing.T) {
 		Created:         &created,
 		InitialPassword: &initialPassword,
 		Resources: &[]struct {
-			Id   *string `json:"id,omitempty"`
+			ID   *string `json:"id,omitempty"`
 			Spec *struct {
-				CpuMillis  *int    `json:"cpu_millis,omitempty"`
+				CPUMillis  *int    `json:"cpu_millis,omitempty"`
 				MemoryGbs  *int    `json:"memory_gbs,omitempty"`
 				VolumeType *string `json:"volume_type,omitempty"`
 			} `json:"spec,omitempty"`
 		}{
 			{
 				Spec: &struct {
-					CpuMillis  *int    `json:"cpu_millis,omitempty"`
+					CPUMillis  *int    `json:"cpu_millis,omitempty"`
 					MemoryGbs  *int    `json:"memory_gbs,omitempty"`
 					VolumeType *string `json:"volume_type,omitempty"`
 				}{
-					CpuMillis: &cpuMillis,
+					CPUMillis: &cpuMillis,
 					MemoryGbs: &memoryGbs,
 				},
 			},
@@ -392,37 +392,37 @@ func TestOutputService_FreeTier(t *testing.T) {
 	// Create a test free tier service object with null CPU and memory
 	serviceID := "svc-free-123"
 	serviceName := "free-tier-service"
-	serviceType := api.TIMESCALEDB
+	serviceType := api.ServiceTypeTIMESCALEDB
 	regionCode := "us-east-1"
-	status := api.READY
+	status := api.DeployStatusREADY
 	created := time.Now()
 	replicaCount := 0
 	host := "free.tigerdata.com"
 	port := 5432
 
 	service := api.Service{
-		ServiceId:   &serviceID,
+		ServiceID:   &serviceID,
 		Name:        &serviceName,
 		ServiceType: &serviceType,
 		RegionCode:  &regionCode,
 		Status:      &status,
 		Created:     &created,
 		Resources: &[]struct {
-			Id   *string `json:"id,omitempty"`
+			ID   *string `json:"id,omitempty"`
 			Spec *struct {
-				CpuMillis  *int    `json:"cpu_millis,omitempty"`
+				CPUMillis  *int    `json:"cpu_millis,omitempty"`
 				MemoryGbs  *int    `json:"memory_gbs,omitempty"`
 				VolumeType *string `json:"volume_type,omitempty"`
 			} `json:"spec,omitempty"`
 		}{
 			{
 				Spec: &struct {
-					CpuMillis  *int    `json:"cpu_millis,omitempty"`
+					CPUMillis  *int    `json:"cpu_millis,omitempty"`
 					MemoryGbs  *int    `json:"memory_gbs,omitempty"`
 					VolumeType *string `json:"volume_type,omitempty"`
 				}{
 					// CPU and Memory are nil for free tier services
-					CpuMillis: nil,
+					CPUMillis: nil,
 					MemoryGbs: nil,
 				},
 			},
@@ -475,7 +475,7 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	initialPassword := "secret-password-123"
 
 	service := api.Service{
-		ServiceId:       &serviceID,
+		ServiceID:       &serviceID,
 		Name:            &serviceName,
 		InitialPassword: &initialPassword,
 	}
@@ -498,7 +498,7 @@ func TestPrepareServiceForOutput_WithoutPassword(t *testing.T) {
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
+	if outputSvc.ServiceID == nil || *outputSvc.ServiceID != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
 	if outputSvc.Name == nil || *outputSvc.Name != serviceName {
@@ -515,7 +515,7 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	servicePort := 5432
 
 	service := api.Service{
-		ServiceId:       &serviceID,
+		ServiceID:       &serviceID,
 		Name:            &serviceName,
 		InitialPassword: &initialPassword,
 		Endpoint: &api.Endpoint{
@@ -542,7 +542,7 @@ func TestPrepareServiceForOutput_WithPassword(t *testing.T) {
 	}
 
 	// Verify that other fields are preserved
-	if outputSvc.ServiceId == nil || *outputSvc.ServiceId != serviceID {
+	if outputSvc.ServiceID == nil || *outputSvc.ServiceID != serviceID {
 		t.Error("Expected service_id to be preserved")
 	}
 	if outputSvc.Name == nil || *outputSvc.Name != serviceName {

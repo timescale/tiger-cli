@@ -59,7 +59,7 @@ func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, 
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(cmd, cfg, service, withPassword)
 	if strict && withPassword && outputSvc.Password == "" {
-		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceId))
+		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceID))
 	}
 	outputWriter := cmd.OutOrStdout()
 
@@ -93,7 +93,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Header("PROPERTY", "VALUE")
 
 	// Basic service information
-	table.Append("Service ID", util.Deref(service.ServiceId))
+	table.Append("Service ID", util.Deref(service.ServiceID))
 	table.Append("Name", util.Deref(service.Name))
 	table.Append("Status", util.DerefStr(service.Status))
 	table.Append("Type", util.DerefStr(service.ServiceType))
@@ -108,12 +108,12 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	if service.Resources != nil && len(*service.Resources) > 0 {
 		resource := (*service.Resources)[0] // Get first resource
 		if resource.Spec != nil {
-			if resource.Spec.CpuMillis != nil {
-				cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+			if resource.Spec.CPUMillis != nil {
+				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
 				if cpuCores == float64(int(cpuCores)) {
-					table.Append("CPU", fmt.Sprintf("%.0f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
+					table.Append("CPU", fmt.Sprintf("%.0f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
 				} else {
-					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CpuMillis))
+					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
 				}
 			} else {
 				// CPU is null - this indicates a free tier service
@@ -203,7 +203,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	}
 
 	// Build console URL
-	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceId)
+	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceID)
 
 	return outputSvc
 }

@@ -95,7 +95,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 
 	// Prepare resize request
 	resizeReq := api.ResizeInput{
-		CpuMillis: cpuMillis,
+		CPUMillis: cpuMillis,
 		MemoryGbs: memoryGBs,
 	}
 

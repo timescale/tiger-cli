@@ -75,8 +75,8 @@ func TestDBSchema_NotReadyStates(t *testing.T) {
 		status  api.DeployStatus
 		wantMsg string
 	}{
-		{"paused", api.PAUSED, "service is paused"},
-		{"not ready", api.QUEUED, "service is not ready"},
+		{"paused", api.DeployStatusPAUSED, "service is paused"},
+		{"not ready", api.DeployStatusQUEUED, "service is not ready"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestDBSchema_NotReadyStates(t *testing.T) {
 
 			mockTestPAT(t)
 			withMockService(t, api.Service{
-				ServiceId: util.Ptr("svc-12345"),
+				ServiceID: util.Ptr("svc-12345"),
 				Status:    util.Ptr(tt.status),
 			})
 

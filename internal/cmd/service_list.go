@@ -109,7 +109,7 @@ func outputServicesTable(services []OutputService, output io.Writer) error {
 
 	for _, service := range services {
 		table.Append(
-			util.Deref(service.ServiceId),
+			util.Deref(service.ServiceID),
 			util.Deref(service.Name),
 			util.DerefStr(service.Status),
 			util.DerefStr(service.ServiceType),

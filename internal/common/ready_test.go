@@ -14,17 +14,17 @@ func TestCheckServiceReady(t *testing.T) {
 		status  *api.DeployStatus
 		wantErr error
 	}{
-		{name: "ready", status: util.Ptr(api.READY), wantErr: nil},
-		{name: "paused", status: util.Ptr(api.PAUSED), wantErr: ErrPaused},
-		{name: "pausing", status: util.Ptr(api.PAUSING), wantErr: ErrPaused},
-		{name: "queued", status: util.Ptr(api.QUEUED), wantErr: ErrNotReady},
-		{name: "configuring", status: util.Ptr(api.CONFIGURING), wantErr: ErrNotReady},
-		{name: "resuming", status: util.Ptr(api.RESUMING), wantErr: ErrNotReady},
-		{name: "upgrading", status: util.Ptr(api.UPGRADING), wantErr: ErrNotReady},
-		{name: "optimizing", status: util.Ptr(api.OPTIMIZING), wantErr: ErrNotReady},
-		{name: "unstable", status: util.Ptr(api.UNSTABLE), wantErr: ErrNotReady},
-		{name: "deleting", status: util.Ptr(api.DELETING), wantErr: ErrNotReady},
-		{name: "deleted", status: util.Ptr(api.DELETED), wantErr: ErrNotReady},
+		{name: "ready", status: util.Ptr(api.DeployStatusREADY), wantErr: nil},
+		{name: "paused", status: util.Ptr(api.DeployStatusPAUSED), wantErr: ErrPaused},
+		{name: "pausing", status: util.Ptr(api.DeployStatusPAUSING), wantErr: ErrPaused},
+		{name: "queued", status: util.Ptr(api.DeployStatusQUEUED), wantErr: ErrNotReady},
+		{name: "configuring", status: util.Ptr(api.DeployStatusCONFIGURING), wantErr: ErrNotReady},
+		{name: "resuming", status: util.Ptr(api.DeployStatusRESUMING), wantErr: ErrNotReady},
+		{name: "upgrading", status: util.Ptr(api.DeployStatusUPGRADING), wantErr: ErrNotReady},
+		{name: "optimizing", status: util.Ptr(api.DeployStatusOPTIMIZING), wantErr: ErrNotReady},
+		{name: "unstable", status: util.Ptr(api.DeployStatusUNSTABLE), wantErr: ErrNotReady},
+		{name: "deleting", status: util.Ptr(api.DeployStatusDELETING), wantErr: ErrNotReady},
+		{name: "deleted", status: util.Ptr(api.DeployStatusDELETED), wantErr: ErrNotReady},
 		{name: "unknown status", status: util.Ptr(api.DeployStatus("SOMETHING_NEW")), wantErr: ErrNotReady},
 		{name: "nil status", status: nil, wantErr: ErrNotReady},
 	}

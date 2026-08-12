@@ -138,7 +138,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		Addons:       util.ConvertStringSlicePtr[api.ServiceCreateAddons](input.Addons),
 		RegionCode:   input.Region,
 		ReplicaCount: &input.Replicas,
-		CpuMillis:    cpuMillis,
+		CPUMillis:    cpuMillis,
 		MemoryGbs:    memoryGBs,
 	}
 
@@ -161,7 +161,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	service := *resp.JSON202
-	serviceID := util.Deref(service.ServiceId)
+	serviceID := util.Deref(service.ServiceID)
 
 	// Set as default service if requested (defaults to true)
 	if input.SetDefault {

@@ -106,7 +106,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 // convertToServiceInfo converts an API Service to MCP ServiceInfo
 func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 	info := ServiceInfo{
-		ServiceID: util.Deref(service.ServiceId),
+		ServiceID: util.Deref(service.ServiceID),
 		Name:      util.Deref(service.Name),
 		Status:    util.DerefStr(service.Status),
 		Type:      util.DerefStr(service.ServiceType),
@@ -124,8 +124,8 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		if resource.Spec != nil {
 			info.Resources = &ResourceInfo{}
 
-			if resource.Spec.CpuMillis != nil {
-				cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+			if resource.Spec.CPUMillis != nil {
+				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
 				if cpuCores == float64(int(cpuCores)) {
 					info.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
 				} else {

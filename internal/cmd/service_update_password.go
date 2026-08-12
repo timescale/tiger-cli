@@ -103,7 +103,7 @@ Examples:
 			// A read replica has no separate password to rotate.
 			if common.IsReadReplica(service) {
 				return fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
-					serviceID, util.DerefStr(service.ForkedFrom.ServiceId))
+					serviceID, util.DerefStr(service.ForkedFrom.ServiceID))
 			}
 
 			if autoGenerate {
