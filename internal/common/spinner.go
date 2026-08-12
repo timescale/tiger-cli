@@ -35,6 +35,10 @@ type SpinnerArgs struct {
 	// Cancel is called when the user presses Ctrl+C. It lets the caller's
 	// polling loop unwind through its own context rather than being torn down
 	// from underneath.
+	//
+	// Set it whenever the animated spinner might be chosen: BubbleTea leaves
+	// Ctrl+C as a key press rather than a SIGINT, so a spinner without a Cancel
+	// gives the user no way at all to interrupt the wait.
 	Cancel context.CancelFunc
 }
 

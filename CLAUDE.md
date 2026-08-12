@@ -1055,9 +1055,12 @@ program := tea.NewProgram(model,
 
 - `tea.WithInput` — **always**, even for a write-only UI like a spinner.
   BubbleTea asks the terminal for keyboard disambiguation (the Kitty keyboard
-  protocol), so Ctrl+C arrives as a key press on stdin rather than as a SIGINT;
-  with no stdin attached it has nowhere to go and Ctrl+C does nothing. Easy to
-  omit with no compile error, since BubbleTea quietly falls back to `os.Stdin`.
+  protocol), so Ctrl+C arrives as a key press on stdin rather than as a SIGINT.
+  It asks for that while rendering, no matter what it was given for input, so
+  `tea.WithInput(nil)` doesn't bring the signal back — it just leaves the key
+  press unread, and Ctrl+C does nothing at all. Easy to omit with no compile
+  error: BubbleTea falls back to `os.Stdin`, and opens `/dev/tty` outright if
+  that isn't a terminal.
 - `tea.WithOutput` — **stderr**: a menu is interactive UI, not the command's
   result (see "Output Streams").
 - `tea.WithContext` — so a SIGTERM caught by `main.go` unwinds the program. Skip
