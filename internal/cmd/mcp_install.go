@@ -28,8 +28,9 @@ func buildMCPInstallCmd(app *common.App) *cobra.Command {
 	var configPath string
 
 	cmd := &cobra.Command{
-		Use:   "install [client]",
-		Short: "Install and configure Tiger MCP server for a client",
+		Use:     "install [client]",
+		Aliases: []string{"add"},
+		Short:   "Install and configure Tiger MCP server for a client",
 		Long: fmt.Sprintf(`Install and configure the Tiger MCP server for a specific MCP client or AI assistant.
 
 This command automates the configuration process by modifying the appropriate

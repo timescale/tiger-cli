@@ -18,6 +18,7 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "show",
+		Aliases:           []string{"list", "ls"},
 		Short:             "Show current configuration",
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,

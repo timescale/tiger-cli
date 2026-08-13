@@ -18,8 +18,9 @@ func buildServiceStartCmd(app *common.App) *cobra.Command {
 	var startWaitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "start [service-id]",
-		Short: "Start a stopped database service",
+		Use:     "start [service-id]",
+		Aliases: []string{"resume"},
+		Short:   "Start a stopped database service",
 		Long: `Start a stopped database service.
 
 This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.

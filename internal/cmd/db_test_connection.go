@@ -19,8 +19,9 @@ func buildDbTestConnectionCmd(app *common.App) *cobra.Command {
 	var dbTestConnectionRole string
 
 	cmd := &cobra.Command{
-		Use:   "test-connection [service-id]",
-		Short: "Test database connectivity",
+		Use:     "test-connection [service-id]",
+		Aliases: []string{"test", "ping"},
+		Short:   "Test database connectivity",
 		Long: `Test database connectivity to a service.
 
 The service ID can be provided as an argument or will use the default service

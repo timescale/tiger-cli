@@ -22,6 +22,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "list",
+		Aliases:           []string{"ls"},
 		Short:             "List all services",
 		Long:              `List all database services in the current project.`,
 		Args:              cobra.NoArgs,
