@@ -1196,6 +1196,10 @@ Examples:
 3. **Consistent Prefixes** - Use `--no-` for negative overrides
 4. **Avoid Abbreviations** - Prefer `--no-wait` over `--nowait`
 
+### Case Insensitivity
+
+Commands, aliases, and flags are matched case-insensitively (configured in `root.go`). Always declare them in lowercase — that's the canonical form. Two names that differ only in case are a collision and must be avoided.
+
 These patterns ensure Tiger CLI maintains consistency with modern CLI tools while providing a predictable user experience.
 
 ## GitHub Workflows
