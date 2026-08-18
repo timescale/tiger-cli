@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -18,6 +20,11 @@ import (
 )
 
 func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
+	// Match command names and aliases case-insensitively (e.g. `tiger SERVICE
+	// LIST` works the same as `tiger service list`). Cobra only exposes this as
+	// a global.
+	cobra.EnableCaseInsensitive = true
+
 	// TIGER_EXPERIMENTAL toggles preview-stage commands and MCP tools. Read at
 	// build time so ungated subtrees are never added to the command tree — the
 	// command literally does not exist when the env var is unset/false, so it
@@ -53,6 +60,12 @@ tiger auth login
 	// without this every cmd.Printf would land on stderr.
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
+
+	// Match flag names case-insensitively (e.g. `--Output` works the same as
+	// `--output`). Propagates to all subcommands added after this point.
+	cmd.SetGlobalNormalizationFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		return pflag.NormalizedName(strings.ToLower(name))
+	})
 
 	// Add persistent flags. Values are read back from the config (see
 	// flagBindings in internal/config) rather than from the flag variables, so
