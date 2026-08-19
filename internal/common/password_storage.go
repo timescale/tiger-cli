@@ -20,17 +20,17 @@ func getPasswordServiceName() string {
 
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords
 func buildPasswordKeyringUsername(service api.Service, role string) (string, error) {
-	if service.ServiceId == nil {
+	if service.ServiceID == nil {
 		return "", fmt.Errorf("service ID is required")
 	}
-	if service.ProjectId == nil {
+	if service.ProjectID == nil {
 		return "", fmt.Errorf("project ID is required")
 	}
 	if role == "" {
 		return "", fmt.Errorf("role is required")
 	}
 
-	return fmt.Sprintf("password-%s-%s-%s", *service.ProjectId, *service.ServiceId, role), nil
+	return fmt.Sprintf("password-%s-%s-%s", *service.ProjectID, *service.ServiceID, role), nil
 }
 
 // sanitizeErrorMessage removes sensitive information from error messages

@@ -73,9 +73,9 @@ func TestServiceUpdatePassword_ReadReplicaRejected(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(api.Service{
-			ServiceId:  util.Ptr("rep1234567"),
-			ProjectId:  util.Ptr("test-project-123"),
-			ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceId: util.Ptr("svcprimary")},
+			ServiceID:  util.Ptr("rep1234567"),
+			ProjectID:  util.Ptr("test-project-123"),
+			ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceID: util.Ptr("svcprimary")},
 		})
 	}))
 	defer srv.Close()

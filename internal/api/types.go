@@ -11,23 +11,23 @@ import (
 
 // Defines values for AuthInfoType.
 const (
-	ApiKey AuthInfoType = "apiKey"
-	Oauth  AuthInfoType = "oauth"
+	AuthInfoTypeAPIKey AuthInfoType = "apiKey"
+	AuthInfoTypeOauth  AuthInfoType = "oauth"
 )
 
 // Defines values for DeployStatus.
 const (
-	CONFIGURING DeployStatus = "CONFIGURING"
-	DELETED     DeployStatus = "DELETED"
-	DELETING    DeployStatus = "DELETING"
-	OPTIMIZING  DeployStatus = "OPTIMIZING"
-	PAUSED      DeployStatus = "PAUSED"
-	PAUSING     DeployStatus = "PAUSING"
-	QUEUED      DeployStatus = "QUEUED"
-	READY       DeployStatus = "READY"
-	RESUMING    DeployStatus = "RESUMING"
-	UNSTABLE    DeployStatus = "UNSTABLE"
-	UPGRADING   DeployStatus = "UPGRADING"
+	DeployStatusCONFIGURING DeployStatus = "CONFIGURING"
+	DeployStatusDELETED     DeployStatus = "DELETED"
+	DeployStatusDELETING    DeployStatus = "DELETING"
+	DeployStatusOPTIMIZING  DeployStatus = "OPTIMIZING"
+	DeployStatusPAUSED      DeployStatus = "PAUSED"
+	DeployStatusPAUSING     DeployStatus = "PAUSING"
+	DeployStatusQUEUED      DeployStatus = "QUEUED"
+	DeployStatusREADY       DeployStatus = "READY"
+	DeployStatusRESUMING    DeployStatus = "RESUMING"
+	DeployStatusUNSTABLE    DeployStatus = "UNSTABLE"
+	DeployStatusUPGRADING   DeployStatus = "UPGRADING"
 )
 
 // Defines values for EnvironmentTag.
@@ -38,24 +38,24 @@ const (
 
 // Defines values for ForkStrategy.
 const (
-	LASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
-	NOW          ForkStrategy = "NOW"
-	PITR         ForkStrategy = "PITR"
+	ForkStrategyLASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
+	ForkStrategyNOW          ForkStrategy = "NOW"
+	ForkStrategyPITR         ForkStrategy = "PITR"
 )
 
 // Defines values for MetricsSeriesRequestFn.
 const (
-	AVG      MetricsSeriesRequestFn = "AVG"
-	COUNT    MetricsSeriesRequestFn = "COUNT"
-	INCREASE MetricsSeriesRequestFn = "INCREASE"
-	LAST     MetricsSeriesRequestFn = "LAST"
-	MAX      MetricsSeriesRequestFn = "MAX"
-	MIN      MetricsSeriesRequestFn = "MIN"
-	P50      MetricsSeriesRequestFn = "P50"
-	P90      MetricsSeriesRequestFn = "P90"
-	P99      MetricsSeriesRequestFn = "P99"
-	RATE     MetricsSeriesRequestFn = "RATE"
-	SUM      MetricsSeriesRequestFn = "SUM"
+	MetricsSeriesRequestFnAVG      MetricsSeriesRequestFn = "AVG"
+	MetricsSeriesRequestFnCOUNT    MetricsSeriesRequestFn = "COUNT"
+	MetricsSeriesRequestFnINCREASE MetricsSeriesRequestFn = "INCREASE"
+	MetricsSeriesRequestFnLAST     MetricsSeriesRequestFn = "LAST"
+	MetricsSeriesRequestFnMAX      MetricsSeriesRequestFn = "MAX"
+	MetricsSeriesRequestFnMIN      MetricsSeriesRequestFn = "MIN"
+	MetricsSeriesRequestFnP50      MetricsSeriesRequestFn = "P50"
+	MetricsSeriesRequestFnP90      MetricsSeriesRequestFn = "P90"
+	MetricsSeriesRequestFnP99      MetricsSeriesRequestFn = "P99"
+	MetricsSeriesRequestFnRATE     MetricsSeriesRequestFn = "RATE"
+	MetricsSeriesRequestFnSUM      MetricsSeriesRequestFn = "SUM"
 )
 
 // Defines values for ReadReplicaSetStatus.
@@ -69,15 +69,15 @@ const (
 
 // Defines values for ServiceCreateAddons.
 const (
-	Ai         ServiceCreateAddons = "ai"
-	TimeSeries ServiceCreateAddons = "time-series"
+	ServiceCreateAddonsAi         ServiceCreateAddons = "ai"
+	ServiceCreateAddonsTimeSeries ServiceCreateAddons = "time-series"
 )
 
 // Defines values for ServiceType.
 const (
-	POSTGRES    ServiceType = "POSTGRES"
-	TIMESCALEDB ServiceType = "TIMESCALEDB"
-	VECTOR      ServiceType = "VECTOR"
+	ServiceTypePOSTGRES    ServiceType = "POSTGRES"
+	ServiceTypeTIMESCALEDB ServiceType = "TIMESCALEDB"
+	ServiceTypeVECTOR      ServiceType = "VECTOR"
 )
 
 // Defines values for SetEnvironmentInputEnvironment.
@@ -89,8 +89,8 @@ const (
 // AuthInfo Information about the authentication credentials being used. Exactly one
 // of `apiKey` or `oauth` is populated; the `type` field discriminates.
 type AuthInfo struct {
-	// ApiKey Information about the API key credentials
-	ApiKey *struct {
+	// APIKey Information about the API key credentials
+	APIKey *struct {
 		// Created When the client credentials were created
 		Created time.Time `json:"created"`
 
@@ -99,8 +99,8 @@ type AuthInfo struct {
 			// Email The user's email
 			Email openapi_types.Email `json:"email"`
 
-			// Id The user ID
-			Id string `json:"id"`
+			// ID The user ID
+			ID string `json:"id"`
 
 			// Name The user's name
 			Name string `json:"name"`
@@ -111,8 +111,8 @@ type AuthInfo struct {
 
 		// Project Information about the project
 		Project struct {
-			// Id The project ID
-			Id string `json:"id"`
+			// ID The project ID
+			ID string `json:"id"`
 
 			// Name The name of the project
 			Name string `json:"name"`
@@ -131,8 +131,8 @@ type AuthInfo struct {
 			// Email The user's email
 			Email openapi_types.Email `json:"email"`
 
-			// Id The numeric user ID
-			Id string `json:"id"`
+			// ID The numeric user ID
+			ID string `json:"id"`
 
 			// Name The user's name
 			Name string `json:"name"`
@@ -180,8 +180,8 @@ type Error struct {
 // ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
 // HA replica count is always set to 0 for forked services.
 type ForkServiceCreate struct {
-	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
-	CpuMillis *string `json:"cpu_millis,omitempty"`
+	// CPUMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
+	CPUMillis *string `json:"cpu_millis,omitempty"`
 
 	// EnvironmentTag The environment tag for the service.
 	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
@@ -205,8 +205,8 @@ type ForkServiceCreate struct {
 // ForkSpec defines model for ForkSpec.
 type ForkSpec struct {
 	IsStandby *bool   `json:"is_standby,omitempty"`
-	ProjectId *string `json:"project_id,omitempty"`
-	ServiceId *string `json:"service_id,omitempty"`
+	ProjectID *string `json:"project_id,omitempty"`
+	ServiceID *string `json:"service_id,omitempty"`
 }
 
 // ForkStrategy Strategy for creating the fork:
@@ -274,11 +274,26 @@ type MetricsSeriesRequest struct {
 	// response are lowercased.
 	Filters *[]MetricLabelFilter `json:"filters,omitempty"`
 
-	// Fn Aggregation function applied per bucket. Only applies to
-	// metrics-store-backed series (e.g. `pg_*`, `pgex_*`, `pgbouncer_*`,
-	// `timescaledb_*`); setting it on a legacy `timescale_cloud_*`
-	// series is rejected with INVALID_REQUEST. When omitted, the server
-	// picks a sensible default for the metric (typically LAST).
+	// Fn Aggregation function applied per bucket. Optional: when omitted,
+	// the server picks the default for the metric (currently `LAST`).
+	//
+	// Not accepted on the following metrics — requests are rejected
+	// with `INVALID_REQUEST`:
+	//   - `timescale_cloud_system_cpu_total_millicores`
+	//   - `timescale_cloud_system_cpu_usage_millicores`
+	//   - `timescale_cloud_system_disk_io_read_bytes`
+	//   - `timescale_cloud_system_disk_io_read_ops`
+	//   - `timescale_cloud_system_disk_io_total_bytes`
+	//   - `timescale_cloud_system_disk_io_total_ops`
+	//   - `timescale_cloud_system_disk_io_write_bytes`
+	//   - `timescale_cloud_system_disk_io_write_ops`
+	//   - `timescale_cloud_system_disk_usage_bytes`
+	//   - `timescale_cloud_system_memory_total_bytes`
+	//   - `timescale_cloud_system_memory_usage_bytes`
+	//   - `timescale_cloud_database_qps`
+	//   - `timescale_cloud_database_num_connections`
+	//   - `timescale_cloud_database_job_duration_usecs`
+	//   - `timescale_cloud_database_job_success`
 	Fn *MetricsSeriesRequestFn `json:"fn,omitempty"`
 
 	// From Start of the time window (RFC3339; nanosecond precision accepted).
@@ -291,34 +306,49 @@ type MetricsSeriesRequest struct {
 	To time.Time `json:"to"`
 }
 
-// MetricsSeriesRequestFn Aggregation function applied per bucket. Only applies to
-// metrics-store-backed series (e.g. `pg_*`, `pgex_*`, `pgbouncer_*`,
-// `timescaledb_*`); setting it on a legacy `timescale_cloud_*`
-// series is rejected with INVALID_REQUEST. When omitted, the server
-// picks a sensible default for the metric (typically LAST).
+// MetricsSeriesRequestFn Aggregation function applied per bucket. Optional: when omitted,
+// the server picks the default for the metric (currently `LAST`).
+//
+// Not accepted on the following metrics — requests are rejected
+// with `INVALID_REQUEST`:
+//   - `timescale_cloud_system_cpu_total_millicores`
+//   - `timescale_cloud_system_cpu_usage_millicores`
+//   - `timescale_cloud_system_disk_io_read_bytes`
+//   - `timescale_cloud_system_disk_io_read_ops`
+//   - `timescale_cloud_system_disk_io_total_bytes`
+//   - `timescale_cloud_system_disk_io_total_ops`
+//   - `timescale_cloud_system_disk_io_write_bytes`
+//   - `timescale_cloud_system_disk_io_write_ops`
+//   - `timescale_cloud_system_disk_usage_bytes`
+//   - `timescale_cloud_system_memory_total_bytes`
+//   - `timescale_cloud_system_memory_usage_bytes`
+//   - `timescale_cloud_database_qps`
+//   - `timescale_cloud_database_num_connections`
+//   - `timescale_cloud_database_job_duration_usecs`
+//   - `timescale_cloud_database_job_success`
 type MetricsSeriesRequestFn string
 
 // Peering defines model for Peering.
 type Peering struct {
 	ErrorMessage   *string `json:"error_message,omitempty"`
-	Id             *string `json:"id,omitempty"`
-	PeerAccountId  *string `json:"peer_account_id,omitempty"`
+	ID             *string `json:"id,omitempty"`
+	PeerAccountID  *string `json:"peer_account_id,omitempty"`
 	PeerRegionCode *string `json:"peer_region_code,omitempty"`
-	PeerVpcId      *string `json:"peer_vpc_id,omitempty"`
-	ProvisionedId  *string `json:"provisioned_id,omitempty"`
+	PeerVpcID      *string `json:"peer_vpc_id,omitempty"`
+	ProvisionedID  *string `json:"provisioned_id,omitempty"`
 	Status         *string `json:"status,omitempty"`
 }
 
 // PeeringCreate defines model for PeeringCreate.
 type PeeringCreate struct {
-	PeerAccountId  string `json:"peer_account_id"`
+	PeerAccountID  string `json:"peer_account_id"`
 	PeerRegionCode string `json:"peer_region_code"`
-	PeerVpcId      string `json:"peer_vpc_id"`
+	PeerVpcID      string `json:"peer_vpc_id"`
 }
 
 // Project defines model for Project.
 type Project struct {
-	Id   string `json:"id"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -326,10 +356,10 @@ type Project struct {
 type ReadReplicaSet struct {
 	ConnectionPooler *ConnectionPooler `json:"connection_pooler,omitempty"`
 
-	// CpuMillis CPU allocation in milli-cores.
-	CpuMillis *int      `json:"cpu_millis,omitempty"`
+	// CPUMillis CPU allocation in milli-cores.
+	CPUMillis *int      `json:"cpu_millis,omitempty"`
 	Endpoint  *Endpoint `json:"endpoint,omitempty"`
-	Id        *string   `json:"id,omitempty"`
+	ID        *string   `json:"id,omitempty"`
 
 	// MemoryGbs Memory allocation in gigabytes.
 	MemoryGbs *int `json:"memory_gbs,omitempty"`
@@ -351,8 +381,8 @@ type ReadReplicaSetStatus string
 
 // ReadReplicaSetCreate defines model for ReadReplicaSetCreate.
 type ReadReplicaSetCreate struct {
-	// CpuMillis The initial CPU allocation in milli-cores.
-	CpuMillis int `json:"cpu_millis"`
+	// CPUMillis The initial CPU allocation in milli-cores.
+	CPUMillis int `json:"cpu_millis"`
 
 	// MemoryGbs The initial memory allocation in gigabytes.
 	MemoryGbs int `json:"memory_gbs"`
@@ -366,8 +396,8 @@ type ReadReplicaSetCreate struct {
 
 // ResizeInput defines model for ResizeInput.
 type ResizeInput struct {
-	// CpuMillis The new CPU allocation in milli-cores.
-	CpuMillis string `json:"cpu_millis"`
+	// CPUMillis The new CPU allocation in milli-cores.
+	CPUMillis string `json:"cpu_millis"`
 
 	// MemoryGbs The new memory allocation in gigabytes.
 	MemoryGbs string `json:"memory_gbs"`
@@ -395,8 +425,8 @@ type Service struct {
 	// Name The name of the service.
 	Name *string `json:"name,omitempty"`
 
-	// ProjectId The project this service belongs to.
-	ProjectId       *string           `json:"project_id,omitempty"`
+	// ProjectID The project this service belongs to.
+	ProjectID       *string           `json:"project_id,omitempty"`
 	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
 
 	// RegionCode The cloud region where the service is hosted.
@@ -404,13 +434,13 @@ type Service struct {
 
 	// Resources List of resources allocated to the service
 	Resources *[]struct {
-		// Id Resource identifier
-		Id *string `json:"id,omitempty"`
+		// ID Resource identifier
+		ID *string `json:"id,omitempty"`
 
 		// Spec Resource specification
 		Spec *struct {
-			// CpuMillis CPU allocation in millicores
-			CpuMillis *int `json:"cpu_millis,omitempty"`
+			// CPUMillis CPU allocation in millicores
+			CPUMillis *int `json:"cpu_millis,omitempty"`
 
 			// MemoryGbs Memory allocation in gigabytes
 			MemoryGbs *int `json:"memory_gbs,omitempty"`
@@ -420,8 +450,8 @@ type Service struct {
 		} `json:"spec,omitempty"`
 	} `json:"resources,omitempty"`
 
-	// ServiceId The unique identifier for the service.
-	ServiceId   *string       `json:"service_id,omitempty"`
+	// ServiceID The unique identifier for the service.
+	ServiceID   *string       `json:"service_id,omitempty"`
 	ServiceType *ServiceType  `json:"service_type,omitempty"`
 	Status      *DeployStatus `json:"status,omitempty"`
 
@@ -434,8 +464,8 @@ type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
 	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
 
-	// CpuMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
-	CpuMillis *string `json:"cpu_millis,omitempty"`
+	// CPUMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
+	CPUMillis *string `json:"cpu_millis,omitempty"`
 
 	// EnvironmentTag The environment tag for the service.
 	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
@@ -485,8 +515,8 @@ type ServiceType string
 
 // ServiceVPCInput defines model for ServiceVPCInput.
 type ServiceVPCInput struct {
-	// VpcId The ID of the VPC to attach the service to.
-	VpcId string `json:"vpc_id"`
+	// VpcID The ID of the VPC to attach the service to.
+	VpcID string `json:"vpc_id"`
 }
 
 // SetEnvironmentInput defines model for SetEnvironmentInput.
@@ -516,7 +546,7 @@ type UpdatePasswordInput struct {
 // VPC defines model for VPC.
 type VPC struct {
 	Cidr       *string `json:"cidr,omitempty"`
-	Id         *string `json:"id,omitempty"`
+	ID         *string `json:"id,omitempty"`
 	Name       *string `json:"name,omitempty"`
 	RegionCode *string `json:"region_code,omitempty"`
 }
@@ -534,17 +564,17 @@ type VPCRename struct {
 	Name string `json:"name"`
 }
 
-// PeeringId defines model for PeeringId.
-type PeeringId = string
+// PeeringID defines model for PeeringId.
+type PeeringID = string
 
-// ProjectId defines model for ProjectId.
-type ProjectId = string
+// ProjectID defines model for ProjectId.
+type ProjectID = string
 
-// ReplicaSetId defines model for ReplicaSetId.
-type ReplicaSetId = string
+// ReplicaSetID defines model for ReplicaSetId.
+type ReplicaSetID = string
 
-// ServiceId defines model for ServiceId.
-type ServiceId = string
+// ServiceID defines model for ServiceId.
+type ServiceID = string
 
 // VPCId defines model for VPCId.
 type VPCId = string

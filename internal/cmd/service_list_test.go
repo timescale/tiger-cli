@@ -183,12 +183,12 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 
 	services := []api.Service{
 		{
-			ServiceId:       &serviceID1,
+			ServiceID:       &serviceID1,
 			Name:            &serviceName1,
 			InitialPassword: &initialPassword1,
 		},
 		{
-			ServiceId:       &serviceID2,
+			ServiceID:       &serviceID2,
 			Name:            &serviceName2,
 			InitialPassword: &initialPassword2,
 		},
@@ -212,8 +212,8 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 		}
 
 		// Verify that other fields are preserved
-		if service.ServiceId == nil {
-			t.Errorf("Expected ServiceId to be preserved in sanitized service %d", i)
+		if service.ServiceID == nil {
+			t.Errorf("Expected ServiceID to be preserved in sanitized service %d", i)
 		}
 		if service.Name == nil {
 			t.Errorf("Expected Name to be preserved in sanitized service %d", i)

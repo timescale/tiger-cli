@@ -67,7 +67,7 @@ func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponses
 		return &ConnectionTarget{ConnectionService: service, CredentialService: service}, nil
 	}
 
-	parentID := util.DerefStr(service.ForkedFrom.ServiceId)
+	parentID := util.DerefStr(service.ForkedFrom.ServiceID)
 	if parentID == "" {
 		return &ConnectionTarget{ConnectionService: service, CredentialService: service, IsReplica: true}, nil
 	}
@@ -95,7 +95,7 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet) *ConnectionTarget {
 	return &ConnectionTarget{
 		ConnectionService: api.Service{
-			ServiceId:        replica.Id,
+			ServiceID:        replica.ID,
 			Name:             replica.Name,
 			Endpoint:         replica.Endpoint,
 			ConnectionPooler: replica.ConnectionPooler,

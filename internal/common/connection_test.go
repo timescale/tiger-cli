@@ -218,8 +218,8 @@ func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -267,8 +267,8 @@ func TestBuildConnectionString_WithPassword_PgpassStorage(t *testing.T) {
 	host := "test-pgpass-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -340,8 +340,8 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -379,8 +379,8 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -416,8 +416,8 @@ func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -460,8 +460,8 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	serviceID := "test-invalid-service"
 	projectID := "test-invalid-project"
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint:  nil, // Invalid - no endpoint
 	}
 
@@ -491,8 +491,8 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 	// credService supplies credentials only; endpoint selection is driven by
 	// connService. WithPassword is off here, so credService is not exercised.
 	primary := api.Service{
-		ServiceId: util.Ptr("svc-primary"),
-		ProjectId: util.Ptr("proj-1"),
+		ServiceID: util.Ptr("svc-primary"),
+		ProjectID: util.Ptr("proj-1"),
 		Endpoint: &api.Endpoint{
 			Host: &primaryHost,
 			Port: &port,
@@ -501,7 +501,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 
 	t.Run("direct endpoint", func(t *testing.T) {
 		conn := api.Service{
-			ServiceId: util.Ptr("rep-1"),
+			ServiceID: util.Ptr("rep-1"),
 			Name:      util.Ptr("my-replica"),
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
@@ -526,7 +526,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 
 	t.Run("pooled endpoint when available", func(t *testing.T) {
 		conn := api.Service{
-			ServiceId: util.Ptr("rep-1"),
+			ServiceID: util.Ptr("rep-1"),
 			Name:      util.Ptr("my-replica"),
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 			ConnectionPooler: &api.ConnectionPooler{
@@ -548,7 +548,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 
 	t.Run("falls back to direct when pooler requested but unavailable", func(t *testing.T) {
 		conn := api.Service{
-			ServiceId: util.Ptr("rep-1"),
+			ServiceID: util.Ptr("rep-1"),
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
@@ -565,7 +565,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 	})
 
 	t.Run("error when endpoint missing", func(t *testing.T) {
-		conn := api.Service{ServiceId: util.Ptr("rep-1")}
+		conn := api.Service{ServiceID: util.Ptr("rep-1")}
 		if _, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
 			t.Fatal("expected error for missing connection endpoint")
 		}

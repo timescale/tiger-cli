@@ -104,7 +104,7 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 	cutoff := time.Now().Add(-threshold)
 	swept := 0
 	for _, s := range services {
-		if s.ServiceId == nil || s.Name == nil || s.Created == nil {
+		if s.ServiceID == nil || s.Name == nil || s.Created == nil {
 			continue
 		}
 		if !strings.HasPrefix(*s.Name, testServicePrefix) {
@@ -114,11 +114,11 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 			continue
 		}
 		t.Logf("Sweep: deleting stale service %s (name=%s, created=%s)",
-			*s.ServiceId, *s.Name, s.Created.Format(time.RFC3339))
+			*s.ServiceID, *s.Name, s.Created.Format(time.RFC3339))
 		if _, err := executeIntegrationCommand(ctx,
-			"service", "delete", *s.ServiceId,
+			"service", "delete", *s.ServiceID,
 			"--confirm", "--no-wait"); err != nil {
-			t.Logf("Sweep: failed to delete %s: %v", *s.ServiceId, err)
+			t.Logf("Sweep: failed to delete %s: %v", *s.ServiceID, err)
 			continue
 		}
 		swept++
@@ -295,8 +295,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify service details
-		if service.ServiceId == nil || *service.ServiceId != serviceID {
-			t.Errorf("Expected service ID %s, got %v", serviceID, service.ServiceId)
+		if service.ServiceID == nil || *service.ServiceID != serviceID {
+			t.Errorf("Expected service ID %s, got %v", serviceID, service.ServiceID)
 		}
 
 		if service.Name == nil || *service.Name != serviceName {
@@ -1115,8 +1115,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if serviceBefore.Resources != nil && len(*serviceBefore.Resources) > 0 {
 			resource := (*serviceBefore.Resources)[0]
 			if resource.Spec != nil {
-				if resource.Spec.CpuMillis != nil {
-					cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+				if resource.Spec.CPUMillis != nil {
+					cpuCores := float64(*resource.Spec.CPUMillis) / 1000
 					currentCPU = fmt.Sprintf("%.1f CPU", cpuCores)
 				}
 				if resource.Spec.MemoryGbs != nil {
@@ -1182,8 +1182,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if serviceAfter.Resources != nil && len(*serviceAfter.Resources) > 0 {
 			resource := (*serviceAfter.Resources)[0]
 			if resource.Spec != nil {
-				if resource.Spec.CpuMillis != nil {
-					newCPUMillis = *resource.Spec.CpuMillis
+				if resource.Spec.CPUMillis != nil {
+					newCPUMillis = *resource.Spec.CPUMillis
 				}
 				if resource.Spec.MemoryGbs != nil {
 					newMemoryGbs = *resource.Spec.MemoryGbs
@@ -1324,8 +1324,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	// Try to parse as JSON first (if --output json was used)
 	var service api.Service
 	if err := json.Unmarshal([]byte(output), &service); err == nil {
-		if service.ServiceId != nil {
-			return *service.ServiceId
+		if service.ServiceID != nil {
+			return *service.ServiceID
 		}
 	}
 

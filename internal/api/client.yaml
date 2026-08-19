@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/HEAD/configuration-schema.json
+package: api
+output: client.go
+generate:
+  client: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
+compatibility:
+  always-prefix-enum-values: true

@@ -141,13 +141,13 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
-			if err := cfg.StoreCredentials(apiKey, authInfo.ApiKey.Project.Id); err != nil {
+			if err := cfg.StoreCredentials(apiKey, authInfo.APIKey.Project.ID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
 			// See the OAuth branch above: keep the App's client in sync with the
 			// credentials we just stored.
-			app.SetClient(client, authInfo.ApiKey.Project.Id)
-			finishLogin(cmd, authInfo.ApiKey.Project.Id)
+			app.SetClient(client, authInfo.APIKey.Project.ID)
+			finishLogin(cmd, authInfo.APIKey.Project.ID)
 			return nil
 		},
 	}
@@ -418,7 +418,7 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	case 0:
 		return "", fmt.Errorf("user has no accessible projects")
 	case 1:
-		return projects[0].Id, nil
+		return projects[0].ID, nil
 	default:
 		if !util.IsTerminal(l.cmd.InOrStdin()) || !util.IsTerminal(l.cmd.ErrOrStderr()) {
 			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
@@ -482,7 +482,7 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 		case "enter", "space":
-			m.selected = m.projects[m.cursor].Id
+			m.selected = m.projects[m.cursor].ID
 			return m, tea.Quit
 		case "backspace":
 			// Handle backspace to remove last character from buffer
@@ -529,7 +529,7 @@ func (m projectSelectModel) View() tea.View {
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.Id)
+		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
 	}
 
 	// Show the current number buffer if user is typing

@@ -94,8 +94,8 @@ func primarySvc() api.Service {
 	host := "svcprimary.example.com"
 	port := 5432
 	return api.Service{
-		ServiceId: util.Ptr("svcprimary"),
-		ProjectId: util.Ptr("proj1"),
+		ServiceID: util.Ptr("svcprimary"),
+		ProjectID: util.Ptr("proj1"),
 		Name:      util.Ptr("my-db"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
@@ -105,14 +105,14 @@ func standbySvc() api.Service {
 	host := "replica.example.com"
 	port := 5432
 	return api.Service{
-		ServiceId: util.Ptr("rep1234567"),
-		ProjectId: util.Ptr("proj1"),
+		ServiceID: util.Ptr("rep1234567"),
+		ProjectID: util.Ptr("proj1"),
 		Name:      util.Ptr("reporting-replica"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 		ForkedFrom: &api.ForkSpec{
 			IsStandby: util.Ptr(true),
-			ProjectId: util.Ptr("proj1"),
-			ServiceId: util.Ptr("svcprimary"),
+			ProjectID: util.Ptr("proj1"),
+			ServiceID: util.Ptr("svcprimary"),
 		},
 	}
 }
@@ -137,8 +137,8 @@ func TestLookupConnectionTarget_Primary(t *testing.T) {
 	if target.IsReplica {
 		t.Fatal("expected a primary target")
 	}
-	if util.DerefStr(target.ConnectionService.ServiceId) != "svcprimary" {
-		t.Errorf("expected connect svcprimary, got %q", util.DerefStr(target.ConnectionService.ServiceId))
+	if util.DerefStr(target.ConnectionService.ServiceID) != "svcprimary" {
+		t.Errorf("expected connect svcprimary, got %q", util.DerefStr(target.ConnectionService.ServiceID))
 	}
 }
 
@@ -162,11 +162,11 @@ func TestLookupConnectionTarget_Replica(t *testing.T) {
 	if !target.IsReplica {
 		t.Fatal("expected a replica target")
 	}
-	if util.DerefStr(target.ConnectionService.ServiceId) != "rep1234567" {
-		t.Errorf("expected connect rep1234567, got %q", util.DerefStr(target.ConnectionService.ServiceId))
+	if util.DerefStr(target.ConnectionService.ServiceID) != "rep1234567" {
+		t.Errorf("expected connect rep1234567, got %q", util.DerefStr(target.ConnectionService.ServiceID))
 	}
-	if util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
-		t.Errorf("expected credential svcprimary, got %q", util.DerefStr(target.CredentialService.ServiceId))
+	if util.DerefStr(target.CredentialService.ServiceID) != "svcprimary" {
+		t.Errorf("expected credential svcprimary, got %q", util.DerefStr(target.CredentialService.ServiceID))
 	}
 }
 
@@ -194,11 +194,11 @@ func TestBuildConnectionDetailsForTarget_ReplicaPoolerFallback(t *testing.T) {
 	rport := 5432
 	target := &common.ConnectionTarget{
 		ConnectionService: api.Service{
-			ServiceId: util.Ptr("rep1234567"),
+			ServiceID: util.Ptr("rep1234567"),
 			Name:      util.Ptr("reporting-replica"),
 			Endpoint:  &api.Endpoint{Host: &rhost, Port: &rport},
 		},
-		CredentialService: api.Service{ServiceId: util.Ptr("svcprimary"), ProjectId: util.Ptr("proj1")},
+		CredentialService: api.Service{ServiceID: util.Ptr("svcprimary"), ProjectID: util.Ptr("proj1")},
 		IsReplica:         true,
 	}
 
@@ -228,7 +228,7 @@ func TestBuildConnectionDetailsForTarget_PrimaryRequiresPooler(t *testing.T) {
 	host := "primary.example.com"
 	port := 5432
 	svc := api.Service{
-		ServiceId: util.Ptr("svcprimary"),
+		ServiceID: util.Ptr("svcprimary"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
 	target := &common.ConnectionTarget{ConnectionService: svc, CredentialService: svc}

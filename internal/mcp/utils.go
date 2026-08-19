@@ -78,7 +78,7 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
 func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service, withPassword bool) ServiceDetail {
 	detail := ServiceDetail{
-		ServiceID: util.Deref(service.ServiceId),
+		ServiceID: util.Deref(service.ServiceID),
 		Name:      util.Deref(service.Name),
 		Status:    util.DerefStr(service.Status),
 		Type:      util.DerefStr(service.ServiceType),
@@ -96,8 +96,8 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		if resource.Spec != nil {
 			detail.Resources = &ResourceInfo{}
 
-			if resource.Spec.CpuMillis != nil {
-				cpuCores := float64(*resource.Spec.CpuMillis) / 1000
+			if resource.Spec.CPUMillis != nil {
+				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
 				if cpuCores == float64(int(cpuCores)) {
 					detail.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
 				} else {

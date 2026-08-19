@@ -187,7 +187,7 @@ func selectConnection(
 	// Offer the replica menu only for a primary on an interactive terminal.
 	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
 		primary := target.ConnectionService
-		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceId))
+		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceID))
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
 			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
@@ -274,7 +274,7 @@ type connectTargetModel struct {
 func newConnectTargetModel(primary api.Service, replicas []api.ReadReplicaSet) connectTargetModel {
 	choices := []connectTargetChoice{{
 		kind:  targetPrimary,
-		label: fmt.Sprintf("Connect to primary service (%s)", util.DerefStr(primary.ServiceId)),
+		label: fmt.Sprintf("Connect to primary service (%s)", util.DerefStr(primary.ServiceID)),
 	}}
 
 	for i := range replicas {

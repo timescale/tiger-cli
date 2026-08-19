@@ -58,8 +58,8 @@ Examples:
 			// Make the start request
 			resp, err := client.StartServiceWithResponse(
 				context.Background(),
-				api.ProjectId(projectID),
-				api.ServiceId(serviceID),
+				api.ProjectID(projectID),
+				api.ServiceID(serviceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to start Service: %w", err)
