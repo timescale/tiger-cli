@@ -43,14 +43,13 @@ Examples:
   tiger service delete svc-12345 --wait-timeout 15m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require explicit service ID for safety
 			if len(args) < 1 {
 				return fmt.Errorf("service ID is required")
 			}
 			serviceID := args[0]
-
-			cmd.SilenceUsage = true
 
 			// Check read-only mode before the confirmation prompt, so it refuses
 			// without asking the user to type the service ID.

@@ -27,9 +27,8 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 		Long:              `List all database services in the current project.`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err

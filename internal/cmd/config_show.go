@@ -23,9 +23,8 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 		Long:              `Display the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			// Values are re-read free of env and CLI flags (unless --with-env

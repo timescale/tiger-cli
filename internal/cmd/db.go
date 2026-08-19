@@ -80,8 +80,6 @@ func getServiceDetails(cmd *cobra.Command, app *common.App, args []string) (api.
 		return api.Service{}, err
 	}
 
-	cmd.SilenceUsage = true
-
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 	defer cancel()
 

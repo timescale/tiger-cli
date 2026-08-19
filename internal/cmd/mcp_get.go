@@ -38,10 +38,9 @@ Examples:
   tiger mcp get service_create -o yaml`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: mcpGetCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			capabilityName := args[0]
-
-			cmd.SilenceUsage = true
 
 			cfg := app.GetConfig()
 

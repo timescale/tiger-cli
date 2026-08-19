@@ -36,15 +36,14 @@ Examples:
   tiger service start svc-12345 --wait-timeout 10m`,
 		ValidArgsFunction: serviceIDCompletion(app),
 		Args:              cobra.MaximumNArgs(1),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
 			if err := common.CheckReadOnly(cfg); err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -53,8 +52,6 @@ Examples:
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			// Make the start request
 			resp, err := client.StartServiceWithResponse(

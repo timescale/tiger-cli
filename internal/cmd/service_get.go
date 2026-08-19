@@ -39,10 +39,10 @@ Examples:
   tiger service get svc-12345 --output yaml`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -51,8 +51,6 @@ Examples:
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			// Make API call to get service details
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)

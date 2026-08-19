@@ -53,9 +53,8 @@ Examples:
   tiger db test-connection svc-12345 --timeout 0`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
