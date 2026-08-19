@@ -79,7 +79,7 @@ Examples:
 				passwordToSave = envPassword
 			} else {
 				// Interactive prompt - check if we're in a terminal
-				if !util.IsTerminal(cmd.InOrStdin()) {
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable")
 				}
 

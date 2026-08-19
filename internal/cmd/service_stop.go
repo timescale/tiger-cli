@@ -94,6 +94,7 @@ Examples:
 					TargetStatus: "PAUSED",
 					Service:      &service,
 				},
+				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
 				Timeout:    stopWaitTimeout,
 				TimeoutMsg: "service may still be stopping",

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/hujson"
 
@@ -69,7 +69,7 @@ Examples:
 			var clientName string
 			if len(args) == 0 {
 				// No client specified, prompt user to select one
-				if !util.IsTerminal(cmd.InOrStdin()) {
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
 				}
 				var err error
@@ -513,7 +513,11 @@ func selectClientInteractively(cmd *cobra.Command) (string, error) {
 		cursor:  0,
 	}
 
-	program := tea.NewProgram(model, tea.WithInput(cmd.InOrStdin()), tea.WithOutput(cmd.ErrOrStderr()))
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
 	finalModel, err := program.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed to run editor selection: %w", err)
@@ -541,7 +545,7 @@ func (m clientSelectModel) Init() tea.Cmd {
 
 func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
@@ -557,7 +561,7 @@ func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.options)-1 {
 				m.cursor++
 			}
-		case "enter", " ":
+		case "enter", "space":
 			m.selected = m.options[m.cursor].ClientName
 			return m, tea.Quit
 		case "backspace":
@@ -597,7 +601,7 @@ func (m *clientSelectModel) updateNumberBuffer(newBuffer string) {
 	}
 }
 
-func (m clientSelectModel) View() string {
+func (m clientSelectModel) View() tea.View {
 	s := "Select an MCP client to configure:\n\n"
 
 	for i, option := range m.options {
@@ -614,7 +618,7 @@ func (m clientSelectModel) View() string {
 	}
 
 	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return s
+	return tea.NewView(s)
 }
 
 // addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig

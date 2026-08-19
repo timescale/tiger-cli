@@ -513,6 +513,7 @@ logging. Don't add log statements to CLI commands — print with `cmd.Print*` /
 - **Cobra**: CLI framework and command structure
 - **Viper**: Configuration management with multiple sources
 - **slog**: Structured logging for the MCP server
+- **BubbleTea v2**: Interactive terminal menus and spinners (`charm.land/bubbletea/v2`)
 - **oapi-codegen**: OpenAPI client generation (build-time dependency)
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
@@ -996,7 +997,7 @@ keeps an `io.Writer` parameter because `tablewriter` needs one anyway.
 
 Code in other packages (`internal/common`, `internal/version`) must not import
 cobra. Those take an `io.Writer` (`common.WaitForServiceArgs.Output`,
-`common.NewSpinner`, `version.PrintUpdateWarning`) and the caller in
+`common.SpinnerArgs.Output`, `version.PrintUpdateWarning`) and the caller in
 `internal/cmd` passes `cmd.ErrOrStderr()` or `cmd.OutOrStdout()`.
 
 ### Reading Stdin
@@ -1015,13 +1016,15 @@ Ctrl-C unblocks a waiting prompt instead of hanging until the user hits enter.
 doesn't leave the shell in raw mode.
 
 **Every read that prompts the user in real time must be gated on
-`util.IsTerminal(cmd.InOrStdin())`**, and must return an error naming the
-non-interactive alternative when it's false — see `service update-password`
-("use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD
-environment variable") and `service delete` ("use --confirm to skip the
-prompt"). That covers confirmations, password prompts, and every BubbleTea menu
-(see "Interactive Terminal UIs"). Ungated, they fail on an unhelpful EOF, or
-block forever, when the command runs in CI or with stdin redirected.
+`util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr())`**, and
+must return an error naming the non-interactive alternative when either is false
+— see `service update-password` ("use --new-password flag, --auto-generate flag,
+or TIGER_NEW_PASSWORD environment variable") and `service delete` ("use --confirm
+to skip the prompt"). Both streams have to be terminals: stdin so the user can
+answer, stderr so they can see what they're being asked. A prompt nobody can see
+reads as a hang, and can be answered by accident — a stray Enter at `service
+update-password` rotates the password. Confirmations, password prompts, and
+BubbleTea programs all follow this rule.
 
 The gate is about *prompts*, not about reading stdin as such. A read whose whole
 point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
@@ -1039,30 +1042,48 @@ password prompt can't be driven with `cmd.SetIn`; `ReadLine`/`ReadAll` take any
 
 ### Interactive Terminal UIs
 
-Interactive menus use BubbleTea (`github.com/charmbracelet/bubbletea`). When
-creating a `tea.NewProgram`, always pass both streams:
+Interactive menus and spinners use BubbleTea (`charm.land/bubbletea/v2`). Always
+pass all four of these to `tea.NewProgram`:
 
 ```go
 program := tea.NewProgram(model,
     tea.WithInput(cmd.InOrStdin()),
-    tea.WithOutput(cmd.ErrOrStderr()))
+    tea.WithOutput(cmd.ErrOrStderr()),
+    tea.WithContext(cmd.Context()),
+    tea.WithoutSignalHandler())
 ```
 
-`tea.WithInput` is easy to forget and there is no compile error if you do:
-BubbleTea silently defaults to `os.Stdin`, so the program reads real stdin no
-matter what the command was given. Pass it even when the model looks write-only.
-The one deliberate exception is `common.NewSpinner`, which passes
-`tea.WithInput(nil)` because it never reads keys.
+- `tea.WithInput` — **always**, even for a write-only UI like a spinner.
+  BubbleTea asks the terminal for keyboard disambiguation (the Kitty keyboard
+  protocol), so Ctrl+C arrives as a key press on stdin rather than as a SIGINT.
+  It asks for that while rendering, no matter what it was given for input, so
+  `tea.WithInput(nil)` doesn't bring the signal back — it just leaves the key
+  press unread, and Ctrl+C does nothing at all. Easy to omit with no compile
+  error: BubbleTea falls back to `os.Stdin`, and opens `/dev/tty` outright if
+  that isn't a terminal.
+- `tea.WithOutput` — **stderr**: a menu is interactive UI, not the command's
+  result (see "Output Streams").
+- `tea.WithContext` — so a SIGTERM caught by `main.go` unwinds the program. Skip
+  it only when the model already has its own cancellation path that would race
+  it, as `common.NewSpinner` does: `WaitForService`'s polling loop owns that
+  shutdown and stops the spinner itself.
+- `tea.WithoutSignalHandler` — Ctrl+C is handled as a key press and other
+  signals reach `main.go`'s handler, so BubbleTea's own handler would only be a
+  second owner of the same shutdown.
 
-Output goes to **stderr** — a menu is interactive UI, not the command's result
-(see "Output Streams").
+**Every model must handle `"ctrl+c"` itself** — nothing else will. A write-only
+program turns it into a `context.CancelFunc` call so background goroutines unwind
+cleanly; `spinnerModel` in `internal/common/spinner.go` is the model for that,
+and it's what makes Ctrl+C work during a `--wait`.
 
-Gate every BubbleTea program on `util.IsTerminal(cmd.InOrStdin())` and return an
-error naming the non-interactive alternative when it's false. Without the gate
-the program fails deep inside BubbleTea with an opaque error, or blocks.
+Gate every program on both streams, as "Reading Stdin" describes.
+`common.NewSpinner` follows the same rule, printing one message per line instead
+when either stream isn't a terminal.
 
 Because these helpers need both streams, they take the `*cobra.Command` rather
-than an `io.Writer` — which is why `oauthLogin` holds a `*cobra.Command`.
+than an `io.Writer` — which is why `oauthLogin` holds one. Code in
+`internal/common` can't import cobra, so `WaitForServiceArgs` and `SpinnerArgs`
+carry the `Input`/`Output` fields the caller fills in instead.
 
 ### Boolean Flag Patterns
 
@@ -1113,6 +1134,9 @@ if len(args) < 1 {
 
 // Interactive confirmation unless --confirm
 if !confirmFlag {
+    if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+        return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+    }
     cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
     confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
     if err != nil {
