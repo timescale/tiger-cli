@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
@@ -246,15 +246,19 @@ func TestConnectTargetModel_DefaultsToCancel(t *testing.T) {
 }
 
 func TestConnectTargetModel_KeySelection(t *testing.T) {
+	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
+	// stringifies to "\x03" and would match nothing.
 	cases := []struct {
 		name          string
-		key           tea.KeyMsg
+		key           tea.KeyPressMsg
 		wantKind      connectTargetKind
 		wantReplicaID string // checked only when set
 	}{
-		{"q cancels", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}, targetCancel, ""},
-		{"enter selects primary (cursor starts at 0)", tea.KeyMsg{Type: tea.KeyEnter}, targetPrimary, ""},
-		{"'2' selects the first replica", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}}, targetReplica, "rep-1"},
+		{"q cancels", tea.KeyPressMsg{Code: 'q'}, targetCancel, ""},
+		{"enter selects primary (cursor starts at 0)", tea.KeyPressMsg{Code: tea.KeyEnter}, targetPrimary, ""},
+		{"space selects primary", tea.KeyPressMsg{Code: tea.KeySpace}, targetPrimary, ""},
+		{"ctrl+c cancels", tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, targetCancel, ""},
+		{"'2' selects the first replica", tea.KeyPressMsg{Code: '2'}, targetReplica, "rep-1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

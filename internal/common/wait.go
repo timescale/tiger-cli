@@ -30,16 +30,22 @@ type WaitHandler interface {
 }
 
 type WaitForServiceArgs struct {
-	Client     api.ClientWithResponsesInterface
-	ProjectID  string
-	ServiceID  string
-	Handler    WaitHandler
+	Client    api.ClientWithResponsesInterface
+	ProjectID string
+	ServiceID string
+	Handler   WaitHandler
+
+	// Input lets the spinner pick up a Ctrl+C and cancel the wait. See
+	// [SpinnerArgs.Input] for why the spinner needs stdin at all.
+	Input      io.Reader
 	Output     io.Writer
 	Timeout    time.Duration
 	TimeoutMsg string
 }
 
 func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
+	// The spinner cancels this context on Ctrl+C, which the loop below reports
+	// as a canceled wait.
 	ctx, cancel := context.WithTimeout(ctx, args.Timeout)
 	defer cancel()
 
@@ -51,7 +57,12 @@ func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 	defer ticker.Stop()
 
 	// Start the spinner
-	spinner := NewSpinner(args.Output, args.Handler.Message())
+	spinner := NewSpinner(SpinnerArgs{
+		Input:   args.Input,
+		Output:  args.Output,
+		Message: args.Handler.Message(),
+		Cancel:  cancel,
+	})
 	defer spinner.Stop()
 
 	for {

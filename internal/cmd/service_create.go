@@ -195,6 +195,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 						TargetStatus: "READY",
 						Service:      &service,
 					},
+					Input:      cmd.InOrStdin(),
 					Output:     cmd.ErrOrStderr(),
 					Timeout:    createWaitTimeout,
 					TimeoutMsg: "service may still be provisioning",

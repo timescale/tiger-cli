@@ -217,6 +217,7 @@ Examples:
 						TargetStatus: "READY",
 						Service:      &forkedService,
 					},
+					Input:      cmd.InOrStdin(),
 					Output:     cmd.ErrOrStderr(),
 					Timeout:    forkWaitTimeout,
 					TimeoutMsg: "service may still be provisioning",
