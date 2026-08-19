@@ -22,9 +22,9 @@ func CheckServiceReady(service api.Service) error {
 		return ErrNotReady
 	}
 	switch *service.Status {
-	case api.READY:
+	case api.DeployStatusREADY:
 		return nil
-	case api.PAUSED, api.PAUSING:
+	case api.DeployStatusPAUSED, api.DeployStatusPAUSING:
 		return ErrPaused
 	default:
 		return ErrNotReady

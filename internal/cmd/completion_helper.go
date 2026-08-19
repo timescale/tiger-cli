@@ -46,8 +46,8 @@ func serviceIDCompletion(app *common.App) cobra.CompletionFunc {
 
 		results := make([]string, 0, len(services))
 		for _, service := range services {
-			if service.ServiceId != nil && strings.HasPrefix(*service.ServiceId, toComplete) {
-				results = append(results, cobra.CompletionWithDesc(*service.ServiceId, *service.Name))
+			if service.ServiceID != nil && strings.HasPrefix(*service.ServiceID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(*service.ServiceID, *service.Name))
 			}
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp

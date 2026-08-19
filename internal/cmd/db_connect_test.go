@@ -197,15 +197,15 @@ func equalStringSlices(a, b []string) bool {
 
 func testPrimary() api.Service {
 	return api.Service{
-		ServiceId: util.Ptr("svc-primary"),
+		ServiceID: util.Ptr("svc-primary"),
 		Name:      util.Ptr("my-db"),
 	}
 }
 
 func testReplicas() []api.ReadReplicaSet {
 	return []api.ReadReplicaSet{
-		{Id: util.Ptr("rep-1"), Name: util.Ptr("replica-a")},
-		{Id: util.Ptr("rep-2"), Name: util.Ptr("replica-b")},
+		{ID: util.Ptr("rep-1"), Name: util.Ptr("replica-a")},
+		{ID: util.Ptr("rep-2"), Name: util.Ptr("replica-b")},
 	}
 }
 
@@ -227,10 +227,10 @@ func TestNewConnectTargetModel_Options(t *testing.T) {
 	if len(m.choices) != 4 {
 		t.Fatalf("expected 4 choices with two replicas, got %d: %v", len(m.choices), m.choices)
 	}
-	if m.choices[1].kind != targetReplica || m.choices[1].replica == nil || *m.choices[1].replica.Id != "rep-1" {
+	if m.choices[1].kind != targetReplica || m.choices[1].replica == nil || *m.choices[1].replica.ID != "rep-1" {
 		t.Errorf("expected second choice to be replica rep-1, got %+v", m.choices[1])
 	}
-	if m.choices[2].kind != targetReplica || *m.choices[2].replica.Id != "rep-2" {
+	if m.choices[2].kind != targetReplica || *m.choices[2].replica.ID != "rep-2" {
 		t.Errorf("expected third choice to be replica rep-2, got %+v", m.choices[2])
 	}
 	if m.choices[3].kind != targetCancel {
@@ -268,7 +268,7 @@ func TestConnectTargetModel_KeySelection(t *testing.T) {
 			if choice.kind != tc.wantKind {
 				t.Fatalf("expected kind %v, got %v", tc.wantKind, choice.kind)
 			}
-			if tc.wantReplicaID != "" && (choice.replica == nil || *choice.replica.Id != tc.wantReplicaID) {
+			if tc.wantReplicaID != "" && (choice.replica == nil || *choice.replica.ID != tc.wantReplicaID) {
 				t.Errorf("expected replica %s, got %+v", tc.wantReplicaID, choice.replica)
 			}
 		})
@@ -295,7 +295,7 @@ func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
 	host := "primary.example.com"
 	port := 5432
 	primary := api.Service{
-		ServiceId: util.Ptr("svc-primary"),
+		ServiceID: util.Ptr("svc-primary"),
 		Name:      util.Ptr("my-db"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
@@ -459,8 +459,8 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	serviceID := "test-psql-service"
 	projectID := "test-psql-project"
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 	}
 
 	// Store a test password in keyring
@@ -516,8 +516,8 @@ func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
 	serviceID := "test-service-id"
 	projectID := "test-project-id"
 	service := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 	}
 
 	psqlPath := "/usr/bin/psql"

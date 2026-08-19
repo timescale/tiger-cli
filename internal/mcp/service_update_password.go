@@ -98,7 +98,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	service := *serviceResp.JSON200
 	if common.IsReadReplica(service) {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
-			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceId))
+			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 	}
 
 	resp, err := client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)

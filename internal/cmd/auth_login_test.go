@@ -318,7 +318,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	mockServerURL := setupOAuthTest(t, []api.Project{
-		{Id: "project-123", Name: "Test Project"},
+		{ID: "project-123", Name: "Test Project"},
 	}, "project-123")
 
 	// Execute login command - the mocked openBrowser will handle the callback automatically
@@ -363,9 +363,9 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 
 func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	mockServerURL := setupOAuthTest(t, []api.Project{
-		{Id: "project-123", Name: "Test Project 1"},
-		{Id: "project-456", Name: "Test Project 2"},
-		{Id: "project-789", Name: "Test Project 3"},
+		{ID: "project-123", Name: "Test Project 1"},
+		{ID: "project-456", Name: "Test Project 2"},
+		{ID: "project-789", Name: "Test Project 3"},
 	}, "project-789")
 
 	// The picker only runs on a TTY
@@ -378,9 +378,9 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	}()
 
 	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
-		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].Id)
+		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].ID)
 		// Simulate user pressing down arrow twice and then enter (selects third project)
-		return projects[2].Id, nil
+		return projects[2].ID, nil
 	}
 
 	// Execute login command - both mocked functions will handle OAuth flow and project selection

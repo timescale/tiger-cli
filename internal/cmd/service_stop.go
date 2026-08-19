@@ -59,8 +59,8 @@ Examples:
 			// Make the stop request
 			resp, err := client.StopServiceWithResponse(
 				context.Background(),
-				api.ProjectId(projectID),
-				api.ServiceId(serviceID),
+				api.ProjectID(projectID),
+				api.ServiceID(serviceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to stop Service: %w", err)

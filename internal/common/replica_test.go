@@ -43,8 +43,8 @@ func primaryService() api.Service {
 	host := "svcprimary.example.com"
 	port := 5432
 	return api.Service{
-		ServiceId: util.Ptr("svcprimary"),
-		ProjectId: util.Ptr("proj1"),
+		ServiceID: util.Ptr("svcprimary"),
+		ProjectID: util.Ptr("proj1"),
 		Name:      util.Ptr("my-db"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 	}
@@ -54,14 +54,14 @@ func replicaService() api.Service {
 	host := "replica.example.com"
 	port := 5432
 	return api.Service{
-		ServiceId: util.Ptr("rep1234567"),
-		ProjectId: util.Ptr("proj1"),
+		ServiceID: util.Ptr("rep1234567"),
+		ProjectID: util.Ptr("proj1"),
 		Name:      util.Ptr("reporting-replica"),
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 		ForkedFrom: &api.ForkSpec{
 			IsStandby: util.Ptr(true),
-			ProjectId: util.Ptr("proj1"),
-			ServiceId: util.Ptr("svcprimary"),
+			ProjectID: util.Ptr("proj1"),
+			ServiceID: util.Ptr("svcprimary"),
 		},
 	}
 }
@@ -77,7 +77,7 @@ func TestResolveConnectionTarget_Primary(t *testing.T) {
 	if target.IsReplica {
 		t.Fatal("expected a primary target")
 	}
-	if util.DerefStr(target.ConnectionService.ServiceId) != "svcprimary" || util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
+	if util.DerefStr(target.ConnectionService.ServiceID) != "svcprimary" || util.DerefStr(target.CredentialService.ServiceID) != "svcprimary" {
 		t.Errorf("expected connect and credential to be the primary, got %+v", target)
 	}
 }
@@ -95,12 +95,12 @@ func TestResolveConnectionTarget_Replica(t *testing.T) {
 		t.Fatal("expected a replica target")
 	}
 	// Connect to the replica's own endpoint.
-	if util.DerefStr(target.ConnectionService.ServiceId) != "rep1234567" {
-		t.Errorf("expected connect service rep1234567, got %q", util.DerefStr(target.ConnectionService.ServiceId))
+	if util.DerefStr(target.ConnectionService.ServiceID) != "rep1234567" {
+		t.Errorf("expected connect service rep1234567, got %q", util.DerefStr(target.ConnectionService.ServiceID))
 	}
 	// Credentials resolve against the parent primary (fetched via GetService).
-	if util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
-		t.Errorf("expected credential service svcprimary, got %q", util.DerefStr(target.CredentialService.ServiceId))
+	if util.DerefStr(target.CredentialService.ServiceID) != "svcprimary" {
+		t.Errorf("expected credential service svcprimary, got %q", util.DerefStr(target.CredentialService.ServiceID))
 	}
 }
 
@@ -133,7 +133,7 @@ func TestResolveConnectionTargetByID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !target.IsReplica || util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
+	if !target.IsReplica || util.DerefStr(target.CredentialService.ServiceID) != "svcprimary" {
 		t.Errorf("expected replica target with parent credentials, got %+v", target)
 	}
 
@@ -148,7 +148,7 @@ func TestNewReplicaConnectionTarget(t *testing.T) {
 	host := "menu-replica.example.com"
 	port := 5432
 	replica := api.ReadReplicaSet{
-		Id:       util.Ptr("rep7654321"),
+		ID:       util.Ptr("rep7654321"),
 		Name:     util.Ptr("menu-replica"),
 		Endpoint: &api.Endpoint{Host: &host, Port: &port},
 	}
@@ -157,11 +157,11 @@ func TestNewReplicaConnectionTarget(t *testing.T) {
 	if !target.IsReplica {
 		t.Error("expected a replica target")
 	}
-	if util.DerefStr(target.ConnectionService.ServiceId) != "rep7654321" || util.DerefStr(target.ConnectionService.Endpoint.Host) != host {
+	if util.DerefStr(target.ConnectionService.ServiceID) != "rep7654321" || util.DerefStr(target.ConnectionService.Endpoint.Host) != host {
 		t.Errorf("expected connect to carry the replica endpoint, got %+v", target.ConnectionService)
 	}
-	if util.DerefStr(target.CredentialService.ServiceId) != "svcprimary" {
-		t.Errorf("expected credential to be the primary, got %q", util.DerefStr(target.CredentialService.ServiceId))
+	if util.DerefStr(target.CredentialService.ServiceID) != "svcprimary" {
+		t.Errorf("expected credential to be the primary, got %q", util.DerefStr(target.CredentialService.ServiceID))
 	}
 }
 

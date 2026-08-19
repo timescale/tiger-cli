@@ -90,16 +90,16 @@ func outputAuthInfoTable(authInfo api.AuthInfo, output io.Writer) error {
 	table.Append("Status", "Logged in")
 
 	switch authInfo.Type {
-	case api.ApiKey:
-		apiKey := authInfo.ApiKey
+	case api.AuthInfoTypeAPIKey:
+		apiKey := authInfo.APIKey
 		planType := cases.Title(language.English).String(apiKey.Project.PlanType)
 		table.Append("Credential Name", apiKey.Name)
 		table.Append("Public Key", apiKey.PublicKey)
 		table.Append("Created At", apiKey.Created.Format("2006-01-02 15:04:05 MST"))
-		table.Append("Project", fmt.Sprintf("%s (%s)", apiKey.Project.Name, apiKey.Project.Id))
+		table.Append("Project", fmt.Sprintf("%s (%s)", apiKey.Project.Name, apiKey.Project.ID))
 		table.Append("Plan Type", planType)
 		table.Append("Issuing User", fmt.Sprintf("%s (%s)", apiKey.IssuingUser.Name, apiKey.IssuingUser.Email))
-	case api.Oauth:
+	case api.AuthInfoTypeOauth:
 		user := authInfo.Oauth.User
 		displayName := string(user.Email)
 		if user.Name != "" {

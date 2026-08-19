@@ -170,6 +170,11 @@ go generate ./internal/api
 # - mocks/mock_client.go: Mock implementations for testing
 ```
 
+Generation is configured by `internal/api/types.yaml` and
+`internal/api/client.yaml`. Both normalize generated names to Go's initialism
+conventions (`ServiceID`, `CPUMillis`) and prefix enum constants with their type
+name (`api.DeployStatusREADY`).
+
 ## Development Best Practices
 
 1. **Always use go fmt** after making file changes and before committing

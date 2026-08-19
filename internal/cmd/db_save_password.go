@@ -102,10 +102,10 @@ Examples:
 
 			if target.IsReplica {
 				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
-					*service.ServiceId)
+					*service.ServiceID)
 			}
 			cmd.PrintErrf("Password saved successfully for service %s (role: %s)\n",
-				*service.ServiceId, dbSavePasswordRole)
+				*service.ServiceID, dbSavePasswordRole)
 			return nil
 		},
 	}

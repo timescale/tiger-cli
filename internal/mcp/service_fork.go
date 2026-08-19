@@ -37,8 +37,8 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Examples = []any{"my-forked-db", "prod-fork-test", "backup-db"}
 
 	schema.Properties["fork_strategy"].Description = "Fork strategy: 'NOW' creates fork at current state, 'LAST_SNAPSHOT' uses last existing snapshot (faster), 'PITR' allows point-in-time recovery to specific timestamp (requires target_time parameter)"
-	schema.Properties["fork_strategy"].Enum = []any{api.NOW, api.LASTSNAPSHOT, api.PITR}
-	schema.Properties["fork_strategy"].Examples = []any{api.NOW, api.LASTSNAPSHOT}
+	schema.Properties["fork_strategy"].Enum = []any{api.ForkStrategyNOW, api.ForkStrategyLASTSNAPSHOT, api.ForkStrategyPITR}
+	schema.Properties["fork_strategy"].Examples = []any{api.ForkStrategyNOW, api.ForkStrategyLASTSNAPSHOT}
 
 	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format, e.g., '2025-01-15T10:30:00Z'). Only used when fork_strategy is 'PITR'."
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
@@ -112,7 +112,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Validate fork strategy and target_time relationship
 	switch input.ForkStrategy {
-	case api.PITR:
+	case api.ForkStrategyPITR:
 		if input.TargetTime == nil {
 			return nil, ServiceForkOutput{}, fmt.Errorf("target_time is required when fork_strategy is 'PITR'")
 		}
@@ -145,7 +145,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	forkReq := api.ForkServiceCreate{
 		ForkStrategy: input.ForkStrategy,
 		TargetTime:   input.TargetTime,
-		CpuMillis:    cpuMillis,
+		CPUMillis:    cpuMillis,
 		MemoryGbs:    memoryGBs,
 	}
 
@@ -173,7 +173,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	service := *resp.JSON202
-	serviceID := util.Deref(service.ServiceId)
+	serviceID := util.Deref(service.ServiceID)
 
 	// Save password immediately after service fork, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted

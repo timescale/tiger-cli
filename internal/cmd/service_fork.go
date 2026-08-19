@@ -131,22 +131,22 @@ Examples:
 			var targetTime *time.Time
 
 			if forkNow {
-				forkStrategy = api.NOW
+				forkStrategy = api.ForkStrategyNOW
 			} else if forkLastSnapshot {
-				forkStrategy = api.LASTSNAPSHOT
+				forkStrategy = api.ForkStrategyLASTSNAPSHOT
 			} else if toTimestampSet {
-				forkStrategy = api.PITR
+				forkStrategy = api.ForkStrategyPITR
 				targetTime = util.Ptr(forkToTimestamp)
 			}
 
 			// Display what we're about to do
 			strategyDesc := ""
 			switch forkStrategy {
-			case api.NOW:
+			case api.ForkStrategyNOW:
 				strategyDesc = "current state"
-			case api.LASTSNAPSHOT:
+			case api.ForkStrategyLASTSNAPSHOT:
 				strategyDesc = "last snapshot"
-			case api.PITR:
+			case api.ForkStrategyPITR:
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
 			}
 			// Prepare output message for name
@@ -161,7 +161,7 @@ Examples:
 			forkReq := api.ForkServiceCreate{
 				ForkStrategy:   forkStrategy,
 				TargetTime:     targetTime,
-				CpuMillis:      cpuMemoryCfg.CPUMillisString(),
+				CPUMillis:      cpuMemoryCfg.CPUMillisString(),
 				MemoryGbs:      cpuMemoryCfg.MemoryGBsString(),
 				EnvironmentTag: &environmentTag,
 			}
@@ -186,7 +186,7 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 			forkedService := *forkResp.JSON202
-			forkedServiceID := util.DerefStr(forkedService.ServiceId)
+			forkedServiceID := util.DerefStr(forkedService.ServiceID)
 
 			cmd.PrintErrf("✅ Fork request accepted!\n")
 			cmd.PrintErrf("📋 New Service ID: %s\n", forkedServiceID)

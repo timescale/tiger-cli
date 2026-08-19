@@ -83,8 +83,8 @@ Examples:
 			// Make the delete request
 			resp, err := client.DeleteServiceWithResponse(
 				cmd.Context(),
-				api.ProjectId(projectID),
-				api.ServiceId(serviceID),
+				api.ProjectID(projectID),
+				api.ServiceID(serviceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to delete Service: %w", err)

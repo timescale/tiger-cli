@@ -161,11 +161,11 @@ func TestValidateAPIKey(t *testing.T) {
 				if authInfo == nil {
 					t.Fatal("Expected auth info to be returned, got nil")
 				}
-				if authInfo.ApiKey.Project.Id != tt.expectedProjectID {
-					t.Errorf("Expected project ID %q, got %q", tt.expectedProjectID, authInfo.ApiKey.Project.Id)
+				if authInfo.APIKey.Project.ID != tt.expectedProjectID {
+					t.Errorf("Expected project ID %q, got %q", tt.expectedProjectID, authInfo.APIKey.Project.ID)
 				}
-				if authInfo.ApiKey.PublicKey != tt.expectedPublicKey {
-					t.Errorf("Expected access key %q, got %q", tt.expectedPublicKey, authInfo.ApiKey.PublicKey)
+				if authInfo.APIKey.PublicKey != tt.expectedPublicKey {
+					t.Errorf("Expected access key %q, got %q", tt.expectedPublicKey, authInfo.APIKey.PublicKey)
 				}
 			} else {
 				if err == nil {

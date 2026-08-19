@@ -76,7 +76,7 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 		validatedAPIKeyCache[apiKey] = authInfo
 	}
 
-	return client, authInfo.ApiKey.Project.Id, nil
+	return client, authInfo.APIKey.Project.ID, nil
 }
 
 // ValidateAPIKey validates the API key by calling the /auth/info endpoint, and
@@ -104,14 +104,14 @@ func ValidateAPIKey(ctx context.Context, cfg *config.Config, client api.ClientWi
 	}
 
 	authInfo := resp.JSON200
-	if authInfo.ApiKey == nil {
+	if authInfo.APIKey == nil {
 		return nil, fmt.Errorf("expected a PAT credential")
 	}
-	apiKey := authInfo.ApiKey
+	apiKey := authInfo.APIKey
 
-	a := analytics.New(cfg, client, apiKey.Project.Id)
+	a := analytics.New(cfg, client, apiKey.Project.ID)
 	a.Identify(
-		analytics.Property("userId", apiKey.IssuingUser.Id),
+		analytics.Property("userId", apiKey.IssuingUser.ID),
 		analytics.Property("email", string(apiKey.IssuingUser.Email)),
 		analytics.Property("planType", apiKey.Project.PlanType),
 	)
@@ -139,7 +139,7 @@ func IdentifyOAuthUser(ctx context.Context, cfg *config.Config, client api.Clien
 	user := resp.JSON200.Oauth.User
 
 	a.Identify(
-		analytics.Property("userId", user.Id),
+		analytics.Property("userId", user.ID),
 		analytics.Property("email", string(user.Email)),
 	)
 }

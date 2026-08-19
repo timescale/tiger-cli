@@ -40,8 +40,8 @@ func TestDBSavePassword_ExplicitPassword(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -98,18 +98,18 @@ func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
 	primaryHost := "svcprimary.example.com"
 	replicaHost := "replica.example.com"
 	primary := api.Service{
-		ServiceId: util.Ptr("svcprimary"),
-		ProjectId: util.Ptr(projectID),
+		ServiceID: util.Ptr("svcprimary"),
+		ProjectID: util.Ptr(projectID),
 		Endpoint:  &api.Endpoint{Host: &primaryHost, Port: &port},
 	}
 	replica := api.Service{
-		ServiceId: util.Ptr("rep1234567"),
-		ProjectId: util.Ptr(projectID),
+		ServiceID: util.Ptr("rep1234567"),
+		ProjectID: util.Ptr(projectID),
 		Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		ForkedFrom: &api.ForkSpec{
 			IsStandby: util.Ptr(true),
-			ProjectId: util.Ptr(projectID),
-			ServiceId: util.Ptr("svcprimary"),
+			ProjectID: util.Ptr(projectID),
+			ServiceID: util.Ptr("svcprimary"),
 		},
 	}
 
@@ -192,8 +192,8 @@ func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -260,8 +260,8 @@ func TestDBSavePassword_InteractivePrompt(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -333,8 +333,8 @@ func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
 	serviceID := "svc-empty-test"
 	projectID := "test-project-123"
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 	}
 
 	originalGetServiceDetails := getServiceDetailsFunc
@@ -389,8 +389,8 @@ func TestDBSavePassword_CustomRole(t *testing.T) {
 	host := "test-host.com"
 	port := 5432
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,
@@ -517,8 +517,8 @@ func TestDBSavePassword_PgpassStorage(t *testing.T) {
 	host := "pgpass-host.com"
 	port := 5432
 	mockService := api.Service{
-		ServiceId: &serviceID,
-		ProjectId: &projectID,
+		ServiceID: &serviceID,
+		ProjectID: &projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,

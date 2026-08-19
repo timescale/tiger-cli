@@ -124,6 +124,19 @@ go generate ./internal/api
 # - mocks/mock_client.go: Mock implementations for testing
 ```
 
+Generation is driven by `internal/api/types.yaml` and `internal/api/client.yaml`
+rather than command-line flags. Both set:
+
+- `name-normalizer: ToCamelCaseWithInitialisms` — generated names capitalize
+  initialisms the way Go does (`ServiceID`, not `ServiceId`; `CPUMillis`, not
+  `CpuMillis`)
+- `always-prefix-enum-values: true` — enum constants are prefixed with their type
+  (`api.DeployStatusREADY`, not `api.READY`), so values from different enums can't
+  collide in the package namespace
+
+Keep these two configs in sync with each other, and with ghost's equivalents.
+Changing either option renames identifiers across the whole codebase.
+
 ## Development Best Practices
 
 ### Code Formatting and Validation
