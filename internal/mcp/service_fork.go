@@ -106,7 +106,10 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
+	// Deliberately DEV-only, like service_create: no environment_tag input, so the
+	// fork is always tagged DEV. Forking a PROD source is still allowed - it reads
+	// production without changing it.
+	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -190,7 +193,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 
 	// Set as default service if requested (defaults to true)
 	if input.SetDefault {
-		if err := cfg.Set("service_id", serviceID); err != nil {
+		if _, err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service fork
 			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
 		} else {

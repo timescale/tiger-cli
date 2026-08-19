@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -627,6 +630,148 @@ func TestDestructiveCommands_ReadOnly(t *testing.T) {
 			_, err, _ := executeServiceCommand(t.Context(), args...)
 			if !errors.Is(err, common.ErrReadOnly) {
 				t.Errorf("Expected common.ErrReadOnly, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestDestructiveCommands_ReadOnlyProd verifies that read_only=prod refuses
+// destructive commands against a PROD service and lets them through against a
+// DEV one. The mock API reports the tag and records any mutation attempt.
+func TestDestructiveCommands_ReadOnlyProd(t *testing.T) {
+	cases := [][]string{
+		{"service", "start", "source-service-123"},
+		{"service", "stop", "source-service-123"},
+		{"service", "resize", "source-service-123", "--cpu", "1000", "--memory", "4"},
+		{"service", "update-password", "source-service-123", "--auto-generate"},
+		{"service", "delete", "source-service-123", "--confirm"},
+	}
+
+	for _, tag := range []string{"PROD", "DEV"} {
+		t.Run(tag, func(t *testing.T) {
+			// Only the tag varies per command, so the server and config are
+			// shared; mutated is reset per command below.
+			var mutated bool
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					mutated = true
+					// The command's own outcome doesn't matter here, only that
+					// it got as far as asking.
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				// project_id is dereferenced by the password-update path.
+				fmt.Fprintf(w, `{"service_id":"source-service-123","project_id":"test-project-123","metadata":{"environment":%q}}`, tag)
+			}))
+			defer server.Close()
+
+			tmpDir := setupServiceTest(t)
+			if _, err := config.UseTestConfig(tmpDir, map[string]any{
+				"api_url":   server.URL,
+				"read_only": "prod",
+			}); err != nil {
+				t.Fatalf("Failed to save test config: %v", err)
+			}
+			mockTestPAT(t)
+
+			for _, args := range cases {
+				t.Run(args[1], func(t *testing.T) {
+					mutated = false
+
+					_, err, _ := executeServiceCommand(t.Context(), args...)
+
+					if tag == "PROD" {
+						if !errors.Is(err, common.ErrReadOnlyProd) {
+							t.Errorf("Expected common.ErrReadOnlyProd, got: %v", err)
+						}
+						if mutated {
+							t.Error("Command attempted a mutating request against a PROD service")
+						}
+						return
+					}
+
+					if errors.Is(err, common.ErrReadOnlyProd) || errors.Is(err, common.ErrReadOnly) {
+						t.Errorf("Command was refused for a DEV service: %v", err)
+					}
+					if !mutated {
+						t.Error("Command did not attempt a mutating request against a DEV service")
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestCreateFork_ReadOnlyProd verifies that read_only=prod gates service create
+// and fork on the tag they request, not on any existing service. Reaching the
+// mock API is what separates a refusal from a command that got through.
+func TestCreateFork_ReadOnlyProd(t *testing.T) {
+	var reached bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		// The outcome doesn't matter, only that it got this far.
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	tmpDir := setupServiceTest(t)
+	if _, err := config.UseTestConfig(tmpDir, map[string]any{
+		"api_url":   server.URL,
+		"read_only": "prod",
+	}); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	mockTestPAT(t)
+
+	cases := []struct {
+		name        string
+		args        []string
+		wantRefusal bool
+	}{
+		{
+			name:        "create PROD is refused",
+			args:        []string{"service", "create", "--addons", "none", "--environment", "PROD"},
+			wantRefusal: true,
+		},
+		{
+			name: "create DEV is allowed",
+			args: []string{"service", "create", "--addons", "none", "--environment", "DEV"},
+		},
+		{
+			name:        "fork to PROD is refused",
+			args:        []string{"service", "fork", "source-service-123", "--now", "--environment", "PROD"},
+			wantRefusal: true,
+		},
+		{
+			// Reads production without modifying it, so nothing to refuse.
+			name: "fork to DEV is allowed",
+			args: []string{"service", "fork", "source-service-123", "--now", "--environment", "DEV"},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			reached = false
+
+			_, err, _ := executeServiceCommand(t.Context(), tt.args...)
+
+			if tt.wantRefusal {
+				if !errors.Is(err, common.ErrReadOnlyProd) {
+					t.Errorf("Expected common.ErrReadOnlyProd, got: %v", err)
+				}
+				if reached {
+					t.Error("Command called the API despite being refused")
+				}
+				return
+			}
+
+			if errors.Is(err, common.ErrReadOnlyProd) || errors.Is(err, common.ErrReadOnly) {
+				t.Errorf("Command was refused for a DEV service: %v", err)
+			}
+			if !reached {
+				t.Errorf("Command did not reach the API, got: %v", err)
 			}
 		})
 	}

@@ -4,11 +4,30 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+
+	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // Matches front-end logic for generating a random service name
 func GenerateServiceName() string {
 	return fmt.Sprintf("db-%d", 10000+rand.Intn(90000))
+}
+
+// ServiceEnvironmentTag returns a service's environment tag. A fetched service
+// carries it as a free-form string under metadata, not the enum the create and
+// fork requests take. Only PROD is recognized: absent, empty and unknown values
+// all read as DEV, because metadata is optional in the response and treating
+// unknowns as protected would have read_only=prod block untagged services.
+func ServiceEnvironmentTag(service api.Service) api.EnvironmentTag {
+	if service.Metadata == nil {
+		return api.EnvironmentTagDEV
+	}
+
+	if strings.EqualFold(util.DerefStr(service.Metadata.Environment), string(api.EnvironmentTagPROD)) {
+		return api.EnvironmentTagPROD
+	}
+	return api.EnvironmentTagDEV
 }
 
 // Addon constants - these match the ServiceCreateAddons from the API

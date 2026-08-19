@@ -164,7 +164,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		slog.Duration("timeout", timeout),
 		slog.String("role", input.Role),
 		slog.Bool("pooled", input.Pooled),
-		slog.Bool("read_only", cfg.ReadOnly),
+		slog.String("read_only", string(cfg.ReadOnly)),
 	)
 
 	// service_id may name a service or one of its read replicas.
@@ -172,6 +172,9 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err
 	}
+
+	// Under prod mode the resolved target's tag decides.
+	readOnlySession := target.ReadOnlySession(cfg)
 
 	// A replica without a pooler connects directly; surface that as a warning.
 	poolerWarning := common.ReplicaPoolerWarning(target, input.Pooled)
@@ -199,7 +202,7 @@ func (s *Server) handleDBExecuteQuery(ctx context.Context, req *mcp.CallToolRequ
 		Pooled:       input.Pooled,
 		Role:         input.Role,
 		WithPassword: true,
-		ReadOnly:     cfg.ReadOnly,
+		ReadOnly:     readOnlySession,
 	}, mode)
 	if err != nil {
 		return nil, DBExecuteQueryOutput{}, err

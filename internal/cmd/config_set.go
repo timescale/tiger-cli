@@ -21,11 +21,12 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 			cfg := app.GetConfig()
 
 			key, value := args[0], args[1]
-			if err := cfg.Set(key, value); err != nil {
+			stored, err := cfg.Set(key, value)
+			if err != nil {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
 
-			cmd.Printf("Set %s = %s\n", key, value)
+			cmd.Printf("Set %s = %s\n", key, stored)
 			return nil
 		},
 	}

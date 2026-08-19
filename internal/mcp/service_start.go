@@ -69,7 +69,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		return nil, ServiceStartOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
+	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceStartOutput{}, err
 	}
 

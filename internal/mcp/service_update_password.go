@@ -67,8 +67,10 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
-		return nil, ServiceUpdatePasswordOutput{}, err
+	// Refuse without an API call under read_only=all. prod needs the tag, so the
+	// real gate waits for the fetch below.
+	if cfg.ReadOnly.BlocksAll() {
+		return nil, ServiceUpdatePasswordOutput{}, common.ErrReadOnly
 	}
 
 	s.logger.Info("MCP: Updating service password",
@@ -83,8 +85,8 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Fetch first so we can reject read replicas and reuse the service for
-	// password storage below.
+	// Fetch first so we can apply the read-only gate, reject read replicas, and
+	// reuse the service for password storage below.
 	serviceResp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to get service details: %w", err)
@@ -96,6 +98,12 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("empty response from API")
 	}
 	service := *serviceResp.JSON200
+
+	// The prod half of the gate, riding on the fetch above.
+	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
+		return nil, ServiceUpdatePasswordOutput{}, err
+	}
+
 	if common.IsReadReplica(service) {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
 			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))

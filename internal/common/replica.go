@@ -19,6 +19,13 @@ type ConnectionTarget struct {
 	IsReplica         bool
 }
 
+// ReadOnlySession reports whether read-only mode requires this target's session to
+// open in Tiger Cloud's immutable read-only mode. Only ConnectionService decides,
+// so a replica is judged on its own environment tag rather than its primary's.
+func (t *ConnectionTarget) ReadOnlySession(cfg *config.Config) bool {
+	return ForcesReadOnlySession(cfg, t.ConnectionService)
+}
+
 // Details builds the target's connection details. A requested-but-unavailable
 // pooler is a hard error for a primary but silently falls back to direct for a
 // replica.
@@ -93,12 +100,21 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 // a service's read replica sets (as listed via the /replicaSets endpoint). The
 // replica supplies the endpoint; the primary supplies the credentials.
 func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet) *ConnectionTarget {
+	// A replica set's environment tag decides its own sessions, so carry it over.
+	// ReplicaSetMetadata and ServiceMetadata are separate types holding the same
+	// field, so it has to be copied rather than assigned.
+	var metadata *api.ServiceMetadata
+	if replica.Metadata != nil {
+		metadata = &api.ServiceMetadata{Environment: replica.Metadata.Environment}
+	}
+
 	return &ConnectionTarget{
 		ConnectionService: api.Service{
 			ServiceID:        replica.ID,
 			Name:             replica.Name,
 			Endpoint:         replica.Endpoint,
 			ConnectionPooler: replica.ConnectionPooler,
+			Metadata:         metadata,
 		},
 		CredentialService: primary,
 		IsReplica:         true,

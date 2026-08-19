@@ -34,7 +34,7 @@ const nextStepsMessage = `
 • Install MCP server for your favorite AI coding tool: tiger mcp install
 • List existing services: tiger service list
 • Create a new service: tiger service create
-• Enable read-only mode: tiger config set read_only true
+• Protect services from writes: tiger config set read_only prod (or all, off)
 `
 
 var (

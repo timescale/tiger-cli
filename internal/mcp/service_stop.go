@@ -69,7 +69,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceStopOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
+	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceStopOutput{}, err
 	}
 

@@ -209,7 +209,9 @@ func processData(cfg *config.Config) {
 Config-derived state lives on the `Config` too: credential storage is a set of
 methods on it (`cfg.StoreCredentials`, `cfg.GetStoredCredentials`,
 `cfg.RemoveCredentials`), keyed off `cfg.ConfigDir`, and `cfg.Set`/`Unset`/`Reset`
-write the config file and then reload the struct **in place**. Reloading in place
+write the config file and then reload the struct **in place**. `Set` also returns
+the value as stored, which isn't always its argument — `read_only` normalizes its
+legacy spellings — so echo the return value to the user rather than the input. Reloading in place
 is what lets a command change the config mid-run and have the App's readers see
 it — that's how `tiger config set analytics false` suppresses its own analytics
 event, and how `version_check false` suppresses the update notice.
@@ -372,7 +374,7 @@ pattern: `strconv.ParseBool(os.Getenv("TIGER_EXPERIMENTAL"))` is read once in
 and the MCP server read at registration time.
 
 - CLI: `buildServiceCmd` guards `cmd.AddCommand(buildServiceMetricsCmd(app))` with `if app.Experimental { … }`. When the env var is unset, the `metrics` subtree isn't added to the command tree at all — the command literally does not exist (no help entry, no tab completion, `unknown command` error like any typo).
-- MCP: `NewServer` passes `app.Experimental` to `registerServiceTools(readOnly, experimental bool)`, which guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
+- MCP: `NewServer` passes `app.Experimental` to `registerServiceTools(mode config.ReadOnlyMode, experimental bool)`, which guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
 
 **Do not mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, spec
 files, or error messages.** When a feature graduates, remove the
@@ -418,7 +420,56 @@ helpers and API-to-output conversion live in `utils.go`.
 
 **Read-Only Mode Gate:**
 
-Write/destructive MCP tool handlers and CLI command `RunE` functions must call `common.CheckReadOnly(cfg)` (defined in `internal/common/errors.go`) immediately after reading the config from the App. When `cfg.ReadOnly` is `true`, the call returns `common.ErrReadOnly` and the API client is never invoked. The gated CLI commands today are `service create`, `service fork`, `service start`, `service stop`, `service resize`, `service update-password`, and `service delete`.
+`cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off`. The legacy
+booleans are still accepted: `config.Load` runs whatever the source held through
+`ParseReadOnlyMode`, which takes the mode names plus every boolean spelling
+viper's weak typing can produce, so nothing downstream sees an unnormalized
+value. Since `prod` protects only services tagged `PROD`, every gate needs its
+target's environment tag, so the two checks in `internal/common/errors.go` split
+the way `ResolveConnectionTarget`/`...ByID` does:
+
+- **`common.CheckReadOnly(cfg, tag)`** — the verdict, for a caller that has the
+  tag: from a fetched service via `common.ServiceEnvironmentTag(service)`
+  (responses carry it under `metadata`, not as the enum the requests take), or
+  from the tag about to be requested — `--environment` for `service
+  create`/`fork`, and a hardcoded `api.EnvironmentTagDEV` for the MCP versions,
+  which take no such input.
+- **`common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, serviceID)`** —
+  the same verdict from an ID, fetching the service to read its tag. Costs one
+  API call, and only under `prod`; `all` refuses and `off` allows without one. A
+  failed fetch is a refusal.
+
+Every write/destructive CLI `RunE` and MCP handler calls one of them: `service
+create`, `fork`, `start`, `stop`, `resize`, `update-password`, `delete` and `db
+create role` on the CLI side, and the six `service_*` write tools listed in
+`readOnlyGatedTools` on the MCP side.
+
+Four things to know before adding a surface:
+
+- **A replica set is judged on its own tag, not its primary's**, on both planes.
+  The API tags replica sets individually, so nothing is inherited — a replica of
+  a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
+- **`prod` refuses creating a `PROD` service, not just modifying one.** No
+  existing service is at risk there, so it looks like over-reach — but allowing
+  it would let a caller create a service the same mode then refuses to stop,
+  resize or delete, recoverable only through the console. `service create`/`fork`
+  therefore gate on the tag they are about to request.
+- **MCP registration can't express `prod`.** `addTool` skips `readOnlyGatedTools`
+  only under `all`; under `prod` the write tools stay registered (they work on
+  `DEV` services) and refuse per call instead. `buildServerInstructions` has a
+  `prod` variant explaining that to the model, so a refusal doesn't read as a bug.
+- **Database sessions reach the same verdict**, through
+  `common.ForcesReadOnlySession(cfg, service)` — used by
+  `ConnectionTarget.ReadOnlySession` and by the two helpers that embed a
+  connection string in service output, `prepareServiceForOutput` and
+  `convertToServiceDetail`. Keep it defined in terms of `CheckReadOnly` so the two
+  halves can't drift.
+
+`CheckReadOnly` needs a tag, so it can't accidentally be called in a way that
+ignores `prod`. The one exception is refusing the blanket case *before* a fetch
+the command was making anyway: read the mode directly with
+`if cfg.ReadOnly.BlocksAll() { return common.ErrReadOnly }`, then still call
+`CheckReadOnly` once the service arrives. `service update-password` does both.
 
 **Tool Definition Pattern:**
 

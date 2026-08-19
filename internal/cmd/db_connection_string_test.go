@@ -179,14 +179,19 @@ func TestDBConnectionString_ReadOnlyConfig(t *testing.T) {
 
 	cases := []struct {
 		name      string
-		readOnly  bool
+		readOnly  string
+		env       string
 		extraArgs []string
 		want      bool
 	}{
-		{"flag off, config off", false, nil, false},
-		{"flag on, config off", false, []string{"--read-only"}, true},
-		{"flag off, config on", true, nil, true},
-		{"flag on, config on", true, []string{"--read-only"}, true},
+		{name: "flag off, config off", readOnly: "off", want: false},
+		{name: "flag on, config off", readOnly: "off", extraArgs: []string{"--read-only"}, want: true},
+		{name: "flag off, config all", readOnly: "all", want: true},
+		{name: "flag on, config all", readOnly: "all", extraArgs: []string{"--read-only"}, want: true},
+		{name: "config prod, PROD service", readOnly: "prod", env: "PROD", want: true},
+		{name: "config prod, DEV service", readOnly: "prod", env: "DEV", want: false},
+		{name: "config prod, untagged service", readOnly: "prod", want: false},
+		{name: "flag on beats config prod", readOnly: "prod", env: "DEV", extraArgs: []string{"--read-only"}, want: true},
 	}
 
 	for _, tc := range cases {
@@ -209,9 +214,13 @@ func TestDBConnectionString_ReadOnlyConfig(t *testing.T) {
 			getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
 				host := "test-host.com"
 				port := 5432
-				return api.Service{
+				service := api.Service{
 					Endpoint: &api.Endpoint{Host: &host, Port: &port},
-				}, nil
+				}
+				if tc.env != "" {
+					service.Metadata = &api.ServiceMetadata{Environment: &tc.env}
+				}
+				return service, nil
 			}
 			t.Cleanup(func() { getServiceDetailsFunc = originalGetServiceDetails })
 
