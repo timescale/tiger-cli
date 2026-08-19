@@ -16,8 +16,9 @@ import (
 func buildMCPListCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List available MCP tools, prompts, and resources",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available MCP tools, prompts, and resources",
 		Long: `List all MCP tools, prompts, and resources exposed via the Tiger MCP server.
 
 The output can be formatted as a table, JSON, or YAML.

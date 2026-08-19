@@ -98,34 +98,34 @@ Tiger CLI provides the following commands:
 - `tiger auth` - Authentication management
   - `login` - Log in to your Tiger account
   - `logout` - Log out from your Tiger account
-  - `status` - Show current authentication status and project ID
-- `tiger service` - Service lifecycle management
-  - `list` - List all services
+  - `status` - Show current authentication status and project ID (alias: `whoami`)
+- `tiger service` - Service lifecycle management (aliases: `services`, `svc`)
+  - `list` - List all services (alias: `ls`)
   - `create` - Create a new service
   - `get` - Show detailed service information (aliases: `describe`, `show`)
   - `fork` - Fork an existing service
-  - `start` - Start a stopped service
-  - `stop` - Stop a running service
+  - `start` - Start a stopped service (alias: `resume`)
+  - `stop` - Stop a running service (alias: `pause`)
   - `resize` - Resize service CPU and memory allocation
-  - `delete` - Delete a service
+  - `delete` - Delete a service (alias: `rm`)
   - `update-password` - Update service master password
-  - `logs` - View service logs
+  - `logs` - View service logs (alias: `log`)
 - `tiger db` - Database operations
-  - `connect` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip)
-  - `connection-string` - Get connection string for a service
-  - `test-connection` - Test database connectivity
+  - `connect` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip) (alias: `psql`)
+  - `connection-string` - Get connection string for a service (alias: `uri`)
+  - `test-connection` - Test database connectivity (aliases: `test`, `ping`)
   - `schema` - Display database schema information (tables, views, indexes, functions, TimescaleDB hypertables, and more)
   - `save-password` - Save a database password to configured password storage (keyring, pgpass, or none)
-  - `create role` - Create a new database role, with optional read-only enforcement, inherited grants (`--from`), and statement timeout
-- `tiger config` - Configuration management
-  - `show` - Show current configuration
+  - `create role` - Create a new database role, with optional read-only enforcement, inherited grants (`--from`), and statement timeout (alias: `create user`)
+- `tiger config` - Configuration management (alias: `cfg`)
+  - `show` - Show current configuration (aliases: `list`, `ls`)
   - `set` - Set configuration value
-  - `unset` - Remove configuration value
-  - `reset` - Reset configuration to defaults
+  - `unset` - Remove configuration value (aliases: `rm`, `delete`)
+  - `reset` - Reset configuration to defaults (alias: `clear`)
 - `tiger mcp` - MCP server setup and management
-  - `install` - Install and configure MCP server for an AI assistant
+  - `install` - Install and configure MCP server for an AI assistant (alias: `add`)
   - `start` - Start the MCP server
-  - `list` - List available MCP tools, prompts, and resources
+  - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)

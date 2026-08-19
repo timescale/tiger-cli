@@ -11,6 +11,7 @@ import (
 func buildConfigResetCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:               "reset",
+		Aliases:           []string{"clear"},
 		Short:             "Reset to defaults",
 		Long:              `Reset all configuration settings to their default values`,
 		Args:              cobra.NoArgs,

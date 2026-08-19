@@ -23,6 +23,7 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:               "status",
+		Aliases:           []string{"whoami"},
 		Short:             "Show current authentication status and project ID",
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
 		Args:              cobra.NoArgs,

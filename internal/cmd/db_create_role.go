@@ -22,8 +22,9 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 	var passwordFlag string
 
 	cmd := &cobra.Command{
-		Use:   "role [service-id]",
-		Short: "Create a new database role",
+		Use:     "role [service-id]",
+		Aliases: []string{"user"},
+		Short:   "Create a new database role",
 		Long: `Create a new database role with optional read-only enforcement.
 
 The service ID can be provided as an argument or will use the default service

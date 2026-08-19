@@ -11,6 +11,7 @@ import (
 func buildConfigUnsetCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:               "unset <key>",
+		Aliases:           []string{"rm", "delete"},
 		Short:             "Remove configuration value",
 		Long:              `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
 		Args:              cobra.ExactArgs(1),

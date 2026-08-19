@@ -15,8 +15,9 @@ func buildDbConnectionStringCmd(app *common.App) *cobra.Command {
 	var dbConnectionStringReadOnly bool
 
 	cmd := &cobra.Command{
-		Use:   "connection-string [service-id]",
-		Short: "Get connection string for a service",
+		Use:     "connection-string [service-id]",
+		Aliases: []string{"uri"},
+		Short:   "Get connection string for a service",
 		Long: `Get a PostgreSQL connection string for connecting to a database service.
 
 The service ID can be provided as an argument or will use the default service
