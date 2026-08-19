@@ -163,7 +163,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("empty response from API")
 			}
 			service := *resp.JSON202
-			serviceID := util.Deref(service.ServiceID)
+			serviceID := service.ServiceID
 
 			cmd.PrintErrf("✅ Service creation request accepted!\n")
 			cmd.PrintErrf("📋 Service ID: %s\n", serviceID)

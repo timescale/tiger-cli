@@ -25,7 +25,7 @@ func updateAndSaveServicePassword(
 ) error {
 	// Call API to update password
 	updateReq := api.UpdatePasswordInput{Password: newPassword}
-	resp, err := client.UpdatePasswordWithResponse(ctx, *service.ProjectID, *service.ServiceID, updateReq)
+	resp, err := client.UpdatePasswordWithResponse(ctx, service.ProjectID, service.ServiceID, updateReq)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
@@ -39,7 +39,7 @@ func updateAndSaveServicePassword(
 		cmd.PrintErrf("Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		cmd.PrintErrf("%s\n", result.Message)
-		cmd.PrintErrf("To view your new password, run: \n\t tiger service get %s --with-password\n", util.Deref(service.ServiceID))
+		cmd.PrintErrf("To view your new password, run: \n\t tiger service get %s --with-password\n", service.ServiceID)
 	}
 
 	return nil

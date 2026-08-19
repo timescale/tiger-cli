@@ -119,7 +119,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 
 	// Return status and message (after wait so status is accurate)
 	output := ServiceStartOutput{
-		Status:  util.DerefStr(service.Status),
+		Status:  string(service.Status),
 		Message: message,
 	}
 

@@ -5,28 +5,27 @@ import (
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestCheckServiceReady(t *testing.T) {
 	tests := []struct {
 		name    string
-		status  *api.DeployStatus
+		status  api.DeployStatus
 		wantErr error
 	}{
-		{name: "ready", status: util.Ptr(api.DeployStatusREADY), wantErr: nil},
-		{name: "paused", status: util.Ptr(api.DeployStatusPAUSED), wantErr: ErrPaused},
-		{name: "pausing", status: util.Ptr(api.DeployStatusPAUSING), wantErr: ErrPaused},
-		{name: "queued", status: util.Ptr(api.DeployStatusQUEUED), wantErr: ErrNotReady},
-		{name: "configuring", status: util.Ptr(api.DeployStatusCONFIGURING), wantErr: ErrNotReady},
-		{name: "resuming", status: util.Ptr(api.DeployStatusRESUMING), wantErr: ErrNotReady},
-		{name: "upgrading", status: util.Ptr(api.DeployStatusUPGRADING), wantErr: ErrNotReady},
-		{name: "optimizing", status: util.Ptr(api.DeployStatusOPTIMIZING), wantErr: ErrNotReady},
-		{name: "unstable", status: util.Ptr(api.DeployStatusUNSTABLE), wantErr: ErrNotReady},
-		{name: "deleting", status: util.Ptr(api.DeployStatusDELETING), wantErr: ErrNotReady},
-		{name: "deleted", status: util.Ptr(api.DeployStatusDELETED), wantErr: ErrNotReady},
-		{name: "unknown status", status: util.Ptr(api.DeployStatus("SOMETHING_NEW")), wantErr: ErrNotReady},
-		{name: "nil status", status: nil, wantErr: ErrNotReady},
+		{name: "ready", status: api.DeployStatusREADY, wantErr: nil},
+		{name: "paused", status: api.DeployStatusPAUSED, wantErr: ErrPaused},
+		{name: "pausing", status: api.DeployStatusPAUSING, wantErr: ErrPaused},
+		{name: "queued", status: api.DeployStatusQUEUED, wantErr: ErrNotReady},
+		{name: "configuring", status: api.DeployStatusCONFIGURING, wantErr: ErrNotReady},
+		{name: "resuming", status: api.DeployStatusRESUMING, wantErr: ErrNotReady},
+		{name: "upgrading", status: api.DeployStatusUPGRADING, wantErr: ErrNotReady},
+		{name: "optimizing", status: api.DeployStatusOPTIMIZING, wantErr: ErrNotReady},
+		{name: "unstable", status: api.DeployStatusUNSTABLE, wantErr: ErrNotReady},
+		{name: "deleting", status: api.DeployStatusDELETING, wantErr: ErrNotReady},
+		{name: "deleted", status: api.DeployStatusDELETED, wantErr: ErrNotReady},
+		{name: "unknown status", status: api.DeployStatus("SOMETHING_NEW"), wantErr: ErrNotReady},
+		{name: "empty status", status: "", wantErr: ErrNotReady},
 	}
 
 	for _, tt := range tests {

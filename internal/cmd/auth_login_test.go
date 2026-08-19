@@ -272,7 +272,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	// Mock the validator to return success
 	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
 		authInfo := &api.AuthInfo{}
-		json.Unmarshal([]byte(`{"type":"apiKey","apiKey":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
+		json.Unmarshal([]byte(`{"type":"apiKey","api_key":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
 		return authInfo, nil // Success
 	}
 

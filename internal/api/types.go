@@ -9,6 +9,11 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	BasicAuthScopes  = "basicAuth.Scopes"
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
 // Defines values for AuthInfoType.
 const (
 	AuthInfoTypeAPIKey AuthInfoType = "apiKey"
@@ -87,93 +92,131 @@ const (
 )
 
 // AuthInfo Information about the authentication credentials being used. Exactly one
-// of `apiKey` or `oauth` is populated; the `type` field discriminates.
+// of `api_key` or `oauth` is populated; the `type` field discriminates.
 type AuthInfo struct {
-	// APIKey Information about the API key credentials
-	APIKey *struct {
-		// Created When the client credentials were created
-		Created time.Time `json:"created"`
+	// APIKeyDeprecated Deprecated. Use `api_key` instead.
+	// Deprecated: Use `api_key` instead.
+	APIKeyDeprecated *AuthInfoAPIKey `json:"apiKey,omitempty"`
 
-		// IssuingUser Information about the user who created the credentials
-		IssuingUser struct {
-			// Email The user's email
-			Email openapi_types.Email `json:"email"`
-
-			// ID The user ID
-			ID string `json:"id"`
-
-			// Name The user's name
-			Name string `json:"name"`
-		} `json:"issuing_user"`
-
-		// Name The name of the credential
-		Name string `json:"name"`
-
-		// Project Information about the project
-		Project struct {
-			// ID The project ID
-			ID string `json:"id"`
-
-			// Name The name of the project
-			Name string `json:"name"`
-
-			// PlanType The plan type for the project
-			PlanType string `json:"plan_type"`
-		} `json:"project"`
-
-		// PublicKey The public key of the client credentials
-		PublicKey string `json:"public_key"`
-	} `json:"apiKey,omitempty"`
+	// APIKey Information about the API key credentials (PAT).
+	APIKey *AuthInfoAPIKey `json:"api_key,omitempty"`
 
 	// Oauth OAuth user details. Present for OAuth user callers.
-	Oauth *struct {
-		User struct {
-			// Email The user's email
-			Email openapi_types.Email `json:"email"`
+	Oauth *AuthInfoOAuth `json:"oauth,omitempty"`
 
-			// ID The numeric user ID
-			ID string `json:"id"`
-
-			// Name The user's name
-			Name string `json:"name"`
-		} `json:"user"`
-	} `json:"oauth,omitempty"`
-
-	// Type Discriminator for the credential shape. `apiKey` for PAT callers;
-	// `oauth` for OAuth user callers.
+	// Type Discriminator for the credential shape. `apiKey` for PAT callers; `oauth` for OAuth
+	// user callers.
 	Type AuthInfoType `json:"type"`
 }
 
-// AuthInfoType Discriminator for the credential shape. `apiKey` for PAT callers;
-// `oauth` for OAuth user callers.
+// AuthInfoType Discriminator for the credential shape. `apiKey` for PAT callers; `oauth` for OAuth
+// user callers.
 type AuthInfoType string
 
-// ConnectionPooler defines model for ConnectionPooler.
+// AuthInfoAPIKey Information about the API key credentials (PAT).
+type AuthInfoAPIKey struct {
+	// Created When the client credentials were created.
+	Created time.Time `json:"created"`
+
+	// IssuingUser Information about the user who created the credentials.
+	IssuingUser AuthInfoIssuingUser `json:"issuing_user"`
+
+	// Name The name of the credential.
+	Name string `json:"name"`
+
+	// Project Information about the project.
+	Project AuthInfoProject `json:"project"`
+
+	// PublicKey The public key of the client credentials.
+	PublicKey string `json:"public_key"`
+}
+
+// AuthInfoIssuingUser Information about the user who created the credentials.
+type AuthInfoIssuingUser struct {
+	// Email The user's email.
+	Email openapi_types.Email `json:"email"`
+
+	// ID The user ID.
+	ID string `json:"id"`
+
+	// Name The user's name.
+	Name string `json:"name"`
+}
+
+// AuthInfoOAuth OAuth user details. Present for OAuth user callers.
+type AuthInfoOAuth struct {
+	// User The authenticated OAuth user.
+	User AuthInfoUser `json:"user"`
+}
+
+// AuthInfoProject Information about the project.
+type AuthInfoProject struct {
+	// ID The project ID.
+	ID string `json:"id"`
+
+	// Name The name of the project.
+	Name string `json:"name"`
+
+	// PlanType The plan type for the project.
+	PlanType string `json:"plan_type"`
+}
+
+// AuthInfoUser The authenticated OAuth user.
+type AuthInfoUser struct {
+	// Email The user's email.
+	Email openapi_types.Email `json:"email"`
+
+	// ID The numeric user ID.
+	ID string `json:"id"`
+
+	// Name The user's name.
+	Name string `json:"name"`
+}
+
+// ConnectionPooler Connection pooler configuration for a service.
 type ConnectionPooler struct {
+	// Endpoint A network endpoint for connecting to a service.
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
 }
 
-// DeployStatus defines model for DeployStatus.
+// DeployStatus The current deployment status of the service:
+// - QUEUED: the create request has been submitted and is queued
+// - DELETING: the service is being deleted
+// - CONFIGURING: the service is up but still completing configuration
+// - READY: fully configured and serving traffic
+// - DELETED: the service has been deleted
+// - UNSTABLE: the service was ready but is not currently reachable
+// - PAUSING: the service is being paused
+// - PAUSED: the service is paused (temporarily shut down)
+// - RESUMING: the service is resuming after being paused
+// - UPGRADING: the service is being updated
+//
+// OPTIMIZING is deprecated and should not be used.
 type DeployStatus string
 
-// Endpoint defines model for Endpoint.
+// Endpoint A network endpoint for connecting to a service.
 type Endpoint struct {
+	// Host The hostname of the endpoint.
 	Host *string `json:"host,omitempty"`
-	Port *int    `json:"port,omitempty"`
+
+	// Port The port of the endpoint.
+	Port *int `json:"port,omitempty"`
 }
 
-// EnvironmentTag The environment tag for the service.
+// EnvironmentTag The environment tag for the service:
+// - DEV: a development environment
+// - PROD: a production environment
 type EnvironmentTag string
 
-// Error defines model for Error.
+// Error An error returned when a request cannot be completed.
 type Error struct {
+	// Code A machine-readable error code.
 	Code *string `json:"code,omitempty"`
 
-	// Details Additional context about the failure. Often the actionable part
-	// of the error (e.g. "bearer auth is not enabled on this server"
-	// for a generic UNAUTHORIZED). Optional; absent on errors with no
-	// extra detail.
+	// Details additional context, sent by the API but not yet in its spec. Hand-added, not regenerated from openapi.yaml.
 	Details *string `json:"details,omitempty"`
+
+	// Message A human-readable error message.
 	Message *string `json:"message,omitempty"`
 }
 
@@ -183,7 +226,7 @@ type ForkServiceCreate struct {
 	// CPUMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
 	CPUMillis *string `json:"cpu_millis,omitempty"`
 
-	// EnvironmentTag The environment tag for the service.
+	// EnvironmentTag The environment tag for the forked service.
 	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
 
 	// ForkStrategy Strategy for creating the fork:
@@ -202,10 +245,15 @@ type ForkServiceCreate struct {
 	TargetTime *time.Time `json:"target_time,omitempty"`
 }
 
-// ForkSpec defines model for ForkSpec.
+// ForkSpec The service this service was forked from.
 type ForkSpec struct {
-	IsStandby *bool   `json:"is_standby,omitempty"`
+	// IsStandby Whether this service is a standby of the parent service.
+	IsStandby *bool `json:"is_standby,omitempty"`
+
+	// ProjectID The project of the parent service.
 	ProjectID *string `json:"project_id,omitempty"`
+
+	// ServiceID The ID of the parent service.
 	ServiceID *string `json:"service_id,omitempty"`
 }
 
@@ -215,7 +263,7 @@ type ForkSpec struct {
 // - PITR: Point-in-time recovery using target_time
 type ForkStrategy string
 
-// HAReplica defines model for HAReplica.
+// HAReplica High-availability replica configuration for a service.
 type HAReplica struct {
 	// ReplicaCount Number of high-availability replicas (all replicas are asynchronous by default).
 	ReplicaCount *int `json:"replica_count,omitempty"`
@@ -229,10 +277,10 @@ type MetricDataPoint struct {
 	// Time The bucket start timestamp.
 	Time time.Time `json:"time"`
 
-	// Value The aggregated value at this bucket. Buckets without collected
-	// data are omitted from the parent series' `data` array; the API
-	// does not currently emit null values.
-	Value *float64 `json:"value,omitempty"`
+	// Value The aggregated value at this bucket, or null for a gap bucket with
+	// no collected data. Gap buckets are still emitted (one entry per
+	// bucket in the window), so this is null rather than omitted.
+	Value *float64 `json:"value"`
 }
 
 // MetricLabelFilter A single key/value label match applied to a metric series query.
@@ -274,8 +322,10 @@ type MetricsSeriesRequest struct {
 	// response are lowercased.
 	Filters *[]MetricLabelFilter `json:"filters,omitempty"`
 
-	// Fn Aggregation function applied per bucket. Optional: when omitted,
-	// the server picks the default for the metric (currently `LAST`).
+	// Fn Aggregation function applied to raw/pre-aggregated samples when
+	// collapsing them into one value per output bucket. Optional: when
+	// omitted the server picks the default for the metric (currently
+	// `LAST`).
 	//
 	// Not accepted on the following metrics — requests are rejected
 	// with `INVALID_REQUEST`:
@@ -294,6 +344,18 @@ type MetricsSeriesRequest struct {
 	//   - `timescale_cloud_database_num_connections`
 	//   - `timescale_cloud_database_job_duration_usecs`
 	//   - `timescale_cloud_database_job_success`
+	//
+	// Values:
+	//   - `RATE`: counter-reset-aware per-second rate of change.
+	//   - `INCREASE`: counter-reset-aware total increase over the bucket.
+	//   - `SUM`: sum of samples in the bucket.
+	//   - `AVG`: mean of samples in the bucket.
+	//   - `MIN`: minimum sample in the bucket.
+	//   - `MAX`: maximum sample in the bucket.
+	//   - `COUNT`: number of samples in the bucket.
+	//   - `P50` / `P90` / `P99`: percentile approximations (only valid
+	//     for metrics stored as sketches).
+	//   - `LAST`: the most recent sample in the bucket (default).
 	Fn *MetricsSeriesRequestFn `json:"fn,omitempty"`
 
 	// From Start of the time window (RFC3339; nanosecond precision accepted).
@@ -306,8 +368,10 @@ type MetricsSeriesRequest struct {
 	To time.Time `json:"to"`
 }
 
-// MetricsSeriesRequestFn Aggregation function applied per bucket. Optional: when omitted,
-// the server picks the default for the metric (currently `LAST`).
+// MetricsSeriesRequestFn Aggregation function applied to raw/pre-aggregated samples when
+// collapsing them into one value per output bucket. Optional: when
+// omitted the server picks the default for the metric (currently
+// `LAST`).
 //
 // Not accepted on the following metrics — requests are rejected
 // with `INVALID_REQUEST`:
@@ -326,60 +390,109 @@ type MetricsSeriesRequest struct {
 //   - `timescale_cloud_database_num_connections`
 //   - `timescale_cloud_database_job_duration_usecs`
 //   - `timescale_cloud_database_job_success`
+//
+// Values:
+//   - `RATE`: counter-reset-aware per-second rate of change.
+//   - `INCREASE`: counter-reset-aware total increase over the bucket.
+//   - `SUM`: sum of samples in the bucket.
+//   - `AVG`: mean of samples in the bucket.
+//   - `MIN`: minimum sample in the bucket.
+//   - `MAX`: maximum sample in the bucket.
+//   - `COUNT`: number of samples in the bucket.
+//   - `P50` / `P90` / `P99`: percentile approximations (only valid
+//     for metrics stored as sketches).
+//   - `LAST`: the most recent sample in the bucket (default).
 type MetricsSeriesRequestFn string
 
-// Peering defines model for Peering.
+// Peering A VPC peering connection to an external cloud account.
 type Peering struct {
-	ErrorMessage   *string `json:"error_message,omitempty"`
-	ID             *string `json:"id,omitempty"`
-	PeerAccountID  *string `json:"peer_account_id,omitempty"`
-	PeerRegionCode *string `json:"peer_region_code,omitempty"`
-	PeerVpcID      *string `json:"peer_vpc_id,omitempty"`
-	ProvisionedID  *string `json:"provisioned_id,omitempty"`
-	Status         *string `json:"status,omitempty"`
-}
+	// ErrorMessage A human-readable error message when the peering connection failed.
+	ErrorMessage *string `json:"error_message,omitempty"`
 
-// PeeringCreate defines model for PeeringCreate.
-type PeeringCreate struct {
-	PeerAccountID  string `json:"peer_account_id"`
+	// ID The unique identifier for the peering connection.
+	ID *string `json:"id,omitempty"`
+
+	// PeerAccountID The cloud account ID of the peer VPC.
+	PeerAccountID string `json:"peer_account_id"`
+
+	// PeerRegionCode The cloud region of the peer VPC.
 	PeerRegionCode string `json:"peer_region_code"`
-	PeerVpcID      string `json:"peer_vpc_id"`
+
+	// PeerVpcID The ID of the peer VPC.
+	PeerVpcID string `json:"peer_vpc_id"`
+
+	// ProvisionedID The provider-assigned identifier for the provisioned peering.
+	ProvisionedID *string `json:"provisioned_id,omitempty"`
+
+	// Status The current status of the peering connection.
+	Status *string `json:"status,omitempty"`
 }
 
-// Project defines model for Project.
+// PeeringCreate Parameters for creating a VPC peering connection.
+type PeeringCreate struct {
+	// PeerAccountID The cloud account ID of the peer VPC.
+	PeerAccountID string `json:"peer_account_id"`
+
+	// PeerRegionCode The cloud region of the peer VPC.
+	PeerRegionCode string `json:"peer_region_code"`
+
+	// PeerVpcID The ID of the peer VPC.
+	PeerVpcID string `json:"peer_vpc_id"`
+}
+
+// Project A project that organizes your Tiger Cloud resources, such as services and VPCs.
 type Project struct {
-	ID   string `json:"id"`
+	// ID The unique identifier for the project.
+	ID string `json:"id"`
+
+	// Name The name of the project.
 	Name string `json:"name"`
 }
 
-// ReadReplicaSet defines model for ReadReplicaSet.
+// ReadReplicaSet A set of read replicas for a service.
 type ReadReplicaSet struct {
+	// ConnectionPooler Connection pooler configuration for a service.
 	ConnectionPooler *ConnectionPooler `json:"connection_pooler,omitempty"`
 
 	// CPUMillis CPU allocation in milli-cores.
-	CPUMillis *int      `json:"cpu_millis,omitempty"`
-	Endpoint  *Endpoint `json:"endpoint,omitempty"`
-	ID        *string   `json:"id,omitempty"`
+	CPUMillis int `json:"cpu_millis"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ID The unique identifier for the read replica set.
+	ID string `json:"id"`
 
 	// MemoryGbs Memory allocation in gigabytes.
-	MemoryGbs *int `json:"memory_gbs,omitempty"`
+	MemoryGbs int `json:"memory_gbs"`
 
-	// Metadata Additional metadata for the read replica set
-	Metadata *struct {
-		// Environment Environment tag for the read replica set
-		Environment *string `json:"environment,omitempty"`
-	} `json:"metadata,omitempty"`
-	Name *string `json:"name,omitempty"`
+	// Metadata Additional metadata for the read replica set.
+	Metadata *ReplicaSetMetadata `json:"metadata,omitempty"`
+
+	// Name The name of the read replica set.
+	Name string `json:"name"`
 
 	// Nodes Number of nodes in the replica set.
-	Nodes  *int                  `json:"nodes,omitempty"`
-	Status *ReadReplicaSetStatus `json:"status,omitempty"`
+	Nodes int `json:"nodes"`
+
+	// Status The current status of the read replica set:
+	// - creating: the replica set is being provisioned
+	// - active: the replica set is provisioned and serving traffic
+	// - resizing: the replica set is being resized
+	// - deleting: the replica set is being deleted
+	// - error: the replica set is in an error state
+	Status ReadReplicaSetStatus `json:"status"`
 }
 
-// ReadReplicaSetStatus defines model for ReadReplicaSet.Status.
+// ReadReplicaSetStatus The current status of the read replica set:
+// - creating: the replica set is being provisioned
+// - active: the replica set is provisioned and serving traffic
+// - resizing: the replica set is being resized
+// - deleting: the replica set is being deleted
+// - error: the replica set is in an error state
 type ReadReplicaSetStatus string
 
-// ReadReplicaSetCreate defines model for ReadReplicaSetCreate.
+// ReadReplicaSetCreate Parameters for creating a read replica set.
 type ReadReplicaSetCreate struct {
 	// CPUMillis The initial CPU allocation in milli-cores.
 	CPUMillis int `json:"cpu_millis"`
@@ -394,7 +507,13 @@ type ReadReplicaSetCreate struct {
 	Nodes int `json:"nodes"`
 }
 
-// ResizeInput defines model for ResizeInput.
+// ReplicaSetMetadata Additional metadata for the read replica set.
+type ReplicaSetMetadata struct {
+	// Environment Environment tag for the read replica set.
+	Environment *string `json:"environment,omitempty"`
+}
+
+// ResizeInput Parameters for resizing a service.
 type ResizeInput struct {
 	// CPUMillis The new CPU allocation in milli-cores.
 	CPUMillis string `json:"cpu_millis"`
@@ -403,63 +522,86 @@ type ResizeInput struct {
 	MemoryGbs string `json:"memory_gbs"`
 }
 
-// Service defines model for Service.
+// Resource A resource allocated to the service.
+type Resource struct {
+	// ID Resource identifier.
+	ID *string `json:"id,omitempty"`
+
+	// Spec Resource specification.
+	Spec *ResourceSpec `json:"spec,omitempty"`
+}
+
+// ResourceSpec Resource specification.
+type ResourceSpec struct {
+	// CPUMillis CPU allocation in millicores.
+	CPUMillis *int `json:"cpu_millis,omitempty"`
+
+	// MemoryGbs Memory allocation in gigabytes.
+	MemoryGbs *int `json:"memory_gbs,omitempty"`
+
+	// VolumeType Type of storage volume.
+	VolumeType *string `json:"volume_type,omitempty"`
+}
+
+// Service A database service and its current configuration.
 type Service struct {
+	// ConnectionPooler Connection pooler configuration for a service.
 	ConnectionPooler *ConnectionPooler `json:"connection_pooler,omitempty"`
 
-	// Created Creation timestamp
-	Created    *time.Time `json:"created,omitempty"`
-	Endpoint   *Endpoint  `json:"endpoint,omitempty"`
-	ForkedFrom *ForkSpec  `json:"forked_from,omitempty"`
+	// Created Creation timestamp.
+	Created time.Time `json:"created"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ForkedFrom The service this service was forked from.
+	ForkedFrom *ForkSpec `json:"forked_from,omitempty"`
+
+	// HaReplicas High-availability replica configuration for a service.
 	HaReplicas *HAReplica `json:"ha_replicas,omitempty"`
 
 	// InitialPassword The initial password for the service.
 	InitialPassword *string `json:"initial_password,omitempty"`
 
-	// Metadata Additional metadata for the service
-	Metadata *struct {
-		// Environment Environment tag for the service
-		Environment *string `json:"environment,omitempty"`
-	} `json:"metadata,omitempty"`
+	// Metadata Additional metadata for the service.
+	Metadata *ServiceMetadata `json:"metadata,omitempty"`
+
+	// Metrics Resource usage metrics for the service.
+	Metrics *ServiceMetrics `json:"metrics"`
 
 	// Name The name of the service.
-	Name *string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// ProjectID The project this service belongs to.
-	ProjectID       *string           `json:"project_id,omitempty"`
+	ProjectID string `json:"project_id"`
+
+	// ReadReplicaSets The read replica sets attached to the service.
 	ReadReplicaSets *[]ReadReplicaSet `json:"read_replica_sets,omitempty"`
 
 	// RegionCode The cloud region where the service is hosted.
-	RegionCode *string `json:"region_code,omitempty"`
+	RegionCode string `json:"region_code"`
 
-	// Resources List of resources allocated to the service
-	Resources *[]struct {
-		// ID Resource identifier
-		ID *string `json:"id,omitempty"`
-
-		// Spec Resource specification
-		Spec *struct {
-			// CPUMillis CPU allocation in millicores
-			CPUMillis *int `json:"cpu_millis,omitempty"`
-
-			// MemoryGbs Memory allocation in gigabytes
-			MemoryGbs *int `json:"memory_gbs,omitempty"`
-
-			// VolumeType Type of storage volume
-			VolumeType *string `json:"volume_type,omitempty"`
-		} `json:"spec,omitempty"`
-	} `json:"resources,omitempty"`
+	// Resources List of resources allocated to the service.
+	Resources []Resource `json:"resources"`
 
 	// ServiceID The unique identifier for the service.
-	ServiceID   *string       `json:"service_id,omitempty"`
-	ServiceType *ServiceType  `json:"service_type,omitempty"`
-	Status      *DeployStatus `json:"status,omitempty"`
+	ServiceID string `json:"service_id"`
 
-	// VpcEndpoint VPC endpoint configuration if available
-	VpcEndpoint *map[string]interface{} `json:"vpcEndpoint"`
+	// ServiceType The type of the service.
+	ServiceType ServiceType `json:"service_type"`
+
+	// Status Current status of the service.
+	Status DeployStatus `json:"status"`
+
+	// VpcEndpointDeprecated Deprecated. Use `vpc_endpoint` instead.
+	// Deprecated: Use `vpc_endpoint` instead.
+	VpcEndpointDeprecated *VPCEndpoint `json:"vpcEndpoint,omitempty"`
+
+	// VpcEndpoint VPC endpoint configuration if available.
+	VpcEndpoint *VPCEndpoint `json:"vpc_endpoint,omitempty"`
 }
 
-// ServiceCreate defines model for ServiceCreate.
+// ServiceCreate Parameters for creating a service.
 type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
 	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
@@ -486,46 +628,88 @@ type ServiceCreate struct {
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
 
-// ServiceLogEntry defines model for ServiceLogEntry.
+// ServiceLogEntry A single structured log entry from a service.
 type ServiceLogEntry struct {
-	// Message Log message text
+	// Message Log message text.
 	Message string `json:"message"`
 
-	// Severity PostgreSQL severity level (e.g. LOG, WARNING, ERROR, FATAL)
+	// Severity PostgreSQL severity level (e.g. LOG, WARNING, ERROR, FATAL).
 	Severity string `json:"severity"`
 
-	// Timestamp Timestamp of the log entry (RFC3339 format)
+	// Timestamp Timestamp of the log entry (RFC3339 format).
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// ServiceLogs defines model for ServiceLogs.
+// ServiceLogs The logs for a service.
 type ServiceLogs struct {
-	// Entries Structured log entries with timestamp and severity metadata. Only present on the cursor-based path.
+	// Entries Structured log entries with timestamp and severity metadata.
+	// Entries are in the same order as logs and can be used in place of it
+	// by callers that need structured data.
 	Entries *[]ServiceLogEntry `json:"entries,omitempty"`
 
-	// LastCursor Opaque cursor for the next page of results. Present when more log entries exist older than the last entry in this response. Absent when there are no further results.
-	LastCursor *string `json:"lastCursor,omitempty"`
+	// LastCursorDeprecated Deprecated. Use `last_cursor` instead.
+	// Deprecated: Use `last_cursor` instead.
+	LastCursorDeprecated *string `json:"lastCursor,omitempty"`
+
+	// LastCursor Opaque cursor for the next page of results. Present when more log entries
+	// exist older than the last entry in this response. Pass this value as the
+	// `cursor` query parameter to retrieve the next page. Absent when there are
+	// no further results.
+	LastCursor *string `json:"last_cursor,omitempty"`
 
 	// Logs Array of log message strings. Preserved for backwards compatibility.
+	// Deprecated: Use `entries` instead.
 	Logs []string `json:"logs"`
 }
 
-// ServiceType defines model for ServiceType.
+// ServiceMetadata Additional metadata for the service.
+type ServiceMetadata struct {
+	// Environment Environment tag for the service.
+	Environment *string `json:"environment,omitempty"`
+}
+
+// ServiceMetrics Resource usage metrics for the service.
+type ServiceMetrics struct {
+	// MemoryMb Memory usage in megabytes.
+	MemoryMb *int `json:"memory_mb"`
+
+	// MilliCPU CPU usage in millicores.
+	MilliCPU *int `json:"milli_cpu"`
+
+	// StorageMb Storage usage in megabytes.
+	StorageMb *int `json:"storage_mb"`
+}
+
+// ServiceRename Parameters for renaming a service.
+type ServiceRename struct {
+	// Name The new name for the service.
+	Name string `json:"name"`
+}
+
+// ServiceType The type of the service:
+// - TIMESCALEDB: a TimescaleDB service (PostgreSQL with the TimescaleDB extension)
+// - POSTGRES: a standard PostgreSQL service
+//
+// VECTOR is deprecated and should not be used.
 type ServiceType string
 
-// ServiceVPCInput defines model for ServiceVPCInput.
+// ServiceVPCInput Parameters for attaching a service to a VPC.
 type ServiceVPCInput struct {
 	// VpcID The ID of the VPC to attach the service to.
 	VpcID string `json:"vpc_id"`
 }
 
-// SetEnvironmentInput defines model for SetEnvironmentInput.
+// SetEnvironmentInput Parameters for setting a service's environment.
 type SetEnvironmentInput struct {
-	// Environment The target environment for the service.
+	// Environment The target environment for the service:
+	// - PROD: a production environment
+	// - DEV: a development environment
 	Environment SetEnvironmentInputEnvironment `json:"environment"`
 }
 
-// SetEnvironmentInputEnvironment The target environment for the service.
+// SetEnvironmentInputEnvironment The target environment for the service:
+// - PROD: a production environment
+// - DEV: a development environment
 type SetEnvironmentInputEnvironment string
 
 // SetHAReplicaInput At least one of sync_replica_count or replica_count must be provided.
@@ -537,28 +721,52 @@ type SetHAReplicaInput struct {
 	SyncReplicaCount *int `json:"sync_replica_count,omitempty"`
 }
 
-// UpdatePasswordInput defines model for UpdatePasswordInput.
+// UpdatePasswordInput Parameters for updating a service's password.
 type UpdatePasswordInput struct {
 	// Password The new password.
 	Password string `json:"password"`
 }
 
-// VPC defines model for VPC.
+// VPC A virtual private cloud that services can be attached to.
 type VPC struct {
-	Cidr       *string `json:"cidr,omitempty"`
-	ID         *string `json:"id,omitempty"`
-	Name       *string `json:"name,omitempty"`
-	RegionCode *string `json:"region_code,omitempty"`
-}
+	// Cidr The IPv4 CIDR block for the VPC, in address/prefix notation (e.g. 10.0.0.0/16).
+	Cidr string `json:"cidr"`
 
-// VPCCreate defines model for VPCCreate.
-type VPCCreate struct {
-	Cidr       string `json:"cidr"`
-	Name       string `json:"name"`
+	// ID The unique identifier for the VPC.
+	ID *string `json:"id,omitempty"`
+
+	// Name The name of the VPC.
+	Name string `json:"name"`
+
+	// RegionCode The cloud region where the VPC is hosted.
 	RegionCode string `json:"region_code"`
 }
 
-// VPCRename defines model for VPCRename.
+// VPCCreate Parameters for creating a VPC.
+type VPCCreate struct {
+	// Cidr The IPv4 CIDR block for the VPC, in address/prefix notation (e.g. 10.0.0.0/16).
+	Cidr string `json:"cidr"`
+
+	// Name The name of the VPC.
+	Name string `json:"name"`
+
+	// RegionCode The cloud region where the VPC will be created.
+	RegionCode string `json:"region_code"`
+}
+
+// VPCEndpoint VPC endpoint configuration for connecting to a service over VPC peering.
+type VPCEndpoint struct {
+	// Host The hostname for connecting to the service over VPC peering.
+	Host *string `json:"host,omitempty"`
+
+	// Port The port for connecting to the service over VPC peering.
+	Port *int `json:"port,omitempty"`
+
+	// VpcID The ID of the VPC the endpoint is associated with.
+	VpcID *string `json:"vpc_id,omitempty"`
+}
+
+// VPCRename Parameters for renaming a VPC.
 type VPCRename struct {
 	// Name The new name for the VPC.
 	Name string `json:"name"`
@@ -581,11 +789,11 @@ type VPCId = string
 
 // AnalyticsResponse defines model for AnalyticsResponse.
 type AnalyticsResponse struct {
-	// Status Status of the analytics operation
+	// Status Status of the analytics operation.
 	Status *string `json:"status,omitempty"`
 }
 
-// ClientError defines model for ClientError.
+// ClientError An error returned when a request cannot be completed.
 type ClientError = Error
 
 // SuccessMessage defines model for SuccessMessage.
@@ -595,41 +803,47 @@ type SuccessMessage struct {
 
 // IdentifyUserJSONBody defines parameters for IdentifyUser.
 type IdentifyUserJSONBody struct {
-	// Properties Optional map of arbitrary properties associated with the user
+	// Properties Optional map of arbitrary properties associated with the user.
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
 // TrackEventJSONBody defines parameters for TrackEvent.
 type TrackEventJSONBody struct {
-	// Event The name of the event to track
+	// Event The name of the event to track.
 	Event string `json:"event"`
 
-	// Properties Optional map of arbitrary properties associated with the event
+	// Properties Optional map of arbitrary properties associated with the event.
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 }
 
 // LogoutJSONBody defines parameters for Logout.
 type LogoutJSONBody struct {
-	// RefreshToken The OAuth refresh token to revoke.
+	// RefreshToken The OAuth refresh token to revoke. Omit for sessions without a refresh token.
 	RefreshToken *string `json:"refresh_token,omitempty"`
 }
 
 // GetServiceLogsParams defines parameters for GetServiceLogs.
 type GetServiceLogsParams struct {
-	// Node Specific service node to fetch logs from (for multi-node services)
+	// Node Specific service node to fetch logs from (for multi-node services).
 	Node *int `form:"node,omitempty" json:"node,omitempty"`
 
-	// Page Page number for pagination (0-based)
-	Page *int `form:"page,omitempty" json:"page,omitempty"`
+	// Cursor Opaque pagination cursor returned as `last_cursor` in a previous response.
+	// When provided, returns the next page of logs older than the cursor position.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 
-	// Until Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)
+	// Until Upper bound timestamp — fetch logs before this time (RFC3339 format, e.g., 2024-01-15T10:00:00Z).
 	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
 
-	// Since Fetch logs after this timestamp (RFC3339 format, e.g., 2024-01-15T09:00:00Z).
+	// Since Lower bound timestamp — fetch logs after this time (RFC3339 format).
 	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
 
-	// Cursor Opaque pagination cursor returned as lastCursor in a previous response. When provided, returns the next page of logs older than the cursor position.
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	// Search Full-text search terms to filter log lines. Repeat the parameter for multiple values
+	// (e.g. `?search=slow+query&search=ERROR`).
+	Search *[]string `form:"search,omitempty" json:"search,omitempty"`
+
+	// Severities Severity levels to filter results. Repeat the parameter for multiple values
+	// (e.g. `?severities=ERROR&severities=WARNING`).
+	Severities *[]string `form:"severities,omitempty" json:"severities,omitempty"`
 }
 
 // IdentifyUserJSONRequestBody defines body for IdentifyUser for application/json ContentType.
@@ -655,6 +869,9 @@ type ForkServiceJSONRequestBody = ForkServiceCreate
 
 // GetServiceMetricsSeriesJSONRequestBody defines body for GetServiceMetricsSeries for application/json ContentType.
 type GetServiceMetricsSeriesJSONRequestBody = MetricsSeriesRequest
+
+// RenameServiceJSONRequestBody defines body for RenameService for application/json ContentType.
+type RenameServiceJSONRequestBody = ServiceRename
 
 // CreateReplicaSetJSONRequestBody defines body for CreateReplicaSet for application/json ContentType.
 type CreateReplicaSetJSONRequestBody = ReadReplicaSetCreate

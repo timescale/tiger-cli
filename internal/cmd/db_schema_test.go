@@ -9,7 +9,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestDBSchema_NoServiceID(t *testing.T) {
@@ -90,8 +89,8 @@ func TestDBSchema_NotReadyStates(t *testing.T) {
 
 			mockTestPAT(t)
 			withMockService(t, api.Service{
-				ServiceID: util.Ptr("svc-12345"),
-				Status:    util.Ptr(tt.status),
+				ServiceID: "svc-12345",
+				Status:    tt.status,
 			})
 
 			_, err := executeDBCommand(t.Context(), "db", "schema")

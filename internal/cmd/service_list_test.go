@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -183,13 +182,13 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 
 	services := []api.Service{
 		{
-			ServiceID:       &serviceID1,
-			Name:            &serviceName1,
+			ServiceID:       serviceID1,
+			Name:            serviceName1,
 			InitialPassword: &initialPassword1,
 		},
 		{
-			ServiceID:       &serviceID2,
-			Name:            &serviceName2,
+			ServiceID:       serviceID2,
+			Name:            serviceName2,
 			InitialPassword: &initialPassword2,
 		},
 	}
@@ -212,21 +211,11 @@ func TestSanitizeServicesForOutput(t *testing.T) {
 		}
 
 		// Verify that other fields are preserved
-		if service.ServiceID == nil {
+		if service.ServiceID == "" {
 			t.Errorf("Expected ServiceID to be preserved in sanitized service %d", i)
 		}
-		if service.Name == nil {
+		if service.Name == "" {
 			t.Errorf("Expected Name to be preserved in sanitized service %d", i)
 		}
-	}
-}
-
-func TestFormatTimePtr(t *testing.T) {
-	testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-	if formatTimePtr(&testTime) == "" {
-		t.Error("formatTimePtr should return formatted time string")
-	}
-	if formatTimePtr(nil) != "" {
-		t.Error("formatTimePtr should return empty string for nil")
 	}
 }

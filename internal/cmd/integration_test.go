@@ -104,21 +104,18 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 	cutoff := time.Now().Add(-threshold)
 	swept := 0
 	for _, s := range services {
-		if s.ServiceID == nil || s.Name == nil || s.Created == nil {
-			continue
-		}
-		if !strings.HasPrefix(*s.Name, testServicePrefix) {
+		if !strings.HasPrefix(s.Name, testServicePrefix) {
 			continue
 		}
 		if !s.Created.Before(cutoff) {
 			continue
 		}
 		t.Logf("Sweep: deleting stale service %s (name=%s, created=%s)",
-			*s.ServiceID, *s.Name, s.Created.Format(time.RFC3339))
+			s.ServiceID, s.Name, s.Created.Format(time.RFC3339))
 		if _, err := executeIntegrationCommand(ctx,
-			"service", "delete", *s.ServiceID,
+			"service", "delete", s.ServiceID,
 			"--confirm", "--no-wait"); err != nil {
-			t.Logf("Sweep: failed to delete %s: %v", *s.ServiceID, err)
+			t.Logf("Sweep: failed to delete %s: %v", s.ServiceID, err)
 			continue
 		}
 		swept++
@@ -295,11 +292,11 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify service details
-		if service.ServiceID == nil || *service.ServiceID != serviceID {
+		if service.ServiceID != serviceID {
 			t.Errorf("Expected service ID %s, got %v", serviceID, service.ServiceID)
 		}
 
-		if service.Name == nil || *service.Name != serviceName {
+		if service.Name != serviceName {
 			t.Errorf("Expected service name %s, got %v", serviceName, service.Name)
 		}
 
@@ -954,10 +951,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Fatalf("Failed to parse service JSON: %v", err)
 		}
 
-		var status string
-		if service.Status != nil {
-			status = string(*service.Status)
-		}
+		status := string(service.Status)
 
 		t.Logf("Service status after stop: %s", status)
 
@@ -1042,10 +1036,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Fatalf("Failed to parse service JSON: %v", err)
 		}
 
-		var status string
-		if service.Status != nil {
-			status = string(*service.Status)
-		}
+		status := string(service.Status)
 
 		t.Logf("Service status after start: %s", status)
 
@@ -1112,8 +1103,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		var currentCPU, currentMemory string
-		if serviceBefore.Resources != nil && len(*serviceBefore.Resources) > 0 {
-			resource := (*serviceBefore.Resources)[0]
+		if len(serviceBefore.Resources) > 0 {
+			resource := serviceBefore.Resources[0]
 			if resource.Spec != nil {
 				if resource.Spec.CPUMillis != nil {
 					cpuCores := float64(*resource.Spec.CPUMillis) / 1000
@@ -1179,8 +1170,8 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		var newCPUMillis, newMemoryGbs int
-		if serviceAfter.Resources != nil && len(*serviceAfter.Resources) > 0 {
-			resource := (*serviceAfter.Resources)[0]
+		if len(serviceAfter.Resources) > 0 {
+			resource := serviceAfter.Resources[0]
 			if resource.Spec != nil {
 				if resource.Spec.CPUMillis != nil {
 					newCPUMillis = *resource.Spec.CPUMillis
@@ -1213,10 +1204,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify service is still in READY state after resize
-		var status string
-		if serviceAfter.Status != nil {
-			status = string(*serviceAfter.Status)
-		}
+		status := string(serviceAfter.Status)
 
 		if status != "READY" {
 			t.Logf("Warning: Expected service status to be READY after resize, got %s", status)
@@ -1324,8 +1312,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	// Try to parse as JSON first (if --output json was used)
 	var service api.Service
 	if err := json.Unmarshal([]byte(output), &service); err == nil {
-		if service.ServiceID != nil {
-			return *service.ServiceID
+		if service.ServiceID != "" {
+			return service.ServiceID
 		}
 	}
 

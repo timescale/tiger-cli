@@ -156,6 +156,11 @@ type ClientInterface interface {
 
 	GetServiceMetricsSeries(ctx context.Context, projectID ProjectID, serviceID ServiceID, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RenameServiceWithBody request with any body
+	RenameServiceWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	RenameService(ctx context.Context, projectID ProjectID, serviceID ServiceID, body RenameServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetReplicaSets request
 	GetReplicaSets(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -533,6 +538,30 @@ func (c *Client) GetServiceMetricsSeriesWithBody(ctx context.Context, projectID 
 
 func (c *Client) GetServiceMetricsSeries(ctx context.Context, projectID ProjectID, serviceID ServiceID, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServiceMetricsSeriesRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RenameServiceWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameServiceRequestWithBody(c.Server, projectID, serviceID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RenameService(ctx context.Context, projectID ProjectID, serviceID ServiceID, body RenameServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameServiceRequest(c.Server, projectID, serviceID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1560,9 +1589,9 @@ func NewGetServiceLogsRequest(server string, projectID ProjectID, serviceID Serv
 
 		}
 
-		if params.Page != nil {
+		if params.Cursor != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "page", runtime.ParamLocationQuery, *params.Page); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1608,9 +1637,25 @@ func NewGetServiceLogsRequest(server string, projectID ProjectID, serviceID Serv
 
 		}
 
-		if params.Cursor != nil {
+		if params.Search != nil {
 
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "cursor", runtime.ParamLocationQuery, *params.Cursor); err != nil {
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "search", runtime.ParamLocationQuery, *params.Search); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Severities != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "severities", runtime.ParamLocationQuery, *params.Severities); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -1711,6 +1756,60 @@ func NewGetServiceMetricsSeriesRequestWithBody(server string, projectID ProjectI
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/services/%s/metrics/series", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRenameServiceRequest calls the generic RenameService builder with application/json body
+func NewRenameServiceRequest(server string, projectID ProjectID, serviceID ServiceID, body RenameServiceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRenameServiceRequestWithBody(server, projectID, serviceID, "application/json", bodyReader)
+}
+
+// NewRenameServiceRequestWithBody generates requests for RenameService with any type of body
+func NewRenameServiceRequestWithBody(server string, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/rename", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2907,6 +3006,11 @@ type ClientWithResponsesInterface interface {
 
 	GetServiceMetricsSeriesWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body GetServiceMetricsSeriesJSONRequestBody, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error)
 
+	// RenameServiceWithBodyWithResponse request with any body
+	RenameServiceWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameServiceResponse, error)
+
+	RenameServiceWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body RenameServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameServiceResponse, error)
+
 	// GetReplicaSetsWithResponse request
 	GetReplicaSetsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetReplicaSetsResponse, error)
 
@@ -3383,6 +3487,29 @@ func (r GetServiceMetricsSeriesResponse) StatusCode() int {
 	return 0
 }
 
+type RenameServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Service
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r RenameServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RenameServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetReplicaSetsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3500,6 +3627,7 @@ func (r EnableReplicaPoolerResponse) StatusCode() int {
 type ResizeReplicaSetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON202      *SuccessMessage
 	JSON4XX      *ClientError
 }
 
@@ -3864,7 +3992,7 @@ func (r GetVPCPeeringResponse) StatusCode() int {
 type RenameVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *VPC
+	JSON200      *SuccessMessage
 	JSON4XX      *ClientError
 }
 
@@ -4099,6 +4227,23 @@ func (c *ClientWithResponses) GetServiceMetricsSeriesWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseGetServiceMetricsSeriesResponse(rsp)
+}
+
+// RenameServiceWithBodyWithResponse request with arbitrary body returning *RenameServiceResponse
+func (c *ClientWithResponses) RenameServiceWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameServiceResponse, error) {
+	rsp, err := c.RenameServiceWithBody(ctx, projectID, serviceID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenameServiceResponse(rsp)
+}
+
+func (c *ClientWithResponses) RenameServiceWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body RenameServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameServiceResponse, error) {
+	rsp, err := c.RenameService(ctx, projectID, serviceID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenameServiceResponse(rsp)
 }
 
 // GetReplicaSetsWithResponse request returning *GetReplicaSetsResponse
@@ -4926,6 +5071,39 @@ func ParseGetServiceMetricsSeriesResponse(rsp *http.Response) (*GetServiceMetric
 	return response, nil
 }
 
+// ParseRenameServiceResponse parses an HTTP response from a RenameServiceWithResponse call
+func ParseRenameServiceResponse(rsp *http.Response) (*RenameServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RenameServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetReplicaSetsResponse parses an HTTP response from a GetReplicaSetsWithResponse call
 func ParseGetReplicaSetsResponse(rsp *http.Response) (*GetReplicaSetsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5098,6 +5276,13 @@ func ParseResizeReplicaSetResponse(rsp *http.Response) (*ResizeReplicaSetRespons
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest SuccessMessage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -5599,7 +5784,7 @@ func ParseRenameVPCResponse(rsp *http.Response) (*RenameVPCResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest VPC
+		var dest SuccessMessage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

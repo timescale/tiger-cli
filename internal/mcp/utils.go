@@ -78,21 +78,17 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 // convertToServiceDetail converts an API Service to MCP ServiceDetail
 func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service, withPassword bool) ServiceDetail {
 	detail := ServiceDetail{
-		ServiceID: util.Deref(service.ServiceID),
-		Name:      util.Deref(service.Name),
-		Status:    util.DerefStr(service.Status),
-		Type:      util.DerefStr(service.ServiceType),
-		Region:    util.Deref(service.RegionCode),
-	}
-
-	// Add creation time if available
-	if service.Created != nil {
-		detail.Created = service.Created.Format("2006-01-02T15:04:05Z")
+		ServiceID: service.ServiceID,
+		Name:      service.Name,
+		Status:    string(service.Status),
+		Type:      string(service.ServiceType),
+		Region:    service.RegionCode,
+		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
 	}
 
 	// Add resource information if available
-	if service.Resources != nil && len(*service.Resources) > 0 {
-		resource := (*service.Resources)[0]
+	if len(service.Resources) > 0 {
+		resource := service.Resources[0]
 		if resource.Spec != nil {
 			detail.Resources = &ResourceInfo{}
 

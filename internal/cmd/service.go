@@ -59,7 +59,7 @@ func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, 
 	// Prepare the output service with computed fields
 	outputSvc := prepareServiceForOutput(cmd, cfg, service, withPassword)
 	if strict && withPassword && outputSvc.Password == "" {
-		return fmt.Errorf("password requested but not available for service %s", util.Deref(outputSvc.ServiceID))
+		return fmt.Errorf("password requested but not available for service %s", outputSvc.ServiceID)
 	}
 	outputWriter := cmd.OutOrStdout()
 
@@ -93,11 +93,11 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Header("PROPERTY", "VALUE")
 
 	// Basic service information
-	table.Append("Service ID", util.Deref(service.ServiceID))
-	table.Append("Name", util.Deref(service.Name))
-	table.Append("Status", util.DerefStr(service.Status))
-	table.Append("Type", util.DerefStr(service.ServiceType))
-	table.Append("Region", util.Deref(service.RegionCode))
+	table.Append("Service ID", service.ServiceID)
+	table.Append("Name", service.Name)
+	table.Append("Status", string(service.Status))
+	table.Append("Type", string(service.ServiceType))
+	table.Append("Region", service.RegionCode)
 
 	// Environment tag
 	if service.Metadata != nil && service.Metadata.Environment != nil {
@@ -105,8 +105,8 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	}
 
 	// Resource information from Resources slice
-	if service.Resources != nil && len(*service.Resources) > 0 {
-		resource := (*service.Resources)[0] // Get first resource
+	if len(service.Resources) > 0 {
+		resource := service.Resources[0] // Get first resource
 		if resource.Spec != nil {
 			if resource.Spec.CPUMillis != nil {
 				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
@@ -159,9 +159,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	}
 
 	// Timestamps
-	if service.Created != nil {
-		table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
-	}
+	table.Append("Created", service.Created.Format("2006-01-02 15:04:05 MST"))
 
 	// Output password if available
 	if service.Password != "" {
@@ -203,7 +201,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	}
 
 	// Build console URL
-	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, *service.ServiceID)
+	outputSvc.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s", cfg.ConsoleURL, service.ServiceID)
 
 	return outputSvc
 }

@@ -173,7 +173,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	service := *resp.JSON202
-	serviceID := util.Deref(service.ServiceID)
+	serviceID := service.ServiceID
 
 	// Save password immediately after service fork, before any waiting
 	// This ensures the password is stored even if the wait fails or is interrupted
