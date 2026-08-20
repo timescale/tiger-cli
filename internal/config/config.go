@@ -68,16 +68,22 @@ func ParseReadOnlyMode(value string) (ReadOnlyMode, error) {
 		return ReadOnlyOff, nil
 	}
 
-	// Matched case-sensitively, like the other enum-valued config keys
-	// (`output`, `password_storage`).
-	switch mode := ReadOnlyMode(trimmed); mode {
+	// Matched case-insensitively, unlike `output` and `password_storage`. PROD is
+	// how the environment tag is spelled in `service get` output, the MCP server
+	// instructions and ErrReadOnlyProd's own message, so it's the spelling most
+	// likely to be copied - and rejecting it fails the load, which takes out the
+	// `config set` that could repair it. ParseBool below is case-insensitive too,
+	// so accepting TRUE while rejecting PROD would be the odd rule, not this one.
+	lowered := strings.ToLower(trimmed)
+
+	switch mode := ReadOnlyMode(lowered); mode {
 	case ReadOnlyAll, ReadOnlyProd, ReadOnlyOff:
 		return mode, nil
 	}
 
 	// `on` pairs with the `off` mode name, so anyone reading those two as a
 	// boolean pair gets what they expect. strconv.ParseBool rejects it.
-	if trimmed == "on" {
+	if lowered == "on" {
 		return ReadOnlyAll, nil
 	}
 

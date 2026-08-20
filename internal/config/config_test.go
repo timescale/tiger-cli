@@ -128,9 +128,11 @@ func TestParseReadOnlyMode(t *testing.T) {
 		{value: "", want: ReadOnlyOff},
 		{value: "  prod  ", want: ReadOnlyProd},
 
-		// Rejected: mixed case included.
-		{value: "PROD", wantErr: true},
-		{value: "ON", wantErr: true},
+		// Case-insensitive, so the PROD spelling used everywhere else is accepted.
+		{value: "PROD", want: ReadOnlyProd},
+		{value: "ON", want: ReadOnlyAll},
+		{value: "Off", want: ReadOnlyOff},
+
 		{value: "sometimes", wantErr: true},
 	}
 
