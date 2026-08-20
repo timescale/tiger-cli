@@ -129,6 +129,9 @@ type ClientInterface interface {
 
 	AttachServiceToVPC(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBackups request
+	GetBackups(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DetachServiceFromVPCWithBody request with any body
 	DetachServiceFromVPCWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -418,6 +421,18 @@ func (c *Client) AttachServiceToVPCWithBody(ctx context.Context, projectID Proje
 
 func (c *Client) AttachServiceToVPC(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAttachServiceToVPCRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetBackups(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBackupsRequest(c.Server, projectID, serviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1343,6 +1358,47 @@ func NewAttachServiceToVPCRequestWithBody(server string, projectID ProjectID, se
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetBackupsRequest generates requests for GetBackups
+func NewGetBackupsRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "project_id", runtime.ParamLocationPath, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "service_id", runtime.ParamLocationPath, serviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backups", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2979,6 +3035,9 @@ type ClientWithResponsesInterface interface {
 
 	AttachServiceToVPCWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error)
 
+	// GetBackupsWithResponse request
+	GetBackupsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupsResponse, error)
+
 	// DetachServiceFromVPCWithBodyWithResponse request with any body
 	DetachServiceFromVPCWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error)
 
@@ -3320,6 +3379,29 @@ func (r AttachServiceToVPCResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r AttachServiceToVPCResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetBackupsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Backup
+	JSON4XX      *ClientError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBackupsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBackupsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4142,6 +4224,15 @@ func (c *ClientWithResponses) AttachServiceToVPCWithResponse(ctx context.Context
 	return ParseAttachServiceToVPCResponse(rsp)
 }
 
+// GetBackupsWithResponse request returning *GetBackupsResponse
+func (c *ClientWithResponses) GetBackupsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupsResponse, error) {
+	rsp, err := c.GetBackups(ctx, projectID, serviceID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBackupsResponse(rsp)
+}
+
 // DetachServiceFromVPCWithBodyWithResponse request with arbitrary body returning *DetachServiceFromVPCResponse
 func (c *ClientWithResponses) DetachServiceFromVPCWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DetachServiceFromVPCResponse, error) {
 	rsp, err := c.DetachServiceFromVPCWithBody(ctx, projectID, serviceID, contentType, body, reqEditors...)
@@ -4827,6 +4918,39 @@ func ParseAttachServiceToVPCResponse(rsp *http.Response) (*AttachServiceToVPCRes
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBackupsResponse parses an HTTP response from a GetBackupsWithResponse call
+func ParseGetBackupsResponse(rsp *http.Response) (*GetBackupsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBackupsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Backup
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError

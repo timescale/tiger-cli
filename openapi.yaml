@@ -32,6 +32,8 @@ tags:
     description: Manage services and their associated actions.
   - name: Read Replica Sets
     description: Manage read replica sets and their associated actions.
+  - name: Backups
+    description: View the backups taken for a service.
   - name: Analytics
     description: Track analytics events.
 
@@ -747,6 +749,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceLogs'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/backups:
+    get:
+      operationId: getBackups
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: List All Backups
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a list of the full and incremental backups taken for a
+        service. Backups run automatically on a schedule; there is no operation
+        to create or delete one. To restore data, create a recovery fork with
+        `fork_strategy: PITR`.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: A list of backups.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Backup'
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -1821,6 +1852,100 @@ components:
           x-go-name: LastCursorDeprecated
           description: Deprecated. Use `last_cursor` instead.
           example: "eyJ0cyI6IjIwMjUtMDEtMTVUMDk6MzA6MDBaIn0="
+    Backup:
+      x-tigerdata-preview: true
+      type: object
+      description: A single backup of a service, taken automatically by Tiger Cloud.
+      required:
+        - label
+        - type
+        - started_at
+        - regions
+      properties:
+        label:
+          type: string
+          description: The label the backup system assigns to this backup.
+          example: "20260115-093000F"
+        type:
+          allOf:
+            - $ref: '#/components/schemas/BackupType'
+          description: The type of the backup.
+        started_at:
+          type: string
+          format: date-time
+          description: When the backup started.
+          example: "2026-01-15T09:30:00Z"
+        finished_at:
+          type: string
+          format: date-time
+          description: When the backup finished. Absent while the backup is still running.
+          example: "2026-01-15T09:41:12Z"
+        duration_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How long the backup took, in seconds. Absent while the backup is still running.
+          example: 672
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The size of the backup in bytes. Absent while the backup is still running.
+          example: 4831838208
+        regions:
+          type: array
+          description: |
+            Every region storing a copy of this backup: the region the service
+            runs in, plus any region enabled for cross-region backups.
+          items:
+            $ref: '#/components/schemas/BackupRegionState'
+    BackupRegionState:
+      x-tigerdata-preview: true
+      type: object
+      description: A region storing a copy of a backup.
+      required:
+        - region_code
+      properties:
+        region_code:
+          type: string
+          description: The region storing the copy.
+          example: "eu-central-1"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/BackupCopyStatus'
+          description: The state of this copy.
+    BackupCopyStatus:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        The state of a copy of a backup in one region.
+
+        - `SCHEDULED`: the copy has not started yet.
+        - `RUNNING`: the copy is in progress.
+        - `RETRYING`: the copy failed and is being retried.
+        - `FINISHED`: the copy completed successfully.
+        - `FAILED`: the copy did not complete.
+        - `UNKNOWN`: an unrecognized state.
+      enum:
+        - SCHEDULED
+        - RUNNING
+        - RETRYING
+        - FINISHED
+        - FAILED
+        - UNKNOWN
+    BackupType:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        The type of a backup.
+
+        - `FULL`: a complete copy of the service's data.
+        - `INCREMENTAL`: only the data that changed since the previous backup.
+        - `UNKNOWN`: a type this version of the API does not name.
+      enum:
+        - FULL
+        - INCREMENTAL
+        - UNKNOWN
     Project:
       type: object
       description: A project that organizes your Tiger Cloud resources, such as services and VPCs.
