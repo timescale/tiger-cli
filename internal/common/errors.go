@@ -1,22 +1,71 @@
 package common
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// ErrReadOnly is returned when a destructive operation is attempted while
-// read-only mode is enabled in the user's config.
+// ErrReadOnly is returned when read_only=all blocks a destructive operation.
 var ErrReadOnly = errors.New("this operation is not allowed in read-only mode")
 
-// CheckReadOnly returns ErrReadOnly if read-only mode is enabled. Callers
-// should invoke this before any destructive API call.
-func CheckReadOnly(cfg *config.Config) error {
-	if cfg.ReadOnly {
+// ErrReadOnlyProd is returned when read_only=prod blocks a destructive operation
+// on a service tagged PROD.
+var ErrReadOnlyProd = errors.New(`this operation is not allowed on services tagged PROD while read_only is set to "prod"`)
+
+// CheckReadOnly returns an error when read-only mode blocks writes to a service
+// with the given environment tag. When only the service's ID is known, use CheckReadOnlyByServiceID.
+func CheckReadOnly(cfg *config.Config, tag api.EnvironmentTag) error {
+	switch cfg.ReadOnly {
+	case config.ReadOnlyAll:
 		return ErrReadOnly
+	case config.ReadOnlyProd:
+		if tag == api.EnvironmentTagPROD {
+			return ErrReadOnlyProd
+		}
 	}
 	return nil
+}
+
+// CheckReadOnlyByServiceID is CheckReadOnly for a caller that has only the
+// service's ID, fetching the service under read_only=prod to read its tag. A
+// failed fetch is a refusal: we can't tell whether the service is PROD, and
+// refusing is the safe direction.
+func CheckReadOnlyByServiceID(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface, projectID, serviceID string) error {
+	if cfg.ReadOnly.BlocksAll() {
+		return ErrReadOnly
+	}
+	// Only prod's verdict depends on the tag, so only prod pays for the lookup.
+	if cfg.ReadOnly != config.ReadOnlyProd {
+		return nil
+	}
+
+	service, err := GetService(ctx, client, projectID, serviceID)
+	if err != nil {
+		refusal := fmt.Errorf("cannot verify whether service %s is tagged PROD (read_only=%s): %w", serviceID, cfg.ReadOnly, err)
+
+		// main.go type-asserts on ExitCode() instead of using errors.As, so the
+		// wrap above would downgrade an unknown service to exit 1.
+		var exitErr ExitCodeError
+		if errors.As(err, &exitErr) {
+			return ExitWithCode(exitErr.ExitCode(), refusal)
+		}
+		return refusal
+	}
+
+	if err := CheckReadOnly(cfg, ServiceEnvironmentTag(*service)); err != nil {
+		return fmt.Errorf("service %s: %w", serviceID, err)
+	}
+	return nil
+}
+
+// ForcesReadOnlySession reports whether read-only mode requires a database
+// session against this service to open in Tiger Cloud's immutable read-only mode.
+func ForcesReadOnlySession(cfg *config.Config, service api.Service) bool {
+	return CheckReadOnly(cfg, ServiceEnvironmentTag(service)) != nil
 }
 
 // Exit codes as defined in the CLI specification

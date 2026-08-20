@@ -61,9 +61,11 @@ Examples:
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
+			// Refuse without an API call under read_only=all. prod needs the tag,
+			// so the real gate waits for the fetch below.
+			if cfg.ReadOnly.BlocksAll() {
 				cmd.SilenceUsage = true
-				return err
+				return common.ErrReadOnly
 			}
 
 			// Determine service ID
@@ -99,6 +101,12 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 			service := *serviceResp.JSON200
+
+			// The prod half of the gate, riding on the fetch above — still before
+			// anything is modified or prompted for.
+			if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
+				return err
+			}
 
 			// A read replica has no separate password to rotate.
 			if common.IsReadReplica(service) {

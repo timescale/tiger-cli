@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -498,10 +499,13 @@ func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID stri
 
 	// Set config URLs to point to mock server
 	configFile := config.GetConfigFile(tmpDir)
+	// Pinned so the first-login prompt doesn't fire in tests that stub a terminal
+	// for project selection. The prompt has its own TestOfferProdProtection.
 	configContent := fmt.Sprintf(`
 console_url: "%s"
 gateway_url: "%s"
 api_url: "%s"
+read_only: "off"
 `, mockServer.URL, mockServer.URL, mockServer.URL)
 	err := os.WriteFile(configFile, []byte(configContent), 0644)
 	if err != nil {
@@ -661,5 +665,69 @@ func assertExpiresInAbout(t *testing.T, expiry time.Time) {
 	d := time.Until(expiry)
 	if d < 3540*time.Second || d > 3600*time.Second {
 		t.Errorf("Expected expiry ~3600s from now (from expires_in=3600), got %v (in %v)", expiry, d)
+	}
+}
+
+// TestOfferProdProtection covers the first-login read-only prompt. The three
+// "already ..." cases guard the ask-exactly-once property.
+func TestOfferProdProtection(t *testing.T) {
+	tests := []struct {
+		name string
+		// preexisting is empty when read_only is absent from the file.
+		preexisting string
+		answer      string
+		notATTY     bool
+		wantPrompt  bool
+		wantStored  string // "" = key must stay absent
+	}{
+		{name: "yes stores prod", answer: "y\n", wantPrompt: true, wantStored: "prod"},
+		{name: "bare enter defaults to yes", answer: "\n", wantPrompt: true, wantStored: "prod"},
+		{name: "no stores off", answer: "n\n", wantPrompt: true, wantStored: "off"},
+		{name: "EOF records nothing", answer: "", wantPrompt: true, wantStored: ""},
+		{name: "not a terminal skips silently", answer: "y\n", notATTY: true, wantStored: ""},
+		// Answered before, either way: never ask again.
+		{name: "already declined", preexisting: "off", answer: "y\n", wantStored: "off"},
+		{name: "already opted in", preexisting: "prod", answer: "n\n", wantStored: "prod"},
+		{name: "already set to all", preexisting: "all", answer: "y\n", wantStored: "all"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := setupAuthTest(t)
+			values := map[string]any{}
+			if tt.preexisting != "" {
+				values["read_only"] = tt.preexisting
+			}
+			cfg, err := config.UseTestConfig(tmpDir, values)
+			if err != nil {
+				t.Fatalf("UseTestConfig failed: %v", err)
+			}
+			stubIsTerminal(t, !tt.notATTY)
+
+			cmd := &cobra.Command{}
+			cmd.SetContext(t.Context())
+			errOut := new(bytes.Buffer)
+			cmd.SetOut(new(bytes.Buffer))
+			cmd.SetErr(errOut)
+			cmd.SetIn(strings.NewReader(tt.answer))
+
+			offerProdProtection(cmd, cfg)
+
+			if got := strings.Contains(errOut.String(), "Protect services tagged PROD"); got != tt.wantPrompt {
+				t.Errorf("prompted = %t, want %t (stderr: %q)", got, tt.wantPrompt, errOut.String())
+			}
+
+			stored, err := config.LoadForOutput(tmpDir, false, true)
+			if err != nil {
+				t.Fatalf("LoadForOutput failed: %v", err)
+			}
+			got := ""
+			if stored.ReadOnly != nil {
+				got = string(*stored.ReadOnly)
+			}
+			if got != tt.wantStored {
+				t.Errorf("stored read_only = %q, want %q", got, tt.wantStored)
+			}
+		})
 	}
 }

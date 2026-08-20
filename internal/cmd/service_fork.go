@@ -104,7 +104,10 @@ Examples:
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
+			// Gate on the fork's own tag: under prod mode, forking a PROD source
+			// into a DEV fork is allowed — it reads production without changing it.
+			environmentTag := api.EnvironmentTag(forkEnvironment)
+			if err := common.CheckReadOnly(cfg, environmentTag); err != nil {
 				cmd.SilenceUsage = true
 				return err
 			}
@@ -157,7 +160,6 @@ Examples:
 			cmd.PrintErrf("🍴 Forking service '%s' to create '%s' at %s...\n", serviceID, displayName, strategyDesc)
 
 			// Create ForkServiceCreate request
-			environmentTag := api.EnvironmentTag(forkEnvironment)
 			forkReq := api.ForkServiceCreate{
 				ForkStrategy:   forkStrategy,
 				TargetTime:     targetTime,

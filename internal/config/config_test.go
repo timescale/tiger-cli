@@ -53,7 +53,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 		t.Errorf("Expected Analytics %t, got %t", DefaultAnalytics, cfg.Analytics)
 	}
 	if cfg.ReadOnly != DefaultReadOnly {
-		t.Errorf("Expected ReadOnly %t, got %t", DefaultReadOnly, cfg.ReadOnly)
+		t.Errorf("Expected ReadOnly %s, got %s", DefaultReadOnly, cfg.ReadOnly)
 	}
 	if cfg.MCPMaxRows != DefaultMCPMaxRows {
 		t.Errorf("Expected MCPMaxRows %d, got %d", DefaultMCPMaxRows, cfg.MCPMaxRows)
@@ -100,8 +100,113 @@ read_only: true
 	if cfg.Analytics != false {
 		t.Errorf("Expected Analytics false, got %t", cfg.Analytics)
 	}
-	if !cfg.ReadOnly {
-		t.Errorf("Expected ReadOnly true, got false")
+	// A legacy boolean still means "every service".
+	if cfg.ReadOnly != ReadOnlyAll {
+		t.Errorf("Expected ReadOnly %s, got %s", ReadOnlyAll, cfg.ReadOnly)
+	}
+}
+
+// TestParseReadOnlyMode covers the value vocabulary. It's a pure function, so the
+// matrix lives here rather than in TestLoad_ReadOnlyMode, which pays for a temp
+// dir and a config file per case.
+func TestParseReadOnlyMode(t *testing.T) {
+	tests := []struct {
+		value   string
+		want    ReadOnlyMode
+		wantErr bool
+	}{
+		{value: "all", want: ReadOnlyAll},
+		{value: "prod", want: ReadOnlyProd},
+		{value: "off", want: ReadOnlyOff},
+
+		// Accepted spellings, legacy and otherwise.
+		{value: "true", want: ReadOnlyAll},
+		{value: "false", want: ReadOnlyOff},
+		{value: "1", want: ReadOnlyAll},
+		{value: "0", want: ReadOnlyOff},
+		{value: "on", want: ReadOnlyAll},
+		{value: "", want: ReadOnlyOff},
+		{value: "  prod  ", want: ReadOnlyProd},
+
+		// Case-insensitive, so the PROD spelling used everywhere else is accepted.
+		{value: "PROD", want: ReadOnlyProd},
+		{value: "ON", want: ReadOnlyAll},
+		{value: "Off", want: ReadOnlyOff},
+
+		{value: "sometimes", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%q", tt.value), func(t *testing.T) {
+			got, err := ParseReadOnlyMode(tt.value)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("ParseReadOnlyMode(%q) = %q, want an error", tt.value, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseReadOnlyMode(%q) failed: %v", tt.value, err)
+			}
+			if got != tt.want {
+				t.Errorf("ParseReadOnlyMode(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestLoad_ReadOnlyMode covers the plumbing rather than the vocabulary (see
+// TestParseReadOnlyMode): that each source reaches the parser, and that a shape
+// only viper can produce survives the round trip.
+func TestLoad_ReadOnlyMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileBody string
+		env      string
+		want     ReadOnlyMode
+		wantErr  bool
+	}{
+		{name: "unset falls back to the default", want: DefaultReadOnly},
+		{name: "from file", fileBody: "read_only: prod\n", want: ReadOnlyProd},
+		{name: "from env", env: "prod", want: ReadOnlyProd},
+		{name: "env overrides file", fileBody: "read_only: all\n", env: "off", want: ReadOnlyOff},
+		{name: "invalid value fails the load", fileBody: "read_only: sometimes\n", wantErr: true},
+
+		// A YAML int reaches the decoder as an int, not a string. Left unparsed it
+		// would store a mode no gate matches, and the old bool field read 1 as
+		// true, so this is the fail-open regression guard.
+		{name: "YAML int", fileBody: "read_only: 1\n", want: ReadOnlyAll},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := setupTestConfig(t)
+
+			if tt.fileBody != "" {
+				if err := os.WriteFile(GetConfigFile(tmpDir), []byte(tt.fileBody), 0644); err != nil {
+					t.Fatalf("Failed to write config file: %v", err)
+				}
+			}
+
+			t.Setenv("TIGER_CONFIG_DIR", tmpDir)
+			if tt.env != "" {
+				t.Setenv("TIGER_READ_ONLY", tt.env)
+			}
+
+			cfg, err := Load(nil)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Load(nil) succeeded with ReadOnly = %q, want an error", cfg.ReadOnly)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load(nil) failed: %v", err)
+			}
+			if cfg.ReadOnly != tt.want {
+				t.Errorf("ReadOnly = %q, want %q", cfg.ReadOnly, tt.want)
+			}
+		})
 	}
 }
 
@@ -195,8 +300,8 @@ func TestLoad_FromEnvironmentVariables(t *testing.T) {
 	if cfg.Analytics != false {
 		t.Errorf("Expected Analytics false, got %t", cfg.Analytics)
 	}
-	if !cfg.ReadOnly {
-		t.Errorf("Expected ReadOnly true, got false")
+	if cfg.ReadOnly != ReadOnlyAll {
+		t.Errorf("Expected ReadOnly %s, got %s", ReadOnlyAll, cfg.ReadOnly)
 	}
 }
 
@@ -410,6 +515,25 @@ func TestSet(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			key:   "read_only",
+			value: "prod",
+			checkFunc: func() bool {
+				return cfg.ReadOnly == ReadOnlyProd
+			},
+		},
+		{
+			key:   "read_only",
+			value: "true",
+			checkFunc: func() bool {
+				return cfg.ReadOnly == ReadOnlyAll
+			},
+		},
+		{
+			key:           "read_only",
+			value:         "invalid",
+			expectedError: true,
+		},
+		{
 			key:           "unknown_key",
 			value:         "value",
 			expectedError: true,
@@ -418,7 +542,7 @@ func TestSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s=%s", tt.key, tt.value), func(t *testing.T) {
-			err := cfg.Set(tt.key, tt.value)
+			_, err := cfg.Set(tt.key, tt.value)
 
 			if tt.expectedError {
 				if err == nil {
@@ -434,6 +558,41 @@ func TestSet(t *testing.T) {
 
 			if tt.checkFunc != nil && !tt.checkFunc() {
 				t.Errorf("Configuration value not set correctly for %s=%s", tt.key, tt.value)
+			}
+		})
+	}
+}
+
+// TestSet_ReadOnlyNormalizesOnWrite checks the one thing TestSet's checkFunc
+// can't: read_only is stored as the canonical mode rather than verbatim, so a
+// config file written with a legacy boolean is cleaned up rather than kept.
+func TestSet_ReadOnlyNormalizesOnWrite(t *testing.T) {
+	for _, tt := range []struct{ value, want, wantFile string }{
+		{value: "prod", want: "prod", wantFile: "read_only: prod"},
+		{value: "true", want: "all", wantFile: "read_only: all"},
+		{value: "on", want: "all", wantFile: "read_only: all"},
+		// The writer quotes `off`, which unquoted would round-trip as a YAML 1.1
+		// boolean. That quoting is what makes the mode name safe to store.
+		{value: "false", want: "off", wantFile: `read_only: "off"`},
+	} {
+		t.Run(tt.value, func(t *testing.T) {
+			tmpDir := setupTestConfig(t)
+			cfg := &Config{ConfigDir: tmpDir}
+
+			stored, err := cfg.Set("read_only", tt.value)
+			if err != nil {
+				t.Fatalf("Set(read_only, %q) failed: %v", tt.value, err)
+			}
+			if stored != tt.want {
+				t.Errorf("Set returned %q, want %q", stored, tt.want)
+			}
+
+			body, err := os.ReadFile(GetConfigFile(tmpDir))
+			if err != nil {
+				t.Fatalf("Failed to read config file: %v", err)
+			}
+			if got := strings.TrimSpace(string(body)); got != tt.wantFile {
+				t.Errorf("config file = %q, want %q", got, tt.wantFile)
 			}
 		})
 	}

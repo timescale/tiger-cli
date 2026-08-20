@@ -104,7 +104,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
+	// Deliberately DEV-only: this tool takes no environment_tag, unlike the CLI's
+	// --environment, so the API always tags what it creates DEV.
+	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
@@ -165,7 +167,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 
 	// Set as default service if requested (defaults to true)
 	if input.SetDefault {
-		if err := cfg.Set("service_id", serviceID); err != nil {
+		if _, err := cfg.Set("service_id", serviceID); err != nil {
 			// Log warning but don't fail the service creation
 			s.logger.Warn("MCP: Failed to set service as default", slog.Any("error", err))
 		} else {

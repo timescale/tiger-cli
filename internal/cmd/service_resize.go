@@ -65,11 +65,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
-				cmd.SilenceUsage = true
-				return err
-			}
-
 			// Determine service ID
 			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
@@ -88,6 +83,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			cmd.SilenceUsage = true
+
+			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+				return err
+			}
 
 			// Display resize information
 			cmd.PrintErrf("📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
