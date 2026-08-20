@@ -16,9 +16,8 @@ func buildConfigUnsetCmd(app *common.App) *cobra.Command {
 		Long:              `Remove a configuration value and save changes to ~/.config/tiger/config.yaml`,
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: configOptionCompletion,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			key := args[0]

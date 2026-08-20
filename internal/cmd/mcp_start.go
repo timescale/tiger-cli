@@ -32,9 +32,9 @@ Examples:
   tiger mcp start http`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
-			cmd.SilenceUsage = true
 			return startStdioServer(cmd, app)
 		},
 	}

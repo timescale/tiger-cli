@@ -48,10 +48,10 @@ Examples:
   tiger db schema svc-12345 --internal`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, _, _, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 

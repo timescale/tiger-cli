@@ -17,14 +17,14 @@ import (
 func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:   "available-series [service-id]",
-		Short: "List available metric series",
-		Long:  `List the names of all metric series available for a service.`,
-		Args:  cobra.MaximumNArgs(1),
+		Use:          "available-series [service-id]",
+		Short:        "List available metric series",
+		Long:         `List the names of all metric series available for a service.`,
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -32,8 +32,6 @@ func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()

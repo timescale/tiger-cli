@@ -71,6 +71,7 @@ Examples:
   tiger service fork svc-12345 --now --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
@@ -100,12 +101,10 @@ Examples:
 
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
 			if err := common.CheckReadOnly(cfg); err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -114,8 +113,6 @@ Examples:
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()

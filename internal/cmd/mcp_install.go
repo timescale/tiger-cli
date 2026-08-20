@@ -61,11 +61,10 @@ Examples:
 
   # Use custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
-		Args:      cobra.MaximumNArgs(1),
-		ValidArgs: getValidEditorNames(),
+		Args:         cobra.MaximumNArgs(1),
+		ValidArgs:    getValidEditorNames(),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			var clientName string
 			if len(args) == 0 {
 				// No client specified, prompt user to select one

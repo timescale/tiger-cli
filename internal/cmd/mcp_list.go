@@ -34,9 +34,8 @@ Examples:
   tiger mcp list -o yaml`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			// Create MCP server

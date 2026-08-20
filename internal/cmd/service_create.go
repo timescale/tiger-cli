@@ -81,6 +81,7 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
@@ -112,8 +113,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if createWaitTimeout <= 0 {
 				return fmt.Errorf("wait timeout must be positive, got %v", createWaitTimeout)
 			}
-
-			cmd.SilenceUsage = true
 
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {

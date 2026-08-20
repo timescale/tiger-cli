@@ -16,9 +16,8 @@ func buildConfigResetCmd(app *common.App) *cobra.Command {
 		Long:              `Reset all configuration settings to their default values`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			if err := cfg.Reset(); err != nil {

@@ -19,9 +19,8 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 		Long:              `Remove stored credentials. For OAuth logins, also revokes the refresh token server-side.`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			revokeOAuthSession(cmd, app, cfg)

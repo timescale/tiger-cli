@@ -569,32 +569,35 @@ The `internal/` directory follows Go conventions to prevent external imports of 
 
 ## Cobra Usage Display Pattern
 
-When implementing Cobra commands, use this pattern to control when usage information is displayed on errors:
+Every leaf command (one with a `RunE`) sets `SilenceUsage: true` as a literal
+field on its `cobra.Command` struct, unconditionally. A bad flag or a bad
+argument count therefore prints only the error, not the full help text:
 
 ```go
-RunE: func(cmd *cobra.Command, args []string) error {
-    // 1. Do argument validation first - errors here show usage
-    if len(args) < 1 {
-        return fmt.Errorf("service ID is required")
-    }
-
-    // 2. Set SilenceUsage = true after argument validation
-    cmd.SilenceUsage = true
-
-    // 3. Proceed with business logic - errors here don't show usage
-    if err := someAPICall(); err != nil {
-        return fmt.Errorf("operation failed: %w", err)
-    }
-
-    return nil
-},
+cmd := &cobra.Command{
+    Use:               "get [service-id]",
+    Args:              cobra.MaximumNArgs(1),
+    ValidArgsFunction: serviceIDCompletion(app),
+    SilenceUsage:      true,
+    RunE: func(cmd *cobra.Command, args []string) error {
+        // ...
+    },
+}
 ```
 
-**Philosophy**:
-- Early argument/syntax errors → show usage (helps users learn command syntax)
-- Operational errors after arguments are validated → don't show usage (avoids cluttering output with irrelevant usage info)
+**Philosophy**: usage output is only useful the first time someone learns a
+command's syntax, and by then `--help` (or the docs) has already shown it. A
+wrong flag or a failed API call both just need the one-line error; burying it
+under a wall of flag descriptions makes it harder to read, not easier.
 
-This provides fine-grained control over when usage is displayed, improving user experience by showing help when it's relevant and hiding it when it's not.
+Because `SilenceUsage` lives on the struct literal, it's already `true` before
+`RunE` ever runs — including for a flag-parsing error, which cobra reports
+before calling `RunE` at all. There's nothing to set inside the handler.
+
+Parent/group commands (`tiger service`, `tiger mcp`) have no `RunE` and don't
+set it — cobra's own "unknown command" error for a bad subcommand name still
+shows that command's usage, which is the one case where seeing the available
+subcommands actually helps.
 
 `SilenceErrors` is a separate setting and is rarely needed: set it only on a
 command that already reports its own errors, so cobra doesn't print them a second
@@ -762,14 +765,13 @@ func buildMyFlaggedCmd(app *common.App) *cobra.Command {
     var retryCount int
 
     cmd := &cobra.Command{
-        Use:   "my-command",
-        Short: "Command with local flags",
+        Use:          "my-command",
+        Short:        "Command with local flags",
+        SilenceUsage: true,
         RunE: func(cmd *cobra.Command, args []string) error {
             if len(args) < 1 {
                 return fmt.Errorf("argument required")
             }
-
-            cmd.SilenceUsage = true
 
             // Use flag variables (they're in scope)
             fmt.Printf("Flag: %s, Feature: %t, Retries: %d\n",
@@ -803,10 +805,10 @@ that bug. Flag types that validate at parse time (`outputFlag` and friends in
 ```go
 func buildMyConfigurableFlagCmd(app *common.App) *cobra.Command {
     cmd := &cobra.Command{
-        Use:   "my-command",
-        Short: "Command with configurable flag",
+        Use:          "my-command",
+        Short:        "Command with configurable flag",
+        SilenceUsage: true,
         RunE: func(cmd *cobra.Command, args []string) error {
-            cmd.SilenceUsage = true
             cfg := app.GetConfig()
             // ... use cfg.Output which respects: flag > env > config > default
         },

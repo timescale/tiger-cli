@@ -15,9 +15,8 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 		Long:              `Set a configuration value and save it to ~/.config/tiger/config.yaml`,
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: configOptionCompletion,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			key, value := args[0], args[1]
