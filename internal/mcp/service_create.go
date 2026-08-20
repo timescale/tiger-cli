@@ -105,10 +105,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Deliberately DEV-only: this tool takes no environment_tag, unlike the CLI's
-	// --environment, so the API always tags what it creates DEV. That keeps an
-	// invariant worth having - under read_only=prod an agent can always stop,
-	// resize or delete what it created, because it can never have created a PROD
-	// service it would then be refused. Promoting to PROD stays a human act.
+	// --environment, so the API always tags what it creates DEV.
 	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}

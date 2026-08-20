@@ -106,9 +106,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	// Deliberately DEV-only, like service_create: no environment_tag input, so the
-	// fork is always tagged DEV. Forking a PROD source is still allowed - it reads
-	// production without changing it.
+	// Deliberately DEV-only: the fork is always tagged DEV.
 	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}

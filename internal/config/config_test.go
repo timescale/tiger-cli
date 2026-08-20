@@ -520,9 +520,6 @@ func TestSet(t *testing.T) {
 			},
 		},
 		{
-			// A legacy boolean is stored as the mode it means, not verbatim - see
-			// TestSet_ReadOnlyNormalizesOnWrite. The vocabulary itself is covered by
-			// TestParseReadOnlyMode.
 			key:   "read_only",
 			value: "true",
 			checkFunc: func() bool {
