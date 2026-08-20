@@ -90,6 +90,11 @@ Examples:
 
 			cfg := app.GetConfig()
 
+			// Captured before either branch stores anything: afterwards there are
+			// always credentials.
+			_, credErr := cfg.GetStoredCredentials()
+			firstLogin := credErr != nil
+
 			var err error
 			creds := credentials{
 				publicKey: flagOrEnvVar(flags.publicKey, "TIGER_PUBLIC_KEY"),
@@ -118,7 +123,7 @@ Examples:
 				app.SetClient(client, projectID)
 				// Identify the user for analytics.
 				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
-				finishLogin(cmd, projectID)
+				finishLogin(cmd, cfg, projectID, firstLogin)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
 				creds, err = promptForCredentials(cmd, cfg.ConsoleURL, creds)
@@ -147,7 +152,7 @@ Examples:
 			// See the OAuth branch above: keep the App's client in sync with the
 			// credentials we just stored.
 			app.SetClient(client, authInfo.APIKey.Project.ID)
-			finishLogin(cmd, authInfo.APIKey.Project.ID)
+			finishLogin(cmd, cfg, authInfo.APIKey.Project.ID, firstLogin)
 			return nil
 		},
 	}
@@ -158,9 +163,52 @@ Examples:
 	return cmd
 }
 
-func finishLogin(cmd *cobra.Command, projectID string) {
+func finishLogin(cmd *cobra.Command, cfg *config.Config, projectID string, firstLogin bool) {
 	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
+
+	if firstLogin {
+		offerProdProtection(cmd, cfg)
+	}
 	cmd.Print(nextStepsMessage)
+}
+
+// offerProdProtection asks a first-time user whether to protect services tagged
+// PROD from writes. Both answers are recorded, so it asks exactly once: declining
+// stores read_only=off rather than leaving it absent, which a logout and second
+// login would otherwise read as never having been asked.
+func offerProdProtection(cmd *cobra.Command, cfg *config.Config) {
+	// Both streams, per the convention: stdin so the answer can be read, stderr so
+	// the question can be seen. An unseen prompt reads as a hang.
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+		return
+	}
+
+	// Loading without defaults reports read_only as nil only when the file doesn't
+	// mention it. Comparing cfg.ReadOnly wouldn't: off is also the default.
+	stored, err := config.LoadForOutput(cfg.ConfigDir, false, true)
+	if err != nil || stored.ReadOnly != nil {
+		return
+	}
+
+	cmd.PrintErrf("Protect services tagged PROD from writes? [Y/n]: ")
+	answer, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
+	if err != nil {
+		// Interrupted or EOF - not an answer, so record nothing and ask again.
+		return
+	}
+
+	mode := config.ReadOnlyProd
+	if strings.HasPrefix(strings.ToLower(answer), "n") {
+		mode = config.ReadOnlyOff
+	}
+	if _, err := cfg.Set("read_only", string(mode)); err != nil {
+		cmd.PrintErrf("⚠️  Warning: could not set read_only: %v\n", err)
+		return
+	}
+	// Announcing "read_only set to off" to someone who just declined is noise.
+	if mode == config.ReadOnlyProd {
+		cmd.PrintErrf("Services tagged PROD are now protected from writes.\n")
+	}
 }
 
 func flagOrEnvVar(flagVal, envVarName string) string {

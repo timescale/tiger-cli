@@ -249,7 +249,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `mcp_max_rows` - Maximum number of rows the `db_execute_query` MCP tool returns per result set before truncating, to limit how much data lands in an AI agent's context. Only applies to the MCP tool, not CLI commands. Default: `100`
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
-- `read_only` - Which services this CLI may change: `all`, `prod`, or `off` (default: `off`, which protects nothing). `true` and `on` are accepted as aliases for `all`, and `false` for `off`, so existing config files and `TIGER_READ_ONLY=true` behave as before.
+- `read_only` - Which services this CLI may change: `all`, `prod`, or `off` (default: `off`, which protects nothing). Your first interactive `tiger auth login` offers to set `prod`, and records your answer either way, so it only asks once. `true` and `on` are accepted as aliases for `all`, and `false` for `off`, so existing config files and `TIGER_READ_ONLY=true` behave as before.
 
   Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db connect`, `tiger db connection-string`, the `db_execute_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
 

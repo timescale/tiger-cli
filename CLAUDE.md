@@ -1090,6 +1090,10 @@ reads as a hang, and can be answered by accident — a stray Enter at `service
 update-password` rotates the password. Confirmations, password prompts, and
 BubbleTea programs all follow this rule.
 
+A prompt that merely *offers* something skips silently instead of erroring, since
+nothing is being refused — `offerProdProtection` in `auth_login.go` is the one
+example.
+
 The gate is about *prompts*, not about reading stdin as such. A read whose whole
 point is piped input — `util.ReadAll` on a here-doc or a `|` — must not be
 gated, since a TTY is exactly what it doesn't expect.
