@@ -16,8 +16,8 @@ import (
 func createTestService(serviceID string) api.Service {
 	projectID := "test-project-123"
 	return api.Service{
-		ProjectID: &projectID,
-		ServiceID: &serviceID,
+		ProjectID: projectID,
+		ServiceID: serviceID,
 		Endpoint: &api.Endpoint{
 			Host: util.Ptr("test-host.tigerdata.com"),
 			Port: util.Ptr(5432),
@@ -78,7 +78,7 @@ func TestKeyringStorage_Save_NoProjectId(t *testing.T) {
 	storage := &KeyringStorage{}
 	serviceID := "test-service-123"
 	service := api.Service{
-		ServiceID: &serviceID,
+		ServiceID: serviceID,
 		// No ProjectID
 	}
 
@@ -124,7 +124,7 @@ func TestKeyringStorage_Get_NoProjectId(t *testing.T) {
 	storage := &KeyringStorage{}
 	serviceID := "test-service-123"
 	service := api.Service{
-		ServiceID: &serviceID,
+		ServiceID: serviceID,
 		// No ProjectID
 	}
 
@@ -173,7 +173,7 @@ func TestKeyringStorage_Remove_NoProjectId(t *testing.T) {
 	storage := &KeyringStorage{}
 	serviceID := "test-service-123"
 	service := api.Service{
-		ServiceID: &serviceID,
+		ServiceID: serviceID,
 		// No ProjectID
 	}
 
@@ -202,7 +202,7 @@ func TestKeyringStorage_Remove_NoRole(t *testing.T) {
 func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceID: util.Ptr("test-service-123"),
+		ServiceID: "test-service-123",
 		// No Endpoint
 	}
 
@@ -231,7 +231,7 @@ func TestPgpassStorage_Remove_NoRole(t *testing.T) {
 func TestPgpassStorage_Get_NoEndpoint(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := api.Service{
-		ServiceID: util.Ptr("test-service-123"),
+		ServiceID: "test-service-123",
 		// No Endpoint
 	}
 
@@ -702,8 +702,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "valid service with both IDs and tsdbadmin role",
 			service: api.Service{
-				ProjectID: util.Ptr("project-123"),
-				ServiceID: util.Ptr("service-456"),
+				ProjectID: "project-123",
+				ServiceID: "service-456",
 			},
 			role:        "tsdbadmin",
 			expected:    "password-project-123-service-456-tsdbadmin",
@@ -712,8 +712,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "valid service with both IDs and readonly role",
 			service: api.Service{
-				ProjectID: util.Ptr("project-123"),
-				ServiceID: util.Ptr("service-456"),
+				ProjectID: "project-123",
+				ServiceID: "service-456",
 			},
 			role:        "readonly",
 			expected:    "password-project-123-service-456-readonly",
@@ -722,8 +722,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "valid service with both IDs and mixed-case role",
 			service: api.Service{
-				ProjectID: util.Ptr("project-123"),
-				ServiceID: util.Ptr("service-456"),
+				ProjectID: "project-123",
+				ServiceID: "service-456",
 			},
 			role:        "MyAppUser",
 			expected:    "password-project-123-service-456-MyAppUser",
@@ -732,7 +732,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing service ID",
 			service: api.Service{
-				ProjectID: util.Ptr("project-123"),
+				ProjectID: "project-123",
 			},
 			role:        "tsdbadmin",
 			expected:    "",
@@ -741,7 +741,7 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing project ID",
 			service: api.Service{
-				ServiceID: util.Ptr("service-456"),
+				ServiceID: "service-456",
 			},
 			role:        "tsdbadmin",
 			expected:    "",
@@ -757,8 +757,8 @@ func TestBuildPasswordKeyringUsername(t *testing.T) {
 		{
 			name: "missing role",
 			service: api.Service{
-				ProjectID: util.Ptr("project-123"),
-				ServiceID: util.Ptr("service-456"),
+				ProjectID: "project-123",
+				ServiceID: "service-456",
 			},
 			role:        "",
 			expected:    "",

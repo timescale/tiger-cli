@@ -159,7 +159,7 @@ func (s *Server) registerServiceTools(readOnly, experimental bool) {
 	addTool(s, readOnly, newServiceResizeTool(), s.handleServiceResize)
 	addTool(s, readOnly, newServiceLogsTool(), s.handleServiceLogs)
 
-	// Metrics tools target gateway endpoints marked `x-preview: true`. They
+	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They
 	// are registered only when the experimental gate is on at server startup;
 	// the user must restart the MCP server after toggling the gate. Handler
 	// bodies re-check the gate defensively in case config changes mid-session.

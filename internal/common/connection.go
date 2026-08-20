@@ -9,7 +9,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // hasPooler reports whether a connection pooler exposes an endpoint.
@@ -24,7 +23,7 @@ func ReplicaPoolerWarning(target *ConnectionTarget, pooled bool) string {
 	if !target.IsReplica || !pooled || hasPooler(target.ConnectionService.ConnectionPooler) {
 		return ""
 	}
-	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", util.DerefStr(target.ConnectionService.Name))
+	return fmt.Sprintf("read replica %q has no connection pooler; connecting directly instead", target.ConnectionService.Name)
 }
 
 // ConnectionDetailsOptions configures how the connection string is built

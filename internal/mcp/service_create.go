@@ -161,7 +161,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	service := *resp.JSON202
-	serviceID := util.Deref(service.ServiceID)
+	serviceID := service.ServiceID
 
 	// Set as default service if requested (defaults to true)
 	if input.SetDefault {
