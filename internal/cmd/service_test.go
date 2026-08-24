@@ -578,14 +578,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 		return
 	}
 
-	// Check that it's an exitCodeError with common.ExitTimeout
-	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != common.ExitTimeout {
-			t.Errorf("Expected exit code %d for wait timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
-		}
-	} else {
-		t.Error("Expected exitCodeError for wait timeout")
-	}
+	assertExitCode(t, err, common.ExitTimeout)
 
 	// Check error message mentions timeout and continuing provisioning
 	errorMsg := err.Error()

@@ -19,6 +19,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
@@ -423,6 +424,171 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	}
 }
 
+func TestAuthLogin_OAuth_ProjectIDFlag(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project 1"},
+		{ID: "project-456", Name: "Test Project 2"},
+		{ID: "project-789", Name: "Test Project 3"},
+	}, "project-456")
+
+	// No TTY and no picker stub: --project-id skips the interactive selection.
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: project-456)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+
+	stored, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if stored.ProjectID != "project-456" {
+		t.Errorf("Expected project ID 'project-456', got %q", stored.ProjectID)
+	}
+}
+
+func TestAuthLogin_OAuth_ProjectIDFlag_NoAccess(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project 1"},
+	}, "project-123")
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-999")
+	if err == nil {
+		t.Fatal("Expected login to fail for inaccessible project")
+	}
+	if !strings.Contains(err.Error(), "no access to the requested project") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// The exit code must survive the "failed to select project" wrap.
+	assertExitCode(t, err, common.ExitInvalidParameters)
+	// The requested ID is echoed on stderr, not in the error.
+	if !strings.Contains(output, "Project project-999 is not among your accessible projects") {
+		t.Errorf("Expected stderr to name the project, got: %q", output)
+	}
+
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored when project selection fails")
+	}
+}
+
+func TestAuthLogin_KeyFlags_ProjectIDMismatch(t *testing.T) {
+	setupAuthTest(t) // mock validator reports project 'test-project-id'
+
+	_, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "some-other-project")
+	if err == nil {
+		t.Fatal("Expected login to fail on project mismatch")
+	}
+	if !strings.Contains(err.Error(), "API key is scoped to a different project") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored on project mismatch")
+	}
+}
+
+func TestAuthLogin_KeyFlags_ProjectIDMatch(t *testing.T) {
+	setupAuthTest(t)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "test-project-id")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: test-project-id)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+}
+
+func TestAuthLogin_ProjectChange_ClearsDefaultService(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project"},
+	}, "project-123")
+
+	// Simulate a previous login to a different project with a default service.
+	cfg := testConfig(t)
+	if err := cfg.Set("service_id", "svc-old"); err != nil {
+		t.Fatalf("Failed to set service_id: %v", err)
+	}
+	prevToken := &oauth2.Token{
+		AccessToken:  "prev-access-token",
+		RefreshToken: "prev-refresh-token",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := cfg.StoreOAuthCredentials(prevToken, "project-old"); err != nil {
+		t.Fatalf("Failed to store previous credentials: %v", err)
+	}
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Cleared default service (config key service_id): it belonged to the previous project") {
+		t.Errorf("Expected default service to be cleared, got: %q", output)
+	}
+	if serviceID := testConfig(t).ServiceID; serviceID != "" {
+		t.Errorf("Expected service_id to be cleared, got %q", serviceID)
+	}
+}
+
+func TestAuthLogin_AfterLogout_ClearsDefaultService(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project"},
+	}, "project-123")
+
+	// A default service left behind by a logged-out session: the previous
+	// project is unknown, so login must clear it.
+	if err := testConfig(t).Set("service_id", "svc-old"); err != nil {
+		t.Fatalf("Failed to set service_id: %v", err)
+	}
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Cleared default service") {
+		t.Errorf("Expected default service to be cleared, got: %q", output)
+	}
+	if serviceID := testConfig(t).ServiceID; serviceID != "" {
+		t.Errorf("Expected service_id to be cleared, got %q", serviceID)
+	}
+}
+
+func TestAuthLogin_SameProject_KeepsDefaultService(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project"},
+	}, "project-123")
+
+	cfg := testConfig(t)
+	if err := cfg.Set("service_id", "svc-123"); err != nil {
+		t.Fatalf("Failed to set service_id: %v", err)
+	}
+	prevToken := &oauth2.Token{
+		AccessToken:  "prev-access-token",
+		RefreshToken: "prev-refresh-token",
+		Expiry:       time.Now().Add(time.Hour),
+	}
+	if err := cfg.StoreOAuthCredentials(prevToken, "project-123"); err != nil {
+		t.Fatalf("Failed to store previous credentials: %v", err)
+	}
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if strings.Contains(output, "Cleared default service") {
+		t.Errorf("Default service should be kept for a same-project login, got: %q", output)
+	}
+	if serviceID := testConfig(t).ServiceID; serviceID != "svc-123" {
+		t.Errorf("Expected service_id to be kept, got %q", serviceID)
+	}
+}
+
 // TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
 // refreshed, the rotated token is persisted with a non-zero Expiry derived from
 // the standard `expires_in` returned by the gateway.
@@ -484,10 +650,6 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID string) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
-
-	// Ensure no keys in environment
-	os.Unsetenv("TIGER_PUBLIC_KEY")
-	os.Unsetenv("TIGER_SECRET_KEY")
 
 	// Start mock server for OAuth endpoints
 	mockServer := startMockOAuthServer(t, projects)

@@ -9,11 +9,18 @@ import (
 	"syscall"
 
 	"github.com/timescale/tiger-cli/internal/cmd"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func main() {
 	if err := run(); err != nil {
-		// Check if it's a custom exit code error
+		// A common.ExitCodeError anywhere in the chain sets the exit code.
+		// Foreign carriers (psql's *exec.ExitError) count only unwrapped, so
+		// wrapped subprocess codes can't collide with tiger's exit codes.
+		var codeErr common.ExitCodeError
+		if errors.As(err, &codeErr) {
+			os.Exit(codeErr.ExitCode())
+		}
 		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
 			os.Exit(exitErr.ExitCode())
 		}
