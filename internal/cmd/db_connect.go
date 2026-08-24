@@ -228,9 +228,6 @@ func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
 
 // fetchReplicaSets retrieves the read replica sets for a service.
 func fetchReplicaSets(ctx context.Context, client api.ClientWithResponsesInterface, projectID, serviceID string) ([]api.ReadReplicaSet, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	resp, err := client.GetReplicaSetsWithResponse(ctx, projectID, serviceID)
 	if err != nil {
 		return nil, err

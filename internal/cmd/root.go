@@ -172,7 +172,7 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 	}
 	resultCh := make(chan checkResult, 1)
 	go func() {
-		result, err := version.CheckForUpdate(cfg)
+		result, err := version.CheckForUpdate(cmd.Context(), cfg)
 		resultCh <- checkResult{result: result, err: err}
 	}()
 

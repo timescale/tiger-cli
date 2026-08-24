@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -33,10 +31,7 @@ func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 				return err
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, serviceID)
+			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to list metric series: %w", err)
 			}

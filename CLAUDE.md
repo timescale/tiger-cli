@@ -340,6 +340,21 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   - Log fetching with pagination (FetchServiceLogs)
 - **Utilities**: `internal/util/` - Small utility functions with minimal dependencies (formatting, validation, password generation)
 
+### HTTP Requests
+
+All outgoing HTTP requests should use the shared `api.HTTPClient` defined in
+`internal/api/client_util.go`. This client has a built-in 30-second request
+timeout and sets the CLI's User-Agent on every request. `NewTigerClient` and
+`NewTigerClientWithToken` use it automatically. If you need to make HTTP
+requests outside of the API client, use `api.HTTPClient` directly rather than
+`http.DefaultClient` or creating a new `http.Client`.
+
+If a request needs a shorter timeout, set one via the context:
+```go
+ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
+defer cancel()
+```
+
 ### Configuration System
 
 The CLI uses a layered configuration approach:

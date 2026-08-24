@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -78,10 +77,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		slog.String("service_id", input.ServiceID))
 
 	// Make API call to start service
-	startCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	resp, err := client.StartServiceWithResponse(startCtx, projectID, input.ServiceID)
+	resp, err := client.StartServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStartOutput{}, fmt.Errorf("failed to start service: %w", err)
 	}

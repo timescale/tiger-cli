@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -80,8 +78,7 @@ Examples:
 				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
+			ctx := cmd.Context()
 
 			// Fetch service details
 			serviceResp, err := client.GetServiceWithResponse(ctx, projectID, serviceID)

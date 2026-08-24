@@ -90,10 +90,7 @@ func (s *Server) handleServiceLogs(ctx context.Context, req *mcp.CallToolRequest
 	)
 
 	// Fetch logs with pagination support
-	logsCtx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-
-	entries, err := common.FetchServiceLogs(logsCtx, common.FetchServiceLogsArgs{
+	entries, err := common.FetchServiceLogs(ctx, common.FetchServiceLogsArgs{
 		Client:    client,
 		ProjectID: projectID,
 		ServiceID: input.ServiceID,

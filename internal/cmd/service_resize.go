@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -96,10 +95,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Make API call to resize service
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.ResizeServiceWithResponse(ctx, projectID, serviceID, resizeReq)
+			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, serviceID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize service: %w", err)
 			}

@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"sync"
+	"runtime"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -13,38 +13,39 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// Shared HTTP client with resource limits to prevent resource exhaustion under load
-var (
-	httpClientOnce   sync.Once
-	sharedHTTPClient *http.Client
-)
+// HTTPClient is the shared HTTP client all outgoing requests should use,
+// giving every request a 30-second timeout and the CLI's User-Agent by
+// default. A call that needs a shorter bound should layer a
+// context.WithTimeout over the call rather than build a separate client; a
+// call that needs a longer one (e.g. downloading a large release archive) is
+// a legitimate reason to use a dedicated client instead.
+var HTTPClient = &http.Client{
+	Timeout:   30 * time.Second,
+	Transport: userAgentTransport{},
+}
 
-// getHTTPClient returns a singleton HTTP client with essential resource limits
-// Focuses on preventing resource leaks while using reasonable Go defaults elsewhere
-func getHTTPClient() *http.Client {
-	httpClientOnce.Do(func() {
-		// Clone default transport to inherit sensible defaults, then customize key settings
-		transport := http.DefaultTransport.(*http.Transport).Clone()
+// userAgentTransport stamps the CLI's User-Agent onto every outgoing request.
+// It's HTTPClient's Transport, so anything built on HTTPClient gets it for
+// free — including a Bearer-authenticated client's requests and its token
+// refreshes, both of which route through this same Transport (see
+// NewTigerClientWithToken).
+type userAgentTransport struct{}
 
-		// Essential resource limits to prevent exhaustion
-		transport.MaxIdleConns = 100                 // Limit total idle connections
-		transport.MaxIdleConnsPerHost = 10           // Limit per-host idle connections
-		transport.IdleConnTimeout = 90 * time.Second // Clean up idle connections
+func (userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("User-Agent", userAgent())
+	return http.DefaultTransport.RoundTrip(req)
+}
 
-		sharedHTTPClient = &http.Client{
-			Transport: transport,
-			Timeout:   30 * time.Second, // Overall request timeout
-		}
-	})
-	return sharedHTTPClient
+// userAgent returns the User-Agent the CLI sends on HTTP requests.
+func userAgent() string {
+	return fmt.Sprintf("tiger-cli/%s (%s/%s)", config.Version, runtime.GOOS, runtime.GOARCH)
 }
 
 // apiKey must be in "publicKey:secretKey" format.
 func NewTigerClient(cfg *config.Config, apiKey string) (*ClientWithResponses, error) {
 	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(apiKey))
-	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(getHTTPClient()), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(HTTPClient), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", authHeader)
-		req.Header.Set("User-Agent", config.UserAgent())
 		return nil
 	}))
 	if err != nil {
@@ -70,8 +71,11 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 		},
 	}
 
-	// Stash our pooled client in the context.
-	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, getHTTPClient())
+	// Stash our shared client in the context: oauth2 uses it both for token
+	// refresh requests and to seed the Base transport (and Timeout) of the
+	// *http.Client returned by oauth2.NewClient below, so the returned
+	// client's ordinary API requests get our 30s timeout and User-Agent too.
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, HTTPClient)
 
 	var src oauth2.TokenSource = oauthCfg.TokenSource(ctx, token)
 	if persist != nil {
@@ -79,12 +83,8 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 	}
 
 	httpClient := oauth2.NewClient(ctx, src)
-	httpClient.Timeout = 30 * time.Second
 
-	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient), WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
-		req.Header.Set("User-Agent", config.UserAgent())
-		return nil
-	}))
+	client, err := NewClientWithResponses(cfg.APIURL, WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client: %w", err)
 	}

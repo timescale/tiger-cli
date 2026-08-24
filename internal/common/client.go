@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/api"
@@ -84,9 +83,6 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 // analytics. Only PAT credentials reach this path, so the response always
 // carries the apiKey branch.
 func ValidateAPIKey(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	resp, err := client.GetAuthInfoWithResponse(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("API call failed: %w", err)
@@ -128,9 +124,6 @@ func IdentifyOAuthUser(ctx context.Context, cfg *config.Config, client api.Clien
 	if !a.Enabled() {
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 
 	resp, err := client.GetAuthInfoWithResponse(ctx)
 	if err != nil || resp.JSON200 == nil || resp.JSON200.Oauth == nil {

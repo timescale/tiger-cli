@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -79,9 +78,6 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	updateReq := api.UpdatePasswordInput{
 		Password: input.Password,
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 
 	// Fetch first so we can reject read replicas and reuse the service for
 	// password storage below.

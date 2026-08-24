@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -56,14 +54,11 @@ func revokeOAuthSession(cmd *cobra.Command, app *common.App, cfg *config.Config)
 	}
 	app.SetClient(client, stored.ProjectID)
 
-	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
-	defer cancel()
-
 	body := api.LogoutJSONRequestBody{}
 	if rt := stored.OAuth.RefreshToken; rt != "" {
 		body.RefreshToken = &rt
 	}
-	if _, err := client.LogoutWithResponse(ctx, body); err != nil {
+	if _, err := client.LogoutWithResponse(cmd.Context(), body); err != nil {
 		cmd.PrintErrf("warning: server-side logout failed: %v\n", err)
 	}
 }

@@ -1,6 +1,7 @@
 package version
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -233,7 +234,7 @@ func TestFetchLatestVersion(t *testing.T) {
 			defer server.Close()
 
 			// Test fetchLatestVersion
-			got, err := fetchLatestVersion(server.URL)
+			got, err := fetchLatestVersion(context.Background(), server.URL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("fetchLatestVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -285,7 +286,7 @@ func TestCheckForUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := checkVersionForUpdate(tt.currentVersion, cfg)
+			result, err := checkVersionForUpdate(context.Background(), tt.currentVersion, cfg)
 			if err != nil {
 				t.Errorf("checkVersionForUpdate() error = %v", err)
 				return

@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -53,10 +51,7 @@ Examples:
 			}
 
 			// Make API call to get service details
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetServiceWithResponse(ctx, projectID, serviceID)
+			resp, err := client.GetServiceWithResponse(cmd.Context(), projectID, serviceID)
 			if err != nil {
 				return fmt.Errorf("failed to get service details: %w", err)
 			}

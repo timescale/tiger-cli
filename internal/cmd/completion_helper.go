@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -61,10 +59,7 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	}
 
 	// Make API call to list services
-	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-	defer cancel()
-
-	resp, err := client.GetServicesWithResponse(ctx, projectID)
+	resp, err := client.GetServicesWithResponse(cmd.Context(), projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list services: %w", err)
 	}

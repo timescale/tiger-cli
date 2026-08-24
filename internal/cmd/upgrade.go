@@ -95,7 +95,7 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 		return err
 	}
 
-	result, err := version.CheckForUpdate(cfg)
+	result, err := version.CheckForUpdate(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to check for latest version: %w", err)
 	}
