@@ -84,6 +84,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
 			if roleName == "" {
@@ -92,7 +93,6 @@ PostgreSQL Configuration Parameters That May Be Set:
 
 			cfg, _, _, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 

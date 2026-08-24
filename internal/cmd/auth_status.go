@@ -28,9 +28,8 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg, client, _, err := app.GetAll()
 			if err != nil {
 				if errors.Is(err, config.ErrNotLoggedIn) {

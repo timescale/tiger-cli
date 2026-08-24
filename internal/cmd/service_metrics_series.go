@@ -53,7 +53,8 @@ Examples:
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --filter ordinal=0`,
-		Args: cobra.MaximumNArgs(1),
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
@@ -71,7 +72,6 @@ Examples:
 
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -79,8 +79,6 @@ Examples:
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			body := api.MetricsSeriesRequest{
 				Name: metric,

@@ -88,9 +88,8 @@ Examples:
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg, _, _, err := app.GetAll()
 			if err != nil {
 				return err

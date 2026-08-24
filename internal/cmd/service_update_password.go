@@ -54,15 +54,14 @@ Examples:
   tiger service update-password --auto-generate`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
 			if err := common.CheckReadOnly(cfg); err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -80,8 +79,6 @@ Examples:
 			if autoGenerate && password != "" {
 				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
-
-			cmd.SilenceUsage = true
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 			defer cancel()

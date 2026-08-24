@@ -18,8 +18,8 @@ Examples:
   tiger mcp start stdio`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
 			return startStdioServer(cmd, app)
 		},
 	}

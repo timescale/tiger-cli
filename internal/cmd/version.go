@@ -32,9 +32,8 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 		Long:              `Display version, build time, and git commit information for the Tiger CLI`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
-
 			cfg := app.GetConfig()
 
 			versionOutput := VersionOutput{

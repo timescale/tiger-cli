@@ -58,15 +58,14 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
 			if err := common.CheckReadOnly(cfg); err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -86,8 +85,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if cpuMemoryCfg == nil {
 				return fmt.Errorf("must specify at least one of --cpu or --memory")
 			}
-
-			cmd.SilenceUsage = true
 
 			// Display resize information
 			cmd.PrintErrf("📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)

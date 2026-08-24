@@ -51,10 +51,10 @@ Examples:
   tiger service logs --tail 1000`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
-				cmd.SilenceUsage = true
 				return err
 			}
 
@@ -63,8 +63,6 @@ Examples:
 			if err != nil {
 				return err
 			}
-
-			cmd.SilenceUsage = true
 
 			// Prepare parameters
 			var sincePtr *time.Time
