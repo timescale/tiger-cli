@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -318,6 +317,25 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 	}
 }
 
+// assertOAuthLoginOutput checks the OAuth login flow's full output: the auth
+// URL, the browser message, and the success line naming projectID.
+func assertOAuthLoginOutput(t *testing.T, output, mockServerURL, projectID string) {
+	t.Helper()
+
+	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
+		`Opening browser for authentication\.\.\.\n`+
+		`Successfully logged in \(project: %s\)\n`+
+		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL), regexp.QuoteMeta(projectID))
+
+	matched, err := regexp.MatchString(expectedPattern, output)
+	if err != nil {
+		t.Fatalf("Regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
+	}
+}
+
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	mockServerURL := setupOAuthTest(t, []api.Project{
 		{ID: "project-123", Name: "Test Project"},
@@ -330,37 +348,10 @@ func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
-		`Opening browser for authentication\.\.\.\n`+
-		`Successfully logged in \(project: project-123\)\n`+
-		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
+	assertOAuthLoginOutput(t, output, mockServerURL, "project-123")
 
-	matched, err := regexp.MatchString(expectedPattern, output)
-	if err != nil {
-		t.Fatalf("Regex compilation failed: %v", err)
-	}
-	if !matched {
-		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
-	}
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
-	}
-	token, projectID := stored.OAuth, stored.ProjectID
-	if token.AccessToken != "mock-access-token-12345" {
-		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
-	}
-	if token.RefreshToken != "mock-refresh-token-67890" {
-		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
-	}
-	assertExpiresInAbout(t, token.Expiry)
-	if projectID != "project-123" {
-		t.Errorf("Expected project ID 'project-123', got '%s'", projectID)
-	}
+	stored := assertStoredProject(t, "project-123")
+	assertExpiresInAbout(t, stored.OAuth.Expiry)
 }
 
 func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
@@ -387,37 +378,10 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
-		`Opening browser for authentication\.\.\.\n`+
-		`Successfully logged in \(project: project-789\)\n`+
-		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
+	assertOAuthLoginOutput(t, output, mockServerURL, "project-789")
 
-	matched, err := regexp.MatchString(expectedPattern, output)
-	if err != nil {
-		t.Fatalf("Regex compilation failed: %v", err)
-	}
-	if !matched {
-		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
-	}
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
-	}
-	token, projectID := stored.OAuth, stored.ProjectID
-	if token.AccessToken != "mock-access-token-12345" {
-		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
-	}
-	if token.RefreshToken != "mock-refresh-token-67890" {
-		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
-	}
-	assertExpiresInAbout(t, token.Expiry)
-	if projectID != "project-789" {
-		t.Errorf("Expected project ID 'project-789', got '%s'", projectID)
-	}
+	stored := assertStoredProject(t, "project-789")
+	assertExpiresInAbout(t, stored.OAuth.Expiry)
 }
 
 // TestAuthLogin_OAuth_ProjectIDFlag verifies --project-id replaces the picker,
@@ -425,12 +389,9 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 func TestAuthLogin_OAuth_ProjectIDFlag(t *testing.T) {
 	setupOAuthTest(t, testProjects)
 
-	// No TTY: the picker isn't available, and isn't needed
+	// No TTY: the picker isn't available, and isn't needed. If --project-id
+	// were ignored, resolveProjectID's TTY gate would fail the login.
 	stubIsTerminal(t, false)
-	stubSelectProject(t, func(*cobra.Command, []api.Project) (api.Project, error) {
-		t.Error("Project picker should not run when --project-id is set")
-		return api.Project{}, errors.New("unexpected picker")
-	})
 
 	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-456")
 	if err != nil {
@@ -440,16 +401,7 @@ func TestAuthLogin_OAuth_ProjectIDFlag(t *testing.T) {
 		t.Errorf("Unexpected output: %q", output)
 	}
 
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
-	}
-	if stored.ProjectID != "project-456" {
-		t.Errorf("Expected project ID 'project-456', got '%s'", stored.ProjectID)
-	}
+	assertStoredProject(t, "project-456")
 }
 
 // TestAuthLogin_OAuth_ProjectIDEnvVar verifies TIGER_PROJECT_ID works like the
@@ -468,13 +420,7 @@ func TestAuthLogin_OAuth_ProjectIDEnvVar(t *testing.T) {
 		t.Errorf("Unexpected output: %q", output)
 	}
 
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.ProjectID != "project-789" {
-		t.Errorf("Expected project ID 'project-789', got '%s'", stored.ProjectID)
-	}
+	assertStoredProject(t, "project-789")
 }
 
 func TestAuthLogin_OAuth_ProjectIDFlag_Inaccessible(t *testing.T) {
@@ -512,13 +458,8 @@ func TestAuthLogin_OAuth_ProjectIDEnvVar_Inaccessible(t *testing.T) {
 		t.Errorf("Expected a warning about the ignored env var, got: %q", output)
 	}
 
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.ProjectID != "project-123" {
-		t.Errorf("Expected fallback to the single accessible project, got %q", stored.ProjectID)
-	}
+	// Falls back to the single accessible project
+	assertStoredProject(t, "project-123")
 }
 
 // TestAuthLogin_APIKey_ProjectIDEmptyFlagEnvMismatch verifies an explicitly
@@ -631,19 +572,11 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Store an already-expired OAuth token that still has a valid refresh token.
-	expired := &oauth2.Token{
-		AccessToken:  "stale-access-token",
-		RefreshToken: "mock-refresh-token-67890",
-		Expiry:       time.Now().Add(-time.Hour),
-	}
 	// The config file above points api_url/gateway_url at the mock server, and
 	// carries the test config dir so the refreshed token is persisted there.
-	cfg := testConfig(t)
-	if err := cfg.StoreOAuthCredentials(expired, "project-789"); err != nil {
-		t.Fatalf("Failed to store oauth credentials: %v", err)
-	}
+	storeExpiredOAuthLogin(t, "project-789")
 
+	cfg := testConfig(t)
 	stored, err := cfg.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to load stored credentials: %v", err)

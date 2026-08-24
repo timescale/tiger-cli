@@ -37,9 +37,22 @@ func testOAuthToken() *oauth2.Token {
 	}
 }
 
-// assertStoredProject checks the stored credentials still hold an OAuth session
-// and name the expected project.
-func assertStoredProject(t *testing.T, expectedProjectID string) {
+// storeExpiredOAuthLogin stores an OAuth login for projectID whose access
+// token is expired but still refreshable, so any API request mints a new one.
+func storeExpiredOAuthLogin(t *testing.T, projectID string) {
+	t.Helper()
+
+	expired := testOAuthToken()
+	expired.AccessToken = "stale-access-token"
+	expired.Expiry = time.Now().Add(-time.Hour)
+	if err := testConfig(t).StoreOAuthCredentials(expired, projectID); err != nil {
+		t.Fatalf("Failed to store oauth credentials: %v", err)
+	}
+}
+
+// assertStoredProject checks the stored credentials hold an OAuth session with
+// the mock's tokens and the expected project, returning them for extra checks.
+func assertStoredProject(t *testing.T, expectedProjectID string) *config.Credentials {
 	t.Helper()
 
 	stored, err := testConfig(t).GetStoredCredentials()
@@ -47,17 +60,18 @@ func assertStoredProject(t *testing.T, expectedProjectID string) {
 		t.Fatalf("Failed to get stored credentials: %v", err)
 	}
 	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials to remain stored, got: %+v", stored)
+		t.Fatalf("Expected OAuth credentials to be stored, got: %+v", stored)
 	}
 	if stored.OAuth.AccessToken != "mock-access-token-12345" {
-		t.Errorf("Expected access token to be preserved, got %q", stored.OAuth.AccessToken)
+		t.Errorf("Expected the mock's access token, got %q", stored.OAuth.AccessToken)
 	}
 	if stored.OAuth.RefreshToken != "mock-refresh-token-67890" {
-		t.Errorf("Expected refresh token to be preserved, got %q", stored.OAuth.RefreshToken)
+		t.Errorf("Expected the mock's refresh token, got %q", stored.OAuth.RefreshToken)
 	}
 	if stored.ProjectID != expectedProjectID {
 		t.Errorf("Expected project ID %q, got %q", expectedProjectID, stored.ProjectID)
 	}
+	return stored
 }
 
 func TestProject_SwitchByArgument(t *testing.T) {
@@ -81,13 +95,7 @@ func TestProject_SwitchByArgument(t *testing.T) {
 // that rotated token rather than the stale copy it read on the way in.
 func TestProject_PreservesRefreshedToken(t *testing.T) {
 	setupProjectTest(t, testProjects, "")
-
-	expired := testOAuthToken()
-	expired.AccessToken = "stale-access-token"
-	expired.Expiry = time.Now().Add(-time.Hour)
-	if err := testConfig(t).StoreOAuthCredentials(expired, "project-123"); err != nil {
-		t.Fatalf("Failed to store oauth credentials: %v", err)
-	}
+	storeExpiredOAuthLogin(t, "project-123")
 
 	if _, err := executeAuthCommand(t.Context(), "project", "project-456"); err != nil {
 		t.Fatalf("Switching projects failed: %v", err)
@@ -110,12 +118,7 @@ func TestProject_SurvivesPostSwitchRefresh(t *testing.T) {
 	mockShortLivedRotatingTokens(t)
 	t.Setenv("TIGER_ANALYTICS", "true")
 
-	expired := testOAuthToken()
-	expired.AccessToken = "stale-access-token"
-	expired.Expiry = time.Now().Add(-time.Hour)
-	if err := testConfig(t).StoreOAuthCredentials(expired, "project-123"); err != nil {
-		t.Fatalf("Failed to store oauth credentials: %v", err)
-	}
+	storeExpiredOAuthLogin(t, "project-123")
 
 	if _, err := executeAuthCommand(t.Context(), "project", "project-456"); err != nil {
 		t.Fatalf("Switching projects failed: %v", err)
