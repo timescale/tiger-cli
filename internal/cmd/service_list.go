@@ -71,6 +71,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
 
 	return cmd
 }

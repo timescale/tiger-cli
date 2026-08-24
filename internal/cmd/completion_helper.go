@@ -82,12 +82,75 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 }
 
 func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// Config option is always first positional argument
-	if len(args) > 0 {
+	switch len(args) {
+	case 0:
+		// Completing the key
+		return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+	case 1:
+		// Completing the value, based on the key already typed
+		return filterCompletionsByPrefix(config.ValidConfigOptionValues(args[0]), toComplete), cobra.ShellCompDirectiveNoFileComp
+	default:
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+}
 
-	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+// validEnvironmentTags are the accepted values for --environment on `service
+// create` and `service fork`.
+var validEnvironmentTags = []string{"DEV", "PROD"}
+
+var environmentCompletion = cobra.FixedCompletions(validEnvironmentTags, cobra.ShellCompDirectiveNoFileComp)
+
+// addonsCompletion completes --addons on `service create`, drawn from the
+// same list used to validate it (common.ValidateAddons).
+var addonsCompletion = cobra.FixedCompletions(append(common.ValidAddons(), common.AddonNone), cobra.ShellCompDirectiveNoFileComp)
+
+// passwordStorageCompletion completes the global --password-storage flag,
+// drawn from the same list used to validate `tiger config set password_storage`.
+var passwordStorageCompletion = cobra.FixedCompletions(config.ValidPasswordStorageOptions(), cobra.ShellCompDirectiveNoFileComp)
+
+// metricsSeriesRoleCompletion completes --role on `service metrics series`.
+var metricsSeriesRoleCompletion = cobra.FixedCompletions([]string{"PRIMARY", "REPLICA"}, cobra.ShellCompDirectiveNoFileComp)
+
+// metricsSeriesFnCompletion completes --fn on `service metrics series`, drawn
+// from the generated MetricsSeriesRequestFn enum.
+var metricsSeriesFnCompletion = cobra.FixedCompletions([]string{
+	string(api.MetricsSeriesRequestFnAVG),
+	string(api.MetricsSeriesRequestFnCOUNT),
+	string(api.MetricsSeriesRequestFnINCREASE),
+	string(api.MetricsSeriesRequestFnLAST),
+	string(api.MetricsSeriesRequestFnMAX),
+	string(api.MetricsSeriesRequestFnMIN),
+	string(api.MetricsSeriesRequestFnP50),
+	string(api.MetricsSeriesRequestFnP90),
+	string(api.MetricsSeriesRequestFnP99),
+	string(api.MetricsSeriesRequestFnRATE),
+	string(api.MetricsSeriesRequestFnSUM),
+}, cobra.ShellCompDirectiveNoFileComp)
+
+// outputCompletion returns a completion func for --output/-o flags. extra
+// lists any command-specific formats beyond the universal json/yaml/table
+// (e.g. "env" on `service create/get/fork`, "bare" on `version`).
+func outputCompletion(extra ...string) cobra.CompletionFunc {
+	return cobra.FixedCompletions(config.ValidOutputFormats(extra...), cobra.ShellCompDirectiveNoFileComp)
+}
+
+// cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
+// drawn from the same allowed configurations used to validate the pair
+// (common.ValidateAndNormalizeCPUMemory).
+func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
+	values := make([]string, 0, len(configs))
+	for _, c := range configs {
+		values = append(values, *c.CPUMillisString())
+	}
+	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func memoryCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
+	values := make([]string, 0, len(configs))
+	for _, c := range configs {
+		values = append(values, *c.MemoryGBsString())
+	}
+	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
 }
 
 // mcpGetCompletion provides custom completions for the get command
