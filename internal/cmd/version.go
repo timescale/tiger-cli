@@ -46,7 +46,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 
 			updateAvailable := false
 			if checkVersion {
-				result, err := version.CheckForUpdate(cfg)
+				result, err := version.CheckForUpdate(cmd.Context(), cfg)
 				if err != nil {
 					// A failed check shouldn't fail the version command; warn and
 					// continue printing the local version info.

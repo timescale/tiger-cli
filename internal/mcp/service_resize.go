@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -100,9 +99,6 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	// Make API call to resize service
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	resp, err := client.ResizeServiceWithResponse(ctx, projectID, input.ServiceID, resizeReq)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, fmt.Errorf("failed to resize service: %w", err)

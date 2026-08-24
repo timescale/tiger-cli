@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
@@ -58,8 +59,8 @@ func (s *Server) registerDocsProxy(ctx context.Context) {
 		return
 	}
 
-	// Create timeout for establishing proxy
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	// Create timeout for establishing proxy (matches Ghost)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	proxyClient, err := NewProxyClient(ctx, cfg.DocsMCPURL, s.logger)
@@ -109,7 +110,8 @@ type ProxyClient struct {
 // NewProxyClient creates a new proxy client for the given remote server configuration
 func NewProxyClient(ctx context.Context, url string, logger *slog.Logger) (*ProxyClient, error) {
 	transport := &mcp.StreamableClientTransport{
-		Endpoint: url,
+		Endpoint:   url,
+		HTTPClient: api.HTTPClient,
 	}
 
 	client := mcp.NewClient(&mcp.Implementation{

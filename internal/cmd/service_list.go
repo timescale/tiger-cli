@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -35,10 +33,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			}
 
 			// Make API call to list services
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetServicesWithResponse(ctx, projectID)
+			resp, err := client.GetServicesWithResponse(cmd.Context(), projectID)
 			if err != nil {
 				return fmt.Errorf("failed to list services: %w", err)
 			}

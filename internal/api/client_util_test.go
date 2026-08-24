@@ -2,8 +2,10 @@ package api_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -50,7 +52,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	}
 
 	// Verify the User-Agent header was set correctly
-	expectedUserAgent := config.UserAgent()
+	expectedUserAgent := fmt.Sprintf("tiger-cli/%s (%s/%s)", config.Version, runtime.GOOS, runtime.GOARCH)
 	if capturedUserAgent != expectedUserAgent {
 		t.Errorf("Expected User-Agent %q, got %q", expectedUserAgent, capturedUserAgent)
 	}

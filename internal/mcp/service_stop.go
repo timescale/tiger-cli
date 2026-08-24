@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -78,10 +77,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		slog.String("service_id", input.ServiceID))
 
 	// Make API call to stop service
-	stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	resp, err := client.StopServiceWithResponse(stopCtx, projectID, input.ServiceID)
+	resp, err := client.StopServiceWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceStopOutput{}, fmt.Errorf("failed to stop service: %w", err)
 	}

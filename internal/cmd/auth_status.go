@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -39,10 +37,7 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 			}
 
 			// Make API call to get auth information
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetAuthInfoWithResponse(ctx)
+			resp, err := client.GetAuthInfoWithResponse(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("failed to get auth information: %w", err)
 			}
