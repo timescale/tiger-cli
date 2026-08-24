@@ -81,7 +81,18 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	return *resp.JSON200, nil
 }
 
-func configOptionCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+// configKeyCompletion completes the <key> argument of `tiger config unset`,
+// which takes no value argument.
+func configKeyCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+// configKeyValueCompletion completes the <key> and <value> arguments of
+// `tiger config set`.
+func configKeyValueCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	switch len(args) {
 	case 0:
 		// Completing the key
