@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"time"
-
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -47,9 +44,7 @@ func lookupConnectionTarget(cmd *cobra.Command, app *common.App, args []string) 
 
 	// The API resolves both primary and read replica IDs via GetService; a read
 	// replica comes back linked to its parent, whose credentials it shares.
-	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-	defer cancel()
-	return common.ResolveConnectionTarget(ctx, client, projectID, service)
+	return common.ResolveConnectionTarget(cmd.Context(), client, projectID, service)
 }
 
 // warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
@@ -80,10 +75,7 @@ func getServiceDetails(cmd *cobra.Command, app *common.App, args []string) (api.
 		return api.Service{}, err
 	}
 
-	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-	defer cancel()
-
-	service, err := common.GetService(ctx, client, projectID, serviceID)
+	service, err := common.GetService(cmd.Context(), client, projectID, serviceID)
 	if err != nil {
 		return api.Service{}, err
 	}

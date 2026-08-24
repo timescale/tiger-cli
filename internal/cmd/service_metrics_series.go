@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -97,10 +96,7 @@ Examples:
 				body.Filters = &labelFilters
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, serviceID, body)
+			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, serviceID, body)
 			if err != nil {
 				return fmt.Errorf("failed to fetch metric series: %w", err)
 			}

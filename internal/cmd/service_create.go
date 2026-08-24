@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -140,16 +139,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Make API call to create service
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
 			// All status messages go to stderr
 			if cmd.Flags().Changed("name") {
 				cmd.PrintErrf("🚀 Creating service '%s'...\n", createServiceName)
 			} else {
 				cmd.PrintErrf("🚀 Creating service '%s' (auto-generated name)...\n", createServiceName)
 			}
-			resp, err := client.CreateServiceWithResponse(ctx, projectID, serviceCreateReq)
+			resp, err := client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq)
 			if err != nil {
 				return fmt.Errorf("failed to create Service: %w", err)
 			}

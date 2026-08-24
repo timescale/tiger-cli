@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -115,9 +114,6 @@ Examples:
 				return err
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
 			// Use provided custom values, validate against allowed combinations
 			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
 			if err != nil {
@@ -170,7 +166,7 @@ Examples:
 			}
 
 			// Make API call to fork service
-			forkResp, err := client.ForkServiceWithResponse(ctx, projectID, serviceID, forkReq)
+			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, serviceID, forkReq)
 			if err != nil {
 				return fmt.Errorf("failed to fork Service: %w", err)
 			}

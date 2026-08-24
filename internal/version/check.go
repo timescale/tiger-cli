@@ -1,6 +1,7 @@
 package version
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/cli/safeexec"
 	"github.com/fatih/color"
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -39,13 +41,18 @@ type CheckResult struct {
 	UpdateCommand   string
 }
 
-// FetchLatestVersion downloads the latest version string from the given URL
-func fetchLatestVersion(checkURL string) (string, error) {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
+// FetchLatestVersion downloads the latest version string from the given URL.
+// Bounded to 5 seconds (shorter than api.HTTPClient's default) since this
+// runs in the background on every command invocation and shouldn't be felt.
+func fetchLatestVersion(ctx context.Context, checkURL string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-	resp, err := client.Get(checkURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to build request: %w", err)
+	}
+	resp, err := api.HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch latest version: %w", err)
 	}
@@ -181,8 +188,8 @@ func getUpdateCommand(method InstallMethod) string {
 	}
 }
 
-func checkVersionForUpdate(version string, cfg *config.Config) (*CheckResult, error) {
-	latestVersion, err := fetchLatestVersion(cfg.ReleasesURL + "/latest.txt")
+func checkVersionForUpdate(ctx context.Context, version string, cfg *config.Config) (*CheckResult, error) {
+	latestVersion, err := fetchLatestVersion(ctx, cfg.ReleasesURL+"/latest.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +221,8 @@ func checkVersionForUpdate(version string, cfg *config.Config) (*CheckResult, er
 // Note: CheckResult.LatestVersion has its leading "v" trimmed (for display and
 // comparison). Callers that need the release tag used in download paths (e.g.
 // releases/v1.2.3/) must re-add the "v" prefix.
-func CheckForUpdate(cfg *config.Config) (*CheckResult, error) {
-	return checkVersionForUpdate(config.Version, cfg)
+func CheckForUpdate(ctx context.Context, cfg *config.Config) (*CheckResult, error) {
+	return checkVersionForUpdate(ctx, config.Version, cfg)
 }
 
 // PrintUpdateWarning writes a warning to output if an update is available.

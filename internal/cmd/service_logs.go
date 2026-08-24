@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -83,10 +82,7 @@ Examples:
 			}
 
 			// Fetch logs with pagination support
-			ctx, cancel := context.WithTimeout(cmd.Context(), time.Minute)
-			defer cancel()
-
-			logs, err := common.FetchServiceLogs(ctx, common.FetchServiceLogsArgs{
+			logs, err := common.FetchServiceLogs(cmd.Context(), common.FetchServiceLogsArgs{
 				Client:    client,
 				ProjectID: projectID,
 				ServiceID: serviceID,

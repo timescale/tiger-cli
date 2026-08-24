@@ -155,10 +155,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	}
 
 	// Make API call to fork service
-	forkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	resp, err := client.ForkServiceWithResponse(forkCtx, projectID, input.ServiceID, forkReq)
+	resp, err := client.ForkServiceWithResponse(ctx, projectID, input.ServiceID, forkReq)
 	if err != nil {
 		return nil, ServiceForkOutput{}, fmt.Errorf("failed to fork service: %w", err)
 	}

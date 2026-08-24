@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -74,9 +73,6 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	s.logger.Info("MCP: Listing services", slog.String("project_id", projectID))
 
 	// Make API call to list services
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	resp, err := client.GetServicesWithResponse(ctx, projectID)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)

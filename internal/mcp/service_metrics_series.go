@@ -145,9 +145,6 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		body.Filters = &filters
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch metric series: %w", err)

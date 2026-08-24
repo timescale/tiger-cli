@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -61,9 +60,6 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 		slog.String("project_id", projectID),
 		slog.String("service_id", input.ServiceID),
 	)
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 
 	resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
