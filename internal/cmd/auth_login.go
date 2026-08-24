@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
-	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
@@ -100,6 +99,13 @@ Examples:
 			}
 			requestedProjectID := flagOrEnvVar(projectIDFlag, "TIGER_PROJECT_ID")
 
+			// Captured before the login replaces it: landing on a different
+			// project clears the default service, like `tiger project` does.
+			prevProjectID := ""
+			if stored, err := cfg.GetStoredCredentials(); err == nil {
+				prevProjectID = stored.ProjectID
+			}
+
 			if creds.publicKey == "" && creds.secretKey == "" {
 				l := &oauthLogin{
 					cfg:               cfg,
@@ -124,6 +130,9 @@ Examples:
 				app.SetClient(client, projectID)
 				// Identify the user for analytics.
 				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
+				if err := clearStaleDefaultService(cmd, cfg, prevProjectID, projectID); err != nil {
+					return err
+				}
 				finishLogin(cmd, projectID)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
@@ -153,10 +162,10 @@ Examples:
 			// flagOrEnvVar above.
 			if requestedProjectID != "" && requestedProjectID != authInfo.APIKey.Project.ID {
 				if projectIDFlag != "" {
+					// No project IDs in the message — analytics records error
+					// text verbatim; `tiger auth status` shows the key's project.
 					return common.ExitWithCode(common.ExitInvalidParameters,
-						analytics.RedactError(
-							fmt.Errorf("API key is scoped to project %s, not the requested %s", authInfo.APIKey.Project.ID, requestedProjectID),
-							"API key is scoped to a different project than requested"))
+						errors.New("API key is scoped to a different project than the requested one"))
 				}
 				cmd.PrintErrf("Warning: ignoring TIGER_PROJECT_ID (%s) - this API key is scoped to project %s\n", requestedProjectID, authInfo.APIKey.Project.ID)
 			}
@@ -166,6 +175,9 @@ Examples:
 			// See the OAuth branch above: keep the App's client in sync with the
 			// credentials we just stored.
 			app.SetClient(client, authInfo.APIKey.Project.ID)
+			if err := clearStaleDefaultService(cmd, cfg, prevProjectID, authInfo.APIKey.Project.ID); err != nil {
+				return err
+			}
 			finishLogin(cmd, authInfo.APIKey.Project.ID)
 			return nil
 		},

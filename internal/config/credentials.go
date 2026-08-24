@@ -127,14 +127,17 @@ func (c *Config) storeCredentials(creds storedCredentials) error {
 	if keyringErr == nil {
 		return nil
 	}
-	// loadCredentialsBlob prefers the keyring, so an entry we can read but
-	// not overwrite would shadow the file fallback on every later read.
+	if err := c.storeToFile(string(credentialsJSON)); err != nil {
+		return err
+	}
+	// A readable-but-unwritable keyring entry would shadow the file just
+	// written; deleted only now so a failure never destroys the sole copy.
 	if _, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
 		if err := keyring.Delete(GetServiceName(), keyringUsername); err != nil {
 			return fmt.Errorf("failed to store credentials in keyring (%v) or to remove the stale keyring entry shadowing the file fallback: %w", keyringErr, err)
 		}
 	}
-	return c.storeToFile(string(credentialsJSON))
+	return nil
 }
 
 func storeToKeyring(credentials string) error {
@@ -216,14 +219,23 @@ func (c *Config) loadCredentialsBlob() (string, error) {
 
 // RemoveCredentials removes stored credentials from keyring and file fallback
 func (c *Config) RemoveCredentials() error {
-	// Remove from keyring (ignore errors as it might not exist)
-	removeCredentialsFromKeyring()
+	if err := removeCredentialsFromKeyring(); err != nil {
+		return err
+	}
 	return c.removeCredentialsFile()
 }
 
-// removeCredentialsFromKeyring removes credentials from keyring (test helper)
-func removeCredentialsFromKeyring() {
-	keyring.Delete(GetServiceName(), keyringUsername)
+// removeCredentialsFromKeyring deletes the keyring entry. An entry still
+// readable after a failed delete would keep authenticating, so that errors.
+func removeCredentialsFromKeyring() error {
+	err := keyring.Delete(GetServiceName(), keyringUsername)
+	if err == nil {
+		return nil
+	}
+	if _, getErr := keyring.Get(GetServiceName(), keyringUsername); getErr == nil {
+		return fmt.Errorf("failed to remove credentials from keyring: %w", err)
+	}
+	return nil
 }
 
 // removeCredentialsFile removes credentials file

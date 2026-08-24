@@ -251,7 +251,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands return an error, and their MCP equivalents are not registered, so they don't appear in `tools/list` and can't be called. `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected — `tiger db schema` and the `db_schema` MCP tool always open a read-only session regardless of this setting. Default: `false`.
-- `service_id` - Default service ID. Cleared automatically by `tiger project`, since a service belongs to the project it was created in
+- `service_id` - Default service ID. Cleared automatically when the active project changes (`tiger project`, or `tiger auth login` landing on a different project), since a service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
 ### Environment Variables

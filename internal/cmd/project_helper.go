@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -9,9 +10,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -46,11 +47,10 @@ func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, non
 				return project, nil
 			}
 		}
-		// RedactError keeps the requested ID out of the analytics error property
+		// No project ID in the message — analytics records error text verbatim,
+		// and the user just typed the ID themselves.
 		return api.Project{}, common.ExitWithCode(common.ExitInvalidParameters,
-			analytics.RedactError(
-				fmt.Errorf("project %q not found or not accessible", requested),
-				"project not found or not accessible"))
+			errors.New("requested project not found or not accessible"))
 	}
 
 	switch len(projects) {
@@ -66,6 +66,28 @@ func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, non
 
 		return selectProjectInteractively(cmd, projects)
 	}
+}
+
+// clearStaleDefaultService unsets the config-file service_id when the stored
+// login moves between projects — a default service belongs to the project it
+// was set in. Only the config file is touched, so a flag or env var still wins.
+func clearStaleDefaultService(cmd *cobra.Command, cfg *config.Config, previousProjectID, newProjectID string) error {
+	if previousProjectID == "" || previousProjectID == newProjectID {
+		return nil
+	}
+
+	// An empty flag can hide a config-file default, so Unset runs regardless.
+	previous := cfg.ServiceID
+	if err := cfg.Unset("service_id"); err != nil {
+		return fmt.Errorf("failed to clear default service: %w", err)
+	}
+	switch {
+	case cfg.ServiceID != "":
+		cmd.PrintErrf("⚠️  Default service '%s' comes from a flag or environment variable and still points at the previous project.\n", cfg.ServiceID)
+	case previous != "":
+		cmd.PrintErrf("🎯 Cleared default service '%s' - it belongs to the previous project.\n", previous)
+	}
+	return nil
 }
 
 // describeProject renders a project for human-readable output.

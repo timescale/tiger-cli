@@ -96,13 +96,13 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 func NewTigerClientForCredentials(cfg *config.Config, creds *config.Credentials) (*ClientWithResponses, error) {
 	if creds.OAuth != nil {
 		persist := func(t *oauth2.Token) error {
-			// Re-read the stored project: `tiger project` may have repointed
-			// the login since this client was built; a refresh must not undo it.
-			projectID := creds.ProjectID
-			if stored, err := cfg.GetStoredCredentials(); err == nil {
-				projectID = stored.ProjectID
+			// Re-read storage: a concurrent `tiger project` switch must not
+			// be undone, and a replaced login must not be resurrected.
+			stored, err := cfg.GetStoredCredentials()
+			if err != nil || stored.OAuth == nil {
+				return nil
 			}
-			return cfg.StoreOAuthCredentials(t, projectID)
+			return cfg.StoreOAuthCredentials(t, stored.ProjectID)
 		}
 		return NewTigerClientWithToken(cfg, creds.OAuth, persist)
 	}

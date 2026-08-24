@@ -74,6 +74,19 @@ func assertStoredProject(t *testing.T, expectedProjectID string) *config.Credent
 	return stored
 }
 
+// assertServiceIDCleared checks the config file no longer holds a service_id.
+func assertServiceIDCleared(t *testing.T) {
+	t.Helper()
+
+	cfg, err := config.LoadForOutput(testConfigDir(t), false, true)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	if cfg.ServiceID != nil {
+		t.Errorf("Expected service_id to be removed from the config file, got %q", *cfg.ServiceID)
+	}
+}
+
 func TestProject_SwitchByArgument(t *testing.T) {
 	setupProjectTest(t, testProjects, "project-123")
 
@@ -149,14 +162,23 @@ func TestProject_ClearsDefaultService(t *testing.T) {
 		t.Errorf("Expected output to report the cleared default service, got %q", output)
 	}
 	assertStoredProject(t, "project-789")
+	assertServiceIDCleared(t)
+}
 
-	cfg, err := config.LoadForOutput(testConfigDir(t), false, true)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
+// TestProject_ClearsDefaultService_EmptyServiceIDFlag verifies an explicitly
+// empty --service-id flag can't hide the config-file default from the clearing.
+func TestProject_ClearsDefaultService_EmptyServiceIDFlag(t *testing.T) {
+	setupProjectTest(t, testProjects, "project-123")
+
+	if err := testConfig(t).Set("service_id", "svc1234567"); err != nil {
+		t.Fatalf("Failed to set default service: %v", err)
 	}
-	if cfg.ServiceID != nil {
-		t.Errorf("Expected service_id to be removed from the config file, got %q", *cfg.ServiceID)
+
+	if _, err := executeAuthCommand(t.Context(), "project", "project-456", "--service-id", ""); err != nil {
+		t.Fatalf("Switching projects failed: %v", err)
 	}
+
+	assertServiceIDCleared(t)
 }
 
 // TestProject_DefaultServiceFromEnvironment covers a default service that Unset
@@ -202,7 +224,7 @@ func TestProject_UnknownProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected switching to an inaccessible project to fail")
 	}
-	if !strings.Contains(err.Error(), `project "project-does-not-exist" not found or not accessible`) {
+	if !strings.Contains(err.Error(), "requested project not found or not accessible") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

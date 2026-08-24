@@ -430,7 +430,7 @@ func TestAuthLogin_OAuth_ProjectIDFlag_Inaccessible(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected login to fail for an inaccessible project")
 	}
-	if !strings.Contains(err.Error(), `project "project-nope" not found or not accessible`) {
+	if !strings.Contains(err.Error(), "requested project not found or not accessible") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	assertExitCode(t, err, common.ExitInvalidParameters)
@@ -462,6 +462,29 @@ func TestAuthLogin_OAuth_ProjectIDEnvVar_Inaccessible(t *testing.T) {
 	assertStoredProject(t, "project-123")
 }
 
+// TestAuthLogin_ClearsDefaultServiceOnProjectChange verifies a login that
+// lands on a different project clears the stored default service, like
+// `tiger project` does.
+func TestAuthLogin_ClearsDefaultServiceOnProjectChange(t *testing.T) {
+	setupProjectTest(t, testProjects, "project-123")
+
+	if err := testConfig(t).Set("service_id", "svc1234567"); err != nil {
+		t.Fatalf("Failed to set default service: %v", err)
+	}
+
+	stubIsTerminal(t, false)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Cleared default service 'svc1234567'") {
+		t.Errorf("Expected output to report the cleared default service, got %q", output)
+	}
+
+	assertServiceIDCleared(t)
+}
+
 // TestAuthLogin_OAuth_MultipleProjectsWithoutTTY verifies the error names the
 // non-interactive alternative instead of leaving the user stuck.
 func TestAuthLogin_OAuth_MultipleProjectsWithoutTTY(t *testing.T) {
@@ -489,7 +512,7 @@ func TestAuthLogin_APIKey_ProjectIDMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected login to fail when --project-id doesn't match the API key's project")
 	}
-	if !strings.Contains(err.Error(), "API key is scoped to project test-project-id, not the requested some-other-project") {
+	if !strings.Contains(err.Error(), "API key is scoped to a different project") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	assertExitCode(t, err, common.ExitInvalidParameters)
@@ -543,13 +566,13 @@ func TestAuthLogin_APIKey_ProjectIDMatches(t *testing.T) {
 	}
 }
 
-// TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
-// refreshed, the rotated token is persisted with a non-zero Expiry derived from
-// the standard `expires_in` returned by the gateway.
-func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
+// setupOAuthRefreshTest points the config at a mock token server and stores an
+// expired-but-refreshable OAuth login for projectID, returning a client whose
+// next API request refreshes and persists the token.
+func setupOAuthRefreshTest(t *testing.T, projectID string) *api.ClientWithResponses {
+	t.Helper()
 	tmpDir := setupAuthTest(t)
 
-	// Mock server backs the refresh_token grant (returns expires_in=3600).
 	mockServer := startMockOAuthServer(t, nil)
 	configFile := config.GetConfigFile(tmpDir)
 	configContent := fmt.Sprintf("gateway_url: \"%s\"\napi_url: \"%s\"\n", mockServer.URL, mockServer.URL)
@@ -557,24 +580,25 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// The config file above points api_url/gateway_url at the mock server, and
-	// carries the test config dir so the refreshed token is persisted there.
-	storeExpiredOAuthLogin(t, "project-789")
-
-	cfg := testConfig(t)
-	stored, err := cfg.GetStoredCredentials()
+	storeExpiredOAuthLogin(t, projectID)
+	stored, err := testConfig(t).GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to load stored credentials: %v", err)
 	}
-
-	client, err := api.NewTigerClientForCredentials(cfg, stored)
+	client, err := api.NewTigerClientForCredentials(testConfig(t), stored)
 	if err != nil {
 		t.Fatalf("Failed to build client: %v", err)
 	}
+	return client
+}
 
-	// Any request makes the oauth2 transport mint a token first; since the
-	// stored token is expired, that triggers a refresh + persist. The response
-	// status itself is irrelevant — we only care about the persisted token.
+// TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
+// refreshed, the rotated token is persisted with a non-zero Expiry derived from
+// the standard `expires_in` returned by the gateway.
+func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
+	client := setupOAuthRefreshTest(t, "project-789")
+
+	// The response status is irrelevant — only the persisted token matters.
 	if _, err := client.GetAuthInfoWithResponse(t.Context()); err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
@@ -590,6 +614,30 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 		t.Fatalf("Expected token to be refreshed, got access token %q", reloaded.OAuth.AccessToken)
 	}
 	assertExpiresInAbout(t, reloaded.OAuth.Expiry)
+}
+
+// TestOAuthRefresh_SkipsPersistAfterRelogin verifies a refresh from a client
+// built for an OAuth login doesn't overwrite credentials that a concurrent
+// `auth login` replaced with an API key.
+func TestOAuthRefresh_SkipsPersistAfterRelogin(t *testing.T) {
+	client := setupOAuthRefreshTest(t, "project-789")
+
+	// Another process replaces the login with an API key before the refresh.
+	if err := testConfig(t).StoreCredentials("public:secret", "project-other"); err != nil {
+		t.Fatalf("Failed to store API key credentials: %v", err)
+	}
+
+	if _, err := client.GetAuthInfoWithResponse(t.Context()); err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+
+	reloaded, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to reload credentials: %v", err)
+	}
+	if reloaded.APIKey != "public:secret" || reloaded.ProjectID != "project-other" {
+		t.Errorf("Expected the API key login to survive the refresh, got %+v", reloaded)
+	}
 }
 
 // setupOAuthTest creates a complete OAuth test environment with mock server and browser

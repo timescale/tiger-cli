@@ -302,7 +302,7 @@ The middleware automatically excludes sensitive fields using a centralized ignor
    Annotations: map[string]string{analytics.OmitArgsAnnotation: "true"},
    ```
 
-3. **For error messages:** The `error` event property records the command's error text verbatim. Wrap errors whose message embeds sensitive data with `analytics.RedactError(err, "safe message")` — the user sees the full message, analytics records the redacted one.
+3. **For error messages:** The `error` event property records the command's error text verbatim, so don't interpolate sensitive values (project IDs, keys, queries) into error messages. Echo them on stderr (`cmd.PrintErrf`) instead when the user needs them — stderr never reaches analytics.
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -323,7 +323,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
-  - `project.go` - `tiger project`, which switches the active project via `cfg.SwitchProject`. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. A switch clears the `service_id` config value (a default service belongs to its project) and reloads the App so later readers — analytics in particular — see the new project. `project_helper.go` holds the project fetching and selection shared with `auth login`. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
+  - `project.go` - `tiger project`, which switches the active project via `cfg.SwitchProject`. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. Any project change clears the `service_id` config value via `clearStaleDefaultService` — `auth login` calls it too, since a default service belongs to its project — and updates the App's client so later readers (analytics in particular) see the new project. `project_helper.go` holds the project fetching and selection shared with `auth login`. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see

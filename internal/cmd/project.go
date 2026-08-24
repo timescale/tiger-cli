@@ -80,25 +80,13 @@ Examples:
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
 
-			// The default service belongs to the project we just left. Unset
-			// clears only the config file, so a flag or env var wins again
-			// after the reload.
-			if previous := cfg.ServiceID; previous != "" {
-				if err := cfg.Unset("service_id"); err != nil {
-					return fmt.Errorf("failed to clear default service: %w", err)
-				}
-				if cfg.ServiceID != "" {
-					cmd.PrintErrf("⚠️  Default service '%s' comes from a flag or environment variable and still points at the previous project.\n", cfg.ServiceID)
-				} else {
-					cmd.PrintErrf("🎯 Cleared default service '%s' - it belongs to the previous project.\n", previous)
-				}
-			}
-
-			// Reload so later readers in this invocation — the trailing
-			// analytics event in particular — see the new project.
-			if _, _, _, err := app.Load(cmd.Context()); err != nil {
+			if err := clearStaleDefaultService(cmd, cfg, currentProjectID, project.ID); err != nil {
 				return err
 			}
+
+			// Later readers in this invocation — the trailing analytics event
+			// in particular — see the new project.
+			app.SetClient(client, project.ID)
 
 			cmd.Printf("Switched to project %s\n", describeProject(project))
 			return nil
