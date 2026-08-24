@@ -186,7 +186,7 @@ func selectConnection(
 	// Offer the replica menu only for a primary on an interactive terminal.
 	if !target.IsReplica && !noReplicaPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
 		primary := target.ConnectionService
-		replicas, err := fetchReplicaSets(ctx, client, projectID, util.DerefStr(primary.ServiceID))
+		replicas, err := fetchReplicaSets(ctx, client, projectID, primary.ServiceID)
 		if err != nil {
 			// Don't block the connection if we can't list replicas.
 			cmd.PrintErrf("Warning: could not list read replicas: %v\n", err)
@@ -210,7 +210,7 @@ func selectConnection(
 	}
 
 	if chosen.IsReplica {
-		cmd.PrintErrf("Connecting to read replica '%s'...\n", util.DerefStr(chosen.ConnectionService.Name))
+		cmd.PrintErrf("Connecting to read replica '%s'...\n", chosen.ConnectionService.Name)
 	}
 	return details, nil
 }
@@ -219,7 +219,7 @@ func selectConnection(
 func connectableReplicas(replicas []api.ReadReplicaSet) []api.ReadReplicaSet {
 	var out []api.ReadReplicaSet
 	for _, r := range replicas {
-		if r.Status != nil && *r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
+		if r.Status == api.ReadReplicaSetStatusActive && r.Endpoint != nil {
 			out = append(out, r)
 		}
 	}
@@ -273,14 +273,14 @@ type connectTargetModel struct {
 func newConnectTargetModel(primary api.Service, replicas []api.ReadReplicaSet) connectTargetModel {
 	choices := []connectTargetChoice{{
 		kind:  targetPrimary,
-		label: fmt.Sprintf("Connect to primary service (%s)", util.DerefStr(primary.ServiceID)),
+		label: fmt.Sprintf("Connect to primary service (%s)", primary.ServiceID),
 	}}
 
 	for i := range replicas {
 		choices = append(choices, connectTargetChoice{
 			kind:    targetReplica,
 			replica: &replicas[i],
-			label:   fmt.Sprintf("Connect to read replica '%s'", util.DerefStr(replicas[i].Name)),
+			label:   fmt.Sprintf("Connect to read replica '%s'", replicas[i].Name),
 		})
 	}
 

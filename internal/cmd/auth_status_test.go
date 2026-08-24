@@ -21,7 +21,7 @@ func TestAuthStatus_LoggedIn(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{
 				"type": "apiKey",
-				"apiKey": {
+				"api_key": {
 					"public_key": "test-access-key",
 					"name": "Test Credentials",
 					"created": "2025-01-01T00:00:00Z",

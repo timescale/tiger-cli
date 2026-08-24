@@ -357,12 +357,12 @@ Note that not all config options have corresponding global flags, and not all gl
 ### Experimental Feature Gating
 
 Some surfaces (currently `tiger service metrics …` CLI commands and the
-`service_metrics_*` MCP tools) call gateway endpoints marked `x-preview: true`
-in `openapi.yaml` — their request/response shape is still in flux. Upstream
-(`savannah-gateway/internal/rest/openapi.yaml`) uses the same marker; the
-Stainless SDK pipeline drops `x-preview` operations entirely, but
-oapi-codegen ignores the extension, so tiger-cli's generated v1 client
-includes them. We gate access at registration time, behind an
+`service_metrics_*` MCP tools) call gateway endpoints marked
+`x-tigerdata-preview: true` in `openapi.yaml` — their request/response shape is
+still in flux. Upstream (`savannah-gateway/internal/rest/openapi.yaml`) uses the
+same marker; the Stainless SDK pipeline drops `x-tigerdata-preview` operations
+entirely, but oapi-codegen ignores the extension, so tiger-cli's generated v1
+client includes them. We gate access at registration time, behind an
 intentionally-undocumented env var — `TIGER_EXPERIMENTAL` (default `false`).
 
 **This is env-var only** — deliberately not a config-file key, not a flag, and
@@ -375,8 +375,8 @@ and the MCP server read at registration time.
 - MCP: `NewServer` passes `app.Experimental` to `registerServiceTools(readOnly, experimental bool)`, which guards the metrics tool `addTool` calls the same way, so the tools aren't advertised to MCP clients when the env var is off. Restart the MCP server after toggling.
 
 **Do not mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, spec
-files, or error messages.** When a feature graduates, remove the `x-preview:
-true` marker upstream, delete the `if app.Experimental { … }` / `if experimental
+files, or error messages.** When a feature graduates, remove the
+`x-tigerdata-preview: true` marker upstream, delete the `if app.Experimental { … }` / `if experimental
 { … }` wrappers (both CLI and MCP), drop the `experimental bool` parameter from
 `registerServiceTools`, and remove the `Experimental` field from `common.App`. The
 call sites already use the normal v1 client — no client wiring needs to change.

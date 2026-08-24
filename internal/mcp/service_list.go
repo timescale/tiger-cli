@@ -106,21 +106,17 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 // convertToServiceInfo converts an API Service to MCP ServiceInfo
 func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 	info := ServiceInfo{
-		ServiceID: util.Deref(service.ServiceID),
-		Name:      util.Deref(service.Name),
-		Status:    util.DerefStr(service.Status),
-		Type:      util.DerefStr(service.ServiceType),
-		Region:    util.Deref(service.RegionCode),
-	}
-
-	// Add creation time if available
-	if service.Created != nil {
-		info.Created = service.Created.Format("2006-01-02T15:04:05Z")
+		ServiceID: service.ServiceID,
+		Name:      service.Name,
+		Status:    string(service.Status),
+		Type:      string(service.ServiceType),
+		Region:    service.RegionCode,
+		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
 	}
 
 	// Add resource information if available
-	if service.Resources != nil && len(*service.Resources) > 0 {
-		resource := (*service.Resources)[0]
+	if len(service.Resources) > 0 {
+		resource := service.Resources[0]
 		if resource.Spec != nil {
 			info.Resources = &ResourceInfo{}
 

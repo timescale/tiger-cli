@@ -105,7 +105,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			// A read replica is read-only, so a role can't be created there.
 			if common.IsReadReplica(service) {
 				return fmt.Errorf("%q is a read replica; create the role on its primary service %q instead",
-					util.Deref(service.ServiceID), util.DerefStr(service.ForkedFrom.ServiceID))
+					service.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 			}
 
 			// Get password

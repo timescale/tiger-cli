@@ -109,22 +109,14 @@ func outputServicesTable(services []OutputService, output io.Writer) error {
 
 	for _, service := range services {
 		table.Append(
-			util.Deref(service.ServiceID),
-			util.Deref(service.Name),
-			util.DerefStr(service.Status),
-			util.DerefStr(service.ServiceType),
-			util.Deref(service.RegionCode),
-			formatTimePtr(service.Created),
+			service.ServiceID,
+			service.Name,
+			string(service.Status),
+			string(service.ServiceType),
+			service.RegionCode,
+			service.Created.Format("2006-01-02 15:04"),
 		)
 	}
 
 	return table.Render()
-}
-
-// formatTimePtr formats a time pointer, returning empty string if nil
-func formatTimePtr(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format("2006-01-02 15:04")
 }

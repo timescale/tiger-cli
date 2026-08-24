@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 type WaitHandler interface {
@@ -101,7 +100,7 @@ type StatusWaitHandler struct {
 }
 
 func (h *StatusWaitHandler) Message() string {
-	return fmt.Sprintf("Service status: %s", util.DerefStr(h.Service.Status))
+	return fmt.Sprintf("Service status: %s", h.Service.Status)
 }
 
 func (h *StatusWaitHandler) InitialCheck() (bool, error) {
@@ -134,7 +133,7 @@ func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
 }
 
 func (h *StatusWaitHandler) checkServiceStatus(service *api.Service) (bool, error) {
-	status := util.DerefStr(service.Status)
+	status := string(service.Status)
 	switch status {
 	case h.TargetStatus:
 		return true, nil

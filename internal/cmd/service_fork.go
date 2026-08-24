@@ -183,7 +183,7 @@ Examples:
 				return fmt.Errorf("empty response from API")
 			}
 			forkedService := *forkResp.JSON202
-			forkedServiceID := util.DerefStr(forkedService.ServiceID)
+			forkedServiceID := forkedService.ServiceID
 
 			cmd.PrintErrf("✅ Fork request accepted!\n")
 			cmd.PrintErrf("📋 New Service ID: %s\n", forkedServiceID)

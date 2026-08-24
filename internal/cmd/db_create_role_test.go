@@ -27,8 +27,8 @@ func TestDBCreateRole_ReadReplicaRejected(t *testing.T) {
 	mockTestPAT(t)
 
 	standby := api.Service{
-		ServiceID:  util.Ptr("rep1234567"),
-		ProjectID:  util.Ptr("test-project-123"),
+		ServiceID:  "rep1234567",
+		ProjectID:  "test-project-123",
 		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceID: util.Ptr("svcprimary")},
 	}
 	orig := getServiceDetailsFunc

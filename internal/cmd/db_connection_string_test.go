@@ -114,8 +114,8 @@ func TestDBConnectionString_WithPassword(t *testing.T) {
 	host := "test-e2e-host.com"
 	port := 5432
 	service := api.Service{
-		ServiceID: &serviceID,
-		ProjectID: &projectID,
+		ServiceID: serviceID,
+		ProjectID: projectID,
 		Endpoint: &api.Endpoint{
 			Host: &host,
 			Port: &port,

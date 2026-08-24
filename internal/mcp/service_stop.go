@@ -119,7 +119,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 
 	// Return status and message (after wait so status is accurate)
 	output := ServiceStopOutput{
-		Status:  util.DerefStr(service.Status),
+		Status:  string(service.Status),
 		Message: message,
 	}
 

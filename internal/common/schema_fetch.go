@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // FetchServiceSchema opens a read-only connection to the target (a primary
@@ -34,8 +33,8 @@ func FetchServiceSchema(ctx context.Context, cfg *config.Config, target *Connect
 	defer conn.Close(context.Background())
 
 	ident := SchemaIdent{
-		ID:   util.DerefStr(target.ConnectionService.ServiceID),
-		Name: util.DerefStr(target.ConnectionService.Name),
+		ID:   target.ConnectionService.ServiceID,
+		Name: target.ConnectionService.Name,
 	}
 	return FetchSchemaFromConn(ctx, conn, ident, opts)
 }

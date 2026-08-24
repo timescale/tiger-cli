@@ -862,6 +862,46 @@ func (mr *MockClientInterfaceMockRecorder) LogoutWithBody(ctx, contentType, body
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutWithBody", reflect.TypeOf((*MockClientInterface)(nil).LogoutWithBody), varargs...)
 }
 
+// RenameService mocks base method.
+func (m *MockClientInterface) RenameService(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.RenameServiceJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RenameService", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenameService indicates an expected call of RenameService.
+func (mr *MockClientInterfaceMockRecorder) RenameService(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameService", reflect.TypeOf((*MockClientInterface)(nil).RenameService), varargs...)
+}
+
+// RenameServiceWithBody mocks base method.
+func (m *MockClientInterface) RenameServiceWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RenameServiceWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenameServiceWithBody indicates an expected call of RenameServiceWithBody.
+func (mr *MockClientInterfaceMockRecorder) RenameServiceWithBody(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameServiceWithBody", reflect.TypeOf((*MockClientInterface)(nil).RenameServiceWithBody), varargs...)
+}
+
 // RenameVPC mocks base method.
 func (m *MockClientInterface) RenameVPC(ctx context.Context, projectID api.ProjectID, vpcID api.VPCId, body api.RenameVPCJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -2024,6 +2064,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) LogoutWithResponse(ctx, 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).LogoutWithResponse), varargs...)
+}
+
+// RenameServiceWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) RenameServiceWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.RenameServiceResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RenameServiceWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.RenameServiceResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenameServiceWithBodyWithResponse indicates an expected call of RenameServiceWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameServiceWithBodyWithResponse(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameServiceWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).RenameServiceWithBodyWithResponse), varargs...)
+}
+
+// RenameServiceWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) RenameServiceWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.RenameServiceJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.RenameServiceResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RenameServiceWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.RenameServiceResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenameServiceWithResponse indicates an expected call of RenameServiceWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) RenameServiceWithResponse(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameServiceWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).RenameServiceWithResponse), varargs...)
 }
 
 // RenameVPCWithBodyWithResponse mocks base method.
