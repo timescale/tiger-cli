@@ -202,10 +202,6 @@ func TestProject_UnknownProject(t *testing.T) {
 	if !strings.Contains(err.Error(), `project "project-does-not-exist" not found or not accessible`) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// The error lists what the user can switch to instead.
-	if !strings.Contains(err.Error(), "Test Project 2 (project-456)") {
-		t.Errorf("Expected error to list accessible projects, got: %v", err)
-	}
 
 	assertExitCode(t, err, common.ExitInvalidParameters)
 

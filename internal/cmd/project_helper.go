@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -48,9 +47,10 @@ func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, non
 				return project, nil
 			}
 		}
+		// RedactError keeps the requested ID out of the analytics error property
 		return api.Project{}, common.ExitWithCode(common.ExitInvalidParameters,
 			analytics.RedactError(
-				fmt.Errorf("project %q not found or not accessible.%s", requested, accessibleProjectsHint(projects)),
+				fmt.Errorf("project %q not found or not accessible", requested),
 				"project not found or not accessible"))
 	}
 
@@ -61,28 +61,12 @@ func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, non
 		return projects[0], nil
 	default:
 		if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-			return api.Project{}, analytics.RedactError(
-				fmt.Errorf("TTY not detected - cannot select between %d projects. To choose one, %s.%s",
-					len(projects), nonInteractiveHint, accessibleProjectsHint(projects)),
-				fmt.Sprintf("TTY not detected - cannot select between %d projects", len(projects)))
+			return api.Project{}, fmt.Errorf("TTY not detected - cannot select between %d projects. To choose one, %s",
+				len(projects), nonInteractiveHint)
 		}
 
 		return selectProjectInteractively(cmd, projects)
 	}
-}
-
-// accessibleProjectsHint lists the caller's projects for an error message, so a
-// misspelled project ID doesn't need a second command to fix.
-func accessibleProjectsHint(projects []api.Project) string {
-	if len(projects) == 0 {
-		return ""
-	}
-
-	described := make([]string, 0, len(projects))
-	for _, project := range projects {
-		described = append(described, describeProject(project))
-	}
-	return " Accessible projects: " + strings.Join(described, ", ")
 }
 
 // describeProject renders a project for human-readable output.

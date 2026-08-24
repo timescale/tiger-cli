@@ -54,37 +54,6 @@ func serviceIDCompletion(app *common.App) cobra.CompletionFunc {
 	})
 }
 
-// projectIDCompletion completes project IDs for `tiger project` and `tiger auth
-// login --project-id`. It needs credentials, so it yields nothing until the user
-// has logged in once.
-func projectIDCompletion(app *common.App) cobra.CompletionFunc {
-	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		// `tiger project` takes one project ID, so nothing is left to complete
-		// once it has one. (As a flag completion, args is always empty.)
-		if len(args) > 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		client, _, err := app.GetClient()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		projects, err := fetchProjects(cmd.Context(), client)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results := make([]string, 0, len(projects))
-		for _, project := range projects {
-			if strings.HasPrefix(project.ID, toComplete) {
-				results = append(results, cobra.CompletionWithDesc(project.ID, project.Name))
-			}
-		}
-		return results, cobra.ShellCompDirectiveNoFileComp
-	})
-}
-
 func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	client, projectID, err := app.GetClient()
 	if err != nil {

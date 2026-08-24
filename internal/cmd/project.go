@@ -34,7 +34,7 @@ Examples:
 		Args: cobra.MaximumNArgs(1),
 		// The argument is a project ID, which analytics excludes.
 		Annotations:       map[string]string{analytics.OmitArgsAnnotation: "true"},
-		ValidArgsFunction: projectIDCompletion(app),
+		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
