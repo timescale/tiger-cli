@@ -462,24 +462,6 @@ func TestAuthLogin_OAuth_ProjectIDEnvVar_Inaccessible(t *testing.T) {
 	assertStoredProject(t, "project-123")
 }
 
-// TestAuthLogin_APIKey_ProjectIDEmptyFlagEnvMismatch verifies an explicitly
-// empty --project-id counts as unset, so a mismatched ambient TIGER_PROJECT_ID
-// still only warns (e.g. `--project-id "$PROJ"` in CI with $PROJ unset).
-func TestAuthLogin_APIKey_ProjectIDEmptyFlagEnvMismatch(t *testing.T) {
-	setupAuthTest(t)
-	t.Setenv("TIGER_PROJECT_ID", "some-other-project")
-
-	output, err := executeAuthCommand(t.Context(), "auth", "login",
-		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
-		"--project-id", "")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if !strings.Contains(output, "Warning: ignoring TIGER_PROJECT_ID (some-other-project) - this API key is scoped to project test-project-id") {
-		t.Errorf("Expected a warning about the ignored env var, got: %q", output)
-	}
-}
-
 // TestAuthLogin_OAuth_MultipleProjectsWithoutTTY verifies the error names the
 // non-interactive alternative instead of leaving the user stuck.
 func TestAuthLogin_OAuth_MultipleProjectsWithoutTTY(t *testing.T) {
@@ -519,13 +501,16 @@ func TestAuthLogin_APIKey_ProjectIDMismatch(t *testing.T) {
 
 // TestAuthLogin_APIKey_ProjectIDEnvVarMismatch verifies an ambient
 // TIGER_PROJECT_ID only warns, since it may be set for OAuth logins elsewhere
-// in the environment.
+// in the environment. The explicitly empty --project-id must count as unset
+// (e.g. `--project-id "$PROJ"` in CI with $PROJ unset), so it covers the
+// plain no-flag case too.
 func TestAuthLogin_APIKey_ProjectIDEnvVarMismatch(t *testing.T) {
 	setupAuthTest(t)
 	t.Setenv("TIGER_PROJECT_ID", "some-other-project")
 
 	output, err := executeAuthCommand(t.Context(), "auth", "login",
-		"--public-key", "test-public-key", "--secret-key", "test-secret-key")
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}

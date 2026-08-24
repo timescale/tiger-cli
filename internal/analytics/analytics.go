@@ -16,9 +16,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// OmitArgsAnnotation is a cobra command annotation that keeps a command's
-// positional arguments out of its analytics event — the ignore list below can't
-// do it, since arguments arrive without names.
+// OmitArgsAnnotation is a cobra annotation that keeps a command's positional
+// arguments out of its analytics event — they have no names for the ignore list.
 const OmitArgsAnnotation = "analytics_omit_args"
 
 // A list of properties that should never be recorded in analytics events.
@@ -136,8 +135,7 @@ func (e redactedError) Error() string { return e.err.Error() }
 func (e redactedError) Unwrap() error { return e.err }
 
 // RedactError wraps err so analytics records redacted in place of the error's
-// own text. Use it on errors whose message embeds data the ignore list keeps
-// out of analytics elsewhere (project IDs and names, for example).
+// own text, for messages embedding data the ignore list excludes elsewhere.
 func RedactError(err error, redacted string) error {
 	if err == nil {
 		return nil

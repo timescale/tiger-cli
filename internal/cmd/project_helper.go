@@ -35,11 +35,10 @@ func fetchProjects(ctx context.Context, client api.ClientWithResponsesInterface)
 	return *resp.JSON200, nil
 }
 
-// resolveProjectID picks the project to use. A requested ID (from --project-id
-// or a positional argument) is validated against the accessible ones; otherwise
-// a lone project is used as-is and a choice between several is made
-// interactively. nonInteractiveHint names how the calling command takes a
-// project ID without a prompt, for the error raised when there's no terminal.
+// resolveProjectID picks the project to use: a requested ID (from --project-id
+// or a positional argument) is validated against the accessible ones, a lone
+// project is used as-is, and several prompt interactively. nonInteractiveHint
+// names the calling command's promptless alternative for the no-TTY error.
 func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, nonInteractiveHint string) (api.Project, error) {
 	if requested != "" {
 		for _, project := range projects {
@@ -120,13 +119,11 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
-			// Clear buffer when using arrows
 			m.numberBuffer = ""
 			if m.cursor > 0 {
 				m.cursor--
 			}
 		case "down", "j":
-			// Clear buffer when using arrows
 			m.numberBuffer = ""
 			if m.cursor < len(m.projects)-1 {
 				m.cursor++
@@ -135,15 +132,12 @@ func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = m.projects[m.cursor]
 			return m, tea.Quit
 		case "backspace":
-			// Handle backspace to remove last character from buffer
 			if len(m.numberBuffer) > 0 {
 				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
 			}
 		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			// Add digit to buffer and update cursor position
 			m.updateNumberBuffer(m.numberBuffer + msg.String())
 		case "ctrl+w", "esc":
-			// Clear buffer on escape
 			m.numberBuffer = ""
 		}
 	}
@@ -157,13 +151,12 @@ func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
 		return
 	}
 
-	// Parse the buffer as a number
 	num, err := strconv.Atoi(newBuffer)
 	if err != nil {
 		return
 	}
 
-	// Convert from 1-based to 0-based index and validate bounds
+	// The list is displayed 1-based
 	index := num - 1
 	if index >= 0 && index < len(m.projects) {
 		m.numberBuffer = newBuffer
@@ -182,7 +175,6 @@ func (m projectSelectModel) View() tea.View {
 		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
 	}
 
-	// Show the current number buffer if user is typing
 	if m.numberBuffer != "" {
 		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
 	}

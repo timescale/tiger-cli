@@ -296,15 +296,13 @@ The middleware automatically excludes sensitive fields using a centralized ignor
 1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/analytics/analytics.go`
    - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
 
-2. **For positional arguments:** Positional arguments are tracked automatically for every command. A command whose argument carries something the ignore list excludes elsewhere opts out with the `analytics.OmitArgsAnnotation` annotation (defined in `internal/analytics/analytics.go`), which makes `wrapCommands` skip the `args` property for that command:
+2. **For positional arguments:** Positional arguments are tracked automatically. A command whose argument is sensitive opts out with the `analytics.OmitArgsAnnotation` annotation, which makes `wrapCommands` skip the `args` property — `tiger project` does this, since its argument is a project ID:
 
    ```go
    Annotations: map[string]string{analytics.OmitArgsAnnotation: "true"},
    ```
 
-   The constant lives beside the `ignore` list, so both redaction mechanisms sit together. `tiger project` uses it, since its argument is a project ID and `project_id` is on the ignore list. For anything else sensitive, either refactor to use a flag or add filtering logic in `wrapCommands()`.
-
-3. **For error messages:** The `error` event property records the command's error text verbatim, so an error whose message embeds sensitive data re-leaks what the ignore list excludes. Wrap such errors with `analytics.RedactError(err, "safe message")` — the user sees the full message, analytics records the redacted one. `resolveProjectID` is the model.
+3. **For error messages:** The `error` event property records the command's error text verbatim. Wrap errors whose message embeds sensitive data with `analytics.RedactError(err, "safe message")` — the user sees the full message, analytics records the redacted one.
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -325,7 +323,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
-  - `project.go` - `tiger project`, which switches the active project via `cfg.SwitchProject`. The active project lives in the stored credentials (`storedCredentials.ProjectID`), not in the config file, so switching is only possible for an OAuth login — an API key is scoped to one project, and API keys in the environment take precedence over stored credentials entirely. Clears the `service_id` config value on a switch, since a default service belongs to the project it was set in, then calls `app.Load` so the API client is rebuilt against the new project (its token-persisting closure is bound to the project it was built for). `project_helper.go` holds the project fetching and selection shared with `auth login`. Deliberately has no MCP counterpart: switching a process-wide default from a per-request MCP session would change state for every other session sharing the credentials.
+  - `project.go` - `tiger project`, which switches the active project via `cfg.SwitchProject`. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. A switch clears the `service_id` config value (a default service belongs to its project) and reloads the App so later readers — analytics in particular — see the new project. `project_helper.go` holds the project fetching and selection shared with `auth login`. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see

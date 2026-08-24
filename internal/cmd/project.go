@@ -81,9 +81,8 @@ Examples:
 			}
 
 			// The default service belongs to the project we just left. Unset
-			// clears only the config file, so a flag or env var wins again after
-			// the reload. (`auth login --project-id` deliberately doesn't clear
-			// it: a fresh login isn't a switch.)
+			// clears only the config file, so a flag or env var wins again
+			// after the reload.
 			if previous := cfg.ServiceID; previous != "" {
 				if err := cfg.Unset("service_id"); err != nil {
 					return fmt.Errorf("failed to clear default service: %w", err)

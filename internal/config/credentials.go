@@ -89,9 +89,8 @@ func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) er
 }
 
 // SwitchProject repoints the stored login at projectID, keeping its OAuth
-// session. The read and write live together here so a token refreshed in
-// between isn't lost — token and project ID share one record. An API key is
-// scoped to the project it was issued for, so this refuses one.
+// session — read and write sit together so a token refreshed in between isn't
+// lost. An API key is scoped to one project, so this refuses one.
 func (c *Config) SwitchProject(projectID string) error {
 	creds, err := c.GetStoredCredentials()
 	if err != nil {

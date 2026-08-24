@@ -147,13 +147,10 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
-			// An API key carries its own project, so there's nothing to select.
-			// A mismatch is still reported rather than ignored: scripts pass
-			// --project-id without knowing which auth method they'll get. Only
-			// the explicit flag fails, though — TIGER_PROJECT_ID is ambient, and
-			// may well be set for OAuth logins elsewhere in the environment.
-			// Checking projectIDFlag rather than cobra's Changed keeps an
-			// explicitly empty flag counting as unset, like flagOrEnvVar above.
+			// An API key carries its own project: a mismatched --project-id is
+			// an error, while the ambient TIGER_PROJECT_ID only warns. An empty
+			// flag counts as unset (projectIDFlag, not cobra's Changed), like
+			// flagOrEnvVar above.
 			if requestedProjectID != "" && requestedProjectID != authInfo.APIKey.Project.ID {
 				if projectIDFlag != "" {
 					return common.ExitWithCode(common.ExitInvalidParameters,
@@ -179,7 +176,6 @@ Examples:
 	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Project ID to log in to (skips interactive project selection)")
 
 	// Suppress cobra's default file completion; filenames are never project IDs.
-	// Only fails if the flag doesn't exist, which the line above guarantees.
 	_ = cmd.RegisterFlagCompletionFunc("project-id", cobra.NoFileCompletions)
 
 	return cmd
@@ -260,9 +256,8 @@ func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.Cl
 	project, err := resolveProjectID(l.cmd, projects, l.projectID,
 		"pass --project-id or set TIGER_PROJECT_ID")
 	if err != nil && l.projectID != "" && !l.projectIDFromFlag {
-		// TIGER_PROJECT_ID is ambient and may be set for a different login
-		// elsewhere in the environment, so an inaccessible project it names
-		// downgrades to a warning, matching the API-key branch.
+		// TIGER_PROJECT_ID is ambient and may belong to a different login, so
+		// an inaccessible project it names only warns, like the API-key branch.
 		l.cmd.PrintErrf("Warning: ignoring TIGER_PROJECT_ID (%s) - project not found or not accessible\n", l.projectID)
 		project, err = resolveProjectID(l.cmd, projects, "", "pass --project-id")
 	}
