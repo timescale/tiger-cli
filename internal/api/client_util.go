@@ -32,6 +32,7 @@ var HTTPClient = &http.Client{
 type userAgentTransport struct{}
 
 func (userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
 	req.Header.Set("User-Agent", userAgent())
 	return http.DefaultTransport.RoundTrip(req)
 }
