@@ -178,6 +178,10 @@ Examples:
 	cmd.Flags().StringVar(&flags.secretKey, "secret-key", "", "Secret key for authentication")
 	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Project ID to log in to (skips interactive project selection)")
 
+	// Suppress cobra's default file completion; filenames are never project IDs.
+	// Only fails if the flag doesn't exist, which the line above guarantees.
+	_ = cmd.RegisterFlagCompletionFunc("project-id", cobra.NoFileCompletions)
+
 	return cmd
 }
 
