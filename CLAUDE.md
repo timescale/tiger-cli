@@ -698,8 +698,10 @@ Place a helper by who calls it, working down this list until one matches:
 The `_helper.go` suffix is reserved for rule 3, so every other file in
 `internal/cmd` is named after a command and contains a `build*Cmd()`.
 
-Shell completion functions are an exception to rule 1: they all live in
-`completion_helper.go`, however many commands use them.
+Shell completion functions — both positional-arg completions (`ValidArgsFunction`)
+and flag-value completions (`RegisterFlagCompletionFunc`) — are an exception to
+rule 1: they all live in `completion_helper.go`, however many commands or flags
+use them.
 
 Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
 `db connect` flow — argument splitting, read replica selection, password
