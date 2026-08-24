@@ -355,6 +355,10 @@ ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 defer cancel()
 ```
 
+If a request needs a longer timeout, clone `api.HTTPClient` and override its
+`Timeout` rather than building a new `http.Client` from scratch — this keeps
+the User-Agent (see `upgradeHTTPClient` in `internal/cmd/upgrade.go`).
+
 ### Configuration System
 
 The CLI uses a layered configuration approach:

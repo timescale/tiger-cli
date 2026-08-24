@@ -20,14 +20,22 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/spf13/cobra"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
-// upgradeHTTPClient is used to download release archives and checksums. It uses
-// a generous timeout because release archives are much larger than the small
-// latest.txt fetch performed by the version package's 5s client.
-var upgradeHTTPClient = &http.Client{Timeout: 3 * time.Minute}
+// upgradeHTTPClient is used to download release archives and checksums. It's
+// cloned from api.HTTPClient (so it still sends our User-Agent) with a longer
+// timeout, since release archives are much larger than the small latest.txt
+// fetch performed by the version package's 5s client.
+var upgradeHTTPClient = newUpgradeHTTPClient()
+
+func newUpgradeHTTPClient() *http.Client {
+	client := *api.HTTPClient
+	client.Timeout = 3 * time.Minute
+	return &client
+}
 
 // binaryFilename is the name of the tiger executable inside a release archive
 // (and on disk), with the platform-appropriate extension. Note that the binary
