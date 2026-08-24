@@ -30,6 +30,13 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
+			// The default service is anchored to the login's project; left
+			// behind, it would silently apply to whatever project the next
+			// login lands on.
+			if err := cfg.Unset("service_id"); err != nil {
+				cmd.PrintErrf("⚠️  Failed to clear the default service: %s\n", err)
+			}
+
 			cmd.Println("Successfully logged out and removed stored credentials")
 			return nil
 		},

@@ -43,6 +43,26 @@ func TestAuthLogout_Success(t *testing.T) {
 	}
 }
 
+// TestAuthLogout_ClearsDefaultService verifies logout removes the stored
+// default service — anchored to the login's project, it must not carry over
+// to whatever project the next login lands on.
+func TestAuthLogout_ClearsDefaultService(t *testing.T) {
+	setupAuthTest(t)
+
+	if err := testConfig(t).StoreCredentials("test-api-key-logout", "test-project-logout"); err != nil {
+		t.Fatalf("Failed to store credentials: %v", err)
+	}
+	if err := testConfig(t).Set("service_id", "svc1234567"); err != nil {
+		t.Fatalf("Failed to set default service: %v", err)
+	}
+
+	if _, err := executeAuthCommand(t.Context(), "auth", "logout"); err != nil {
+		t.Fatalf("Logout failed: %v", err)
+	}
+
+	assertServiceIDCleared(t)
+}
+
 // TestAuthLogout_OAuthCredentialsStayRemoved guards an edge case in the App's
 // cached client: for an OAuth session that client persists refreshed tokens back
 // to storage, and the analytics event deferred by wrapCommands runs *after*

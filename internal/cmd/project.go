@@ -80,9 +80,7 @@ Examples:
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
 
-			if err := clearStaleDefaultService(cmd, cfg, currentProjectID, project.ID); err != nil {
-				return err
-			}
+			clearStaleDefaultService(cmd, cfg, currentProjectID, project.ID)
 
 			// Later readers in this invocation — the trailing analytics event
 			// in particular — see the new project.

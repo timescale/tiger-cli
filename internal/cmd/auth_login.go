@@ -63,7 +63,8 @@ and skip the interactive selection, which is what you want when no terminal is a
 logging in, switch between projects with 'tiger project'.
 
 The credentials and project ID will be stored securely in the system keyring, or in a fallback file with
-restricted permissions.
+restricted permissions. Logging in to a different project than the previous login clears the default
+service (config key service_id), since a default service belongs to the project it was set in.
 
 You may also provide API keys via flags or environment variables, in which case they will be used
 directly. The CLI will prompt for any missing information. An API key is scoped to a single project,
@@ -124,16 +125,9 @@ Examples:
 				if err := cfg.StoreOAuthCredentials(token, projectID); err != nil {
 					return fmt.Errorf("failed to store credentials: %w", err)
 				}
-				// Hand the freshly authenticated client to the App so later
-				// readers — analytics in particular — use the new credentials
-				// instead of the pre-login state.
-				app.SetClient(client, projectID)
 				// Identify the user for analytics.
 				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
-				if err := clearStaleDefaultService(cmd, cfg, prevProjectID, projectID); err != nil {
-					return err
-				}
-				finishLogin(cmd, projectID)
+				completeLogin(cmd, app, cfg, client, prevProjectID, projectID)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
 				creds, err = promptForCredentials(cmd, cfg.ConsoleURL, creds)
@@ -172,13 +166,7 @@ Examples:
 			if err := cfg.StoreCredentials(apiKey, authInfo.APIKey.Project.ID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
-			// See the OAuth branch above: keep the App's client in sync with the
-			// credentials we just stored.
-			app.SetClient(client, authInfo.APIKey.Project.ID)
-			if err := clearStaleDefaultService(cmd, cfg, prevProjectID, authInfo.APIKey.Project.ID); err != nil {
-				return err
-			}
-			finishLogin(cmd, authInfo.APIKey.Project.ID)
+			completeLogin(cmd, app, cfg, client, prevProjectID, authInfo.APIKey.Project.ID)
 			return nil
 		},
 	}
@@ -191,6 +179,16 @@ Examples:
 	_ = cmd.RegisterFlagCompletionFunc("project-id", cobra.NoFileCompletions)
 
 	return cmd
+}
+
+// completeLogin runs the post-store steps shared by both login flavors: hand
+// the freshly authenticated client to the App so later readers — analytics in
+// particular — use the new credentials, clear a default service left over
+// from a different project, and print the success message.
+func completeLogin(cmd *cobra.Command, app *common.App, cfg *config.Config, client *api.ClientWithResponses, prevProjectID, projectID string) {
+	app.SetClient(client, projectID)
+	clearStaleDefaultService(cmd, cfg, prevProjectID, projectID)
+	finishLogin(cmd, projectID)
 }
 
 func finishLogin(cmd *cobra.Command, projectID string) {

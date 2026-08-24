@@ -14,15 +14,12 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		// A common.ExitCodeError anywhere in the chain sets the exit code.
-		// Other ExitCode() carriers (psql's *exec.ExitError) count only
-		// unwrapped, so a wrapped foreign code can't collide with ours.
+		// A common.ExitCodeError anywhere in the chain sets the exit code;
+		// foreign carriers (psql's *exec.ExitError) are converted to it at
+		// their call sites (see launchPsql).
 		var codeErr common.ExitCodeError
 		if errors.As(err, &codeErr) {
 			os.Exit(codeErr.ExitCode())
-		}
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(exitErr.ExitCode())
 		}
 		os.Exit(1)
 	}

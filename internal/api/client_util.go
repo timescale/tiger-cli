@@ -96,13 +96,18 @@ func NewTigerClientWithToken(cfg *config.Config, token *oauth2.Token, persist fu
 func NewTigerClientForCredentials(cfg *config.Config, creds *config.Credentials) (*ClientWithResponses, error) {
 	if creds.OAuth != nil {
 		persist := func(t *oauth2.Token) error {
-			// Re-read storage: a concurrent `tiger project` switch must not
-			// be undone, and a replaced login must not be resurrected.
-			stored, err := cfg.GetStoredCredentials()
-			if err != nil || stored.OAuth == nil {
-				return nil
+			// Re-read storage so a concurrent `tiger project` switch isn't
+			// undone and a login replaced by an API key isn't overwritten. A
+			// failed read falls back to the captured project: a transient
+			// keyring error must not drop a rotated (one-time) refresh token.
+			projectID := creds.ProjectID
+			if stored, err := cfg.GetStoredCredentials(); err == nil {
+				if stored.OAuth == nil {
+					return nil
+				}
+				projectID = stored.ProjectID
 			}
-			return cfg.StoreOAuthCredentials(t, stored.ProjectID)
+			return cfg.StoreOAuthCredentials(t, projectID)
 		}
 		return NewTigerClientWithToken(cfg, creds.OAuth, persist)
 	}

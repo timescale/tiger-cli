@@ -132,10 +132,12 @@ func (c *Config) storeCredentials(creds storedCredentials) error {
 	}
 	// A readable-but-unwritable keyring entry would shadow the file just
 	// written; deleted only now so a failure never destroys the sole copy.
-	if _, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
-		if err := keyring.Delete(GetServiceName(), keyringUsername); err != nil {
-			return fmt.Errorf("failed to store credentials in keyring (%v) or to remove the stale keyring entry shadowing the file fallback: %w", keyringErr, err)
-		}
+	if err := removeCredentialsFromKeyring(); err != nil {
+		// Don't leave the new credentials latent behind the surviving entry:
+		// they'd silently take over whenever the keyring stops being readable.
+		return errors.Join(
+			fmt.Errorf("failed to store credentials in keyring: %w", keyringErr),
+			err, c.removeCredentialsFile())
 	}
 	return nil
 }
@@ -217,19 +219,21 @@ func (c *Config) loadCredentialsBlob() (string, error) {
 	return string(data), nil
 }
 
-// RemoveCredentials removes stored credentials from keyring and file fallback
+// RemoveCredentials removes stored credentials from keyring and file fallback.
+// The file is removed even when the keyring delete fails, so a failed logout
+// never leaves the fallback copy behind.
 func (c *Config) RemoveCredentials() error {
-	if err := removeCredentialsFromKeyring(); err != nil {
-		return err
-	}
-	return c.removeCredentialsFile()
+	return errors.Join(removeCredentialsFromKeyring(), c.removeCredentialsFile())
 }
 
-// removeCredentialsFromKeyring deletes the keyring entry. An entry still
-// readable after a failed delete would keep authenticating, so that errors.
+// removeCredentialsFromKeyring deletes the keyring entry. It errors only when
+// an entry provably survives (still readable) — reads prefer the keyring, so
+// it would keep authenticating. An unreadable backend (no keyring daemon,
+// locked collection) can't serve the entry either, and treating it as fatal
+// would break logout on every keyring-less system.
 func removeCredentialsFromKeyring() error {
 	err := keyring.Delete(GetServiceName(), keyringUsername)
-	if err == nil {
+	if err == nil || errors.Is(err, keyring.ErrNotFound) {
 		return nil
 	}
 	if _, getErr := keyring.Get(GetServiceName(), keyringUsername); getErr == nil {
