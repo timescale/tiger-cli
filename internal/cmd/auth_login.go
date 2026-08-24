@@ -181,10 +181,9 @@ Examples:
 	return cmd
 }
 
-// completeLogin runs the post-store steps shared by both login flavors: hand
-// the freshly authenticated client to the App so later readers — analytics in
-// particular — use the new credentials, clear a default service left over
-// from a different project, and print the success message.
+// completeLogin runs the post-store steps shared by both login flavors: update
+// the App's client so later readers (analytics) use the new credentials, clear
+// a default service left from a different project, and print the success message.
 func completeLogin(cmd *cobra.Command, app *common.App, cfg *config.Config, client *api.ClientWithResponses, prevProjectID, projectID string) {
 	app.SetClient(client, projectID)
 	clearStaleDefaultService(cmd, cfg, prevProjectID, projectID)

@@ -15,8 +15,7 @@ import (
 func main() {
 	if err := run(); err != nil {
 		// A common.ExitCodeError anywhere in the chain sets the exit code;
-		// foreign carriers (psql's *exec.ExitError) are converted to it at
-		// their call sites (see launchPsql).
+		// foreign carriers are converted to it at their call sites (launchPsql).
 		var codeErr common.ExitCodeError
 		if errors.As(err, &codeErr) {
 			os.Exit(codeErr.ExitCode())

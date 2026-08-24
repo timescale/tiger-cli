@@ -220,17 +220,15 @@ func (c *Config) loadCredentialsBlob() (string, error) {
 }
 
 // RemoveCredentials removes stored credentials from keyring and file fallback.
-// The file is removed even when the keyring delete fails, so a failed logout
-// never leaves the fallback copy behind.
+// The file is removed even when the keyring delete fails.
 func (c *Config) RemoveCredentials() error {
 	return errors.Join(removeCredentialsFromKeyring(), c.removeCredentialsFile())
 }
 
-// removeCredentialsFromKeyring deletes the keyring entry. It errors only when
-// an entry provably survives (still readable) — reads prefer the keyring, so
-// it would keep authenticating. An unreadable backend (no keyring daemon,
-// locked collection) can't serve the entry either, and treating it as fatal
-// would break logout on every keyring-less system.
+// removeCredentialsFromKeyring deletes the keyring entry, erroring only when
+// an entry provably survives (still readable — it would keep authenticating).
+// An unreadable backend can't serve the entry either, and treating it as
+// fatal would break logout on every keyring-less system.
 func removeCredentialsFromKeyring() error {
 	err := keyring.Delete(GetServiceName(), keyringUsername)
 	if err == nil || errors.Is(err, keyring.ErrNotFound) {

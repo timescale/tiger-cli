@@ -634,9 +634,8 @@ func testSaveAndLaunchPsqlWithPassword(
 func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
 	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, service, cmd)
 	err := psqlCmd.Run()
-	// Carry psql's own exit code as the CLI's. Converting here (rather than
-	// matching *exec.ExitError in main) keeps the code through any fmt.Errorf
-	// wrap on the way up — main.go only extracts common.ExitCodeError.
+	// Carry psql's own exit code as the CLI's; converting here keeps it
+	// through any fmt.Errorf wrap, since main.go only extracts ExitCodeError.
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		return common.ExitWithCode(exitErr.ExitCode(), err)

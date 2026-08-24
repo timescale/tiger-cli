@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
-
-	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -44,8 +41,7 @@ func TestAuthLogout_Success(t *testing.T) {
 }
 
 // TestAuthLogout_ClearsDefaultService verifies logout removes the stored
-// default service — anchored to the login's project, it must not carry over
-// to whatever project the next login lands on.
+// default service, so it can't carry over to the next login's project.
 func TestAuthLogout_ClearsDefaultService(t *testing.T) {
 	setupAuthTest(t)
 
@@ -88,15 +84,7 @@ func TestAuthLogout_OAuthCredentialsStayRemoved(t *testing.T) {
 
 	// An expired access token with a refresh token the mock still honors: the
 	// state where a logout triggers a refresh.
-	cfg := testConfig(t)
-	expired := &oauth2.Token{
-		AccessToken:  "stale-access-token",
-		RefreshToken: "mock-refresh-token-67890",
-		Expiry:       time.Now().Add(-time.Hour),
-	}
-	if err := cfg.StoreOAuthCredentials(expired, "project-789"); err != nil {
-		t.Fatalf("Failed to store oauth credentials: %v", err)
-	}
+	storeExpiredOAuthLogin(t, "project-789")
 
 	if _, err := executeAuthCommand(t.Context(), "auth", "logout"); err != nil {
 		t.Fatalf("Logout failed: %v", err)

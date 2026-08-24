@@ -71,8 +71,7 @@ func resolveProjectID(cmd *cobra.Command, projects []api.Project, requested, non
 // clearStaleDefaultService unsets the config-file service_id when the stored
 // login moves between projects — a default service belongs to the project it
 // was set in. Only the config file is touched, so a flag or env var still
-// wins. Failures only warn: callers run this after the project change has
-// persisted, and an error would report that change as not having happened.
+// wins; failures only warn, since the project change has already persisted.
 func clearStaleDefaultService(cmd *cobra.Command, cfg *config.Config, previousProjectID, newProjectID string) {
 	if previousProjectID == "" || previousProjectID == newProjectID {
 		return
