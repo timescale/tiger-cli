@@ -2,6 +2,7 @@ package analytics
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"os"
 	"runtime"
@@ -14,6 +15,11 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 )
+
+// OmitArgsAnnotation is a cobra command annotation that keeps a command's
+// positional arguments out of its analytics event — the ignore list below can't
+// do it, since arguments arrive without names.
+const OmitArgsAnnotation = "analytics_omit_args"
 
 // A list of properties that should never be recorded in analytics events.
 // Used to filter flags and MCP tool call parameters from automatic tracking.
@@ -98,19 +104,45 @@ func FlagSet(flagSet *pflag.FlagSet) Option {
 
 // Error creates an Option that adds success and error information to event
 // properties. If err is nil, sets success: true. If err is not nil, sets
-// success: false and includes the error message.
+// success: false and includes the error message — the redacted one, for errors
+// wrapped with RedactError.
 //
 // This is commonly used at the end of command execution to track whether
 // operations succeeded or failed, and what errors occurred.
 func Error(err error) Option {
 	return func(properties map[string]any) {
-		if err != nil {
-			properties["success"] = false
-			properties["error"] = err.Error()
-		} else {
+		if err == nil {
 			properties["success"] = true
+			return
 		}
+		properties["success"] = false
+		msg := err.Error()
+		var re redactedError
+		if errors.As(err, &re) {
+			msg = re.redacted
+		}
+		properties["error"] = msg
 	}
+}
+
+// redactedError carries a sanitized message for analytics while leaving the
+// user-facing error text untouched.
+type redactedError struct {
+	err      error
+	redacted string
+}
+
+func (e redactedError) Error() string { return e.err.Error() }
+func (e redactedError) Unwrap() error { return e.err }
+
+// RedactError wraps err so analytics records redacted in place of the error's
+// own text. Use it on errors whose message embeds data the ignore list keeps
+// out of analytics elsewhere (project IDs and names, for example).
+func RedactError(err error, redacted string) error {
+	if err == nil {
+		return nil
+	}
+	return redactedError{err: err, redacted: redacted}
 }
 
 // Identify associates the provided properties with the user for the sake of

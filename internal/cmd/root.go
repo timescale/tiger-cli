@@ -82,6 +82,7 @@ tiger auth login
 	cmd.AddCommand(buildUpgradeCmd(app))
 	cmd.AddCommand(buildConfigCmd(app))
 	cmd.AddCommand(buildAuthCmd(app))
+	cmd.AddCommand(buildProjectCmd(app))
 	cmd.AddCommand(buildServiceCmd(app))
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
@@ -132,13 +133,18 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 			defer func() {
 				cfg, client, projectID := app.TryGetAll()
 				a := analytics.New(cfg, client, projectID)
-				a.Track(
-					fmt.Sprintf("Run %s", c.CommandPath()),
-					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
+				options := make([]analytics.Option, 0, 4)
+				options = append(options,
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags()),
 					analytics.Error(runErr),
 				)
+				// NOTE: Args are safe for most commands; the rest opt out with
+				// analytics.OmitArgsAnnotation.
+				if c.Annotations[analytics.OmitArgsAnnotation] != "true" {
+					options = append(options, analytics.Property("args", args))
+				}
+				a.Track(fmt.Sprintf("Run %s", c.CommandPath()), options...)
 			}()
 
 			return originalRunE(c, args)

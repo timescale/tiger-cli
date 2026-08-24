@@ -296,9 +296,15 @@ The middleware automatically excludes sensitive fields using a centralized ignor
 1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/analytics/analytics.go`
    - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
 
-2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
-   - Refactor to use a flag instead
-   - Add filtering logic in `wrapCommands()` in `internal/cmd/root.go` to sanitize or omit the args from tracking
+2. **For positional arguments:** Positional arguments are tracked automatically for every command. A command whose argument carries something the ignore list excludes elsewhere opts out with the `analytics.OmitArgsAnnotation` annotation (defined in `internal/analytics/analytics.go`), which makes `wrapCommands` skip the `args` property for that command:
+
+   ```go
+   Annotations: map[string]string{analytics.OmitArgsAnnotation: "true"},
+   ```
+
+   The constant lives beside the `ignore` list, so both redaction mechanisms sit together. `tiger project` uses it, since its argument is a project ID and `project_id` is on the ignore list. For anything else sensitive, either refactor to use a flag or add filtering logic in `wrapCommands()`.
+
+3. **For error messages:** The `error` event property records the command's error text verbatim, so an error whose message embeds sensitive data re-leaks what the ignore list excludes. Wrap such errors with `analytics.RedactError(err, "safe message")` — the user sees the full message, analytics records the redacted one. `resolveProjectID` is the model.
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -313,12 +319,13 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
 - **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
-  CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
+  CLI commands (auth, project, service, db, config, mcp, version, upgrade, completion).
   Each command lives in its own file, named to match the command in snake_case
   (see "One File Per Command" below). `root.go` holds the root command, global
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
+  - `project.go` - `tiger project`, which switches the active project via `cfg.SwitchProject`. The active project lives in the stored credentials (`storedCredentials.ProjectID`), not in the config file, so switching is only possible for an OAuth login — an API key is scoped to one project, and API keys in the environment take precedence over stored credentials entirely. Clears the `service_id` config value on a switch, since a default service belongs to the project it was set in, then calls `app.Load` so the API client is rebuilt against the new project (its token-persisting closure is bound to the project it was built for). `project_helper.go` holds the project fetching and selection shared with `auth login`. Deliberately has no MCP counterpart: switching a process-wide default from a per-request MCP session would change state for every other session sharing the credentials.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see
@@ -667,7 +674,7 @@ Place a helper by who calls it, working down this list until one matches:
 2. **Several commands in one group** → the group file (`service.go`, `db.go`).
 3. **Across groups** → a package-level `<topic>_helper.go` file:
    `completion_helper.go`, `flag_helper.go`, `logger_helper.go`,
-   `password_helper.go`.
+   `password_helper.go`, `project_helper.go`.
 4. **A genuine standalone utility** — small and isolated, with no notion of a
    command (`util.GenerateSecurePassword`) → `internal/util`. Anything shaped
    around the CLI stays in `cmd` even if its signature looks generic.

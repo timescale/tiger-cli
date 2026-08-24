@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
@@ -319,7 +321,7 @@ func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
 func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
 	mockServerURL := setupOAuthTest(t, []api.Project{
 		{ID: "project-123", Name: "Test Project"},
-	}, "project-123")
+	})
 
 	// Execute login command - the mocked openBrowser will handle the callback automatically
 	output, err := executeAuthCommand(t.Context(), "auth", "login")
@@ -366,22 +368,17 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 		{ID: "project-123", Name: "Test Project 1"},
 		{ID: "project-456", Name: "Test Project 2"},
 		{ID: "project-789", Name: "Test Project 3"},
-	}, "project-789")
+	})
 
 	// The picker only runs on a TTY
 	stubIsTerminal(t, true)
 
 	// Mock the project selection to simulate user selecting the third project (index 2)
-	originalSelectProjectInteractively := selectProjectInteractively
-	defer func() {
-		selectProjectInteractively = originalSelectProjectInteractively
-	}()
-
-	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
+	stubSelectProject(t, func(_ *cobra.Command, projects []api.Project) (api.Project, error) {
 		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].ID)
 		// Simulate user pressing down arrow twice and then enter (selects third project)
-		return projects[2].ID, nil
-	}
+		return projects[2], nil
+	})
 
 	// Execute login command - both mocked functions will handle OAuth flow and project selection
 	output, err := executeAuthCommand(t.Context(), "auth", "login")
@@ -420,6 +417,203 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	assertExpiresInAbout(t, token.Expiry)
 	if projectID != "project-789" {
 		t.Errorf("Expected project ID 'project-789', got '%s'", projectID)
+	}
+}
+
+// TestAuthLogin_OAuth_ProjectIDFlag verifies --project-id replaces the picker,
+// so a multi-project user can log in without a terminal.
+func TestAuthLogin_OAuth_ProjectIDFlag(t *testing.T) {
+	setupOAuthTest(t, testProjects)
+
+	// No TTY: the picker isn't available, and isn't needed
+	stubIsTerminal(t, false)
+	stubSelectProject(t, func(*cobra.Command, []api.Project) (api.Project, error) {
+		t.Error("Project picker should not run when --project-id is set")
+		return api.Project{}, errors.New("unexpected picker")
+	})
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: project-456)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+
+	stored, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if stored.OAuth == nil {
+		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
+	}
+	if stored.ProjectID != "project-456" {
+		t.Errorf("Expected project ID 'project-456', got '%s'", stored.ProjectID)
+	}
+}
+
+// TestAuthLogin_OAuth_ProjectIDEnvVar verifies TIGER_PROJECT_ID works like the
+// flag, as the API key env vars do.
+func TestAuthLogin_OAuth_ProjectIDEnvVar(t *testing.T) {
+	setupOAuthTest(t, testProjects)
+	t.Setenv("TIGER_PROJECT_ID", "project-789")
+
+	stubIsTerminal(t, false)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: project-789)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+
+	stored, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if stored.ProjectID != "project-789" {
+		t.Errorf("Expected project ID 'project-789', got '%s'", stored.ProjectID)
+	}
+}
+
+func TestAuthLogin_OAuth_ProjectIDFlag_Inaccessible(t *testing.T) {
+	setupOAuthTest(t, testProjects)
+
+	_, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-nope")
+	if err == nil {
+		t.Fatal("Expected login to fail for an inaccessible project")
+	}
+	if !strings.Contains(err.Error(), `project "project-nope" not found or not accessible`) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	assertExitCode(t, err, common.ExitInvalidParameters)
+
+	// A failed selection stores nothing
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored when project selection fails")
+	}
+}
+
+// TestAuthLogin_OAuth_ProjectIDEnvVar_Inaccessible verifies an ambient
+// TIGER_PROJECT_ID naming a project this account can't see only warns and
+// falls back to normal selection, matching the API-key branch.
+func TestAuthLogin_OAuth_ProjectIDEnvVar_Inaccessible(t *testing.T) {
+	setupOAuthTest(t, testProjects[:1])
+	t.Setenv("TIGER_PROJECT_ID", "project-nope")
+
+	stubIsTerminal(t, false)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Warning: ignoring TIGER_PROJECT_ID (project-nope) - project not found or not accessible") {
+		t.Errorf("Expected a warning about the ignored env var, got: %q", output)
+	}
+
+	stored, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if stored.ProjectID != "project-123" {
+		t.Errorf("Expected fallback to the single accessible project, got %q", stored.ProjectID)
+	}
+}
+
+// TestAuthLogin_APIKey_ProjectIDEmptyFlagEnvMismatch verifies an explicitly
+// empty --project-id counts as unset, so a mismatched ambient TIGER_PROJECT_ID
+// still only warns (e.g. `--project-id "$PROJ"` in CI with $PROJ unset).
+func TestAuthLogin_APIKey_ProjectIDEmptyFlagEnvMismatch(t *testing.T) {
+	setupAuthTest(t)
+	t.Setenv("TIGER_PROJECT_ID", "some-other-project")
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Warning: ignoring TIGER_PROJECT_ID (some-other-project) - this API key is scoped to project test-project-id") {
+		t.Errorf("Expected a warning about the ignored env var, got: %q", output)
+	}
+}
+
+// TestAuthLogin_OAuth_MultipleProjectsWithoutTTY verifies the error names the
+// non-interactive alternative instead of leaving the user stuck.
+func TestAuthLogin_OAuth_MultipleProjectsWithoutTTY(t *testing.T) {
+	setupOAuthTest(t, testProjects)
+
+	stubIsTerminal(t, false)
+
+	_, err := executeAuthCommand(t.Context(), "auth", "login")
+	if err == nil {
+		t.Fatal("Expected login to fail without a TTY to select a project on")
+	}
+	if !strings.Contains(err.Error(), "pass --project-id or set TIGER_PROJECT_ID") {
+		t.Errorf("Expected the error to name the non-interactive alternative, got: %v", err)
+	}
+}
+
+// TestAuthLogin_APIKey_ProjectIDMismatch verifies --project-id is checked
+// against the key's own project instead of being ignored.
+func TestAuthLogin_APIKey_ProjectIDMismatch(t *testing.T) {
+	setupAuthTest(t)
+
+	_, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "some-other-project")
+	if err == nil {
+		t.Fatal("Expected login to fail when --project-id doesn't match the API key's project")
+	}
+	if !strings.Contains(err.Error(), "API key is scoped to project test-project-id, not the requested some-other-project") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	assertExitCode(t, err, common.ExitInvalidParameters)
+
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored when the requested project doesn't match")
+	}
+}
+
+// TestAuthLogin_APIKey_ProjectIDEnvVarMismatch verifies an ambient
+// TIGER_PROJECT_ID only warns, since it may be set for OAuth logins elsewhere
+// in the environment.
+func TestAuthLogin_APIKey_ProjectIDEnvVarMismatch(t *testing.T) {
+	setupAuthTest(t)
+	t.Setenv("TIGER_PROJECT_ID", "some-other-project")
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Warning: ignoring TIGER_PROJECT_ID (some-other-project) - this API key is scoped to project test-project-id") {
+		t.Errorf("Expected a warning about the ignored env var, got: %q", output)
+	}
+
+	creds, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if creds.ProjectID != "test-project-id" {
+		t.Errorf("Expected the API key's own project, got %q", creds.ProjectID)
+	}
+}
+
+// TestAuthLogin_APIKey_ProjectIDMatches verifies a matching --project-id is
+// accepted, so a script can pass it whatever the auth method.
+func TestAuthLogin_APIKey_ProjectIDMatches(t *testing.T) {
+	setupAuthTest(t)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "test-project-id")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: test-project-id)") {
+		t.Errorf("Unexpected output: %q", output)
 	}
 }
 
@@ -481,7 +675,7 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 }
 
 // setupOAuthTest creates a complete OAuth test environment with mock server and browser
-func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID string) string {
+func setupOAuthTest(t *testing.T, projects []api.Project) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
 
@@ -515,6 +709,41 @@ api_url: "%s"
 	})
 
 	return mockServer.URL
+}
+
+// By default the mock mints one fixed, long-lived token, so tests can assert on
+// its value. mockShortLivedRotatingTokens makes it behave like a real IdP —
+// a distinct token per mint, expiring at once — so every request refreshes and
+// every refresh persists.
+// Both are atomic: the cleanup resetting rotatingTokens runs before the mock
+// server closes (t.Cleanup is LIFO), so a straggling in-flight request can
+// still be reading in a handler goroutine while the test goroutine writes.
+var (
+	rotatingTokens     atomic.Bool
+	accessTokenCounter atomic.Int64
+)
+
+func mockShortLivedRotatingTokens(t *testing.T) {
+	t.Helper()
+	rotatingTokens.Store(true)
+	accessTokenCounter.Store(0)
+	t.Cleanup(func() { rotatingTokens.Store(false) })
+}
+
+func mockAccessToken() string {
+	if !rotatingTokens.Load() {
+		return "mock-access-token-12345"
+	}
+	return fmt.Sprintf("mock-access-token-%d", accessTokenCounter.Add(1))
+}
+
+// mockTokenExpiresIn is the expires_in the mock returns: 1 second under
+// rotation, which oauth2 treats as already expired (10s delta).
+func mockTokenExpiresIn() int {
+	if rotatingTokens.Load() {
+		return 1
+	}
+	return 3600
 }
 
 // startMockOAuthServer starts a mock server that handles all OAuth endpoints
@@ -555,9 +784,9 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 		}
 
 		tokenResponse := map[string]interface{}{
-			"access_token":  "mock-access-token-12345",
+			"access_token":  mockAccessToken(),
 			"refresh_token": "mock-refresh-token-67890",
-			"expires_in":    3600,
+			"expires_in":    mockTokenExpiresIn(),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -572,6 +801,16 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(projects); err != nil {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	})
+
+	// Backs the validation common.NewAPIClient runs on API keys from the
+	// environment.
+	mux.HandleFunc("GET /auth/info", func(w http.ResponseWriter, _ *http.Request) {
+		t.Logf("Mock server received GET /auth/info request")
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"type":"apiKey","api_key":{"public_key":"env-public-key","project":{"id":"env-key-project","name":"Env Key Project","plan_type":"free"},"issuing_user":{"id":"1","name":"Test User","email":"test@example.com"},"name":"key","created":"2026-01-01T00:00:00Z"}}`)); err != nil {
+			t.Errorf("Failed to write auth info response: %v", err)
 		}
 	})
 

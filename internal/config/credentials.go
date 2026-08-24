@@ -88,6 +88,21 @@ func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) er
 	})
 }
 
+// SwitchProject repoints the stored login at projectID, keeping its OAuth
+// session. The read and write live together here so a token refreshed in
+// between isn't lost — token and project ID share one record. An API key is
+// scoped to the project it was issued for, so this refuses one.
+func (c *Config) SwitchProject(projectID string) error {
+	creds, err := c.GetStoredCredentials()
+	if err != nil {
+		return err
+	}
+	if creds.OAuth == nil {
+		return fmt.Errorf("stored credentials are an API key, which is scoped to a single project")
+	}
+	return c.StoreOAuthCredentials(creds.OAuth, projectID)
+}
+
 // StoreCredentialsToFile stores credentials to file (test helper)
 func (c *Config) StoreCredentialsToFile(apiKey, projectID string) error {
 	creds := storedCredentials{
@@ -109,8 +124,16 @@ func (c *Config) storeCredentials(creds storedCredentials) error {
 		return fmt.Errorf("failed to marshal credentials: %w", err)
 	}
 
-	if err := storeToKeyring(string(credentialsJSON)); err == nil {
+	keyringErr := storeToKeyring(string(credentialsJSON))
+	if keyringErr == nil {
 		return nil
+	}
+	// loadCredentialsBlob prefers the keyring, so an entry we can read but
+	// not overwrite would shadow the file fallback on every later read.
+	if _, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
+		if err := keyring.Delete(GetServiceName(), keyringUsername); err != nil {
+			return fmt.Errorf("failed to store credentials in keyring (%v) or to remove the stale keyring entry shadowing the file fallback: %w", keyringErr, err)
+		}
 	}
 	return c.storeToFile(string(credentialsJSON))
 }

@@ -11,14 +11,13 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 
+	"github.com/timescale/tiger-cli/internal/analytics"
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
@@ -37,13 +36,8 @@ const nextStepsMessage = `
 • Enable read-only mode: tiger config set read_only true
 `
 
-var (
-	// openBrowser can be overridden for testing
-	openBrowser = openBrowserImpl
-
-	// selectProjectInteractively can be overridden for testing
-	selectProjectInteractively = selectProjectInteractivelyImpl
-)
+// openBrowser can be overridden for testing
+var openBrowser = openBrowserImpl
 
 type credentials struct {
 	publicKey string
@@ -52,6 +46,7 @@ type credentials struct {
 
 func buildLoginCmd(app *common.App) *cobra.Command {
 	var flags credentials
+	var projectIDFlag string
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -64,17 +59,25 @@ The OAuth flow will:
 - Let you select a project (if you have multiple)
 - Store an OAuth session for the selected project
 
+Use --project-id (or the TIGER_PROJECT_ID environment variable) to pick the project up front
+and skip the interactive selection, which is what you want when no terminal is available. After
+logging in, switch between projects with 'tiger project'.
+
 The credentials and project ID will be stored securely in the system keyring, or in a fallback file with
 restricted permissions.
 
 You may also provide API keys via flags or environment variables, in which case they will be used
-directly. The CLI will prompt for any missing information.
+directly. The CLI will prompt for any missing information. An API key is scoped to a single project,
+so --project-id only confirms which project that is.
 
 You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings
 
 Examples:
   # Interactive login with OAuth (opens browser)
   tiger auth login
+
+  # OAuth login without the interactive project picker
+  tiger auth login --project-id rp1pz7uyae
 
   # Login with keys (project ID will be auto-detected)
   tiger auth login --public-key your-public-key --secret-key your-secret-key
@@ -95,14 +98,17 @@ Examples:
 				publicKey: flagOrEnvVar(flags.publicKey, "TIGER_PUBLIC_KEY"),
 				secretKey: flagOrEnvVar(flags.secretKey, "TIGER_SECRET_KEY"),
 			}
+			requestedProjectID := flagOrEnvVar(projectIDFlag, "TIGER_PROJECT_ID")
 
 			if creds.publicKey == "" && creds.secretKey == "" {
 				l := &oauthLogin{
-					cfg:        cfg,
-					authURL:    cfg.ConsoleURL + "/oauth/authorize",
-					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
-					successURL: cfg.ConsoleURL + "/oauth/code/success",
-					cmd:        cmd,
+					cfg:               cfg,
+					authURL:           cfg.ConsoleURL + "/oauth/authorize",
+					tokenURL:          cfg.GatewayURL + "/idp/external/cli/token",
+					successURL:        cfg.ConsoleURL + "/oauth/code/success",
+					projectID:         requestedProjectID,
+					projectIDFromFlag: projectIDFlag != "",
+					cmd:               cmd,
 				}
 
 				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
@@ -141,6 +147,22 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
+			// An API key carries its own project, so there's nothing to select.
+			// A mismatch is still reported rather than ignored: scripts pass
+			// --project-id without knowing which auth method they'll get. Only
+			// the explicit flag fails, though — TIGER_PROJECT_ID is ambient, and
+			// may well be set for OAuth logins elsewhere in the environment.
+			// Checking projectIDFlag rather than cobra's Changed keeps an
+			// explicitly empty flag counting as unset, like flagOrEnvVar above.
+			if requestedProjectID != "" && requestedProjectID != authInfo.APIKey.Project.ID {
+				if projectIDFlag != "" {
+					return common.ExitWithCode(common.ExitInvalidParameters,
+						analytics.RedactError(
+							fmt.Errorf("API key is scoped to project %s, not the requested %s", authInfo.APIKey.Project.ID, requestedProjectID),
+							"API key is scoped to a different project than requested"))
+				}
+				cmd.PrintErrf("Warning: ignoring TIGER_PROJECT_ID (%s) - this API key is scoped to project %s\n", requestedProjectID, authInfo.APIKey.Project.ID)
+			}
 			if err := cfg.StoreCredentials(apiKey, authInfo.APIKey.Project.ID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
@@ -154,6 +176,10 @@ Examples:
 
 	cmd.Flags().StringVar(&flags.publicKey, "public-key", "", "Public key for authentication")
 	cmd.Flags().StringVar(&flags.secretKey, "secret-key", "", "Secret key for authentication")
+	cmd.Flags().StringVar(&projectIDFlag, "project-id", "", "Project ID to log in to (skips interactive project selection)")
+
+	// Only fails if the flag doesn't exist, which the line above guarantees.
+	_ = cmd.RegisterFlagCompletionFunc("project-id", projectIDCompletion(app))
 
 	return cmd
 }
@@ -205,7 +231,12 @@ type oauthLogin struct {
 	authURL    string
 	tokenURL   string
 	successURL string
-	cmd        *cobra.Command
+	// projectID comes from --project-id or TIGER_PROJECT_ID; empty means
+	// select one after authenticating. projectIDFromFlag records which: the
+	// flag is authoritative, the ambient env var only warns.
+	projectID         string
+	projectIDFromFlag bool
+	cmd               *cobra.Command
 }
 
 func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
@@ -221,12 +252,24 @@ func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.Cl
 		return nil, nil, "", fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	projectID, err := l.selectProjectID(ctx, client)
+	projects, err := fetchProjects(ctx, client)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	project, err := resolveProjectID(l.cmd, projects, l.projectID,
+		"pass --project-id or set TIGER_PROJECT_ID")
+	if err != nil && l.projectID != "" && !l.projectIDFromFlag {
+		// TIGER_PROJECT_ID is ambient and may be set for a different login
+		// elsewhere in the environment, so an inaccessible project it names
+		// downgrades to a warning, matching the API-key branch.
+		l.cmd.PrintErrf("Warning: ignoring TIGER_PROJECT_ID (%s) - project not found or not accessible\n", l.projectID)
+		project, err = resolveProjectID(l.cmd, projects, "", "pass --project-id")
+	}
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to select project: %w", err)
 	}
 
-	return token, client, projectID, nil
+	return token, client, project.ID, nil
 }
 
 func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
@@ -402,141 +445,4 @@ func openBrowserImpl(url string) error {
 	}
 
 	return cmd.Start()
-}
-
-func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
-	resp, err := client.GetProjectsWithResponse(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get user projects: %w", err)
-	}
-	if resp.JSON200 == nil {
-		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	projects := *resp.JSON200
-
-	switch len(projects) {
-	case 0:
-		return "", fmt.Errorf("user has no accessible projects")
-	case 1:
-		return projects[0].ID, nil
-	default:
-		if !util.IsTerminal(l.cmd.InOrStdin()) || !util.IsTerminal(l.cmd.ErrOrStderr()) {
-			return "", fmt.Errorf("TTY not detected - cannot select between %d projects. Log in with API keys instead (--public-key, --secret-key)", len(projects))
-		}
-		return selectProjectInteractively(l.cmd, projects)
-	}
-}
-
-// selectProjectInteractivelyImpl is the default implementation for project selection using Bubble Tea
-func selectProjectInteractivelyImpl(cmd *cobra.Command, projects []api.Project) (string, error) {
-	model := projectSelectModel{
-		projects: projects,
-		cursor:   0,
-	}
-
-	program := tea.NewProgram(model,
-		tea.WithInput(cmd.InOrStdin()),
-		tea.WithOutput(cmd.ErrOrStderr()),
-		tea.WithContext(cmd.Context()),
-		tea.WithoutSignalHandler())
-	finalModel, err := program.Run()
-	if err != nil {
-		return "", fmt.Errorf("failed to run project selection: %w", err)
-	}
-
-	result := finalModel.(projectSelectModel)
-	if result.selected == "" {
-		return "", fmt.Errorf("no project selected")
-	}
-
-	return result.selected, nil
-}
-
-type projectSelectModel struct {
-	projects     []api.Project
-	cursor       int
-	selected     string
-	numberBuffer string
-}
-
-func (m projectSelectModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m projectSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "k":
-			// Clear buffer when using arrows
-			m.numberBuffer = ""
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			// Clear buffer when using arrows
-			m.numberBuffer = ""
-			if m.cursor < len(m.projects)-1 {
-				m.cursor++
-			}
-		case "enter", "space":
-			m.selected = m.projects[m.cursor].ID
-			return m, tea.Quit
-		case "backspace":
-			// Handle backspace to remove last character from buffer
-			if len(m.numberBuffer) > 0 {
-				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
-			}
-		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			// Add digit to buffer and update cursor position
-			m.updateNumberBuffer(m.numberBuffer + msg.String())
-		case "ctrl+w", "esc":
-			// Clear buffer on escape
-			m.numberBuffer = ""
-		}
-	}
-	return m, nil
-}
-
-// updateNumberBuffer moves the cursor to the project matching the number buffer
-func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
-	if newBuffer == "" {
-		m.numberBuffer = newBuffer
-		return
-	}
-
-	// Parse the buffer as a number
-	num, err := strconv.Atoi(newBuffer)
-	if err != nil {
-		return
-	}
-
-	// Convert from 1-based to 0-based index and validate bounds
-	index := num - 1
-	if index >= 0 && index < len(m.projects) {
-		m.numberBuffer = newBuffer
-		m.cursor = index
-	}
-}
-
-func (m projectSelectModel) View() tea.View {
-	s := "Select a project:\n\n"
-
-	for i, project := range m.projects {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
-	}
-
-	// Show the current number buffer if user is typing
-	if m.numberBuffer != "" {
-		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
-	}
-
-	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return tea.NewView(s)
 }

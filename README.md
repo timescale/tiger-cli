@@ -96,9 +96,10 @@ tiger mcp install
 Tiger CLI provides the following commands:
 
 - `tiger auth` - Authentication management
-  - `login` - Log in to your Tiger account
+  - `login` - Log in to your Tiger account (use `--project-id` to pick a project without the interactive prompt)
   - `logout` - Log out from your Tiger account
   - `status` - Show current authentication status and project ID (alias: `whoami`)
+- `tiger project [project-id]` - Switch the active project, prompting for one when no ID is given. Requires an OAuth login, since an API key is scoped to a single project (aliases: `projects`, `proj`)
 - `tiger service` - Service lifecycle management (aliases: `services`, `svc`)
   - `list` - List all services (alias: `ls`)
   - `create` - Create a new service
@@ -250,7 +251,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands return an error, and their MCP equivalents are not registered, so they don't appear in `tools/list` and can't be called. `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected — `tiger db schema` and the `db_schema` MCP tool always open a read-only session regardless of this setting. Default: `false`.
-- `service_id` - Default service ID
+- `service_id` - Default service ID. Cleared automatically by `tiger project`, since a service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
 ### Environment Variables
@@ -263,6 +264,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
+- `TIGER_PROJECT_ID` - Project to log in to, used by `tiger auth login` in place of the interactive project selection
 - `TIGER_READ_ONLY` - When `true`, write/destructive CLI commands return an error, the corresponding Tiger MCP write tools are not registered, and `db_execute_query` runs against a read-only database connection
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)

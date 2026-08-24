@@ -35,6 +35,10 @@ func setupAuthTest(t *testing.T) string {
 	// the test load their config from the test directory
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
+	// An ambient TIGER_PROJECT_ID would feed into project resolution and fail
+	// against the mocks' project lists
+	os.Unsetenv("TIGER_PROJECT_ID")
+
 	// Disable analytics for auth tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
 

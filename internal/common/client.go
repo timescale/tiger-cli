@@ -27,6 +27,17 @@ var (
 	validatedAPIKeyCache = map[string]*api.AuthInfo{}
 )
 
+// EnvAPIKey returns the API key formed from TIGER_PUBLIC_KEY/TIGER_SECRET_KEY,
+// and whether either was set. These take priority over stored credentials.
+func EnvAPIKey() (string, bool) {
+	publicKey := os.Getenv("TIGER_PUBLIC_KEY")
+	secretKey := os.Getenv("TIGER_SECRET_KEY")
+	if publicKey == "" && secretKey == "" {
+		return "", false
+	}
+	return fmt.Sprintf("%s:%s", publicKey, secretKey), true
+}
+
 // NewAPIClient initializes a [api.ClientWithResponses] and returns it along
 // with the current project ID. Credentials are pulled from the environment (if
 // present), or loaded from storage (either the keyring or fallback file). When
@@ -37,11 +48,10 @@ var (
 // have already been performed via `tiger auth login`.
 func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithResponses, string, error) {
 	// Credentials in the environment take priority
-	publicKey := os.Getenv("TIGER_PUBLIC_KEY")
-	secretKey := os.Getenv("TIGER_SECRET_KEY")
+	apiKey, fromEnv := EnvAPIKey()
 
 	// If there were no credentials in the environment, try to load stored credentials
-	if publicKey == "" && secretKey == "" {
+	if !fromEnv {
 		stored, err := GetStoredCredentials(cfg)
 		if err != nil {
 			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
@@ -58,7 +68,6 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 	}
 
 	// Create API client
-	apiKey := fmt.Sprintf("%s:%s", publicKey, secretKey)
 	client, err := api.NewTigerClient(cfg, apiKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create API client: %w", err)

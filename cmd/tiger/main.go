@@ -13,8 +13,10 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		// Check if it's a custom exit code error
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
+		// Check if it's a custom exit code error. errors.As unwraps, so the
+		// code survives fmt.Errorf wrapping.
+		var exitErr interface{ ExitCode() int }
+		if errors.As(err, &exitErr) {
 			os.Exit(exitErr.ExitCode())
 		}
 		os.Exit(1)

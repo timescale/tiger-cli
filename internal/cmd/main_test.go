@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -44,6 +45,35 @@ func stubReadPassword(t *testing.T, password string) {
 	t.Cleanup(func() { util.ReadPassword = original })
 }
 
+// stubSelectProject replaces the interactive project picker with fn.
+func stubSelectProject(t *testing.T, fn func(*cobra.Command, []api.Project) (api.Project, error)) {
+	t.Helper()
+	original := selectProjectInteractively
+	selectProjectInteractively = fn
+	t.Cleanup(func() { selectProjectInteractively = original })
+}
+
+// testProjects is the project list the mock API serves.
+var testProjects = []api.Project{
+	{ID: "project-123", Name: "Test Project 1"},
+	{ID: "project-456", Name: "Test Project 2"},
+	{ID: "project-789", Name: "Test Project 3"},
+}
+
+// assertExitCode checks that err carries the expected CLI exit code.
+func assertExitCode(t *testing.T, err error, expected int) {
+	t.Helper()
+
+	var exitErr common.ExitCodeError
+	if !errors.As(err, &exitErr) {
+		t.Errorf("Expected a common.ExitCodeError, got: %v", err)
+		return
+	}
+	if exitErr.ExitCode() != expected {
+		t.Errorf("Expected exit code %d, got %d (%v)", expected, exitErr.ExitCode(), err)
+	}
+}
+
 func TestMain(m *testing.M) {
 	// Clean up any global state before tests
 	code := m.Run()
@@ -61,6 +91,9 @@ func setupTestCommand(t *testing.T) (string, func()) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
+
+	// Isolate the test from the developer's real config file
+	t.Setenv("TIGER_CONFIG_DIR", tmpDir)
 
 	// Disable analytics for root tests to avoid tracking test events
 	os.Setenv("TIGER_ANALYTICS", "false")
