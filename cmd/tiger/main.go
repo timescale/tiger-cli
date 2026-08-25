@@ -14,15 +14,12 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		// A common.ExitCodeError anywhere in the chain sets the exit code.
-		// Foreign carriers (psql's *exec.ExitError) count only unwrapped, so
-		// wrapped subprocess codes can't collide with tiger's exit codes.
+		// A common.ExitCodeError anywhere in the chain sets the exit code;
+		// it is the only carrier main honors. errors.As unwraps, so the
+		// code survives fmt.Errorf wrapping.
 		var codeErr common.ExitCodeError
 		if errors.As(err, &codeErr) {
 			os.Exit(codeErr.ExitCode())
-		}
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(exitErr.ExitCode())
 		}
 		os.Exit(1)
 	}
