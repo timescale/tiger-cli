@@ -36,13 +36,13 @@ func setupProjectTest(t *testing.T, projects []api.Project, currentProjectID, se
 	}
 }
 
-func TestProject_Switch(t *testing.T) {
+func TestProjectUse_Switch(t *testing.T) {
 	setupProjectTest(t, []api.Project{
 		{ID: "project-old", Name: "Old Project"},
 		{ID: "project-new", Name: "New Project"},
 	}, "project-old", "svc-123")
 
-	output, err := executeAuthCommand(t.Context(), "project", "project-new")
+	output, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
 	if err != nil {
 		t.Fatalf("Switch failed: %v", err)
 	}
@@ -69,12 +69,12 @@ func TestProject_Switch(t *testing.T) {
 	}
 }
 
-func TestProject_SameProject(t *testing.T) {
+func TestProjectUse_SameProject(t *testing.T) {
 	setupProjectTest(t, []api.Project{
 		{ID: "project-old", Name: "Old Project"},
 	}, "project-old", "svc-123")
 
-	output, err := executeAuthCommand(t.Context(), "project", "project-old")
+	output, err := executeAuthCommand(t.Context(), "project", "use", "project-old")
 	if err != nil {
 		t.Fatalf("Command failed: %v", err)
 	}
@@ -88,12 +88,12 @@ func TestProject_SameProject(t *testing.T) {
 	}
 }
 
-func TestProject_NoAccess(t *testing.T) {
+func TestProjectUse_NoAccess(t *testing.T) {
 	setupProjectTest(t, []api.Project{
 		{ID: "project-old", Name: "Old Project"},
 	}, "project-old", "")
 
-	output, err := executeAuthCommand(t.Context(), "project", "project-unknown")
+	output, err := executeAuthCommand(t.Context(), "project", "use", "project-unknown")
 	if err == nil {
 		t.Fatal("Expected error for inaccessible project")
 	}
@@ -115,24 +115,24 @@ func TestProject_NoAccess(t *testing.T) {
 	}
 }
 
-func TestProject_APIKeyLogin(t *testing.T) {
+func TestProjectUse_APIKeyLogin(t *testing.T) {
 	setupAuthTest(t)
 
 	if err := testConfig(t).StoreCredentials("pub:sec", "project-old"); err != nil {
 		t.Fatalf("Failed to store credentials: %v", err)
 	}
 
-	_, err := executeAuthCommand(t.Context(), "project", "project-new")
+	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
 	if err == nil {
 		t.Fatal("Expected error for API key login")
 	}
-	if !strings.Contains(err.Error(), "requires an OAuth login") {
+	if !strings.Contains(err.Error(), "an API key is scoped to a single project") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	assertExitCode(t, err, common.ExitAuthenticationError)
 }
 
-func TestProject_EnvAPIKeys(t *testing.T) {
+func TestProjectUse_EnvAPIKeys(t *testing.T) {
 	tmpDir := setupAuthTest(t)
 	// Keep the env-key validation in wrapCommands off the network.
 	if _, err := config.UseTestConfig(tmpDir, map[string]any{"api_url": "http://localhost:1"}); err != nil {
@@ -141,7 +141,7 @@ func TestProject_EnvAPIKeys(t *testing.T) {
 	t.Setenv("TIGER_PUBLIC_KEY", "env-public")
 	t.Setenv("TIGER_SECRET_KEY", "env-secret")
 
-	_, err := executeAuthCommand(t.Context(), "project", "project-new")
+	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
 	if err == nil {
 		t.Fatal("Expected error with env API keys set")
 	}
@@ -151,14 +151,14 @@ func TestProject_EnvAPIKeys(t *testing.T) {
 	assertExitCode(t, err, common.ExitAuthenticationError)
 }
 
-func TestProject_EnvServiceID(t *testing.T) {
+func TestProjectUse_EnvServiceID(t *testing.T) {
 	setupProjectTest(t, []api.Project{
 		{ID: "project-old", Name: "Old Project"},
 		{ID: "project-new", Name: "New Project"},
 	}, "project-old", "")
 	t.Setenv("TIGER_SERVICE_ID", "svc-env")
 
-	output, err := executeAuthCommand(t.Context(), "project", "project-new")
+	output, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
 	if err != nil {
 		t.Fatalf("Switch failed: %v", err)
 	}
@@ -172,10 +172,10 @@ func TestProject_EnvServiceID(t *testing.T) {
 	}
 }
 
-func TestProject_NotLoggedIn(t *testing.T) {
+func TestProjectUse_NotLoggedIn(t *testing.T) {
 	setupAuthTest(t)
 
-	_, err := executeAuthCommand(t.Context(), "project", "project-new")
+	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
 	if err == nil {
 		t.Fatal("Expected error when not logged in")
 	}

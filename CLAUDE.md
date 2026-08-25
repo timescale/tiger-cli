@@ -301,11 +301,9 @@ The middleware automatically excludes sensitive fields using a centralized ignor
 1. **For sensitive flags or MCP tool parameters:** Add the field name to the `ignore` list in `internal/analytics/analytics.go`
    - Note: Flag names with dashes (like `public-key`) should be added with underscores (`public_key`) to the ignore list
 
-2. **For positional arguments:** Positional arguments are tracked automatically. If a command accepts sensitive data as a positional argument (not as a flag), mark it with the `analytics.OmitArgsAnnotation` annotation so `wrapCommands()` omits its args from tracking (see `tiger project`, whose argument is a project ID):
-
-   ```go
-   Annotations: map[string]string{analytics.OmitArgsAnnotation: "true"},
-   ```
+2. **For positional arguments:** Currently, all positional arguments are tracked automatically. If a command is added that accepts sensitive data as a positional argument (not as a flag), you must either:
+   - Refactor to use a flag instead
+   - Add filtering logic in `wrapCommands()` in `internal/cmd/root.go` to sanitize or omit the args from tracking
 
 **Common sensitive fields to watch for:**
 - Credentials: API keys, tokens, passwords, secret keys
@@ -326,7 +324,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
-  - `project.go` - `tiger project`, which switches the active project. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. Any project change clears the `service_id` config value via `clearStaleDefaultService` (`project_helper.go`) — `auth login` calls it too unless it lands on the same project as the previous login — and rebuilds the App's client so later readers (analytics in particular) see the new project. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
+  - `project_use.go` - `tiger project use`, which switches the active project. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. Any project change clears the `service_id` config value via `clearStaleDefaultService` (`project_helper.go`) — `auth login` calls it too unless it lands on the same project as the previous login — and rebuilds the App's client so later readers (analytics in particular) see the new project. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see

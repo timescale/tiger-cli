@@ -99,7 +99,8 @@ Tiger CLI provides the following commands:
   - `login` - Log in to your Tiger account
   - `logout` - Log out from your Tiger account
   - `status` - Show current authentication status and project ID (alias: `whoami`)
-- `tiger project <project-id>` - Switch the active project (requires an OAuth login; clears the default `service_id`, since it belonged to the previous project)
+- `tiger project` - Project management
+  - `use` - Switch the active project (requires an OAuth login; clears the default `service_id`, since it belonged to the previous project) (alias: `switch`)
 - `tiger service` - Service lifecycle management (aliases: `services`, `svc`)
   - `list` - List all services (alias: `ls`)
   - `create` - Create a new service

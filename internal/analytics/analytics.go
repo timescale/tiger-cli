@@ -29,10 +29,6 @@ var ignore = []string{
 	"parameters",
 }
 
-// OmitArgsAnnotation marks a cobra command (via cmd.Annotations, value "true")
-// whose positional args carry sensitive values and must not be tracked.
-const OmitArgsAnnotation = "analytics:omit-args"
-
 type Analytics struct {
 	config    *config.Config
 	projectID string

@@ -66,7 +66,7 @@ The OAuth flow will:
 - Store an OAuth session for the selected project
 
 Use --project-id to pick the project up front and skip the interactive selection. After
-logging in, you can switch projects with 'tiger project'.
+logging in, you can switch projects with 'tiger project use'.
 
 The credentials and project ID will be stored securely in the system keyring, or in a fallback file with
 restricted permissions. Unless the login lands on the same project as the previous login, the default
@@ -425,10 +425,14 @@ func openBrowserImpl(url string) error {
 }
 
 func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {
-	projects, err := fetchProjects(ctx, client)
+	resp, err := client.GetProjectsWithResponse(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get user projects: %w", err)
 	}
+	if resp.JSON200 == nil {
+		return "", common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+	projects := *resp.JSON200
 
 	if l.projectID != "" {
 		if err := requireProjectAccess(l.cmd, projects, l.projectID); err != nil {

@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -12,18 +10,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
-
-// fetchProjects lists the projects the logged-in user can access.
-func fetchProjects(ctx context.Context, client api.ClientWithResponsesInterface) ([]api.Project, error) {
-	resp, err := client.GetProjectsWithResponse(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list projects: %w", err)
-	}
-	if resp.JSON200 == nil {
-		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	return *resp.JSON200, nil
-}
 
 // requireProjectAccess verifies that projectID is one of projects. The
 // rejected ID goes to stderr only, not into the error text that analytics
@@ -38,7 +24,7 @@ func requireProjectAccess(cmd *cobra.Command, projects []api.Project, projectID 
 
 // clearStaleDefaultService removes the service_id config value after the
 // active project changed: a default service belongs to the project it was set
-// in. Used by `tiger project` and `tiger auth login`.
+// in. Used by `tiger project use` and `tiger auth login`.
 func clearStaleDefaultService(cmd *cobra.Command, cfg *config.Config) {
 	if cfg.ServiceID == "" {
 		return
