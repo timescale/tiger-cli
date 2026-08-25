@@ -23,7 +23,7 @@ func TestServiceResize_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service resize command
-	_, err, _ = executeServiceCommand(t.Context(), "service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8")
+	_, _, err = executeServiceCommand(t.Context(), "service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -54,7 +54,7 @@ func TestServiceResize_MissingParams(t *testing.T) {
 	mockTestPAT(t)
 
 	// Test missing both CPU and memory parameters
-	_, err, _ = executeServiceCommand(t.Context(), "service", "resize")
+	_, _, err = executeServiceCommand(t.Context(), "service", "resize")
 	if err == nil {
 		t.Fatal("Expected error when CPU and memory are missing")
 	}
@@ -80,7 +80,7 @@ func TestServiceResize_InvalidCPUMemoryCombination(t *testing.T) {
 	mockTestPAT(t)
 
 	// Test invalid CPU/memory combination
-	_, err, _ = executeServiceCommand(t.Context(), "service", "resize", "--cpu", "3000", "--memory", "8")
+	_, _, err = executeServiceCommand(t.Context(), "service", "resize", "--cpu", "3000", "--memory", "8")
 	if err == nil {
 		t.Fatal("Expected error for invalid CPU/memory combination")
 	}

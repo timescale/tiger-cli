@@ -143,6 +143,11 @@ Changing either option renames identifiers across the whole codebase.
 
 - Always use `go fmt` after making file changes and before committing
 - Run `go vet ./...` to catch potential issues before committing
+- Run `go fix -diff ./...` to check for code that should be updated to use newer
+  Go APIs or idioms
+- Run `go tool staticcheck ./...` to catch additional issues (unused code, deprecated
+  APIs, style checks) before committing — it's declared as a build-time tool in
+  `go.mod`'s `tool (...)` block alongside `oapi-codegen` and `mockgen`
 - Run `go test ./...` to ensure all tests pass
 
 ### Error Messages
@@ -504,7 +509,12 @@ addTool(s, readOnly, newServiceCreateTool(), s.handleServiceCreate)
 - **LLM validation**: Stricter JSON schema validations (min/max values, enums, patterns, etc.) prevent LLMs from sending invalid arguments in tool calls, catching errors before they reach the handler
 
 **Important Notes:**
-- Fields with `omitempty` are optional; fields without it are required
+- Fields with `omitempty` or `omitzero` are optional; fields without either are
+  required. For a struct-typed (not pointer) optional field, use `omitzero`
+  instead of `omitempty` — plain `encoding/json`'s `omitempty` has no effect on
+  a struct-valued field (it's never the zero value in the way `omitempty`
+  checks for), so the field would always be required in the schema despite the
+  tag.
 - Always provide descriptions and examples for better AI assistant understanding
 - Use JSON Schema properties to constrain and document values (e.g., `Default`, `Minimum`, `Maximum`, `Enum`, `Pattern`, `MinLength`, etc.)
   - See the [jsonschema-go Schema type](https://pkg.go.dev/github.com/google/jsonschema-go/jsonschema#Schema) for all available properties

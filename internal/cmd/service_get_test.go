@@ -23,7 +23,7 @@ func TestServiceGet_NoServiceID(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service get command without service ID
-	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
+	_, _, err = executeServiceCommand(t.Context(), "service", "get")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -49,7 +49,7 @@ func TestServiceGet_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service get command
-	_, err, _ = executeServiceCommand(t.Context(), "service", "get")
+	_, _, err = executeServiceCommand(t.Context(), "service", "get")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}

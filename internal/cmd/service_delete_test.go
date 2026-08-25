@@ -19,7 +19,7 @@ func TestServiceDelete_NoServiceID(t *testing.T) {
 	}
 
 	// Execute service delete command without service ID
-	_, err, _ = executeServiceCommand(t.Context(), "service", "delete")
+	_, _, err = executeServiceCommand(t.Context(), "service", "delete")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided")
 	}
@@ -44,7 +44,7 @@ func TestServiceDelete_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service delete command
-	_, err, _ = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
+	_, _, err = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -70,7 +70,7 @@ func TestServiceDelete_WithConfirmFlag(t *testing.T) {
 
 	// Execute service delete command with --confirm flag
 	// This should fail due to network error (which is expected in tests)
-	_, err, _ = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
+	_, _, err = executeServiceCommand(t.Context(), "service", "delete", "svc-12345", "--confirm")
 	if err == nil {
 		t.Fatal("Expected error due to network failure, but got none")
 	}
@@ -100,7 +100,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 
 	// Execute service delete command without --confirm flag
 	// This should try to read from stdin for confirmation, which will fail in test environment
-	output, err, _ := executeServiceCommand(t.Context(), "service", "delete", "svc-12345")
+	output, _, err := executeServiceCommand(t.Context(), "service", "delete", "svc-12345")
 
 	// Should either fail due to stdin read error or show cancellation message
 	// The exact behavior depends on the test environment
@@ -111,7 +111,7 @@ func TestServiceDelete_ConfirmationPrompt(t *testing.T) {
 
 func TestServiceDelete_HelpOutput(t *testing.T) {
 	// Test that the help output contains expected information
-	output, err, _ := executeServiceCommand(t.Context(), "service", "delete", "--help")
+	output, _, err := executeServiceCommand(t.Context(), "service", "delete", "--help")
 	if err != nil {
 		t.Fatalf("Help command should not fail: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestServiceDelete_FlagsValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// All these should fail due to network (which is expected)
 			// but they should NOT fail due to flag parsing errors
-			_, err, _ := executeServiceCommand(t.Context(), tc.args...)
+			_, _, err := executeServiceCommand(t.Context(), tc.args...)
 
 			// Should fail with network error, not flag parsing error
 			if err != nil && strings.Contains(err.Error(), "flag") {

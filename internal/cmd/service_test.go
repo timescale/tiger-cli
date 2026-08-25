@@ -47,13 +47,13 @@ func setupServiceTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeServiceCommand(ctx context.Context, args ...string) (string, error, *cobra.Command) {
+func executeServiceCommand(ctx context.Context, args ...string) (string, *cobra.Command, error) {
 	// No need to reset any flags - we build fresh commands with local variables
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot, err := buildRootCmd(ctx)
 	if err != nil {
-		return "", err, nil
+		return "", nil, err
 	}
 
 	buf := new(bytes.Buffer)
@@ -62,7 +62,7 @@ func executeServiceCommand(ctx context.Context, args ...string) (string, error, 
 	testRoot.SetArgs(args)
 
 	err = testRoot.Execute()
-	return buf.String(), err, testRoot
+	return buf.String(), testRoot, err
 }
 
 // Helper function to create test services
@@ -624,7 +624,7 @@ func TestDestructiveCommands_ReadOnly(t *testing.T) {
 
 	for _, args := range cases {
 		t.Run(args[1], func(t *testing.T) {
-			_, err, _ := executeServiceCommand(t.Context(), args...)
+			_, _, err := executeServiceCommand(t.Context(), args...)
 			if !errors.Is(err, common.ErrReadOnly) {
 				t.Errorf("Expected common.ErrReadOnly, got: %v", err)
 			}
