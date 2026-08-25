@@ -7,10 +7,6 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
-func Ptr[T any](val T) *T {
-	return &val
-}
-
 func PtrIfNonNil[T ~[]E, E any](val T) *T {
 	if val == nil {
 		return nil
@@ -67,5 +63,4 @@ func ConvertSliceToAny[T any](ts []T) []any {
 		out[i] = any(t)
 	}
 	return out
-
 }

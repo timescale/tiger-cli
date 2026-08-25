@@ -131,18 +131,18 @@ func TestAddTigerMCPServer(t *testing.T) {
 		name                 string
 		initialConfig        string
 		mcpServersPathPrefix string
-		expectedResult       map[string]interface{}
+		expectedResult       map[string]any
 		expectError          bool
 	}{
 		{
 			name:                 "empty config file",
 			initialConfig:        `{}`,
 			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]interface{}{
-				"mcpServers": map[string]interface{}{
-					"tiger": map[string]interface{}{
+			expectedResult: map[string]any{
+				"mcpServers": map[string]any{
+					"tiger": map[string]any{
 						"command": "tiger",
-						"args":    []interface{}{"mcp", "start"},
+						"args":    []any{"mcp", "start"},
 					},
 				},
 			},
@@ -152,15 +152,15 @@ func TestAddTigerMCPServer(t *testing.T) {
 			name:                 "config with existing mcpServers",
 			initialConfig:        `{"mcpServers": {"existing": {"command": "existing", "args": ["test"]}}}`,
 			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]interface{}{
-				"mcpServers": map[string]interface{}{
-					"existing": map[string]interface{}{
+			expectedResult: map[string]any{
+				"mcpServers": map[string]any{
+					"existing": map[string]any{
 						"command": "existing",
-						"args":    []interface{}{"test"},
+						"args":    []any{"test"},
 					},
-					"tiger": map[string]interface{}{
+					"tiger": map[string]any{
 						"command": "tiger",
-						"args":    []interface{}{"mcp", "start"},
+						"args":    []any{"mcp", "start"},
 					},
 				},
 			},
@@ -170,19 +170,19 @@ func TestAddTigerMCPServer(t *testing.T) {
 			name:                 "preserves multiple sibling servers",
 			initialConfig:        `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`,
 			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]interface{}{
-				"mcpServers": map[string]interface{}{
-					"server1": map[string]interface{}{
+			expectedResult: map[string]any{
+				"mcpServers": map[string]any{
+					"server1": map[string]any{
 						"command": "cmd1",
-						"args":    []interface{}{"arg1"},
+						"args":    []any{"arg1"},
 					},
-					"server2": map[string]interface{}{
+					"server2": map[string]any{
 						"command": "cmd2",
-						"args":    []interface{}{"arg2", "arg3"},
+						"args":    []any{"arg2", "arg3"},
 					},
-					"tiger": map[string]interface{}{
+					"tiger": map[string]any{
 						"command": "tiger",
-						"args":    []interface{}{"mcp", "start"},
+						"args":    []any{"mcp", "start"},
 					},
 				},
 			},
@@ -192,12 +192,12 @@ func TestAddTigerMCPServer(t *testing.T) {
 			name:                 "config without mcpServers section",
 			initialConfig:        `{"other": "config"}`,
 			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]interface{}{
+			expectedResult: map[string]any{
 				"other": "config",
-				"mcpServers": map[string]interface{}{
-					"tiger": map[string]interface{}{
+				"mcpServers": map[string]any{
+					"tiger": map[string]any{
 						"command": "tiger",
-						"args":    []interface{}{"mcp", "start"},
+						"args":    []any{"mcp", "start"},
 					},
 				},
 			},
@@ -207,11 +207,11 @@ func TestAddTigerMCPServer(t *testing.T) {
 			name:                 "different path prefix",
 			initialConfig:        `{}`,
 			mcpServersPathPrefix: "/servers",
-			expectedResult: map[string]interface{}{
-				"servers": map[string]interface{}{
-					"tiger": map[string]interface{}{
+			expectedResult: map[string]any{
+				"servers": map[string]any{
+					"tiger": map[string]any{
 						"command": "tiger",
-						"args":    []interface{}{"mcp", "start"},
+						"args":    []any{"mcp", "start"},
 					},
 				},
 			},
@@ -251,7 +251,7 @@ func TestAddTigerMCPServer(t *testing.T) {
 			require.NoError(t, err)
 
 			// Parse the result
-			var result map[string]interface{}
+			var result map[string]any
 			err = json.Unmarshal(resultBytes, &result)
 			require.NoError(t, err)
 
@@ -298,15 +298,15 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		resultBytes, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var result map[string]interface{}
+		var result map[string]any
 		err = json.Unmarshal(resultBytes, &result)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"mcpServers": map[string]interface{}{
-				"tiger": map[string]interface{}{
+		expected := map[string]any{
+			"mcpServers": map[string]any{
+				"tiger": map[string]any{
 					"command": "tiger",
-					"args":    []interface{}{"mcp", "start"},
+					"args":    []any{"mcp", "start"},
 				},
 			},
 		}
@@ -328,15 +328,15 @@ func TestAddTigerMCPServerFileOperations(t *testing.T) {
 		resultBytes, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var result map[string]interface{}
+		var result map[string]any
 		err = json.Unmarshal(resultBytes, &result)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"mcpServers": map[string]interface{}{
-				"tiger": map[string]interface{}{
+		expected := map[string]any{
+			"mcpServers": map[string]any{
+				"tiger": map[string]any{
 					"command": "tiger",
-					"args":    []interface{}{"mcp", "start"},
+					"args":    []any{"mcp", "start"},
 				},
 			},
 		}
@@ -840,19 +840,19 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		configContent, err := os.ReadFile(configPath)
 		require.NoError(t, err, "should be able to read config file")
 
-		var config map[string]interface{}
+		var config map[string]any
 		err = json.Unmarshal(configContent, &config)
 		require.NoError(t, err, "config should be valid JSON")
 
 		// Check that mcpServers exists and contains tiger
-		mcpServers, exists := config["mcpServers"].(map[string]interface{})
+		mcpServers, exists := config["mcpServers"].(map[string]any)
 		require.True(t, exists, "mcpServers should exist in config")
 
-		tiger, exists := mcpServers["tiger"].(map[string]interface{})
+		tiger, exists := mcpServers["tiger"].(map[string]any)
 		require.True(t, exists, "tiger should be added to mcpServers")
 
 		assert.Equal(t, "tiger", tiger["command"], "command should be 'tiger'")
-		args, ok := tiger["args"].([]interface{})
+		args, ok := tiger["args"].([]any)
 		require.True(t, ok, "args should be an array")
 		require.Len(t, args, 2, "should have two arguments")
 		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
@@ -888,11 +888,11 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		configContent, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var config map[string]interface{}
+		var config map[string]any
 		err = json.Unmarshal(configContent, &config)
 		require.NoError(t, err)
 
-		mcpServers := config["mcpServers"].(map[string]interface{})
+		mcpServers := config["mcpServers"].(map[string]any)
 		assert.Contains(t, mcpServers, "tiger", "tiger should be added")
 		assert.Contains(t, mcpServers, "existing", "existing server should be preserved")
 	})
@@ -935,19 +935,19 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		content1, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var config1 map[string]interface{}
+		var config1 map[string]any
 		err = json.Unmarshal(content1, &config1)
 		require.NoError(t, err)
 
 		// Verify tiger was updated
-		mcpServers1 := config1["mcpServers"].(map[string]interface{})
+		mcpServers1 := config1["mcpServers"].(map[string]any)
 		assert.Contains(t, mcpServers1, "tiger", "tiger should exist after install")
 		assert.Contains(t, mcpServers1, "existing", "existing server should be preserved")
 
-		tigerConfig := mcpServers1["tiger"].(map[string]interface{})
+		tigerConfig := mcpServers1["tiger"].(map[string]any)
 		assert.Equal(t, "tiger", tigerConfig["command"], "command should be updated to 'tiger' in test mode")
 
-		args := tigerConfig["args"].([]interface{})
+		args := tigerConfig["args"].([]any)
 		assert.Equal(t, 2, len(args), "should have 2 args")
 		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
 		assert.Equal(t, "start", args[1], "second arg should be 'start'")
@@ -960,12 +960,12 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		content2, err := os.ReadFile(configPath)
 		require.NoError(t, err)
 
-		var config2 map[string]interface{}
+		var config2 map[string]any
 		err = json.Unmarshal(content2, &config2)
 		require.NoError(t, err)
 
 		// Verify config is identical after second install
-		mcpServers2 := config2["mcpServers"].(map[string]interface{})
+		mcpServers2 := config2["mcpServers"].(map[string]any)
 		assert.Contains(t, mcpServers2, "tiger", "tiger should still exist after second install")
 		assert.Contains(t, mcpServers2, "existing", "existing server should still be preserved")
 
@@ -973,7 +973,7 @@ func TestInstallMCPForEditor_Integration(t *testing.T) {
 		assert.Equal(t, len(mcpServers1), len(mcpServers2), "number of MCP servers should not increase")
 
 		// Verify tiger config is still correct
-		tigerConfig2 := mcpServers2["tiger"].(map[string]interface{})
+		tigerConfig2 := mcpServers2["tiger"].(map[string]any)
 		assert.Equal(t, tigerConfig, tigerConfig2, "tiger config should remain the same")
 	})
 }

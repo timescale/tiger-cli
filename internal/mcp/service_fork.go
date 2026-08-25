@@ -91,9 +91,9 @@ WARNING: Creates billable resources.`,
 		OutputSchema: ServiceForkOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
-			IdempotentHint:  false,           // Forking same service multiple times creates multiple forks
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(false), // Creates resources but doesn't modify existing
+			IdempotentHint:  false,      // Forking same service multiple times creates multiple forks
+			OpenWorldHint:   new(true),
 			Title:           "Fork Database Service",
 		},
 	}

@@ -9,7 +9,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // Helper function to create a test service
@@ -19,8 +18,8 @@ func createTestService(serviceID string) api.Service {
 		ProjectID: projectID,
 		ServiceID: serviceID,
 		Endpoint: &api.Endpoint{
-			Host: util.Ptr("test-host.tigerdata.com"),
-			Port: util.Ptr(5432),
+			Host: new("test-host.tigerdata.com"),
+			Port: new(5432),
 		},
 	}
 }

@@ -181,7 +181,7 @@ func TestConfigSet_OutputDoesPersist(t *testing.T) {
 	}
 
 	// Parse the YAML to check
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
 		t.Fatalf("Failed to parse config YAML: %v", err)
 	}

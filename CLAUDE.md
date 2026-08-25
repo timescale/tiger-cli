@@ -550,7 +550,7 @@ logging. Don't add log statements to CLI commands — print with `cmd.Print*` /
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
 - **pgx/v5**: PostgreSQL driver for database operations in MCP tools
-- **Go 1.25+**: Required Go version
+- **Go 1.27+**: Required Go version
 
 ## Project Structure
 

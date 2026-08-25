@@ -129,7 +129,7 @@ Examples:
 				forkStrategy = api.ForkStrategyLASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.ForkStrategyPITR
-				targetTime = util.Ptr(forkToTimestamp)
+				targetTime = new(forkToTimestamp)
 			}
 
 			// Display what we're about to do

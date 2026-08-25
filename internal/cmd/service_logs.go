@@ -147,7 +147,7 @@ func colorizeLogEntry(line, severity string, colorEnabled bool) string {
 		return line
 	}
 
-	var colorFn func(string, ...interface{}) string
+	var colorFn func(string, ...any) string
 	switch strings.ToUpper(severity) {
 	case "ERROR", "FATAL", "PANIC":
 		colorFn = color.RedString

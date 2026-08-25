@@ -10,7 +10,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
@@ -75,7 +74,7 @@ func TestServiceUpdatePassword_ReadReplicaRejected(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(api.Service{
 			ServiceID:  "rep1234567",
 			ProjectID:  "test-project-123",
-			ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceID: util.Ptr("svcprimary")},
+			ForkedFrom: &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")},
 		})
 	}))
 	defer srv.Close()

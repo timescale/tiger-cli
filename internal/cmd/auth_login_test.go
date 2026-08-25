@@ -554,7 +554,7 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 			}
 		}
 
-		tokenResponse := map[string]interface{}{
+		tokenResponse := map[string]any{
 			"access_token":  "mock-access-token-12345",
 			"refresh_token": "mock-refresh-token-67890",
 			"expires_in":    3600,
