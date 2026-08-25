@@ -11,9 +11,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// requireProjectAccess verifies that projectID is one of projects. The
-// rejected ID goes to stderr only, not into the error text that analytics
-// records verbatim.
+// requireProjectAccess verifies that projectID is one of projects.
 func requireProjectAccess(cmd *cobra.Command, projects []api.Project, projectID string) error {
 	if slices.ContainsFunc(projects, func(p api.Project) bool { return p.ID == projectID }) {
 		return nil

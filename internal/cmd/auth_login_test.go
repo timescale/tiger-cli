@@ -505,87 +505,58 @@ func TestAuthLogin_KeyFlags_ProjectIDMatch(t *testing.T) {
 	}
 }
 
-func TestAuthLogin_ProjectChange_ClearsDefaultService(t *testing.T) {
-	setupOAuthTest(t, []api.Project{
-		{ID: "project-123", Name: "Test Project"},
-	}, "project-123")
-
-	// Simulate a previous login to a different project with a default service.
-	cfg := testConfig(t)
-	if err := cfg.Set("service_id", "svc-old"); err != nil {
-		t.Fatalf("Failed to set service_id: %v", err)
-	}
-	prevToken := &oauth2.Token{
-		AccessToken:  "prev-access-token",
-		RefreshToken: "prev-refresh-token",
-		Expiry:       time.Now().Add(time.Hour),
-	}
-	if err := cfg.StoreOAuthCredentials(prevToken, "project-old"); err != nil {
-		t.Fatalf("Failed to store previous credentials: %v", err)
+// TestAuthLogin_DefaultServiceClearing covers the three prevProjectID branches
+// of finishLogin: known-different project, unknown previous project (e.g.
+// after a logout), and same project.
+func TestAuthLogin_DefaultServiceClearing(t *testing.T) {
+	testCases := []struct {
+		name          string
+		prevProjectID string // "" = no stored credentials before login
+		wantCleared   bool
+	}{
+		{name: "different project clears", prevProjectID: "project-old", wantCleared: true},
+		{name: "unknown previous project clears", prevProjectID: "", wantCleared: true},
+		{name: "same project keeps", prevProjectID: "project-123", wantCleared: false},
 	}
 
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if !strings.Contains(output, "Cleared default service (config key service_id): it belonged to the previous project") {
-		t.Errorf("Expected default service to be cleared, got: %q", output)
-	}
-	if serviceID := testConfig(t).ServiceID; serviceID != "" {
-		t.Errorf("Expected service_id to be cleared, got %q", serviceID)
-	}
-}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOAuthTest(t, []api.Project{
+				{ID: "project-123", Name: "Test Project"},
+			}, "project-123")
 
-func TestAuthLogin_AfterLogout_ClearsDefaultService(t *testing.T) {
-	setupOAuthTest(t, []api.Project{
-		{ID: "project-123", Name: "Test Project"},
-	}, "project-123")
+			cfg := testConfig(t)
+			if err := cfg.Set("service_id", "svc-before"); err != nil {
+				t.Fatalf("Failed to set service_id: %v", err)
+			}
+			if tc.prevProjectID != "" {
+				prevToken := &oauth2.Token{
+					AccessToken:  "prev-access-token",
+					RefreshToken: "prev-refresh-token",
+					Expiry:       time.Now().Add(time.Hour),
+				}
+				if err := cfg.StoreOAuthCredentials(prevToken, tc.prevProjectID); err != nil {
+					t.Fatalf("Failed to store previous credentials: %v", err)
+				}
+			}
 
-	// A default service left behind by a logged-out session: the previous
-	// project is unknown, so login must clear it.
-	if err := testConfig(t).Set("service_id", "svc-old"); err != nil {
-		t.Fatalf("Failed to set service_id: %v", err)
-	}
+			output, err := executeAuthCommand(t.Context(), "auth", "login")
+			if err != nil {
+				t.Fatalf("Login failed: %v", err)
+			}
 
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if !strings.Contains(output, "Cleared default service") {
-		t.Errorf("Expected default service to be cleared, got: %q", output)
-	}
-	if serviceID := testConfig(t).ServiceID; serviceID != "" {
-		t.Errorf("Expected service_id to be cleared, got %q", serviceID)
-	}
-}
-
-func TestAuthLogin_SameProject_KeepsDefaultService(t *testing.T) {
-	setupOAuthTest(t, []api.Project{
-		{ID: "project-123", Name: "Test Project"},
-	}, "project-123")
-
-	cfg := testConfig(t)
-	if err := cfg.Set("service_id", "svc-123"); err != nil {
-		t.Fatalf("Failed to set service_id: %v", err)
-	}
-	prevToken := &oauth2.Token{
-		AccessToken:  "prev-access-token",
-		RefreshToken: "prev-refresh-token",
-		Expiry:       time.Now().Add(time.Hour),
-	}
-	if err := cfg.StoreOAuthCredentials(prevToken, "project-123"); err != nil {
-		t.Fatalf("Failed to store previous credentials: %v", err)
-	}
-
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if strings.Contains(output, "Cleared default service") {
-		t.Errorf("Default service should be kept for a same-project login, got: %q", output)
-	}
-	if serviceID := testConfig(t).ServiceID; serviceID != "svc-123" {
-		t.Errorf("Expected service_id to be kept, got %q", serviceID)
+			cleared := strings.Contains(output, "Cleared default service")
+			if cleared != tc.wantCleared {
+				t.Errorf("Cleared message present = %t, want %t; output: %q", cleared, tc.wantCleared, output)
+			}
+			wantServiceID := "svc-before"
+			if tc.wantCleared {
+				wantServiceID = ""
+			}
+			if serviceID := testConfig(t).ServiceID; serviceID != wantServiceID {
+				t.Errorf("service_id = %q, want %q", serviceID, wantServiceID)
+			}
+		})
 	}
 }
 

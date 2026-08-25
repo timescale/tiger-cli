@@ -157,7 +157,7 @@ Examples:
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
 			// An API key carries its own project; a mismatched --project-id is
-			// an error. IDs stay out of the error text, which analytics records.
+			// an error.
 			if projectID != "" && projectID != authInfo.APIKey.Project.ID {
 				return common.ExitWithCode(common.ExitInvalidParameters,
 					errors.New("API key is scoped to a different project than the one requested with --project-id"))
