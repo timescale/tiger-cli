@@ -1,130 +1,155 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
+	"fmt"
+	"maps"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func setupConfigTest(t *testing.T) (string, func()) {
+// showValues returns the values `config show` reports for a default config in
+// configDir, with overrides replacing individual keys.
+func showValues(configDir string, overrides map[string]any) map[string]any {
+	values := map[string]any{
+		"api_url":          "https://console.cloud.tigerdata.com/public/api/v1",
+		"analytics":        true,
+		"color":            true,
+		"config_dir":       configDir,
+		"console_url":      "https://console.cloud.tigerdata.com",
+		"docs_mcp":         true,
+		"docs_mcp_url":     "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database",
+		"gateway_url":      "https://console.cloud.tigerdata.com/api",
+		"mcp_max_rows":     100,
+		"output":           "table",
+		"password_storage": "keyring",
+		"read_only":        false,
+		"releases_url":     "https://cli.tigerdata.com",
+		"service_id":       "",
+		"version_check":    true,
+	}
+	maps.Copy(values, overrides)
+	return values
+}
+
+// showJSON renders the expected `config show` JSON output (keys in struct
+// field order) for a default config in configDir with the given overrides.
+func showJSON(t *testing.T, configDir string, overrides map[string]any) string {
 	t.Helper()
-
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-
-	// Create temporary directory for test config
-	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+	values := showValues(configDir, overrides)
+	keys := []string{
+		"api_url", "analytics", "color", "config_dir", "console_url",
+		"docs_mcp", "docs_mcp_url", "gateway_url", "mcp_max_rows", "output",
+		"password_storage", "read_only", "releases_url", "service_id",
+		"version_check",
 	}
-
-	// Set environment variable to use test directory
-	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-
-	// Disable analytics for config tests to avoid tracking test events
-	os.Setenv("TIGER_ANALYTICS", "false")
-
-	config.UseTestConfig(tmpDir, map[string]any{})
-
-	// Clean up function
-	cleanup := func() {
-		os.RemoveAll(tmpDir)
-		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_ANALYTICS")
-
-		// Reset global config in the config package
-		// This is important for test isolation
-		// We need to clear the singleton
+	var b strings.Builder
+	b.WriteString("{\n")
+	for i, key := range keys {
+		value, err := json.Marshal(values[key])
+		if err != nil {
+			t.Fatalf("failed to marshal %s: %v", key, err)
+		}
+		fmt.Fprintf(&b, "  %q: %s", key, value)
+		if i < len(keys)-1 {
+			b.WriteString(",")
+		}
+		b.WriteString("\n")
 	}
-
-	t.Cleanup(cleanup)
-
-	return tmpDir, cleanup
+	b.WriteString("}\n")
+	return b.String()
 }
 
-func executeConfigCommand(ctx context.Context, args ...string) (string, error) {
-	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot, err := buildRootCmd(ctx)
+// readConfigFile parses the config file persisted in configDir.
+func readConfigFile(t *testing.T, configDir string) map[string]any {
+	t.Helper()
+	contents, err := os.ReadFile(config.GetConfigFile(configDir))
 	if err != nil {
-		return "", err
+		t.Fatalf("failed to read config file: %v", err)
 	}
-
-	buf := new(bytes.Buffer)
-	testRoot.SetOut(buf)
-	testRoot.SetErr(buf)
-	testRoot.SetArgs(args)
-
-	err = testRoot.Execute()
-	return buf.String(), err
+	var values map[string]any
+	if err := yaml.Unmarshal(contents, &values); err != nil {
+		t.Fatalf("failed to parse config file: %v", err)
+	}
+	return values
 }
 
-func TestConfigCommands_Integration(t *testing.T) {
-	_, _ = setupConfigTest(t)
-
-	// Test full workflow: set -> show -> unset -> reset
-
-	// 1. Set some values
-	_, err := executeConfigCommand(t.Context(), "config", "set", "service_id", "integration-test")
-	if err != nil {
-		t.Fatalf("Failed to set service_id: %v", err)
+// checkConfigFile returns a check func asserting that the persisted config
+// file contains exactly the given keys and values.
+func checkConfigFile(want map[string]any) func(t *testing.T, result cmdResult) {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		got := readConfigFile(t, result.configDir)
+		if got == nil {
+			got = map[string]any{}
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("config file mismatch (-want +got):\n%s", diff)
+		}
 	}
+}
 
-	_, err = executeConfigCommand(t.Context(), "config", "set", "output", "json")
-	if err != nil {
-		t.Fatalf("Failed to set output: %v", err)
-	}
+func TestConfigCmd(t *testing.T) {
+	t.Run("cfg alias", func(t *testing.T) {
+		result := runCommand(t, []string{"cfg", "set", "service_id", "alias-service"}, nil)
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		assertOutput(t, result.stdout, "Set service_id = alias-service\n")
+		checkConfigFile(map[string]any{"service_id": "alias-service"})(t, result)
+	})
 
-	// 2. Show config in JSON format (should use the output format we just set)
-	showOutput, err := executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Failed to show config: %v", err)
-	}
+	t.Run("set show unset reset workflow", func(t *testing.T) {
+		result := runCommand(t, []string{"config", "set", "service_id", "integration-test"}, nil)
+		if result.err != nil {
+			t.Fatalf("config set service_id failed: %v", result.err)
+		}
+		dir := result.configDir
 
-	// Should be JSON output
-	var result map[string]any
-	if err := json.Unmarshal([]byte(showOutput), &result); err != nil {
-		t.Fatalf("Expected JSON output, got: %s", showOutput)
-	}
+		result = runCommand(t, []string{"config", "set", "output", "json"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config set output failed: %v", result.err)
+		}
 
-	if result["service_id"] != "integration-test" {
-		t.Errorf("Expected service_id 'integration-test', got %v", result["service_id"])
-	}
+		// The configured output format applies to `config show` itself.
+		result = runCommand(t, []string{"config", "show"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config show failed: %v", result.err)
+		}
+		assertOutput(t, result.stdout, showJSON(t, dir, map[string]any{
+			"output":     "json",
+			"service_id": "integration-test",
+		}))
 
-	// 3. Unset service_id
-	_, err = executeConfigCommand(t.Context(), "config", "unset", "service_id")
-	if err != nil {
-		t.Fatalf("Failed to unset service_id: %v", err)
-	}
+		result = runCommand(t, []string{"config", "unset", "service_id"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config unset failed: %v", result.err)
+		}
 
-	// 4. Verify service_id was unset
-	showOutput, err = executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Failed to show config after unset: %v", err)
-	}
+		result = runCommand(t, []string{"config", "show"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config show after unset failed: %v", result.err)
+		}
+		assertOutput(t, result.stdout, showJSON(t, dir, map[string]any{
+			"output": "json",
+		}))
 
-	result = make(map[string]any)
-	json.Unmarshal([]byte(showOutput), &result)
-	if result["service_id"] != "" {
-		t.Errorf("Expected empty service_id after unset, got %v", result["service_id"])
-	}
+		result = runCommand(t, []string{"config", "reset"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config reset failed: %v", result.err)
+		}
+		checkConfigFile(map[string]any{})(t, result)
 
-	// 5. Reset all config
-	_, err = executeConfigCommand(t.Context(), "config", "reset")
-	if err != nil {
-		t.Fatalf("Failed to reset config: %v", err)
-	}
-
-	// 6. Verify everything is back to defaults
-	cfg, err := config.Load(nil)
-	if err != nil {
-		t.Fatalf("Failed to load config after reset: %v", err)
-	}
-
-	if cfg.Output != config.DefaultOutput {
-		t.Errorf("Expected output reset to default %s, got %s", config.DefaultOutput, cfg.Output)
-	}
+		result = runCommand(t, []string{"config", "show", "-o", "json"}, nil, withConfigDir(dir))
+		if result.err != nil {
+			t.Fatalf("config show after reset failed: %v", result.err)
+		}
+		assertOutput(t, result.stdout, showJSON(t, dir, nil))
+	})
 }

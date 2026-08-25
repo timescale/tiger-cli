@@ -1,15 +1,11 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -22,634 +18,351 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestAuthLogin_KeyFlags(t *testing.T) {
-	setupAuthTest(t)
+func TestAuthLoginCmd(t *testing.T) {
+	// Backs the PAT path's key validation (/auth/info): keys with an "invalid-"
+	// public key are rejected, everything else is accepted with the project ID
+	// "test-project-id".
+	authInfoServer := startFakeAuthInfoServer(t)
+	patURLs := map[string]any{"api_url": authInfoServer.URL}
 
-	// Execute login command with public and secret key flags (project ID is auto-detected)
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
+	tests := []cmdTest{
+		{
+			name:    "rejects positional args",
+			args:    []string{"auth", "login", "extra"},
+			wantErr: `unknown command "extra" for "tiger auth login"`,
+		},
+		{
+			name:    "missing secret key without TTY",
+			args:    []string{"auth", "login", "--public-key", "test-public-key"},
+			wantErr: "failed to get credentials: TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)",
+		},
+		{
+			name:    "missing public key without TTY",
+			args:    []string{"auth", "login", "--secret-key", "test-secret-key"},
+			wantErr: "failed to get credentials: TTY not detected - credentials required. Use flags (--public-key, --secret-key) or environment variables (TIGER_PUBLIC_KEY, TIGER_SECRET_KEY)",
+		},
+		{
+			name: "prompts for missing secret key",
+			args: []string{"auth", "login", "--public-key", "test-public-key"},
+			opts: []runOption{
+				withConfig(patURLs),
+				withIsTerminal(true),
+				withReadPassword("prompted-secret"),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your secret key: \nValidating API key...\n",
+			check:      checkStoredAPIKey("test-public-key:prompted-secret", "test-project-id"),
+		},
+		{
+			name: "prompts for missing public key",
+			args: []string{"auth", "login", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(patURLs),
+				withIsTerminal(true),
+				withStdin("prompted-public\n"),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your public key: Validating API key...\n",
+			check:      checkStoredAPIKey("prompted-public:test-secret-key", "test-project-id"),
+		},
+		{
+			name: "empty prompted public key",
+			args: []string{"auth", "login", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withIsTerminal(true),
+				withStdin("\n"),
+			},
+			wantErr:    "both public key and secret key are required",
+			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your public key: Error: both public key and secret key are required\n",
+		},
+		{
+			name:       "API key validation failure",
+			args:       []string{"auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret"},
+			opts:       []runOption{withConfig(patURLs)},
+			wantErr:    "API key validation failed: invalid credentials",
+			wantStderr: "Validating API key...\nError: API key validation failed: invalid credentials\n",
+			check:      checkNoStoredCredentials,
+		},
+		{
+			name:       "stores credentials from flags",
+			args:       []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts:       []runOption{withConfig(patURLs)},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStderr: "Validating API key...\n",
+			check:      checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id"),
+		},
+		{
+			name: "stores credentials from environment variables",
+			args: []string{"auth", "login"},
+			opts: []runOption{
+				withConfig(patURLs),
+				withEnv("TIGER_PUBLIC_KEY", "env-public-key"),
+				withEnv("TIGER_SECRET_KEY", "env-secret-key"),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStderr: "Validating API key...\n",
+			check:      checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id"),
+		},
 	}
+	runCmdTests(t, tests)
 
-	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-id)\n" + nextStepsMessage
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
-	}
+	// The OAuth flow's stderr embeds a random state and callback port, so these
+	// stay bespoke: exact stdout, pattern-matched stderr.
+	t.Run("oauth single project", func(t *testing.T) {
+		server := startMockOAuthServer(t, []api.Project{
+			{ID: "project-123", Name: "Test Project"},
+		})
 
-	// Verify credentials were stored (try keyring first, then file fallback)
-	// The combined key should be in format "public:secret"
-	expectedAPIKey := "test-public-key:test-secret-key"
-	expectedProjectID := "test-project-id" // Comes from mock validation function
+		result := runCommand(t, []string{"auth", "login"}, nil,
+			withConfig(oauthURLs(server.URL)),
+			withOpenBrowser(mockOpenBrowser(t)))
 
-	creds, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Credentials not stored in keyring or file: %v", err)
-	}
-	apiKey, projectID := creds.APIKey, creds.ProjectID
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		assertOutput(t, result.stdout, "Successfully logged in (project: project-123)\n"+nextStepsMessage)
+		assertOAuthStderr(t, result.stderr, server.URL, "")
+		assertStoredOAuthCredentials(t, result.configDir, "project-123")
+	})
 
-	if apiKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
-	}
-	if projectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, projectID)
-	}
+	t.Run("oauth multiple projects with interactive selection", func(t *testing.T) {
+		server := startMockOAuthServer(t, []api.Project{
+			{ID: "project-123", Name: "Test Project 1"},
+			{ID: "project-456", Name: "Test Project 2"},
+			{ID: "project-789", Name: "Test Project 3"},
+		})
+		stubSelectProject(t, 2)
+
+		result := runCommand(t, []string{"auth", "login"}, nil,
+			withConfig(oauthURLs(server.URL)),
+			withOpenBrowser(mockOpenBrowser(t)),
+			withIsTerminal(true)) // the picker only runs on a TTY
+
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		assertOutput(t, result.stdout, "Successfully logged in (project: project-789)\n"+nextStepsMessage)
+		assertOAuthStderr(t, result.stderr, server.URL, "")
+		assertStoredOAuthCredentials(t, result.configDir, "project-789")
+	})
+
+	t.Run("oauth multiple projects without TTY", func(t *testing.T) {
+		server := startMockOAuthServer(t, []api.Project{
+			{ID: "project-123", Name: "Test Project 1"},
+			{ID: "project-456", Name: "Test Project 2"},
+			{ID: "project-789", Name: "Test Project 3"},
+		})
+
+		result := runCommand(t, []string{"auth", "login"}, nil,
+			withConfig(oauthURLs(server.URL)),
+			withOpenBrowser(mockOpenBrowser(t)))
+
+		wantErr := "failed to select project: TTY not detected - cannot select between 3 projects. Log in with API keys instead (--public-key, --secret-key)"
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		assertOutput(t, result.err.Error(), wantErr)
+		assertOAuthStderr(t, result.stderr, server.URL, regexp.QuoteMeta("Error: "+wantErr+"\n"))
+		checkNoStoredCredentials(t, result)
+	})
+
+	t.Run("oauth no accessible projects", func(t *testing.T) {
+		server := startMockOAuthServer(t, []api.Project{})
+
+		result := runCommand(t, []string{"auth", "login"}, nil,
+			withConfig(oauthURLs(server.URL)),
+			withOpenBrowser(mockOpenBrowser(t)))
+
+		wantErr := "failed to select project: user has no accessible projects"
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		assertOutput(t, result.err.Error(), wantErr)
+		assertOAuthStderr(t, result.stderr, server.URL, regexp.QuoteMeta("Error: "+wantErr+"\n"))
+		checkNoStoredCredentials(t, result)
+	})
 }
 
-func TestAuthLogin_KeyEnvironmentVariables(t *testing.T) {
-	setupAuthTest(t)
-
-	// Set environment variables for public and secret keys (project ID is auto-detected)
-	os.Setenv("TIGER_PUBLIC_KEY", "env-public-key")
-	os.Setenv("TIGER_SECRET_KEY", "env-secret-key")
-	defer os.Unsetenv("TIGER_PUBLIC_KEY")
-	defer os.Unsetenv("TIGER_SECRET_KEY")
-
-	// Execute login command using env vars for keys
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-id)\n" + nextStepsMessage
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
-	}
-
-	// Verify credentials were stored
-	expectedAPIKey := "env-public-key:env-secret-key"
-	expectedProjectID := "test-project-id" // Auto-detected from mock
-	creds, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
-	if storedKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
-	}
-	if storedProjectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
-	}
-}
-
-// TestAuthLogin_KeyringFallback tests the scenario where keyring fails and system falls back to file storage
-func TestAuthLogin_KeyringFallback(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-
-	// We can't easily mock keyring failure, but we can test file storage directly
-	// by ensuring the API key gets stored to file when keyring might not be available
-
-	// Execute login command with public and secret key flags (project ID auto-detected)
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "fallback-public", "--secret-key", "fallback-secret")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-id)\n" + nextStepsMessage
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
-	}
-
-	// Force test file storage scenario by directly checking file
-	credentialsFile := filepath.Join(tmpDir, "credentials")
-
-	// If keyring worked, manually create file scenario by clearing all credentials and adding to file
-	testConfig(t).RemoveCredentials()
-
-	// Store to file manually to simulate fallback
-	expectedAPIKey := "fallback-public:fallback-secret"
-	expectedProjectID := "test-project-id"
-	if err := testConfig(t).StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
-		t.Fatalf("Failed to store credentials to file: %v", err)
-	}
-
-	// Verify file storage works
-	creds, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get credentials from file fallback: %v", err)
-	}
-	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
-	if storedKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
-	}
-	if storedProjectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
-	}
-
-	// Test logout with file-only storage
-	output, err = executeAuthCommand(t.Context(), "auth", "logout")
-	if err != nil {
-		t.Fatalf("Logout failed with file storage: %v", err)
-	}
-	if output != "Successfully logged out and removed stored credentials\n" {
-		t.Errorf("Unexpected logout output: '%s'", output)
-	}
-
-	// Verify file was removed
-	if _, err := os.Stat(credentialsFile); !os.IsNotExist(err) {
-		t.Error("Credentials file should be removed after logout")
-	}
-}
-
-// TestAuthLogin_EnvironmentVariable_FileOnly tests env var login when only file storage is available
-func TestAuthLogin_EnvironmentVariable_FileOnly(t *testing.T) {
-	setupAuthTest(t)
-
-	// Set environment variables for public key and secret key (project ID auto-detected)
-	os.Setenv("TIGER_PUBLIC_KEY", "env-file-public")
-	os.Setenv("TIGER_SECRET_KEY", "env-file-secret")
-	defer os.Unsetenv("TIGER_PUBLIC_KEY")
-	defer os.Unsetenv("TIGER_SECRET_KEY")
-
-	// Execute login command without any flags (keys from env vars, project ID auto-detected)
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-id)\n" + nextStepsMessage
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: '%s'", output)
-	}
-
-	// Clear all credentials to ensure we're testing file-only retrieval
-	testConfig(t).RemoveCredentials()
-
-	// Verify credentials were stored in file (since we'll manually write to file only)
-	expectedAPIKey := "env-file-public:env-file-secret"
-	expectedProjectID := "test-project-id"
-
-	// Store to file manually to simulate fallback scenario
-	if err := testConfig(t).StoreCredentialsToFile(expectedAPIKey, expectedProjectID); err != nil {
-		t.Fatalf("Failed to store credentials to file: %v", err)
-	}
-
-	// Verify getCredentials works with file-only storage
-	creds, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get credentials from file: %v", err)
-	}
-	storedKey, storedProjectID := creds.APIKey, creds.ProjectID
-	if storedKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, storedKey)
-	}
-	if storedProjectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, storedProjectID)
-	}
-}
-
-func TestAuthLogin_APIKeyValidationFailure(t *testing.T) {
-	// Set up test environment but don't use setupAuthTest since we want to test validation failure
-	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Point the command under test (and testConfig) at the test directory
-	t.Setenv("TIGER_CONFIG_DIR", tmpDir)
-
-	// Use a unique service name for this test
-	config.SetTestServiceName(t)
-
-	originalValidator := validateAPIKey
-
-	// Mock the validator to return an error
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
-		return nil, errors.New("invalid API key: authentication failed")
-	}
-
-	defer func() {
-		validateAPIKey = originalValidator
-	}()
-
-	// Write an empty config file in the test directory
-	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
-		t.Fatalf("Failed to use test config: %v", err)
-	}
-
-	// Clean up credentials
-	testConfig(t).RemoveCredentials()
-	defer testConfig(t).RemoveCredentials()
-
-	// Execute login command with public and secret key flags - should fail validation
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "invalid-public", "--secret-key", "invalid-secret")
-	if err == nil {
-		t.Fatal("Expected login to fail with invalid keys, but it succeeded")
-	}
-
-	expectedErrorMsg := "API key validation failed: invalid API key: authentication failed"
-	if !strings.Contains(err.Error(), expectedErrorMsg) {
-		t.Errorf("Expected error to contain %q, got: %v", expectedErrorMsg, err)
-	}
-
-	// Verify that output contains validation message
-	if !strings.Contains(output, "Validating API key...") {
-		t.Errorf("Expected output to contain validation message, got: %s", output)
-	}
-
-	// Verify that no credentials were stored
-	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
-		t.Error("Credentials should not be stored when validation fails")
-	}
-}
-
-func TestAuthLogin_APIKeyValidationSuccess(t *testing.T) {
-	// Set up test environment
-	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Point the command under test (and testConfig) at the test directory
-	t.Setenv("TIGER_CONFIG_DIR", tmpDir)
-
-	// Use a unique service name for this test
-	config.SetTestServiceName(t)
-
-	originalValidator := validateAPIKey
-
-	// Mock the validator to return success
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
-		authInfo := &api.AuthInfo{}
-		json.Unmarshal([]byte(`{"type":"apiKey","api_key":{"public_key":"test-access-key","project":{"id":"test-project-valid"}}}`), authInfo)
-		return authInfo, nil // Success
-	}
-
-	defer func() {
-		validateAPIKey = originalValidator
-	}()
-
-	// Write an empty config file in the test directory
-	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
-		t.Fatalf("Failed to use test config: %v", err)
-	}
-
-	// Clean up credentials
-	testConfig(t).RemoveCredentials()
-	defer testConfig(t).RemoveCredentials()
-
-	// Execute login command with public and secret key flags - should succeed
-	output, err := executeAuthCommand(t.Context(), "auth", "login", "--public-key", "valid-public", "--secret-key", "valid-secret")
-	if err != nil {
-		t.Fatalf("Expected login to succeed with valid keys, got error: %v", err)
-	}
-
-	expectedOutput := "Validating API key...\nSuccessfully logged in (project: test-project-valid)\n" + nextStepsMessage
-	if output != expectedOutput {
-		t.Errorf("Expected output %q, got %q", expectedOutput, output)
-	}
-
-	// Verify that credentials were stored
-	expectedAPIKey := "valid-public:valid-secret"
-	expectedProjectID := "test-project-valid"
-	creds, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Credentials not stored in keyring or file: %v", err)
-	}
-	apiKey, projectID := creds.APIKey, creds.ProjectID
-	if apiKey != expectedAPIKey {
-		t.Errorf("Expected API key '%s', got '%s'", expectedAPIKey, apiKey)
-	}
-	if projectID != expectedProjectID {
-		t.Errorf("Expected project ID '%s', got '%s'", expectedProjectID, projectID)
-	}
-}
-
-func TestAuthLogin_OAuth_SingleProject(t *testing.T) {
-	mockServerURL := setupOAuthTest(t, []api.Project{
-		{ID: "project-123", Name: "Test Project"},
-	}, "project-123")
-
-	// Execute login command - the mocked openBrowser will handle the callback automatically
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
-		`Opening browser for authentication\.\.\.\n`+
-		`Successfully logged in \(project: project-123\)\n`+
-		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
-
-	matched, err := regexp.MatchString(expectedPattern, output)
-	if err != nil {
-		t.Fatalf("Regex compilation failed: %v", err)
-	}
-	if !matched {
-		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
-	}
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
-	}
-	token, projectID := stored.OAuth, stored.ProjectID
-	if token.AccessToken != "mock-access-token-12345" {
-		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
-	}
-	if token.RefreshToken != "mock-refresh-token-67890" {
-		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
-	}
-	assertExpiresInAbout(t, token.Expiry)
-	if projectID != "project-123" {
-		t.Errorf("Expected project ID 'project-123', got '%s'", projectID)
-	}
-}
-
-func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
-	mockServerURL := setupOAuthTest(t, []api.Project{
-		{ID: "project-123", Name: "Test Project 1"},
-		{ID: "project-456", Name: "Test Project 2"},
-		{ID: "project-789", Name: "Test Project 3"},
-	}, "project-789")
-
-	// The picker only runs on a TTY
-	stubIsTerminal(t, true)
-
-	// Mock the project selection to simulate user selecting the third project (index 2)
-	originalSelectProjectInteractively := selectProjectInteractively
-	defer func() {
-		selectProjectInteractively = originalSelectProjectInteractively
-	}()
-
-	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
-		t.Logf("Mock project selection - user selects project at index 2: %s", projects[2].ID)
-		// Simulate user pressing down arrow twice and then enter (selects third project)
-		return projects[2].ID, nil
-	}
-
-	// Execute login command - both mocked functions will handle OAuth flow and project selection
-	output, err := executeAuthCommand(t.Context(), "auth", "login")
-
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-
-	expectedPattern := fmt.Sprintf(`^Auth URL is: %s/oauth/authorize\?client_id=45e1b16d-e435-4049-97b2-8daad150818c&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\n`+
-		`Opening browser for authentication\.\.\.\n`+
-		`Successfully logged in \(project: project-789\)\n`+
-		regexp.QuoteMeta(nextStepsMessage)+`$`, regexp.QuoteMeta(mockServerURL))
-
-	matched, err := regexp.MatchString(expectedPattern, output)
-	if err != nil {
-		t.Fatalf("Regex compilation failed: %v", err)
-	}
-	if !matched {
-		t.Errorf("Output doesn't match expected pattern.\nPattern: %s\nActual output: '%s'", expectedPattern, output)
-	}
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.OAuth == nil {
-		t.Fatalf("Expected OAuth credentials, got PAT: %+v", stored)
-	}
-	token, projectID := stored.OAuth, stored.ProjectID
-	if token.AccessToken != "mock-access-token-12345" {
-		t.Errorf("Expected access token 'mock-access-token-12345', got '%s'", token.AccessToken)
-	}
-	if token.RefreshToken != "mock-refresh-token-67890" {
-		t.Errorf("Expected refresh token 'mock-refresh-token-67890', got '%s'", token.RefreshToken)
-	}
-	assertExpiresInAbout(t, token.Expiry)
-	if projectID != "project-789" {
-		t.Errorf("Expected project ID 'project-789', got '%s'", projectID)
-	}
-}
-
-// TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
+// TestOAuthRefreshPersistsExpiry verifies that when an expired OAuth token is
 // refreshed, the rotated token is persisted with a non-zero Expiry derived from
-// the standard `expires_in` returned by the gateway.
-func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
-	tmpDir := setupAuthTest(t)
+// the standard `expires_in` returned by the gateway. This runs below the
+// command layer (runCommand injects a mock client, so the real refreshing
+// client is never built there).
+func TestOAuthRefreshPersistsExpiry(t *testing.T) {
+	config.SetTestServiceName(t)
 
-	// Mock server backs the refresh_token grant (returns expires_in=3600).
-	mockServer := startMockOAuthServer(t, nil)
-	configFile := config.GetConfigFile(tmpDir)
-	configContent := fmt.Sprintf("gateway_url: \"%s\"\napi_url: \"%s\"\n", mockServer.URL, mockServer.URL)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+	// The mock server backs the refresh_token grant (returns expires_in=3600).
+	server := startMockOAuthServer(t, nil)
+	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
+		"gateway_url": server.URL,
+		"api_url":     server.URL,
+	})
+	if err != nil {
+		t.Fatalf("failed to seed config: %v", err)
 	}
 
-	// Store an already-expired OAuth token that still has a valid refresh token.
+	// An already-expired OAuth token that still has a valid refresh token.
 	expired := &oauth2.Token{
 		AccessToken:  "stale-access-token",
 		RefreshToken: "mock-refresh-token-67890",
 		Expiry:       time.Now().Add(-time.Hour),
 	}
-	// The config file above points api_url/gateway_url at the mock server, and
-	// carries the test config dir so the refreshed token is persisted there.
-	cfg := testConfig(t)
 	if err := cfg.StoreOAuthCredentials(expired, "project-789"); err != nil {
-		t.Fatalf("Failed to store oauth credentials: %v", err)
+		t.Fatalf("failed to store oauth credentials: %v", err)
 	}
 
 	stored, err := cfg.GetStoredCredentials()
 	if err != nil {
-		t.Fatalf("Failed to load stored credentials: %v", err)
+		t.Fatalf("failed to load stored credentials: %v", err)
 	}
-
 	client, err := api.NewTigerClientForCredentials(cfg, stored)
 	if err != nil {
-		t.Fatalf("Failed to build client: %v", err)
+		t.Fatalf("failed to build client: %v", err)
 	}
 
 	// Any request makes the oauth2 transport mint a token first; since the
 	// stored token is expired, that triggers a refresh + persist. The response
 	// status itself is irrelevant — we only care about the persisted token.
 	if _, err := client.GetAuthInfoWithResponse(t.Context()); err != nil {
-		t.Fatalf("Request failed: %v", err)
+		t.Fatalf("request failed: %v", err)
 	}
 
-	reloaded, err := testConfig(t).GetStoredCredentials()
+	reloaded, err := cfg.GetStoredCredentials()
 	if err != nil {
-		t.Fatalf("Failed to reload credentials: %v", err)
+		t.Fatalf("failed to reload credentials: %v", err)
 	}
 	if reloaded.OAuth == nil {
-		t.Fatal("Expected OAuth credentials to remain stored after refresh")
+		t.Fatal("expected OAuth credentials to remain stored after refresh")
 	}
 	if reloaded.OAuth.AccessToken != "mock-access-token-12345" {
-		t.Fatalf("Expected token to be refreshed, got access token %q", reloaded.OAuth.AccessToken)
+		t.Fatalf("expected token to be refreshed, got access token %q", reloaded.OAuth.AccessToken)
 	}
 	assertExpiresInAbout(t, reloaded.OAuth.Expiry)
 }
 
-// setupOAuthTest creates a complete OAuth test environment with mock server and browser
-func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID string) string {
-	t.Helper()
-	tmpDir := setupAuthTest(t)
-
-	// Ensure no keys in environment
-	os.Unsetenv("TIGER_PUBLIC_KEY")
-	os.Unsetenv("TIGER_SECRET_KEY")
-
-	// Start mock server for OAuth endpoints
-	mockServer := startMockOAuthServer(t, projects)
-
-	// Set up mock browser function
-	originalOpenBrowser := openBrowser
-	openBrowser = mockOpenBrowser(t)
-
-	// Set config URLs to point to mock server
-	configFile := config.GetConfigFile(tmpDir)
-	configContent := fmt.Sprintf(`
-console_url: "%s"
-gateway_url: "%s"
-api_url: "%s"
-`, mockServer.URL, mockServer.URL, mockServer.URL)
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Return cleanup function
-	t.Cleanup(func() {
-		mockServer.Close()
-		openBrowser = originalOpenBrowser
-	})
-
-	return mockServer.URL
-}
-
-// startMockOAuthServer starts a mock server that handles all OAuth endpoints
-func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server {
+// startFakeAuthInfoServer backs common.ValidateAPIKey's GET /auth/info call for
+// the PAT login path. Keys arrive as HTTP basic auth; a public key starting
+// with "invalid" is rejected with a 401.
+func startFakeAuthInfoServer(t *testing.T) *httptest.Server {
 	t.Helper()
 
 	mux := http.NewServeMux()
-
-	// Token exchange endpoint
-	mux.HandleFunc("POST /idp/external/cli/token", func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("Mock server received token exchange request")
-
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+	mux.HandleFunc("GET /auth/info", func(w http.ResponseWriter, r *http.Request) {
+		publicKey, _, ok := r.BasicAuth()
+		w.Header().Set("Content-Type", "application/json")
+		if !ok || strings.HasPrefix(publicKey, "invalid") {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]any{"message": "invalid credentials"})
 			return
 		}
-
-		// The mock backs both the initial authorization_code exchange and the
-		// silent refresh that oauth2.NewClient performs once the access token
-		// is past its expiry. Both grants return the same canned token so
-		// downstream assertions remain stable.
-		grantType := r.FormValue("grant_type")
-		switch grantType {
-		case "refresh_token":
-			if r.FormValue("refresh_token") == "" || r.FormValue("client_id") == "" {
-				http.Error(w, "Missing required parameters", http.StatusBadRequest)
-				return
-			}
-		default:
-			if r.FormValue("client_id") == "" || r.FormValue("code") == "" || r.FormValue("code_verifier") == "" {
-				http.Error(w, "Missing required parameters", http.StatusBadRequest)
-				return
-			}
-			// Exchange must carry the CLI User-Agent.
-			if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "tiger-cli/") {
-				t.Errorf("code exchange User-Agent = %q, want \"tiger-cli/\" prefix", ua)
-			}
-		}
-
-		tokenResponse := map[string]any{
-			"access_token":  "mock-access-token-12345",
-			"refresh_token": "mock-refresh-token-67890",
-			"expires_in":    3600,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(tokenResponse); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"type": "apiKey",
+			"api_key": map[string]any{
+				"name":         "Test Credentials",
+				"public_key":   publicKey,
+				"created":      "2025-01-01T00:00:00Z",
+				"project":      map[string]any{"id": "test-project-id", "name": "Test Project", "plan_type": "free"},
+				"issuing_user": map[string]any{"id": "user-123", "name": "Test User", "email": "test@example.com"},
+			},
+		})
 	})
 
-	// REST endpoint backing selectProjectID
-	mux.HandleFunc("GET /projects", func(w http.ResponseWriter, _ *http.Request) {
-		t.Logf("Mock server received GET /projects request")
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(projects); err != nil {
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		}
-	})
-
-	// OAuth success endpoint (just returns 200 OK)
-	mux.HandleFunc("GET /oauth/code/success", func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("Mock server received OAuth success request")
-		w.WriteHeader(http.StatusOK)
-	})
-
-	// Create test server
-	return httptest.NewServer(mux)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
 }
 
-// mockOpenBrowser returns a mock openBrowser function that simulates OAuth callback
-func mockOpenBrowser(t *testing.T) func(string) error {
-	return func(authURL string) error {
-		t.Logf("Mock browser opening URL: %s", authURL)
+// oauthURLs points every endpoint the OAuth login flow touches at the mock
+// server: the authorize URL (console), the token endpoint (gateway), and the
+// project listing (API).
+func oauthURLs(serverURL string) map[string]any {
+	return map[string]any{
+		"console_url": serverURL,
+		"gateway_url": serverURL,
+		"api_url":     serverURL,
+	}
+}
 
-		// Extract redirect_uri and state from the URL parameters
-		parsedURL, err := url.Parse(authURL)
+// mockOpenBrowser simulates the user completing browser authentication: it
+// validates the PKCE parameters in the auth URL, then hits the local callback
+// with a fake authorization code.
+func mockOpenBrowser(t *testing.T) func(string) error {
+	t.Helper()
+	return func(authURL string) error {
+		parsed, err := url.Parse(authURL)
 		if err != nil {
 			return err
 		}
-
-		clientID := parsedURL.Query().Get("client_id")
-		responseType := parsedURL.Query().Get("response_type")
-		codeChallengeMethod := parsedURL.Query().Get("code_challenge_method")
-		codeChallenge := parsedURL.Query().Get("code_challenge")
-		redirectURI := parsedURL.Query().Get("redirect_uri")
-		state := parsedURL.Query().Get("state")
-
-		if clientID == "" {
-			t.Fatal("no client_id found in OAuth URL")
-			return errors.New("no client_id found in OAuth URL")
-		}
-
-		if responseType != "code" {
-			t.Fatal("invalid response_type found in OAuth URL")
-			return errors.New("no response_type found in OAuth URL")
-		}
-
-		if codeChallengeMethod != "S256" {
-			t.Fatal("invalid code_challenge_method found in OAuth URL")
-			return errors.New("no code_challenge_method found in OAuth URL")
-		}
-
-		if codeChallenge == "" {
-			t.Fatal("no code_challenge found in OAuth URL")
-			return errors.New("no code_challenge found in OAuth URL")
-		}
-
-		if redirectURI == "" {
-			t.Fatal("no redirect_uri found in OAuth URL")
-			return errors.New("no redirect_uri found in OAuth URL")
-		}
-
-		if state == "" {
-			t.Fatal("no state found in OAuth URL")
-			return errors.New("no state found in OAuth URL")
-		}
-
-		// Give the OAuth server a moment to start
-		go func() {
-			// Make the OAuth callback request directly
-			callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", redirectURI, state)
-			t.Logf("Mock browser making callback request to: %s", callbackURL)
-
-			resp, err := http.Get(callbackURL)
-			if err != nil {
-				t.Errorf("Mock callback request failed: %v", err)
-				return
+		q := parsed.Query()
+		for _, param := range []string{"client_id", "code_challenge", "redirect_uri", "state"} {
+			if q.Get(param) == "" {
+				return fmt.Errorf("missing %s in auth URL", param)
 			}
-			if err := resp.Body.Close(); err != nil {
-				t.Errorf("Error closing callback request body: %v", err)
-			}
-		}()
+		}
+		if q.Get("response_type") != "code" {
+			return fmt.Errorf("unexpected response_type %q in auth URL", q.Get("response_type"))
+		}
+		if q.Get("code_challenge_method") != "S256" {
+			return fmt.Errorf("unexpected code_challenge_method %q in auth URL", q.Get("code_challenge_method"))
+		}
 
-		return nil
+		callbackURL := fmt.Sprintf("%s?code=test-auth-code&state=%s", q.Get("redirect_uri"), q.Get("state"))
+		resp, err := http.Get(callbackURL)
+		if err != nil {
+			return fmt.Errorf("callback request failed: %w", err)
+		}
+		return resp.Body.Close()
+	}
+}
+
+// stubSelectProject makes the interactive project picker select the project at
+// the given index for the duration of the test.
+func stubSelectProject(t *testing.T, index int) {
+	t.Helper()
+	original := selectProjectInteractively
+	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
+		return projects[index].ID, nil
+	}
+	t.Cleanup(func() { selectProjectInteractively = original })
+}
+
+// assertOAuthStderr matches the OAuth flow's stderr: the auth URL line (which
+// embeds a random state and callback port) plus the browser-open notice,
+// followed by suffix (an already-quoted pattern, e.g. an Error line).
+func assertOAuthStderr(t *testing.T, stderr, serverURL, suffix string) {
+	t.Helper()
+	pattern := fmt.Sprintf(
+		`^Auth URL is: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s$`,
+		regexp.QuoteMeta(serverURL), config.TigerCLIClientID, suffix)
+	matched, err := regexp.MatchString(pattern, stderr)
+	if err != nil {
+		t.Fatalf("regex compilation failed: %v", err)
+	}
+	if !matched {
+		t.Errorf("stderr doesn't match expected pattern.\npattern: %s\nstderr: %q", pattern, stderr)
+	}
+}
+
+// assertStoredOAuthCredentials checks that the mock server's canned OAuth token
+// was stored for the given project.
+func assertStoredOAuthCredentials(t *testing.T, configDir, projectID string) {
+	t.Helper()
+	stored, err := readStoredCredentials(t, configDir)
+	if err != nil {
+		t.Fatalf("failed to get stored credentials: %v", err)
+	}
+	if stored.OAuth == nil {
+		t.Fatalf("expected OAuth credentials, got: %+v", stored)
+	}
+	if stored.OAuth.AccessToken != "mock-access-token-12345" {
+		t.Errorf("stored access token = %q, want %q", stored.OAuth.AccessToken, "mock-access-token-12345")
+	}
+	if stored.OAuth.RefreshToken != "mock-refresh-token-67890" {
+		t.Errorf("stored refresh token = %q, want %q", stored.OAuth.RefreshToken, "mock-refresh-token-67890")
+	}
+	assertExpiresInAbout(t, stored.OAuth.Expiry)
+	if stored.ProjectID != projectID {
+		t.Errorf("stored project ID = %q, want %q", stored.ProjectID, projectID)
 	}
 }
 
@@ -660,6 +373,32 @@ func assertExpiresInAbout(t *testing.T, expiry time.Time) {
 	t.Helper()
 	d := time.Until(expiry)
 	if d < 3540*time.Second || d > 3600*time.Second {
-		t.Errorf("Expected expiry ~3600s from now (from expires_in=3600), got %v (in %v)", expiry, d)
+		t.Errorf("expected expiry ~3600s from now (from expires_in=3600), got %v (in %v)", expiry, d)
+	}
+}
+
+// checkStoredAPIKey returns a check func asserting that the given PAT
+// credentials were stored.
+func checkStoredAPIKey(apiKey, projectID string) func(t *testing.T, result cmdResult) {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		creds, err := readStoredCredentials(t, result.configDir)
+		if err != nil {
+			t.Fatalf("failed to get stored credentials: %v", err)
+		}
+		if creds.APIKey != apiKey {
+			t.Errorf("stored API key = %q, want %q", creds.APIKey, apiKey)
+		}
+		if creds.ProjectID != projectID {
+			t.Errorf("stored project ID = %q, want %q", creds.ProjectID, projectID)
+		}
+	}
+}
+
+// checkNoStoredCredentials asserts that no credentials were stored.
+func checkNoStoredCredentials(t *testing.T, result cmdResult) {
+	t.Helper()
+	if creds, err := readStoredCredentials(t, result.configDir); err == nil {
+		t.Errorf("expected no stored credentials, got: %+v", creds)
 	}
 }

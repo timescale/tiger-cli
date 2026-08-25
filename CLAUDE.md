@@ -1267,7 +1267,7 @@ The project uses GitHub Actions for continuous integration and release automatio
 
 **Purpose:** Validates code quality and ensures all tests pass
 
-**Note:** Tests run with `-p 1` to avoid parallel execution issues with keyring access.
+**Note:** Tests never touch the system keyring — `TestMain` swaps in an in-memory mock (`keyring.MockInit()`), so CI needs no keyring setup.
 
 ### Release Workflow (`release.yml`)
 
@@ -1295,3 +1295,40 @@ VERSION=1.2.3 && git tag -a v${VERSION} -m "${VERSION}" && git push origin v${VE
 ## Testing Guidelines
 
 - Never accept a state where tests are failing
+
+### Unit Test Pattern
+
+Command tests live in `internal/cmd`, one test file per command file, and all
+follow a single table-driven pattern built on the shared harness in
+`main_test.go`:
+
+- `runCommand(t, args, setupMock, opts...)` builds the real root command via
+  `buildRootCmd`, injects a generated mock API client
+  (`internal/api/mocks.MockClientWithResponsesInterface`) through
+  `app.SetClientFactory`, runs against an isolated `t.TempDir()` config
+  directory (always passing `--analytics=false --skip-update-check`), and
+  returns captured, ANSI-stripped stdout/stderr plus the Execute error.
+- Test cases use the `cmdTest` struct and run through `runCmdTests`, which
+  asserts `wantErr`, `wantStdout`, and `wantStderr` with **exact** matching
+  (`assertOutput`, a go-cmp diff). When `wantErr` is set and `wantStderr`
+  isn't, stderr is expected to be `"Error: <wantErr>\n"`. An optional `check`
+  func holds extra assertions (config file contents, stored credentials, exit
+  codes via `errors.As` on `common.ExitCodeError`).
+- Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
+  file keys), `withConfigDir` (chain commands sharing one config dir),
+  `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
+  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withContext`.
+- Mock expectations use `validCtx` for context arguments and exact request
+  structs; `httpResponse(status)` and `sampleService(overrides...)` keep
+  tables concise.
+- `TestMain` calls `keyring.MockInit()` (tests never touch the system
+  keyring; `internal/common` and `internal/config` do the same) and scrubs
+  inherited `TIGER_*` env vars, preserving `TIGER_*_INTEGRATION`.
+- Order cases by the command's execution flow: auth errors, argument/flag
+  validation, read-only gate, network/API errors, nil response body, success
+  paths (text, json, yaml), then remaining flags and edge cases.
+- Test commands as a whole through `runCommand` — don't unit-test individual
+  helpers unless their behavior is unreachable through a command.
+- Commands that reach a real database (pgx) or spawn external binaries test
+  their error paths only; the success paths are covered by
+  `integration_test.go`.

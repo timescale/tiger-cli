@@ -1,284 +1,238 @@
 package cmd
 
 import (
-	"encoding/json"
-	"os"
-	"slices"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestConfigShow_TableOutput(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
-
-	// Create config file with test data
-	configContent := `api_url: https://test.api.com/v1
-service_id: test-service
-output: table
-analytics: false
-password_storage: pgpass
-`
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	output, err := executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-	lines := strings.Split(output, "\n")
-
-	// Check table output contains all expected key:value lines
-	expectedLines := map[string]string{
-		"api_url":          "https://test.api.com/v1",
-		"console_url":      "https://console.cloud.tigerdata.com",
-		"gateway_url":      "https://console.cloud.tigerdata.com/api",
-		"docs_mcp":         "true",
-		"docs_mcp_url":     "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database",
-		"service_id":       "test-service",
-		"output":           "table",
-		"analytics":        "false",
-		"password_storage": "pgpass",
-		"config_dir":       tmpDir,
-		"mcp_max_rows":     strconv.Itoa(config.DefaultMCPMaxRows),
-	}
-
-	for key, expectedLine := range expectedLines {
-		if !slices.ContainsFunc(lines, func(line string) bool {
-			return strings.Contains(line, key) && strings.Contains(line, expectedLine)
-		}) {
-			t.Errorf("Output should contain line '%s':'%s', got: %s", key, expectedLine, output)
+// renderTable mimics tablewriter's default box layout, so expected table
+// output can be computed for values only known at runtime (the temp config
+// dir, whose length sets the VALUE column width).
+func renderTable(rows [][2]string) string {
+	inner := [2]int{len("PROPERTY") + 2, len("VALUE") + 2}
+	for _, row := range rows {
+		for i, cell := range row {
+			if len(cell)+2 > inner[i] {
+				inner[i] = len(cell) + 2
+			}
 		}
 	}
+	center := func(s string, w int) string {
+		left := (w - len(s)) / 2
+		return strings.Repeat(" ", left) + s + strings.Repeat(" ", w-len(s)-left)
+	}
+	cell := func(s string, w int) string {
+		return " " + s + strings.Repeat(" ", w-len(s)-1)
+	}
+	border := func(l, m, r string) string {
+		return l + strings.Repeat("─", inner[0]) + m + strings.Repeat("─", inner[1]) + r + "\n"
+	}
+	var b strings.Builder
+	b.WriteString(border("┌", "┬", "┐"))
+	b.WriteString("│" + center("PROPERTY", inner[0]) + "│" + center("VALUE", inner[1]) + "│\n")
+	b.WriteString(border("├", "┼", "┤"))
+	for _, row := range rows {
+		b.WriteString("│" + cell(row[0], inner[0]) + "│" + cell(row[1], inner[1]) + "│\n")
+	}
+	b.WriteString(border("└", "┴", "┘"))
+	return b.String()
 }
 
-func TestConfigShow_JSONOutput(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
-
-	// Create config file with JSON output format
-	configContent := `api_url: https://json.api.com/v1
-output: json
-analytics: false
-password_storage: keyring
-`
-
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+func showTableValue(v any) string {
+	switch v := v.(type) {
+	case bool:
+		return strconv.FormatBool(v)
+	case int:
+		return strconv.Itoa(v)
+	default:
+		return fmt.Sprintf("%v", v)
 	}
+}
 
-	output, err := executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
+// showTable renders the expected full `config show` table (rows in the order
+// outputTable prints them) for a default config with the given overrides.
+func showTable(configDir string, overrides map[string]any) string {
+	values := showValues(configDir, overrides)
+	keys := []string{
+		"api_url", "analytics", "config_dir", "console_url", "docs_mcp",
+		"docs_mcp_url", "gateway_url", "mcp_max_rows", "color", "output",
+		"password_storage", "read_only", "releases_url", "service_id",
+		"version_check",
 	}
-
-	// Parse JSON output
-	var result map[string]any
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse JSON output: %v", err)
+	rows := make([][2]string, len(keys))
+	for i, key := range keys {
+		rows[i] = [2]string{key, showTableValue(values[key])}
 	}
+	return renderTable(rows)
+}
 
-	// Verify ALL JSON keys and their expected values
-	expectedValues := map[string]any{
-		"api_url":          "https://json.api.com/v1",
-		"console_url":      "https://console.cloud.tigerdata.com",
-		"gateway_url":      "https://console.cloud.tigerdata.com/api",
-		"docs_mcp":         true,
-		"docs_mcp_url":     "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database",
-		"service_id":       "",
-		"color":            true,
-		"output":           "json",
-		"analytics":        false,
-		"password_storage": "keyring",
-		"read_only":        false,
-		"config_dir":       tmpDir,
-		"releases_url":     "https://cli.tigerdata.com",
-		"version_check":    true,
-		"mcp_max_rows":     float64(config.DefaultMCPMaxRows),
+// showYAML renders the expected `config show` YAML output (keys sorted
+// alphabetically) for a default config with the given overrides.
+func showYAML(configDir string, overrides map[string]any) string {
+	values := showValues(configDir, overrides)
+	keys := []string{
+		"analytics", "api_url", "color", "config_dir", "console_url",
+		"docs_mcp", "docs_mcp_url", "gateway_url", "mcp_max_rows", "output",
+		"password_storage", "read_only", "releases_url", "service_id",
+		"version_check",
 	}
-
-	for key, expectedValue := range expectedValues {
-		if result[key] != expectedValue {
-			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
+	var b strings.Builder
+	for _, key := range keys {
+		value := fmt.Sprintf("%v", values[key])
+		if value == "" {
+			value = `""`
 		}
+		fmt.Fprintf(&b, "%s: %s\n", key, value)
 	}
-
-	// Ensure no extra keys are present
-	if len(result) != len(expectedValues) {
-		t.Errorf("Expected %d keys in JSON output, got %d", len(expectedValues), len(result))
-	}
+	return b.String()
 }
 
-func TestConfigShow_YAMLOutput(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
+func TestConfigShowCmd(t *testing.T) {
+	dir := t.TempDir()
 
-	// Create config file with YAML output format
-	configContent := `api_url: https://yaml.api.com/v1
-output: yaml
-analytics: false
-password_storage: keyring
-`
-
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+	// A second config dir, pointed at by TIGER_CONFIG_DIR in one case to prove
+	// the --config-dir flag takes precedence over the env var.
+	envDir := t.TempDir()
+	if _, err := config.UseTestConfig(envDir, map[string]any{"api_url": "https://env.api.com/v1"}); err != nil {
+		t.Fatalf("failed to seed env config dir: %v", err)
 	}
 
-	output, err := executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
+	tests := []cmdTest{
+		{
+			name:    "unexpected argument",
+			args:    []string{"config", "show", "extra"},
+			wantErr: `unknown command "extra" for "tiger config show"`,
+		},
+		{
+			name:       "table output defaults",
+			args:       []string{"config", "show"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},
+			wantStdout: showTable(dir, nil),
+		},
+		{
+			name: "table output with configured values",
+			args: []string{"config", "show"},
+			opts: []runOption{withConfigDir(dir), withConfig(map[string]any{
+				"api_url":          "https://test.api.com/v1",
+				"service_id":       "test-service",
+				"analytics":        false,
+				"password_storage": "pgpass",
+			})},
+			wantStdout: showTable(dir, map[string]any{
+				"api_url":          "https://test.api.com/v1",
+				"service_id":       "test-service",
+				"analytics":        false,
+				"password_storage": "pgpass",
+			}),
+		},
+		{
+			name: "json output from config file",
+			args: []string{"config", "show"},
+			opts: []runOption{withConfigDir(dir), withConfig(map[string]any{
+				"output":    "json",
+				"api_url":   "https://json.api.com/v1",
+				"analytics": false,
+			})},
+			wantStdout: showJSON(t, dir, map[string]any{
+				"output":    "json",
+				"api_url":   "https://json.api.com/v1",
+				"analytics": false,
+			}),
+		},
+		{
+			name:       "output flag changes format but not reported value",
+			args:       []string{"config", "show", "-o", "json"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},
+			wantStdout: showJSON(t, dir, nil),
+		},
+		{
+			name: "output env var changes format but not reported value",
+			args: []string{"config", "show"},
+			opts: []runOption{
+				withConfigDir(dir),
+				withConfig(map[string]any{"output": "table"}),
+				withEnv("TIGER_OUTPUT", "json"),
+			},
+			wantStdout: showJSON(t, dir, map[string]any{"output": "table"}),
+		},
+		{
+			name: "yaml output from config file",
+			args: []string{"config", "show"},
+			opts: []runOption{withConfigDir(dir), withConfig(map[string]any{
+				"output":  "yaml",
+				"api_url": "https://yaml.api.com/v1",
+			})},
+			wantStdout: showYAML(dir, map[string]any{
+				"output":  "yaml",
+				"api_url": "https://yaml.api.com/v1",
+			}),
+		},
+		{
+			name:       "yaml output via flag",
+			args:       []string{"config", "show", "-o", "yaml"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},
+			wantStdout: showYAML(dir, nil),
+		},
+		{
+			name: "no-defaults shows only configured values",
+			args: []string{"config", "show", "--no-defaults"},
+			opts: []runOption{withConfigDir(dir), withConfig(map[string]any{
+				"service_id": "test-service",
+				"analytics":  false,
+			})},
+			wantStdout: renderTable([][2]string{
+				{"analytics", "false"},
+				{"config_dir", dir},
+				{"service_id", "test-service"},
+			}),
+		},
+		{
+			name: "with-env applies env overrides",
+			args: []string{"config", "show", "--with-env"},
+			opts: []runOption{
+				withConfigDir(dir),
+				withConfig(map[string]any{}),
+				withEnv("TIGER_SERVICE_ID", "env-service"),
+			},
+			wantStdout: showTable(dir, map[string]any{"service_id": "env-service"}),
+		},
+		{
+			name: "env override ignored without with-env",
+			args: []string{"config", "show"},
+			opts: []runOption{
+				withConfigDir(dir),
+				withConfig(map[string]any{}),
+				withEnv("TIGER_SERVICE_ID", "env-service"),
+			},
+			wantStdout: showTable(dir, nil),
+		},
+		{
+			name: "config-dir flag overrides TIGER_CONFIG_DIR env var",
+			args: []string{"config", "show"},
+			opts: []runOption{
+				withConfigDir(dir),
+				withConfig(map[string]any{"api_url": "https://flag-test.api.com/v1"}),
+				withEnv("TIGER_CONFIG_DIR", envDir),
+			},
+			wantStdout: showTable(dir, map[string]any{"api_url": "https://flag-test.api.com/v1"}),
+		},
+		{
+			name:       "list alias",
+			args:       []string{"config", "list"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},
+			wantStdout: showTable(dir, nil),
+		},
+		{
+			name:       "ls alias",
+			args:       []string{"config", "ls"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},
+			wantStdout: showTable(dir, nil),
+		},
 	}
 
-	// Parse YAML output
-	var result map[string]any
-	if err := yaml.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse YAML output: %v", err)
-	}
-
-	// Verify ALL YAML keys and their expected values
-	expectedValues := map[string]any{
-		"api_url":          "https://yaml.api.com/v1",
-		"console_url":      "https://console.cloud.tigerdata.com",
-		"gateway_url":      "https://console.cloud.tigerdata.com/api",
-		"docs_mcp":         true,
-		"docs_mcp_url":     "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database",
-		"service_id":       "",
-		"color":            true,
-		"output":           "yaml",
-		"analytics":        false,
-		"password_storage": "keyring",
-		"read_only":        false,
-		"config_dir":       tmpDir,
-		"releases_url":     "https://cli.tigerdata.com",
-		"version_check":    true,
-		"mcp_max_rows":     config.DefaultMCPMaxRows,
-	}
-
-	for key, expectedValue := range expectedValues {
-		if result[key] != expectedValue {
-			t.Errorf("Expected %s '%v', got %v", key, expectedValue, result[key])
-		}
-	}
-
-	// Ensure no extra keys are present
-	if len(result) != len(expectedValues) {
-		t.Errorf("Expected %d keys in YAML output, got %d", len(expectedValues), len(result))
-	}
-}
-
-func TestConfigShow_OutputValueUnaffectedByCliArg(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
-
-	// Create config file with table as default output
-	configContent := `api_url: https://test.api.com/v1
-project_id: test-project
-output: table
-analytics: true
-`
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Test that -o json flag overrides config file setting for output format, but not the config value itself
-	output, err := executeConfigCommand(t.Context(), "config", "show", "-o", "json")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-
-	// Should be valid JSON, not table format
-	var result map[string]any
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
-	}
-
-	if result["output"] != "table" {
-		t.Errorf("Expected output 'table' in JSON output, got %v", result["output"])
-	}
-}
-
-func TestConfigShow_OutputValueUnaffectedByEnvVar(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
-
-	// Create config file with table as default output
-	configContent := `api_url: https://test.api.com/v1
-output: table
-analytics: true
-`
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Test that env overrides config file setting for output format, but not the config value itself
-	os.Setenv("TIGER_OUTPUT", "json")
-	defer func() {
-		os.Unsetenv("TIGER_OUTPUT")
-	}()
-
-	output, err := executeConfigCommand(t.Context(), "config", "show")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-
-	// Should be valid JSON, not table format
-	var result map[string]any
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
-	}
-
-	if result["output"] != "table" {
-		t.Errorf("Expected output 'table' in JSON output, got %v", result["output"])
-	}
-}
-
-func TestConfigShow_ConfigDirFlag(t *testing.T) {
-	setupConfigTest(t)
-
-	// Create a different temporary directory for the --config-dir flag, which
-	// should override the value provided via the TIGER_CONFIG_DIR env var in
-	// setupConfigTest
-	tmpDir, err := os.MkdirTemp("", "tiger-config-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpDir)
-	})
-
-	// Create a config file with test data in the specified directory
-	configContent := `api_url: https://flag-test.api.com/v1
-output: json
-analytics: false
-`
-	configFile := config.GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Execute config show with --config-dir flag
-	output, err := executeConfigCommand(t.Context(), "--config-dir", tmpDir, "config", "show")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-
-	// Parse JSON output and verify values
-	var result map[string]any
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse JSON output: %v", err)
-	}
-
-	if result["api_url"] != "https://flag-test.api.com/v1" {
-		t.Errorf("Expected api_url 'https://flag-test.api.com/v1', got %v", result["api_url"])
-	}
-	if result["config_dir"] != tmpDir {
-		t.Errorf("Expected config_dir '%s', got %v", tmpDir, result["config_dir"])
-	}
+	runCmdTests(t, tests)
 }

@@ -8,52 +8,42 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestConfigReset(t *testing.T) {
-	tmpDir, _ := setupConfigTest(t)
-
-	// First set some custom values
-	cfg, err := config.Load(nil)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
+func TestConfigResetCmd(t *testing.T) {
+	tests := []cmdTest{
+		{
+			name:    "unexpected argument",
+			args:    []string{"config", "reset", "extra"},
+			wantErr: `unknown command "extra" for "tiger config reset"`,
+		},
+		{
+			name: "reset clears configured values",
+			args: []string{"config", "reset"},
+			opts: []runOption{withConfig(map[string]any{
+				"service_id": "custom-service",
+				"output":     "json",
+				"analytics":  false,
+			})},
+			wantStdout: "Configuration reset to defaults\n",
+			check: func(t *testing.T, result cmdResult) {
+				// Reset empties the config file rather than writing defaults
+				// into it, so env vars still apply afterwards.
+				contents, err := os.ReadFile(config.GetConfigFile(result.configDir))
+				if err != nil {
+					t.Fatalf("failed to read config file: %v", err)
+				}
+				if strings.TrimSpace(string(contents)) != "{}" {
+					t.Errorf("expected an empty config file, got %q", string(contents))
+				}
+			},
+		},
+		{
+			name:       "clear alias",
+			args:       []string{"config", "clear"},
+			opts:       []runOption{withConfig(map[string]any{"service_id": "custom-service"})},
+			wantStdout: "Configuration reset to defaults\n",
+			check:      checkConfigFile(map[string]any{}),
+		},
 	}
 
-	cfg.Set("service_id", "custom-service")
-	cfg.Set("output", "json")
-	cfg.Set("analytics", "false")
-
-	// Execute reset command
-	output, err := executeConfigCommand(t.Context(), "config", "reset")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-
-	if !strings.Contains(output, "Configuration reset to defaults") {
-		t.Errorf("Expected output to contain reset message, got '%s'", strings.TrimSpace(output))
-	}
-
-	cfg, err = config.Load(nil)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-
-	// Verify all values were reset to defaults
-	if cfg.APIURL != config.DefaultAPIURL {
-		t.Errorf("Expected default APIURL %s, got %s", config.DefaultAPIURL, cfg.APIURL)
-	}
-	if cfg.ServiceID != "" {
-		t.Errorf("Expected empty ServiceID, got %s", cfg.ServiceID)
-	}
-	if cfg.Output != config.DefaultOutput {
-		t.Errorf("Expected default Output %s, got %s", config.DefaultOutput, cfg.Output)
-	}
-
-	// Reset empties the config file rather than writing defaults into it, so
-	// env vars still apply afterwards (setupConfigTest sets TIGER_ANALYTICS).
-	contents, err := os.ReadFile(config.GetConfigFile(tmpDir))
-	if err != nil {
-		t.Fatalf("Failed to read config file: %v", err)
-	}
-	if strings.TrimSpace(string(contents)) != "{}" {
-		t.Errorf("Expected an empty config file, got %q", string(contents))
-	}
+	runCmdTests(t, tests)
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
-func buildRootCmd(ctx context.Context) (*cobra.Command, error) {
+func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 	// Match command names and aliases case-insensitively (e.g. `tiger SERVICE
 	// LIST` works the same as `tiger service list`). Cobra only exposes this as
 	// a global.
@@ -88,7 +88,7 @@ tiger auth login
 
 	wrapCommands(cmd, app, skipUpdateCheck)
 
-	return cmd, nil
+	return cmd, app, nil
 }
 
 // wrapCommands recursively wraps the RunE of every command in the tree rooted at
@@ -196,7 +196,7 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) 
 }
 
 func Execute(ctx context.Context) error {
-	rootCmd, err := buildRootCmd(ctx)
+	rootCmd, _, err := buildRootCmd(ctx)
 	if err != nil {
 		return err
 	}

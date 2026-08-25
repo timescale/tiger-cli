@@ -1,290 +1,200 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/spf13/cobra"
 
+	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestDBTestConnection_NoServiceID(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config with no default service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url": "https://api.tigerdata.com/public/v1",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
+func TestDbTestConnectionCmd(t *testing.T) {
+	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
+		expectGetService(m, "svc-12345", sampleService())
 	}
 
-	// Mock authentication
-	mockTestPAT(t)
-
-	// Execute db test-connection command without service ID
-	_, err = executeDBCommand(t.Context(), "db", "test-connection")
-	if err == nil {
-		t.Fatal("Expected error when no service ID is provided or configured")
+	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
+		return func(t *testing.T, result cmdResult) {
+			var exitErr common.ExitCodeError
+			if !errors.As(result.err, &exitErr) {
+				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
+			}
+			if exitErr.ExitCode() != code {
+				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
+			}
+		}
 	}
 
-	if !strings.Contains(err.Error(), "service ID is required") {
-		t.Errorf("Expected error about missing service ID, got: %v", err)
-	}
-}
-
-func TestDBTestConnection_NoAuth(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config with service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication failure
-	mockNotLoggedIn(t)
-
-	// Execute db test-connection command
-	_, err = executeDBCommand(t.Context(), "db", "test-connection")
-	if err == nil {
-		t.Fatal("Expected error when not authenticated")
-	}
-
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Expected authentication error, got: %v", err)
-	}
-}
-
-func TestDBTestConnection_TimeoutParsing(t *testing.T) {
-	testCases := []struct {
-		name           string
-		timeoutFlag    string
-		expectError    bool
-		expectedOutput string
-	}{
+	tests := []cmdTest{
 		{
-			name:        "Valid duration - seconds",
-			timeoutFlag: "30s",
-			expectError: true, // Will fail due to unreachable server
+			name:    "not logged in",
+			args:    []string{"db", "test-connection", "svc-12345"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			check:   wantExitCode(common.ExitInvalidParameters),
 		},
 		{
-			name:        "Valid duration - minutes",
-			timeoutFlag: "5m",
-			expectError: true, // Will fail due to unreachable server
+			name:    "missing service id",
+			args:    []string{"db", "test-connection"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			check:   wantExitCode(common.ExitInvalidParameters),
 		},
 		{
-			name:        "Valid duration - hours",
-			timeoutFlag: "1h",
-			expectError: true, // Will fail due to unreachable server
+			name:    "missing service id via ping alias",
+			args:    []string{"db", "ping"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:        "Valid duration - mixed",
-			timeoutFlag: "1h30m45s",
-			expectError: true, // Will fail due to unreachable server
+			name:    "invalid timeout duration",
+			args:    []string{"db", "test-connection", "svc-12345", "--timeout", "invalid"},
+			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: time: invalid duration \"invalid\"",
 		},
 		{
-			name:        "Zero timeout (no timeout)",
-			timeoutFlag: "0",
-			expectError: true, // Will fail due to unreachable server
+			name: "network error",
+			args: []string{"db", "test-connection", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+			check:   wantExitCode(common.ExitInvalidParameters),
 		},
 		{
-			name:           "Invalid duration format",
-			timeoutFlag:    "invalid",
-			expectError:    true,
-			expectedOutput: "invalid duration",
+			name: "API error",
+			args: []string{"db", "test-connection", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusNotFound),
+						JSON4XX:      &api.Error{Message: new("service not found")},
+					}, nil)
+			},
+			wantErr: "service not found",
+			check:   wantExitCode(common.ExitInvalidParameters),
 		},
 		{
-			name:        "Negative duration",
-			timeoutFlag: "-5s",
-			expectError: true,
-			// Note: API call fails before validation, so we don't get the validation error
+			name: "nil response body",
+			args: []string{"db", "test-connection", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+			check:   wantExitCode(common.ExitInvalidParameters),
+		},
+		{
+			name:    "pooled without pooler",
+			args:    []string{"db", "test-connection", "svc-12345", "--pooled"},
+			setup:   setupGet,
+			wantErr: "connection pooler not available for this service",
+			check:   wantExitCode(common.ExitInvalidParameters),
+		},
+		{
+			name:    "negative timeout",
+			args:    []string{"db", "test-connection", "svc-12345", "--timeout=-5s"},
+			setup:   setupGet,
+			wantErr: "timeout must be positive or zero, got -5s",
+			check:   wantExitCode(common.ExitInvalidParameters),
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := setupDBTest(t)
+	runCmdTests(t, tests)
 
-			// Set up config
-			_, err := config.UseTestConfig(tmpDir, map[string]any{
-				"api_url":    "http://localhost:9999", // Non-existent server
-				"service_id": "svc-12345",
+	// Actual connection attempts produce environment-dependent pgx error text,
+	// so these assert the exit code and stderr shape instead of exact output.
+	t.Run("unreachable server", func(t *testing.T) {
+		result := runCommand(t, []string{"db", "test-connection", "svc-12345"},
+			func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
+				}))
 			})
-			if err != nil {
-				t.Fatalf("Failed to save test config: %v", err)
-			}
-
-			// Mock authentication
-			mockTestPAT(t)
-
-			// Execute db test-connection command with timeout flag
-			_, err = executeDBCommand(t.Context(), "db", "test-connection", "--timeout", tc.timeoutFlag)
-
-			if !tc.expectError {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				return
-			}
-
-			// All test cases expect errors due to invalid duration or unreachable server
-			if err == nil {
-				t.Error("Expected error but got none")
-				return
-			}
-
-			// Check if error message contains expected content for invalid format
-			if tc.expectedOutput != "" && !strings.Contains(err.Error(), tc.expectedOutput) {
-				t.Errorf("Expected error to contain '%s', got: %v", tc.expectedOutput, err)
-			}
-
-			// For valid durations that fail due to server unreachable, check exit code
-			if tc.expectedOutput == "" {
-				if exitErr, ok := err.(common.ExitCodeError); ok {
-					// Should be common.ExitTimeout (no response) or common.ExitInvalidParameters (invalid params) for network errors
-					if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
-						t.Errorf("Expected exit code %d or %d, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
-					}
-				} else {
-					t.Error("Expected common.ExitCodeError")
-				}
-			}
-		})
-	}
-}
-
-func TestTestDatabaseConnection_InvalidConnectionString(t *testing.T) {
-	// Test with truly invalid connection string that should fail at sql.Open
-
-	cmd := &cobra.Command{}
-	outBuf := new(bytes.Buffer)
-	errBuf := new(bytes.Buffer)
-	cmd.SetOut(outBuf)
-	cmd.SetErr(errBuf)
-
-	// Test with malformed connection string (should return common.ExitInvalidParameters)
-	invalidConnectionString := "this is not a valid connection string at all"
-	ctx := context.Background()
-	err := testDatabaseConnection(ctx, invalidConnectionString, 1*time.Second, cmd)
-
-	if err == nil {
-		t.Error("Expected error for invalid connection string")
-	}
-
-	// Should be an common.ExitCodeError
-	if exitErr, ok := err.(common.ExitCodeError); ok {
-		// The exact code depends on where it fails - could be common.ExitTimeout or common.ExitInvalidParameters
-		if exitErr.ExitCode() != common.ExitTimeout && exitErr.ExitCode() != common.ExitInvalidParameters {
-			t.Errorf("Expected exit code %d or %d for invalid connection string, got %d", common.ExitTimeout, common.ExitInvalidParameters, exitErr.ExitCode())
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
 		}
-	} else {
-		t.Error("Expected common.ExitCodeError for invalid connection string")
-	}
-}
+		var exitErr common.ExitCodeError
+		if !errors.As(result.err, &exitErr) {
+			t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
+		}
+		if exitErr.ExitCode() != 2 {
+			t.Errorf("exit code = %d, want 2", exitErr.ExitCode())
+		}
+		if !strings.HasPrefix(result.stderr, "Connection failed: ") {
+			t.Errorf("expected stderr to start with %q, got %q", "Connection failed: ", result.stderr)
+		}
+	})
 
-func TestTestDatabaseConnection_Timeout(t *testing.T) {
-	// Test timeout functionality with a connection to a non-existent server
-	cmd := &cobra.Command{}
-	outBuf := new(bytes.Buffer)
-	errBuf := new(bytes.Buffer)
-	cmd.SetOut(outBuf)
-	cmd.SetErr(errBuf)
-
-	// Use a connection string to a non-routable IP to test timeout
-	timeoutConnectionString := "postgresql://user:pass@192.0.2.1:5432/db?sslmode=disable&connect_timeout=1"
-
-	ctx := context.Background()
-	start := time.Now()
-	err := testDatabaseConnection(ctx, timeoutConnectionString, 1*time.Second, cmd) // 1 second timeout
-	duration := time.Since(start)
-
-	if err == nil {
-		t.Error("Expected error for timeout connection")
-	}
-
-	// Should complete within reasonable time (not hang)
-	if duration > 3*time.Second {
-		t.Errorf("Connection test took too long: %v", duration)
-	}
-
-	// Check exit code (should be common.ExitTimeout for unreachable)
-	if exitErr, ok := err.(common.ExitCodeError); ok {
+	t.Run("connection timeout", func(t *testing.T) {
+		// 192.0.2.0/24 (TEST-NET-1) is non-routable, so the dial hangs until
+		// the --timeout deadline fires.
+		result := runCommand(t, []string{"db", "test-connection", "svc-12345", "--timeout", "250ms"},
+			func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
+				}))
+			})
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var exitErr common.ExitCodeError
+		if !errors.As(result.err, &exitErr) {
+			t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
+		}
 		if exitErr.ExitCode() != common.ExitTimeout {
-			t.Errorf("Expected exit code %d for timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
+			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitTimeout)
 		}
-	} else {
-		t.Error("Expected common.ExitCodeError for timeout")
-	}
+		assertOutput(t, result.stderr, "Connection timeout after 250ms\n")
+	})
 }
 
+// TestIsConnectionRejected stays at helper level: a real 57P03 rejection needs
+// a live PostgreSQL server that is starting up or out of connection slots.
 func TestIsConnectionRejected(t *testing.T) {
-	testCases := []struct {
-		name     string
-		err      error
-		expected bool
+	tests := []struct {
+		name string
+		err  error
+		want bool
 	}{
 		{
-			name: "PostgreSQL error code 57P03 (ERRCODE_CANNOT_CONNECT_NOW)",
-			err: &pgconn.PgError{
-				Code:    "57P03",
-				Message: "the database system is starting up",
-			},
-			expected: true,
+			name: "cannot connect now (57P03)",
+			err:  &pgconn.PgError{Code: "57P03", Message: "the database system is starting up"},
+			want: true,
 		},
 		{
-			name: "PostgreSQL authentication error (28P01)",
-			err: &pgconn.PgError{
-				Code:    "28P01",
-				Message: "password authentication failed for user \"test\"",
-			},
-			expected: false,
+			name: "authentication failed (28P01)",
+			err:  &pgconn.PgError{Code: "28P01", Message: "password authentication failed for user \"test\""},
+			want: false,
 		},
 		{
-			name: "PostgreSQL invalid authorization error (28000)",
-			err: &pgconn.PgError{
-				Code:    "28000",
-				Message: "role \"nonexistent\" does not exist",
-			},
-			expected: false,
+			name: "invalid authorization (28000)",
+			err:  &pgconn.PgError{Code: "28000", Message: "role \"nonexistent\" does not exist"},
+			want: false,
 		},
 		{
-			name: "PostgreSQL database does not exist (3D000)",
-			err: &pgconn.PgError{
-				Code:    "3D000",
-				Message: "database \"nonexistent\" does not exist",
-			},
-			expected: false,
+			name: "database does not exist (3D000)",
+			err:  &pgconn.PgError{Code: "3D000", Message: "database \"nonexistent\" does not exist"},
+			want: false,
 		},
 		{
-			name:     "Non-PostgreSQL error (connection refused)",
-			err:      fmt.Errorf("dial tcp: connection refused"),
-			expected: false,
-		},
-		{
-			name:     "Non-PostgreSQL error (network unreachable)",
-			err:      fmt.Errorf("dial tcp: network is unreachable"),
-			expected: false,
+			name: "non-postgres error",
+			err:  fmt.Errorf("dial tcp: connection refused"),
+			want: false,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := isConnectionRejected(tc.err)
-
-			if result != tc.expected {
-				t.Errorf("Expected isConnectionRejected to return %v for error %v, got %v",
-					tc.expected, tc.err, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isConnectionRejected(tt.err); got != tt.want {
+				t.Errorf("isConnectionRejected(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}

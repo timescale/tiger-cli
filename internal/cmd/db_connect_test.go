@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"context"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -15,240 +16,313 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestDBConnect_NoServiceID(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config with no default service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url": "https://api.tigerdata.com/public/v1",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
+func TestDbConnectCmd(t *testing.T) {
+	// A stub psql on PATH lets cases get past the LookPath check; every case
+	// that does so still fails before psql would actually run.
+	psqlDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(psqlDir, "psql"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("failed to create stub psql: %v", err)
 	}
 
-	// Mock authentication
-	mockTestPAT(t)
-
-	// Execute db connect command without service ID
-	_, err = executeDBCommand(t.Context(), "db", "connect")
-	if err == nil {
-		t.Fatal("Expected error when no service ID is provided or configured")
+	expectGetService := func(m *mocks.MockClientWithResponsesInterface, svc api.Service) {
+		m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, svc.ServiceID).
+			Return(&api.GetServiceResponse{
+				HTTPResponse: httpResponse(http.StatusOK),
+				JSON200:      &svc,
+			}, nil)
 	}
 
-	if !strings.Contains(err.Error(), "service ID is required") {
-		t.Errorf("Expected error about missing service ID, got: %v", err)
+	noEndpoint := func(s *api.Service) { s.Endpoint = nil }
+
+	// A read replica of sampleService, with no endpoint of its own.
+	replicaService := func() api.Service {
+		return api.Service{
+			ServiceID: "rep-123",
+			ProjectID: testProjectID,
+			ForkedFrom: &api.ForkSpec{
+				IsStandby: new(true),
+				ProjectID: new(testProjectID),
+				ServiceID: new("svc-12345"),
+			},
+		}
 	}
+
+	expectExitCode := func(code int) func(*testing.T, cmdResult) {
+		return func(t *testing.T, result cmdResult) {
+			var exitErr common.ExitCodeError
+			if !errors.As(result.err, &exitErr) {
+				t.Fatalf("expected ExitCodeError, got %T", result.err)
+			}
+			if got := exitErr.ExitCode(); got != code {
+				t.Errorf("expected exit code %d, got %d", code, got)
+			}
+		}
+	}
+
+	tests := []cmdTest{
+		{
+			name:    "not logged in",
+			args:    []string{"db", "connect", "svc-12345"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			check:   expectExitCode(common.ExitAuthenticationError),
+		},
+		{
+			name:    "service ID required",
+			args:    []string{"db", "connect"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name:    "psql alias",
+			args:    []string{"db", "psql"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name:    "args after -- are not the service ID",
+			args:    []string{"db", "connect", "--", "--single-transaction"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "default service ID from config with psql flags after --",
+			args: []string{"db", "connect", "--", "-c", "SELECT 1;"},
+			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+		},
+		{
+			name: "service ID before -- separator",
+			args: []string{"db", "connect", "svc-12345", "--", "-c", "SELECT 1;"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+		},
+		{
+			name: "API error fetching service",
+			args: []string{"db", "connect", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusNotFound),
+						JSON4XX:      &api.Error{Message: new("service not found")},
+					}, nil)
+			},
+			wantErr: "service not found",
+			check:   expectExitCode(common.ExitServiceNotFound),
+		},
+		{
+			name: "nil response body",
+			args: []string{"db", "connect", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+		},
+		{
+			name: "parent fetch fails for read replica",
+			args: []string{"db", "connect", "rep-123"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, replicaService())
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: `failed to fetch parent service "svc-12345" for read replica: failed to fetch service details: connection refused`,
+		},
+		{
+			name: "psql not found",
+			args: []string{"db", "connect", "svc-12345"},
+			opts: []runOption{withEnv("PATH", "/nonexistent")},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService())
+			},
+			wantErr: "psql client not found. Please install PostgreSQL client tools",
+		},
+		{
+			// No GetReplicaSets expectation: a non-TTY stdin/stderr must skip
+			// the replica prompt entirely.
+			name: "non-TTY skips replica prompt",
+			args: []string{"db", "connect", "svc-12345"},
+			opts: []runOption{withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService(noEndpoint))
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
+			name: "--no-replica-prompt skips replica prompt on a TTY",
+			args: []string{"db", "connect", "svc-12345", "--no-replica-prompt"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService(noEndpoint))
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
+			name: "replica target skips replica prompt",
+			args: []string{"db", "connect", "rep-123"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, replicaService())
+				expectGetService(m, sampleService())
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
+			name: "replica listing failure warns and continues",
+			args: []string{"db", "connect", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService(noEndpoint))
+				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr:    "failed to build connection string: service endpoint not available",
+			wantStderr: "Warning: could not list read replicas: connection refused\nError: failed to build connection string: service endpoint not available\n",
+		},
+		{
+			name: "no replicas skips prompt on a TTY",
+			args: []string{"db", "connect", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService(noEndpoint))
+				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetReplicaSetsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &[]api.ReadReplicaSet{},
+					}, nil)
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
+			name: "no connectable replicas skips prompt",
+			args: []string{"db", "connect", "svc-12345"},
+			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService(noEndpoint))
+				replicas := []api.ReadReplicaSet{
+					{
+						ID:     "rep-1",
+						Name:   "replica-a",
+						Status: api.ReadReplicaSetStatusCreating,
+						Endpoint: &api.Endpoint{
+							Host: new("rep.example.com"),
+							Port: new(5432),
+						},
+					},
+					{ID: "rep-2", Name: "replica-b", Status: api.ReadReplicaSetStatusActive},
+				}
+				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetReplicaSetsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &replicas,
+					}, nil)
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
+			name: "--pooled without pooler",
+			args: []string{"db", "connect", "svc-12345", "--pooled"},
+			opts: []runOption{withEnv("PATH", psqlDir)},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, sampleService())
+			},
+			wantErr: "connection pooler not available for this service",
+		},
+	}
+
+	runCmdTests(t, tests)
 }
 
-func TestDBConnect_NoAuth(t *testing.T) {
-	tmpDir := setupDBTest(t)
+// psqlArgsLenAtDash implements ArgsLenAtDashProvider for
+// TestSeparateServiceAndPsqlArgs.
+type psqlArgsLenAtDash int
 
-	// Set up config with service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
+func (p psqlArgsLenAtDash) ArgsLenAtDash() int { return int(p) }
 
-	// Mock authentication failure
-	mockNotLoggedIn(t)
-
-	// Execute db connect command
-	_, err = executeDBCommand(t.Context(), "db", "connect")
-	if err == nil {
-		t.Fatal("Expected error when not authenticated")
-	}
-
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Expected authentication error, got: %v", err)
-	}
-}
-
-func TestDBConnect_PsqlNotFound(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication
-	mockTestPAT(t)
-
-	// Test that psql alias works the same as connect
-	_, err1 := executeDBCommand(t.Context(), "db", "connect")
-	_, err2 := executeDBCommand(t.Context(), "db", "psql")
-
-	// Both should behave identically (both will fail due to network/psql not found, but with same error pattern)
-	if err1 == nil || err2 == nil {
-		t.Fatal("Expected both connect and psql to fail in test environment")
-	}
-
-	// Both should have similar error patterns (either network error or psql not found)
-	connectErrStr := err1.Error()
-	psqlErrStr := err2.Error()
-
-	// They should both fail for the same fundamental reason
-	if strings.Contains(connectErrStr, "authentication") != strings.Contains(psqlErrStr, "authentication") ||
-		strings.Contains(connectErrStr, "psql client not found") != strings.Contains(psqlErrStr, "psql client not found") ||
-		strings.Contains(connectErrStr, "failed to fetch") != strings.Contains(psqlErrStr, "failed to fetch") {
-		t.Errorf("Connect and psql should behave identically. Connect error: %v, Psql error: %v", err1, err2)
-	}
-}
-
+// TestSeparateServiceAndPsqlArgs covers the service-arg/psql-flag split at the
+// helper level: the full split isn't observable through the command without
+// actually launching psql.
 func TestSeparateServiceAndPsqlArgs(t *testing.T) {
-	testCases := []struct {
-		name                string
-		args                []string
-		argsLenAtDash       int // What ArgsLenAtDash should return
-		expectedServiceArgs []string
-		expectedPsqlFlags   []string
+	tests := []struct {
+		name            string
+		args            []string
+		argsLenAtDash   int
+		wantServiceArgs []string
+		wantPsqlFlags   []string
 	}{
-		{
-			name:                "No separator - service only",
-			args:                []string{"svc-12345"},
-			argsLenAtDash:       -1, // No -- found
-			expectedServiceArgs: []string{"svc-12345"},
-			expectedPsqlFlags:   []string{},
-		},
-		{
-			name:                "No arguments at all",
-			args:                []string{},
-			argsLenAtDash:       -1,
-			expectedServiceArgs: []string{},
-			expectedPsqlFlags:   []string{},
-		},
-		{
-			name:                "Service with psql flags after --",
-			args:                []string{"svc-12345", "-c", "SELECT 1;"},
-			argsLenAtDash:       1, // -- was after first arg
-			expectedServiceArgs: []string{"svc-12345"},
-			expectedPsqlFlags:   []string{"-c", "SELECT 1;"},
-		},
-		{
-			name:                "No service, just psql flags after --",
-			args:                []string{"--single-transaction", "--quiet"},
-			argsLenAtDash:       0, // -- was at the beginning
-			expectedServiceArgs: []string{},
-			expectedPsqlFlags:   []string{"--single-transaction", "--quiet"},
-		},
-		{
-			name:                "Service with multiple psql flags",
-			args:                []string{"svc-test", "-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"},
-			argsLenAtDash:       1,
-			expectedServiceArgs: []string{"svc-test"},
-			expectedPsqlFlags:   []string{"-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"},
-		},
+		{"no separator", []string{"svc-12345"}, -1, []string{"svc-12345"}, []string{}},
+		{"no arguments", []string{}, -1, []string{}, []string{}},
+		{"service with psql flags", []string{"svc-12345", "-c", "SELECT 1;"}, 1, []string{"svc-12345"}, []string{"-c", "SELECT 1;"}},
+		{"only psql flags", []string{"--single-transaction", "--quiet"}, 0, []string{}, []string{"--single-transaction", "--quiet"}},
+		{"multiple psql flags", []string{"svc-test", "-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"}, 1, []string{"svc-test"}, []string{"-c", "SELECT version();", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"}},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Create a mock command that returns the expected ArgsLenAtDash
-			mockCmd := &mockCobraCommand{
-				args:          tc.args,
-				argsLenAtDash: tc.argsLenAtDash,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(psqlArgsLenAtDash(tt.argsLenAtDash), tt.args)
+			if !slices.Equal(serviceArgs, tt.wantServiceArgs) {
+				t.Errorf("expected serviceArgs %v, got %v", tt.wantServiceArgs, serviceArgs)
 			}
-
-			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(mockCmd, tc.args)
-
-			if !equalStringSlices(serviceArgs, tc.expectedServiceArgs) {
-				t.Errorf("Expected serviceArgs %v, got %v", tc.expectedServiceArgs, serviceArgs)
-			}
-
-			if !equalStringSlices(psqlFlags, tc.expectedPsqlFlags) {
-				t.Errorf("Expected psqlFlags %v, got %v", tc.expectedPsqlFlags, psqlFlags)
+			if !slices.Equal(psqlFlags, tt.wantPsqlFlags) {
+				t.Errorf("expected psqlFlags %v, got %v", tt.wantPsqlFlags, psqlFlags)
 			}
 		})
 	}
 }
 
-// mockCobraCommand implements the minimal interface needed for testing
-type mockCobraCommand struct {
-	args          []string
-	argsLenAtDash int
-}
-
-func (m *mockCobraCommand) ArgsLenAtDash() int {
-	return m.argsLenAtDash
-}
-
-// Helper function to compare string slices
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func testPrimary() api.Service {
-	return api.Service{
-		ServiceID: "svc-primary",
-		Name:      "my-db",
-	}
-}
-
-func testReplicas() []api.ReadReplicaSet {
-	return []api.ReadReplicaSet{
+// TestConnectTargetModel covers the replica-selection menu model at the helper
+// level: driving the Bubble Tea menu through the command would need a real TTY.
+func TestConnectTargetModel(t *testing.T) {
+	primary := api.Service{ServiceID: "svc-primary", Name: "my-db"}
+	replicas := []api.ReadReplicaSet{
 		{ID: "rep-1", Name: "replica-a"},
 		{ID: "rep-2", Name: "replica-b"},
 	}
-}
 
-func TestNewConnectTargetModel_Options(t *testing.T) {
-	// No replicas: primary, cancel.
-	m := newConnectTargetModel(testPrimary(), nil)
-	if len(m.choices) != 2 {
-		t.Fatalf("expected 2 choices with no replicas, got %d: %v", len(m.choices), m.choices)
-	}
-	if m.choices[0].kind != targetPrimary {
-		t.Errorf("expected first choice to be primary")
-	}
-	if m.choices[1].kind != targetCancel {
-		t.Errorf("expected last choice to be cancel")
-	}
+	t.Run("choices", func(t *testing.T) {
+		// No replicas: primary, cancel.
+		m := newConnectTargetModel(primary, nil)
+		if len(m.choices) != 2 || m.choices[0].kind != targetPrimary || m.choices[1].kind != targetCancel {
+			t.Errorf("expected [primary, cancel] with no replicas, got %+v", m.choices)
+		}
 
-	// Two replicas: primary, replica-a, replica-b, cancel.
-	m = newConnectTargetModel(testPrimary(), testReplicas())
-	if len(m.choices) != 4 {
-		t.Fatalf("expected 4 choices with two replicas, got %d: %v", len(m.choices), m.choices)
-	}
-	if m.choices[1].kind != targetReplica || m.choices[1].replica == nil || m.choices[1].replica.ID != "rep-1" {
-		t.Errorf("expected second choice to be replica rep-1, got %+v", m.choices[1])
-	}
-	if m.choices[2].kind != targetReplica || m.choices[2].replica.ID != "rep-2" {
-		t.Errorf("expected third choice to be replica rep-2, got %+v", m.choices[2])
-	}
-	if m.choices[3].kind != targetCancel {
-		t.Errorf("expected last choice to be cancel when replicas exist, got %v", m.choices[3].kind)
-	}
-}
+		// Two replicas: primary, replica-a, replica-b, cancel.
+		m = newConnectTargetModel(primary, replicas)
+		if len(m.choices) != 4 {
+			t.Fatalf("expected 4 choices with two replicas, got %d: %+v", len(m.choices), m.choices)
+		}
+		if m.choices[1].kind != targetReplica || m.choices[1].replica == nil || m.choices[1].replica.ID != "rep-1" {
+			t.Errorf("expected second choice to be replica rep-1, got %+v", m.choices[1])
+		}
+		if m.choices[2].kind != targetReplica || m.choices[2].replica.ID != "rep-2" {
+			t.Errorf("expected third choice to be replica rep-2, got %+v", m.choices[2])
+		}
+		if m.choices[3].kind != targetCancel {
+			t.Errorf("expected last choice to be cancel, got %v", m.choices[3].kind)
+		}
 
-func TestConnectTargetModel_DefaultsToCancel(t *testing.T) {
-	m := newConnectTargetModel(testPrimary(), testReplicas())
-	if m.chosen.kind != targetCancel {
-		t.Errorf("expected default chosen to be cancel, got %v", m.chosen.kind)
-	}
-}
+		// Quitting without a selection must be a no-op connection.
+		if m.chosen.kind != targetCancel {
+			t.Errorf("expected default chosen to be cancel, got %v", m.chosen.kind)
+		}
+	})
 
-func TestConnectTargetModel_KeySelection(t *testing.T) {
 	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
 	// stringifies to "\x03" and would match nothing.
-	cases := []struct {
+	keyTests := []struct {
 		name          string
 		key           tea.KeyPressMsg
 		wantKind      connectTargetKind
@@ -260,289 +334,119 @@ func TestConnectTargetModel_KeySelection(t *testing.T) {
 		{"ctrl+c cancels", tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, targetCancel, ""},
 		{"'2' selects the first replica", tea.KeyPressMsg{Code: '2'}, targetReplica, "rep-1"},
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			m := newConnectTargetModel(testPrimary(), testReplicas())
-			updated, _ := m.Update(tc.key)
+
+	for _, tt := range keyTests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newConnectTargetModel(primary, replicas)
+			updated, _ := m.Update(tt.key)
 			choice := updated.(connectTargetModel).chosen
-			if choice.kind != tc.wantKind {
-				t.Fatalf("expected kind %v, got %v", tc.wantKind, choice.kind)
+			if choice.kind != tt.wantKind {
+				t.Fatalf("expected kind %v, got %v", tt.wantKind, choice.kind)
 			}
-			if tc.wantReplicaID != "" && (choice.replica == nil || choice.replica.ID != tc.wantReplicaID) {
-				t.Errorf("expected replica %s, got %+v", tc.wantReplicaID, choice.replica)
+			if tt.wantReplicaID != "" && (choice.replica == nil || choice.replica.ID != tt.wantReplicaID) {
+				t.Errorf("expected replica %s, got %+v", tt.wantReplicaID, choice.replica)
 			}
 		})
 	}
 }
 
-// TestSelectConnection_NoReplicasSkipsPrompt verifies that, with no
-// connectable replicas, selectConnection connects to the primary directly
-// instead of showing a single-option menu (which would block on TTY input in
-// this test).
-func TestSelectConnection_NoReplicasSkipsPrompt(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[]`)) // no replicas
-	}))
-	defer server.Close()
-
-	client, err := api.NewClientWithResponses(server.URL)
-	if err != nil {
-		t.Fatalf("failed to build client: %v", err)
-	}
-
-	host := "primary.example.com"
-	port := 5432
-	primary := api.Service{
-		ServiceID: "svc-primary",
-		Name:      "my-db",
-		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
-	}
-
-	// Pretend we're on a TTY so the prompt would normally run.
-	stubIsTerminal(t, true)
-
-	cmd := &cobra.Command{}
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-
-	target := &common.ConnectionTarget{ConnectionService: primary, CredentialService: primary}
-	app := newTestApp(t, client, "proj-1")
-	details, err := selectConnection(context.Background(), cmd, app, target,
-		common.ConnectionDetailsOptions{Role: "tsdbadmin"}, false /*noReplicaPrompt*/)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if details == nil || details.Host != host {
-		t.Fatalf("expected to connect directly to primary %q, got %+v", host, details)
-	}
-}
-
+// TestIsAuthenticationError covers the auth-error classifier at the helper
+// level: exercising it through the command would need a real Postgres server.
 func TestIsAuthenticationError(t *testing.T) {
-	testCases := []struct {
-		name     string
-		err      error
-		expected bool
+	tests := []struct {
+		name string
+		err  error
+		want bool
 	}{
-		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
-		},
-		{
-			name: "PostgreSQL error code 28P01 (invalid_password)",
-			err: &pgconn.PgError{
-				Code:    "28P01",
-				Message: "password authentication failed for user \"test\"",
-			},
-			expected: true,
-		},
-		{
-			name: "PostgreSQL error code 28000 (invalid_authorization_specification)",
-			err: &pgconn.PgError{
-				Code:    "28000",
-				Message: "role \"nonexistent\" does not exist",
-			},
-			expected: true,
-		},
-		{
-			name: "PostgreSQL error code 57P03 (cannot_connect_now) - not auth error",
-			err: &pgconn.PgError{
-				Code:    "57P03",
-				Message: "the database system is starting up",
-			},
-			expected: false,
-		},
-		{
-			name: "PostgreSQL error code 3D000 (database does not exist) - not auth error",
-			err: &pgconn.PgError{
-				Code:    "3D000",
-				Message: "database \"nonexistent\" does not exist",
-			},
-			expected: false,
-		},
+		{"nil error", nil, false},
+		{"28P01 invalid_password", &pgconn.PgError{Code: "28P01"}, true},
+		{"28000 invalid_authorization_specification", &pgconn.PgError{Code: "28000"}, true},
+		{"57P03 cannot_connect_now", &pgconn.PgError{Code: "57P03"}, false},
+		{"3D000 database does not exist", &pgconn.PgError{Code: "3D000"}, false},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := isAuthenticationError(tc.err)
-
-			if result != tc.expected {
-				t.Errorf("Expected isAuthenticationError to return %v for error %v, got %v",
-					tc.expected, tc.err, result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAuthenticationError(tt.err); got != tt.want {
+				t.Errorf("isAuthenticationError(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestLaunchPsqlWithConnectionString(t *testing.T) {
-	// This test verifies the psql launching logic without actually running psql
-
-	// Create a test command to capture output
-	cmd := &cobra.Command{}
-	outBuf := new(bytes.Buffer)
-	cmd.SetOut(outBuf)
-
-	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
-
-	// Create a dummy service for the test
-	service := api.Service{}
-	connectionDetails := &common.ConnectionDetails{
-		Host:     "testhost",
-		Port:     5432,
-		Database: "testdb",
-		Role:     "testuser",
-		Password: "",
+// TestBuildPsqlCommand covers the psql handoff at the helper level: the command
+// path would exec a real psql.
+func TestBuildPsqlCommand(t *testing.T) {
+	details := func() *common.ConnectionDetails {
+		return &common.ConnectionDetails{
+			Host:     "testhost",
+			Port:     5432,
+			Database: "testdb",
+			Role:     "testuser",
+		}
 	}
+	const psqlPath = "/usr/bin/psql"
+	// The password must never appear in the connection string (process lists).
+	const connString = "postgresql://testuser@testhost:5432/testdb?sslmode=require"
 
-	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(testConfig(t), connectionDetails, psqlPath, []string{}, service, cmd)
+	t.Run("connection string and flags are passed through", func(t *testing.T) {
+		d := details()
+		d.Password = "explicit-pw"
+		flags := []string{"--single-transaction", "-c", "SELECT 1;"}
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, d, psqlPath, flags, api.Service{}, discardCmd())
 
-	// Should fail with exec error since fake psql path doesn't exist
-	if err == nil {
-		t.Error("Expected error when using fake psql path")
-	}
+		wantArgs := []string{psqlPath, connString, "--single-transaction", "-c", "SELECT 1;"}
+		if !slices.Equal(psqlCmd.Args, wantArgs) {
+			t.Errorf("expected args %v, got %v", wantArgs, psqlCmd.Args)
+		}
+		if !slices.Contains(psqlCmd.Env, "PGPASSWORD=explicit-pw") {
+			t.Errorf("expected PGPASSWORD=explicit-pw in env, got %v", psqlCmd.Env)
+		}
+	})
 
-	// No output expected since we removed the connecting message
-	output := outBuf.String()
-	if output != "" {
-		t.Errorf("Expected no output, got: %q", output)
-	}
-}
+	t.Run("keyring password becomes PGPASSWORD", func(t *testing.T) {
+		config.SetTestServiceName(t)
+		service := api.Service{ServiceID: "svc-psql", ProjectID: "proj-psql"}
+		if err := (&common.KeyringStorage{}).Save(service, "keyring-pw", "testuser"); err != nil {
+			t.Fatalf("failed to save test password: %v", err)
+		}
 
-func TestLaunchPsqlWithAdditionalFlags(t *testing.T) {
-	// This test verifies that additional flags are passed correctly to psql
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "keyring"}, details(), psqlPath, nil, service, discardCmd())
+		if !slices.Contains(psqlCmd.Env, "PGPASSWORD=keyring-pw") {
+			t.Errorf("expected PGPASSWORD=keyring-pw in env, got %v", psqlCmd.Env)
+		}
+	})
 
-	// Create a test command to capture output
-	cmd := &cobra.Command{}
-	outBuf := new(bytes.Buffer)
-	cmd.SetOut(outBuf)
-
-	psqlPath := "/fake/path/to/psql" // This will fail, but we can test the setup
-	additionalFlags := []string{"--single-transaction", "--quiet", "-c", "SELECT 1;"}
-
-	// Create a dummy service for the test
-	service := api.Service{}
-
-	connectionDetails := &common.ConnectionDetails{
-		Host:     "testhost",
-		Port:     5432,
-		Database: "testdb",
-		Role:     "testuser",
-		Password: "",
-	}
-
-	// This will fail because psql path doesn't exist, but we can verify the error
-	err := launchPsql(testConfig(t), connectionDetails, psqlPath, additionalFlags, service, cmd)
-
-	// Should fail with exec error since fake psql path doesn't exist
-	if err == nil {
-		t.Error("Expected error when using fake psql path")
-	}
-
-	// No output expected since we removed the connecting message
-	output := outBuf.String()
-	if output != "" {
-		t.Errorf("Expected no output, got: %q", output)
-	}
-}
-
-func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-
-	// Set keyring as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	// Create a test service
-	serviceID := "test-psql-service"
-	projectID := "test-psql-project"
-	service := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-	}
-
-	// Store a test password in keyring
-	testPassword := "test-password-12345"
-	storage := common.GetPasswordStorage(testConfig(t))
-	err := storage.Save(service, testPassword, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("Failed to save test password: %v", err)
-	}
-	defer storage.Remove(service, "tsdbadmin") // Clean up after test
-
-	psqlPath := "/usr/bin/psql"
-	additionalFlags := []string{"--quiet"}
-
-	connectionDetails := &common.ConnectionDetails{
-		Host:     "testhost",
-		Port:     5432,
-		Database: "testdb",
-		Role:     "testuser",
-		Password: testPassword,
-	}
-
-	// Create a mock command for testing
-	testCmd := &cobra.Command{}
-
-	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(testConfig(t), connectionDetails, psqlPath, additionalFlags, service, testCmd)
-
-	if psqlCmd == nil {
-		t.Fatal("buildPsqlCommand returned nil")
-	}
-
-	// Verify that PGPASSWORD is set in the environment with the correct value
-	found := false
-	expectedEnvVar := "PGPASSWORD=" + testPassword
-	if slices.Contains(psqlCmd.Env, expectedEnvVar) {
-		found = true
-	}
-
-	if !found {
-		t.Errorf("Expected PGPASSWORD=%s to be set in environment, but it wasn't. Env vars: %v", testPassword, psqlCmd.Env)
-	}
-}
-
-func TestBuildPsqlCommand_PgpassStorage_NoEnvVar(t *testing.T) {
-	// Set pgpass as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "pgpass")
-
-	// Create a test service
-	serviceID := "test-service-id"
-	projectID := "test-project-id"
-	service := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-	}
-
-	psqlPath := "/usr/bin/psql"
-
-	connectionDetails := &common.ConnectionDetails{
-		Host:     "testhost",
-		Port:     5432,
-		Database: "testdb",
-		Role:     "testuser",
-		Password: "", // Password should be fetched from .pgpass
-	}
-
-	// Create a mock command for testing
-	testCmd := &cobra.Command{}
-
-	// Call the actual production function that builds the command
-	psqlCmd := buildPsqlCommand(testConfig(t), connectionDetails, psqlPath, []string{}, service, testCmd)
-
-	if psqlCmd == nil {
-		t.Fatal("buildPsqlCommand returned nil")
-	}
-
-	// Verify that PGPASSWORD is NOT set in the environment for pgpass storage
-	if psqlCmd.Env != nil {
-		for _, envVar := range psqlCmd.Env {
-			if strings.HasPrefix(envVar, "PGPASSWORD=") {
-				t.Errorf("PGPASSWORD should not be set when using pgpass storage, but found: %s", envVar)
+	t.Run("pgpass storage sets no PGPASSWORD", func(t *testing.T) {
+		// psql reads ~/.pgpass itself, so the env var must stay unset.
+		psqlCmd := buildPsqlCommand(&config.Config{PasswordStorage: "pgpass"}, details(), psqlPath, nil, api.Service{}, discardCmd())
+		for _, env := range psqlCmd.Env {
+			if strings.HasPrefix(env, "PGPASSWORD=") {
+				t.Errorf("expected no PGPASSWORD for pgpass storage, got %s", env)
 			}
 		}
+	})
+}
+
+// TestLaunchPsql covers the launch failure path at the helper level, with a
+// psql path that cannot exist.
+func TestLaunchPsql(t *testing.T) {
+	var stdout bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&stdout)
+	cmd.SetErr(io.Discard)
+
+	details := &common.ConnectionDetails{
+		Host:     "testhost",
+		Port:     5432,
+		Database: "testdb",
+		Role:     "testuser",
+	}
+	err := launchPsql(&config.Config{PasswordStorage: "none"}, details, "/nonexistent/psql", []string{"--quiet"}, api.Service{}, cmd)
+	if err == nil {
+		t.Error("expected error for nonexistent psql path")
+	}
+	if stdout.String() != "" {
+		t.Errorf("expected no output, got %q", stdout.String())
 	}
 }

@@ -36,7 +36,7 @@ func setupIntegrationTest(t *testing.T) string {
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
 		// to avoid circular dependencies during setup
-		rootCmd, err := buildRootCmd(t.Context())
+		rootCmd, _, err := buildRootCmd(t.Context())
 		if err != nil {
 			t.Fatalf("Failed to build root command during setup: %v", err)
 		}
@@ -60,7 +60,7 @@ func setupIntegrationTest(t *testing.T) string {
 // executeIntegrationCommand executes a CLI command for integration testing
 func executeIntegrationCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot, err := buildRootCmd(ctx)
+	testRoot, _, err := buildRootCmd(ctx)
 	if err != nil {
 		return "", err
 	}

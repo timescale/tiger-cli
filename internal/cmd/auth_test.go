@@ -1,80 +1,68 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
-	"os"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func setupAuthTest(t *testing.T) string {
+// startMockOAuthServer serves the endpoints the OAuth flows hit: the token
+// endpoint (both the authorization_code exchange and the refresh_token grant),
+// the project listing backing project selection, and the post-login success
+// redirect. Both grants return the same canned token so downstream assertions
+// stay stable. Shared by the auth login and logout tests.
+func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server {
 	t.Helper()
 
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
+	mux := http.NewServeMux()
 
-	// Mock the API key validation for testing
-	originalValidator := validateAPIKey
-	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {
-		authInfo := &api.AuthInfo{}
-		json.Unmarshal([]byte(`{"type":"apiKey","api_key":{"public_key":"test-access-key","project":{"id":"test-project-id"}}}`), authInfo)
-		return authInfo, nil
-	}
+	mux.HandleFunc("POST /idp/external/cli/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "failed to parse form", http.StatusBadRequest)
+			return
+		}
 
-	// Create temporary directory for test config
-	tmpDir, err := os.MkdirTemp("", "tiger-auth-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
+		switch r.FormValue("grant_type") {
+		case "refresh_token":
+			if r.FormValue("refresh_token") == "" || r.FormValue("client_id") == "" {
+				http.Error(w, "missing required parameters", http.StatusBadRequest)
+				return
+			}
+		default:
+			if r.FormValue("client_id") == "" || r.FormValue("code") == "" || r.FormValue("code_verifier") == "" {
+				http.Error(w, "missing required parameters", http.StatusBadRequest)
+				return
+			}
+			// The code exchange must carry the CLI User-Agent (recorded
+			// server-side as the session's user_agent).
+			if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "tiger-cli/") {
+				t.Errorf("code exchange User-Agent = %q, want \"tiger-cli/\" prefix", ua)
+			}
+		}
 
-	// Set TIGER_CONFIG_DIR environment variable so that commands executed by
-	// the test load their config from the test directory
-	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
-
-	// Disable analytics for auth tests to avoid tracking test events
-	os.Setenv("TIGER_ANALYTICS", "false")
-
-	// Write an empty config file in the test directory
-	if _, err := config.UseTestConfig(tmpDir, map[string]any{}); err != nil {
-		t.Fatalf("Failed to use test config: %v", err)
-	}
-
-	// Clean up any existing test credentials
-	testConfig(t).RemoveCredentials()
-
-	t.Cleanup(func() {
-		// Clean up test credentials
-		testConfig(t).RemoveCredentials()
-		validateAPIKey = originalValidator // Restore original validator
-		// Remove config file explicitly
-		configFile := config.GetConfigFile(tmpDir)
-		os.Remove(configFile)
-		// Clean up environment variables BEFORE cleaning up file system
-		os.Unsetenv("TIGER_CONFIG_DIR")
-		os.Unsetenv("TIGER_ANALYTICS")
-		// Then clean up file system
-		os.RemoveAll(tmpDir)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "mock-access-token-12345",
+			"refresh_token": "mock-refresh-token-67890",
+			"expires_in":    3600,
+		})
 	})
 
-	return tmpDir
-}
+	// REST endpoint backing selectProjectID
+	mux.HandleFunc("GET /projects", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(projects)
+	})
 
-func executeAuthCommand(ctx context.Context, args ...string) (string, error) {
-	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot, err := buildRootCmd(ctx)
-	if err != nil {
-		return "", err
-	}
+	mux.HandleFunc("GET /oauth/code/success", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
-	buf := new(bytes.Buffer)
-	testRoot.SetOut(buf)
-	testRoot.SetErr(buf)
-	testRoot.SetArgs(args)
-
-	err = testRoot.Execute()
-	return buf.String(), err
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
 }

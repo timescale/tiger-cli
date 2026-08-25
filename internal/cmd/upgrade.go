@@ -207,8 +207,9 @@ func isDowngrade(currentVersion, targetTag string) bool {
 
 // resolveCurrentBinaryPath returns the absolute path of the running binary,
 // resolving any symlinks so that upgrades target the actual file rather than
-// replacing a symlink.
-func resolveCurrentBinaryPath() (string, error) {
+// replacing a symlink. Package-level var so tests can point the upgrade at a
+// scratch file instead of the running test binary.
+var resolveCurrentBinaryPath = func() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to determine current binary path: %w", err)
