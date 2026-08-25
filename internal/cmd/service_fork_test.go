@@ -23,7 +23,7 @@ func TestServiceFork_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service fork command with required timing flag
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "--now")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -48,7 +48,7 @@ func TestServiceFork_NoSourceService(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service fork command without providing service ID but with timing flag
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "--now")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "--now")
 	if err == nil {
 		t.Fatal("Expected error when no service ID provided")
 	}
@@ -74,7 +74,7 @@ func TestServiceFork_NoTimingFlag(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service fork command without any timing flag
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "source-service-123")
 	if err == nil {
 		t.Fatal("Expected error when no timing flag provided")
 	}
@@ -100,7 +100,7 @@ func TestServiceFork_MultipleTiming(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service fork command with multiple timing flags
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--last-snapshot")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--last-snapshot")
 	if err == nil {
 		t.Fatal("Expected error when multiple timing flags provided")
 	}
@@ -126,7 +126,7 @@ func TestServiceFork_InvalidTimestamp(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service fork command with invalid timestamp
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--to-timestamp", "invalid-timestamp")
 	if err == nil {
 		t.Fatal("Expected error when invalid timestamp provided")
 	}
@@ -153,7 +153,7 @@ func TestServiceFork_CPUMemoryValidation(t *testing.T) {
 
 	// Test with invalid CPU/memory combination (this would fail at API call stage)
 	// Since we don't want to make real API calls, we expect the command to fail during validation
-	_, err, _ = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--cpu", "999", "--memory", "1")
+	_, _, err = executeServiceCommand(t.Context(), "service", "fork", "source-service-123", "--now", "--cpu", "999", "--memory", "1")
 
 	// This test is mainly to ensure the flags are parsed correctly
 	// The actual validation happens later in the process when we have source service details

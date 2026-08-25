@@ -28,7 +28,7 @@ func TestServiceUpdatePassword_NoServiceID(t *testing.T) {
 	mockTestPAT(t)
 
 	// Execute service update-password command without service ID
-	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
+	_, _, err = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when no service ID is provided or configured")
 	}
@@ -54,7 +54,7 @@ func TestServiceUpdatePassword_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service update-password command
-	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
+	_, _, err = executeServiceCommand(t.Context(), "service", "update-password", "--new-password", "new-password")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}
@@ -87,7 +87,7 @@ func TestServiceUpdatePassword_ReadReplicaRejected(t *testing.T) {
 	}
 	mockTestPAT(t)
 
-	_, err, _ := executeServiceCommand(t.Context(), "service", "update-password", "rep1234567", "--new-password", "irrelevant")
+	_, _, err := executeServiceCommand(t.Context(), "service", "update-password", "rep1234567", "--new-password", "irrelevant")
 	if err == nil {
 		t.Fatal("expected update-password on a read replica to be rejected")
 	}
@@ -123,7 +123,7 @@ func TestServiceUpdatePassword_EnvironmentVariable(t *testing.T) {
 	}()
 
 	// Execute command without --password flag (should use environment variable)
-	_, err, _ = executeServiceCommand(t.Context(), "service", "update-password", "test-service-456")
+	_, _, err = executeServiceCommand(t.Context(), "service", "update-password", "test-service-456")
 
 	// Should fail with network error (not password missing error) since we have password from env
 	if err == nil {
