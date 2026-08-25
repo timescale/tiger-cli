@@ -58,7 +58,7 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
 
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
-	schema.Properties["bucket_seconds"].Minimum = util.Ptr(60.0)
+	schema.Properties["bucket_seconds"].Minimum = new(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
 
 	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST)."
@@ -96,7 +96,7 @@ Available metrics include: CPU usage/allocation, memory usage/total, disk usage,
 		OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(false),
+			OpenWorldHint: new(false),
 			Title:         "Get Metric Series Data",
 		},
 	}

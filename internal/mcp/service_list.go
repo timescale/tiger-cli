@@ -57,7 +57,7 @@ func newServiceListTool() *mcp.Tool {
 		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(true),
+			OpenWorldHint: new(true),
 			Title:         "List Database Services",
 		},
 	}

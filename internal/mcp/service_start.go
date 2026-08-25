@@ -53,9 +53,9 @@ This operation starts a service that is currently in a stopped/paused state. The
 		OutputSchema: ServiceStartOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(false), // Starting a service cannot really break anything
-			IdempotentHint:  true,            // Starting an already-started service is safe (but returns an error)
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(false), // Starting a service cannot really break anything
+			IdempotentHint:  true,       // Starting an already-started service is safe (but returns an error)
+			OpenWorldHint:   new(true),
 			Title:           "Start Database Service",
 		},
 	}

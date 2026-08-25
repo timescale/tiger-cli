@@ -10,7 +10,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestDBConnectionString_NoServiceID(t *testing.T) {
@@ -71,8 +70,8 @@ func TestDBConnectionString_PoolerWarning(t *testing.T) {
 	// Service without connection pooler
 	service := api.Service{
 		Endpoint: &api.Endpoint{
-			Host: util.Ptr("test-host.tigerdata.com"),
-			Port: util.Ptr(5432),
+			Host: new("test-host.tigerdata.com"),
+			Port: new(5432),
 		},
 		ConnectionPooler: nil, // No pooler available
 	}

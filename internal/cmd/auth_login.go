@@ -513,21 +513,22 @@ func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
 }
 
 func (m projectSelectModel) View() tea.View {
-	s := "Select a project:\n\n"
+	var s strings.Builder
+	s.WriteString("Select a project:\n\n")
 
 	for i, project := range m.projects {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
+		s.WriteString(fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID))
 	}
 
 	// Show the current number buffer if user is typing
 	if m.numberBuffer != "" {
-		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
+		s.WriteString(fmt.Sprintf("\nTyping: %s", m.numberBuffer))
 	}
 
-	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return tea.NewView(s)
+	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
+	return tea.NewView(s.String())
 }

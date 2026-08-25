@@ -79,13 +79,13 @@ password_storage: keyring
 	}
 
 	// Parse JSON output
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
 
 	// Verify ALL JSON keys and their expected values
-	expectedValues := map[string]interface{}{
+	expectedValues := map[string]any{
 		"api_url":          "https://json.api.com/v1",
 		"console_url":      "https://console.cloud.tigerdata.com",
 		"gateway_url":      "https://console.cloud.tigerdata.com/api",
@@ -193,7 +193,7 @@ analytics: true
 	}
 
 	// Should be valid JSON, not table format
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
 	}
@@ -228,7 +228,7 @@ analytics: true
 	}
 
 	// Should be valid JSON, not table format
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Expected JSON output but got: %v\nOutput was: %s", err, output)
 	}
@@ -270,7 +270,7 @@ analytics: false
 	}
 
 	// Parse JSON output and verify values
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}

@@ -101,7 +101,7 @@ func createTestServices() []api.Service {
 	}
 }
 
-func parseConfigFile(t *testing.T, configFile string) map[string]interface{} {
+func parseConfigFile(t *testing.T, configFile string) map[string]any {
 	t.Helper()
 
 	// Read the config file directly
@@ -109,7 +109,7 @@ func parseConfigFile(t *testing.T, configFile string) map[string]interface{} {
 	if err != nil {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
 		t.Fatalf("Failed to parse config YAML: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestOutputService_JSON(t *testing.T) {
 
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
-	var jsonMap map[string]interface{}
+	var jsonMap map[string]any
 	err2 := json.Unmarshal([]byte(output), &jsonMap)
 	if err2 != nil {
 		t.Errorf("Output should be valid JSON map: %v", err2)
@@ -282,7 +282,7 @@ func TestOutputService_YAML(t *testing.T) {
 
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
-	var yamlMap map[string]interface{}
+	var yamlMap map[string]any
 	err2 := yaml.Unmarshal([]byte(output), &yamlMap)
 	if err2 != nil {
 		t.Errorf("Output should be valid YAML map: %v", err2)

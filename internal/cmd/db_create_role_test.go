@@ -11,7 +11,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // db create role on a read replica ID is rejected (replicas are read-only).
@@ -29,7 +28,7 @@ func TestDBCreateRole_ReadReplicaRejected(t *testing.T) {
 	standby := api.Service{
 		ServiceID:  "rep1234567",
 		ProjectID:  "test-project-123",
-		ForkedFrom: &api.ForkSpec{IsStandby: util.Ptr(true), ServiceID: util.Ptr("svcprimary")},
+		ForkedFrom: &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")},
 	}
 	orig := getServiceDetailsFunc
 	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {

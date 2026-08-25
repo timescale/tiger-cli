@@ -88,7 +88,7 @@ func TestMCPGetCommand(t *testing.T) {
 					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "json"})
 
 					// Should be valid JSON
-					var toolData map[string]interface{}
+					var toolData map[string]any
 					err := json.Unmarshal([]byte(output), &toolData)
 					require.NoError(t, err, "output should be valid JSON")
 
@@ -107,7 +107,7 @@ func TestMCPGetCommand(t *testing.T) {
 					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "yaml"})
 
 					// Should be valid YAML
-					var toolData map[string]interface{}
+					var toolData map[string]any
 					err := yaml.Unmarshal([]byte(output), &toolData)
 					require.NoError(t, err, "output should be valid YAML")
 
@@ -151,7 +151,7 @@ func TestMCPGetCommand(t *testing.T) {
 					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "json"})
 
 					// Should be valid JSON
-					var promptData map[string]interface{}
+					var promptData map[string]any
 					err := json.Unmarshal([]byte(output), &promptData)
 					require.NoError(t, err, "output should be valid JSON")
 
@@ -172,7 +172,7 @@ func TestMCPGetCommand(t *testing.T) {
 					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "yaml"})
 
 					// Should be valid YAML
-					var promptData map[string]interface{}
+					var promptData map[string]any
 					err := yaml.Unmarshal([]byte(output), &promptData)
 					require.NoError(t, err, "output should be valid YAML")
 
