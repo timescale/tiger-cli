@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,13 +33,6 @@ func TestAuthLogoutCmd(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 	}
 
-	checkNothingStored := func(t *testing.T, result cmdResult) {
-		t.Helper()
-		if creds, err := readStoredCredentials(t, result.configDir); err == nil {
-			t.Errorf("expected credentials to be removed, got: %+v", creds)
-		}
-	}
-
 	tests := []cmdTest{
 		{
 			name:    "rejects positional args",
@@ -49,7 +43,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 			name:       "not logged in still succeeds",
 			args:       []string{"auth", "logout"},
 			wantStdout: "Successfully logged out and removed stored credentials\n",
-			check:      checkNothingStored,
+			check:      checkNoStoredCredentials,
 		},
 		{
 			name: "removes stored PAT credentials",
@@ -61,7 +55,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 				}),
 			},
 			wantStdout: "Successfully logged out and removed stored credentials\n",
-			check:      checkNothingStored,
+			check:      checkNoStoredCredentials,
 		},
 		{
 			name: "revokes OAuth session server-side and removes credentials",
@@ -75,7 +69,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 			},
 			wantStdout: "Successfully logged out and removed stored credentials\n",
 			check: func(t *testing.T, result cmdResult) {
-				checkNothingStored(t, result)
+				checkNoStoredCredentials(t, result)
 				if want := `{"refresh_token":"test-refresh-token"}`; logoutBody != want {
 					t.Errorf("server-side logout body = %q, want %q", logoutBody, want)
 				}
@@ -83,6 +77,27 @@ func TestAuthLogoutCmd(t *testing.T) {
 		},
 	}
 	runCmdTests(t, tests)
+
+	// Server-side revocation failures are non-fatal: warn on stderr, still
+	// remove the local credentials and succeed. The transport error's wording
+	// varies by OS, so this asserts a stderr prefix instead of using the table.
+	t.Run("warns when server-side revocation fails", func(t *testing.T) {
+		result := runCommand(t, []string{"auth", "logout"}, nil,
+			withConfig(map[string]any{"api_url": "http://127.0.0.1:1"}),
+			withStoredCredentials(config.Credentials{
+				OAuth:     oauthToken,
+				ProjectID: "test-project-123",
+			}))
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		assertOutput(t, result.stdout, "Successfully logged out and removed stored credentials\n")
+		const wantPrefix = "warning: server-side logout failed: "
+		if !strings.HasPrefix(result.stderr, wantPrefix) {
+			t.Errorf("stderr = %q, want prefix %q", result.stderr, wantPrefix)
+		}
+		checkNoStoredCredentials(t, result)
+	})
 
 	// Guards an edge case in the App's cached client: for an OAuth session that
 	// client persists refreshed tokens back to storage, and the analytics event

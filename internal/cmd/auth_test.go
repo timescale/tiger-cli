@@ -66,3 +66,12 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 	t.Cleanup(server.Close)
 	return server
 }
+
+// checkNoStoredCredentials asserts that no credentials are stored (either none
+// were written, or they were removed). Shared by the login and logout tests.
+func checkNoStoredCredentials(t *testing.T, result cmdResult) {
+	t.Helper()
+	if creds, err := readStoredCredentials(t, result.configDir); err == nil {
+		t.Errorf("expected no stored credentials, got: %+v", creds)
+	}
+}

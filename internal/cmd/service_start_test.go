@@ -22,25 +22,13 @@ func TestServiceStartCmd(t *testing.T) {
 		}
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	tests := []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "start", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "read-only mode",
@@ -73,7 +61,7 @@ func TestServiceStartCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service is already running",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name: "service not found",
@@ -86,7 +74,7 @@ func TestServiceStartCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",
@@ -141,15 +129,28 @@ func TestServiceStartCmd(t *testing.T) {
 				"❌ Error: service failed with status: FAILED\n",
 		},
 		{
-			name:    "wait timeout",
-			args:    []string{"service", "start", "svc-12345", "--wait-timeout", "1ms"},
-			setup:   setupStart(api.DeployStatusRESUMING),
+			name: "wait timeout",
+			args: []string{"service", "start", "svc-12345", "--wait-timeout", "1ms"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				setupStart(api.DeployStatusRESUMING)(m)
+				// The 1ms deadline fires before the 1s poll tick, so no
+				// GetService call is expected — but allow it in case the test
+				// runs slowly, keeping the service unready either way. (The
+				// non-TTY spinner dedupes repeated messages, so this can't
+				// add stderr lines.)
+				resuming := sampleService(func(s *api.Service) { s.Status = api.DeployStatusRESUMING })
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &resuming,
+					}, nil).AnyTimes()
+			},
 			wantErr: "wait timeout reached after 1ms - service may still be starting",
 			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
 				"⏳ Waiting for service to start (wait timeout: 1ms)...\n" +
 				"⢎  Service status: RESUMING\n" +
 				"❌ Error: wait timeout reached after 1ms - service may still be starting\n",
-			check: wantExitCode(common.ExitTimeout),
+			check: checkExitCode(common.ExitTimeout),
 		},
 		{
 			name:  "default service id from config",

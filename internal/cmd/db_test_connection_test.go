@@ -19,36 +19,35 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		expectGetService(m, "svc-12345", sampleService())
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	tests := []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "test-connection", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"db", "test-connection"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name:    "missing service id via ping alias",
 			args:    []string{"db", "ping"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "default service id from config",
+			args: []string{"db", "test-connection"},
+			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name:    "invalid timeout duration",
@@ -63,7 +62,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to fetch service details: connection refused",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name: "API error",
@@ -76,7 +75,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name: "nil response body",
@@ -89,21 +88,21 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "empty response from API",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name:    "pooled without pooler",
 			args:    []string{"db", "test-connection", "svc-12345", "--pooled"},
 			setup:   setupGet,
 			wantErr: "connection pooler not available for this service",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name:    "negative timeout",
 			args:    []string{"db", "test-connection", "svc-12345", "--timeout=-5s"},
 			setup:   setupGet,
 			wantErr: "timeout must be positive or zero, got -5s",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 	}
 
@@ -118,16 +117,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			})
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		var exitErr common.ExitCodeError
-		if !errors.As(result.err, &exitErr) {
-			t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-		}
-		if exitErr.ExitCode() != 2 {
-			t.Errorf("exit code = %d, want 2", exitErr.ExitCode())
-		}
+		checkExitCode(2)(t, result)
 		if !strings.HasPrefix(result.stderr, "Connection failed: ") {
 			t.Errorf("expected stderr to start with %q, got %q", "Connection failed: ", result.stderr)
 		}
@@ -142,16 +132,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
 				}))
 			})
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		var exitErr common.ExitCodeError
-		if !errors.As(result.err, &exitErr) {
-			t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-		}
-		if exitErr.ExitCode() != common.ExitTimeout {
-			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitTimeout)
-		}
+		checkExitCode(common.ExitTimeout)(t, result)
 		assertOutput(t, result.stderr, "Connection timeout after 250ms\n")
 	})
 }

@@ -68,6 +68,16 @@ func TestRootCmd(t *testing.T) {
 			server.URL+"/latest.txt"))
 	})
 
+	// Command names and flags match case-insensitively (cobra.EnableCaseInsensitive
+	// and the flag normalization func, both configured in buildRootCmd).
+	t.Run("case-insensitive commands and flags", func(t *testing.T) {
+		result := runCommand(t, []string{"VERSION", "--Output", "bare"}, nil)
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		assertOutput(t, result.stdout, config.Version+"\n")
+	})
+
 	t.Run("config precedence", func(t *testing.T) {
 		tests := []struct {
 			name   string

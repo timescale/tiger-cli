@@ -35,6 +35,16 @@ func TestConfigUnsetCmd(t *testing.T) {
 			check:      checkConfigFile(map[string]any{}),
 		},
 		{
+			// version_check_interval is a legacy key (not a current config
+			// option); unset accepts any key present in the file so stale keys
+			// can be removed.
+			name:       "unset legacy key present in config file",
+			args:       []string{"config", "unset", "version_check_interval"},
+			opts:       []runOption{withConfig(map[string]any{"version_check_interval": 0})},
+			wantStdout: "Unset version_check_interval\n",
+			check:      checkConfigFile(map[string]any{}),
+		},
+		{
 			name:       "rm alias",
 			args:       []string{"config", "rm", "service_id"},
 			opts:       []runOption{withConfig(map[string]any{"service_id": "test-service"})},

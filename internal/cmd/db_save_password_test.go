@@ -14,29 +14,13 @@ import (
 
 func TestDbSavePasswordCmd(t *testing.T) {
 	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
-		svc := sampleService()
-		m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-			Return(&api.GetServiceResponse{
-				HTTPResponse: httpResponse(http.StatusOK),
-				JSON200:      &svc,
-			}, nil)
-	}
-
-	expectExitCode := func(code int) func(*testing.T, cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T", result.err)
-			}
-			if got := exitErr.ExitCode(); got != code {
-				t.Errorf("expected exit code %d, got %d", code, got)
-			}
-		}
+		expectGetService(m, "svc-12345", sampleService())
 	}
 
 	// checkKeyringPassword asserts the mock keyring holds want for role.
 	checkKeyringPassword := func(role, want string) func(*testing.T, cmdResult) {
 		return func(t *testing.T, result cmdResult) {
+			t.Helper()
 			got, err := (&common.KeyringStorage{}).Get(sampleService(), role)
 			if err != nil {
 				t.Fatalf("failed to read saved password: %v", err)
@@ -58,7 +42,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			args:    []string{"db", "save-password", "svc-12345", "--password=pw"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   expectExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "service ID required",
@@ -85,7 +69,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   expectExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",
@@ -218,30 +202,16 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		},
 		{
 			name: "replica ID saves against parent primary",
-			args: []string{"db", "save-password", "rep-123", "--password=replica-pw"},
+			args: []string{"db", "save-password", "rep-67890", "--password=replica-pw"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				replica := api.Service{
-					ServiceID: "rep-123",
-					ProjectID: testProjectID,
-					ForkedFrom: &api.ForkSpec{
-						IsStandby: new(true),
-						ProjectID: new(testProjectID),
-						ServiceID: new("svc-12345"),
-					},
-				}
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "rep-123").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &replica,
-					}, nil)
+				expectGetService(m, "rep-67890", sampleReplica())
 				setupGetService(m)
 			},
 			wantStderr: "Read replicas share the primary's credentials; saving against primary svc-12345.\nPassword saved successfully for service svc-12345 (role: tsdbadmin)\n",
 			check: func(t *testing.T, result cmdResult) {
 				// Stored against the parent primary, matching the connect read path.
 				checkKeyringPassword("tsdbadmin", "replica-pw")(t, result)
-				replica := api.Service{ServiceID: "rep-123", ProjectID: testProjectID}
-				if pw, err := (&common.KeyringStorage{}).Get(replica, "tsdbadmin"); err == nil {
+				if pw, err := (&common.KeyringStorage{}).Get(sampleReplica(), "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored under the replica ID, got %q", pw)
 				}
 			},

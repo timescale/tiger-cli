@@ -394,11 +394,3 @@ func checkStoredAPIKey(apiKey, projectID string) func(t *testing.T, result cmdRe
 		}
 	}
 }
-
-// checkNoStoredCredentials asserts that no credentials were stored.
-func checkNoStoredCredentials(t *testing.T, result cmdResult) {
-	t.Helper()
-	if creds, err := readStoredCredentials(t, result.configDir); err == nil {
-		t.Errorf("expected no stored credentials, got: %+v", creds)
-	}
-}

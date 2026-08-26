@@ -22,25 +22,13 @@ func TestServiceStopCmd(t *testing.T) {
 		}
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	tests := []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "stop", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "read-only mode",
@@ -73,7 +61,7 @@ func TestServiceStopCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service is already stopped",
-			check:   wantExitCode(common.ExitInvalidParameters),
+			check:   checkExitCode(common.ExitInvalidParameters),
 		},
 		{
 			name: "service not found",
@@ -86,7 +74,7 @@ func TestServiceStopCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",
@@ -132,15 +120,28 @@ func TestServiceStopCmd(t *testing.T) {
 				"✅ Service has been successfully stopped!\n",
 		},
 		{
-			name:    "wait timeout",
-			args:    []string{"service", "stop", "svc-12345", "--wait-timeout", "1ms"},
-			setup:   setupStop(api.DeployStatusPAUSING),
+			name: "wait timeout",
+			args: []string{"service", "stop", "svc-12345", "--wait-timeout", "1ms"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				setupStop(api.DeployStatusPAUSING)(m)
+				// The 1ms deadline fires before the 1s poll tick, so no
+				// GetService call is expected — but allow it in case the test
+				// runs slowly, keeping the service unpaused either way. (The
+				// non-TTY spinner dedupes repeated messages, so this can't
+				// add stderr lines.)
+				pausing := sampleService(func(s *api.Service) { s.Status = api.DeployStatusPAUSING })
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &pausing,
+					}, nil).AnyTimes()
+			},
 			wantErr: "wait timeout reached after 1ms - service may still be stopping",
 			wantStderr: "⏹️  Stop request accepted for service 'svc-12345'.\n" +
 				"⏳ Waiting for service to stop (timeout: 1ms)...\n" +
 				"⢎  Service status: PAUSING\n" +
 				"❌ Error: wait timeout reached after 1ms - service may still be stopping\n",
-			check: wantExitCode(common.ExitTimeout),
+			check: checkExitCode(common.ExitTimeout),
 		},
 		{
 			name:  "default service id from config",

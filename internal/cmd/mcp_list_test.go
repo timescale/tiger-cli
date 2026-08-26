@@ -116,6 +116,12 @@ func TestMCPListCmd(t *testing.T) {
 
 	tests := []cmdTest{
 		{
+			name:    "invalid output format",
+			args:    []string{"mcp", "list", "-o", "invalid"},
+			opts:    noDocsProxy(nil),
+			wantErr: `invalid argument "invalid" for "-o, --output" flag: invalid output format: invalid (must be one of: json, yaml, table)`,
+		},
+		{
 			name:       "text output",
 			args:       []string{"mcp", "list"},
 			opts:       noDocsProxy(nil),
@@ -151,12 +157,6 @@ func TestMCPListCmd(t *testing.T) {
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),
 			wantStdout: wantTextExperimental,
-		},
-		{
-			name:    "invalid output format",
-			args:    []string{"mcp", "list", "-o", "invalid"},
-			opts:    noDocsProxy(nil),
-			wantErr: `invalid argument "invalid" for "-o, --output" flag: invalid output format: invalid (must be one of: json, yaml, table)`,
 		},
 	}
 

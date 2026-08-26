@@ -96,15 +96,7 @@ func TestServiceLogsCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check: func(t *testing.T, result cmdResult) {
-				var exitErr common.ExitCodeError
-				if !errors.As(result.err, &exitErr) {
-					t.Fatalf("expected ExitCodeError, got %T", result.err)
-				}
-				if exitErr.ExitCode() != common.ExitServiceNotFound {
-					t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitServiceNotFound)
-				}
-			},
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",

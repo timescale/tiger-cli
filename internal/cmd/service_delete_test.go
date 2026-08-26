@@ -18,18 +18,6 @@ func TestServiceDeleteCmd(t *testing.T) {
 			}, nil)
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	confirmPrompt := "Are you sure you want to delete service 'svc-12345'? This operation cannot be undone.\n" +
 		"Type the service ID 'svc-12345' to confirm: "
 
@@ -46,7 +34,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			args:    []string{"service", "delete", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "read-only mode",
@@ -101,7 +89,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "wait until deleted",
@@ -118,14 +106,27 @@ func TestServiceDeleteCmd(t *testing.T) {
 				"✅ Service 'svc-12345' has been successfully deleted.\n",
 		},
 		{
-			name:    "wait timeout",
-			args:    []string{"service", "delete", "svc-12345", "--confirm", "--wait-timeout", "1ms"},
-			setup:   setupDelete,
+			name: "wait timeout",
+			args: []string{"service", "delete", "svc-12345", "--confirm", "--wait-timeout", "1ms"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				setupDelete(m)
+				// The 1ms deadline fires before the 1s poll tick, so no
+				// GetService call is expected — but allow it in case the test
+				// runs slowly; a 200 keeps the deletion wait polling. (The
+				// non-TTY spinner dedupes repeated messages, so this can't
+				// add stderr lines.)
+				svc := sampleService()
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &svc,
+					}, nil).AnyTimes()
+			},
 			wantErr: "wait timeout reached after 1ms - service may still be deleting",
 			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
 				"❌ Error: wait timeout reached after 1ms - service may still be deleting\n",
-			check: wantExitCode(common.ExitTimeout),
+			check: checkExitCode(common.ExitTimeout),
 		},
 		{
 			name:  "rm alias",

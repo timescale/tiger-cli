@@ -34,25 +34,13 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		}
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	tests := []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "connection-string", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "missing service id",
@@ -79,7 +67,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",
@@ -163,6 +151,22 @@ func TestDbConnectionStringCmd(t *testing.T) {
 			args:       []string{"db", "connection-string", "rep-67890"},
 			setup:      setupGetReplica,
 			wantStdout: replicaURI,
+		},
+		{
+			name: "replica pooled with pooler uses replica pooler",
+			args: []string{"db", "connection-string", "rep-67890", "--pooled"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
+					s.ConnectionPooler = &api.ConnectionPooler{
+						Endpoint: &api.Endpoint{
+							Host: new("pooler.rep-67890.project.tsdb.cloud.timescale.com"),
+							Port: new(6432),
+						},
+					}
+				}))
+				expectGetService(m, "svc-12345", sampleService())
+			},
+			wantStdout: "postgresql://tsdbadmin@pooler.rep-67890.project.tsdb.cloud.timescale.com:6432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica pooled without pooler falls back with warning",

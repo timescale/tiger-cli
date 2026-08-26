@@ -29,40 +29,7 @@ func TestDbConnectCmd(t *testing.T) {
 		t.Fatalf("failed to create stub psql: %v", err)
 	}
 
-	expectGetService := func(m *mocks.MockClientWithResponsesInterface, svc api.Service) {
-		m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, svc.ServiceID).
-			Return(&api.GetServiceResponse{
-				HTTPResponse: httpResponse(http.StatusOK),
-				JSON200:      &svc,
-			}, nil)
-	}
-
 	noEndpoint := func(s *api.Service) { s.Endpoint = nil }
-
-	// A read replica of sampleService, with no endpoint of its own.
-	replicaService := func() api.Service {
-		return api.Service{
-			ServiceID: "rep-123",
-			ProjectID: testProjectID,
-			ForkedFrom: &api.ForkSpec{
-				IsStandby: new(true),
-				ProjectID: new(testProjectID),
-				ServiceID: new("svc-12345"),
-			},
-		}
-	}
-
-	expectExitCode := func(code int) func(*testing.T, cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T", result.err)
-			}
-			if got := exitErr.ExitCode(); got != code {
-				t.Errorf("expected exit code %d, got %d", code, got)
-			}
-		}
-	}
 
 	tests := []cmdTest{
 		{
@@ -70,7 +37,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args:    []string{"db", "connect", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   expectExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "service ID required",
@@ -117,7 +84,7 @@ func TestDbConnectCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   expectExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",
@@ -133,9 +100,9 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "parent fetch fails for read replica",
-			args: []string{"db", "connect", "rep-123"},
+			args: []string{"db", "connect", "rep-67890"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, replicaService())
+				expectGetService(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -146,7 +113,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345"},
 			opts: []runOption{withEnv("PATH", "/nonexistent")},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService())
+				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr: "psql client not found. Please install PostgreSQL client tools",
 		},
@@ -157,7 +124,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService(noEndpoint))
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
@@ -166,17 +133,17 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345", "--no-replica-prompt"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService(noEndpoint))
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
 		{
 			name: "replica target skips replica prompt",
-			args: []string{"db", "connect", "rep-123"},
+			args: []string{"db", "connect", "rep-67890"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, replicaService())
-				expectGetService(m, sampleService())
+				expectGetService(m, "rep-67890", sampleReplica(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
@@ -185,7 +152,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -197,7 +164,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService(noEndpoint))
 				m.EXPECT().GetReplicaSetsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetReplicaSetsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -211,7 +178,7 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService(noEndpoint))
+				expectGetService(m, "svc-12345", sampleService(noEndpoint))
 				replicas := []api.ReadReplicaSet{
 					{
 						ID:     "rep-1",
@@ -237,13 +204,36 @@ func TestDbConnectCmd(t *testing.T) {
 			args: []string{"db", "connect", "svc-12345", "--pooled"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, sampleService())
+				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr: "connection pooler not available for this service",
 		},
 	}
 
 	runCmdTests(t, tests)
+
+	// The stored-password test connection runs before psql launches. A refused
+	// connection isn't an auth error, so it must surface directly instead of
+	// opening the password recovery menu; the pgx error text is
+	// environment-dependent, so this can't be an exact-match table case.
+	t.Run("non-auth connection error surfaces directly", func(t *testing.T) {
+		result := runCommand(t, []string{"db", "connect", "svc-12345"},
+			func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
+				}))
+			},
+			withEnv("PATH", psqlDir))
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		// No password is stored, so the lookup warning comes first.
+		const wantWarning = "Warning: could not retrieve stored password: secret not found in keyring\n"
+		if !strings.HasPrefix(result.stderr, wantWarning) {
+			t.Errorf("expected stderr to start with %q, got %q", wantWarning, result.stderr)
+		}
+		assertOutput(t, result.stdout, "")
+	})
 }
 
 // psqlArgsLenAtDash implements ArgsLenAtDashProvider for

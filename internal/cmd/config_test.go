@@ -4,14 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"gopkg.in/yaml.v3"
-
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // showValues returns the values `config show` reports for a default config in
@@ -64,20 +60,6 @@ func showJSON(t *testing.T, configDir string, overrides map[string]any) string {
 	}
 	b.WriteString("}\n")
 	return b.String()
-}
-
-// readConfigFile parses the config file persisted in configDir.
-func readConfigFile(t *testing.T, configDir string) map[string]any {
-	t.Helper()
-	contents, err := os.ReadFile(config.GetConfigFile(configDir))
-	if err != nil {
-		t.Fatalf("failed to read config file: %v", err)
-	}
-	var values map[string]any
-	if err := yaml.Unmarshal(contents, &values); err != nil {
-		t.Fatalf("failed to parse config file: %v", err)
-	}
-	return values
 }
 
 // checkConfigFile returns a check func asserting that the persisted config

@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"net/http"
-	"os"
+	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
@@ -44,17 +42,38 @@ func TestServiceCommandAliases(t *testing.T) {
 	runCmdTests(t, tests)
 }
 
-func parseConfigFile(t *testing.T, configFile string) map[string]any {
-	t.Helper()
+// TestServiceMetricsExperimentalGate covers the registration gate for the
+// preview `service metrics` subtree: buildServiceCmd only adds it when the
+// experimental env var is truthy, so by default the command doesn't exist in
+// the tree at all. Help output is asserted loosely (containment) rather than
+// exactly, so the gate test doesn't break every time an unrelated subcommand's
+// help text changes.
+func TestServiceMetricsExperimentalGate(t *testing.T) {
+	t.Run("unregistered by default", func(t *testing.T) {
+		result := runCommand(t, []string{"service", "metrics"}, nil)
+		// Cobra only reports "unknown command" at the root level; for a
+		// non-root group it treats the unknown name as a stray argument and
+		// prints the group's help. The gate is observable as the absence of
+		// any metrics entry in that help.
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		if !strings.Contains(result.stdout, "Available Commands:") {
+			t.Errorf("expected the service group help on stdout, got:\n%s", result.stdout)
+		}
+		if strings.Contains(result.stdout, "metrics") {
+			t.Errorf("service help must not mention metrics when experimental is off, got:\n%s", result.stdout)
+		}
+	})
 
-	// Read the config file directly
-	configBytes, err := os.ReadFile(configFile)
-	if err != nil {
-		t.Fatalf("Failed to read config file: %v", err)
-	}
-	var configMap map[string]any
-	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
-		t.Fatalf("Failed to parse config YAML: %v", err)
-	}
-	return configMap
+	t.Run("registered when experimental", func(t *testing.T) {
+		result := runCommand(t, []string{"service", "metrics", "--help"}, nil,
+			withEnv("TIGER_EXPERIMENTAL", "true"))
+		if result.err != nil {
+			t.Fatalf("unexpected error: %v", result.err)
+		}
+		if !strings.Contains(result.stdout, "Commands for querying time-series metrics") {
+			t.Errorf("expected the metrics group help on stdout, got:\n%s", result.stdout)
+		}
+	})
 }

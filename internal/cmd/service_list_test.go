@@ -9,7 +9,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 const noServicesStderr = "🏜️  No services found! Your project is looking a bit empty.\n" +
@@ -52,15 +51,7 @@ func TestServiceListCmd(t *testing.T) {
 			args:    []string{"service", "list"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check: func(t *testing.T, result cmdResult) {
-				var exitErr common.ExitCodeError
-				if !errors.As(result.err, &exitErr) {
-					t.Fatalf("expected ExitCodeError, got %T", result.err)
-				}
-				if exitErr.ExitCode() != common.ExitAuthenticationError {
-					t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitAuthenticationError)
-				}
-			},
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name: "network error",
@@ -81,15 +72,7 @@ func TestServiceListCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "unknown error",
-			check: func(t *testing.T, result cmdResult) {
-				var exitErr common.ExitCodeError
-				if !errors.As(result.err, &exitErr) {
-					t.Fatalf("expected ExitCodeError, got %T", result.err)
-				}
-				if exitErr.ExitCode() != common.ExitGeneralError {
-					t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitGeneralError)
-				}
-			},
+			check:   checkExitCode(common.ExitGeneralError),
 		},
 		{
 			name: "nil response body",
@@ -123,73 +106,13 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			// The -o flag overrides the configured format for this run only:
 			// the config file must not be rewritten.
-			name:  "json output via flag overriding config",
-			args:  []string{"service", "list", "-o", "json"},
-			setup: setupList(services),
-			opts:  []runOption{withConfig(map[string]any{"output": "table"})},
-			wantStdout: `[
-  {
-    "created": "2025-01-15T10:30:00Z",
-    "endpoint": {
-      "host": "svc-12345.project.tsdb.cloud.timescale.com",
-      "port": 5432
-    },
-    "metrics": null,
-    "name": "test-service",
-    "project_id": "test-project-123",
-    "region_code": "us-east-1",
-    "resources": [
-      {
-        "id": "resource-1",
-        "spec": {
-          "cpu_millis": 1000,
-          "memory_gbs": 4
-        }
-      }
-    ],
-    "service_id": "svc-12345",
-    "service_type": "TIMESCALEDB",
-    "status": "READY",
-    "role": "tsdbadmin",
-    "host": "svc-12345.project.tsdb.cloud.timescale.com",
-    "port": 5432,
-    "database": "tsdb",
-    "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-    "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
-  },
-  {
-    "created": "2025-02-01T08:00:00Z",
-    "endpoint": {
-      "host": "svc-67890.project.tsdb.cloud.timescale.com",
-      "port": 5432
-    },
-    "metrics": null,
-    "name": "analytics-db",
-    "project_id": "test-project-123",
-    "region_code": "eu-west-1",
-    "resources": [
-      {
-        "id": "resource-1",
-        "spec": {
-          "cpu_millis": 1000,
-          "memory_gbs": 4
-        }
-      }
-    ],
-    "service_id": "svc-67890",
-    "service_type": "POSTGRES",
-    "status": "PAUSED",
-    "role": "tsdbadmin",
-    "host": "svc-67890.project.tsdb.cloud.timescale.com",
-    "port": 5432,
-    "database": "tsdb",
-    "connection_string": "postgresql://tsdbadmin@svc-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
-    "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-67890"
-  }
-]
-`,
+			name:       "json output via flag overriding config",
+			args:       []string{"service", "list", "-o", "json"},
+			setup:      setupList(services),
+			opts:       []runOption{withConfig(map[string]any{"output": "table"})},
+			wantStdout: serviceListJSON,
 			check: func(t *testing.T, result cmdResult) {
-				configMap := parseConfigFile(t, config.GetConfigFile(result.configDir))
+				configMap := readConfigFile(t, result.configDir)
 				if got := configMap["output"]; got != "table" {
 					t.Errorf("config output = %v, want table (config file must not be modified by -o)", got)
 				}
@@ -246,11 +169,40 @@ func TestServiceListCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "output format from config",
-			args:  []string{"service", "list"},
-			setup: setupList(services),
-			opts:  []runOption{withConfig(map[string]any{"output": "json"})},
-			wantStdout: `[
+			name:       "output format from config",
+			args:       []string{"service", "list"},
+			setup:      setupList(services),
+			opts:       []runOption{withConfig(map[string]any{"output": "json"})},
+			wantStdout: serviceListJSON,
+		},
+		{
+			// "env" is rejected at flag-parse time for list, but can still
+			// reach the output switch via a hand-edited config file.
+			name:    "env output format from config",
+			args:    []string{"service", "list"},
+			setup:   setupList(services),
+			opts:    []runOption{withConfig(map[string]any{"output": "env"})},
+			wantErr: "environment variable output is not supported for multiple services",
+		},
+		{
+			name:    "env output flag rejected",
+			args:    []string{"service", "list", "-o", "env"},
+			wantErr: `invalid argument "env" for "-o, --output" flag: invalid output format: env (must be one of: json, yaml, table)`,
+		},
+		{
+			name:       "ls alias",
+			args:       []string{"service", "ls"},
+			setup:      setupList(nil),
+			wantStderr: noServicesStderr,
+		},
+	}
+
+	runCmdTests(t, tests)
+}
+
+// serviceListJSON is the JSON rendering of the two-service list used by
+// TestServiceListCmd, shared by the flag-driven and config-driven json cases.
+const serviceListJSON = `[
   {
     "created": "2025-01-15T10:30:00Z",
     "endpoint": {
@@ -310,15 +262,4 @@ func TestServiceListCmd(t *testing.T) {
     "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-67890"
   }
 ]
-`,
-		},
-		{
-			name:       "ls alias",
-			args:       []string{"service", "ls"},
-			setup:      setupList(nil),
-			wantStderr: noServicesStderr,
-		},
-	}
-
-	runCmdTests(t, tests)
-}
+`

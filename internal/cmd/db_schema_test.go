@@ -7,6 +7,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestDbSchemaCmd(t *testing.T) {
@@ -31,6 +32,15 @@ func TestDbSchemaCmd(t *testing.T) {
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
+			// Paused readiness stops the command before any connection attempt,
+			// proving the config default reached the service lookup.
+			name:    "default service id from config",
+			args:    []string{"db", "schema"},
+			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr: "service is paused",
+		},
+		{
 			name: "network error",
 			args: []string{"db", "schema", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
@@ -50,6 +60,7 @@ func TestDbSchemaCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",

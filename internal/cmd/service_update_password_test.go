@@ -39,20 +39,10 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			}, nil)
 	}
 
-	wantExitCode := func(code int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got %T: %v", result.err, result.err)
-			}
-			if exitErr.ExitCode() != code {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), code)
-			}
-		}
-	}
-
 	// storedPassword reads the password the command saved for the sample
-	// service in the per-test mock keyring ("" if none is stored).
+	// service in the per-test mock keyring ("" if none is stored). The shared
+	// checkStoredPassword helper can't express "nothing stored" or "random,
+	// but 32 characters", so those cases read the keyring through this.
 	storedPassword := func(t *testing.T) string {
 		t.Helper()
 		storage := &common.KeyringStorage{}
@@ -61,14 +51,6 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			return ""
 		}
 		return password
-	}
-
-	checkStoredPassword := func(want string) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			if got := storedPassword(t); got != want {
-				t.Errorf("stored password = %q, want %q", got, want)
-			}
-		}
 	}
 
 	savedStderr := "Password saved to system keyring for automatic authentication\n" +
@@ -86,7 +68,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   wantExitCode(common.ExitAuthenticationError),
+			check:   checkExitCode(common.ExitAuthenticationError),
 		},
 		{
 			name:    "read-only mode",
@@ -125,7 +107,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   wantExitCode(common.ExitServiceNotFound),
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body on get",
@@ -182,7 +164,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "permission denied",
-			check:   wantExitCode(common.ExitPermissionDenied),
+			check:   checkExitCode(common.ExitPermissionDenied),
 		},
 		{
 			name: "new-password flag",
@@ -192,7 +174,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("newpass123"),
+			check:      checkStoredPassword("svc-12345", "newpass123"),
 		},
 		{
 			name: "env var password",
@@ -203,7 +185,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("env-pass-456")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("env-pass-456"),
+			check:      checkStoredPassword("svc-12345", "env-pass-456"),
 		},
 		{
 			name: "auto-generate",
@@ -228,7 +210,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("prompted-pass")(m)
 			},
 			wantStderr: "Enter new password (leave empty to generate): \n" + savedStderr,
-			check:      checkStoredPassword("prompted-pass"),
+			check:      checkStoredPassword("svc-12345", "prompted-pass"),
 		},
 		{
 			name: "interactive prompt empty generates",
@@ -254,7 +236,11 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: "✅ Master password for 'tsdbadmin' user updated successfully\n",
-			check:      checkStoredPassword(""),
+			check: func(t *testing.T, result cmdResult) {
+				if got := storedPassword(t); got != "" {
+					t.Errorf("stored password = %q, want none stored", got)
+				}
+			},
 		},
 		{
 			name: "default service id from config",
@@ -265,7 +251,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("newpass123"),
+			check:      checkStoredPassword("svc-12345", "newpass123"),
 		},
 	}
 

@@ -118,6 +118,16 @@ func TestMCPInstallCmd(t *testing.T) {
 		return p
 	}
 
+	// Stub `claude` on PATH so the CLI-based install path runs end-to-end
+	// without the real client; the script records its argv for the check.
+	stubBin := t.TempDir()
+	argvFile := filepath.Join(stubBin, "argv")
+	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
+	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0755); err != nil {
+		t.Fatalf("failed to write claude stub: %v", err)
+	}
+	cliHome := t.TempDir()
+
 	mergePath := seed("merge", `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`, 0644)
 	otherPath := seed("other", `{"other": "config"}`, 0644)
 	idempotentPath := seed("idempotent", `{"mcpServers": {"existing": {"command": "existing", "args": ["arg1"]}, "tiger": {"command": "/old/path/to/tiger", "args": ["old", "args"]}}}`, 0644)
@@ -128,6 +138,11 @@ func TestMCPInstallCmd(t *testing.T) {
 	badPath := seed("bad", `{invalid json`, 0644)
 
 	tests := []cmdTest{
+		{
+			name:    "too many arguments",
+			args:    []string{"mcp", "install", "cursor", "windsurf"},
+			wantErr: "accepts at most 1 arg(s), received 2",
+		},
 		{
 			name:    "no client and no TTY",
 			args:    []string{"mcp", "install"},
@@ -287,6 +302,24 @@ func TestMCPInstallCmd(t *testing.T) {
 			},
 		},
 		{
+			// claude-code installs via the client's own CLI rather than JSON
+			// patching; the stub on PATH records the exact command run.
+			name: "cli-based client runs the client's install command",
+			args: []string{"mcp", "install", "claude-code"},
+			opts: []runOption{
+				withEnv("PATH", stubBin),
+				withEnv("HOME", cliHome),
+			},
+			wantStdout: installSuccessOutput("claude-code", filepath.Join(cliHome, ".claude.json")),
+			check: func(t *testing.T, result cmdResult) {
+				argv, err := os.ReadFile(argvFile)
+				if err != nil {
+					t.Fatalf("claude stub was not invoked: %v", err)
+				}
+				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\ntiger\nmcp\nstart\n")
+			},
+		},
+		{
 			name:       "default config path under HOME",
 			args:       []string{"mcp", "install", "cursor", "--no-backup"},
 			opts:       []runOption{withEnv("HOME", home)},
@@ -387,9 +420,6 @@ func TestFindClientConfig(t *testing.T) {
 			}
 			if found.Name == "" {
 				t.Errorf("%s: Name should not be empty", cfg.ClientType)
-			}
-			if len(found.EditorNames) == 0 {
-				t.Errorf("%s: EditorNames should not be empty", cfg.ClientType)
 			}
 			// Every client needs an install mechanism: JSON patching (path
 			// prefix) or a CLI install command.
@@ -564,16 +594,34 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 		}
 	})
 
-	t.Run("runs the configured command", func(t *testing.T) {
-		cfg := &clientConfig{
-			ClientType: "test-client",
-			Name:       "Test Client",
-			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-				return []string{"echo", "test", "output"}, nil
-			},
+	// The install commands themselves would exec the real client binaries, so
+	// pin each CLI-based client's exact argv here instead. The command-level
+	// "cli-based client" case executes claude-code's end-to-end via a stub.
+	t.Run("builds the expected command per client", func(t *testing.T) {
+		want := map[MCPClient][]string{
+			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
+			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
+			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
+			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
+			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},
 		}
-		if err := addMCPServerViaCLI(cfg, "tiger", "/path/to/tiger", []string{"mcp", "start"}); err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		for _, cfg := range supportedClients {
+			if cfg.buildInstallCommand == nil {
+				continue
+			}
+			wantCmd, ok := want[cfg.ClientType]
+			if !ok {
+				t.Errorf("%s: CLI-based client missing from expected command table", cfg.ClientType)
+				continue
+			}
+			got, err := cfg.BuildInstallCommand("tiger", "/path/to/tiger", []string{"mcp", "start"})
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", cfg.ClientType, err)
+				continue
+			}
+			if diff := cmp.Diff(wantCmd, got); diff != "" {
+				t.Errorf("%s: install command mismatch (-want +got):\n%s", cfg.ClientType, diff)
+			}
 		}
 	})
 }

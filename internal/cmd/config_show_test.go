@@ -221,6 +221,15 @@ func TestConfigShowCmd(t *testing.T) {
 			wantStdout: showTable(dir, map[string]any{"api_url": "https://flag-test.api.com/v1"}),
 		},
 		{
+			// Configs written by older CLI versions used a
+			// version_check_interval duration; 0 (checks disabled) must carry
+			// over to version_check=false rather than the default true.
+			name:       "legacy version_check_interval 0 disables version_check",
+			args:       []string{"config", "show"},
+			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{"version_check_interval": 0})},
+			wantStdout: showTable(dir, map[string]any{"version_check": false}),
+		},
+		{
 			name:       "list alias",
 			args:       []string{"config", "list"},
 			opts:       []runOption{withConfigDir(dir), withConfig(map[string]any{})},

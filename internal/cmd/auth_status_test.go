@@ -49,19 +49,6 @@ func TestAuthStatusCmd(t *testing.T) {
 				}, nil)
 		}
 	}
-	checkExitCode := func(want int) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
-			t.Helper()
-			var exitErr common.ExitCodeError
-			if !errors.As(result.err, &exitErr) {
-				t.Fatalf("expected ExitCodeError, got: %v", result.err)
-			}
-			if exitErr.ExitCode() != want {
-				t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), want)
-			}
-		}
-	}
-
 	patTable := `┌─────────────────┬─────────────────────────────────┐
 │    PROPERTY     │              VALUE              │
 ├─────────────────┼─────────────────────────────────┤

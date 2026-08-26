@@ -551,24 +551,11 @@ service_type: TIMESCALEDB
 status: READY
 `
 
-// checkExitCode returns a check asserting the command failed with the given
-// exit code.
-func checkExitCode(want int) func(*testing.T, cmdResult) {
-	return func(t *testing.T, result cmdResult) {
-		var exitErr common.ExitCodeError
-		if !errors.As(result.err, &exitErr) {
-			t.Fatalf("expected an exit code error, got %v", result.err)
-		}
-		if exitErr.ExitCode() != want {
-			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), want)
-		}
-	}
-}
-
 // checkDefaultService returns a check asserting the config file's default
 // service_id after the command ran.
 func checkDefaultService(want string) func(*testing.T, cmdResult) {
 	return func(t *testing.T, result cmdResult) {
+		t.Helper()
 		cfg, err := config.Load(testFlags(t, result.configDir))
 		if err != nil {
 			t.Fatalf("failed to load config: %v", err)
@@ -583,6 +570,7 @@ func checkDefaultService(want string) func(*testing.T, cmdResult) {
 // (mock) keyring for the given service.
 func checkStoredPassword(serviceID, want string) func(*testing.T, cmdResult) {
 	return func(t *testing.T, result cmdResult) {
+		t.Helper()
 		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
 		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
 		if err != nil {

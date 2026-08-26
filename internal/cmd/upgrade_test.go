@@ -142,15 +142,14 @@ func fakeInstalledBinary(t *testing.T) string {
 }
 
 // withCurrentBinary makes the upgrade treat path as the currently running
-// binary instead of the real test binary. The override is installed when the
-// test case runs (runOptions are applied per subtest) and restored by t's
+// binary instead of the real test binary. Restored by the running subtest's
 // cleanups.
-func withCurrentBinary(t *testing.T, path string) runOption {
-	return func(*runConfig) {
+func withCurrentBinary(path string) runOption {
+	return withSetup(func(t *testing.T) {
 		original := resolveCurrentBinaryPath
 		resolveCurrentBinaryPath = func() (string, error) { return path, nil }
 		t.Cleanup(func() { resolveCurrentBinaryPath = original })
-	}
+	})
 }
 
 func TestUpgradeCmd(t *testing.T) {
@@ -223,7 +222,7 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": latestServer.URL}),
-				withCurrentBinary(t, archive404Bin),
+				withCurrentBinary(archive404Bin),
 			},
 			wantStdout: downloadHeader("Upgrading", "dev", latestServer.URL),
 			wantErr: fmt.Sprintf("failed to download release archive: unexpected status code 404 for %s/releases/v1.2.3/%s",
@@ -234,7 +233,7 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": noChecksumServer.URL}),
-				withCurrentBinary(t, checksum404Bin),
+				withCurrentBinary(checksum404Bin),
 			},
 			wantStdout: downloadHeader("Upgrading", "dev", noChecksumServer.URL) + "Verifying checksum\n",
 			wantErr: fmt.Sprintf("failed to fetch checksum: unexpected status code 404 for %s/releases/v1.2.3/%s.sha256",
@@ -245,7 +244,7 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": mismatchServer.URL}),
-				withCurrentBinary(t, mismatchBin),
+				withCurrentBinary(mismatchBin),
 			},
 			wantStdout: downloadHeader("Upgrading", "dev", mismatchServer.URL) + "Verifying checksum\n",
 			wantErr:    fmt.Sprintf("checksum mismatch for %s: expected deadbeef, got %s", archiveName, mismatchDigest),
@@ -255,7 +254,7 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": wrongEntryServer.URL}),
-				withCurrentBinary(t, wrongEntryBin),
+				withCurrentBinary(wrongEntryBin),
 			},
 			wantStdout: downloadHeader("Upgrading", "dev", wrongEntryServer.URL) + "Verifying checksum\n",
 			wantErr:    fmt.Sprintf("failed to extract archive: binary %q not found in archive", binaryFilename()),
@@ -267,7 +266,7 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": successServer.URL}),
-				withCurrentBinary(t, successBin),
+				withCurrentBinary(successBin),
 			},
 			wantStdout: downloadHeader("Upgrading", "dev", successServer.URL) +
 				"Verifying checksum\n" +
@@ -300,8 +299,8 @@ func TestUpgradeCmd(t *testing.T) {
 			args: []string{"upgrade", "--force", "--version", "1.2.3"},
 			opts: []runOption{
 				withConfig(map[string]any{"releases_url": successServer.URL}),
-				withCurrentBinary(t, downgradeBin),
-				withCLIVersion(t, "2.0.0"),
+				withCurrentBinary(downgradeBin),
+				withCLIVersion("2.0.0"),
 			},
 			wantStdout: downloadHeader("Downgrading", "2.0.0", successServer.URL) +
 				"Verifying checksum\n" +

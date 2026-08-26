@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/zalando/go-keyring"
 	"go.uber.org/mock/gomock"
+	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
@@ -36,8 +39,8 @@ func discardCmd() *cobra.Command {
 	return cmd
 }
 
-// stubIsTerminal makes util.IsTerminal report val for the duration of the test,
-// so commands take their interactive path against a non-TTY stdin.
+// stubIsTerminal makes util.IsTerminal report val for the duration of the test
+// (true lets commands take their interactive path against a non-TTY stdin).
 func stubIsTerminal(t *testing.T, val bool) {
 	t.Helper()
 	original := util.IsTerminal
@@ -92,11 +95,12 @@ type runConfig struct {
 	ctx          context.Context
 	envVars      map[string]string
 	configDir    string         // if set, reused instead of a fresh t.TempDir()
-	configValues map[string]any // if set, written to the config file before the command runs
+	configValues map[string]any // merged across withConfig calls; written to the config file before the command runs
 	credentials  *config.Credentials
 	clientErr    error              // if set, the client factory returns this error (nil client)
 	openBrowser  func(string) error // if set, overrides the openBrowser stub for this test
 	readPassword *string            // if set, util.ReadPassword returns this value
+	setup        []func(t *testing.T)
 }
 
 func withStdin(input string) runOption {
@@ -141,9 +145,25 @@ func withConfigDir(dir string) runOption {
 
 // withConfig seeds the test's config file with the given keys before the
 // command runs (e.g. map[string]any{"service_id": "svc-123", "read_only": true}).
+// Repeated withConfig options merge, later values winning per key. Note the
+// file is written with ONLY the accumulated keys — combining withConfig with
+// withConfigDir overwrites whatever earlier chained commands stored there.
 func withConfig(values map[string]any) runOption {
 	return func(rc *runConfig) {
-		rc.configValues = values
+		if rc.configValues == nil {
+			rc.configValues = map[string]any{}
+		}
+		maps.Copy(rc.configValues, values)
+	}
+}
+
+// withSetup runs f with the subtest's *testing.T just before the command tree
+// is built. Use it from options that stub package-level vars, so their
+// t.Cleanup restores at the end of the case that ran them rather than at the
+// end of an outer test function whose t they'd otherwise have to capture.
+func withSetup(f func(t *testing.T)) runOption {
+	return func(rc *runConfig) {
+		rc.setup = append(rc.setup, f)
 	}
 }
 
@@ -198,6 +218,10 @@ func withReadPassword(password string) runOption {
 // runCommand builds the root command, injects a mock API client, and executes
 // with the given args against an isolated temp config directory. Returns
 // captured stdout, stderr, and any error from Execute.
+//
+// Not t.Parallel-safe: it stubs package-level vars (openBrowser, and via
+// options util.IsTerminal and util.ReadPassword) and the keyring service-name
+// override, and withEnv uses t.Setenv.
 func runCommand(
 	t *testing.T,
 	args []string,
@@ -217,10 +241,17 @@ func runCommand(
 	// Isolate keyring entries (credentials, saved passwords) per test.
 	config.SetTestServiceName(t)
 
-	// Set and restore env vars. Must happen before buildRootCmd, which reads
-	// TIGER_EXPERIMENTAL at build time.
-	for k, v := range rc.envVars {
-		t.Setenv(k, v)
+	// Set env vars (restored when the test ends, not per runCommand call — a
+	// chained runCommand inside a check still sees them). Sorted so two
+	// interdependent vars apply deterministically. Must happen before
+	// buildRootCmd, which reads TIGER_EXPERIMENTAL at build time.
+	for _, k := range slices.Sorted(maps.Keys(rc.envVars)) {
+		t.Setenv(k, rc.envVars[k])
+	}
+
+	// Run t-scoped setup hooks (see withSetup).
+	for _, f := range rc.setup {
+		f(t)
 	}
 
 	// Create mock
@@ -326,7 +357,38 @@ func readStoredCredentials(t *testing.T, configDir string) (*config.Credentials,
 	return cfg.GetStoredCredentials()
 }
 
+// checkExitCode returns a check asserting the command failed with the given
+// exit code.
+func checkExitCode(want int) func(*testing.T, cmdResult) {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		var exitErr common.ExitCodeError
+		if !errors.As(result.err, &exitErr) {
+			t.Fatalf("expected an exit code error, got %v", result.err)
+		}
+		if exitErr.ExitCode() != want {
+			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), want)
+		}
+	}
+}
+
+// readConfigFile parses the config file persisted in configDir.
+func readConfigFile(t *testing.T, configDir string) map[string]any {
+	t.Helper()
+	contents, err := os.ReadFile(config.GetConfigFile(configDir))
+	if err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(contents, &values); err != nil {
+		t.Fatalf("failed to parse config file: %v", err)
+	}
+	return values
+}
+
 // httpResponse creates a minimal *http.Response with the given status code.
+// Its Body is nil — fine for the generated response structs' StatusCode()
+// checks, but any code path that reads the body would panic.
 func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
 }
@@ -392,7 +454,10 @@ type cmdTest struct {
 //
 // When wantErr is set and wantStderr is empty, the expected stderr is
 // automatically derived from the error message (Cobra prints "Error: <msg>\n"
-// to stderr for any error returned by RunE).
+// to stderr for any error returned by RunE). Commands that set SilenceErrors
+// print differently, so their error cases must set wantStderr explicitly; a
+// case expecting an error with EMPTY stderr isn't expressible in the table —
+// use a bespoke subtest.
 func runCmdTests(t *testing.T, tests []cmdTest) {
 	t.Helper()
 	for _, tt := range tests {

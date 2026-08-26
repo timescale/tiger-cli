@@ -8,6 +8,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestDbCreateRoleCmd(t *testing.T) {
@@ -39,6 +40,19 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
+			// The missing endpoint stops the command before any connection
+			// attempt, proving the config default reached the service lookup.
+			name: "default service id from config",
+			args: []string{"db", "create", "role", "--name", "ai_analyst"},
+			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Endpoint = nil
+				}))
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
 			name: "network error",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
@@ -58,6 +72,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
+			check:   checkExitCode(common.ExitServiceNotFound),
 		},
 		{
 			name: "nil response body",

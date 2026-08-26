@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,14 +15,13 @@ import (
 
 // withCLIVersion overrides the build-time version string for a test case, so
 // paths gated on a released (semver) version are reachable from a dev build.
-// The override is installed when the case runs (runOptions are applied per
-// subtest) and restored by t's cleanups.
-func withCLIVersion(t *testing.T, v string) runOption {
-	return func(*runConfig) {
+// Restored by the running subtest's cleanups.
+func withCLIVersion(v string) runOption {
+	return withSetup(func(t *testing.T) {
 		original := config.Version
 		config.Version = v
 		t.Cleanup(func() { config.Version = original })
-	}
+	})
 }
 
 func TestVersionCmd(t *testing.T) {
@@ -141,7 +139,7 @@ version: %s
 		server := startFakeReleasesServer(t, "v99.99.99")
 
 		result := runCommand(t, []string{"version", "--check", "-o", "bare"}, nil,
-			withCLIVersion(t, "0.1.0"),
+			withCLIVersion("0.1.0"),
 			withConfig(map[string]any{"releases_url": server.URL}),
 		)
 
@@ -152,12 +150,6 @@ version: %s
 			t.Errorf("stderr = %q, want prefix %q", result.stderr, wantPrefix)
 		}
 
-		var exitErr common.ExitCodeError
-		if !errors.As(result.err, &exitErr) {
-			t.Fatalf("expected ExitCodeError, got %v (%T)", result.err, result.err)
-		}
-		if exitErr.ExitCode() != common.ExitUpdateAvailable {
-			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), common.ExitUpdateAvailable)
-		}
+		checkExitCode(common.ExitUpdateAvailable)(t, result)
 	})
 }
