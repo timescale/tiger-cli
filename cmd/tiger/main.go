@@ -9,13 +9,16 @@ import (
 	"syscall"
 
 	"github.com/timescale/tiger-cli/internal/cmd"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func main() {
 	if err := run(); err != nil {
-		// Check if it's a custom exit code error
-		if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(exitErr.ExitCode())
+		// A common.ExitCodeError anywhere in the chain sets the exit code;
+		// it is the only carrier main honors. errors.AsType unwraps, so the
+		// code survives fmt.Errorf wrapping.
+		if codeErr, ok := errors.AsType[common.ExitCodeError](err); ok {
+			os.Exit(codeErr.ExitCode())
 		}
 		os.Exit(1)
 	}

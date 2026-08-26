@@ -318,12 +318,13 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
 - **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
-  CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
+  CLI commands (auth, project, service, db, config, mcp, version, upgrade, completion).
   Each command lives in its own file, named to match the command in snake_case
   (see "One File Per Command" below). `root.go` holds the root command, global
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
+  - `project_use.go` - `tiger project use`, which switches the active project. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. Any project change clears the `service_id` config value via `clearStaleDefaultService` (`project_helper.go`) — `auth login` calls it too unless it lands on the same project as the previous login. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see
