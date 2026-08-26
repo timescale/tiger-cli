@@ -48,6 +48,7 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
 	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
 	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
 
