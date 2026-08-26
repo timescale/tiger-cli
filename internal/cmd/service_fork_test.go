@@ -60,7 +60,7 @@ PGUSER=tsdbadmin
 		{
 			name:    "invalid environment",
 			args:    []string{"service", "fork", "svc-12345", "--now", "--environment", "staging"},
-			wantErr: "environment must be either 'DEV' or 'PROD', got 'STAGING'",
+			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
 			name:    "not logged in",

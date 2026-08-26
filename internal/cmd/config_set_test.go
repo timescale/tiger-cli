@@ -49,7 +49,7 @@ func TestConfigSetCmd(t *testing.T) {
 		{
 			name:    "invalid password_storage value",
 			args:    []string{"config", "set", "password_storage", "secure"},
-			wantErr: "failed to set config: invalid password_storage value: secure (must be keyring, pgpass, or none)",
+			wantErr: "failed to set config: invalid password_storage value: secure (must be one of: keyring, pgpass, none)",
 		},
 		{
 			name:       "set api_url",

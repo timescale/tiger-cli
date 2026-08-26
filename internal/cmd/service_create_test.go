@@ -38,7 +38,7 @@ func TestServiceCreateCmd(t *testing.T) {
 		{
 			name:    "invalid environment",
 			args:    []string{"service", "create", "--name", "test-service", "--environment", "staging"},
-			wantErr: "environment must be either 'DEV' or 'PROD', got 'STAGING'",
+			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
 			name:    "invalid cpu/memory combination",
