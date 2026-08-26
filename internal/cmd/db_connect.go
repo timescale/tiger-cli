@@ -631,7 +631,14 @@ func testSaveAndLaunchPsqlWithPassword(
 // It retrieves the password from storage and sets PGPASSWORD environment variable.
 func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
 	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, service, cmd)
-	return psqlCmd.Run()
+	err := psqlCmd.Run()
+	// Propagate psql's own exit code; a signal death (ExitCode() == -1)
+	// falls through to the generic exit code 1.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() > 0 {
+		return common.ExitWithCode(exitErr.ExitCode(), err)
+	}
+	return err
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup

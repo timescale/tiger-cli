@@ -131,7 +131,7 @@ Tiger CLI is a Go-based command-line interface for managing Tiger resources. The
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
 - **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
-  CLI commands (auth, service, db, config, mcp, version, upgrade). Each command
+  CLI commands (auth, project, service, db, config, mcp, version, upgrade). Each command
   lives in its own file, named to match the command in snake_case
   (`tiger service create` → `service_create.go`). `root.go` holds the root
   command, global flags, and `wrapCommands`, which gives every command the same
