@@ -36,7 +36,7 @@ func TestMCPListCommand(t *testing.T) {
 	}
 
 	// Helper function to validate capabilities map structure and contents
-	validateCapabilities := func(t *testing.T, capabilities map[string]interface{}) {
+	validateCapabilities := func(t *testing.T, capabilities map[string]any) {
 		t.Helper()
 
 		// Should have the expected structure
@@ -46,14 +46,14 @@ func TestMCPListCommand(t *testing.T) {
 		assert.Contains(t, capabilities, "resource_templates", "should contain resource_templates")
 
 		// Verify tools is an array
-		tools, ok := capabilities["tools"].([]interface{})
+		tools, ok := capabilities["tools"].([]any)
 		require.True(t, ok, "tools should be an array")
 		assert.NotEmpty(t, tools, "should have at least one tool")
 
 		// Extract tool names
 		var toolNames []string
 		for _, toolItem := range tools {
-			tool, ok := toolItem.(map[string]interface{})
+			tool, ok := toolItem.(map[string]any)
 			require.True(t, ok, "tool should be an object")
 			assert.Contains(t, tool, "name", "tool should have name field")
 			assert.Contains(t, tool, "description", "tool should have description field")
@@ -66,14 +66,14 @@ func TestMCPListCommand(t *testing.T) {
 		}
 
 		// Verify prompts is an array
-		prompts, ok := capabilities["prompts"].([]interface{})
+		prompts, ok := capabilities["prompts"].([]any)
 		require.True(t, ok, "prompts should be an array")
 		assert.NotEmpty(t, prompts, "should have at least one prompt")
 
 		// Extract prompt names
 		var promptNames []string
 		for _, promptItem := range prompts {
-			prompt, ok := promptItem.(map[string]interface{})
+			prompt, ok := promptItem.(map[string]any)
 			require.True(t, ok, "prompt should be an object")
 			assert.Contains(t, prompt, "name", "prompt should have name field")
 			promptNames = append(promptNames, prompt["name"].(string))
@@ -122,7 +122,7 @@ func TestMCPListCommand(t *testing.T) {
 		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "json"})
 
 		// Should be valid JSON
-		var capabilities map[string]interface{}
+		var capabilities map[string]any
 		err := json.Unmarshal([]byte(output), &capabilities)
 		require.NoError(t, err, "output should be valid JSON")
 
@@ -137,7 +137,7 @@ func TestMCPListCommand(t *testing.T) {
 		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "yaml"})
 
 		// Should be valid YAML
-		var capabilities map[string]interface{}
+		var capabilities map[string]any
 		err := yaml.Unmarshal([]byte(output), &capabilities)
 		require.NoError(t, err, "output should be valid YAML")
 

@@ -47,13 +47,13 @@ func setupServiceTest(t *testing.T) string {
 	return tmpDir
 }
 
-func executeServiceCommand(ctx context.Context, args ...string) (string, error, *cobra.Command) {
+func executeServiceCommand(ctx context.Context, args ...string) (string, *cobra.Command, error) {
 	// No need to reset any flags - we build fresh commands with local variables
 
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
 	testRoot, err := buildRootCmd(ctx)
 	if err != nil {
-		return "", err, nil
+		return "", nil, err
 	}
 
 	buf := new(bytes.Buffer)
@@ -62,7 +62,7 @@ func executeServiceCommand(ctx context.Context, args ...string) (string, error, 
 	testRoot.SetArgs(args)
 
 	err = testRoot.Execute()
-	return buf.String(), err, testRoot
+	return buf.String(), testRoot, err
 }
 
 // Helper function to create test services
@@ -101,7 +101,7 @@ func createTestServices() []api.Service {
 	}
 }
 
-func parseConfigFile(t *testing.T, configFile string) map[string]interface{} {
+func parseConfigFile(t *testing.T, configFile string) map[string]any {
 	t.Helper()
 
 	// Read the config file directly
@@ -109,7 +109,7 @@ func parseConfigFile(t *testing.T, configFile string) map[string]interface{} {
 	if err != nil {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := yaml.Unmarshal(configBytes, &configMap); err != nil {
 		t.Fatalf("Failed to parse config YAML: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestOutputService_JSON(t *testing.T) {
 
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
-	var jsonMap map[string]interface{}
+	var jsonMap map[string]any
 	err2 := json.Unmarshal([]byte(output), &jsonMap)
 	if err2 != nil {
 		t.Errorf("Output should be valid JSON map: %v", err2)
@@ -282,7 +282,7 @@ func TestOutputService_YAML(t *testing.T) {
 
 	// Verify that the unmarshaled result has no initial password
 	// Since we're now using maps for sanitized output, we need to parse it differently
-	var yamlMap map[string]interface{}
+	var yamlMap map[string]any
 	err2 := yaml.Unmarshal([]byte(output), &yamlMap)
 	if err2 != nil {
 		t.Errorf("Output should be valid YAML map: %v", err2)
@@ -578,14 +578,7 @@ func TestWaitForServiceReady_Timeout(t *testing.T) {
 		return
 	}
 
-	// Check that it's an exitCodeError with common.ExitTimeout
-	if exitErr, ok := err.(interface{ ExitCode() int }); ok {
-		if exitErr.ExitCode() != common.ExitTimeout {
-			t.Errorf("Expected exit code %d for wait timeout, got %d", common.ExitTimeout, exitErr.ExitCode())
-		}
-	} else {
-		t.Error("Expected exitCodeError for wait timeout")
-	}
+	assertExitCode(t, err, common.ExitTimeout)
 
 	// Check error message mentions timeout and continuing provisioning
 	errorMsg := err.Error()
@@ -624,7 +617,7 @@ func TestDestructiveCommands_ReadOnly(t *testing.T) {
 
 	for _, args := range cases {
 		t.Run(args[1], func(t *testing.T) {
-			_, err, _ := executeServiceCommand(t.Context(), args...)
+			_, _, err := executeServiceCommand(t.Context(), args...)
 			if !errors.Is(err, common.ErrReadOnly) {
 				t.Errorf("Expected common.ErrReadOnly, got: %v", err)
 			}

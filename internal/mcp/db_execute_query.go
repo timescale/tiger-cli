@@ -45,7 +45,7 @@ func (DBExecuteQueryInput) Schema() *jsonschema.Schema {
 	schema.Properties["parameters"].Examples = []any{[]string{"1", "alice"}, []string{"2024-01-01", "100"}}
 
 	schema.Properties["timeout_seconds"].Description = "Query timeout in seconds"
-	schema.Properties["timeout_seconds"].Minimum = util.Ptr(0.0)
+	schema.Properties["timeout_seconds"].Minimum = new(0.0)
 	schema.Properties["timeout_seconds"].Default = util.Must(json.Marshal(30))
 	schema.Properties["timeout_seconds"].Examples = []any{10, 30, 60}
 
@@ -140,9 +140,9 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 		OutputSchema: DBExecuteQueryOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(true), // Can execute destructive SQL
-			IdempotentHint:  false,          // Queries may have side effects
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(true), // Can execute destructive SQL
+			IdempotentHint:  false,     // Queries may have side effects
+			OpenWorldHint:   new(true),
 			Title:           "Execute SQL Query",
 		},
 	}

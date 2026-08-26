@@ -59,9 +59,9 @@ func replicaService() api.Service {
 		Name:      "reporting-replica",
 		Endpoint:  &api.Endpoint{Host: &host, Port: &port},
 		ForkedFrom: &api.ForkSpec{
-			IsStandby: util.Ptr(true),
-			ProjectID: util.Ptr("proj1"),
-			ServiceID: util.Ptr("svcprimary"),
+			IsStandby: new(true),
+			ProjectID: new("proj1"),
+			ServiceID: new("svcprimary"),
 		},
 	}
 }

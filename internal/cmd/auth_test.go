@@ -17,6 +17,11 @@ func setupAuthTest(t *testing.T) string {
 	// Use a unique service name for this test to avoid conflicts
 	config.SetTestServiceName(t)
 
+	// Env API keys from the host environment would take precedence over the
+	// stored credentials these tests set up
+	os.Unsetenv("TIGER_PUBLIC_KEY")
+	os.Unsetenv("TIGER_SECRET_KEY")
+
 	// Mock the API key validation for testing
 	originalValidator := validateAPIKey
 	validateAPIKey = func(ctx context.Context, cfg *config.Config, client api.ClientWithResponsesInterface) (*api.AuthInfo, error) {

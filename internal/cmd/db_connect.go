@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -327,18 +328,19 @@ func (m connectTargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m connectTargetModel) View() tea.View {
-	s := "How would you like to connect?\n\n"
+	var s strings.Builder
+	s.WriteString("How would you like to connect?\n\n")
 
 	for i, choice := range m.choices {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, choice.label)
+		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, choice.label))
 	}
 
-	s += "\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to cancel"
-	return tea.NewView(s)
+	s.WriteString("\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to cancel")
+	return tea.NewView(s.String())
 }
 
 // selectConnectTargetOption shows the interactive menu for choosing a
@@ -481,8 +483,7 @@ func isAuthenticationError(err error) bool {
 		return false
 	}
 	// Check for PostgreSQL error code 28P01 (invalid_password) or 28000 (invalid_authorization_specification)
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return pgErr.Code == "28P01" || pgErr.Code == "28000"
 	}
 	return false
@@ -564,18 +565,19 @@ func (m passwordRecoveryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m passwordRecoveryModel) View() tea.View {
-	s := "What would you like to do?\n\n"
+	var s strings.Builder
+	s.WriteString("What would you like to do?\n\n")
 
 	for i, option := range m.options {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, option)
+		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, option))
 	}
 
-	s += "\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to quit"
-	return tea.NewView(s)
+	s.WriteString("\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to quit")
+	return tea.NewView(s.String())
 }
 
 // selectPasswordRecoveryOption shows the interactive menu for password recovery
@@ -629,7 +631,14 @@ func testSaveAndLaunchPsqlWithPassword(
 // It retrieves the password from storage and sets PGPASSWORD environment variable.
 func launchPsql(cfg *config.Config, details *common.ConnectionDetails, psqlPath string, additionalFlags []string, service api.Service, cmd *cobra.Command) error {
 	psqlCmd := buildPsqlCommand(cfg, details, psqlPath, additionalFlags, service, cmd)
-	return psqlCmd.Run()
+	err := psqlCmd.Run()
+	// Propagate psql's own exit code; a signal death (ExitCode() == -1)
+	// falls through to the generic exit code 1.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() > 0 {
+		return common.ExitWithCode(exitErr.ExitCode(), err)
+	}
+	return err
 }
 
 // buildPsqlCommand creates the psql command with proper environment setup

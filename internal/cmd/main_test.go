@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -128,6 +129,16 @@ func newTestApp(t *testing.T, client api.ClientWithResponsesInterface, projectID
 		t.Fatalf("Failed to load test app: %v", err)
 	}
 	return app
+}
+
+// assertExitCode checks that err carries the given CLI exit code, unwrapping
+// like cmd/tiger/main.go does.
+func assertExitCode(t *testing.T, err error, want int) {
+	t.Helper()
+	var codeErr common.ExitCodeError
+	if !errors.As(err, &codeErr) || codeErr.ExitCode() != want {
+		t.Errorf("Expected exit code %d, got: %v", want, err)
+	}
 }
 
 // mockStoredCredentials overrides the common.GetStoredCredentials seam for the

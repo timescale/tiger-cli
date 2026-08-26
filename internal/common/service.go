@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 )
 
@@ -28,12 +29,7 @@ func ValidAddons() []string {
 
 // IsValidAddon checks if the given add-on is valid (case-sensitive as per API spec)
 func IsValidAddon(addon string) bool {
-	for _, validAddon := range ValidAddons() {
-		if addon == validAddon {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ValidAddons(), addon)
 }
 
 // ValidateAddons validates a slice of add-ons and removes duplicate values

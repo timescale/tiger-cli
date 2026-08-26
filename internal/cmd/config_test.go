@@ -85,7 +85,7 @@ func TestConfigCommands_Integration(t *testing.T) {
 	}
 
 	// Should be JSON output
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal([]byte(showOutput), &result); err != nil {
 		t.Fatalf("Expected JSON output, got: %s", showOutput)
 	}

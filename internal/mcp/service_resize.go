@@ -61,9 +61,9 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 		OutputSchema: ServiceResizeOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(false), // Not destructive, just modifies resources
-			IdempotentHint:  true,            // Can resize to same size multiple times
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(false), // Not destructive, just modifies resources
+			IdempotentHint:  true,       // Can resize to same size multiple times
+			OpenWorldHint:   new(true),
 			Title:           "Resize Database Service",
 		},
 	}

@@ -76,6 +76,50 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	return *resp.JSON200, nil
 }
 
+func projectIDCompletion(app *common.App) cobra.CompletionFunc {
+	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Project ID is always first positional argument
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		projects, err := listProjects(cmd, app)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		results := make([]string, 0, len(projects))
+		for _, project := range projects {
+			if strings.HasPrefix(project.ID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(project.ID, project.Name))
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
+func listProjects(cmd *cobra.Command, app *common.App) ([]api.Project, error) {
+	client, _, err := app.GetClient()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.GetProjectsWithResponse(cmd.Context())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+	}
+
+	if resp.JSON200 == nil {
+		return []api.Project{}, nil
+	}
+
+	return *resp.JSON200, nil
+}
+
 // configKeyCompletion completes the <key> argument of `tiger config unset`,
 // which takes no value argument.
 func configKeyCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

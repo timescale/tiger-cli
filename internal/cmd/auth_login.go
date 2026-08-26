@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -52,6 +52,7 @@ type credentials struct {
 
 func buildLoginCmd(app *common.App) *cobra.Command {
 	var flags credentials
+	var projectID string
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -64,8 +65,12 @@ The OAuth flow will:
 - Let you select a project (if you have multiple)
 - Store an OAuth session for the selected project
 
+Use --project-id to pick the project up front and skip the interactive selection. After
+logging in, you can switch projects with 'tiger project use'.
+
 The credentials and project ID will be stored securely in the system keyring, or in a fallback file with
-restricted permissions.
+restricted permissions. Unless the login lands on the same project as the previous login, the default
+service (config key service_id) is cleared, since it belongs to the project it was set in.
 
 You may also provide API keys via flags or environment variables, in which case they will be used
 directly. The CLI will prompt for any missing information.
@@ -75,6 +80,9 @@ You can find your API credentials at: https://console.cloud.tigerdata.com/dashbo
 Examples:
   # Interactive login with OAuth (opens browser)
   tiger auth login
+
+  # OAuth login without the interactive project selection
+  tiger auth login --project-id my-project-id
 
   # Login with keys (project ID will be auto-detected)
   tiger auth login --public-key your-public-key --secret-key your-secret-key
@@ -95,12 +103,20 @@ Examples:
 				secretKey: flagOrEnvVar(flags.secretKey, "TIGER_SECRET_KEY"),
 			}
 
+			// Captured before the login replaces it; used to decide whether
+			// the default service is stale.
+			prevProjectID := ""
+			if stored, err := cfg.GetStoredCredentials(); err == nil {
+				prevProjectID = stored.ProjectID
+			}
+
 			if creds.publicKey == "" && creds.secretKey == "" {
 				l := &oauthLogin{
 					cfg:        cfg,
 					authURL:    cfg.ConsoleURL + "/oauth/authorize",
 					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
 					successURL: cfg.ConsoleURL + "/oauth/code/success",
+					projectID:  projectID,
 					cmd:        cmd,
 				}
 
@@ -117,7 +133,7 @@ Examples:
 				app.SetClient(client, projectID)
 				// Identify the user for analytics.
 				common.IdentifyOAuthUser(cmd.Context(), cfg, client, projectID)
-				finishLogin(cmd, projectID)
+				finishLogin(cmd, cfg, prevProjectID, projectID)
 				return nil
 			} else if creds.publicKey == "" || creds.secretKey == "" {
 				creds, err = promptForCredentials(cmd, cfg.ConsoleURL, creds)
@@ -140,24 +156,36 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}
+			// An API key carries its own project; a mismatched --project-id is
+			// an error.
+			if projectID != "" && projectID != authInfo.APIKey.Project.ID {
+				return common.ExitWithCode(common.ExitInvalidParameters,
+					errors.New("API key is scoped to a different project than the one requested with --project-id"))
+			}
 			if err := cfg.StoreCredentials(apiKey, authInfo.APIKey.Project.ID); err != nil {
 				return fmt.Errorf("failed to store credentials: %w", err)
 			}
 			// See the OAuth branch above: keep the App's client in sync with the
 			// credentials we just stored.
 			app.SetClient(client, authInfo.APIKey.Project.ID)
-			finishLogin(cmd, authInfo.APIKey.Project.ID)
+			finishLogin(cmd, cfg, prevProjectID, authInfo.APIKey.Project.ID)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&flags.publicKey, "public-key", "", "Public key for authentication")
 	cmd.Flags().StringVar(&flags.secretKey, "secret-key", "", "Secret key for authentication")
+	cmd.Flags().StringVar(&projectID, "project-id", "", "Project ID to log in to (skips interactive project selection)")
 
 	return cmd
 }
 
-func finishLogin(cmd *cobra.Command, projectID string) {
+func finishLogin(cmd *cobra.Command, cfg *config.Config, prevProjectID, projectID string) {
+	// An empty prevProjectID (e.g. after a logout) means the default service
+	// may belong to any project, so clear it too.
+	if prevProjectID != projectID {
+		clearStaleDefaultService(cmd, cfg)
+	}
 	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
 	cmd.Print(nextStepsMessage)
 }
@@ -204,6 +232,7 @@ type oauthLogin struct {
 	authURL    string
 	tokenURL   string
 	successURL string
+	projectID  string // from --project-id; empty means select interactively
 	cmd        *cobra.Command
 }
 
@@ -405,6 +434,13 @@ func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWith
 	}
 	projects := *resp.JSON200
 
+	if l.projectID != "" {
+		if err := requireProjectAccess(l.cmd, projects, l.projectID); err != nil {
+			return "", err
+		}
+		return l.projectID, nil
+	}
+
 	switch len(projects) {
 	case 0:
 		return "", fmt.Errorf("user has no accessible projects")
@@ -513,21 +549,22 @@ func (m *projectSelectModel) updateNumberBuffer(newBuffer string) {
 }
 
 func (m projectSelectModel) View() tea.View {
-	s := "Select a project:\n\n"
+	var s strings.Builder
+	s.WriteString("Select a project:\n\n")
 
 	for i, project := range m.projects {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID)
+		s.WriteString(fmt.Sprintf("%s %d. %s (%s)\n", cursor, i+1, project.Name, project.ID))
 	}
 
 	// Show the current number buffer if user is typing
 	if m.numberBuffer != "" {
-		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
+		s.WriteString(fmt.Sprintf("\nTyping: %s", m.numberBuffer))
 	}
 
-	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return tea.NewView(s)
+	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
+	return tea.NewView(s.String())
 }

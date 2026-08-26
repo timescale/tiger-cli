@@ -19,6 +19,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
@@ -423,6 +424,142 @@ func TestAuthLogin_OAuth_MultipleProjects(t *testing.T) {
 	}
 }
 
+func TestAuthLogin_OAuth_ProjectIDFlag(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project 1"},
+		{ID: "project-456", Name: "Test Project 2"},
+		{ID: "project-789", Name: "Test Project 3"},
+	}, "project-456")
+
+	// No TTY and no picker stub: --project-id skips the interactive selection.
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-456")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: project-456)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+
+	stored, err := testConfig(t).GetStoredCredentials()
+	if err != nil {
+		t.Fatalf("Failed to get stored credentials: %v", err)
+	}
+	if stored.ProjectID != "project-456" {
+		t.Errorf("Expected project ID 'project-456', got %q", stored.ProjectID)
+	}
+}
+
+func TestAuthLogin_OAuth_ProjectIDFlag_NoAccess(t *testing.T) {
+	setupOAuthTest(t, []api.Project{
+		{ID: "project-123", Name: "Test Project 1"},
+	}, "project-123")
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login", "--project-id", "project-999")
+	if err == nil {
+		t.Fatal("Expected login to fail for inaccessible project")
+	}
+	if !strings.Contains(err.Error(), "no access to the requested project") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// The exit code must survive the "failed to select project" wrap.
+	assertExitCode(t, err, common.ExitInvalidParameters)
+	// The requested ID is echoed on stderr, not in the error.
+	if !strings.Contains(output, "Project project-999 is not among your accessible projects") {
+		t.Errorf("Expected stderr to name the project, got: %q", output)
+	}
+
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored when project selection fails")
+	}
+}
+
+func TestAuthLogin_KeyFlags_ProjectIDMismatch(t *testing.T) {
+	setupAuthTest(t) // mock validator reports project 'test-project-id'
+
+	_, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "some-other-project")
+	if err == nil {
+		t.Fatal("Expected login to fail on project mismatch")
+	}
+	if !strings.Contains(err.Error(), "API key is scoped to a different project") {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if _, err := testConfig(t).GetStoredCredentials(); err == nil {
+		t.Error("Credentials should not be stored on project mismatch")
+	}
+}
+
+func TestAuthLogin_KeyFlags_ProjectIDMatch(t *testing.T) {
+	setupAuthTest(t)
+
+	output, err := executeAuthCommand(t.Context(), "auth", "login",
+		"--public-key", "test-public-key", "--secret-key", "test-secret-key",
+		"--project-id", "test-project-id")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !strings.Contains(output, "Successfully logged in (project: test-project-id)") {
+		t.Errorf("Unexpected output: %q", output)
+	}
+}
+
+// TestAuthLogin_DefaultServiceClearing covers the three prevProjectID branches
+// of finishLogin: known-different project, unknown previous project (e.g.
+// after a logout), and same project.
+func TestAuthLogin_DefaultServiceClearing(t *testing.T) {
+	testCases := []struct {
+		name          string
+		prevProjectID string // "" = no stored credentials before login
+		wantCleared   bool
+	}{
+		{name: "different project clears", prevProjectID: "project-old", wantCleared: true},
+		{name: "unknown previous project clears", prevProjectID: "", wantCleared: true},
+		{name: "same project keeps", prevProjectID: "project-123", wantCleared: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			setupOAuthTest(t, []api.Project{
+				{ID: "project-123", Name: "Test Project"},
+			}, "project-123")
+
+			cfg := testConfig(t)
+			if err := cfg.Set("service_id", "svc-before"); err != nil {
+				t.Fatalf("Failed to set service_id: %v", err)
+			}
+			if tc.prevProjectID != "" {
+				prevToken := &oauth2.Token{
+					AccessToken:  "prev-access-token",
+					RefreshToken: "prev-refresh-token",
+					Expiry:       time.Now().Add(time.Hour),
+				}
+				if err := cfg.StoreOAuthCredentials(prevToken, tc.prevProjectID); err != nil {
+					t.Fatalf("Failed to store previous credentials: %v", err)
+				}
+			}
+
+			output, err := executeAuthCommand(t.Context(), "auth", "login")
+			if err != nil {
+				t.Fatalf("Login failed: %v", err)
+			}
+
+			cleared := strings.Contains(output, "Cleared default service")
+			if cleared != tc.wantCleared {
+				t.Errorf("Cleared message present = %t, want %t; output: %q", cleared, tc.wantCleared, output)
+			}
+			wantServiceID := "svc-before"
+			if tc.wantCleared {
+				wantServiceID = ""
+			}
+			if serviceID := testConfig(t).ServiceID; serviceID != wantServiceID {
+				t.Errorf("service_id = %q, want %q", serviceID, wantServiceID)
+			}
+		})
+	}
+}
+
 // TestOAuthRefresh_PersistsExpiry verifies that when an expired OAuth token is
 // refreshed, the rotated token is persisted with a non-zero Expiry derived from
 // the standard `expires_in` returned by the gateway.
@@ -484,10 +621,6 @@ func TestOAuthRefresh_PersistsExpiry(t *testing.T) {
 func setupOAuthTest(t *testing.T, projects []api.Project, expectedProjectID string) string {
 	t.Helper()
 	tmpDir := setupAuthTest(t)
-
-	// Ensure no keys in environment
-	os.Unsetenv("TIGER_PUBLIC_KEY")
-	os.Unsetenv("TIGER_SECRET_KEY")
 
 	// Start mock server for OAuth endpoints
 	mockServer := startMockOAuthServer(t, projects)
@@ -554,7 +687,7 @@ func startMockOAuthServer(t *testing.T, projects []api.Project) *httptest.Server
 			}
 		}
 
-		tokenResponse := map[string]interface{}{
+		tokenResponse := map[string]any{
 			"access_token":  "mock-access-token-12345",
 			"refresh_token": "mock-refresh-token-67890",
 			"expires_in":    3600,

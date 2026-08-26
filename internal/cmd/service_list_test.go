@@ -29,7 +29,7 @@ func TestServiceList_NoAuth(t *testing.T) {
 	mockNotLoggedIn(t)
 
 	// Execute service list command
-	_, err, _ = executeServiceCommand(t.Context(), "service", "list")
+	_, _, err = executeServiceCommand(t.Context(), "service", "list")
 	if err == nil {
 		t.Fatal("Expected error when not authenticated")
 	}

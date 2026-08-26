@@ -46,7 +46,7 @@ func newServiceGetTool() *mcp.Tool {
 		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(true),
+			OpenWorldHint: new(true),
 			Title:         "Get Service Details",
 		},
 	}
