@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -263,6 +264,26 @@ func ValidConfigOptions() []string {
 	return slices.Collect(maps.Keys(defaultValues))
 }
 
+// ValidConfigOptionValues returns known completion values for a config key's
+// value, or nil if the key doesn't have a fixed set of values.
+func ValidConfigOptionValues(key string) []string {
+	switch key {
+	case "output":
+		return ValidOutputFormats()
+	case "password_storage":
+		return ValidPasswordStorageOptions()
+	case "analytics", "color", "docs_mcp", "read_only", "version_check":
+		return []string{"true", "false"}
+	default:
+		return nil
+	}
+}
+
+// ValidPasswordStorageOptions returns the accepted values for password_storage.
+func ValidPasswordStorageOptions() []string {
+	return []string{"keyring", "pgpass", "none"}
+}
+
 func GetConfigFile(dir string) string {
 	return filepath.Join(dir, ConfigFileName)
 }
@@ -372,8 +393,9 @@ func validateValue(key, value string) (any, error) {
 		}
 		return value, nil
 	case "password_storage":
-		if value != "keyring" && value != "pgpass" && value != "none" {
-			return nil, fmt.Errorf("invalid password_storage value: %s (must be keyring, pgpass, or none)", value)
+		options := ValidPasswordStorageOptions()
+		if !slices.Contains(options, value) {
+			return nil, fmt.Errorf("invalid password_storage value: %s (must be one of: %s)", value, strings.Join(options, ", "))
 		}
 		return value, nil
 	default:

@@ -76,6 +76,7 @@ tiger auth login
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().String("service-id", "", "service ID")
 	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
+	cmd.RegisterFlagCompletionFunc("password-storage", passwordStorageCompletion)
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd(app))

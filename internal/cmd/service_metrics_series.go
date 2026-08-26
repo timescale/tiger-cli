@@ -121,6 +121,9 @@ Examples:
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	cmd.RegisterFlagCompletionFunc("role", metricsSeriesRoleCompletion)
+	cmd.RegisterFlagCompletionFunc("fn", metricsSeriesFnCompletion)
 
 	cmd.MarkFlagRequired("metric")
 	cmd.MarkFlagRequired("from")
