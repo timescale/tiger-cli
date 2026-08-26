@@ -15,10 +15,9 @@ import (
 func main() {
 	if err := run(); err != nil {
 		// A common.ExitCodeError anywhere in the chain sets the exit code;
-		// it is the only carrier main honors. errors.As unwraps, so the
+		// it is the only carrier main honors. errors.AsType unwraps, so the
 		// code survives fmt.Errorf wrapping.
-		var codeErr common.ExitCodeError
-		if errors.As(err, &codeErr) {
+		if codeErr, ok := errors.AsType[common.ExitCodeError](err); ok {
 			os.Exit(codeErr.ExitCode())
 		}
 		os.Exit(1)
