@@ -25,9 +25,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// validateAPIKey can be overridden for testing
-var validateAPIKey = common.ValidateAPIKey
-
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
 🎉 Next steps:
@@ -136,7 +133,7 @@ Examples:
 			}
 
 			cmd.PrintErrln("Validating API key...")
-			authInfo, err := validateAPIKey(cmd.Context(), cfg, client)
+			authInfo, err := common.ValidateAPIKey(cmd.Context(), cfg, client)
 			if err != nil {
 				return fmt.Errorf("API key validation failed: %w", err)
 			}

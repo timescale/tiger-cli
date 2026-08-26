@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -55,7 +54,7 @@ Examples:
 
 			// Make the stop request
 			resp, err := client.StopServiceWithResponse(
-				context.Background(),
+				cmd.Context(),
 				api.ProjectID(projectID),
 				api.ServiceID(serviceID),
 			)

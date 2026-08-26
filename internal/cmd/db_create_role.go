@@ -97,7 +97,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Get service details
-			service, err := getServiceDetailsFunc(cmd, app, args)
+			service, err := getServiceDetails(cmd, app, args)
 			if err != nil {
 				return err
 			}
