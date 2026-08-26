@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -30,7 +28,7 @@ Example:
   tiger project use my-project-id`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
-		ValidArgsFunction: cobra.NoFileCompletions,
+		ValidArgsFunction: projectIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targetID := args[0]
 
@@ -59,10 +57,7 @@ Example:
 				return nil
 			}
 
-			ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-			defer cancel()
-
-			resp, err := client.GetProjectsWithResponse(ctx)
+			resp, err := client.GetProjectsWithResponse(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("failed to list projects: %w", err)
 			}
