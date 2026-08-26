@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/zalando/go-keyring"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,8 +10,8 @@ import (
 func setupCredentialTest(t *testing.T) (string, *Config) {
 	t.Helper()
 
-	// Use a unique service name for this test to avoid conflicts
-	SetTestServiceName(t)
+	// Give the test a fresh, empty in-memory keyring
+	keyring.MockInit()
 
 	// Create temporary directory for test config
 	tmpDir, err := os.MkdirTemp("", "tiger-api-key-test-*")
@@ -76,8 +77,7 @@ func TestGetCredentialsFromFile(t *testing.T) {
 		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 
-	// Get credentials - should get from file since keyring is empty
-	// (each test uses a unique keyring service name)
+	// Get credentials - should get from file since the mock keyring is empty
 	creds, err := cfg.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)

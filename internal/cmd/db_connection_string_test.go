@@ -8,7 +8,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func TestDbConnectionStringCmd(t *testing.T) {
@@ -185,40 +184,31 @@ func TestDbConnectionStringCmd(t *testing.T) {
 			},
 			wantErr: "failed to fetch parent service \"svc-12345\" for read replica: failed to fetch service details: connection refused",
 		},
+		{
+			name:       "with-password includes stored password",
+			args:       []string{"db", "connection-string", "svc-12345", "--with-password"},
+			setup:      setupGet,
+			opts:       []runOption{withStoredPassword(sampleService(), "secret-pw")},
+			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
+		},
+		{
+			name:       "replica uses primary credentials",
+			args:       []string{"db", "connection-string", "rep-67890", "--with-password"},
+			setup:      setupGetReplica,
+			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
+			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
+		},
 	}
 
 	runCmdTests(t, tests)
+}
 
-	// These need a password seeded in the (mock) keyring before the command
-	// runs, which the table's setup hook can't do, so they run as standalone
-	// subtests.
-	t.Run("with-password includes stored password", func(t *testing.T) {
-		config.SetTestServiceName(t)
-		storage := &common.KeyringStorage{}
-		if err := storage.Save(sampleService(), "secret-pw", "tsdbadmin"); err != nil {
+// withStoredPassword seeds a password for svc in the mock keyring before the
+// command runs.
+func withStoredPassword(svc api.Service, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
 			t.Fatalf("failed to seed password: %v", err)
 		}
-
-		result := runCommand(t, []string{"db", "connection-string", "svc-12345", "--with-password"}, setupGet)
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n")
-		assertOutput(t, result.stderr, "")
-	})
-
-	t.Run("replica uses primary credentials", func(t *testing.T) {
-		config.SetTestServiceName(t)
-		storage := &common.KeyringStorage{}
-		if err := storage.Save(sampleService(), "primary-pw", "tsdbadmin"); err != nil {
-			t.Fatalf("failed to seed password: %v", err)
-		}
-
-		result := runCommand(t, []string{"db", "connection-string", "rep-67890", "--with-password"}, setupGetReplica)
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n")
-		assertOutput(t, result.stderr, "")
 	})
 }

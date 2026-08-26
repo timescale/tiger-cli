@@ -35,10 +35,6 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 				return err
 			}
 
-			if *cfgOut.ConfigDir == config.GetDefaultConfigDir() {
-				cfgOut.ConfigDir = nil
-			}
-
 			output := cmd.OutOrStdout()
 			switch cfg.Output {
 			case "json":
@@ -58,17 +54,19 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
+// outputTable renders the config as a table, rows sorted by property name
+// (matching the JSON field order and YAML's sorted keys).
 func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	table := tablewriter.NewWriter(w)
 	table.Header("PROPERTY", "VALUE")
-	if cfg.APIURL != nil {
-		table.Append("api_url", *cfg.APIURL)
-	}
 	if cfg.Analytics != nil {
 		table.Append("analytics", fmt.Sprintf("%t", *cfg.Analytics))
 	}
-	if cfg.ConfigDir != nil {
-		table.Append("config_dir", *cfg.ConfigDir)
+	if cfg.APIURL != nil {
+		table.Append("api_url", *cfg.APIURL)
+	}
+	if cfg.Color != nil {
+		table.Append("color", fmt.Sprintf("%t", *cfg.Color))
 	}
 	if cfg.ConsoleURL != nil {
 		table.Append("console_url", *cfg.ConsoleURL)
@@ -84,9 +82,6 @@ func outputTable(w io.Writer, cfg *config.ConfigOutput) error {
 	}
 	if cfg.MCPMaxRows != nil {
 		table.Append("mcp_max_rows", fmt.Sprintf("%d", *cfg.MCPMaxRows))
-	}
-	if cfg.Color != nil {
-		table.Append("color", fmt.Sprintf("%t", *cfg.Color))
 	}
 	if cfg.Output != nil {
 		table.Append("output", *cfg.Output)

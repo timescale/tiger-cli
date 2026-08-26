@@ -12,12 +12,6 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// getPasswordServiceName returns the service name for password storage
-// Uses the same service name as auth for consistency
-func getPasswordServiceName() string {
-	return config.GetServiceName()
-}
-
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords
 func buildPasswordKeyringUsername(service api.Service, role string) (string, error) {
 	if service.ServiceID == "" {
@@ -70,7 +64,7 @@ func (k *KeyringStorage) Save(service api.Service, password string, role string)
 		return err
 	}
 
-	return keyring.Set(getPasswordServiceName(), username, password)
+	return keyring.Set(config.KeyringServiceName, username, password)
 }
 
 func (k *KeyringStorage) Get(service api.Service, role string) (string, error) {
@@ -79,7 +73,7 @@ func (k *KeyringStorage) Get(service api.Service, role string) (string, error) {
 		return "", err
 	}
 
-	return keyring.Get(getPasswordServiceName(), username)
+	return keyring.Get(config.KeyringServiceName, username)
 }
 
 func (k *KeyringStorage) Remove(service api.Service, role string) error {
@@ -88,7 +82,7 @@ func (k *KeyringStorage) Remove(service api.Service, role string) error {
 		return err
 	}
 
-	return keyring.Delete(getPasswordServiceName(), username)
+	return keyring.Delete(config.KeyringServiceName, username)
 }
 
 func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordStorageResult {

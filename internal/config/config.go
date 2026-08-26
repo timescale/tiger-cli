@@ -91,10 +91,9 @@ type Config struct {
 // ConfigOutput is the shape `tiger config show` renders. Every field is a
 // pointer so unset values can be omitted when defaults are suppressed.
 type ConfigOutput struct {
-	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
 	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty"`
+	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
 	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
-	ConfigDir       *string `mapstructure:"-" json:"config_dir,omitempty"`
 	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
 	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
 	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
@@ -142,7 +141,7 @@ func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutp
 	}
 	migrateVersionCheck(v)
 
-	cfg := &ConfigOutput{ConfigDir: &configDir}
+	cfg := &ConfigOutput{}
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}

@@ -2,12 +2,12 @@ package common
 
 import (
 	"fmt"
+	"github.com/zalando/go-keyring"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func TestBuildConnectionString_Basic(t *testing.T) {
@@ -206,8 +206,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_KeyringStorage(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
+	// Give the test a fresh, empty in-memory keyring
+	keyring.MockInit()
 
 	cfg := testConfig("keyring")
 
@@ -367,8 +367,8 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
+	// Give the test a fresh, empty in-memory keyring
+	keyring.MockInit()
 
 	cfg := testConfig("keyring")
 
@@ -406,7 +406,7 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 }
 
 func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	cfg := testConfig("keyring")
 
@@ -450,8 +450,8 @@ func TestBuildConnectionString_ReadOnly_WithPassword(t *testing.T) {
 }
 
 func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
+	// Give the test a fresh, empty in-memory keyring
+	keyring.MockInit()
 
 	cfg := testConfig("keyring")
 

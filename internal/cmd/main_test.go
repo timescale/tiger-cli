@@ -59,8 +59,11 @@ func stubReadPassword(t *testing.T, password string) {
 }
 
 func TestMain(m *testing.M) {
-	// Replace the system keyring with an in-memory mock so that tests never
-	// read, write, or delete real credentials or passwords.
+	// Backstop: replace the system keyring with an in-memory mock so that even
+	// a test that forgets to reset can never read, write, or delete real
+	// credentials or passwords. Per-test isolation comes from the fresh
+	// keyring.MockInit() in runCommand and in tests that use the keyring
+	// directly.
 	keyring.MockInit()
 
 	// Scrub inherited TIGER_* env vars (e.g. from the developer's shell or a
@@ -90,17 +93,23 @@ type cmdResult struct {
 type runOption func(*runConfig)
 
 type runConfig struct {
-	stdin        io.Reader
-	isTerminal   *bool // if set, overrides util.IsTerminal for this test
-	ctx          context.Context
+	// Execution environment
+	ctx   context.Context
+	setup []func(t *testing.T) // t-scoped setup hooks, run before the command tree is built (see withSetup)
+
+	// Seeded state: environment, config file, and stored credentials
 	envVars      map[string]string
-	configDir    string         // if set, reused instead of a fresh t.TempDir()
-	configValues map[string]any // merged across withConfig calls; written to the config file before the command runs
-	credentials  *config.Credentials
-	clientErr    error              // if set, the client factory returns this error (nil client)
-	openBrowser  func(string) error // if set, overrides the openBrowser stub for this test
+	configValues map[string]any      // merged across withConfig calls; written to the config file before the command runs
+	credentials  *config.Credentials // if set, stored (in the mocked keyring) before the command runs
+
+	// API client injection
+	clientErr error // if set, the client factory returns this error (nil client)
+
+	// Terminal interaction
+	stdin        io.Reader
+	isTerminal   *bool              // if set, overrides util.IsTerminal for this test
 	readPassword *string            // if set, util.ReadPassword returns this value
-	setup        []func(t *testing.T)
+	openBrowser  func(string) error // if set, overrides the openBrowser stub for this test
 }
 
 func withStdin(input string) runOption {
@@ -133,21 +142,9 @@ func withEnv(key, value string) runOption {
 	}
 }
 
-// withConfigDir reuses an existing config directory instead of a fresh
-// t.TempDir(). Use it to chain commands that must observe each other's writes
-// (e.g. `config set` followed by `config show`), passing the configDir from a
-// previous cmdResult.
-func withConfigDir(dir string) runOption {
-	return func(rc *runConfig) {
-		rc.configDir = dir
-	}
-}
-
 // withConfig seeds the test's config file with the given keys before the
 // command runs (e.g. map[string]any{"service_id": "svc-123", "read_only": true}).
-// Repeated withConfig options merge, later values winning per key. Note the
-// file is written with ONLY the accumulated keys — combining withConfig with
-// withConfigDir overwrites whatever earlier chained commands stored there.
+// Repeated withConfig options merge, later values winning per key.
 func withConfig(values map[string]any) runOption {
 	return func(rc *runConfig) {
 		if rc.configValues == nil {
@@ -220,8 +217,8 @@ func withReadPassword(password string) runOption {
 // captured stdout, stderr, and any error from Execute.
 //
 // Not t.Parallel-safe: it stubs package-level vars (openBrowser, and via
-// options util.IsTerminal and util.ReadPassword) and the keyring service-name
-// override, and withEnv uses t.Setenv.
+// options util.IsTerminal and util.ReadPassword), resets the process-wide
+// mock keyring, and withEnv uses t.Setenv.
 func runCommand(
 	t *testing.T,
 	args []string,
@@ -238,8 +235,10 @@ func runCommand(
 		opt(rc)
 	}
 
-	// Isolate keyring entries (credentials, saved passwords) per test.
-	config.SetTestServiceName(t)
+	// Give the run a fresh, empty in-memory keyring so credentials and saved
+	// passwords never leak between tests. Tests that seed keyring entries do
+	// it via options (withStoredCredentials, withSetup), which run after this.
+	keyring.MockInit()
 
 	// Set env vars (restored when the test ends, not per runCommand call — a
 	// chained runCommand inside a check still sees them). Sorted so two
@@ -267,10 +266,7 @@ func runCommand(
 		t.Fatalf("buildRootCmd failed: %v", err)
 	}
 
-	configDir := rc.configDir
-	if configDir == "" {
-		configDir = t.TempDir()
-	}
+	configDir := t.TempDir()
 	if rc.configValues != nil {
 		if _, err := config.UseTestConfig(configDir, rc.configValues); err != nil {
 			t.Fatalf("failed to seed config file: %v", err)

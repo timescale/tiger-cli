@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/zalando/go-keyring"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ import (
 // flag > env > config-file precedence the command saw.
 func effectiveConfig(t *testing.T, configDir string, args ...string) *config.Config {
 	t.Helper()
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	root, _, err := buildRootCmd(t.Context())
 	if err != nil {

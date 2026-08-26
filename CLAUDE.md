@@ -1313,18 +1313,24 @@ follow a single table-driven pattern built on the shared harness in
   asserts `wantErr`, `wantStdout`, and `wantStderr` with **exact** matching
   (`assertOutput`, a go-cmp diff). When `wantErr` is set and `wantStderr`
   isn't, stderr is expected to be `"Error: <wantErr>\n"`. An optional `check`
-  func holds extra assertions (config file contents, stored credentials, exit
-  codes via `errors.As` on `common.ExitCodeError`).
+  func holds extra assertions via the shared helpers: `checkExitCode`,
+  `readConfigFile`, `readStoredCredentials`.
 - Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
-  file keys), `withConfigDir` (chain commands sharing one config dir),
-  `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
-  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withContext`.
+  file keys), `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
+  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withContext`,
+  `withSetup` (t-scoped stubs).
 - Mock expectations use `validCtx` for context arguments and exact request
   structs; `httpResponse(status)` and `sampleService(overrides...)` keep
   tables concise.
-- `TestMain` calls `keyring.MockInit()` (tests never touch the system
-  keyring; `internal/common` and `internal/config` do the same) and scrubs
-  inherited `TIGER_*` env vars, preserving `TIGER_*_INTEGRATION`.
+- Tests never touch the system keyring. Per-test isolation: `runCommand`
+  starts every run with a fresh, empty in-memory keyring
+  (`keyring.MockInit()`), and tests that use the keyring outside `runCommand`
+  call it themselves. As a backstop, `TestMain` also calls
+  `keyring.MockInit()` (in `internal/cmd`, `internal/common`, and
+  `internal/config`), so even a test that forgets to reset can only see
+  another test's mock entries, never the real keyring. `internal/cmd`'s
+  `TestMain` additionally scrubs inherited `TIGER_*` env vars, preserving
+  `TIGER_*_INTEGRATION`.
 - Order cases by the command's execution flow: auth errors, argument/flag
   validation, read-only gate, network/API errors, nil response body, success
   paths (text, json, yaml), then remaining flags and edge cases.

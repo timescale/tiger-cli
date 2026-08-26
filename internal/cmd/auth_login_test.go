@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/zalando/go-keyring"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -311,7 +312,7 @@ func TestAuthLoginCmd(t *testing.T) {
 // command layer (runCommand injects a mock client, so the real refreshing
 // client is never built there).
 func TestOAuthRefreshPersistsExpiry(t *testing.T) {
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	// The mock server backs the refresh_token grant (returns expires_in=3600).
 	server := startMockOAuthServer(t, nil)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"github.com/zalando/go-keyring"
 	"io"
 	"net/http"
 	"os"
@@ -395,7 +396,7 @@ func TestBuildPsqlCommand(t *testing.T) {
 	})
 
 	t.Run("keyring password becomes PGPASSWORD", func(t *testing.T) {
-		config.SetTestServiceName(t)
+		keyring.MockInit()
 		service := api.Service{ServiceID: "svc-psql", ProjectID: "proj-psql"}
 		if err := (&common.KeyringStorage{}).Save(service, "keyring-pw", "testuser"); err != nil {
 			t.Fatalf("failed to save test password: %v", err)
