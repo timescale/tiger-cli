@@ -50,46 +50,46 @@ func TestServiceCommandAliases(t *testing.T) {
 // (containment) rather than exactly, so the gate test doesn't break every time
 // an unrelated subcommand's help text changes.
 func TestServiceExperimentalGate(t *testing.T) {
-	t.Run("unregistered by default", func(t *testing.T) {
-		result := runCommand(t, []string{"service", "metrics"}, nil)
-		// Cobra only reports "unknown command" at the root level; for a
-		// non-root group it treats the unknown name as a stray argument and
-		// prints the group's help. The gate is observable as the absence of
-		// any gated entry in that help.
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		if !strings.Contains(result.stdout, "Available Commands:") {
-			t.Errorf("expected the service group help on stdout, got:\n%s", result.stdout)
-		}
-		for _, gated := range []string{"metrics", "backup"} {
-			if strings.Contains(result.stdout, gated) {
-				t.Errorf("service help must not mention %s when experimental is off, got:\n%s", gated, result.stdout)
+	// matchHelp asserts the output is a help text that mentions want and none
+	// of the gated names in absent.
+	matchHelp := func(want string, absent ...string) matcher {
+		return matchFunc(func(t *testing.T, got string) {
+			if !strings.Contains(got, want) {
+				t.Errorf("expected help output containing %q, got:\n%s", want, got)
 			}
-		}
-	})
+			for _, name := range absent {
+				if strings.Contains(got, name) {
+					t.Errorf("help must not mention %s when experimental is off, got:\n%s", name, got)
+				}
+			}
+		})
+	}
 
-	t.Run("metrics registered when experimental", func(t *testing.T) {
-		result := runCommand(t, []string{"service", "metrics", "--help"}, nil,
-			withEnv("TIGER_EXPERIMENTAL", "true"))
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		if !strings.Contains(result.stdout, "Commands for querying time-series metrics") {
-			t.Errorf("expected the metrics group help on stdout, got:\n%s", result.stdout)
-		}
-	})
+	tests := []cmdTest{
+		{
+			// Cobra only reports "unknown command" at the root level; for a
+			// non-root group it treats the unknown name as a stray argument
+			// and prints the group's help. The gate is observable as the
+			// absence of any gated entry in that help.
+			name:       "unregistered by default",
+			args:       []string{"service", "metrics"},
+			wantStdout: matchHelp("Available Commands:", "metrics", "backup"),
+		},
+		{
+			name:       "metrics registered when experimental",
+			args:       []string{"service", "metrics", "--help"},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp("Commands for querying time-series metrics"),
+		},
+		{
+			name:       "backup registered when experimental",
+			args:       []string{"service", "backup", "--help"},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp("List the full and incremental backups"),
+		},
+	}
 
-	t.Run("backup registered when experimental", func(t *testing.T) {
-		result := runCommand(t, []string{"service", "backup", "--help"}, nil,
-			withEnv("TIGER_EXPERIMENTAL", "true"))
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		if !strings.Contains(result.stdout, "List the full and incremental backups") {
-			t.Errorf("expected the backup command help on stdout, got:\n%s", result.stdout)
-		}
-	})
+	runCmdTests(t, tests)
 }
 
 // checkStoredPassword returns a check asserting the password stored in the

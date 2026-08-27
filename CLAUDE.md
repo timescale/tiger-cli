@@ -1311,14 +1311,19 @@ follow a single table-driven pattern built on the shared harness in
   `app.SetClientFactory`, runs against an isolated `t.TempDir()` config
   directory (always passing `--analytics=false --skip-update-check`), and
   returns captured, ANSI-stripped stdout/stderr plus the Execute error.
-- Test cases use the `cmdTest` struct and run through `runCmdTests`, which
-  asserts `wantErr`, `wantStdout`, and `wantStderr` with **exact** matching
-  (`assertOutput`, a go-cmp diff). When `wantErr` is set and `wantStderr`
-  isn't, stderr is expected to be `"Error: <wantErr>\n"` (not-logged-in cases
-  use the `notLoggedInMsg` const). An optional `checks` slice holds extra
-  assertions (`checkFunc`s), run in order — shared ones include
-  `checkExitCode`, `checkDefaultService`, `readConfigFile`,
-  `readStoredCredentials`.
+- Test cases use the `cmdTest` struct and run through `runCmdTests`. The
+  `wantErr`/`wantStdout`/`wantStderr` fields normally hold a plain string,
+  asserted with **exact** matching (a go-cmp diff) — that is the standard.
+  Left unset, the output fields assert the stream is empty and `wantErr`
+  asserts success; when `wantErr` is set and `wantStderr` isn't, stderr is
+  expected to be `"Error: <wantErr>\n"` (not-logged-in cases use the
+  `notLoggedInMsg` const). Only when output is inherently nondeterministic
+  (random OAuth state, OS-dependent transport/pgx error text, huge generated
+  schemas) may a field hold a matcher instead — `matchRegexp`, `matchPrefix`,
+  or `matchFunc` — with a comment saying why exact matching is impossible.
+  An optional `checks` slice holds extra assertions (`checkFunc`s), run in
+  order — shared ones include `checkExitCode`, `checkDefaultService`,
+  `readConfigFile`, `readStoredCredentials`.
 - Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
   file keys), `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
   `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withUTC`,

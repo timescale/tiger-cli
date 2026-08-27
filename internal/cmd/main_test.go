@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -54,54 +55,122 @@ func TestMain(m *testing.M) {
 const testProjectID = "test-project-123"
 
 // cmdTest is the standard test case struct for table-driven command tests.
+//
+// The want fields hold either a string, compared exactly (the standard), or a
+// matcher (matchRegexp, matchPrefix, matchFunc) for output that is inherently
+// nondeterministic — say why in a comment. Left unset, wantStdout/wantStderr
+// assert that the stream is empty, and wantErr asserts that the command
+// succeeded.
 type cmdTest struct {
 	name       string
 	args       []string
 	setup      func(m *mocks.MockClientWithResponsesInterface)
 	opts       []runOption
-	wantStdout string
-	wantStderr string
-	wantErr    string
+	wantStdout any
+	wantStderr any
+	wantErr    any
 	checks     []checkFunc // optional extra assertions, run in order after the standard ones
 }
 
 // runCmdTests runs a slice of table-driven command tests using the standard
 // assertion pattern: check wantErr, then wantStdout, then wantStderr.
 //
-// When wantErr is set and wantStderr is empty, the expected stderr is
-// automatically derived from the error message (Cobra prints "Error: <msg>\n"
-// to stderr for any error returned by RunE). Commands that set SilenceErrors
-// print differently, so their error cases must set wantStderr explicitly; a
-// case expecting an error with EMPTY stderr isn't expressible in the table —
-// use a bespoke subtest.
+// When wantErr is set and wantStderr isn't, the expected stderr is
+// automatically derived: for a string, "Error: <msg>\n" (what Cobra prints for
+// any error returned by RunE); for a matcher, the same matcher is applied to
+// stderr with that framing stripped. Commands that set SilenceErrors print
+// differently, so their error cases must set wantStderr explicitly (note an
+// explicit "" is a real assertion — nil and "" differ for these any-typed
+// fields).
 func runCmdTests(t *testing.T, tests []cmdTest) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := runCommand(t, tt.args, tt.setup, tt.opts...)
 
-			if tt.wantErr != "" {
+			if tt.wantErr != nil {
 				if result.err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				assertOutput(t, result.err.Error(), tt.wantErr)
+				assertMatch(t, "error", result.err.Error(), tt.wantErr)
 			} else if result.err != nil {
 				t.Fatalf("unexpected error: %v", result.err)
 			}
 
-			assertOutput(t, result.stdout, tt.wantStdout)
+			assertMatch(t, "stdout", result.stdout, tt.wantStdout)
 
 			wantStderr := tt.wantStderr
-			if wantStderr == "" && tt.wantErr != "" {
-				// Cobra prints "Error: <msg>\n" to stderr for RunE errors
-				wantStderr = "Error: " + tt.wantErr + "\n"
+			if wantStderr == nil && tt.wantErr != nil {
+				if msg, ok := tt.wantErr.(string); ok {
+					wantStderr = "Error: " + msg + "\n"
+				} else {
+					// A matcher can't be framed, so unframe stderr instead.
+					got := strings.TrimSuffix(strings.TrimPrefix(result.stderr, "Error: "), "\n")
+					assertMatch(t, "stderr", got, tt.wantErr)
+					wantStderr = matchFunc(func(*testing.T, string) {}) // already asserted
+				}
 			}
-			assertOutput(t, result.stderr, wantStderr)
+			assertMatch(t, "stderr", result.stderr, wantStderr)
 
 			for _, check := range tt.checks {
 				check(t, result)
 			}
 		})
+	}
+}
+
+// assertMatch asserts got against want: nil expects empty, a string is
+// compared exactly (the standard), and a matcher applies its own assertion.
+func assertMatch(t *testing.T, name, got string, want any) {
+	t.Helper()
+	switch want := want.(type) {
+	case nil:
+		if got != "" {
+			t.Errorf("%s = %q, want empty", name, got)
+		}
+	case string:
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s mismatch (-want +got):\n%s", name, diff)
+		}
+	case matcher:
+		want(t, name, got)
+	default:
+		t.Fatalf("%s: unsupported want type %T", name, want)
+	}
+}
+
+// matcher is a non-exact assertion for a cmdTest want field. Use the
+// constructors below; exact string matching remains the standard.
+type matcher func(t *testing.T, name, got string)
+
+// matchRegexp asserts that the value matches the anchored pattern.
+func matchRegexp(pattern string) matcher {
+	re := regexp.MustCompile("^(?:" + pattern + ")$")
+	return func(t *testing.T, name, got string) {
+		t.Helper()
+		if !re.MatchString(got) {
+			t.Errorf("%s = %q, want match for %q", name, got, pattern)
+		}
+	}
+}
+
+// matchPrefix asserts that the value starts with prefix (for output whose tail
+// is environment-dependent).
+func matchPrefix(prefix string) matcher {
+	return func(t *testing.T, name, got string) {
+		t.Helper()
+		if !strings.HasPrefix(got, prefix) {
+			t.Errorf("%s = %q, want prefix %q", name, got, prefix)
+		}
+	}
+}
+
+// matchFunc adapts an arbitrary assertion into a matcher, for output that
+// needs bespoke verification (e.g. parse-and-inspect).
+func matchFunc(f func(t *testing.T, got string)) matcher {
+	return func(t *testing.T, _, got string) {
+		t.Helper()
+		f(t, got)
 	}
 }
 

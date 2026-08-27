@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/common"
@@ -129,27 +128,21 @@ version: %s
 			wantStdout: renderTable(baseInfo),
 			wantStderr: "Warning: failed to check for updates: unexpected status code: 404\n",
 		},
+		{
+			// The exit is a bare ExitCodeError (empty message), and the update
+			// warning ends with the installation-specific upgrade command,
+			// hence the prefix match.
+			name: "check with update available",
+			args: []string{"version", "--check", "-o", "bare"},
+			opts: []runOption{
+				withCLIVersion("0.1.0"),
+				withConfig(map[string]any{"releases_url": upToDateServer.URL}),
+			},
+			wantStdout: "0.1.0\n",
+			wantErr:    "",
+			wantStderr: matchPrefix("\n\nA new release of tiger-cli is available: 0.1.0 → 99.99.99\nTo upgrade: "),
+			checks:     []checkFunc{checkExitCode(common.ExitUpdateAvailable)},
+		},
 	}
 	runCmdTests(t, tests)
-
-	// The update warning names the installation-specific upgrade command, and
-	// the exit is a bare ExitCodeError (empty message), so this case is
-	// asserted inline instead of through the table.
-	t.Run("check with update available", func(t *testing.T) {
-		server := startMockReleasesServer(t, "v99.99.99")
-
-		result := runCommand(t, []string{"version", "--check", "-o", "bare"}, nil,
-			withCLIVersion("0.1.0"),
-			withConfig(map[string]any{"releases_url": server.URL}),
-		)
-
-		assertOutput(t, result.stdout, "0.1.0\n")
-
-		wantPrefix := "\n\nA new release of tiger-cli is available: 0.1.0 → 99.99.99\nTo upgrade: "
-		if !strings.HasPrefix(result.stderr, wantPrefix) {
-			t.Errorf("stderr = %q, want prefix %q", result.stderr, wantPrefix)
-		}
-
-		checkExitCode(common.ExitUpdateAvailable)(t, result)
-	})
 }

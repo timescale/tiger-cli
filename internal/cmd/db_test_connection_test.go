@@ -104,37 +104,46 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			wantErr: "timeout must be positive or zero, got -5s",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
-	}
-
-	runCmdTests(t, tests)
-
-	// Actual connection attempts produce environment-dependent pgx error text,
-	// so these assert the exit code and stderr shape instead of exact output.
-	t.Run("unreachable server", func(t *testing.T) {
-		result := runCommand(t, []string{"db", "test-connection", "svc-12345"},
-			func(m *mocks.MockClientWithResponsesInterface) {
+		{
+			// The dial is refused instantly; pgx's error text is
+			// environment-dependent, hence the non-exact matches.
+			name: "unreachable server",
+			args: []string{"db", "test-connection", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
-			})
-		checkExitCode(2)(t, result)
-		if !strings.HasPrefix(result.stderr, "Connection failed: ") {
-			t.Errorf("expected stderr to start with %q, got %q", "Connection failed: ", result.stderr)
-		}
-	})
-
-	t.Run("connection timeout", func(t *testing.T) {
-		// 192.0.2.0/24 (TEST-NET-1) is non-routable, so the dial hangs until
-		// the --timeout deadline fires.
-		result := runCommand(t, []string{"db", "test-connection", "svc-12345", "--timeout", "250ms"},
-			func(m *mocks.MockClientWithResponsesInterface) {
+			},
+			wantErr: matchFunc(func(t *testing.T, got string) {
+				if !strings.Contains(got, "127.0.0.1") {
+					t.Errorf("error = %q, want it to name the unreachable host", got)
+				}
+			}),
+			wantStderr: matchPrefix("Connection failed: "),
+			checks:     []checkFunc{checkExitCode(2)},
+		},
+		{
+			// 192.0.2.0/24 (TEST-NET-1) is non-routable, so the dial hangs
+			// until the --timeout deadline fires; pgx's error text is
+			// environment-dependent.
+			name: "connection timeout",
+			args: []string{"db", "test-connection", "svc-12345", "--timeout", "250ms"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
 				}))
-			})
-		checkExitCode(common.ExitTimeout)(t, result)
-		assertOutput(t, result.stderr, "Connection timeout after 250ms\n")
-	})
+			},
+			wantErr: matchFunc(func(t *testing.T, got string) {
+				if !strings.Contains(got, "192.0.2.1") {
+					t.Errorf("error = %q, want it to name the unreachable host", got)
+				}
+			}),
+			wantStderr: "Connection timeout after 250ms\n",
+			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
+		},
+	}
+
+	runCmdTests(t, tests)
 }
 
 // TestIsConnectionRejected stays at helper level: a real 57P03 rejection needs

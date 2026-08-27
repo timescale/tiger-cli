@@ -73,13 +73,13 @@ func TestMCPListCmd(t *testing.T) {
 └──────┴───────────────────────────┘
 `
 
-	// checkCapabilities parses structured (JSON/YAML) output and verifies the
+	// matchCapabilities parses structured (JSON/YAML) output and verifies the
 	// capability structure and the exact set of listed tools. Full schemas are
 	// too large to exact-match; the text cases pin the capability list.
-	checkCapabilities := func(unmarshal func([]byte, any) error) func(t *testing.T, result cmdResult) {
-		return func(t *testing.T, result cmdResult) {
+	matchCapabilities := func(unmarshal func([]byte, any) error) matcher {
+		return matchFunc(func(t *testing.T, got string) {
 			var capabilities map[string]any
-			if err := unmarshal([]byte(result.stdout), &capabilities); err != nil {
+			if err := unmarshal([]byte(got), &capabilities); err != nil {
 				t.Fatalf("failed to parse output: %v", err)
 			}
 
@@ -112,7 +112,7 @@ func TestMCPListCmd(t *testing.T) {
 			if !slices.Equal(names, defaultTools) {
 				t.Errorf("tool names mismatch:\ngot:  %v\nwant: %v", names, defaultTools)
 			}
-		}
+		})
 	}
 
 	tests := []cmdTest{
@@ -135,16 +135,16 @@ func TestMCPListCmd(t *testing.T) {
 			wantStdout: wantText,
 		},
 		{
-			name:   "json output",
-			args:   []string{"mcp", "list", "-o", "json"},
-			opts:   noDocsProxy(nil),
-			checks: []checkFunc{checkCapabilities(json.Unmarshal)},
+			name:       "json output",
+			args:       []string{"mcp", "list", "-o", "json"},
+			opts:       noDocsProxy(nil),
+			wantStdout: matchCapabilities(json.Unmarshal),
 		},
 		{
-			name:   "yaml output",
-			args:   []string{"mcp", "list", "-o", "yaml"},
-			opts:   noDocsProxy(nil),
-			checks: []checkFunc{checkCapabilities(yaml.Unmarshal)},
+			name:       "yaml output",
+			args:       []string{"mcp", "list", "-o", "yaml"},
+			opts:       noDocsProxy(nil),
+			wantStdout: matchCapabilities(yaml.Unmarshal),
 		},
 		{
 			name:       "read-only mode skips write tools",
@@ -161,37 +161,5 @@ func TestMCPListCmd(t *testing.T) {
 		},
 	}
 
-	// Not runCmdTests: the JSON/YAML cases assert via check instead of exact
-	// stdout (full tool schemas are 500+ lines), so an empty wantStdout must
-	// mean "non-empty, checked separately" rather than "empty".
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := runCommand(t, tt.args, tt.setup, tt.opts...)
-
-			if tt.wantErr != "" {
-				if result.err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				assertOutput(t, result.err.Error(), tt.wantErr)
-			} else if result.err != nil {
-				t.Fatalf("unexpected error: %v", result.err)
-			}
-
-			if tt.wantStdout != "" {
-				assertOutput(t, result.stdout, tt.wantStdout)
-			} else if tt.wantErr == "" && result.stdout == "" {
-				t.Error("expected non-empty stdout")
-			}
-
-			wantStderr := tt.wantStderr
-			if wantStderr == "" && tt.wantErr != "" {
-				wantStderr = "Error: " + tt.wantErr + "\n"
-			}
-			assertOutput(t, result.stderr, wantStderr)
-
-			for _, check := range tt.checks {
-				check(t, result)
-			}
-		})
-	}
+	runCmdTests(t, tests)
 }

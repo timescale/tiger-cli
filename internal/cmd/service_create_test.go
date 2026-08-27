@@ -433,15 +433,12 @@ PGUSER=tsdbadmin
 				}
 			}},
 		},
-	}
-
-	runCmdTests(t, tests)
-
-	// The auto-generated name is random, so its assertions are inline instead
-	// of exact-matched in the table.
-	t.Run("auto-generated name", func(t *testing.T) {
-		result := runCommand(t, []string{"service", "create", "--no-wait", "--no-set-default", "-o", "env"},
-			func(m *mocks.MockClientWithResponsesInterface) {
+		{
+			// The generated name is random, so the request is matched on its
+			// "db-" prefix and stderr on the auto-generated-name notice.
+			name: "auto-generated name",
+			args: []string{"service", "create", "--no-wait", "--no-set-default", "-o", "env"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, gomock.Cond(func(x any) bool {
 					req, ok := x.(api.CreateServiceJSONRequestBody)
 					return ok && strings.HasPrefix(req.Name, "db-")
@@ -449,14 +446,21 @@ PGUSER=tsdbadmin
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &svc,
 				}, nil)
-			})
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		if !strings.Contains(result.stderr, "(auto-generated name)...") {
-			t.Errorf("expected stderr to mention the auto-generated name, got: %s", result.stderr)
-		}
-	})
+			},
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+PGPORT=5432
+PGDATABASE=tsdb
+PGUSER=tsdbadmin
+`,
+			wantStderr: matchFunc(func(t *testing.T, got string) {
+				if !strings.Contains(got, "(auto-generated name)...") {
+					t.Errorf("expected stderr to mention the auto-generated name, got: %s", got)
+				}
+			}),
+		},
+	}
+
+	runCmdTests(t, tests)
 }
 
 // sampleServiceCreateTable is the table rendering of sampleService() as

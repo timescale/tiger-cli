@@ -45,39 +45,40 @@ func effectiveConfig(t *testing.T, configDir string, args ...string) *config.Con
 }
 
 func TestRootCmd(t *testing.T) {
-	// The context passed to buildRootCmd must reach the command that runs, so
-	// handlers can rely on cmd.Context() for cancellation. Observed through
-	// `version --check`: its HTTP fetch runs under cmd.Context(), so an
-	// already-cancelled context fails the check (and only the check).
-	t.Run("context reaches command", func(t *testing.T) {
-		server := httptest.NewServer(http.NotFoundHandler())
-		t.Cleanup(server.Close)
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
 
-		result := runCommand(t, []string{"version", "--check", "-o", "bare"}, nil,
-			withContext(ctx),
-			withConfig(map[string]any{"releases_url": server.URL}),
-		)
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, config.Version+"\n")
-		assertOutput(t, result.stderr, fmt.Sprintf(
-			"Warning: failed to check for updates: failed to fetch latest version: Get %q: context canceled\n",
-			server.URL+"/latest.txt"))
-	})
-
-	// Command names and flags match case-insensitively (cobra.EnableCaseInsensitive
-	// and the flag normalization func, both configured in buildRootCmd).
-	t.Run("case-insensitive commands and flags", func(t *testing.T) {
-		result := runCommand(t, []string{"VERSION", "--Output", "bare"}, nil)
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, config.Version+"\n")
-	})
+	tests := []cmdTest{
+		{
+			// The context passed to buildRootCmd must reach the command that
+			// runs, so handlers can rely on cmd.Context() for cancellation.
+			// Observed through `version --check`: its HTTP fetch runs under
+			// cmd.Context(), so an already-cancelled context fails the check
+			// (and only the check).
+			name: "context reaches command",
+			args: []string{"version", "--check", "-o", "bare"},
+			opts: []runOption{
+				withContext(cancelledCtx),
+				withConfig(map[string]any{"releases_url": server.URL}),
+			},
+			wantStdout: config.Version + "\n",
+			wantStderr: fmt.Sprintf(
+				"Warning: failed to check for updates: failed to fetch latest version: Get %q: context canceled\n",
+				server.URL+"/latest.txt"),
+		},
+		{
+			// Command names and flags match case-insensitively
+			// (cobra.EnableCaseInsensitive and the flag normalization func,
+			// both configured in buildRootCmd).
+			name:       "case-insensitive commands and flags",
+			args:       []string{"VERSION", "--Output", "bare"},
+			wantStdout: config.Version + "\n",
+		},
+	}
+	runCmdTests(t, tests)
 
 	t.Run("config precedence", func(t *testing.T) {
 		tests := []struct {

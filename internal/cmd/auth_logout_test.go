@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +25,10 @@ func TestAuthLogoutCmd(t *testing.T) {
 	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
+
+	// Backs the refresh_token grant for the deferred-analytics case; everything
+	// else 404s, which is fine — the refresh happens before each request.
+	oauthServer := startMockOAuthServer(t, nil)
 
 	oauthToken := &oauth2.Token{
 		AccessToken:  "test-access-token",
@@ -74,65 +77,57 @@ func TestAuthLogoutCmd(t *testing.T) {
 				}
 			}},
 		},
+		{
+			// Server-side revocation failures are non-fatal: warn on stderr,
+			// still remove the local credentials and succeed. The transport
+			// error's wording varies by OS, hence the prefix match.
+			name: "warns when server-side revocation fails",
+			args: []string{"auth", "logout"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": "http://127.0.0.1:1"}),
+				withStoredCredentials(config.Credentials{
+					OAuth:     oauthToken,
+					ProjectID: "test-project-123",
+				}),
+			},
+			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStderr: matchPrefix("warning: server-side logout failed: "),
+			checks:     []checkFunc{checkNoStoredCredentials},
+		},
+		{
+			// Guards an edge case in the App's cached client: for an OAuth
+			// session that client persists refreshed tokens back to storage,
+			// and the analytics event deferred by wrapCommands runs *after*
+			// logout removed the credentials. If that event triggers a token
+			// refresh, a persisting client would write the credentials straight
+			// back — logout must hand the App a non-persisting one. The stored
+			// token is expired with a refresh token the mock OAuth server still
+			// honors: the state where a logout triggers a refresh. The deferred
+			// analytics event has to actually be sent for this to be a real
+			// test, so --analytics=true (overriding the harness default) and
+			// the global opt-outs are neutralized.
+			name: "OAuth credentials stay removed after deferred analytics",
+			args: []string{"auth", "logout", "--analytics=true"},
+			opts: []runOption{
+				withConfig(map[string]any{
+					"gateway_url": oauthServer.URL,
+					"api_url":     oauthServer.URL,
+				}),
+				withStoredCredentials(config.Credentials{
+					OAuth: &oauth2.Token{
+						AccessToken:  "stale-access-token",
+						RefreshToken: "mock-refresh-token-67890",
+						Expiry:       time.Now().Add(-time.Hour),
+					},
+					ProjectID: "project-789",
+				}),
+				withEnv("DO_NOT_TRACK", ""),
+				withEnv("NO_TELEMETRY", ""),
+				withEnv("DISABLE_TELEMETRY", ""),
+			},
+			wantStdout: "Successfully logged out and removed stored credentials\n",
+			checks:     []checkFunc{checkNoStoredCredentials},
+		},
 	}
 	runCmdTests(t, tests)
-
-	// Server-side revocation failures are non-fatal: warn on stderr, still
-	// remove the local credentials and succeed. The transport error's wording
-	// varies by OS, so this asserts a stderr prefix instead of using the table.
-	t.Run("warns when server-side revocation fails", func(t *testing.T) {
-		result := runCommand(t, []string{"auth", "logout"}, nil,
-			withConfig(map[string]any{"api_url": "http://127.0.0.1:1"}),
-			withStoredCredentials(config.Credentials{
-				OAuth:     oauthToken,
-				ProjectID: "test-project-123",
-			}))
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "Successfully logged out and removed stored credentials\n")
-		const wantPrefix = "warning: server-side logout failed: "
-		if !strings.HasPrefix(result.stderr, wantPrefix) {
-			t.Errorf("stderr = %q, want prefix %q", result.stderr, wantPrefix)
-		}
-		checkNoStoredCredentials(t, result)
-	})
-
-	// Guards an edge case in the App's cached client: for an OAuth session that
-	// client persists refreshed tokens back to storage, and the analytics event
-	// deferred by wrapCommands runs *after* logout removed the credentials. If
-	// that event triggers a token refresh, a persisting client would write the
-	// credentials straight back — logout must hand the App a non-persisting one.
-	t.Run("OAuth credentials stay removed after deferred analytics", func(t *testing.T) {
-		// The mock backs the refresh_token grant; everything else 404s, which
-		// is fine — the refresh happens before each request is issued.
-		oauthServer := startMockOAuthServer(t, nil)
-
-		// An expired access token with a refresh token the mock still honors:
-		// the state where a logout triggers a refresh. The deferred analytics
-		// event has to actually be sent for this to be a real test, so enable
-		// analytics and neutralize the global opt-outs.
-		expired := &oauth2.Token{
-			AccessToken:  "stale-access-token",
-			RefreshToken: "mock-refresh-token-67890",
-			Expiry:       time.Now().Add(-time.Hour),
-		}
-		result := runCommand(t, []string{"auth", "logout", "--analytics=true"}, nil,
-			withConfig(map[string]any{
-				"gateway_url": oauthServer.URL,
-				"api_url":     oauthServer.URL,
-			}),
-			withStoredCredentials(config.Credentials{OAuth: expired, ProjectID: "project-789"}),
-			withEnv("DO_NOT_TRACK", ""),
-			withEnv("NO_TELEMETRY", ""),
-			withEnv("DISABLE_TELEMETRY", ""))
-
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "Successfully logged out and removed stored credentials\n")
-		if creds, err := readStoredCredentials(t, result.configDir); err == nil {
-			t.Fatalf("credentials were resurrected after logout: %+v", creds)
-		}
-	})
 }

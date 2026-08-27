@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/zalando/go-keyring"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -26,6 +26,28 @@ func TestAuthLoginCmd(t *testing.T) {
 	// "test-project-id".
 	authInfoServer := startMockAuthInfoServer(t)
 	patURLs := map[string]any{"api_url": authInfoServer.URL}
+
+	// OAuth flow cases. The flow's stderr embeds a random state and callback
+	// port, so it is matched with matchOAuthStderr rather than exactly.
+	singleProject := startMockOAuthServer(t, []api.Project{
+		{ID: "project-123", Name: "Test Project"},
+	})
+	multiProject := startMockOAuthServer(t, []api.Project{
+		{ID: "project-123", Name: "Test Project 1"},
+		{ID: "project-456", Name: "Test Project 2"},
+		{ID: "project-789", Name: "Test Project 3"},
+	})
+	noProjects := startMockOAuthServer(t, []api.Project{})
+	oauthOpts := func(serverURL string, extra ...runOption) []runOption {
+		return append([]runOption{
+			withConfig(oauthURLs(serverURL)),
+			withOpenBrowser(mockOpenBrowser(t)),
+		}, extra...)
+	}
+
+	multiNoTTYErr := "failed to select project: TTY not detected - cannot select between 3 projects. Log in with API keys instead (--public-key, --secret-key)"
+	noAccessErr := "failed to select project: no access to the requested project"
+	noProjectsErr := "failed to select project: user has no accessible projects"
 
 	tests := []cmdTest{
 		{
@@ -97,9 +119,11 @@ func TestAuthLoginCmd(t *testing.T) {
 			// An API key carries its own project, so a different --project-id is
 			// an error rather than a switch.
 			name: "project-id flag mismatching API key project",
-			args: []string{"auth", "login",
+			args: []string{
+				"auth", "login",
 				"--public-key", "test-public-key", "--secret-key", "test-secret-key",
-				"--project-id", "some-other-project"},
+				"--project-id", "some-other-project",
+			},
 			opts:       []runOption{withConfig(patURLs)},
 			wantErr:    "API key is scoped to a different project than the one requested with --project-id",
 			wantStderr: "Validating API key...\nError: API key is scoped to a different project than the one requested with --project-id\n",
@@ -110,9 +134,11 @@ func TestAuthLoginCmd(t *testing.T) {
 		},
 		{
 			name: "project-id flag matching API key project",
-			args: []string{"auth", "login",
+			args: []string{
+				"auth", "login",
 				"--public-key", "test-public-key", "--secret-key", "test-secret-key",
-				"--project-id", "test-project-id"},
+				"--project-id", "test-project-id",
+			},
 			opts:       []runOption{withConfig(patURLs)},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "Validating API key...\n",
@@ -130,180 +156,103 @@ func TestAuthLoginCmd(t *testing.T) {
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id")},
 		},
+		{
+			name:       "oauth single project",
+			args:       []string{"auth", "login"},
+			opts:       oauthOpts(singleProject.URL),
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(singleProject.URL, ""),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// The picker only runs on a TTY.
+			name:       "oauth multiple projects with interactive selection",
+			args:       []string{"auth", "login"},
+			opts:       oauthOpts(multiProject.URL, withIsTerminal(true), withSelectProject(2)),
+			wantStdout: "Successfully logged in (project: project-789)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(multiProject.URL, ""),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-789")},
+		},
+		{
+			name:       "oauth multiple projects without TTY",
+			args:       []string{"auth", "login"},
+			opts:       oauthOpts(multiProject.URL),
+			wantErr:    multiNoTTYErr,
+			wantStderr: matchOAuthStderr(multiProject.URL, regexp.QuoteMeta("Error: "+multiNoTTYErr+"\n")),
+			checks:     []checkFunc{checkNoStoredCredentials},
+		},
+		{
+			// No TTY and no picker stub: --project-id skips the interactive
+			// selection entirely.
+			name:       "oauth project-id flag skips selection",
+			args:       []string{"auth", "login", "--project-id", "project-456"},
+			opts:       oauthOpts(multiProject.URL),
+			wantStdout: "Successfully logged in (project: project-456)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(multiProject.URL, ""),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-456")},
+		},
+		{
+			// The requested ID is echoed on stderr, not in the error, and the
+			// exit code must survive the "failed to select project" wrap.
+			name:    "oauth project-id flag without access",
+			args:    []string{"auth", "login", "--project-id", "project-999"},
+			opts:    oauthOpts(singleProject.URL),
+			wantErr: noAccessErr,
+			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
+				"Project project-999 is not among your accessible projects\nError: "+noAccessErr+"\n")),
+			checks: []checkFunc{
+				checkExitCode(common.ExitInvalidParameters),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			name:       "oauth no accessible projects",
+			args:       []string{"auth", "login"},
+			opts:       oauthOpts(noProjects.URL),
+			wantErr:    noProjectsErr,
+			wantStderr: matchOAuthStderr(noProjects.URL, regexp.QuoteMeta("Error: "+noProjectsErr+"\n")),
+			checks:     []checkFunc{checkNoStoredCredentials},
+		},
+		{
+			// This case and the two below cover finishLogin's default-service
+			// handling: it clears the default service unless the login landed
+			// on the same project it was set under, since a service belongs to
+			// its project.
+			name: "login on different project clears default service",
+			args: []string{"auth", "login"},
+			opts: oauthOpts(singleProject.URL,
+				withConfig(map[string]any{"service_id": "svc-before"}),
+				withStoredCredentials(prevOAuthCredentials("project-old"))),
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
+				"Cleared default service (config key service_id): it belonged to the previous project\n")),
+			checks: []checkFunc{checkDefaultService("")},
+		},
+		{
+			// No stored credentials before the login, e.g. after a logout: the
+			// default service may belong to any project, so it is cleared too.
+			name: "login after logout clears default service",
+			args: []string{"auth", "login"},
+			opts: oauthOpts(singleProject.URL,
+				withConfig(map[string]any{"service_id": "svc-before"})),
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
+				"Cleared default service (config key service_id): it belonged to the previous project\n")),
+			checks: []checkFunc{checkDefaultService("")},
+		},
+		{
+			name: "login on same project keeps default service",
+			args: []string{"auth", "login"},
+			opts: oauthOpts(singleProject.URL,
+				withConfig(map[string]any{"service_id": "svc-before"}),
+				withStoredCredentials(prevOAuthCredentials("project-123"))),
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStderr: matchOAuthStderr(singleProject.URL, ""),
+			checks:     []checkFunc{checkDefaultService("svc-before")},
+		},
 	}
+
 	runCmdTests(t, tests)
-
-	// The OAuth flow's stderr embeds a random state and callback port, so these
-	// stay bespoke: exact stdout, pattern-matched stderr.
-	t.Run("oauth single project", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{
-			{ID: "project-123", Name: "Test Project"},
-		})
-
-		result := runCommand(t, []string{"auth", "login"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)))
-
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "Successfully logged in (project: project-123)\n"+nextStepsMessage)
-		assertOAuthStderr(t, result.stderr, server.URL, "")
-		assertStoredOAuthCredentials(t, result.configDir, "project-123")
-	})
-
-	t.Run("oauth multiple projects with interactive selection", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{
-			{ID: "project-123", Name: "Test Project 1"},
-			{ID: "project-456", Name: "Test Project 2"},
-			{ID: "project-789", Name: "Test Project 3"},
-		})
-		stubSelectProject(t, 2)
-
-		result := runCommand(t, []string{"auth", "login"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)),
-			withIsTerminal(true)) // the picker only runs on a TTY
-
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "Successfully logged in (project: project-789)\n"+nextStepsMessage)
-		assertOAuthStderr(t, result.stderr, server.URL, "")
-		assertStoredOAuthCredentials(t, result.configDir, "project-789")
-	})
-
-	t.Run("oauth multiple projects without TTY", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{
-			{ID: "project-123", Name: "Test Project 1"},
-			{ID: "project-456", Name: "Test Project 2"},
-			{ID: "project-789", Name: "Test Project 3"},
-		})
-
-		result := runCommand(t, []string{"auth", "login"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)))
-
-		wantErr := "failed to select project: TTY not detected - cannot select between 3 projects. Log in with API keys instead (--public-key, --secret-key)"
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		assertOutput(t, result.err.Error(), wantErr)
-		assertOAuthStderr(t, result.stderr, server.URL, regexp.QuoteMeta("Error: "+wantErr+"\n"))
-		checkNoStoredCredentials(t, result)
-	})
-
-	t.Run("oauth project-id flag skips selection", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{
-			{ID: "project-123", Name: "Test Project 1"},
-			{ID: "project-456", Name: "Test Project 2"},
-			{ID: "project-789", Name: "Test Project 3"},
-		})
-
-		// No TTY and no picker stub: --project-id skips the interactive
-		// selection entirely.
-		result := runCommand(t, []string{"auth", "login", "--project-id", "project-456"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)))
-
-		if result.err != nil {
-			t.Fatalf("unexpected error: %v", result.err)
-		}
-		assertOutput(t, result.stdout, "Successfully logged in (project: project-456)\n"+nextStepsMessage)
-		assertOAuthStderr(t, result.stderr, server.URL, "")
-		assertStoredOAuthCredentials(t, result.configDir, "project-456")
-	})
-
-	t.Run("oauth project-id flag without access", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{
-			{ID: "project-123", Name: "Test Project 1"},
-		})
-
-		result := runCommand(t, []string{"auth", "login", "--project-id", "project-999"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)))
-
-		wantErr := "failed to select project: no access to the requested project"
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		assertOutput(t, result.err.Error(), wantErr)
-		// The requested ID is echoed on stderr, not in the error, and the exit
-		// code must survive the "failed to select project" wrap.
-		assertOAuthStderr(t, result.stderr, server.URL, regexp.QuoteMeta(
-			"Project project-999 is not among your accessible projects\nError: "+wantErr+"\n"))
-		checkExitCode(common.ExitInvalidParameters)(t, result)
-		checkNoStoredCredentials(t, result)
-	})
-
-	// finishLogin clears the default service unless the login landed on the
-	// same project it was set under: a service belongs to its project.
-	t.Run("default service clearing", func(t *testing.T) {
-		testCases := []struct {
-			name          string
-			prevProjectID string // "" = no stored credentials before login (e.g. after a logout)
-			wantCleared   bool
-		}{
-			{name: "different project clears", prevProjectID: "project-old", wantCleared: true},
-			{name: "unknown previous project clears", prevProjectID: "", wantCleared: true},
-			{name: "same project keeps", prevProjectID: "project-123", wantCleared: false},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				server := startMockOAuthServer(t, []api.Project{
-					{ID: "project-123", Name: "Test Project"},
-				})
-
-				opts := []runOption{
-					withConfig(oauthURLs(server.URL)),
-					withConfig(map[string]any{"service_id": "svc-before"}),
-					withOpenBrowser(mockOpenBrowser(t)),
-				}
-				if tc.prevProjectID != "" {
-					opts = append(opts, withStoredCredentials(config.Credentials{
-						OAuth: &oauth2.Token{
-							AccessToken:  "prev-access-token",
-							RefreshToken: "prev-refresh-token",
-							Expiry:       time.Now().Add(time.Hour),
-						},
-						ProjectID: tc.prevProjectID,
-					}))
-				}
-
-				result := runCommand(t, []string{"auth", "login"}, nil, opts...)
-				if result.err != nil {
-					t.Fatalf("unexpected error: %v", result.err)
-				}
-
-				assertOutput(t, result.stdout, "Successfully logged in (project: project-123)\n"+nextStepsMessage)
-				suffix := ""
-				wantServiceID := "svc-before"
-				if tc.wantCleared {
-					suffix = regexp.QuoteMeta("Cleared default service (config key service_id): it belonged to the previous project\n")
-					wantServiceID = ""
-				}
-				assertOAuthStderr(t, result.stderr, server.URL, suffix)
-				checkDefaultService(wantServiceID)(t, result)
-			})
-		}
-	})
-
-	t.Run("oauth no accessible projects", func(t *testing.T) {
-		server := startMockOAuthServer(t, []api.Project{})
-
-		result := runCommand(t, []string{"auth", "login"}, nil,
-			withConfig(oauthURLs(server.URL)),
-			withOpenBrowser(mockOpenBrowser(t)))
-
-		wantErr := "failed to select project: user has no accessible projects"
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		assertOutput(t, result.err.Error(), wantErr)
-		assertOAuthStderr(t, result.stderr, server.URL, regexp.QuoteMeta("Error: "+wantErr+"\n"))
-		checkNoStoredCredentials(t, result)
-	})
 }
 
 // TestOAuthRefreshPersistsExpiry verifies that when an expired OAuth token is
@@ -438,37 +387,50 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 	}
 }
 
-// stubSelectProject makes the interactive project picker select the project at
+// withSelectProject makes the interactive project picker select the project at
 // the given index for the duration of the test.
-func stubSelectProject(t *testing.T, index int) {
-	t.Helper()
-	original := selectProjectInteractively
-	selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
-		return projects[index].ID, nil
-	}
-	t.Cleanup(func() { selectProjectInteractively = original })
+func withSelectProject(index int) runOption {
+	return withSetup(func(t *testing.T) {
+		original := selectProjectInteractively
+		selectProjectInteractively = func(_ *cobra.Command, projects []api.Project) (string, error) {
+			return projects[index].ID, nil
+		}
+		t.Cleanup(func() { selectProjectInteractively = original })
+	})
 }
 
-// assertOAuthStderr matches the OAuth flow's stderr: the auth URL line (which
+// prevOAuthCredentials builds a stored OAuth login for projectID, as left
+// behind by an earlier `tiger auth login`.
+func prevOAuthCredentials(projectID string) config.Credentials {
+	return config.Credentials{
+		OAuth: &oauth2.Token{
+			AccessToken:  "prev-access-token",
+			RefreshToken: "prev-refresh-token",
+			Expiry:       time.Now().Add(time.Hour),
+		},
+		ProjectID: projectID,
+	}
+}
+
+// matchOAuthStderr matches the OAuth flow's stderr: the auth URL line (which
 // embeds a random state and callback port) plus the browser-open notice,
 // followed by suffix (an already-quoted pattern, e.g. an Error line).
-func assertOAuthStderr(t *testing.T, stderr, serverURL, suffix string) {
-	t.Helper()
-	pattern := fmt.Sprintf(
-		`^Auth URL is: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s$`,
-		regexp.QuoteMeta(serverURL), config.TigerCLIClientID, suffix)
-	matched, err := regexp.MatchString(pattern, stderr)
-	if err != nil {
-		t.Fatalf("regex compilation failed: %v", err)
-	}
-	if !matched {
-		t.Errorf("stderr doesn't match expected pattern.\npattern: %s\nstderr: %q", pattern, stderr)
+func matchOAuthStderr(serverURL, suffix string) matcher {
+	return matchRegexp(fmt.Sprintf(
+		`Auth URL is: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s`,
+		regexp.QuoteMeta(serverURL), config.TigerCLIClientID, suffix))
+}
+
+// checkStoredOAuthCredentials returns a check asserting that the mock server's
+// canned OAuth token was stored for the given project.
+func checkStoredOAuthCredentials(projectID string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		checkStoredOAuthToken(t, result.configDir, projectID)
 	}
 }
 
-// assertStoredOAuthCredentials checks that the mock server's canned OAuth token
-// was stored for the given project.
-func assertStoredOAuthCredentials(t *testing.T, configDir, projectID string) {
+func checkStoredOAuthToken(t *testing.T, configDir, projectID string) {
 	t.Helper()
 	stored, err := readStoredCredentials(t, configDir)
 	if err != nil {

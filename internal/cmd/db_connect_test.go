@@ -209,32 +209,30 @@ func TestDbConnectCmd(t *testing.T) {
 			},
 			wantErr: "connection pooler not available for this service",
 		},
-	}
-
-	runCmdTests(t, tests)
-
-	// The stored-password test connection runs before psql launches. A refused
-	// connection isn't an auth error, so it must surface directly instead of
-	// opening the password recovery menu; the pgx error text is
-	// environment-dependent, so this can't be an exact-match table case.
-	t.Run("non-auth connection error surfaces directly", func(t *testing.T) {
-		result := runCommand(t, []string{"db", "connect", "svc-12345"},
-			func(m *mocks.MockClientWithResponsesInterface) {
+		{
+			// The stored-password test connection runs before psql launches. A
+			// refused connection isn't an auth error, so it must surface
+			// directly instead of opening the password recovery menu. No
+			// password is stored, so the lookup warning comes first; the pgx
+			// error text is environment-dependent, hence the non-exact matches.
+			name: "non-auth connection error surfaces directly",
+			args: []string{"db", "connect", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			},
-			withEnv("PATH", psqlDir))
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		// No password is stored, so the lookup warning comes first.
-		const wantWarning = "Warning: could not retrieve stored password: secret not found in keyring\n"
-		if !strings.HasPrefix(result.stderr, wantWarning) {
-			t.Errorf("expected stderr to start with %q, got %q", wantWarning, result.stderr)
-		}
-		assertOutput(t, result.stdout, "")
-	})
+			opts: []runOption{withEnv("PATH", psqlDir)},
+			wantErr: matchFunc(func(t *testing.T, got string) {
+				if !strings.Contains(got, "127.0.0.1") {
+					t.Errorf("error = %q, want it to name the unreachable host", got)
+				}
+			}),
+			wantStderr: matchPrefix("Warning: could not retrieve stored password: secret not found in keyring\n"),
+		},
+	}
+
+	runCmdTests(t, tests)
 }
 
 // psqlArgsLenAtDash implements ArgsLenAtDashProvider for

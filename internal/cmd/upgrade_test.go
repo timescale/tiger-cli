@@ -307,22 +307,16 @@ func TestUpgradeCmd(t *testing.T) {
 				fmt.Sprintf("Installing new binary to %s\n", downgradeBin) +
 				"tiger downgraded successfully to v1.2.3\n",
 		},
+		{
+			// Error from a network failure is non-deterministic (depends on
+			// the net stack's exact wording), hence the prefix match.
+			name:    "fails when latest version cannot be fetched",
+			args:    []string{"upgrade"},
+			opts:    []runOption{withConfig(map[string]any{"releases_url": "http://127.0.0.1:1"})},
+			wantErr: matchPrefix("failed to check for latest version: "),
+		},
 	}
 	runCmdTests(t, tests)
-
-	// Error from a network failure is non-deterministic (depends on the net
-	// stack's exact wording), so we assert only the stable wrapping prefix.
-	t.Run("fails when latest version cannot be fetched", func(t *testing.T) {
-		result := runCommand(t, []string{"upgrade"}, nil,
-			withConfig(map[string]any{"releases_url": "http://127.0.0.1:1"}))
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		const wantPrefix = "failed to check for latest version: "
-		if !strings.HasPrefix(result.err.Error(), wantPrefix) {
-			t.Errorf("unexpected error: %v (want prefix %q)", result.err, wantPrefix)
-		}
-	})
 }
 
 // TestUpgradeLiveCDNIntegration exercises the full upgrade flow end-to-end
