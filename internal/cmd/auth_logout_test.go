@@ -36,7 +36,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects positional args",
 			args:    []string{"auth", "logout", "extra"},
@@ -128,6 +128,5 @@ func TestAuthLogoutCmd(t *testing.T) {
 			wantStdout: "Successfully logged out and removed stored credentials\n",
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
-	}
-	runCmdTests(t, tests)
+	})
 }

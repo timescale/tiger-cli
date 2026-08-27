@@ -3,8 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/zalando/go-keyring"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,37 +10,32 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// effectiveConfig executes args through the real root command against the given
-// config dir, then loads the config the same way the executed command's
-// lifecycle did — from the leaf command's flag set — so it reflects the
-// flag > env > config-file precedence the command saw.
-func effectiveConfig(t *testing.T, configDir string, args ...string) *config.Config {
-	t.Helper()
-	keyring.MockInit()
-
-	root, _, err := buildRootCmd(t.Context())
-	if err != nil {
-		t.Fatalf("buildRootCmd failed: %v", err)
+// checkConfig returns a check asserting against the config the invocation
+// actually resolved (see cmdResult.cfg).
+func checkConfig(assert func(t *testing.T, cfg *config.Config)) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		if result.cfg == nil {
+			t.Fatal("command did not load a config")
+		}
+		assert(t, result.cfg)
 	}
-	root.SetOut(io.Discard)
-	root.SetErr(io.Discard)
-
-	full := append([]string{"--config-dir", configDir, "--analytics=false", "--skip-update-check"}, args...)
-	root.SetArgs(full)
-	if err := root.Execute(); err != nil {
-		t.Fatalf("command execution failed: %v", err)
-	}
-
-	leaf, _, err := root.Find(full)
-	if err != nil {
-		t.Fatalf("failed to find executed command: %v", err)
-	}
-	cfg, err := config.Load(leaf.Flags())
-	if err != nil {
-		t.Fatalf("failed to load config: %v", err)
-	}
-	return cfg
 }
+
+// checkConfigValue returns a check asserting one config field, named for the
+// message. Use it with a getter: checkConfigValue("service_id", ...).
+func checkConfigValue(key string, get func(*config.Config) string, want string) checkFunc {
+	return checkConfig(func(t *testing.T, cfg *config.Config) {
+		t.Helper()
+		if got := get(cfg); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	})
+}
+
+func serviceID(cfg *config.Config) string { return cfg.ServiceID }
+func output(cfg *config.Config) string    { return cfg.Output }
+func apiURL(cfg *config.Config) string    { return cfg.APIURL }
 
 func TestRootCmd(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
@@ -51,7 +44,7 @@ func TestRootCmd(t *testing.T) {
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			// The context passed to buildRootCmd must reach the command that
 			// runs, so handlers can rely on cmd.Context() for cancellation.
@@ -77,115 +70,80 @@ func TestRootCmd(t *testing.T) {
 			args:       []string{"VERSION", "--Output", "bare"},
 			wantStdout: config.Version + "\n",
 		},
-	}
-	runCmdTests(t, tests)
+	})
 
+	// Config precedence is flag > env > file > default. Each case runs a
+	// command and asserts against the config that invocation resolved, so it
+	// tests the precedence the command itself saw rather than a re-derivation.
+	// `version` is the command under test throughout: it needs no API calls,
+	// and it defines --output, so the flag binding for that key is live.
 	t.Run("config precedence", func(t *testing.T) {
-		tests := []struct {
-			name   string
-			config map[string]any
-			env    map[string]string
-			args   []string
-			check  func(t *testing.T, cfg *config.Config)
-		}{
+		runCmdTests(t, []cmdTest{
 			{
 				name: "flag beats env var and config file",
-				config: map[string]any{
-					"service_id": "file-service",
-					"api_url":    "https://file.api.com/v1",
-					"output":     "table",
+				args: []string{"--service-id", "flag-service", "version", "-o", "bare"},
+				opts: []runOption{
+					withConfig(map[string]any{
+						"service_id": "file-service",
+						"api_url":    "https://file.api.com/v1",
+						"output":     "table",
+					}),
+					withEnv("TIGER_SERVICE_ID", "env-service"),
+					withEnv("TIGER_OUTPUT", "json"),
 				},
-				env: map[string]string{
-					"TIGER_SERVICE_ID": "env-service",
-					"TIGER_OUTPUT":     "json",
-				},
-				args: []string{"--service-id", "flag-service", "version"},
-				check: func(t *testing.T, cfg *config.Config) {
-					if cfg.ServiceID != "flag-service" {
-						t.Errorf("service_id = %q, want %q from flag", cfg.ServiceID, "flag-service")
-					}
-					// Env var wins where no flag was given
-					if cfg.Output != "json" {
-						t.Errorf("output = %q, want %q from env var", cfg.Output, "json")
-					}
-					// Config file wins where neither a flag nor an env var was given
-					if cfg.APIURL != "https://file.api.com/v1" {
-						t.Errorf("api_url = %q, want value from config file", cfg.APIURL)
-					}
+				wantStdout: config.Version + "\n",
+				checks: []checkFunc{
+					checkConfigValue("service_id", serviceID, "flag-service"),
+					// The --output flag beats the env var, which beats the file.
+					checkConfigValue("output", output, "bare"),
+					// The file wins where neither a flag nor an env var was given.
+					checkConfigValue("api_url", apiURL, "https://file.api.com/v1"),
 				},
 			},
 			{
-				name: "env var applies when no flag is given",
-				env:  map[string]string{"TIGER_SERVICE_ID": "env-service"},
-				args: []string{"version"},
-				check: func(t *testing.T, cfg *config.Config) {
-					if cfg.ServiceID != "env-service" {
-						t.Errorf("service_id = %q, want %q from env var", cfg.ServiceID, "env-service")
-					}
-				},
+				name:       "env var beats config file",
+				args:       []string{"version"},
+				opts:       []runOption{withConfig(map[string]any{"output": "table"}), withEnv("TIGER_OUTPUT", "json")},
+				wantStdout: matchPrefix(`{`), // json, from the env var
+				checks:     []checkFunc{checkConfigValue("output", output, "json")},
 			},
 			{
-				name: "flag overrides env var",
-				env:  map[string]string{"TIGER_SERVICE_ID": "env-service"},
-				args: []string{"--service-id", "flag-service", "version"},
-				check: func(t *testing.T, cfg *config.Config) {
-					if cfg.ServiceID != "flag-service" {
-						t.Errorf("service_id = %q, want %q from flag", cfg.ServiceID, "flag-service")
-					}
-				},
+				name:       "env var applies when no flag is given",
+				args:       []string{"version", "-o", "bare"},
+				opts:       []runOption{withEnv("TIGER_SERVICE_ID", "env-service")},
+				wantStdout: config.Version + "\n",
+				checks:     []checkFunc{checkConfigValue("service_id", serviceID, "env-service")},
 			},
 			{
-				name: "config file beats default",
-				config: map[string]any{
-					"output":  "json",
-					"api_url": "https://file.api.com/v1",
-				},
-				args: []string{"version"},
-				check: func(t *testing.T, cfg *config.Config) {
-					if cfg.Output != "json" {
-						t.Errorf("output = %q, want %q from config file", cfg.Output, "json")
-					}
-					if cfg.APIURL != "https://file.api.com/v1" {
-						t.Errorf("api_url = %q, want value from config file", cfg.APIURL)
-					}
-				},
+				name:       "config file beats default",
+				args:       []string{"version", "-o", "bare"},
+				opts:       []runOption{withConfig(map[string]any{"api_url": "https://file.api.com/v1"})},
+				wantStdout: config.Version + "\n",
+				checks:     []checkFunc{checkConfigValue("api_url", apiURL, "https://file.api.com/v1")},
 			},
 			{
-				name: "defaults apply when nothing is set",
-				args: []string{"version"},
-				check: func(t *testing.T, cfg *config.Config) {
-					if cfg.Output != config.DefaultOutput {
-						t.Errorf("output = %q, want default %q", cfg.Output, config.DefaultOutput)
-					}
-					if cfg.APIURL != config.DefaultAPIURL {
-						t.Errorf("api_url = %q, want default %q", cfg.APIURL, config.DefaultAPIURL)
-					}
+				// No -o here: the point is that output falls back to its
+				// default, which passing the flag would defeat. The table
+				// itself is asserted exactly in TestVersionCmd.
+				name:       "defaults apply when nothing is set",
+				args:       []string{"version"},
+				wantStdout: matchPrefix("┌"),
+				checks: []checkFunc{
+					checkConfigValue("output", output, config.DefaultOutput),
+					checkConfigValue("api_url", apiURL, config.DefaultAPIURL),
+					checkConfigValue("service_id", serviceID, ""),
 				},
 			},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				dir := t.TempDir()
-				if tt.config != nil {
-					if _, err := config.UseTestConfig(dir, tt.config); err != nil {
-						t.Fatalf("failed to seed config file: %v", err)
-					}
-				}
-				for k, v := range tt.env {
-					t.Setenv(k, v)
-				}
-				tt.check(t, effectiveConfig(t, dir, tt.args...))
-			})
-		}
+		})
 	})
 
 	// Only the flags a command actually defines are bound, so a command without
 	// an --output flag still resolves output from the env and config file.
+	// Asserted on an unexecuted command, since the point is that binding is
+	// per-flag-set rather than global.
 	t.Run("flag binding is per command", func(t *testing.T) {
 		dir := t.TempDir()
-		if _, err := config.UseTestConfig(dir, map[string]any{"output": "yaml"}); err != nil {
-			t.Fatalf("failed to seed config file: %v", err)
-		}
+		writeConfigFile(t, dir, map[string]any{"output": "yaml"})
 		t.Setenv("TIGER_CONFIG_DIR", dir)
 
 		root, _, err := buildRootCmd(t.Context())

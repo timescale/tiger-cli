@@ -137,7 +137,12 @@ func TestMCPInstallCmd(t *testing.T) {
 	permsPath := seed("perms", `{"test": "data"}`, 0600)
 	badPath := seed("bad", `{invalid json`, 0644)
 
-	tests := []cmdTest{
+	// For "backup fails when config is unreadable": the directory is made
+	// unreadable by that case's setup hook, so the paths are just declared here.
+	lockedDir := filepath.Join(dir, "locked")
+	lockedConfigPath := filepath.Join(lockedDir, "config.json")
+
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "too many arguments",
 			args:    []string{"mcp", "install", "cursor", "windsurf"},
@@ -350,33 +355,29 @@ func TestMCPInstallCmd(t *testing.T) {
 				})
 			}},
 		},
-	}
-
-	runCmdTests(t, tests)
-
-	// Not in the table: needs a chmod-restricted directory and a root check.
-	t.Run("backup fails when config is unreadable", func(t *testing.T) {
-		if os.Geteuid() == 0 {
-			t.Skip("cannot test permission errors as root user")
-		}
-
-		lockedDir := t.TempDir()
-		configPath := filepath.Join(lockedDir, "config.json")
-		if err := os.WriteFile(configPath, []byte(`{"test": "data"}`), 0644); err != nil {
-			t.Fatalf("failed to seed config file: %v", err)
-		}
-		if err := os.Chmod(lockedDir, 0444); err != nil {
-			t.Fatalf("failed to chmod dir: %v", err)
-		}
-		t.Cleanup(func() { os.Chmod(lockedDir, 0755) })
-
-		result := runCommand(t, []string{"mcp", "install", "cursor", "--config-path", configPath}, nil)
-		if result.err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		wantErr := fmt.Sprintf("failed to create backup: failed to read original config file: open %s: permission denied", configPath)
-		assertOutput(t, result.err.Error(), wantErr)
-		assertOutput(t, result.stderr, "Error: "+wantErr+"\n")
+		{
+			// The backup read must fail, so the config sits in a directory the
+			// setup hook makes unreadable (and restores, so t.TempDir can
+			// clean up). Root ignores file permissions, hence the skip.
+			name: "backup fails when config is unreadable",
+			args: []string{"mcp", "install", "cursor", "--config-path", lockedConfigPath},
+			opts: []runOption{withSetup(func(t *testing.T) {
+				if os.Geteuid() == 0 {
+					t.Skip("cannot test permission errors as root user")
+				}
+				if err := os.MkdirAll(lockedDir, 0755); err != nil {
+					t.Fatalf("failed to create dir: %v", err)
+				}
+				if err := os.WriteFile(lockedConfigPath, []byte(`{"test": "data"}`), 0644); err != nil {
+					t.Fatalf("failed to seed config file: %v", err)
+				}
+				if err := os.Chmod(lockedDir, 0444); err != nil {
+					t.Fatalf("failed to chmod dir: %v", err)
+				}
+				t.Cleanup(func() { os.Chmod(lockedDir, 0755) })
+			})},
+			wantErr: fmt.Sprintf("failed to create backup: failed to read original config file: open %s: permission denied", lockedConfigPath),
+		},
 	})
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 func TestDbCreateRoleCmd(t *testing.T) {
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing name flag",
 			args:    []string{"db", "create", "role", "svc-12345"},
@@ -104,9 +104,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			},
 			wantErr: "failed to build connection string: service endpoint not available",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // The SQL builders below can't be exercised through the command without a live

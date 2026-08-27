@@ -8,7 +8,7 @@ import (
 
 // checkConfigFile returns a check func asserting that the persisted config
 // file contains exactly the given keys and values.
-func checkConfigFile(want map[string]any) func(t *testing.T, result cmdResult) {
+func checkConfigFile(want map[string]any) checkFunc {
 	return func(t *testing.T, result cmdResult) {
 		t.Helper()
 		got := readConfigFile(t, result.configDir)
@@ -22,14 +22,12 @@ func checkConfigFile(want map[string]any) func(t *testing.T, result cmdResult) {
 }
 
 func TestConfigCmd(t *testing.T) {
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:       "cfg alias",
 			args:       []string{"cfg", "set", "service_id", "alias-service"},
 			wantStdout: "Set service_id = alias-service\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "alias-service"})},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

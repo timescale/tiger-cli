@@ -27,7 +27,7 @@ func TestProjectListCmd(t *testing.T) {
 		{ID: testProjectID, Name: "Current Project"},
 	})
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects positional args",
 			args:    []string{"project", "list", "extra"},
@@ -152,7 +152,5 @@ func TestProjectListCmd(t *testing.T) {
 └──────────────────┴─────────────────┴─────────┘
 `,
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

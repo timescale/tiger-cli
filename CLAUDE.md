@@ -1310,7 +1310,11 @@ follow a single table-driven pattern built on the shared harness in
   (`internal/api/mocks.MockClientWithResponsesInterface`) through
   `app.SetClientFactory`, runs against an isolated `t.TempDir()` config
   directory (always passing `--analytics=false --skip-update-check`), and
-  returns captured, ANSI-stripped stdout/stderr plus the Execute error.
+  returns captured, ANSI-stripped stdout/stderr plus the Execute error. The
+  result also carries `cfg`, the config that invocation actually resolved
+  (captured from the client factory), so precedence can be asserted on what the
+  command saw rather than on a second load; it is nil when nothing loaded,
+  which is what `checkNotLoaded` asserts for help and completion.
 - Test cases use the `cmdTest` struct and run through `runCmdTests`. The
   `wantErr`/`wantStdout`/`wantStderr` fields normally hold a plain string,
   asserted with **exact** matching (a go-cmp diff) — that is the standard.
@@ -1323,13 +1327,26 @@ follow a single table-driven pattern built on the shared harness in
   or `matchFunc` — with a comment saying why exact matching is impossible.
   An optional `checks` slice holds extra assertions (`checkFunc`s), run in
   order — shared ones include `checkExitCode`, `checkDefaultService`,
-  `readConfigFile`, `readStoredCredentials`.
+  `checkNotLoaded`, `readConfigFile`, `readStoredCredentials`. Helpers that
+  build a check return `checkFunc`, not the expanded function type.
 - Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
   file keys), `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
   `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withUTC`,
   `withContext`. Options that stub or seed process-global state are built on
   `withSetup` (t-scoped hooks); plain fields on `runConfig` exist only for
   state `runCommand`'s own plumbing consumes.
+- A case that waits on a timer — anything reaching `common.WaitForService`'s
+  poll loop via `--wait` — sets `synctest: true`, which runs it inside a
+  `testing/synctest` bubble. Time there is virtual, so a one-second poll
+  interval or a thirty-second `--wait-timeout` elapses instantly and
+  deterministically; write the realistic duration rather than shrinking the
+  timeout to a few milliseconds to keep the test fast. Don't set it on a case
+  that both waits on a timer and talks to a loopback `httptest.NewServer`: a
+  bubble only advances its clock while every goroutine is durably blocked, and
+  real network I/O isn't, so such a case hangs until the test binary's own
+  timeout. (`httptest.NewTestServer`'s in-memory network is bubble-safe, but
+  only the client from its `Client` method reaches it, and `api.HTTPClient` has
+  no seam for swapping in that transport.)
 - Mock expectations use `validCtx` for context arguments and exact request
   structs; `httpResponse(status)` and `sampleService(overrides...)` keep
   tables concise.
@@ -1339,9 +1356,18 @@ follow a single table-driven pattern built on the shared harness in
   call it themselves. As a backstop, `TestMain` also calls
   `keyring.MockInit()` (in `internal/cmd`, `internal/common`, and
   `internal/config`), so even a test that forgets to reset can only see
-  another test's mock entries, never the real keyring. `internal/cmd`'s
-  `TestMain` additionally scrubs inherited `TIGER_*` env vars, preserving
-  `TIGER_*_INTEGRATION`.
+  another test's mock entries, never the real keyring.
+- Tests never read the developer's environment either. The `TestMain`s in
+  `internal/cmd`, `internal/config`, and `internal/common` scrub inherited
+  `TIGER_*` env vars (preserving `TIGER_*_INTEGRATION`), because `config.Load`
+  reads them through viper's `TIGER` prefix — without the scrub a stray
+  `TIGER_API_URL` sends tests at a real host. Tests that need an env var set
+  opt in with `withEnv`.
+- Seed a config file with `withConfig`, or `writeConfigFile(t, dir, values)`
+  outside `runCommand`; it writes only the given keys, so everything else still
+  resolves from its default. Tests elsewhere that just need a `*config.Config`
+  build one as a struct literal (`&config.Config{ConfigDir: t.TempDir(),
+  APIURL: server.URL}`) rather than going through a file.
 - Order cases by the command's execution flow: auth errors, argument/flag
   validation, read-only gate, network/API errors, nil response body, success
   paths (text, json, yaml), then remaining flags and edge cases.

@@ -21,7 +21,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 	confirmPrompt := "Are you sure you want to delete service 'svc-12345'? This operation cannot be undone.\n" +
 		"Type the service ID 'svc-12345' to confirm: "
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			// No fallback to the configured default service ID for deletes.
 			name:    "missing service id",
@@ -92,8 +92,9 @@ func TestServiceDeleteCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
-			name: "wait until deleted",
-			args: []string{"service", "delete", "svc-12345", "--confirm"},
+			name:     "wait until deleted",
+			synctest: true,
+			args:     []string{"service", "delete", "svc-12345", "--confirm"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupDelete(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -106,15 +107,15 @@ func TestServiceDeleteCmd(t *testing.T) {
 				"✅ Service 'svc-12345' has been successfully deleted.\n",
 		},
 		{
-			name: "wait timeout",
-			args: []string{"service", "delete", "svc-12345", "--confirm", "--wait-timeout", "1ms"},
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"service", "delete", "svc-12345", "--confirm"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupDelete(m)
-				// The 1ms deadline fires before the 1s poll tick, so no
-				// GetService call is expected — but allow it in case the test
-				// runs slowly; a 200 keeps the deletion wait polling. (The
-				// non-TTY spinner dedupes repeated messages, so this can't
-				// add stderr lines.)
+				// The service is never deleted (a 200 keeps the wait
+				// polling), so the wait runs to the (virtual) deadline. The
+				// non-TTY spinner dedupes repeated messages, so those polls
+				// add no stderr lines.
 				svc := sampleService()
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -122,10 +123,10 @@ func TestServiceDeleteCmd(t *testing.T) {
 						JSON200:      &svc,
 					}, nil).AnyTimes()
 			},
-			wantErr: "wait timeout reached after 1ms - service may still be deleting",
+			wantErr: "wait timeout reached after 30m0s - service may still be deleting",
 			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"❌ Error: wait timeout reached after 1ms - service may still be deleting\n",
+				"❌ Error: wait timeout reached after 30m0s - service may still be deleting\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -135,7 +136,5 @@ func TestServiceDeleteCmd(t *testing.T) {
 			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
 				"💡 Use 'tiger service list' to check deletion status.\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

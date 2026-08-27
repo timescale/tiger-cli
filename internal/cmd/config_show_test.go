@@ -1,7 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
+	"maps"
+	"slices"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/config"
 )
@@ -68,11 +74,9 @@ func TestConfigShowCmd(t *testing.T) {
 	// A second config dir, pointed at by TIGER_CONFIG_DIR in one case to prove
 	// the --config-dir flag takes precedence over the env var.
 	envDir := t.TempDir()
-	if _, err := config.UseTestConfig(envDir, map[string]any{"api_url": "https://env.api.com/v1"}); err != nil {
-		t.Fatalf("failed to seed env config dir: %v", err)
-	}
+	writeConfigFile(t, envDir, map[string]any{"api_url": "https://env.api.com/v1"})
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "unexpected argument",
 			args:    []string{"config", "show", "extra"},
@@ -289,7 +293,58 @@ version_check: true
 			args:       []string{"config", "ls"},
 			wantStdout: configShowDefaultsTable,
 		},
+	})
+}
+
+// Every config key must be visible in every `config show` format. The table is
+// rendered by a hand-written if-chain in outputTable and the other two by
+// ConfigOutput's json/yaml tags, so a newly added key can silently fail to
+// show up in one of them. The literal expectations above would still pass —
+// they only assert the keys that were there when they were written — so assert
+// the full key set against the registry instead.
+func TestConfigShowCoversEveryKey(t *testing.T) {
+	want := config.ValidConfigOptions()
+	slices.Sort(want)
+
+	assertKeys := func(t *testing.T, got []string) {
+		t.Helper()
+		slices.Sort(got)
+		if !slices.Equal(want, got) {
+			t.Errorf("`config show` keys = %v, want %v", got, want)
+		}
 	}
 
-	runCmdTests(t, tests)
+	t.Run("table", func(t *testing.T) {
+		result := runCommand(t, []string{"config", "show"}, nil)
+		var got []string
+		for line := range strings.SplitSeq(result.stdout, "\n") {
+			cells := strings.Split(line, "\u2502")
+			// A data row is "│ key │ value │": empty, key, value, empty.
+			if len(cells) != 4 {
+				continue
+			}
+			if key := strings.TrimSpace(cells[1]); key != "" && key != "PROPERTY" {
+				got = append(got, key)
+			}
+		}
+		assertKeys(t, got)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		result := runCommand(t, []string{"config", "show", "-o", "json"}, nil)
+		var values map[string]any
+		if err := json.Unmarshal([]byte(result.stdout), &values); err != nil {
+			t.Fatalf("failed to parse json output: %v", err)
+		}
+		assertKeys(t, slices.Collect(maps.Keys(values)))
+	})
+
+	t.Run("yaml", func(t *testing.T) {
+		result := runCommand(t, []string{"config", "show", "-o", "yaml"}, nil)
+		var values map[string]any
+		if err := yaml.Unmarshal([]byte(result.stdout), &values); err != nil {
+			t.Fatalf("failed to parse yaml output: %v", err)
+		}
+		assertKeys(t, slices.Collect(maps.Keys(values)))
+	})
 }

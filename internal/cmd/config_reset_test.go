@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigResetCmd(t *testing.T) {
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "unexpected argument",
 			args:    []string{"config", "reset", "extra"},
@@ -43,7 +43,5 @@ func TestConfigResetCmd(t *testing.T) {
 			wantStdout: "Configuration reset to defaults\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

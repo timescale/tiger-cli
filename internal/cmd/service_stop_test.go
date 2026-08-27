@@ -22,7 +22,7 @@ func TestServiceStopCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "stop", "svc-12345"},
@@ -103,8 +103,9 @@ func TestServiceStopCmd(t *testing.T) {
 				"✅ Service has been successfully stopped!\n",
 		},
 		{
-			name: "wait polls until paused",
-			args: []string{"service", "stop", "svc-12345"},
+			name:     "wait polls until paused",
+			synctest: true,
+			args:     []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStop(api.DeployStatusPAUSING)(m)
 				paused := sampleService(func(s *api.Service) { s.Status = api.DeployStatusPAUSED })
@@ -120,15 +121,14 @@ func TestServiceStopCmd(t *testing.T) {
 				"✅ Service has been successfully stopped!\n",
 		},
 		{
-			name: "wait timeout",
-			args: []string{"service", "stop", "svc-12345", "--wait-timeout", "1ms"},
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStop(api.DeployStatusPAUSING)(m)
-				// The 1ms deadline fires before the 1s poll tick, so no
-				// GetService call is expected — but allow it in case the test
-				// runs slowly, keeping the service unpaused either way. (The
-				// non-TTY spinner dedupes repeated messages, so this can't
-				// add stderr lines.)
+				// The service never reaches the target state, so the wait
+				// polls until the (virtual) deadline. The non-TTY spinner
+				// dedupes repeated messages, so those polls add no stderr lines.
 				pausing := sampleService(func(s *api.Service) { s.Status = api.DeployStatusPAUSING })
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -136,11 +136,11 @@ func TestServiceStopCmd(t *testing.T) {
 						JSON200:      &pausing,
 					}, nil).AnyTimes()
 			},
-			wantErr: "wait timeout reached after 1ms - service may still be stopping",
+			wantErr: "wait timeout reached after 10m0s - service may still be stopping",
 			wantStderr: "⏹️  Stop request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to stop (timeout: 1ms)...\n" +
+				"⏳ Waiting for service to stop (timeout: 10m0s)...\n" +
 				"⢎  Service status: PAUSING\n" +
-				"❌ Error: wait timeout reached after 1ms - service may still be stopping\n",
+				"❌ Error: wait timeout reached after 10m0s - service may still be stopping\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -158,7 +158,5 @@ func TestServiceStopCmd(t *testing.T) {
 			wantStderr: "⏹️  Stop request accepted for service 'svc-12345'.\n" +
 				"💡 Use 'tiger service get' to check service status.\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

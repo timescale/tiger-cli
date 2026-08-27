@@ -259,8 +259,11 @@ func (c *Config) GetConfigFile() string {
 	return GetConfigFile(c.ConfigDir)
 }
 
+// ValidConfigOptions returns every settable config key, sorted: shells present
+// completion candidates in the order they are given, so an unsorted list would
+// reshuffle on every keystroke.
 func ValidConfigOptions() []string {
-	return slices.Collect(maps.Keys(defaultValues))
+	return slices.Sorted(maps.Keys(defaultValues))
 }
 
 // ValidConfigOptionValues returns known completion values for a config key's
@@ -419,34 +422,4 @@ func parsePositiveInt(key, value string) (int, error) {
 		return 0, fmt.Errorf("%s must be at least 1, got %d", key, n)
 	}
 	return n, nil
-}
-
-// UseTestConfig writes only the specified key-value pairs to the config file in
-// the given directory and returns a Config instance loaded from it.
-// This function is intended for testing purposes only, where you need to set up
-// specific config file state without writing default values for unspecified keys.
-func UseTestConfig(configDir string, values map[string]any) (*Config, error) {
-	configFile, err := ensureConfigDir(configDir)
-	if err != nil {
-		return nil, err
-	}
-
-	v := viper.New()
-	v.SetConfigFile(configFile)
-
-	// Write only the specified key-value pairs
-	for key, value := range values {
-		v.Set(key, value)
-	}
-
-	if err := v.WriteConfigAs(configFile); err != nil {
-		return nil, fmt.Errorf("error writing config file: %w", err)
-	}
-
-	cfg := &Config{ConfigDir: configDir}
-	if err := cfg.reload(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
 }

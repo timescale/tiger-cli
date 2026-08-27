@@ -19,7 +19,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		expectGetService(m, "svc-12345", sampleService())
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "test-connection", "svc-12345"},
@@ -141,9 +141,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			wantStderr: "Connection timeout after 250ms\n",
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // TestIsConnectionRejected stays at helper level: a real 57P03 rejection needs

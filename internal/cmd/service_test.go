@@ -19,7 +19,7 @@ func TestServiceCommandAliases(t *testing.T) {
 			}, nil)
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:       "service",
 			args:       []string{"service", "list"},
@@ -38,9 +38,7 @@ func TestServiceCommandAliases(t *testing.T) {
 			setup:      emptyList,
 			wantStderr: noServicesStderr,
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // TestServiceExperimentalGate covers the registration gate for the preview
@@ -65,7 +63,7 @@ func TestServiceExperimentalGate(t *testing.T) {
 		})
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			// Cobra only reports "unknown command" at the root level; for a
 			// non-root group it treats the unknown name as a stray argument
@@ -87,9 +85,7 @@ func TestServiceExperimentalGate(t *testing.T) {
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: matchHelp("List the full and incremental backups"),
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // checkStoredPassword returns a check asserting the password stored in the

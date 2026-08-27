@@ -55,7 +55,7 @@ func TestVersionCmd(t *testing.T) {
 	brokenServer := httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(brokenServer.Close)
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects positional args",
 			args:    []string{"version", "extra"},
@@ -143,6 +143,5 @@ version: %s
 			wantStderr: matchPrefix("\n\nA new release of tiger-cli is available: 0.1.0 → 99.99.99\nTo upgrade: "),
 			checks:     []checkFunc{checkExitCode(common.ExitUpdateAvailable)},
 		},
-	}
-	runCmdTests(t, tests)
+	})
 }

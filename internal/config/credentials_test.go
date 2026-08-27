@@ -13,24 +13,9 @@ func setupCredentialTest(t *testing.T) (string, *Config) {
 	// Give the test a fresh, empty in-memory keyring
 	keyring.MockInit()
 
-	// Create temporary directory for test config
-	tmpDir, err := os.MkdirTemp("", "tiger-api-key-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	cfg, err := UseTestConfig(tmpDir, map[string]any{})
-	if err != nil {
-		t.Fatalf("Failed to use test config: %v", err)
-	}
-
-	// Clean up any existing credentials in the test directory
-	cfg.RemoveCredentials()
-
-	t.Cleanup(func() {
-		cfg.RemoveCredentials()
-		os.RemoveAll(tmpDir)
-	})
+	tmpDir := t.TempDir()
+	cfg := &Config{ConfigDir: tmpDir}
+	t.Cleanup(func() { cfg.RemoveCredentials() })
 
 	return tmpDir, cfg
 }
@@ -39,7 +24,7 @@ func TestStoreCredentialsToFile(t *testing.T) {
 	tmpDir, cfg := setupCredentialTest(t)
 
 	// Store credentials in new JSON format
-	if err := cfg.StoreCredentialsToFile("public:secret", "project123"); err != nil {
+	if err := cfg.storeCredentialsToFile("public:secret", "project123"); err != nil {
 		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 

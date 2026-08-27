@@ -41,7 +41,7 @@ PGUSER=tsdbadmin
 `
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing timing flag",
 			args:    []string{"service", "fork", "svc-12345"},
@@ -218,9 +218,7 @@ PGUSER=tsdbadmin
 			wantStdout: forkedEnv,
 			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create 'my-fork' at current state..."),
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // sampleForkedServiceTable is the table rendering of sampleService with

@@ -214,7 +214,7 @@ Output:
 
 `
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing argument",
 			args:    []string{"mcp", "get"},
@@ -282,7 +282,5 @@ Output:
 				withEnv("TIGER_EXPERIMENTAL", "true")),
 			wantStdout: metricsAvailableText,
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

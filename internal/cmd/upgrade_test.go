@@ -196,7 +196,7 @@ func TestUpgradeCmd(t *testing.T) {
 	mismatchBin := mockInstalledBinary(t)
 	wrongEntryBin := mockInstalledBinary(t)
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects invalid --version",
 			args:    []string{"upgrade", "--version", "not-a-version"},
@@ -315,8 +315,7 @@ func TestUpgradeCmd(t *testing.T) {
 			opts:    []runOption{withConfig(map[string]any{"releases_url": "http://127.0.0.1:1"})},
 			wantErr: matchPrefix("failed to check for latest version: "),
 		},
-	}
-	runCmdTests(t, tests)
+	})
 }
 
 // TestUpgradeLiveCDNIntegration exercises the full upgrade flow end-to-end

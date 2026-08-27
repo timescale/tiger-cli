@@ -32,7 +32,7 @@ func TestDbConnectCmd(t *testing.T) {
 
 	noEndpoint := func(s *api.Service) { s.Endpoint = nil }
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "connect", "svc-12345"},
@@ -230,9 +230,7 @@ func TestDbConnectCmd(t *testing.T) {
 			}),
 			wantStderr: matchPrefix("Warning: could not retrieve stored password: secret not found in keyring\n"),
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // psqlArgsLenAtDash implements ArgsLenAtDashProvider for

@@ -49,7 +49,7 @@ func TestAuthLoginCmd(t *testing.T) {
 	noAccessErr := "failed to select project: no access to the requested project"
 	noProjectsErr := "failed to select project: user has no accessible projects"
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects positional args",
 			args:    []string{"auth", "login", "extra"},
@@ -250,9 +250,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkDefaultService("svc-before")},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // TestOAuthRefreshPersistsExpiry verifies that when an expired OAuth token is
@@ -265,13 +263,7 @@ func TestOAuthRefreshPersistsExpiry(t *testing.T) {
 
 	// The mock server backs the refresh_token grant (returns expires_in=3600).
 	server := startMockOAuthServer(t, nil)
-	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
-		"gateway_url": server.URL,
-		"api_url":     server.URL,
-	})
-	if err != nil {
-		t.Fatalf("failed to seed config: %v", err)
-	}
+	cfg := &config.Config{ConfigDir: t.TempDir(), GatewayURL: server.URL, APIURL: server.URL}
 
 	// An already-expired OAuth token that still has a valid refresh token.
 	expired := &oauth2.Token{
@@ -464,7 +456,7 @@ func assertExpiresInAbout(t *testing.T, expiry time.Time) {
 
 // checkStoredAPIKey returns a check func asserting that the given PAT
 // credentials were stored.
-func checkStoredAPIKey(apiKey, projectID string) func(t *testing.T, result cmdResult) {
+func checkStoredAPIKey(apiKey, projectID string) checkFunc {
 	return func(t *testing.T, result cmdResult) {
 		t.Helper()
 		creds, err := readStoredCredentials(t, result.configDir)

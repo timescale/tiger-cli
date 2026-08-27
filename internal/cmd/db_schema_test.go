@@ -19,7 +19,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "schema", "svc-12345"},
@@ -112,7 +112,5 @@ func TestDbSchemaCmd(t *testing.T) {
 			wantErr:    "service is not ready",
 			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: service is not ready\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

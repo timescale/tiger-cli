@@ -33,7 +33,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "connection-string", "svc-12345"},
@@ -198,9 +198,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
 			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // withStoredPassword seeds a password for svc in the mock keyring before the

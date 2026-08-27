@@ -45,7 +45,7 @@ func TestServiceListCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "list"},
@@ -195,9 +195,7 @@ func TestServiceListCmd(t *testing.T) {
 			setup:      setupList(nil),
 			wantStderr: noServicesStderr,
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // serviceListJSON is the JSON rendering of the two-service list used by

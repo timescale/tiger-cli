@@ -59,7 +59,7 @@ func TestServiceLogsCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "logs", "svc-12345"},
@@ -231,7 +231,5 @@ func TestServiceLogsCmd(t *testing.T) {
 			}}),
 			wantStdout: "LOG: ready\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

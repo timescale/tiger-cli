@@ -13,7 +13,7 @@ import (
 func TestServiceResizeCmd(t *testing.T) {
 	svc := sampleService()
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
@@ -141,8 +141,9 @@ func TestServiceResizeCmd(t *testing.T) {
 `,
 		},
 		{
-			name: "wait timeout",
-			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--wait-timeout", "50ms"},
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				configuring := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusCONFIGURING
@@ -152,27 +153,25 @@ func TestServiceResizeCmd(t *testing.T) {
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &configuring,
 					}, nil)
-				// The 50ms deadline fires before the 1s poll tick, so no
-				// GetService call is expected — but allow it in case the test
-				// runs slowly, keeping the service unready either way.
+				// The service never reaches the target state, so the wait
+				// polls until the (virtual) deadline. The non-TTY spinner
+				// dedupes repeated messages, so those polls add no stderr lines.
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 						JSON200:      &configuring,
 					}, nil).AnyTimes()
 			},
-			wantErr: "wait timeout reached after 50ms - service may still be resizing",
+			wantErr: "wait timeout reached after 10m0s - service may still be resizing",
 			// SilenceErrors is set after the wait fails, so Cobra doesn't
 			// print the usual "Error:" line.
 			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
 ✅ Resize request accepted for service 'svc-12345'!
-⏳ Waiting for resize to complete (timeout: 50ms)...
+⏳ Waiting for resize to complete (timeout: 10m0s)...
 ⢎  Service status: CONFIGURING
-❌ Error: wait timeout reached after 50ms - service may still be resizing
+❌ Error: wait timeout reached after 10m0s - service may still be resizing
 `,
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

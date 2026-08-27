@@ -46,7 +46,7 @@ func TestServiceGetCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "get", "svc-12345"},
@@ -297,7 +297,5 @@ status: READY
 			setup:      setupGet(sampleService()),
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

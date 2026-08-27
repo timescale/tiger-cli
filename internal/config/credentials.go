@@ -61,8 +61,10 @@ func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) er
 	})
 }
 
-// StoreCredentialsToFile stores credentials to file (test helper)
-func (c *Config) StoreCredentialsToFile(apiKey, projectID string) error {
+// storeCredentialsToFile stores credentials in the config dir's fallback file,
+// bypassing the keyring. Only the file-fallback tests call it directly; normal
+// storage goes through StoreCredentials, which tries the keyring first.
+func (c *Config) storeCredentialsToFile(apiKey, projectID string) error {
 	creds := storedCredentials{
 		APIKey:    apiKey,
 		ProjectID: projectID,

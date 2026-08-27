@@ -18,7 +18,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 	}
 
 	// checkKeyringPassword asserts the mock keyring holds want for role.
-	checkKeyringPassword := func(role, want string) func(*testing.T, cmdResult) {
+	checkKeyringPassword := func(role, want string) checkFunc {
 		return func(t *testing.T, result cmdResult) {
 			t.Helper()
 			got, err := (&common.KeyringStorage{}).Get(sampleService(), role)
@@ -36,7 +36,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 	pgpassHome := t.TempDir()
 	overwriteHome := t.TempDir()
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"db", "save-password", "svc-12345", "--password=pw"},
@@ -215,7 +215,5 @@ func TestDbSavePasswordCmd(t *testing.T) {
 				}
 			}},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestConfigUnsetCmd(t *testing.T) {
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing argument",
 			args:    []string{"config", "unset"},
@@ -58,7 +58,5 @@ func TestConfigUnsetCmd(t *testing.T) {
 			wantStdout: "Unset output\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

@@ -31,10 +31,7 @@ func TestNewAPIClient_OAuthCredentials(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
-		"api_url": server.URL,
-	})
-	require.NoError(t, err)
+	cfg := &config.Config{ConfigDir: t.TempDir(), APIURL: server.URL}
 
 	// Override the credential seam with an OAuth token.
 	original := GetStoredCredentials
@@ -142,12 +139,7 @@ func TestValidateAPIKey(t *testing.T) {
 			defer server.Close()
 
 			// Setup test config with the test server URL
-			cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
-				"api_url": server.URL,
-			})
-			if err != nil {
-				t.Fatalf("Failed to setup test config: %v", err)
-			}
+			cfg := &config.Config{ConfigDir: t.TempDir(), APIURL: server.URL}
 
 			client, err := api.NewTigerClient(cfg, "test-api-key")
 			require.NoError(t, err)

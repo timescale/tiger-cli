@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/charmbracelet/colorprofile"
@@ -70,6 +71,25 @@ type cmdTest struct {
 	wantStderr any
 	wantErr    any
 	checks     []checkFunc // optional extra assertions, run in order after the standard ones
+
+	// synctest runs the case inside a [synctest] bubble, where time is
+	// virtual: a poll interval or wait timeout elapses the instant every
+	// goroutine is blocked on it. Set it for cases that wait on a timer (the
+	// `--wait` polling loop in common.WaitForService), so they assert against
+	// realistic durations and finish instantly instead of sleeping.
+	//
+	// It is opt-in rather than the default because a bubble only advances its
+	// clock while every goroutine in it is durably blocked, and real network
+	// I/O isn't: a case that waits on a timer *and* on a loopback
+	// httptest.NewServer hangs until the test binary's own timeout. Cases that
+	// talk to such a server and never wait on a timer are fine either way, and
+	// simply don't need it.
+	//
+	// httptest.NewTestServer's in-memory network is bubble-safe and would lift
+	// that restriction, but only the client from its Client method reaches it,
+	// and api.HTTPClient — which every request under test goes through — has
+	// no seam for swapping in that transport.
+	synctest bool
 }
 
 // runCmdTests runs a slice of table-driven command tests using the standard
@@ -86,36 +106,47 @@ func runCmdTests(t *testing.T, tests []cmdTest) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := runCommand(t, tt.args, tt.setup, tt.opts...)
-
-			if tt.wantErr != nil {
-				if result.err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				assertMatch(t, "error", result.err.Error(), tt.wantErr)
-			} else if result.err != nil {
-				t.Fatalf("unexpected error: %v", result.err)
+			if tt.synctest {
+				synctest.Test(t, func(t *testing.T) { runCmdTest(t, tt) })
+				return
 			}
-
-			assertMatch(t, "stdout", result.stdout, tt.wantStdout)
-
-			wantStderr := tt.wantStderr
-			if wantStderr == nil && tt.wantErr != nil {
-				if msg, ok := tt.wantErr.(string); ok {
-					wantStderr = "Error: " + msg + "\n"
-				} else {
-					// A matcher can't be framed, so unframe stderr instead.
-					got := strings.TrimSuffix(strings.TrimPrefix(result.stderr, "Error: "), "\n")
-					assertMatch(t, "stderr", got, tt.wantErr)
-					wantStderr = matchFunc(func(*testing.T, string) {}) // already asserted
-				}
-			}
-			assertMatch(t, "stderr", result.stderr, wantStderr)
-
-			for _, check := range tt.checks {
-				check(t, result)
-			}
+			runCmdTest(t, tt)
 		})
+	}
+}
+
+// runCmdTest runs one case and makes the standard assertions. Split out of
+// runCmdTests so a case can opt into running inside a synctest bubble.
+func runCmdTest(t *testing.T, tt cmdTest) {
+	t.Helper()
+	result := runCommand(t, tt.args, tt.setup, tt.opts...)
+
+	if tt.wantErr != nil {
+		if result.err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		assertMatch(t, "error", result.err.Error(), tt.wantErr)
+	} else if result.err != nil {
+		t.Fatalf("unexpected error: %v", result.err)
+	}
+
+	assertMatch(t, "stdout", result.stdout, tt.wantStdout)
+
+	wantStderr := tt.wantStderr
+	if wantStderr == nil && tt.wantErr != nil {
+		if msg, ok := tt.wantErr.(string); ok {
+			wantStderr = "Error: " + msg + "\n"
+		} else {
+			// A matcher can't be framed, so unframe stderr instead.
+			got := strings.TrimSuffix(strings.TrimPrefix(result.stderr, "Error: "), "\n")
+			assertMatch(t, "stderr", got, tt.wantErr)
+			wantStderr = matchFunc(func(*testing.T, string) {}) // already asserted
+		}
+	}
+	assertMatch(t, "stderr", result.stderr, wantStderr)
+
+	for _, check := range tt.checks {
+		check(t, result)
 	}
 }
 
@@ -204,6 +235,15 @@ type cmdResult struct {
 	stderr    string
 	err       error
 	configDir string
+
+	// cfg is the config the invocation actually resolved — captured from the
+	// client factory, which app.Load calls with the config it just built, so
+	// it reflects the real flag > env > file > default precedence the command
+	// saw. Commands that reload the config in place (`tiger config set`,
+	// clearStaleDefaultService) mutate this same struct, so it also shows the
+	// end state. Nil when the command never loaded (help, completion, a
+	// config-parse failure).
+	cfg *config.Config
 }
 
 // runCommand builds the root command, injects a mock API client, and executes
@@ -263,9 +303,7 @@ func runCommand(
 
 	configDir := t.TempDir()
 	if rc.configValues != nil {
-		if _, err := config.UseTestConfig(configDir, rc.configValues); err != nil {
-			t.Fatalf("failed to seed config file: %v", err)
-		}
+		writeConfigFile(t, configDir, rc.configValues)
 	}
 	if rc.credentials != nil {
 		seedCfg := &config.Config{ConfigDir: configDir}
@@ -278,7 +316,11 @@ func runCommand(
 			t.Fatalf("failed to seed stored credentials: %v", err)
 		}
 	}
+	// The factory runs inside app.Load, so it also serves as the hook for
+	// capturing the config the invocation resolved (see cmdResult.cfg).
+	var loadedCfg *config.Config
 	app.SetClientFactory(func(ctx context.Context, cfg *config.Config) (api.ClientWithResponsesInterface, string, error) {
+		loadedCfg = cfg
 		if rc.clientErr != nil {
 			return nil, "", rc.clientErr
 		}
@@ -314,6 +356,7 @@ func runCommand(
 		stderr:    stderr.String(),
 		err:       execErr,
 		configDir: configDir,
+		cfg:       loadedCfg,
 	}
 }
 
@@ -472,6 +515,35 @@ func checkDefaultService(want string) checkFunc {
 		if cfg.ServiceID != want {
 			t.Errorf("default service_id = %q, want %q", cfg.ServiceID, want)
 		}
+	}
+}
+
+// writeConfigFile writes exactly the given keys to the config file in
+// configDir, creating the directory if needed. Only these keys are written, so
+// unspecified ones still resolve from the environment or their defaults —
+// which is what makes a seeded config file a real precedence test.
+func writeConfigFile(t *testing.T, configDir string, values map[string]any) {
+	t.Helper()
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	contents, err := yaml.Marshal(values)
+	if err != nil {
+		t.Fatalf("failed to marshal config values: %v", err)
+	}
+	if err := os.WriteFile(config.GetConfigFile(configDir), contents, 0600); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+}
+
+// checkNotLoaded asserts the invocation never loaded the config or built an
+// API client. wrapCommands deliberately leaves help, completion, and
+// __complete unwrapped so they stay clear of the config file, the system
+// keyring, and the network; a nil cmdResult.cfg is what that looks like.
+func checkNotLoaded(t *testing.T, result cmdResult) {
+	t.Helper()
+	if result.cfg != nil {
+		t.Errorf("expected no config load, but one happened")
 	}
 }
 

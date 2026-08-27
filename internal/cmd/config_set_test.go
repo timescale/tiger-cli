@@ -5,7 +5,7 @@ import (
 )
 
 func TestConfigSetCmd(t *testing.T) {
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing arguments",
 			args:    []string{"config", "set"},
@@ -116,7 +116,5 @@ func TestConfigSetCmd(t *testing.T) {
 			wantStdout: "Set output = yaml\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"output": "yaml"})},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

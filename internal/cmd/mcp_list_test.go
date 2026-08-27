@@ -115,7 +115,7 @@ func TestMCPListCmd(t *testing.T) {
 		})
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "invalid output format",
 			args:    []string{"mcp", "list", "-o", "invalid"},
@@ -159,7 +159,5 @@ func TestMCPListCmd(t *testing.T) {
 				withEnv("TIGER_EXPERIMENTAL", "true")),
 			wantStdout: wantTextExperimental,
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

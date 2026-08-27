@@ -62,7 +62,7 @@ func TestAuthStatusCmd(t *testing.T) {
 └─────────────────┴─────────────────────────────────┘
 `
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects positional args",
 			args:    []string{"auth", "status", "extra"},
@@ -201,6 +201,5 @@ type: apiKey
 			setup:      setupAuthInfo(patInfo),
 			wantStdout: patTable,
 		},
-	}
-	runCmdTests(t, tests)
+	})
 }

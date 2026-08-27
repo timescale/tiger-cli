@@ -86,7 +86,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "backup", "svc-12345"},
@@ -238,7 +238,5 @@ func TestServiceBackupsCmd(t *testing.T) {
 			setup:   setupList(backups[:2]),
 			wantErr: "environment variable output is not supported for backups",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

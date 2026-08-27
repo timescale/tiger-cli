@@ -24,7 +24,7 @@ func TestServiceCreateCmd(t *testing.T) {
 
 	svc := sampleService()
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "invalid addon",
 			args:    []string{"service", "create", "--name", "test-service", "--addons", "invalid-addon"},
@@ -197,8 +197,9 @@ func TestServiceCreateCmd(t *testing.T) {
 			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
-			name: "wait polls until ready",
-			args: []string{"service", "create", "--name", "test-service"},
+			name:     "wait polls until ready",
+			synctest: true,
+			args:     []string{"service", "create", "--name", "test-service"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				queued := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
@@ -226,8 +227,9 @@ func TestServiceCreateCmd(t *testing.T) {
 `,
 		},
 		{
-			name: "wait timeout",
-			args: []string{"service", "create", "--name", "test-service", "--wait-timeout", "50ms"},
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"service", "create", "--name", "test-service"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				queued := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
@@ -237,16 +239,16 @@ func TestServiceCreateCmd(t *testing.T) {
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &queued,
 					}, nil)
-				// The 50ms deadline fires before the 1s poll tick, so no
-				// GetService call is expected — but allow it in case the test
-				// runs slowly, keeping the service unready either way.
+				// The service never reaches the target state, so the wait
+				// polls until the (virtual) deadline. The non-TTY spinner
+				// dedupes repeated messages, so those polls add no stderr lines.
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 						JSON200:      &queued,
 					}, nil).AnyTimes()
 			},
-			wantErr:    "wait timeout reached after 50ms - service may still be provisioning",
+			wantErr:    "wait timeout reached after 30m0s - service may still be provisioning",
 			wantStdout: sampleServiceCreateQueuedTable,
 			// SilenceErrors is set after the wait fails, so Cobra doesn't
 			// print the usual "Error:" line.
@@ -254,9 +256,9 @@ func TestServiceCreateCmd(t *testing.T) {
 ✅ Service creation request accepted!
 📋 Service ID: svc-12345
 🎯 Set service 'svc-12345' as default service.
-⏳ Waiting for service to be ready (wait timeout: 50ms)...
+⏳ Waiting for service to be ready (wait timeout: 30m0s)...
 ⢎  Service status: QUEUED
-❌ Error: wait timeout reached after 50ms - service may still be provisioning
+❌ Error: wait timeout reached after 30m0s - service may still be provisioning
 `,
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
@@ -458,9 +460,7 @@ PGUSER=tsdbadmin
 				}
 			}),
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
 
 // sampleServiceCreateTable is the table rendering of sampleService() as

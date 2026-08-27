@@ -57,7 +57,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		"To view your new password, run: \n\t tiger service get svc-12345 --with-password\n" +
 		"✅ Master password for 'tsdbadmin' user updated successfully\n"
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "new-password and auto-generate conflict",
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123", "--auto-generate"},
@@ -253,7 +253,5 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantStderr: savedStderr,
 			checks:     []checkFunc{checkStoredPassword("svc-12345", "newpass123")},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

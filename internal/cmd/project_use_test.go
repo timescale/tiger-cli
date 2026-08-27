@@ -43,7 +43,7 @@ func TestProjectUseCmd(t *testing.T) {
 
 	// checkStoredProject asserts which project the stored credentials point at
 	// and that the OAuth token survived.
-	checkStoredProject := func(want string) func(t *testing.T, result cmdResult) {
+	checkStoredProject := func(want string) checkFunc {
 		return func(t *testing.T, result cmdResult) {
 			t.Helper()
 			stored, err := readStoredCredentials(t, result.configDir)
@@ -59,7 +59,7 @@ func TestProjectUseCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "rejects missing argument",
 			args:    []string{"project", "use"},
@@ -192,7 +192,5 @@ func TestProjectUseCmd(t *testing.T) {
 			wantStdout: "Switched to project project-new\n",
 			checks:     []checkFunc{checkStoredProject("project-new")},
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }

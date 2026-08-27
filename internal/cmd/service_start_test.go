@@ -22,7 +22,7 @@ func TestServiceStartCmd(t *testing.T) {
 		}
 	}
 
-	tests := []cmdTest{
+	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
 			args:    []string{"service", "start", "svc-12345"},
@@ -103,8 +103,9 @@ func TestServiceStartCmd(t *testing.T) {
 				"✅ Service has been successfully started!\n",
 		},
 		{
-			name: "wait polls until ready",
-			args: []string{"service", "start", "svc-12345"},
+			name:     "wait polls until ready",
+			synctest: true,
+			args:     []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStart(api.DeployStatusRESUMING)(m)
 				ready := sampleService()
@@ -129,15 +130,14 @@ func TestServiceStartCmd(t *testing.T) {
 				"❌ Error: service failed with status: FAILED\n",
 		},
 		{
-			name: "wait timeout",
-			args: []string{"service", "start", "svc-12345", "--wait-timeout", "1ms"},
+			name:     "wait timeout",
+			synctest: true,
+			args:     []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStart(api.DeployStatusRESUMING)(m)
-				// The 1ms deadline fires before the 1s poll tick, so no
-				// GetService call is expected — but allow it in case the test
-				// runs slowly, keeping the service unready either way. (The
-				// non-TTY spinner dedupes repeated messages, so this can't
-				// add stderr lines.)
+				// The service never reaches the target state, so the wait
+				// polls until the (virtual) deadline. The non-TTY spinner
+				// dedupes repeated messages, so those polls add no stderr lines.
 				resuming := sampleService(func(s *api.Service) { s.Status = api.DeployStatusRESUMING })
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -145,11 +145,11 @@ func TestServiceStartCmd(t *testing.T) {
 						JSON200:      &resuming,
 					}, nil).AnyTimes()
 			},
-			wantErr: "wait timeout reached after 1ms - service may still be starting",
+			wantErr: "wait timeout reached after 10m0s - service may still be starting",
 			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to start (wait timeout: 1ms)...\n" +
+				"⏳ Waiting for service to start (wait timeout: 10m0s)...\n" +
 				"⢎  Service status: RESUMING\n" +
-				"❌ Error: wait timeout reached after 1ms - service may still be starting\n",
+				"❌ Error: wait timeout reached after 10m0s - service may still be starting\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -167,7 +167,5 @@ func TestServiceStartCmd(t *testing.T) {
 			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
 				"💡 Use 'tiger service get' to check service status.\n",
 		},
-	}
-
-	runCmdTests(t, tests)
+	})
 }
