@@ -13,6 +13,7 @@ func buildProjectCmd(app *common.App) *cobra.Command {
 		Long:  `Manage Tiger Cloud projects.`,
 	}
 
+	cmd.AddCommand(buildProjectListCmd(app))
 	cmd.AddCommand(buildProjectUseCmd(app))
 
 	return cmd
