@@ -101,14 +101,14 @@ func prepareProjectsForOutput(projects []api.Project, currentProjectID string) [
 // outputProjectsTable outputs projects in a formatted table using tablewriter
 func outputProjectsTable(projects []OutputProject, output io.Writer) error {
 	table := tablewriter.NewWriter(output)
-	table.Header("CURRENT", "PROJECT ID", "NAME")
+	table.Header("PROJECT ID", "NAME", "CURRENT")
 
 	for _, project := range projects {
 		current := ""
 		if project.Current {
 			current = "*"
 		}
-		table.Append(current, project.ID, project.Name)
+		table.Append(project.ID, project.Name, current)
 	}
 
 	return table.Render()
