@@ -36,6 +36,7 @@ const (
 	toolServiceLogs             = "service_logs"
 	toolServiceMetricsAvailable = "service_metrics_available"
 	toolServiceMetricsSeries    = "service_metrics_series"
+	toolServiceBackups          = "service_backups"
 	toolDBExecuteQuery          = "db_execute_query"
 )
 
@@ -166,6 +167,7 @@ func (s *Server) registerServiceTools(readOnly, experimental bool) {
 	if experimental {
 		addTool(s, readOnly, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 		addTool(s, readOnly, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
+		addTool(s, readOnly, newServiceBackupsTool(), s.handleServiceBackups)
 	}
 }
 

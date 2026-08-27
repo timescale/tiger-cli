@@ -542,6 +542,26 @@ func (mr *MockClientInterfaceMockRecorder) GetAuthInfo(ctx any, reqEditors ...an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfo", reflect.TypeOf((*MockClientInterface)(nil).GetAuthInfo), varargs...)
 }
 
+// GetBackups mocks base method.
+func (m *MockClientInterface) GetBackups(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBackups", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBackups indicates an expected call of GetBackups.
+func (mr *MockClientInterfaceMockRecorder) GetBackups(ctx, projectID, serviceID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackups", reflect.TypeOf((*MockClientInterface)(nil).GetBackups), varargs...)
+}
+
 // GetProjects mocks base method.
 func (m *MockClientInterface) GetProjects(ctx context.Context, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -1744,6 +1764,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetAuthInfoWithResponse(
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfoWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetAuthInfoWithResponse), varargs...)
+}
+
+// GetBackupsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetBackupsWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, reqEditors ...api.RequestEditorFn) (*api.GetBackupsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBackupsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetBackupsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBackupsWithResponse indicates an expected call of GetBackupsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBackupsWithResponse(ctx, projectID, serviceID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackupsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBackupsWithResponse), varargs...)
 }
 
 // GetProjectsWithResponse mocks base method.

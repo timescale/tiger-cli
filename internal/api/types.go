@@ -20,6 +20,23 @@ const (
 	AuthInfoTypeOauth  AuthInfoType = "oauth"
 )
 
+// Defines values for BackupCopyStatus.
+const (
+	BackupCopyStatusFAILED    BackupCopyStatus = "FAILED"
+	BackupCopyStatusFINISHED  BackupCopyStatus = "FINISHED"
+	BackupCopyStatusRETRYING  BackupCopyStatus = "RETRYING"
+	BackupCopyStatusRUNNING   BackupCopyStatus = "RUNNING"
+	BackupCopyStatusSCHEDULED BackupCopyStatus = "SCHEDULED"
+	BackupCopyStatusUNKNOWN   BackupCopyStatus = "UNKNOWN"
+)
+
+// Defines values for BackupType.
+const (
+	BackupTypeFULL        BackupType = "FULL"
+	BackupTypeINCREMENTAL BackupType = "INCREMENTAL"
+	BackupTypeUNKNOWN     BackupType = "UNKNOWN"
+)
+
 // Defines values for DeployStatus.
 const (
 	DeployStatusCONFIGURING DeployStatus = "CONFIGURING"
@@ -172,6 +189,57 @@ type AuthInfoUser struct {
 	// Name The user's name.
 	Name string `json:"name"`
 }
+
+// Backup A single backup of a service, taken automatically by Tiger Cloud.
+type Backup struct {
+	// DurationSeconds How long the backup took, in seconds. Absent while the backup is still running.
+	DurationSeconds *int64 `json:"duration_seconds,omitempty"`
+
+	// FinishedAt When the backup finished. Absent while the backup is still running.
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+
+	// Label The label the backup system assigns to this backup.
+	Label string `json:"label"`
+
+	// Regions Every region storing a copy of this backup: the region the service
+	// runs in, plus any region enabled for cross-region backups.
+	Regions []BackupRegionState `json:"regions"`
+
+	// SizeBytes The size of the backup in bytes. Absent while the backup is still running.
+	SizeBytes *int64 `json:"size_bytes,omitempty"`
+
+	// StartedAt When the backup started.
+	StartedAt time.Time `json:"started_at"`
+
+	// Type The type of the backup.
+	Type BackupType `json:"type"`
+}
+
+// BackupCopyStatus The state of a copy of a backup in one region.
+//
+// - `SCHEDULED`: the copy has not started yet.
+// - `RUNNING`: the copy is in progress.
+// - `RETRYING`: the copy failed and is being retried.
+// - `FINISHED`: the copy completed successfully.
+// - `FAILED`: the copy did not complete.
+// - `UNKNOWN`: an unrecognized state.
+type BackupCopyStatus string
+
+// BackupRegionState A region storing a copy of a backup.
+type BackupRegionState struct {
+	// RegionCode The region storing the copy.
+	RegionCode string `json:"region_code"`
+
+	// Status The state of this copy.
+	Status *BackupCopyStatus `json:"status,omitempty"`
+}
+
+// BackupType The type of a backup.
+//
+// - `FULL`: a complete copy of the service's data.
+// - `INCREMENTAL`: only the data that changed since the previous backup.
+// - `UNKNOWN`: a type this version of the API does not name.
+type BackupType string
 
 // ConnectionPooler Connection pooler configuration for a service.
 type ConnectionPooler struct {
