@@ -8,7 +8,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestBuildConnectionString_Basic(t *testing.T) {
@@ -24,8 +23,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Basic connection string without password",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("test-host.tigerdata.com"),
+					Port: new(5432),
 				},
 			},
 			opts: ConnectionDetailsOptions{
@@ -37,8 +36,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Connection string with custom role",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("test-host.tigerdata.com"),
+					Port: new(5432),
 				},
 			},
 			opts: ConnectionDetailsOptions{
@@ -50,13 +49,13 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Direct connection when pooler is available",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("direct-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("direct-host.tigerdata.com"),
+					Port: new(5432),
 				},
 				ConnectionPooler: &api.ConnectionPooler{
 					Endpoint: &api.Endpoint{
-						Host: util.Ptr("pooler-host.tigerdata.com"),
-						Port: util.Ptr(6432),
+						Host: new("pooler-host.tigerdata.com"),
+						Port: new(6432),
 					},
 				},
 			},
@@ -69,13 +68,13 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Pooled connection string",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("direct-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("direct-host.tigerdata.com"),
+					Port: new(5432),
 				},
 				ConnectionPooler: &api.ConnectionPooler{
 					Endpoint: &api.Endpoint{
-						Host: util.Ptr("pooler-host.tigerdata.com"),
-						Port: util.Ptr(6432),
+						Host: new("pooler-host.tigerdata.com"),
+						Port: new(6432),
 					},
 				},
 			},
@@ -90,8 +89,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Read-only injects tsdb_admin.read_only_connection GUC",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("test-host.tigerdata.com"),
+					Port: new(5432),
 				},
 			},
 			opts: ConnectionDetailsOptions{
@@ -104,8 +103,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Pooled connection fallback to direct when pooler unavailable",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("direct-host.tigerdata.com"),
-					Port: util.Ptr(5432),
+					Host: new("direct-host.tigerdata.com"),
+					Port: new(5432),
 				},
 				ConnectionPooler: nil, // No pooler available
 			},
@@ -130,7 +129,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			service: api.Service{
 				Endpoint: &api.Endpoint{
 					Host: nil,
-					Port: util.Ptr(5432),
+					Port: new(5432),
 				},
 			},
 			opts: ConnectionDetailsOptions{
@@ -142,8 +141,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Error when host is empty",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr(""),
-					Port: util.Ptr(5432),
+					Host: new(""),
+					Port: new(5432),
 				},
 			},
 			opts: ConnectionDetailsOptions{
@@ -155,7 +154,7 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Error when no port available",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
+					Host: new("test-host.tigerdata.com"),
 					Port: nil,
 				},
 			},
@@ -168,8 +167,8 @@ func TestBuildConnectionString_Basic(t *testing.T) {
 			name: "Error when port is zero",
 			service: api.Service{
 				Endpoint: &api.Endpoint{
-					Host: util.Ptr("test-host.tigerdata.com"),
-					Port: util.Ptr(0),
+					Host: new("test-host.tigerdata.com"),
+					Port: new(0),
 				},
 			},
 			opts: ConnectionDetailsOptions{

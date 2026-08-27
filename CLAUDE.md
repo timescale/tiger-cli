@@ -143,6 +143,11 @@ Changing either option renames identifiers across the whole codebase.
 
 - Always use `go fmt` after making file changes and before committing
 - Run `go vet ./...` to catch potential issues before committing
+- Run `go fix -diff ./...` to check for code that should be updated to use newer
+  Go APIs or idioms
+- Run `go tool staticcheck ./...` to catch additional issues (unused code, deprecated
+  APIs, style checks) before committing — it's declared as a build-time tool in
+  `go.mod`'s `tool (...)` block alongside `oapi-codegen` and `mockgen`
 - Run `go test ./...` to ensure all tests pass
 
 ### Error Messages
@@ -313,12 +318,13 @@ Tiger CLI is a Go-based command-line interface for managing Tiger, the modern da
 
 - **Entry Point**: `cmd/tiger/main.go` - Simple main that delegates to cmd.Execute()
 - **Command Structure**: `internal/cmd/` - Cobra-based command definitions for all
-  CLI commands (auth, service, db, config, mcp, version, upgrade, completion).
+  CLI commands (auth, project, service, db, config, mcp, version, upgrade, completion).
   Each command lives in its own file, named to match the command in snake_case
   (see "One File Per Command" below). `root.go` holds the root command, global
   flags, and configuration initialization. Files ending in `_helper.go` hold
   cross-group helpers rather than commands — see "Where Helpers Go" below.
   - `db_connect.go` - The whole `db connect`/`psql` flow, including read replica selection: in an interactive terminal, when the service has one or more active read replicas (listed via the `/replicaSets` API), prompts to connect to the primary or one of the replicas. Skipped when stdin is not a TTY, when `--no-replica-prompt` is set, or when the service has no read replicas. Also handles password recovery when the stored password is rejected.
+  - `project_use.go` - `tiger project use`, which switches the active project. The active project lives in the stored credentials, not the config file, so switching requires an OAuth login — an API key is scoped to one project, and env API keys take precedence over stored credentials entirely. Any project change clears the `service_id` config value via `clearStaleDefaultService` (`project_helper.go`) — `auth login` calls it too unless it lands on the same project as the previous login. Deliberately has no MCP counterpart: a per-request MCP session must not switch a process-wide default shared with other sessions.
   - `upgrade.go` - Self-update command (download latest release, verify checksum, replace running binary in place)
 - **Configuration**: `internal/config/config.go` - `Config` struct plus load/write
   helpers. Each `Load` uses its own viper instance (no global state); see
@@ -504,7 +510,12 @@ addTool(s, readOnly, newServiceCreateTool(), s.handleServiceCreate)
 - **LLM validation**: Stricter JSON schema validations (min/max values, enums, patterns, etc.) prevent LLMs from sending invalid arguments in tool calls, catching errors before they reach the handler
 
 **Important Notes:**
-- Fields with `omitempty` are optional; fields without it are required
+- Fields with `omitempty` or `omitzero` are optional; fields without either are
+  required. For a struct-typed (not pointer) optional field, use `omitzero`
+  instead of `omitempty` — plain `encoding/json`'s `omitempty` has no effect on
+  a struct-valued field (it's never the zero value in the way `omitempty`
+  checks for), so the field would always be required in the schema despite the
+  tag.
 - Always provide descriptions and examples for better AI assistant understanding
 - Use JSON Schema properties to constrain and document values (e.g., `Default`, `Minimum`, `Maximum`, `Enum`, `Pattern`, `MinLength`, etc.)
   - See the [jsonschema-go Schema type](https://pkg.go.dev/github.com/google/jsonschema-go/jsonschema#Schema) for all available properties
@@ -550,7 +561,7 @@ logging. Don't add log statements to CLI commands — print with `cmd.Print*` /
 - **gomock**: Mock generation for testing (build-time dependency)
 - **go-sdk (MCP)**: Model Context Protocol SDK for AI assistant integration
 - **pgx/v5**: PostgreSQL driver for database operations in MCP tools
-- **Go 1.25+**: Required Go version
+- **Go 1.27+**: Required Go version
 
 ## Project Structure
 
@@ -698,8 +709,10 @@ Place a helper by who calls it, working down this list until one matches:
 The `_helper.go` suffix is reserved for rule 3, so every other file in
 `internal/cmd` is named after a command and contains a `build*Cmd()`.
 
-Shell completion functions are an exception to rule 1: they all live in
-`completion_helper.go`, however many commands use them.
+Shell completion functions — both positional-arg completions (`ValidArgsFunction`)
+and flag-value completions (`RegisterFlagCompletionFunc`) — are an exception to
+rule 1: they all live in `completion_helper.go`, however many commands or flags
+use them.
 
 Apply rule 1 even when the helper is large. `db_connect.go` holds the whole
 `db connect` flow — argument splitting, read replica selection, password

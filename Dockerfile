@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.27
 ARG BINARY_SOURCE=builder
 
 # When performing a multi-platform build, leverage Go's built-in support for

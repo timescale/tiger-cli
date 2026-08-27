@@ -429,13 +429,14 @@ func findClientConfig(clientName string) (*clientConfig, error) {
 
 // generateSupportedEditorsHelp generates the supported clients section for help text
 func generateSupportedEditorsHelp() string {
-	result := "Supported Clients:\n"
+	var result strings.Builder
+	result.WriteString("Supported Clients:\n")
 	for _, cfg := range supportedClients {
 		// Show only the primary editor name in help text
 		primaryName := cfg.EditorNames[0]
-		result += fmt.Sprintf("  %-24s Configure for %s\n", primaryName, cfg.Name)
+		result.WriteString(fmt.Sprintf("  %-24s Configure for %s\n", primaryName, cfg.Name))
 	}
-	return result
+	return result.String()
 }
 
 // findClientConfigFile finds a client configuration file from a list of possible paths
@@ -601,23 +602,24 @@ func (m *clientSelectModel) updateNumberBuffer(newBuffer string) {
 }
 
 func (m clientSelectModel) View() tea.View {
-	s := "Select an MCP client to configure:\n\n"
+	var s strings.Builder
+	s.WriteString("Select an MCP client to configure:\n\n")
 
 	for i, option := range m.options {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-		s += fmt.Sprintf("%s %d. %s\n", cursor, i+1, option.Name)
+		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, option.Name))
 	}
 
 	// Show the current number buffer if user is typing
 	if m.numberBuffer != "" {
-		s += fmt.Sprintf("\nTyping: %s", m.numberBuffer)
+		s.WriteString(fmt.Sprintf("\nTyping: %s", m.numberBuffer))
 	}
 
-	s += "\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit"
-	return tea.NewView(s)
+	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
+	return tea.NewView(s.String())
 }
 
 // addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig

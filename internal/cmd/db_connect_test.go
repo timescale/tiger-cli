@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -495,11 +496,8 @@ func TestBuildPsqlCommand_KeyringPasswordEnvVar(t *testing.T) {
 	// Verify that PGPASSWORD is set in the environment with the correct value
 	found := false
 	expectedEnvVar := "PGPASSWORD=" + testPassword
-	for _, envVar := range psqlCmd.Env {
-		if envVar == expectedEnvVar {
-			found = true
-			break
-		}
+	if slices.Contains(psqlCmd.Env, expectedEnvVar) {
+		found = true
 	}
 
 	if !found {

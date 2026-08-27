@@ -51,9 +51,9 @@ func newServiceUpdatePasswordTool() *mcp.Tool {
 		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(true), // Modifies authentication credentials
-			IdempotentHint:  true,           // Same password can be set multiple times
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(true), // Modifies authentication credentials
+			IdempotentHint:  true,      // Same password can be set multiple times
+			OpenWorldHint:   new(true),
 			Title:           "Update Service Password",
 		},
 	}

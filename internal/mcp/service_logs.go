@@ -28,12 +28,12 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 	setServiceIDSchemaProperties(schema)
 
 	schema.Properties["node"].Description = "Specific service node to fetch logs from (for services with HA replicas). If not provided, logs from the primary node will be fetched."
-	schema.Properties["node"].Minimum = util.Ptr(0.0)
+	schema.Properties["node"].Minimum = new(0.0)
 	schema.Properties["node"].Examples = []any{0, 1, 2}
 
 	schema.Properties["tail"].Description = "Number of log lines to return. Defaults to 100."
 	schema.Properties["tail"].Default = util.Must(json.Marshal(100))
-	schema.Properties["tail"].Minimum = util.Ptr(1.0)
+	schema.Properties["tail"].Minimum = new(1.0)
 	schema.Properties["tail"].Examples = []any{50, 100, 1000}
 
 	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format, e.g., '2024-01-15T09:00:00Z'). If not provided, only the tail parameter limits how far back logs are fetched."
@@ -67,7 +67,7 @@ Supports filtering by time (via since/until parameters) and node (for services w
 		OutputSchema: ServiceLogsOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(true),
+			OpenWorldHint: new(true),
 			Title:         "Get Service Logs",
 		},
 	}

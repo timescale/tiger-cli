@@ -184,7 +184,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 	outputSvc := OutputService{
 		Service: service,
 	}
-	outputSvc.InitialPassword = nil
+	outputSvc.Service.InitialPassword = nil
 
 	opts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",

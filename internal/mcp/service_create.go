@@ -44,8 +44,8 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
-	schema.Properties["replicas"].Minimum = util.Ptr(0.0)
-	schema.Properties["replicas"].Maximum = util.Ptr(5.0)
+	schema.Properties["replicas"].Minimum = new(0.0)
+	schema.Properties["replicas"].Maximum = new(5.0)
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
@@ -88,9 +88,9 @@ WARNING: Creates billable resources.`,
 		OutputSchema: ServiceCreateOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: util.Ptr(false), // Creates resources but doesn't modify existing
-			IdempotentHint:  false,           // Creating with same name creates multiple services (name is not unique)
-			OpenWorldHint:   util.Ptr(true),
+			DestructiveHint: new(false), // Creates resources but doesn't modify existing
+			IdempotentHint:  false,      // Creating with same name creates multiple services (name is not unique)
+			OpenWorldHint:   new(true),
 			Title:           "Create Database Service",
 		},
 	}

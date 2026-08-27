@@ -467,7 +467,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -504,7 +504,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -541,7 +541,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -552,7 +552,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify from_roles in output
-		fromRoles, ok := result["from_roles"].([]interface{})
+		fromRoles, ok := result["from_roles"].([]any)
 		if !ok || len(fromRoles) == 0 {
 			t.Error("Expected from_roles in output")
 		} else if fromRoles[0] != "tsdbadmin" {
@@ -590,7 +590,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -626,7 +626,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -723,7 +723,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -734,7 +734,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify from_roles in output
-		fromRoles, ok := result["from_roles"].([]interface{})
+		fromRoles, ok := result["from_roles"].([]any)
 		if !ok || len(fromRoles) == 0 {
 			t.Error("Expected from_roles in output")
 		} else if fromRoles[0] != baseRoleName {
@@ -817,7 +817,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Parse JSON output
-		var result map[string]interface{}
+		var result map[string]any
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
 			t.Fatalf("Failed to parse create role JSON: %v\nOutput: %s", err, output)
 		}
@@ -832,7 +832,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		// Note: statement_timeout not checked as it cannot be set with --from tsdbadmin
 
 		// Verify from_roles in output
-		fromRoles, ok := result["from_roles"].([]interface{})
+		fromRoles, ok := result["from_roles"].([]any)
 		if !ok || len(fromRoles) == 0 {
 			t.Error("Expected from_roles in output")
 		} else if fromRoles[0] != "tsdbadmin" {
@@ -1326,8 +1326,8 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	}
 
 	// Try to extract from structured output lines
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.Contains(line, "Service ID") || strings.Contains(line, "service_id") {
 			// Extract ID from lines like "📋 Service ID: p7yqpiw7a8" or "service_id: svc-12345"

@@ -43,7 +43,7 @@ func newServiceMetricsAvailableTool() *mcp.Tool {
 		OutputSchema: ServiceMetricsAvailableOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(false),
+			OpenWorldHint: new(false),
 			Title:         "List Available Metric Series",
 		},
 	}

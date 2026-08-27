@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -94,8 +95,8 @@ Examples:
 
 			// Validate and normalize environment tag (case-insensitive)
 			forkEnvironment = strings.ToUpper(forkEnvironment)
-			if forkEnvironment != "DEV" && forkEnvironment != "PROD" {
-				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", forkEnvironment)
+			if !slices.Contains(validEnvironmentTags, forkEnvironment) {
+				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), forkEnvironment)
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -129,7 +130,7 @@ Examples:
 				forkStrategy = api.ForkStrategyLASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.ForkStrategyPITR
-				targetTime = util.Ptr(forkToTimestamp)
+				targetTime = new(forkToTimestamp)
 			}
 
 			// Display what we're about to do
@@ -249,6 +250,11 @@ Examples:
 	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
+
+	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
+	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }

@@ -82,7 +82,7 @@ By default only user-facing schemas and objects are shown; view/routine definiti
 		OutputSchema: DBSchemaOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(true),
+			OpenWorldHint: new(true),
 			Title:         "Show Database Schema",
 		},
 	}

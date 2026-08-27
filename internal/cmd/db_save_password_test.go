@@ -13,7 +13,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func TestDBSavePassword_ExplicitPassword(t *testing.T) {
@@ -107,9 +106,9 @@ func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
 		ProjectID: projectID,
 		Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		ForkedFrom: &api.ForkSpec{
-			IsStandby: util.Ptr(true),
-			ProjectID: util.Ptr(projectID),
-			ServiceID: util.Ptr("svcprimary"),
+			IsStandby: new(true),
+			ProjectID: new(projectID),
+			ServiceID: new("svcprimary"),
 		},
 	}
 

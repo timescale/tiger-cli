@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -98,8 +99,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			// Validate and normalize environment tag (case-insensitive)
 			createEnvironment = strings.ToUpper(createEnvironment)
-			if createEnvironment != "DEV" && createEnvironment != "PROD" {
-				return fmt.Errorf("environment must be either 'DEV' or 'PROD', got '%s'", createEnvironment)
+			if !slices.Contains(validEnvironmentTags, createEnvironment) {
+				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), createEnvironment)
 			}
 
 			// Validate and normalize CPU/Memory configuration
@@ -225,6 +226,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&createNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
+
+	cmd.RegisterFlagCompletionFunc("addons", addonsCompletion)
+	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
+	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }
