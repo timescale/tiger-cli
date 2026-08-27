@@ -78,6 +78,7 @@ Examples:
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
 
 	return cmd
 }

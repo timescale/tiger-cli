@@ -45,7 +45,7 @@ func newServiceBackupsTool() *mcp.Tool {
 		OutputSchema: ServiceBackupsOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: util.Ptr(false),
+			OpenWorldHint: new(false),
 			Title:         "List Service Backups",
 		},
 	}

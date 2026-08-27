@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/timescale/tiger-cli/internal/api"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 func createTestBackups() []api.Backup {
@@ -24,11 +23,11 @@ func createTestBackups() []api.Backup {
 			Type:            api.BackupTypeFULL,
 			StartedAt:       started,
 			FinishedAt:      &finished,
-			DurationSeconds: util.Ptr(int64(672)),
-			SizeBytes:       util.Ptr(int64(4831838208)),
+			DurationSeconds: new(int64(672)),
+			SizeBytes:       new(int64(4831838208)),
 			Regions: []api.BackupRegionState{
-				{RegionCode: "us-east-1", Status: util.Ptr(api.BackupCopyStatusFINISHED)},
-				{RegionCode: "eu-central-1", Status: util.Ptr(api.BackupCopyStatusFAILED)},
+				{RegionCode: "us-east-1", Status: new(api.BackupCopyStatusFINISHED)},
+				{RegionCode: "eu-central-1", Status: new(api.BackupCopyStatusFAILED)},
 			},
 		},
 		{
@@ -138,10 +137,10 @@ func TestFormatSizeBytes(t *testing.T) {
 		want  string
 	}{
 		{name: "absent", bytes: nil, want: ""},
-		{name: "bytes", bytes: util.Ptr(int64(512)), want: "512B"},
-		{name: "kibibytes", bytes: util.Ptr(int64(2048)), want: "2KiB"},
-		{name: "mebibytes", bytes: util.Ptr(int64(53_300_000)), want: "50.83MiB"},
-		{name: "gibibytes", bytes: util.Ptr(int64(4831838208)), want: "4.5GiB"},
+		{name: "bytes", bytes: new(int64(512)), want: "512B"},
+		{name: "kibibytes", bytes: new(int64(2048)), want: "2KiB"},
+		{name: "mebibytes", bytes: new(int64(53_300_000)), want: "50.83MiB"},
+		{name: "gibibytes", bytes: new(int64(4831838208)), want: "4.5GiB"},
 	}
 
 	for _, tc := range cases {
@@ -160,9 +159,9 @@ func TestFormatDurationSeconds(t *testing.T) {
 		want    string
 	}{
 		{name: "absent", seconds: nil, want: ""},
-		{name: "seconds", seconds: util.Ptr(int64(2)), want: "2s"},
-		{name: "minutes", seconds: util.Ptr(int64(672)), want: "11m12s"},
-		{name: "hours", seconds: util.Ptr(int64(7325)), want: "2h2m5s"},
+		{name: "seconds", seconds: new(int64(2)), want: "2s"},
+		{name: "minutes", seconds: new(int64(672)), want: "11m12s"},
+		{name: "hours", seconds: new(int64(7325)), want: "2h2m5s"},
 	}
 
 	for _, tc := range cases {
