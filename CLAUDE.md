@@ -1331,7 +1331,7 @@ follow a single table-driven pattern built on the shared harness in
   build a check return `checkFunc`, not the expanded function type.
 - Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
   file keys), `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
-  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withUTC`,
+  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`,
   `withContext`. Options that stub or seed process-global state are built on
   `withSetup` (t-scoped hooks); plain fields on `runConfig` exist only for
   state `runCommand`'s own plumbing consumes.
@@ -1362,7 +1362,10 @@ follow a single table-driven pattern built on the shared harness in
   `TIGER_*` env vars (preserving `TIGER_*_INTEGRATION`), because `config.Load`
   reads them through viper's `TIGER` prefix — without the scrub a stray
   `TIGER_API_URL` sends tests at a real host. Tests that need an env var set
-  opt in with `withEnv`.
+  opt in with `withEnv`. These `TestMain`s also pin `time.Local` to UTC, so
+  output rendering local times is asserted with plain literals; never mutate
+  `time.Local` mid-run — it races with background goroutines calling
+  `time.Now`.
 - Seed a config file with `withConfig`, or `writeConfigFile(t, dir, values)`
   outside `runCommand`; it writes only the given keys, so everything else still
   resolves from its default. Tests elsewhere that just need a `*config.Config`

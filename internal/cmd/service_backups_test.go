@@ -65,7 +65,8 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 	}
 
-	// Expected table for the four sample backups (rendered with withUTC).
+	// Expected table for the four sample backups (start times rendered in
+	// the local timezone, pinned to UTC in TestMain).
 	const backupsTable = `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
 │       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
 ├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
@@ -149,14 +150,14 @@ func TestServiceBackupsCmd(t *testing.T) {
 			// and no command takes it as input.
 			name:       "table output",
 			args:       []string{"service", "backup", "svc-12345"},
-			opts:       []runOption{experimental, withUTC()},
+			opts:       []runOption{experimental},
 			setup:      setupList(backups),
 			wantStdout: backupsTable,
 		},
 		{
 			name:       "default service id from config",
 			args:       []string{"service", "backup"},
-			opts:       []runOption{experimental, withUTC(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup:      setupList(backups),
 			wantStdout: backupsTable,
 		},

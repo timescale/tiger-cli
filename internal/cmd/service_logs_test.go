@@ -120,11 +120,10 @@ func TestServiceLogsCmd(t *testing.T) {
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
-			// Timestamps are rendered in the machine's local timezone, pinned
-			// to UTC by withUTC so the expected output stays literal.
+			// Timestamps are rendered in the local timezone, pinned to UTC in
+			// TestMain so the expected output stays literal.
 			name:  "text output with timestamps",
 			args:  []string{"service", "logs", "svc-12345"},
-			opts:  []runOption{withUTC()},
 			setup: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: "2025-01-15 10:30:00 UTC LOG: checkpoint starting\n" +
 				"2025-01-15 10:31:00 UTC LOG: checkpoint complete\n",

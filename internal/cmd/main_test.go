@@ -49,6 +49,14 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	// Pin the local timezone to UTC so output that renders local times is
+	// deterministic. This must happen here, while the process is still
+	// single-goroutine: mutating time.Local mid-run (as a per-test option
+	// once did) races with any background goroutine that calls time.Now —
+	// e.g. an idle HTTP transport read-loop left over from an earlier test's
+	// httptest traffic.
+	time.Local = time.UTC
+
 	os.Exit(m.Run())
 }
 
@@ -426,16 +434,6 @@ func withOpenBrowser(f func(string) error) runOption {
 		original := openBrowser
 		openBrowser = f
 		t.Cleanup(func() { openBrowser = original })
-	})
-}
-
-// withUTC pins the process's local timezone to UTC, so expected output that
-// embeds local-time formatting stays machine-independent.
-func withUTC() runOption {
-	return withSetup(func(t *testing.T) {
-		original := time.Local
-		time.Local = time.UTC
-		t.Cleanup(func() { time.Local = original })
 	})
 }
 

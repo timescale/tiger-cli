@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zalando/go-keyring"
 )
@@ -26,6 +27,12 @@ func TestMain(m *testing.M) {
 			os.Unsetenv(key)
 		}
 	}
+
+	// Pin the local timezone to UTC so any output rendering local times is
+	// deterministic. This must happen here, while the process is still
+	// single-goroutine: mutating time.Local mid-run races with any background
+	// goroutine that calls time.Now.
+	time.Local = time.UTC
 
 	os.Exit(m.Run())
 }
