@@ -13,10 +13,10 @@ func mapstructureKeys(t *testing.T, v any) []string {
 	t.Helper()
 	typ := reflect.TypeOf(v)
 	keys := make([]string, 0, typ.NumField())
-	for i := range typ.NumField() {
-		tag := typ.Field(i).Tag.Get("mapstructure")
+	for field := range typ.Fields() {
+		tag := field.Tag.Get("mapstructure")
 		if tag == "" {
-			t.Errorf("%s.%s has no mapstructure tag", typ.Name(), typ.Field(i).Name)
+			t.Errorf("%s.%s has no mapstructure tag", typ.Name(), field.Name)
 			continue
 		}
 		if tag == "-" {
