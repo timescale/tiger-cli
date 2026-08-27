@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,25 +36,6 @@ func discardCmd() *cobra.Command {
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	return cmd
-}
-
-// stubIsTerminal makes util.IsTerminal report val for the duration of the test
-// (true lets commands take their interactive path against a non-TTY stdin).
-func stubIsTerminal(t *testing.T, val bool) {
-	t.Helper()
-	original := util.IsTerminal
-	util.IsTerminal = func(any) bool { return val }
-	t.Cleanup(func() { util.IsTerminal = original })
-}
-
-// stubReadPassword makes util.ReadPassword return password for the duration of
-// the test. The real implementation needs stdin to be an *os.File, so password
-// prompts can't be driven with cmd.SetIn.
-func stubReadPassword(t *testing.T, password string) {
-	t.Helper()
-	original := util.ReadPassword
-	util.ReadPassword = func(context.Context, io.Reader) (string, error) { return password, nil }
-	t.Cleanup(func() { util.ReadPassword = original })
 }
 
 func TestMain(m *testing.M) {
@@ -95,27 +75,16 @@ type runOption func(*runConfig)
 type runConfig struct {
 	// Execution environment
 	ctx   context.Context
+	stdin io.Reader
 	setup []func(t *testing.T) // t-scoped setup hooks, run before the command tree is built (see withSetup)
 
-	// Seeded state: environment, config file, and stored credentials
-	envVars      map[string]string
+	// Seeded state: config file and stored credentials (env vars are seeded
+	// via setup hooks; see withEnv)
 	configValues map[string]any      // merged across withConfig calls; written to the config file before the command runs
 	credentials  *config.Credentials // if set, stored (in the mocked keyring) before the command runs
 
 	// API client injection
 	clientErr error // if set, the client factory returns this error (nil client)
-
-	// Terminal interaction
-	stdin        io.Reader
-	isTerminal   *bool              // if set, overrides util.IsTerminal for this test
-	readPassword *string            // if set, util.ReadPassword returns this value
-	openBrowser  func(string) error // if set, overrides the openBrowser stub for this test
-}
-
-func withStdin(input string) runOption {
-	return func(rc *runConfig) {
-		rc.stdin = strings.NewReader(input)
-	}
 }
 
 // withContext sets the context the command runs under. Use this for commands
@@ -128,18 +97,63 @@ func withContext(ctx context.Context) runOption {
 	}
 }
 
-// withIsTerminal overrides util.IsTerminal for the duration of the test.
-// Use this with withStdin to simulate interactive terminal input.
-func withIsTerminal(isTerminal bool) runOption {
+func withStdin(input string) runOption {
 	return func(rc *runConfig) {
-		rc.isTerminal = &isTerminal
+		rc.stdin = strings.NewReader(input)
 	}
 }
 
-func withEnv(key, value string) runOption {
+// withSetup runs f with the subtest's *testing.T just before the command tree
+// is built. Use it from options that stub package-level vars, so their
+// t.Cleanup restores at the end of the case that ran them rather than at the
+// end of an outer test function whose t they'd otherwise have to capture.
+func withSetup(f func(t *testing.T)) runOption {
 	return func(rc *runConfig) {
-		rc.envVars[key] = value
+		rc.setup = append(rc.setup, f)
 	}
+}
+
+// withIsTerminal makes util.IsTerminal report the given value for the duration
+// of the test (true lets commands take their interactive path against a
+// non-TTY stdin). Use this with withStdin to simulate interactive input.
+func withIsTerminal(isTerminal bool) runOption {
+	return withSetup(func(t *testing.T) {
+		original := util.IsTerminal
+		util.IsTerminal = func(any) bool { return isTerminal }
+		t.Cleanup(func() { util.IsTerminal = original })
+	})
+}
+
+// withOpenBrowser overrides openBrowser for the duration of the test. By
+// default, runCommand stubs openBrowser to return an error (installed before
+// the setup hooks run, so this override lands on top of it). Use this to
+// simulate a successful browser open (pass a nil-returning func).
+func withOpenBrowser(f func(string) error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := openBrowser
+		openBrowser = f
+		t.Cleanup(func() { openBrowser = original })
+	})
+}
+
+// withReadPassword makes util.ReadPassword return the given password. The real
+// implementation needs stdin to be an *os.File, so password prompts can't be
+// driven with withStdin.
+func withReadPassword(password string) runOption {
+	return withSetup(func(t *testing.T) {
+		original := util.ReadPassword
+		util.ReadPassword = func(context.Context, io.Reader) (string, error) { return password, nil }
+		t.Cleanup(func() { util.ReadPassword = original })
+	})
+}
+
+// withEnv sets an environment variable for the duration of the test (restored
+// when the test ends, not per runCommand call — a chained runCommand inside a
+// check still sees it). Options apply in the order they're given.
+func withEnv(key, value string) runOption {
+	return withSetup(func(t *testing.T) {
+		t.Setenv(key, value)
+	})
 }
 
 // withConfig seeds the test's config file with the given keys before the
@@ -151,16 +165,6 @@ func withConfig(values map[string]any) runOption {
 			rc.configValues = map[string]any{}
 		}
 		maps.Copy(rc.configValues, values)
-	}
-}
-
-// withSetup runs f with the subtest's *testing.T just before the command tree
-// is built. Use it from options that stub package-level vars, so their
-// t.Cleanup restores at the end of the case that ran them rather than at the
-// end of an outer test function whose t they'd otherwise have to capture.
-func withSetup(f func(t *testing.T)) runOption {
-	return func(rc *runConfig) {
-		rc.setup = append(rc.setup, f)
 	}
 }
 
@@ -194,24 +198,6 @@ func notLoggedInError() error {
 		fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", config.ErrNotLoggedIn))
 }
 
-// withOpenBrowser overrides openBrowser for the duration of the test. By
-// default, runCommand stubs openBrowser to return an error. Use this to
-// simulate a successful browser open (pass a nil-returning func).
-func withOpenBrowser(f func(string) error) runOption {
-	return func(rc *runConfig) {
-		rc.openBrowser = f
-	}
-}
-
-// withReadPassword makes util.ReadPassword return the given password. The real
-// implementation needs stdin to be an *os.File, so password prompts can't be
-// driven with withStdin.
-func withReadPassword(password string) runOption {
-	return func(rc *runConfig) {
-		rc.readPassword = &password
-	}
-}
-
 // runCommand builds the root command, injects a mock API client, and executes
 // with the given args against an isolated temp config directory. Returns
 // captured stdout, stderr, and any error from Execute.
@@ -228,8 +214,7 @@ func runCommand(
 	t.Helper()
 
 	rc := &runConfig{
-		ctx:     context.Background(),
-		envVars: map[string]string{},
+		ctx: context.Background(),
 	}
 	for _, opt := range opts {
 		opt(rc)
@@ -240,15 +225,17 @@ func runCommand(
 	// it via options (withStoredCredentials, withSetup), which run after this.
 	keyring.MockInit()
 
-	// Set env vars (restored when the test ends, not per runCommand call — a
-	// chained runCommand inside a check still sees them). Sorted so two
-	// interdependent vars apply deterministically. Must happen before
-	// buildRootCmd, which reads TIGER_EXPERIMENTAL at build time.
-	for _, k := range slices.Sorted(maps.Keys(rc.envVars)) {
-		t.Setenv(k, rc.envVars[k])
+	// Prevent browser opens in tests (default: return error). Installed before
+	// the setup hooks so a withOpenBrowser override lands on top of it.
+	originalOpenBrowser := openBrowser
+	openBrowser = func(url string) error {
+		return errors.New("browser disabled in tests")
 	}
+	t.Cleanup(func() { openBrowser = originalOpenBrowser })
 
-	// Run t-scoped setup hooks (see withSetup).
+	// Run t-scoped setup hooks (see withSetup) in option order. These must run
+	// before buildRootCmd, which reads withEnv's TIGER_EXPERIMENTAL at build
+	// time.
 	for _, f := range rc.setup {
 		f(t)
 	}
@@ -300,28 +287,6 @@ func runCommand(
 	if rc.stdin != nil {
 		cmd.SetIn(rc.stdin)
 	}
-
-	// Override util.IsTerminal if requested
-	if rc.isTerminal != nil {
-		stubIsTerminal(t, *rc.isTerminal)
-	}
-
-	// Override util.ReadPassword if requested
-	if rc.readPassword != nil {
-		stubReadPassword(t, *rc.readPassword)
-	}
-
-	// Prevent browser opens in tests (default: return error). Tests that need
-	// to simulate a successful browser open use withOpenBrowser.
-	originalOpenBrowser := openBrowser
-	if rc.openBrowser != nil {
-		openBrowser = rc.openBrowser
-	} else {
-		openBrowser = func(url string) error {
-			return errors.New("browser disabled in tests")
-		}
-	}
-	t.Cleanup(func() { openBrowser = originalOpenBrowser })
 
 	// Always include flags that prevent side effects in tests:
 	// --config-dir: isolate from real config
