@@ -52,12 +52,13 @@ func TestMCPListCmd(t *testing.T) {
 └──────┴──────────────────┘
 `
 
-	// TIGER_EXPERIMENTAL registers the preview metrics tools.
+	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
 	wantTextExperimental := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
 │ tool │ db_execute_query          │
 │ tool │ db_schema                 │
+│ tool │ service_backups           │
 │ tool │ service_create            │
 │ tool │ service_fork              │
 │ tool │ service_get               │

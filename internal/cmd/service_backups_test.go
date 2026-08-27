@@ -1,23 +1,36 @@
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
-	"strings"
+	"errors"
+	"net/http"
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
-
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func createTestBackups() []api.Backup {
+func TestServiceBackupsCmd(t *testing.T) {
+	// The command is experimental-gated (see the gate test in service_test.go),
+	// so every case registers it explicitly.
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
+
+	// The table renders start times in the local timezone; pin it to UTC so the
+	// expected output is machine-independent.
+	withUTC := withSetup(func(t *testing.T) {
+		original := time.Local
+		time.Local = time.UTC
+		t.Cleanup(func() { time.Local = original })
+	})
+
+	// Four backups covering the formatting matrix: full/incremental, finished/
+	// still running (absent finished_at/duration/size), second/minute/hour
+	// durations, byte/mebibyte/gibibyte sizes, and regions with and without a
+	// reported copy status.
 	started := time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)
 	finished := time.Date(2026, 1, 15, 9, 41, 12, 0, time.UTC)
-
-	return []api.Backup{
+	backups := []api.Backup{
 		{
 			Label:           "20260115-093000F",
 			Type:            api.BackupTypeFULL,
@@ -31,144 +44,214 @@ func createTestBackups() []api.Backup {
 			},
 		},
 		{
-			// Still running: no finish time, duration or size.
-			// No per-region status: the backend does not always report one.
+			// Still running: no finish time, duration, or size. No per-region
+			// status: the backend does not always report one.
 			Label:     "20260115-093000F_20260116-100000I",
 			Type:      api.BackupTypeINCREMENTAL,
 			StartedAt: started.Add(24 * time.Hour),
 			Regions:   []api.BackupRegionState{{RegionCode: "us-east-1"}},
 		},
-	}
-}
-
-func TestOutputBackups_JSON(t *testing.T) {
-	setupServiceTest(t)
-
-	cmd := &cobra.Command{}
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-
-	if err := outputBackups(cmd, createTestBackups(), "json"); err != nil {
-		t.Fatalf("Failed to output JSON: %v", err)
-	}
-
-	var result []api.Backup
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid JSON output: %v", err)
-	}
-	if len(result) != 2 {
-		t.Fatalf("Expected 2 backups in JSON, got %d", len(result))
-	}
-	// The label is dropped from the table but kept here.
-	if result[0].Label != "20260115-093000F" {
-		t.Errorf("Expected label in JSON, got %q", result[0].Label)
-	}
-	if result[1].FinishedAt != nil {
-		t.Errorf("Expected no finished_at for a running backup, got %v", result[1].FinishedAt)
-	}
-}
-
-func TestOutputBackups_YAML(t *testing.T) {
-	setupServiceTest(t)
-
-	cmd := &cobra.Command{}
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-
-	if err := outputBackups(cmd, createTestBackups(), "yaml"); err != nil {
-		t.Fatalf("Failed to output YAML: %v", err)
+		{
+			Label:           "20260117-093000F",
+			Type:            api.BackupTypeFULL,
+			StartedAt:       started.Add(48 * time.Hour),
+			DurationSeconds: new(int64(2)),
+			SizeBytes:       new(int64(512)),
+			Regions: []api.BackupRegionState{
+				{RegionCode: "us-east-1", Status: new(api.BackupCopyStatusFINISHED)},
+			},
+		},
+		{
+			Label:           "20260117-093000F_20260118-100000I",
+			Type:            api.BackupTypeINCREMENTAL,
+			StartedAt:       started.Add(72 * time.Hour),
+			DurationSeconds: new(int64(7325)),
+			SizeBytes:       new(int64(53_300_000)),
+			Regions: []api.BackupRegionState{
+				{RegionCode: "us-east-1", Status: new(api.BackupCopyStatusRUNNING)},
+			},
+		},
 	}
 
-	var result []api.Backup
-	if err := yaml.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("Invalid YAML output: %v", err)
-	}
-	if len(result) != 2 {
-		t.Fatalf("Expected 2 backups in YAML, got %d", len(result))
-	}
-}
-
-func TestOutputBackups_Table(t *testing.T) {
-	setupServiceTest(t)
-
-	cmd := &cobra.Command{}
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-
-	if err := outputBackups(cmd, createTestBackups(), "table"); err != nil {
-		t.Fatalf("Failed to output table: %v", err)
-	}
-	output := buf.String()
-
-	started := time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)
-	for _, want := range []string{
-		"STARTED", "TYPE", "DURATION", "SIZE", "REGIONS",
-		started.Local().Format("2006-01-02 15:04 MST"), "FULL", "11m12s", "4.5GiB",
-		"us-east-1 (FINISHED), eu-central-1 (FAILED)",
-		started.Add(24 * time.Hour).Local().Format("2006-01-02 15:04 MST"), "INCREMENTAL",
-	} {
-		if !strings.Contains(output, want) {
-			t.Errorf("Expected table to contain %q, got:\n%s", want, output)
+	setupList := func(backups []api.Backup) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
+				Return(&api.GetBackupsResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &backups,
+				}, nil)
 		}
 	}
 
-	for _, unwanted := range []string{"LABEL", "20260115-093000F"} {
-		if strings.Contains(output, unwanted) {
-			t.Errorf("Expected table not to contain %q, got:\n%s", unwanted, output)
-		}
+	tests := []cmdTest{
+		{
+			name:    "not logged in",
+			args:    []string{"service", "backup", "svc-12345"},
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			check:   checkExitCode(common.ExitAuthenticationError),
+		},
+		{
+			name:    "missing service id",
+			args:    []string{"service", "backup"},
+			opts:    []runOption{experimental},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "network error",
+			args: []string{"service", "backup", "svc-12345"},
+			opts: []runOption{experimental},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to list backups: connection refused",
+		},
+		{
+			name: "API error",
+			args: []string{"service", "backup", "svc-12345"},
+			opts: []runOption{experimental},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetBackupsResponse{
+						HTTPResponse: httpResponse(http.StatusNotFound),
+						JSON4XX:      &api.ClientError{Message: new("service not found")},
+					}, nil)
+			},
+			wantErr: "service not found",
+			check:   checkExitCode(common.ExitServiceNotFound),
+		},
+		{
+			name: "nil response body",
+			args: []string{"service", "backup", "svc-12345"},
+			opts: []runOption{experimental},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetBackupsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+		},
+		{
+			name:       "empty list",
+			args:       []string{"service", "backup", "svc-12345"},
+			opts:       []runOption{experimental},
+			setup:      setupList([]api.Backup{}),
+			wantStderr: "No backups found for this service yet.\n",
+		},
+		{
+			// The label is omitted from the table: it repeats STARTED and TYPE,
+			// and no command takes it as input.
+			name:  "table output",
+			args:  []string{"service", "backup", "svc-12345"},
+			opts:  []runOption{experimental, withUTC},
+			setup: setupList(backups),
+			wantStdout: `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
+│       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
+├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
+│ 2026-01-15 09:30 UTC │ FULL        │ 11m12s   │ 4.5GiB   │ us-east-1 (FINISHED), eu-central-1 (FAILED) │
+│ 2026-01-16 09:30 UTC │ INCREMENTAL │          │          │ us-east-1                                   │
+│ 2026-01-17 09:30 UTC │ FULL        │ 2s       │ 512B     │ us-east-1 (FINISHED)                        │
+│ 2026-01-18 09:30 UTC │ INCREMENTAL │ 2h2m5s   │ 50.83MiB │ us-east-1 (RUNNING)                         │
+└──────────────────────┴─────────────┴──────────┴──────────┴─────────────────────────────────────────────┘
+`,
+		},
+		{
+			name:  "default service id from config",
+			args:  []string{"service", "backup"},
+			opts:  []runOption{experimental, withUTC, withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup: setupList(backups),
+			wantStdout: `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
+│       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
+├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
+│ 2026-01-15 09:30 UTC │ FULL        │ 11m12s   │ 4.5GiB   │ us-east-1 (FINISHED), eu-central-1 (FAILED) │
+│ 2026-01-16 09:30 UTC │ INCREMENTAL │          │          │ us-east-1                                   │
+│ 2026-01-17 09:30 UTC │ FULL        │ 2s       │ 512B     │ us-east-1 (FINISHED)                        │
+│ 2026-01-18 09:30 UTC │ INCREMENTAL │ 2h2m5s   │ 50.83MiB │ us-east-1 (RUNNING)                         │
+└──────────────────────┴─────────────┴──────────┴──────────┴─────────────────────────────────────────────┘
+`,
+		},
+		{
+			// The label stays in the structured formats.
+			name:  "json output",
+			args:  []string{"service", "backup", "svc-12345", "-o", "json"},
+			opts:  []runOption{experimental},
+			setup: setupList(backups[:2]),
+			wantStdout: `[
+  {
+    "duration_seconds": 672,
+    "finished_at": "2026-01-15T09:41:12Z",
+    "label": "20260115-093000F",
+    "regions": [
+      {
+        "region_code": "us-east-1",
+        "status": "FINISHED"
+      },
+      {
+        "region_code": "eu-central-1",
+        "status": "FAILED"
+      }
+    ],
+    "size_bytes": 4831838208,
+    "started_at": "2026-01-15T09:30:00Z",
+    "type": "FULL"
+  },
+  {
+    "label": "20260115-093000F_20260116-100000I",
+    "regions": [
+      {
+        "region_code": "us-east-1"
+      }
+    ],
+    "started_at": "2026-01-16T09:30:00Z",
+    "type": "INCREMENTAL"
+  }
+]
+`,
+		},
+		{
+			// size_bytes renders in scientific notation: SerializeToYAML
+			// round-trips through JSON, so large integers become float64s.
+			name:  "yaml output",
+			args:  []string{"service", "backup", "svc-12345", "-o", "yaml"},
+			opts:  []runOption{experimental},
+			setup: setupList(backups[:2]),
+			wantStdout: `- duration_seconds: 672
+  finished_at: "2026-01-15T09:41:12Z"
+  label: 20260115-093000F
+  regions:
+    - region_code: us-east-1
+      status: FINISHED
+    - region_code: eu-central-1
+      status: FAILED
+  size_bytes: 4.831838208e+09
+  started_at: "2026-01-15T09:30:00Z"
+  type: FULL
+- label: 20260115-093000F_20260116-100000I
+  regions:
+    - region_code: us-east-1
+  started_at: "2026-01-16T09:30:00Z"
+  type: INCREMENTAL
+`,
+		},
+		{
+			name:    "env output rejected by flag",
+			args:    []string{"service", "backup", "svc-12345", "-o", "env"},
+			opts:    []runOption{experimental},
+			wantErr: `invalid argument "env" for "-o, --output" flag: invalid output format: env (must be one of: json, yaml, table)`,
+		},
+		{
+			// The flag rejects env at parse time, but a hand-edited config file
+			// can still reach outputBackups' env branch.
+			name:    "env output from config file",
+			args:    []string{"service", "backup", "svc-12345"},
+			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
+			setup:   setupList(backups[:2]),
+			wantErr: "environment variable output is not supported for backups",
+		},
 	}
-}
 
-func TestOutputBackups_EnvUnsupported(t *testing.T) {
-	setupServiceTest(t)
-
-	cmd := &cobra.Command{}
-	cmd.SetOut(new(bytes.Buffer))
-
-	if err := outputBackups(cmd, createTestBackups(), "env"); err == nil {
-		t.Fatal("Expected an error for env output")
-	}
-}
-
-func TestFormatSizeBytes(t *testing.T) {
-	cases := []struct {
-		name  string
-		bytes *int64
-		want  string
-	}{
-		{name: "absent", bytes: nil, want: ""},
-		{name: "bytes", bytes: new(int64(512)), want: "512B"},
-		{name: "kibibytes", bytes: new(int64(2048)), want: "2KiB"},
-		{name: "mebibytes", bytes: new(int64(53_300_000)), want: "50.83MiB"},
-		{name: "gibibytes", bytes: new(int64(4831838208)), want: "4.5GiB"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := formatSizeBytes(tc.bytes); got != tc.want {
-				t.Errorf("formatSizeBytes() = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestFormatDurationSeconds(t *testing.T) {
-	cases := []struct {
-		name    string
-		seconds *int64
-		want    string
-	}{
-		{name: "absent", seconds: nil, want: ""},
-		{name: "seconds", seconds: new(int64(2)), want: "2s"},
-		{name: "minutes", seconds: new(int64(672)), want: "11m12s"},
-		{name: "hours", seconds: new(int64(7325)), want: "2h2m5s"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := formatDurationSeconds(tc.seconds); got != tc.want {
-				t.Errorf("formatDurationSeconds() = %q, want %q", got, tc.want)
-			}
-		})
-	}
+	runCmdTests(t, tests)
 }
