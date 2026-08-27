@@ -28,16 +28,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// discardCmd returns a bare command whose output streams are discarded, for
-// tests that call a helper taking a *cobra.Command without caring what it
-// prints.
-func discardCmd() *cobra.Command {
-	cmd := &cobra.Command{}
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-	return cmd
-}
-
 func TestMain(m *testing.M) {
 	// Backstop: replace the system keyring with an in-memory mock so that even
 	// a test that forgets to reset can never read, write, or delete real
@@ -63,11 +53,64 @@ func TestMain(m *testing.M) {
 // testProjectID is the project ID the injected client factory reports.
 const testProjectID = "test-project-123"
 
-type cmdResult struct {
-	stdout    string
-	stderr    string
-	err       error
-	configDir string
+// cmdTest is the standard test case struct for table-driven command tests.
+type cmdTest struct {
+	name       string
+	args       []string
+	setup      func(m *mocks.MockClientWithResponsesInterface)
+	opts       []runOption
+	wantStdout string
+	wantStderr string
+	wantErr    string
+	checks     []checkFunc // optional extra assertions, run in order after the standard ones
+}
+
+// runCmdTests runs a slice of table-driven command tests using the standard
+// assertion pattern: check wantErr, then wantStdout, then wantStderr.
+//
+// When wantErr is set and wantStderr is empty, the expected stderr is
+// automatically derived from the error message (Cobra prints "Error: <msg>\n"
+// to stderr for any error returned by RunE). Commands that set SilenceErrors
+// print differently, so their error cases must set wantStderr explicitly; a
+// case expecting an error with EMPTY stderr isn't expressible in the table —
+// use a bespoke subtest.
+func runCmdTests(t *testing.T, tests []cmdTest) {
+	t.Helper()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := runCommand(t, tt.args, tt.setup, tt.opts...)
+
+			if tt.wantErr != "" {
+				if result.err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				assertOutput(t, result.err.Error(), tt.wantErr)
+			} else if result.err != nil {
+				t.Fatalf("unexpected error: %v", result.err)
+			}
+
+			assertOutput(t, result.stdout, tt.wantStdout)
+
+			wantStderr := tt.wantStderr
+			if wantStderr == "" && tt.wantErr != "" {
+				// Cobra prints "Error: <msg>\n" to stderr for RunE errors
+				wantStderr = "Error: " + tt.wantErr + "\n"
+			}
+			assertOutput(t, result.stderr, wantStderr)
+
+			for _, check := range tt.checks {
+				check(t, result)
+			}
+		})
+	}
+}
+
+// assertOutput checks that got exactly equals want, showing a unified diff on mismatch.
+func assertOutput(t *testing.T, got, want string) {
+	t.Helper()
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("output mismatch (-want +got):\n%s", diff)
+	}
 }
 
 type runOption func(*runConfig)
@@ -87,115 +130,11 @@ type runConfig struct {
 	clientErr error // if set, the client factory returns this error (nil client)
 }
 
-// withContext sets the context the command runs under. Use this for commands
-// that block until the context is cancelled (e.g. `tiger mcp start`): pass an
-// already-cancelled context to exercise the command without leaving a server
-// running for the duration of the test.
-func withContext(ctx context.Context) runOption {
-	return func(rc *runConfig) {
-		rc.ctx = ctx
-	}
-}
-
-func withStdin(input string) runOption {
-	return func(rc *runConfig) {
-		rc.stdin = strings.NewReader(input)
-	}
-}
-
-// withSetup runs f with the subtest's *testing.T just before the command tree
-// is built. Use it from options that stub package-level vars, so their
-// t.Cleanup restores at the end of the case that ran them rather than at the
-// end of an outer test function whose t they'd otherwise have to capture.
-func withSetup(f func(t *testing.T)) runOption {
-	return func(rc *runConfig) {
-		rc.setup = append(rc.setup, f)
-	}
-}
-
-// withIsTerminal makes util.IsTerminal report the given value for the duration
-// of the test (true lets commands take their interactive path against a
-// non-TTY stdin). Use this with withStdin to simulate interactive input.
-func withIsTerminal(isTerminal bool) runOption {
-	return withSetup(func(t *testing.T) {
-		original := util.IsTerminal
-		util.IsTerminal = func(any) bool { return isTerminal }
-		t.Cleanup(func() { util.IsTerminal = original })
-	})
-}
-
-// withOpenBrowser overrides openBrowser for the duration of the test. By
-// default, runCommand stubs openBrowser to return an error (installed before
-// the setup hooks run, so this override lands on top of it). Use this to
-// simulate a successful browser open (pass a nil-returning func).
-func withOpenBrowser(f func(string) error) runOption {
-	return withSetup(func(t *testing.T) {
-		original := openBrowser
-		openBrowser = f
-		t.Cleanup(func() { openBrowser = original })
-	})
-}
-
-// withReadPassword makes util.ReadPassword return the given password. The real
-// implementation needs stdin to be an *os.File, so password prompts can't be
-// driven with withStdin.
-func withReadPassword(password string) runOption {
-	return withSetup(func(t *testing.T) {
-		original := util.ReadPassword
-		util.ReadPassword = func(context.Context, io.Reader) (string, error) { return password, nil }
-		t.Cleanup(func() { util.ReadPassword = original })
-	})
-}
-
-// withEnv sets an environment variable for the duration of the test (restored
-// when the test ends, not per runCommand call — a chained runCommand inside a
-// check still sees it). Options apply in the order they're given.
-func withEnv(key, value string) runOption {
-	return withSetup(func(t *testing.T) {
-		t.Setenv(key, value)
-	})
-}
-
-// withConfig seeds the test's config file with the given keys before the
-// command runs (e.g. map[string]any{"service_id": "svc-123", "read_only": true}).
-// Repeated withConfig options merge, later values winning per key.
-func withConfig(values map[string]any) runOption {
-	return func(rc *runConfig) {
-		if rc.configValues == nil {
-			rc.configValues = map[string]any{}
-		}
-		maps.Copy(rc.configValues, values)
-	}
-}
-
-// withStoredCredentials stores the given credentials (in the test's mock
-// keyring entry) before the command runs, for commands that read or rewrite
-// stored credentials (e.g. `tiger auth status`, `tiger auth logout`).
-func withStoredCredentials(creds config.Credentials) runOption {
-	return func(rc *runConfig) {
-		rc.credentials = &creds
-	}
-}
-
-// withClientError makes the client factory return the given error instead of a
-// mock client. This simulates scenarios where credentials are invalid.
-func withClientError(err error) runOption {
-	return func(rc *runConfig) {
-		rc.clientErr = err
-	}
-}
-
-// withNotLoggedIn makes the client factory fail exactly the way production does
-// when no credentials are stored.
-func withNotLoggedIn() runOption {
-	return withClientError(notLoggedInError())
-}
-
-// notLoggedInError mirrors the error common.NewAPIClient returns when no
-// credentials are stored.
-func notLoggedInError() error {
-	return common.ExitWithCode(common.ExitAuthenticationError,
-		fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", config.ErrNotLoggedIn))
+type cmdResult struct {
+	stdout    string
+	stderr    string
+	err       error
+	configDir string
 }
 
 // runCommand builds the root command, injects a mock API client, and executes
@@ -309,18 +248,137 @@ func runCommand(
 	}
 }
 
-// readStoredCredentials reads the credentials stored for the test (in the mock
-// keyring or the config dir's fallback file). Use with withStoredCredentials
-// to verify credential rewrites, or after `auth login` to verify storage.
-func readStoredCredentials(t *testing.T, configDir string) (*config.Credentials, error) {
-	t.Helper()
-	cfg := &config.Config{ConfigDir: configDir}
-	return cfg.GetStoredCredentials()
+// withContext sets the context the command runs under. Use this for commands
+// that block until the context is cancelled (e.g. `tiger mcp start`): pass an
+// already-cancelled context to exercise the command without leaving a server
+// running for the duration of the test.
+func withContext(ctx context.Context) runOption {
+	return func(rc *runConfig) {
+		rc.ctx = ctx
+	}
 }
+
+func withStdin(input string) runOption {
+	return func(rc *runConfig) {
+		rc.stdin = strings.NewReader(input)
+	}
+}
+
+// withSetup runs f with the subtest's *testing.T just before the command tree
+// is built. Use it from options that stub package-level vars, so their
+// t.Cleanup restores at the end of the case that ran them rather than at the
+// end of an outer test function whose t they'd otherwise have to capture.
+func withSetup(f func(t *testing.T)) runOption {
+	return func(rc *runConfig) {
+		rc.setup = append(rc.setup, f)
+	}
+}
+
+// withEnv sets an environment variable for the duration of the test (restored
+// when the test ends, not per runCommand call — a chained runCommand inside a
+// check still sees it). Options apply in the order they're given.
+func withEnv(key, value string) runOption {
+	return withSetup(func(t *testing.T) {
+		t.Setenv(key, value)
+	})
+}
+
+// withIsTerminal makes util.IsTerminal report the given value for the duration
+// of the test (true lets commands take their interactive path against a
+// non-TTY stdin). Use this with withStdin to simulate interactive input.
+func withIsTerminal(isTerminal bool) runOption {
+	return withSetup(func(t *testing.T) {
+		original := util.IsTerminal
+		util.IsTerminal = func(any) bool { return isTerminal }
+		t.Cleanup(func() { util.IsTerminal = original })
+	})
+}
+
+// withReadPassword makes util.ReadPassword return the given password. The real
+// implementation needs stdin to be an *os.File, so password prompts can't be
+// driven with withStdin.
+func withReadPassword(password string) runOption {
+	return withSetup(func(t *testing.T) {
+		original := util.ReadPassword
+		util.ReadPassword = func(context.Context, io.Reader) (string, error) { return password, nil }
+		t.Cleanup(func() { util.ReadPassword = original })
+	})
+}
+
+// withOpenBrowser overrides openBrowser for the duration of the test. By
+// default, runCommand stubs openBrowser to return an error (installed before
+// the setup hooks run, so this override lands on top of it). Use this to
+// simulate a successful browser open (pass a nil-returning func).
+func withOpenBrowser(f func(string) error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := openBrowser
+		openBrowser = f
+		t.Cleanup(func() { openBrowser = original })
+	})
+}
+
+// withUTC pins the process's local timezone to UTC, so expected output that
+// embeds local-time formatting stays machine-independent.
+func withUTC() runOption {
+	return withSetup(func(t *testing.T) {
+		original := time.Local
+		time.Local = time.UTC
+		t.Cleanup(func() { time.Local = original })
+	})
+}
+
+// withConfig seeds the test's config file with the given keys before the
+// command runs (e.g. map[string]any{"service_id": "svc-123", "read_only": true}).
+// Repeated withConfig options merge, later values winning per key.
+func withConfig(values map[string]any) runOption {
+	return func(rc *runConfig) {
+		if rc.configValues == nil {
+			rc.configValues = map[string]any{}
+		}
+		maps.Copy(rc.configValues, values)
+	}
+}
+
+// withStoredCredentials stores the given credentials (in the test's mock
+// keyring entry) before the command runs, for commands that read or rewrite
+// stored credentials (e.g. `tiger auth status`, `tiger auth logout`).
+func withStoredCredentials(creds config.Credentials) runOption {
+	return func(rc *runConfig) {
+		rc.credentials = &creds
+	}
+}
+
+// withClientError makes the client factory return the given error instead of a
+// mock client. This simulates scenarios where credentials are invalid.
+func withClientError(err error) runOption {
+	return func(rc *runConfig) {
+		rc.clientErr = err
+	}
+}
+
+// withNotLoggedIn makes the client factory fail exactly the way production does
+// when no credentials are stored.
+func withNotLoggedIn() runOption {
+	return withClientError(notLoggedInError())
+}
+
+// notLoggedInMsg is the message of the error withNotLoggedIn makes the client
+// factory return; test cases expect it as their wantErr.
+const notLoggedInMsg = "authentication required: not logged in. Please run 'tiger auth login'"
+
+// notLoggedInError mirrors the error common.NewAPIClient returns when no
+// credentials are stored.
+func notLoggedInError() error {
+	return common.ExitWithCode(common.ExitAuthenticationError,
+		fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", config.ErrNotLoggedIn))
+}
+
+// checkFunc is an extra assertion a cmdTest runs after the standard ones.
+type checkFunc func(t *testing.T, result cmdResult)
 
 // checkExitCode returns a check asserting the command failed with the given
 // exit code.
-func checkExitCode(want int) func(*testing.T, cmdResult) {
+func checkExitCode(want int) checkFunc {
 	return func(t *testing.T, result cmdResult) {
 		t.Helper()
 		var exitErr common.ExitCodeError
@@ -329,6 +387,21 @@ func checkExitCode(want int) func(*testing.T, cmdResult) {
 		}
 		if exitErr.ExitCode() != want {
 			t.Errorf("exit code = %d, want %d", exitErr.ExitCode(), want)
+		}
+	}
+}
+
+// checkDefaultService returns a check asserting the config file's default
+// service_id after the command ran.
+func checkDefaultService(want string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		cfg, err := config.Load(testFlags(t, result.configDir))
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+		if cfg.ServiceID != want {
+			t.Errorf("default service_id = %q, want %q", cfg.ServiceID, want)
 		}
 	}
 }
@@ -345,6 +418,15 @@ func readConfigFile(t *testing.T, configDir string) map[string]any {
 		t.Fatalf("failed to parse config file: %v", err)
 	}
 	return values
+}
+
+// readStoredCredentials reads the credentials stored for the test (in the mock
+// keyring or the config dir's fallback file). Use with withStoredCredentials
+// to verify credential rewrites, or after `auth login` to verify storage.
+func readStoredCredentials(t *testing.T, configDir string) (*config.Credentials, error) {
+	t.Helper()
+	cfg := &config.Config{ConfigDir: configDir}
+	return cfg.GetStoredCredentials()
 }
 
 // httpResponse creates a minimal *http.Response with the given status code.
@@ -390,64 +472,14 @@ var validCtx = gomock.Cond(func(x any) bool {
 	return ok && ctx != nil
 })
 
-// assertOutput checks that got exactly equals want, showing a unified diff on mismatch.
-func assertOutput(t *testing.T, got, want string) {
-	t.Helper()
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("output mismatch (-want +got):\n%s", diff)
-	}
-}
-
-// cmdTest is the standard test case struct for table-driven command tests.
-type cmdTest struct {
-	name       string
-	args       []string
-	setup      func(m *mocks.MockClientWithResponsesInterface)
-	opts       []runOption
-	wantStdout string
-	wantStderr string
-	wantErr    string
-	check      func(t *testing.T, result cmdResult) // optional extra assertions after the standard ones
-}
-
-// runCmdTests runs a slice of table-driven command tests using the standard
-// assertion pattern: check wantErr, then wantStdout, then wantStderr.
-//
-// When wantErr is set and wantStderr is empty, the expected stderr is
-// automatically derived from the error message (Cobra prints "Error: <msg>\n"
-// to stderr for any error returned by RunE). Commands that set SilenceErrors
-// print differently, so their error cases must set wantStderr explicitly; a
-// case expecting an error with EMPTY stderr isn't expressible in the table —
-// use a bespoke subtest.
-func runCmdTests(t *testing.T, tests []cmdTest) {
-	t.Helper()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := runCommand(t, tt.args, tt.setup, tt.opts...)
-
-			if tt.wantErr != "" {
-				if result.err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				assertOutput(t, result.err.Error(), tt.wantErr)
-			} else if result.err != nil {
-				t.Fatalf("unexpected error: %v", result.err)
-			}
-
-			assertOutput(t, result.stdout, tt.wantStdout)
-
-			wantStderr := tt.wantStderr
-			if wantStderr == "" && tt.wantErr != "" {
-				// Cobra prints "Error: <msg>\n" to stderr for RunE errors
-				wantStderr = "Error: " + tt.wantErr + "\n"
-			}
-			assertOutput(t, result.stderr, wantStderr)
-
-			if tt.check != nil {
-				tt.check(t, result)
-			}
-		})
-	}
+// discardCmd returns a bare command whose output streams are discarded, for
+// tests that call a helper taking a *cobra.Command without caring what it
+// prints.
+func discardCmd() *cobra.Command {
+	cmd := &cobra.Command{}
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	return cmd
 }
 
 // testFlags returns a flag set shaped like a command's, with --config-dir pointed

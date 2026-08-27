@@ -27,8 +27,8 @@ func TestServiceStopCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "stop", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "read-only mode",
@@ -61,7 +61,7 @@ func TestServiceStopCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service is already stopped",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "service not found",
@@ -74,7 +74,7 @@ func TestServiceStopCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -141,7 +141,7 @@ func TestServiceStopCmd(t *testing.T) {
 				"⏳ Waiting for service to stop (timeout: 1ms)...\n" +
 				"⢎  Service status: PAUSING\n" +
 				"❌ Error: wait timeout reached after 1ms - service may still be stopping\n",
-			check: checkExitCode(common.ExitTimeout),
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			name:  "default service id from config",

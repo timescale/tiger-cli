@@ -22,9 +22,9 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// startFakeReleasesServer mimics the release hosting used by scripts/install.sh
+// startMockReleasesServer mimics the release hosting used by scripts/install.sh
 // (latest.txt). Only latest.txt is served; anything else returns 404.
-func startFakeReleasesServer(t *testing.T, latestVersion string) *httptest.Server {
+func startMockReleasesServer(t *testing.T, latestVersion string) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /latest.txt", func(w http.ResponseWriter, r *http.Request) {
@@ -38,8 +38,8 @@ func startFakeReleasesServer(t *testing.T, latestVersion string) *httptest.Serve
 	return server
 }
 
-// fakeRelease describes the release served by startReleaseServer.
-type fakeRelease struct {
+// mockRelease describes the release served by startMockReleaseServer.
+type mockRelease struct {
 	latest     string // latest.txt body
 	tag        string // release tag in the download path (e.g. "v1.2.3")
 	entryName  string // filename inside the archive
@@ -48,12 +48,12 @@ type fakeRelease struct {
 	noChecksum bool   // don't serve the .sha256 route at all
 }
 
-// startReleaseServer serves latest.txt plus a single release archive for the
+// startMockReleaseServer serves latest.txt plus a single release archive for the
 // current platform and its checksum. The default checksum body uses
 // GoReleaser's "<digest>  <filename>" form with an uppercased digest, so the
 // success path also covers checksum parsing and case-insensitive comparison.
 // Returns the server and the archive's correct hex digest.
-func startReleaseServer(t *testing.T, r fakeRelease) (*httptest.Server, string) {
+func startMockReleaseServer(t *testing.T, r mockRelease) (*httptest.Server, string) {
 	t.Helper()
 	archiveName, isZip, err := buildReleaseArchiveName()
 	if err != nil {
@@ -130,13 +130,13 @@ func makeArchive(t *testing.T, isZip bool, entryName string, contents []byte) []
 	return buf.Bytes()
 }
 
-// fakeInstalledBinary creates a stand-in for the currently running binary in
+// mockInstalledBinary creates a stand-in for the currently running binary in
 // its own temp dir (never the real test binary) and returns its path.
-func fakeInstalledBinary(t *testing.T) string {
+func mockInstalledBinary(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), binaryFilename())
 	if err := os.WriteFile(path, []byte("old binary"), 0o755); err != nil {
-		t.Fatalf("write fake installed binary: %v", err)
+		t.Fatalf("write mock installed binary: %v", err)
 	}
 	return path
 }
@@ -158,29 +158,29 @@ func TestUpgradeCmd(t *testing.T) {
 		t.Skipf("unsupported platform for release archives: %v", err)
 	}
 
-	latestServer := startFakeReleasesServer(t, "v99.99.99")
+	latestServer := startMockReleasesServer(t, "v99.99.99")
 
 	newBinary := []byte("#!/bin/sh\necho fake tiger\n")
-	release := fakeRelease{
+	release := mockRelease{
 		latest:    "v99.99.99",
 		tag:       "v1.2.3",
 		entryName: binaryFilename(),
 		contents:  newBinary,
 	}
 
-	successServer, _ := startReleaseServer(t, release)
+	successServer, _ := startMockReleaseServer(t, release)
 
 	mismatchRelease := release
 	mismatchRelease.checksum = "deadbeef"
-	mismatchServer, mismatchDigest := startReleaseServer(t, mismatchRelease)
+	mismatchServer, mismatchDigest := startMockReleaseServer(t, mismatchRelease)
 
 	noChecksumRelease := release
 	noChecksumRelease.noChecksum = true
-	noChecksumServer, _ := startReleaseServer(t, noChecksumRelease)
+	noChecksumServer, _ := startMockReleaseServer(t, noChecksumRelease)
 
 	wrongEntryRelease := release
 	wrongEntryRelease.entryName = "not-" + binaryFilename()
-	wrongEntryServer, _ := startReleaseServer(t, wrongEntryRelease)
+	wrongEntryServer, _ := startMockReleaseServer(t, wrongEntryRelease)
 
 	// Stdout the command prints before each download-flow failure or success:
 	// the version banner and the download line.
@@ -189,12 +189,12 @@ func TestUpgradeCmd(t *testing.T) {
 			verb, currentVersion, serverURL, archiveName)
 	}
 
-	successBin := fakeInstalledBinary(t)
-	downgradeBin := fakeInstalledBinary(t)
-	archive404Bin := fakeInstalledBinary(t)
-	checksum404Bin := fakeInstalledBinary(t)
-	mismatchBin := fakeInstalledBinary(t)
-	wrongEntryBin := fakeInstalledBinary(t)
+	successBin := mockInstalledBinary(t)
+	downgradeBin := mockInstalledBinary(t)
+	archive404Bin := mockInstalledBinary(t)
+	checksum404Bin := mockInstalledBinary(t)
+	mismatchBin := mockInstalledBinary(t)
+	wrongEntryBin := mockInstalledBinary(t)
 
 	tests := []cmdTest{
 		{
@@ -272,7 +272,7 @@ func TestUpgradeCmd(t *testing.T) {
 				"Verifying checksum\n" +
 				fmt.Sprintf("Installing new binary to %s\n", successBin) +
 				"tiger upgraded successfully to v1.2.3\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				got, err := os.ReadFile(successBin)
 				if err != nil {
 					t.Fatalf("read replaced binary: %v", err)
@@ -292,7 +292,7 @@ func TestUpgradeCmd(t *testing.T) {
 				if len(leftovers) != 0 {
 					t.Errorf("temp files left in install dir: %v", leftovers)
 				}
-			},
+			}},
 		},
 		{
 			name: "downgrades when requested version is older",

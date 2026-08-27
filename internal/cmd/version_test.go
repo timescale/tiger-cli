@@ -48,7 +48,7 @@ func TestVersionCmd(t *testing.T) {
 
 	// config.Version is "dev" in tests, so a successful --check never reports
 	// an update as available (dev builds never compare as older).
-	upToDateServer := startFakeReleasesServer(t, "v99.99.99")
+	upToDateServer := startMockReleasesServer(t, "v99.99.99")
 	upToDateInfo := baseInfo
 	upToDateInfo.LatestVersion = "99.99.99"
 	upToDateInfo.UpdateAvailable = new(false)
@@ -136,7 +136,7 @@ version: %s
 	// the exit is a bare ExitCodeError (empty message), so this case is
 	// asserted inline instead of through the table.
 	t.Run("check with update available", func(t *testing.T) {
-		server := startFakeReleasesServer(t, "v99.99.99")
+		server := startMockReleasesServer(t, "v99.99.99")
 
 		result := runCommand(t, []string{"version", "--check", "-o", "bare"}, nil,
 			withCLIVersion("0.1.0"),

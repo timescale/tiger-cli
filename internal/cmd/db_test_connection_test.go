@@ -24,14 +24,14 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"db", "test-connection", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"db", "test-connection"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "missing service id via ping alias",
@@ -47,7 +47,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to fetch service details: connection refused",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "invalid timeout duration",
@@ -62,7 +62,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to fetch service details: connection refused",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "API error",
@@ -75,7 +75,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",
@@ -88,21 +88,21 @@ func TestDbTestConnectionCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "empty response from API",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "pooled without pooler",
 			args:    []string{"db", "test-connection", "svc-12345", "--pooled"},
 			setup:   setupGet,
 			wantErr: "connection pooler not available for this service",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "negative timeout",
 			args:    []string{"db", "test-connection", "svc-12345", "--timeout=-5s"},
 			setup:   setupGet,
 			wantErr: "timeout must be positive or zero, got -5s",
-			check:   checkExitCode(common.ExitInvalidParameters),
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 	}
 

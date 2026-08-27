@@ -38,8 +38,8 @@ func TestDbConnectionStringCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"db", "connection-string", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing service id",
@@ -66,7 +66,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",

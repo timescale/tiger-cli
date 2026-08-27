@@ -24,7 +24,7 @@ func TestConfigResetCmd(t *testing.T) {
 				"analytics":  false,
 			})},
 			wantStdout: "Configuration reset to defaults\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// Reset empties the config file rather than writing defaults
 				// into it, so env vars still apply afterwards.
 				contents, err := os.ReadFile(config.GetConfigFile(result.configDir))
@@ -34,14 +34,14 @@ func TestConfigResetCmd(t *testing.T) {
 				if strings.TrimSpace(string(contents)) != "{}" {
 					t.Errorf("expected an empty config file, got %q", string(contents))
 				}
-			},
+			}},
 		},
 		{
 			name:       "clear alias",
 			args:       []string{"config", "clear"},
 			opts:       []runOption{withConfig(map[string]any{"service_id": "custom-service"})},
 			wantStdout: "Configuration reset to defaults\n",
-			check:      checkConfigFile(map[string]any{}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
 	}
 

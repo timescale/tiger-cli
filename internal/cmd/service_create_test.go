@@ -64,7 +64,7 @@ func TestServiceCreateCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "create", "--name", "test-service"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only mode",
@@ -94,7 +94,7 @@ func TestServiceCreateCmd(t *testing.T) {
 			},
 			wantErr:    "service limit reached",
 			wantStderr: "🚀 Creating service 'test-service'...\nError: service limit reached\n",
-			check:      checkExitCode(common.ExitInvalidParameters),
+			checks:     []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",
@@ -126,7 +126,7 @@ func TestServiceCreateCmd(t *testing.T) {
 ⏳ Waiting for service to be ready (wait timeout: 30m0s)...
 🎉 Service is ready and running!
 `,
-			check: checkDefaultService("svc-12345"),
+			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
 			name: "initial password saved to keyring",
@@ -151,7 +151,7 @@ func TestServiceCreateCmd(t *testing.T) {
 🎉 Service is ready and running!
 🔌 Run 'tiger db connect' to connect to your new service
 `,
-			check: checkStoredPassword("svc-12345", "init-pass-123"),
+			checks: []checkFunc{checkStoredPassword("svc-12345", "init-pass-123")},
 		},
 		{
 			name: "no set default",
@@ -175,7 +175,7 @@ func TestServiceCreateCmd(t *testing.T) {
 🎉 Service is ready and running!
 🔌 Run 'tiger db connect svc-12345' to connect to your new service
 `,
-			check: checkDefaultService(""),
+			checks: []checkFunc{checkDefaultService("")},
 		},
 		{
 			name: "no wait",
@@ -194,7 +194,7 @@ func TestServiceCreateCmd(t *testing.T) {
 🎯 Set service 'svc-12345' as default service.
 ⏳ Service is being created. Use 'tiger service list' to check status.
 `,
-			check: checkDefaultService("svc-12345"),
+			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
 			name: "wait polls until ready",
@@ -258,7 +258,7 @@ func TestServiceCreateCmd(t *testing.T) {
 ⢎  Service status: QUEUED
 ❌ Error: wait timeout reached after 50ms - service may still be provisioning
 `,
-			check: checkExitCode(common.ExitTimeout),
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			name: "json output",
@@ -421,7 +421,7 @@ PGUSER=tsdbadmin
 🎯 Set service 'svc-12345' as default service.
 ⏳ Service is being created. Use 'tiger service list' to check status.
 `,
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// setDefaultService rewrites the config file; the -o flag must
 				// not leak into it.
 				cfg, err := config.Load(testFlags(t, result.configDir))
@@ -431,7 +431,7 @@ PGUSER=tsdbadmin
 				if cfg.Output != "yaml" {
 					t.Errorf("config output = %q, want %q", cfg.Output, "yaml")
 				}
-			},
+			}},
 		},
 	}
 
@@ -550,34 +550,3 @@ service_id: svc-12345
 service_type: TIMESCALEDB
 status: READY
 `
-
-// checkDefaultService returns a check asserting the config file's default
-// service_id after the command ran.
-func checkDefaultService(want string) func(*testing.T, cmdResult) {
-	return func(t *testing.T, result cmdResult) {
-		t.Helper()
-		cfg, err := config.Load(testFlags(t, result.configDir))
-		if err != nil {
-			t.Fatalf("failed to load config: %v", err)
-		}
-		if cfg.ServiceID != want {
-			t.Errorf("default service_id = %q, want %q", cfg.ServiceID, want)
-		}
-	}
-}
-
-// checkStoredPassword returns a check asserting the password stored in the
-// (mock) keyring for the given service.
-func checkStoredPassword(serviceID, want string) func(*testing.T, cmdResult) {
-	return func(t *testing.T, result cmdResult) {
-		t.Helper()
-		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
-		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
-		if err != nil {
-			t.Fatalf("failed to read stored password: %v", err)
-		}
-		if got != want {
-			t.Errorf("stored password = %q, want %q", got, want)
-		}
-	}
-}

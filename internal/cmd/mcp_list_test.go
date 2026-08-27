@@ -135,16 +135,16 @@ func TestMCPListCmd(t *testing.T) {
 			wantStdout: wantText,
 		},
 		{
-			name:  "json output",
-			args:  []string{"mcp", "list", "-o", "json"},
-			opts:  noDocsProxy(nil),
-			check: checkCapabilities(json.Unmarshal),
+			name:   "json output",
+			args:   []string{"mcp", "list", "-o", "json"},
+			opts:   noDocsProxy(nil),
+			checks: []checkFunc{checkCapabilities(json.Unmarshal)},
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"mcp", "list", "-o", "yaml"},
-			opts:  noDocsProxy(nil),
-			check: checkCapabilities(yaml.Unmarshal),
+			name:   "yaml output",
+			args:   []string{"mcp", "list", "-o", "yaml"},
+			opts:   noDocsProxy(nil),
+			checks: []checkFunc{checkCapabilities(yaml.Unmarshal)},
 		},
 		{
 			name:       "read-only mode skips write tools",
@@ -189,8 +189,8 @@ func TestMCPListCmd(t *testing.T) {
 			}
 			assertOutput(t, result.stderr, wantStderr)
 
-			if tt.check != nil {
-				tt.check(t, result)
+			for _, check := range tt.checks {
+				check(t, result)
 			}
 		})
 	}

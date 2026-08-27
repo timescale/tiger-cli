@@ -32,7 +32,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "missing service id",
@@ -72,7 +72,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",

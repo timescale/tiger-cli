@@ -26,13 +26,13 @@ func TestConfigUnsetCmd(t *testing.T) {
 			args:       []string{"config", "unset", "service_id"},
 			opts:       []runOption{withConfig(map[string]any{"service_id": "test-service", "output": "json"})},
 			wantStdout: "Unset service_id\n",
-			check:      checkConfigFile(map[string]any{"output": "json"}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{"output": "json"})},
 		},
 		{
 			name:       "unset valid key not in config file",
 			args:       []string{"config", "unset", "analytics"},
 			wantStdout: "Unset analytics\n",
-			check:      checkConfigFile(map[string]any{}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
 		{
 			// version_check_interval is a legacy key (not a current config
@@ -42,21 +42,21 @@ func TestConfigUnsetCmd(t *testing.T) {
 			args:       []string{"config", "unset", "version_check_interval"},
 			opts:       []runOption{withConfig(map[string]any{"version_check_interval": 0})},
 			wantStdout: "Unset version_check_interval\n",
-			check:      checkConfigFile(map[string]any{}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
 		{
 			name:       "rm alias",
 			args:       []string{"config", "rm", "service_id"},
 			opts:       []runOption{withConfig(map[string]any{"service_id": "test-service"})},
 			wantStdout: "Unset service_id\n",
-			check:      checkConfigFile(map[string]any{}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
 		{
 			name:       "delete alias",
 			args:       []string{"config", "delete", "output"},
 			opts:       []runOption{withConfig(map[string]any{"output": "json"})},
 			wantStdout: "Unset output\n",
-			check:      checkConfigFile(map[string]any{}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{})},
 		},
 	}
 

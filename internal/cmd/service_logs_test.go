@@ -64,7 +64,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "logs", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "no service id",
@@ -96,7 +96,7 @@ func TestServiceLogsCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -120,13 +120,14 @@ func TestServiceLogsCmd(t *testing.T) {
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
-			// Timestamps are rendered in the machine's local timezone, so the
-			// expected output is computed rather than written literally.
+			// Timestamps are rendered in the machine's local timezone, pinned
+			// to UTC by withUTC so the expected output stays literal.
 			name:  "text output with timestamps",
 			args:  []string{"service", "logs", "svc-12345"},
+			opts:  []runOption{withUTC()},
 			setup: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
-			wantStdout: ts1.Local().Format("2006-01-02 15:04:05 MST") + " LOG: checkpoint starting\n" +
-				ts2.Local().Format("2006-01-02 15:04:05 MST") + " LOG: checkpoint complete\n",
+			wantStdout: "2025-01-15 10:30:00 UTC LOG: checkpoint starting\n" +
+				"2025-01-15 10:31:00 UTC LOG: checkpoint complete\n",
 		},
 		{
 			name:  "json output",

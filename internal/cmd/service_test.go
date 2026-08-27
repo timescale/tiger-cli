@@ -7,6 +7,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestServiceCommandAliases(t *testing.T) {
@@ -89,4 +90,20 @@ func TestServiceExperimentalGate(t *testing.T) {
 			t.Errorf("expected the backup command help on stdout, got:\n%s", result.stdout)
 		}
 	})
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// (mock) keyring for the given service.
+func checkStoredPassword(serviceID, want string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
+		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
+		}
+	}
 }

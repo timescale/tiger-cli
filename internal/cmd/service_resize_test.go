@@ -18,8 +18,8 @@ func TestServiceResizeCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "read-only mode",
@@ -64,7 +64,7 @@ func TestServiceResizeCmd(t *testing.T) {
 			},
 			wantErr:    "service not found",
 			wantStderr: "📐 Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: service not found\n",
-			check:      checkExitCode(common.ExitServiceNotFound),
+			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -170,7 +170,7 @@ func TestServiceResizeCmd(t *testing.T) {
 ⢎  Service status: CONFIGURING
 ❌ Error: wait timeout reached after 50ms - service may still be resizing
 `,
-			check: checkExitCode(common.ExitTimeout),
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 	}
 

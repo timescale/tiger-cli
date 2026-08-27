@@ -37,8 +37,8 @@ func TestProjectListCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"project", "list"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name: "network error",
@@ -60,7 +60,7 @@ func TestProjectListCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "internal error",
-			check:   checkExitCode(common.ExitGeneralError),
+			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
 		},
 		{
 			name: "nil response body",

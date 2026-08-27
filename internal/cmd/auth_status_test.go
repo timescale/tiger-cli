@@ -73,7 +73,7 @@ func TestAuthStatusCmd(t *testing.T) {
 			args:    []string{"auth", "status"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: "not logged in",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name: "network error",
@@ -95,7 +95,7 @@ func TestAuthStatusCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "invalid credentials",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name: "nil response body",

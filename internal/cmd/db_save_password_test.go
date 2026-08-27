@@ -41,8 +41,8 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"db", "save-password", "svc-12345", "--password=pw"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "service ID required",
@@ -69,7 +69,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -108,7 +108,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			args:       []string{"db", "save-password", "svc-12345", "--password=flag-pw"},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check:      checkKeyringPassword("tsdbadmin", "flag-pw"),
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
 		},
 		{
 			name:       "default service ID from config",
@@ -116,7 +116,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check:      checkKeyringPassword("tsdbadmin", "default-pw"),
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "default-pw")},
 		},
 		{
 			name:       "saves password from TIGER_NEW_PASSWORD",
@@ -124,7 +124,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check:      checkKeyringPassword("tsdbadmin", "env-pw"),
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "env-pw")},
 		},
 		{
 			name:       "flag takes precedence over TIGER_NEW_PASSWORD",
@@ -132,7 +132,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check:      checkKeyringPassword("tsdbadmin", "flag-pw"),
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
 		},
 		{
 			name:       "prompts for password on a TTY",
@@ -140,19 +140,18 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withIsTerminal(true), withReadPassword("prompt-pw")},
 			setup:      setupGetService,
 			wantStderr: "Enter password: \nPassword saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check:      checkKeyringPassword("tsdbadmin", "prompt-pw"),
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "prompt-pw")},
 		},
 		{
 			name:       "custom role",
 			args:       []string{"db", "save-password", "svc-12345", "--password=readonly-pw", "--role", "readonly"},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: readonly)\n",
-			check: func(t *testing.T, result cmdResult) {
-				checkKeyringPassword("readonly", "readonly-pw")(t, result)
+			checks: []checkFunc{checkKeyringPassword("readonly", "readonly-pw"), func(t *testing.T, result cmdResult) {
 				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored for tsdbadmin, got %q", pw)
 				}
-			},
+			}},
 		},
 		{
 			name:       "pgpass storage",
@@ -160,13 +159,13 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withEnv("HOME", pgpassHome)},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				data, err := os.ReadFile(filepath.Join(pgpassHome, ".pgpass"))
 				if err != nil {
 					t.Fatalf("failed to read .pgpass: %v", err)
 				}
 				assertOutput(t, string(data), pgpassPrefix+"pgpass-pw\n")
-			},
+			}},
 		},
 		{
 			name:       "pgpass save overwrites existing entry",
@@ -174,7 +173,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			opts:       []runOption{withEnv("HOME", overwriteHome)},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				second := runCommand(t,
 					[]string{"db", "save-password", "svc-12345", "--password=second-pw", "--password-storage", "pgpass"},
 					setupGetService,
@@ -187,18 +186,18 @@ func TestDbSavePasswordCmd(t *testing.T) {
 					t.Fatalf("failed to read .pgpass: %v", err)
 				}
 				assertOutput(t, string(data), pgpassPrefix+"second-pw\n")
-			},
+			}},
 		},
 		{
 			name:       "none storage saves nothing",
 			args:       []string{"db", "save-password", "svc-12345", "--password=none-pw", "--password-storage", "none"},
 			setup:      setupGetService,
 			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
 					t.Errorf("expected no stored password, got %q", pw)
 				}
-			},
+			}},
 		},
 		{
 			name: "replica ID saves against parent primary",
@@ -208,13 +207,13 @@ func TestDbSavePasswordCmd(t *testing.T) {
 				setupGetService(m)
 			},
 			wantStderr: "Read replicas share the primary's credentials; saving against primary svc-12345.\nPassword saved successfully for service svc-12345 (role: tsdbadmin)\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				// Stored against the parent primary, matching the connect read path.
 				checkKeyringPassword("tsdbadmin", "replica-pw")(t, result)
 				if pw, err := (&common.KeyringStorage{}).Get(sampleReplica(), "tsdbadmin"); err == nil {
 					t.Errorf("expected no password stored under the replica ID, got %q", pw)
 				}
-			},
+			}},
 		},
 	}
 

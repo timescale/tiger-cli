@@ -1314,13 +1314,17 @@ follow a single table-driven pattern built on the shared harness in
 - Test cases use the `cmdTest` struct and run through `runCmdTests`, which
   asserts `wantErr`, `wantStdout`, and `wantStderr` with **exact** matching
   (`assertOutput`, a go-cmp diff). When `wantErr` is set and `wantStderr`
-  isn't, stderr is expected to be `"Error: <wantErr>\n"`. An optional `check`
-  func holds extra assertions via the shared helpers: `checkExitCode`,
-  `readConfigFile`, `readStoredCredentials`.
+  isn't, stderr is expected to be `"Error: <wantErr>\n"` (not-logged-in cases
+  use the `notLoggedInMsg` const). An optional `checks` slice holds extra
+  assertions (`checkFunc`s), run in order — shared ones include
+  `checkExitCode`, `checkDefaultService`, `readConfigFile`,
+  `readStoredCredentials`.
 - Options configure the run: `withStdin`, `withEnv`, `withConfig` (seed config
   file keys), `withStoredCredentials`, `withClientError`/`withNotLoggedIn`,
-  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withContext`,
-  `withSetup` (t-scoped stubs).
+  `withIsTerminal`, `withReadPassword`, `withOpenBrowser`, `withUTC`,
+  `withContext`. Options that stub or seed process-global state are built on
+  `withSetup` (t-scoped hooks); plain fields on `runConfig` exist only for
+  state `runCommand`'s own plumbing consumes.
 - Mock expectations use `validCtx` for context arguments and exact request
   structs; `httpResponse(status)` and `sampleService(overrides...)` keep
   tables concise.

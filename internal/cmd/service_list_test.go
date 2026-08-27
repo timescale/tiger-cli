@@ -50,8 +50,8 @@ func TestServiceListCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "list"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name: "network error",
@@ -72,7 +72,7 @@ func TestServiceListCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "unknown error",
-			check:   checkExitCode(common.ExitGeneralError),
+			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
 		},
 		{
 			name: "nil response body",
@@ -111,12 +111,12 @@ func TestServiceListCmd(t *testing.T) {
 			setup:      setupList(services),
 			opts:       []runOption{withConfig(map[string]any{"output": "table"})},
 			wantStdout: serviceListJSON,
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				configMap := readConfigFile(t, result.configDir)
 				if got := configMap["output"]; got != "table" {
 					t.Errorf("config output = %v, want table (config file must not be modified by -o)", got)
 				}
-			},
+			}},
 		},
 		{
 			name:  "yaml output",

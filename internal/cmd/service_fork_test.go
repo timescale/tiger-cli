@@ -66,7 +66,7 @@ PGUSER=tsdbadmin
 			name:    "not logged in",
 			args:    []string{"service", "fork", "svc-12345", "--now"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only mode",
@@ -106,7 +106,7 @@ PGUSER=tsdbadmin
 			},
 			wantErr:    "service not found",
 			wantStderr: "🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state...\nError: service not found\n",
-			check:      checkExitCode(common.ExitServiceNotFound),
+			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -145,9 +145,9 @@ PGUSER=tsdbadmin
 🎉 Service fork completed successfully!
 🔌 Run 'tiger db connect' to connect to your new service
 `,
-			check: func(t *testing.T, result cmdResult) {
-				checkDefaultService("svc-67890")(t, result)
-				checkStoredPassword("svc-67890", "fork-pass-123")(t, result)
+			checks: []checkFunc{
+				checkDefaultService("svc-67890"),
+				checkStoredPassword("svc-67890", "fork-pass-123"),
 			},
 		},
 		{
@@ -163,7 +163,7 @@ PGUSER=tsdbadmin
 			},
 			wantStdout: forkedEnv,
 			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state..."),
-			check:      checkDefaultService("svc-12345"),
+			checks:     []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
 			name: "last snapshot strategy",

@@ -51,7 +51,7 @@ func TestServiceGetCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "get", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "no service id",
@@ -78,7 +78,7 @@ func TestServiceGetCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",

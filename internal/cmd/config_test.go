@@ -27,7 +27,7 @@ func TestConfigCmd(t *testing.T) {
 			name:       "cfg alias",
 			args:       []string{"cfg", "set", "service_id", "alias-service"},
 			wantStdout: "Set service_id = alias-service\n",
-			check:      checkConfigFile(map[string]any{"service_id": "alias-service"}),
+			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "alias-service"})},
 		},
 	}
 

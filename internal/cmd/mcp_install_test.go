@@ -163,7 +163,7 @@ func TestMCPInstallCmd(t *testing.T) {
 			name:       "creates config file and directories",
 			args:       []string{"mcp", "install", "cursor", "--config-path", path("fresh")},
 			wantStdout: installSuccessOutput("cursor", path("fresh")),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, path("fresh"), map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
@@ -177,13 +177,13 @@ func TestMCPInstallCmd(t *testing.T) {
 				if backups := backupFiles(t, path("fresh")); len(backups) != 0 {
 					t.Errorf("expected no backup files, got %v", backups)
 				}
-			},
+			}},
 		},
 		{
 			name:       "merges with existing servers",
 			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", mergePath},
 			wantStdout: installSuccessOutput("cursor", mergePath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, mergePath, map[string]any{
 					"mcpServers": map[string]any{
 						"server1": map[string]any{"command": "cmd1", "args": []any{"arg1"}},
@@ -195,24 +195,24 @@ func TestMCPInstallCmd(t *testing.T) {
 				if backups := backupFiles(t, mergePath); len(backups) != 0 {
 					t.Errorf("expected no backup files with --no-backup, got %v", backups)
 				}
-			},
+			}},
 		},
 		{
 			name:       "preserves unrelated config keys",
 			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", otherPath},
 			wantStdout: installSuccessOutput("cursor", otherPath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, otherPath, map[string]any{
 					"other":      "config",
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
-			},
+			}},
 		},
 		{
 			name:       "updates existing tiger entry idempotently",
 			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", idempotentPath},
 			wantStdout: installSuccessOutput("cursor", idempotentPath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				want := map[string]any{
 					"mcpServers": map[string]any{
 						"existing": map[string]any{"command": "existing", "args": []any{"arg1"}},
@@ -227,13 +227,13 @@ func TestMCPInstallCmd(t *testing.T) {
 					t.Fatalf("second install failed: %v", again.err)
 				}
 				assertJSONFile(t, idempotentPath, want)
-			},
+			}},
 		},
 		{
 			name:       "handles empty config file and backs it up",
 			args:       []string{"mcp", "install", "cursor", "--config-path", emptyPath},
 			wantStdout: installSuccessOutput("cursor", emptyPath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, emptyPath, map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
@@ -248,13 +248,13 @@ func TestMCPInstallCmd(t *testing.T) {
 				if len(content) != 0 {
 					t.Errorf("backup of empty file should be empty, got %q", content)
 				}
-			},
+			}},
 		},
 		{
 			name:       "creates backup by default",
 			args:       []string{"mcp", "install", "cursor", "--config-path", backupPath},
 			wantStdout: installSuccessOutput("cursor", backupPath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				backups := backupFiles(t, backupPath)
 				if len(backups) != 1 {
 					t.Fatalf("expected 1 backup file, got %v", backups)
@@ -279,13 +279,13 @@ func TestMCPInstallCmd(t *testing.T) {
 				if backups := backupFiles(t, backupPath); len(backups) != 2 {
 					t.Errorf("expected 2 distinct backup files, got %v", backups)
 				}
-			},
+			}},
 		},
 		{
 			name:       "backup preserves file permissions",
 			args:       []string{"mcp", "install", "cursor", "--config-path", permsPath},
 			wantStdout: installSuccessOutput("cursor", permsPath),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				backups := backupFiles(t, permsPath)
 				if len(backups) != 1 {
 					t.Fatalf("expected 1 backup file, got %v", backups)
@@ -299,7 +299,7 @@ func TestMCPInstallCmd(t *testing.T) {
 						t.Errorf("%s mode = %o, want 0600", p, got)
 					}
 				}
-			},
+			}},
 		},
 		{
 			// claude-code installs via the client's own CLI rather than JSON
@@ -311,44 +311,44 @@ func TestMCPInstallCmd(t *testing.T) {
 				withEnv("HOME", cliHome),
 			},
 			wantStdout: installSuccessOutput("claude-code", filepath.Join(cliHome, ".claude.json")),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				argv, err := os.ReadFile(argvFile)
 				if err != nil {
 					t.Fatalf("claude stub was not invoked: %v", err)
 				}
 				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\ntiger\nmcp\nstart\n")
-			},
+			}},
 		},
 		{
 			name:       "default config path under HOME",
 			args:       []string{"mcp", "install", "cursor", "--no-backup"},
 			opts:       []runOption{withEnv("HOME", home)},
 			wantStdout: installSuccessOutput("cursor", filepath.Join(home, ".cursor", "mcp.json")),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, filepath.Join(home, ".cursor", "mcp.json"), map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
-			},
+			}},
 		},
 		{
 			name:       "client name is case-insensitive",
 			args:       []string{"mcp", "install", "CURSOR", "--no-backup", "--config-path", path("upper")},
 			wantStdout: installSuccessOutput("CURSOR", path("upper")),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, path("upper"), map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
-			},
+			}},
 		},
 		{
 			name:       "add alias",
 			args:       []string{"mcp", "add", "cursor", "--no-backup", "--config-path", path("alias")},
 			wantStdout: installSuccessOutput("cursor", path("alias")),
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				assertJSONFile(t, path("alias"), map[string]any{
 					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
 				})
-			},
+			}},
 		},
 	}
 

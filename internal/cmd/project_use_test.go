@@ -73,14 +73,14 @@ func TestProjectUseCmd(t *testing.T) {
 				withEnv("TIGER_SECRET_KEY", "env-secret"),
 			},
 			wantErr: "cannot switch projects while TIGER_PUBLIC_KEY/TIGER_SECRET_KEY are set: an API key is scoped to a single project",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "not logged in",
 			args:    []string{"project", "use", "project-new"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			// The client is available (e.g. still cached) but nothing is stored:
@@ -97,7 +97,7 @@ func TestProjectUseCmd(t *testing.T) {
 				ProjectID: testProjectID,
 			})},
 			wantErr: "an API key is scoped to a single project. Run 'tiger auth login' without --public-key/--secret-key",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name: "already using project",
@@ -107,10 +107,8 @@ func TestProjectUseCmd(t *testing.T) {
 				withConfig(map[string]any{"service_id": "svc-123"}),
 			},
 			wantStdout: "Already using project " + testProjectID + "\n",
-			check: func(t *testing.T, result cmdResult) {
-				// A no-op switch keeps the default service.
-				checkDefaultService("svc-123")(t, result)
-			},
+			// A no-op switch keeps the default service.
+			checks: []checkFunc{checkDefaultService("svc-123")},
 		},
 		{
 			name: "network error listing projects",
@@ -134,7 +132,7 @@ func TestProjectUseCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "internal error",
-			check:   checkExitCode(common.ExitGeneralError),
+			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
 		},
 		{
 			name:    "no access to requested project",
@@ -144,9 +142,9 @@ func TestProjectUseCmd(t *testing.T) {
 			wantErr: "no access to the requested project",
 			wantStderr: "Project project-unknown is not among your accessible projects\n" +
 				"Error: no access to the requested project\n",
-			check: func(t *testing.T, result cmdResult) {
-				checkExitCode(common.ExitInvalidParameters)(t, result)
-				checkStoredProject(testProjectID)(t, result)
+			checks: []checkFunc{
+				checkExitCode(common.ExitInvalidParameters),
+				checkStoredProject(testProjectID),
 			},
 		},
 		{
@@ -159,9 +157,9 @@ func TestProjectUseCmd(t *testing.T) {
 			setup:      bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			wantStderr: "Cleared default service (config key service_id): it belonged to the previous project\n",
-			check: func(t *testing.T, result cmdResult) {
-				checkStoredProject("project-new")(t, result)
-				checkDefaultService("")(t, result)
+			checks: []checkFunc{
+				checkStoredProject("project-new"),
+				checkDefaultService(""),
 			},
 		},
 		{
@@ -170,7 +168,7 @@ func TestProjectUseCmd(t *testing.T) {
 			opts:       []runOption{oauthLogin},
 			setup:      bothProjects,
 			wantStdout: "Switched to project project-new\n",
-			check:      checkStoredProject("project-new"),
+			checks:     []checkFunc{checkStoredProject("project-new")},
 		},
 		{
 			// A default service from the environment can't be cleared, so the
@@ -184,7 +182,7 @@ func TestProjectUseCmd(t *testing.T) {
 			setup:      bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			wantStderr: "Warning: the default service from --service-id/TIGER_SERVICE_ID belongs to the previous project and is still in effect\n",
-			check:      checkStoredProject("project-new"),
+			checks:     []checkFunc{checkStoredProject("project-new")},
 		},
 		{
 			name:       "switch alias",
@@ -192,7 +190,7 @@ func TestProjectUseCmd(t *testing.T) {
 			opts:       []runOption{oauthLogin},
 			setup:      bothProjects,
 			wantStdout: "Switched to project project-new\n",
-			check:      checkStoredProject("project-new"),
+			checks:     []checkFunc{checkStoredProject("project-new")},
 		},
 	}
 

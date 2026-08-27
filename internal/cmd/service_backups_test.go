@@ -16,14 +16,6 @@ func TestServiceBackupsCmd(t *testing.T) {
 	// so every case registers it explicitly.
 	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
-	// The table renders start times in the local timezone; pin it to UTC so the
-	// expected output is machine-independent.
-	withUTC := withSetup(func(t *testing.T) {
-		original := time.Local
-		time.Local = time.UTC
-		t.Cleanup(func() { time.Local = original })
-	})
-
 	// Four backups covering the formatting matrix: full/incremental, finished/
 	// still running (absent finished_at/duration/size), second/minute/hour
 	// durations, byte/mebibyte/gibibyte sizes, and regions with and without a
@@ -73,6 +65,17 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 	}
 
+	// Expected table for the four sample backups (rendered with withUTC).
+	const backupsTable = `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
+│       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
+├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
+│ 2026-01-15 09:30 UTC │ FULL        │ 11m12s   │ 4.5GiB   │ us-east-1 (FINISHED), eu-central-1 (FAILED) │
+│ 2026-01-16 09:30 UTC │ INCREMENTAL │          │          │ us-east-1                                   │
+│ 2026-01-17 09:30 UTC │ FULL        │ 2s       │ 512B     │ us-east-1 (FINISHED)                        │
+│ 2026-01-18 09:30 UTC │ INCREMENTAL │ 2h2m5s   │ 50.83MiB │ us-east-1 (RUNNING)                         │
+└──────────────────────┴─────────────┴──────────┴──────────┴─────────────────────────────────────────────┘
+`
+
 	setupList := func(backups []api.Backup) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
@@ -88,8 +91,8 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "backup", "svc-12345"},
 			opts:    []runOption{experimental, withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing service id",
@@ -119,7 +122,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body",
@@ -144,34 +147,18 @@ func TestServiceBackupsCmd(t *testing.T) {
 		{
 			// The label is omitted from the table: it repeats STARTED and TYPE,
 			// and no command takes it as input.
-			name:  "table output",
-			args:  []string{"service", "backup", "svc-12345"},
-			opts:  []runOption{experimental, withUTC},
-			setup: setupList(backups),
-			wantStdout: `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
-│       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
-├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
-│ 2026-01-15 09:30 UTC │ FULL        │ 11m12s   │ 4.5GiB   │ us-east-1 (FINISHED), eu-central-1 (FAILED) │
-│ 2026-01-16 09:30 UTC │ INCREMENTAL │          │          │ us-east-1                                   │
-│ 2026-01-17 09:30 UTC │ FULL        │ 2s       │ 512B     │ us-east-1 (FINISHED)                        │
-│ 2026-01-18 09:30 UTC │ INCREMENTAL │ 2h2m5s   │ 50.83MiB │ us-east-1 (RUNNING)                         │
-└──────────────────────┴─────────────┴──────────┴──────────┴─────────────────────────────────────────────┘
-`,
+			name:       "table output",
+			args:       []string{"service", "backup", "svc-12345"},
+			opts:       []runOption{experimental, withUTC()},
+			setup:      setupList(backups),
+			wantStdout: backupsTable,
 		},
 		{
-			name:  "default service id from config",
-			args:  []string{"service", "backup"},
-			opts:  []runOption{experimental, withUTC, withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup: setupList(backups),
-			wantStdout: `┌──────────────────────┬─────────────┬──────────┬──────────┬─────────────────────────────────────────────┐
-│       STARTED        │    TYPE     │ DURATION │   SIZE   │                   REGIONS                   │
-├──────────────────────┼─────────────┼──────────┼──────────┼─────────────────────────────────────────────┤
-│ 2026-01-15 09:30 UTC │ FULL        │ 11m12s   │ 4.5GiB   │ us-east-1 (FINISHED), eu-central-1 (FAILED) │
-│ 2026-01-16 09:30 UTC │ INCREMENTAL │          │          │ us-east-1                                   │
-│ 2026-01-17 09:30 UTC │ FULL        │ 2s       │ 512B     │ us-east-1 (FINISHED)                        │
-│ 2026-01-18 09:30 UTC │ INCREMENTAL │ 2h2m5s   │ 50.83MiB │ us-east-1 (RUNNING)                         │
-└──────────────────────┴─────────────┴──────────┴──────────┴─────────────────────────────────────────────┘
-`,
+			name:       "default service id from config",
+			args:       []string{"service", "backup"},
+			opts:       []runOption{experimental, withUTC(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup:      setupList(backups),
+			wantStdout: backupsTable,
 		},
 		{
 			// The label stays in the structured formats.

@@ -67,8 +67,8 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "read-only mode",
@@ -107,7 +107,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "nil response body on get",
@@ -164,7 +164,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "permission denied",
-			check:   checkExitCode(common.ExitPermissionDenied),
+			checks:  []checkFunc{checkExitCode(common.ExitPermissionDenied)},
 		},
 		{
 			name: "new-password flag",
@@ -174,7 +174,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("svc-12345", "newpass123"),
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "newpass123")},
 		},
 		{
 			name: "env var password",
@@ -185,7 +185,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("env-pass-456")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("svc-12345", "env-pass-456"),
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "env-pass-456")},
 		},
 		{
 			name: "auto-generate",
@@ -195,11 +195,11 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdateAny(m)
 			},
 			wantStderr: "Successfully generated a new password.\n" + savedStderr,
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); len(got) != 32 {
 					t.Errorf("stored password length = %d, want 32", len(got))
 				}
-			},
+			}},
 		},
 		{
 			name: "interactive prompt",
@@ -210,7 +210,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("prompted-pass")(m)
 			},
 			wantStderr: "Enter new password (leave empty to generate): \n" + savedStderr,
-			check:      checkStoredPassword("svc-12345", "prompted-pass"),
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "prompted-pass")},
 		},
 		{
 			name: "interactive prompt empty generates",
@@ -222,11 +222,11 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			},
 			wantStderr: "Enter new password (leave empty to generate): \n" +
 				"Successfully generated a new password.\n" + savedStderr,
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); len(got) != 32 {
 					t.Errorf("stored password length = %d, want 32", len(got))
 				}
-			},
+			}},
 		},
 		{
 			name: "password storage none",
@@ -236,11 +236,11 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: "✅ Master password for 'tsdbadmin' user updated successfully\n",
-			check: func(t *testing.T, result cmdResult) {
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); got != "" {
 					t.Errorf("stored password = %q, want none stored", got)
 				}
-			},
+			}},
 		},
 		{
 			name: "default service id from config",
@@ -251,7 +251,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdate("newpass123")(m)
 			},
 			wantStderr: savedStderr,
-			check:      checkStoredPassword("svc-12345", "newpass123"),
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "newpass123")},
 		},
 	}
 

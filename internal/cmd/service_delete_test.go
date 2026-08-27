@@ -33,8 +33,8 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:    "not logged in",
 			args:    []string{"service", "delete", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
-			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
-			check:   checkExitCode(common.ExitAuthenticationError),
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "read-only mode",
@@ -89,7 +89,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr: "service not found",
-			check:   checkExitCode(common.ExitServiceNotFound),
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
 			name: "wait until deleted",
@@ -126,7 +126,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
 				"❌ Error: wait timeout reached after 1ms - service may still be deleting\n",
-			check: checkExitCode(common.ExitTimeout),
+			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			name:  "rm alias",

@@ -24,7 +24,7 @@ func TestAuthLoginCmd(t *testing.T) {
 	// Backs the PAT path's key validation (/auth/info): keys with an "invalid-"
 	// public key are rejected, everything else is accepted with the project ID
 	// "test-project-id".
-	authInfoServer := startFakeAuthInfoServer(t)
+	authInfoServer := startMockAuthInfoServer(t)
 	patURLs := map[string]any{"api_url": authInfoServer.URL}
 
 	tests := []cmdTest{
@@ -53,7 +53,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your secret key: \nValidating API key...\n",
-			check:      checkStoredAPIKey("test-public-key:prompted-secret", "test-project-id"),
+			checks:     []checkFunc{checkStoredAPIKey("test-public-key:prompted-secret", "test-project-id")},
 		},
 		{
 			name: "prompts for missing public key",
@@ -65,7 +65,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your public key: Validating API key...\n",
-			check:      checkStoredAPIKey("prompted-public:test-secret-key", "test-project-id"),
+			checks:     []checkFunc{checkStoredAPIKey("prompted-public:test-secret-key", "test-project-id")},
 		},
 		{
 			name: "empty prompted public key",
@@ -83,7 +83,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts:       []runOption{withConfig(patURLs)},
 			wantErr:    "API key validation failed: invalid credentials",
 			wantStderr: "Validating API key...\nError: API key validation failed: invalid credentials\n",
-			check:      checkNoStoredCredentials,
+			checks:     []checkFunc{checkNoStoredCredentials},
 		},
 		{
 			name:       "stores credentials from flags",
@@ -91,7 +91,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts:       []runOption{withConfig(patURLs)},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "Validating API key...\n",
-			check:      checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id"),
+			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
 		{
 			// An API key carries its own project, so a different --project-id is
@@ -103,9 +103,9 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts:       []runOption{withConfig(patURLs)},
 			wantErr:    "API key is scoped to a different project than the one requested with --project-id",
 			wantStderr: "Validating API key...\nError: API key is scoped to a different project than the one requested with --project-id\n",
-			check: func(t *testing.T, result cmdResult) {
-				checkExitCode(common.ExitInvalidParameters)(t, result)
-				checkNoStoredCredentials(t, result)
+			checks: []checkFunc{
+				checkExitCode(common.ExitInvalidParameters),
+				checkNoStoredCredentials,
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts:       []runOption{withConfig(patURLs)},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "Validating API key...\n",
-			check:      checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id"),
+			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
 		{
 			name: "stores credentials from environment variables",
@@ -128,7 +128,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			},
 			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
 			wantStderr: "Validating API key...\n",
-			check:      checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id"),
+			checks:     []checkFunc{checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id")},
 		},
 	}
 	runCmdTests(t, tests)
@@ -363,10 +363,10 @@ func TestOAuthRefreshPersistsExpiry(t *testing.T) {
 	assertExpiresInAbout(t, reloaded.OAuth.Expiry)
 }
 
-// startFakeAuthInfoServer backs common.ValidateAPIKey's GET /auth/info call for
+// startMockAuthInfoServer backs common.ValidateAPIKey's GET /auth/info call for
 // the PAT login path. Keys arrive as HTTP basic auth; a public key starting
 // with "invalid" is rejected with a 401.
-func startFakeAuthInfoServer(t *testing.T) *httptest.Server {
+func startMockAuthInfoServer(t *testing.T) *httptest.Server {
 	t.Helper()
 
 	mux := http.NewServeMux()
