@@ -1,110 +1,158 @@
 package cmd
 
 import (
-	"encoding/json"
-	"strings"
+	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func TestProjectList_Table(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-		{ID: "project-new", Name: "New Project"},
-	}, "project-old", "")
-
-	output, err := executeAuthCommand(t.Context(), "project", "list")
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-
-	for _, want := range []string{"CURRENT", "PROJECT ID", "NAME", "project-old", "Old Project", "project-new", "New Project"} {
-		if !strings.Contains(output, want) {
-			t.Errorf("Expected output to contain %q, got: %q", want, output)
+func TestProjectListCmd(t *testing.T) {
+	// The harness's client factory reports testProjectID as the active project,
+	// so it's the one marked current in the output.
+	setupList := func(projects []api.Project) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			m.EXPECT().GetProjectsWithResponse(validCtx).
+				Return(&api.GetProjectsResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &projects,
+				}, nil)
 		}
 	}
+	bothProjects := setupList([]api.Project{
+		{ID: "project-other", Name: "Other Project"},
+		{ID: testProjectID, Name: "Current Project"},
+	})
 
-	// Only the active project is marked.
-	for line := range strings.SplitSeq(output, "\n") {
-		if !strings.Contains(line, "project-old") && !strings.Contains(line, "project-new") {
-			continue
-		}
-		marked := strings.Contains(line, "*")
-		if strings.Contains(line, "project-old") && !marked {
-			t.Errorf("Expected the active project to be marked, got: %q", line)
-		}
-		if strings.Contains(line, "project-new") && marked {
-			t.Errorf("Expected non-active project to be unmarked, got: %q", line)
-		}
+	tests := []cmdTest{
+		{
+			name:    "rejects positional args",
+			args:    []string{"project", "list", "extra"},
+			wantErr: `unknown command "extra" for "tiger project list"`,
+		},
+		{
+			name:    "not logged in",
+			args:    []string{"project", "list"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: "authentication required: not logged in. Please run 'tiger auth login'",
+			check:   checkExitCode(common.ExitAuthenticationError),
+		},
+		{
+			name: "network error",
+			args: []string{"project", "list"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to list projects: connection refused",
+		},
+		{
+			name: "API error",
+			args: []string{"project", "list"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(&api.GetProjectsResponse{
+						HTTPResponse: httpResponse(http.StatusInternalServerError),
+						JSON4XX:      &api.ClientError{Message: new("internal error")},
+					}, nil)
+			},
+			wantErr: "internal error",
+			check:   checkExitCode(common.ExitGeneralError),
+		},
+		{
+			name: "nil response body",
+			args: []string{"project", "list"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(&api.GetProjectsResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+		},
+		{
+			// Only the active project is marked current.
+			name:  "table output",
+			args:  []string{"project", "list"},
+			setup: bothProjects,
+			wantStdout: `┌──────────────────┬─────────────────┬─────────┐
+│    PROJECT ID    │      NAME       │ CURRENT │
+├──────────────────┼─────────────────┼─────────┤
+│ project-other    │ Other Project   │         │
+│ test-project-123 │ Current Project │ *       │
+└──────────────────┴─────────────────┴─────────┘
+`,
+		},
+		{
+			name:  "empty list",
+			args:  []string{"project", "list"},
+			setup: setupList([]api.Project{}),
+			wantStdout: `┌────────────┬──────┬─────────┐
+│ PROJECT ID │ NAME │ CURRENT │
+└────────────┴──────┴─────────┘
+`,
+		},
+		{
+			name:  "json output",
+			args:  []string{"project", "list", "-o", "json"},
+			setup: bothProjects,
+			wantStdout: `[
+  {
+    "id": "project-other",
+    "name": "Other Project",
+    "current": false
+  },
+  {
+    "id": "test-project-123",
+    "name": "Current Project",
+    "current": true
+  }
+]
+`,
+		},
+		{
+			name:  "yaml output",
+			args:  []string{"project", "list", "-o", "yaml"},
+			setup: bothProjects,
+			wantStdout: `- current: false
+  id: project-other
+  name: Other Project
+- current: true
+  id: test-project-123
+  name: Current Project
+`,
+		},
+		{
+			name:    "env output rejected by flag",
+			args:    []string{"project", "list", "-o", "env"},
+			wantErr: `invalid argument "env" for "-o, --output" flag: invalid output format: env (must be one of: json, yaml, table)`,
+		},
+		{
+			// --output rejects env at parse time, but TIGER_OUTPUT isn't
+			// validated on load.
+			name:    "env output from env var",
+			args:    []string{"project", "list"},
+			opts:    []runOption{withEnv("TIGER_OUTPUT", "env")},
+			setup:   bothProjects,
+			wantErr: "environment variable output is not supported for multiple projects",
+		},
+		{
+			name:  "ls alias",
+			args:  []string{"project", "ls"},
+			setup: bothProjects,
+			wantStdout: `┌──────────────────┬─────────────────┬─────────┐
+│    PROJECT ID    │      NAME       │ CURRENT │
+├──────────────────┼─────────────────┼─────────┤
+│ project-other    │ Other Project   │         │
+│ test-project-123 │ Current Project │ *       │
+└──────────────────┴─────────────────┴─────────┘
+`,
+		},
 	}
-}
 
-func TestProjectList_JSON(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-		{ID: "project-new", Name: "New Project"},
-	}, "project-new", "")
-
-	output, err := executeAuthCommand(t.Context(), "project", "list", "--output", "json")
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-
-	var projects []OutputProject
-	if err := json.Unmarshal([]byte(output), &projects); err != nil {
-		t.Fatalf("Failed to parse JSON output %q: %v", output, err)
-	}
-
-	if len(projects) != 2 {
-		t.Fatalf("Expected 2 projects, got %d: %+v", len(projects), projects)
-	}
-	if projects[0].ID != "project-old" || projects[0].Current {
-		t.Errorf("Unexpected first project: %+v", projects[0])
-	}
-	if projects[1].ID != "project-new" || !projects[1].Current {
-		t.Errorf("Unexpected second project: %+v", projects[1])
-	}
-}
-
-func TestProjectList_Alias(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-	}, "project-old", "")
-
-	output, err := executeAuthCommand(t.Context(), "project", "ls")
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-	if !strings.Contains(output, "project-old") {
-		t.Errorf("Expected project in output, got: %q", output)
-	}
-}
-
-func TestProjectList_EnvFormatRejected(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-	}, "project-old", "")
-	// --output rejects env at parse time, but TIGER_OUTPUT isn't validated on load.
-	t.Setenv("TIGER_OUTPUT", "env")
-
-	_, err := executeAuthCommand(t.Context(), "project", "list")
-	if err == nil {
-		t.Fatal("Expected error for env output format")
-	}
-	if !strings.Contains(err.Error(), "environment variable output is not supported for multiple projects") {
-		t.Errorf("Unexpected error: %v", err)
-	}
-}
-
-func TestProjectList_NotLoggedIn(t *testing.T) {
-	setupAuthTest(t)
-
-	_, err := executeAuthCommand(t.Context(), "project", "list")
-	if err == nil {
-		t.Fatal("Expected error when not logged in")
-	}
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	runCmdTests(t, tests)
 }
