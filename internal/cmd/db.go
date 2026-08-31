@@ -8,9 +8,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// getServiceDetailsFunc can be overridden for testing
-var getServiceDetailsFunc = getServiceDetails
-
 func buildDbCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "db",
@@ -32,7 +29,7 @@ func buildDbCmd(app *common.App) *cobra.Command {
 // primary service ID or a read replica set ID. This lets a replica ID work
 // anywhere a service ID does across the db connection commands.
 func lookupConnectionTarget(cmd *cobra.Command, app *common.App, args []string) (*common.ConnectionTarget, error) {
-	service, err := getServiceDetailsFunc(cmd, app, args)
+	service, err := getServiceDetails(cmd, app, args)
 	if err != nil {
 		return nil, err
 	}

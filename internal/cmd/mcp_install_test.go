@@ -2,978 +2,678 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stacklok/toolhive/pkg/client"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// testClientMapping pairs our Tiger client types with their corresponding toolhive types for testing
-type testClientMapping struct {
-	ClientType         MCPClient
-	ToolhiveClientType client.ClientApp
+// stubTigerExecutablePath pins the executable path the install command writes
+// into client configs, since os.Executable returns the unpredictable test
+// binary path.
+func stubTigerExecutablePath(t *testing.T, path string) {
+	t.Helper()
+	original := tigerExecutablePathFunc
+	tigerExecutablePathFunc = func() (string, error) { return path, nil }
+	t.Cleanup(func() { tigerExecutablePathFunc = original })
 }
 
-// testClientMappings defines which clients we want to test for equivalence between ConfigPaths and toolhive
-var testClientMappings = []testClientMapping{
-	{
-		ClientType:         ClaudeCode,
-		ToolhiveClientType: client.ClaudeCode,
-	},
-	{
-		ClientType:         Cursor,
-		ToolhiveClientType: client.Cursor,
-	},
-	{
-		ClientType:         Windsurf,
-		ToolhiveClientType: client.Windsurf,
-	},
+// installSuccessOutput is the exact stdout `tiger mcp install` prints after a
+// successful file-based installation.
+func installSuccessOutput(clientName, configPath string) string {
+	return fmt.Sprintf(`✅ Successfully installed Tiger MCP server configuration for %s
+📁 Configuration file: %s
+
+💡 Next steps:
+   1. Restart %s to load the new configuration
+   2. The Tiger MCP server will be available as 'tiger'
+
+🤖 Try asking your AI assistant:
+
+   📊 List and manage your Tiger Cloud services:
+   • "List my Tiger Cloud services"
+   • "Show me details for service xyz-123"
+   • "Create a new database service called my-app-db"
+   • "Update the password for my database service"
+   • "What Tiger Cloud services do I have access to?"
+
+   📚 Ask questions from the PostgreSQL and Tiger Cloud documentation:
+   • "Show me Tiger Cloud documentation about hypertables?"
+   • "What are the best practices for PostgreSQL indexing?"
+   • "What is the command for renaming a table?"
+   • "Help me optimize my PostgreSQL queries"
+
+   📋 Make use of our optimized AI guides for common workflows:
+   • "Help me create a new database schema for my application"
+   • "Help me set up hypertables for the device_readings table"
+   • "Help me figure out which tables should be hypertables"
+   • "What's the best way to structure time-series data?"
+`, clientName, configPath, clientName)
 }
 
-func TestFindClientConfigFileFallback(t *testing.T) {
-	// Create temporary home directory for controlled testing
-	tempHome := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Setenv("HOME", tempHome)
-	defer func() {
-		os.Setenv("HOME", originalHome)
-	}()
-
-	for _, cfg := range supportedClients {
-		// Skip clients without ConfigPaths defined
-		if len(cfg.ConfigPaths) == 0 {
-			continue
-		}
-
-		t.Run(cfg.Name+" fallback when no file exists", func(t *testing.T) {
-			// Test our ConfigPaths approach - this should succeed with fallback path
-			ourPath, err := findClientConfigFile(cfg.ConfigPaths)
-			require.NoError(t, err, "findClientConfigFile should not error")
-
-			// Verify our path matches the expected fallback (first path in ConfigPaths)
-			expectedPath := util.ExpandPath(cfg.ConfigPaths[0])
-			ourAbsPath, err := filepath.Abs(ourPath)
-			require.NoError(t, err, "should be able to get absolute path for our result")
-			expectedAbsPath, err := filepath.Abs(expectedPath)
-			require.NoError(t, err, "should be able to get absolute path for expected result")
-
-			assert.Equal(t, expectedAbsPath, ourAbsPath,
-				"findClientConfigFile should return expected fallback path for %s", cfg.Name)
-		})
+// tigerServerEntry is the MCP server entry the install command writes (with
+// the executable path stubbed to "tiger").
+func tigerServerEntry() map[string]any {
+	return map[string]any{
+		"command": "tiger",
+		"args":    []any{"mcp", "start"},
 	}
 }
 
-func TestFindClientConfigFileEquivalentToToolhive(t *testing.T) {
-	// Test that our ConfigPaths system produces identical results to toolhive when config files exist
-	tempHome := t.TempDir()
-	originalHome := os.Getenv("HOME")
-	t.Setenv("HOME", tempHome)
-	defer func() {
-		os.Setenv("HOME", originalHome)
-	}()
+func readJSONFile(t *testing.T, path string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", path, err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("file %s is not valid JSON: %v", path, err)
+	}
+	return parsed
+}
 
-	for _, mapping := range testClientMappings {
-		// Find our client config
-		var ourClientConfig *clientConfig
-		for _, cfg := range supportedClients {
-			if cfg.ClientType == mapping.ClientType {
-				ourClientConfig = &cfg
-				break
-			}
-		}
-		require.NotNil(t, ourClientConfig, "should find client config for %s", mapping.ClientType)
-		require.NotEmpty(t, ourClientConfig.ConfigPaths, "client should have ConfigPaths defined for %s", mapping.ClientType)
-
-		t.Run(ourClientConfig.Name+" equivalent to toolhive when file exists", func(t *testing.T) {
-			// Create the config file at the first ConfigPath location
-			expandedPath := util.ExpandPath(ourClientConfig.ConfigPaths[0])
-
-			// Create directory structure
-			dir := filepath.Dir(expandedPath)
-			err := os.MkdirAll(dir, 0755)
-			require.NoError(t, err, "should be able to create directory structure")
-
-			// Create the config file
-			err = os.WriteFile(expandedPath, []byte(`{"mcpServers":{}}`), 0644)
-			require.NoError(t, err, "should be able to create config file")
-
-			// Test our ConfigPaths approach
-			ourPath, err := findClientConfigFile(ourClientConfig.ConfigPaths)
-			require.NoError(t, err, "findClientConfigFile should not error")
-
-			// Test toolhive approach (should succeed now that file exists)
-			toolhiveConfig, err := client.FindClientConfig(mapping.ToolhiveClientType)
-			require.NoError(t, err, "toolhive FindClientConfig should not error when file exists")
-
-			// Convert both paths to absolute paths for comparison
-			ourAbsPath, err := filepath.Abs(ourPath)
-			require.NoError(t, err, "should be able to get absolute path for our result")
-
-			toolhiveAbsPath, err := filepath.Abs(toolhiveConfig.Path)
-			require.NoError(t, err, "should be able to get absolute path for toolhive result")
-
-			// Both systems should find the same existing file
-			assert.Equal(t, ourAbsPath, toolhiveAbsPath,
-				"findClientConfigFile and toolhive should find same existing file for %s", ourClientConfig.Name)
-		})
+func assertJSONFile(t *testing.T, path string, want map[string]any) {
+	t.Helper()
+	if diff := cmp.Diff(want, readJSONFile(t, path)); diff != "" {
+		t.Errorf("config file mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestAddTigerMCPServer(t *testing.T) {
-	tests := []struct {
-		name                 string
-		initialConfig        string
-		mcpServersPathPrefix string
-		expectedResult       map[string]any
-		expectError          bool
+// backupFiles returns the backup files created alongside configPath.
+func backupFiles(t *testing.T, configPath string) []string {
+	t.Helper()
+	matches, err := filepath.Glob(configPath + ".backup.*")
+	if err != nil {
+		t.Fatalf("failed to glob backup files: %v", err)
+	}
+	return matches
+}
+
+func TestMCPInstallCmd(t *testing.T) {
+	stubTigerExecutablePath(t, "tiger")
+
+	dir := t.TempDir()
+	home := t.TempDir()
+
+	// path returns a per-case config file path; seed pre-creates it.
+	path := func(caseName string) string {
+		return filepath.Join(dir, caseName, "mcp.json")
+	}
+	seed := func(caseName, content string, mode os.FileMode) string {
+		t.Helper()
+		p := path(caseName)
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatalf("failed to create config dir: %v", err)
+		}
+		if err := os.WriteFile(p, []byte(content), mode); err != nil {
+			t.Fatalf("failed to seed config file: %v", err)
+		}
+		return p
+	}
+
+	// Stub `claude` on PATH so the CLI-based install path runs end-to-end
+	// without the real client; the script records its argv for the check.
+	stubBin := t.TempDir()
+	argvFile := filepath.Join(stubBin, "argv")
+	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
+	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0755); err != nil {
+		t.Fatalf("failed to write claude stub: %v", err)
+	}
+	cliHome := t.TempDir()
+
+	mergePath := seed("merge", `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`, 0644)
+	otherPath := seed("other", `{"other": "config"}`, 0644)
+	idempotentPath := seed("idempotent", `{"mcpServers": {"existing": {"command": "existing", "args": ["arg1"]}, "tiger": {"command": "/old/path/to/tiger", "args": ["old", "args"]}}}`, 0644)
+	emptyPath := seed("empty", "", 0644)
+	backupInitial := `{"mcpServers": {"existing": {"command": "test", "args": ["arg1"]}}}`
+	backupPath := seed("backup", backupInitial, 0644)
+	permsPath := seed("perms", `{"test": "data"}`, 0600)
+	badPath := seed("bad", `{invalid json`, 0644)
+
+	// For "backup fails when config is unreadable": the directory is made
+	// unreadable by that case's setup hook, so the paths are just declared here.
+	lockedDir := filepath.Join(dir, "locked")
+	lockedConfigPath := filepath.Join(lockedDir, "config.json")
+
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "too many arguments",
+			args:    []string{"mcp", "install", "cursor", "windsurf"},
+			wantErr: "accepts at most 1 arg(s), received 2",
+		},
+		{
+			name:    "no client and no TTY",
+			args:    []string{"mcp", "install"},
+			wantErr: "TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')",
+		},
+		{
+			name:    "unsupported client",
+			args:    []string{"mcp", "install", "bogus"},
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli",
+		},
+		{
+			name:    "invalid existing config",
+			args:    []string{"mcp", "install", "cursor", "--no-backup", "--config-path", badPath},
+			wantErr: "failed to add MCP server configuration: failed to parse existing config: hujson: line 1, column 2: invalid literal: invalid",
+		},
+		{
+			// Backups are enabled (the default) but nothing exists to back up.
+			name:       "creates config file and directories",
+			args:       []string{"mcp", "install", "cursor", "--config-path", path("fresh")},
+			wantStdout: installSuccessOutput("cursor", path("fresh")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, path("fresh"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+				info, err := os.Stat(path("fresh"))
+				if err != nil {
+					t.Fatalf("failed to stat config file: %v", err)
+				}
+				if got := info.Mode().Perm(); got != 0600 {
+					t.Errorf("new config file mode = %o, want 0600", got)
+				}
+				if backups := backupFiles(t, path("fresh")); len(backups) != 0 {
+					t.Errorf("expected no backup files, got %v", backups)
+				}
+			}},
+		},
+		{
+			name:       "merges with existing servers",
+			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", mergePath},
+			wantStdout: installSuccessOutput("cursor", mergePath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, mergePath, map[string]any{
+					"mcpServers": map[string]any{
+						"server1": map[string]any{"command": "cmd1", "args": []any{"arg1"}},
+						"server2": map[string]any{"command": "cmd2", "args": []any{"arg2", "arg3"}},
+						"tiger":   tigerServerEntry(),
+					},
+				})
+				// --no-backup skips the backup of the existing file.
+				if backups := backupFiles(t, mergePath); len(backups) != 0 {
+					t.Errorf("expected no backup files with --no-backup, got %v", backups)
+				}
+			}},
+		},
+		{
+			name:       "preserves unrelated config keys",
+			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", otherPath},
+			wantStdout: installSuccessOutput("cursor", otherPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, otherPath, map[string]any{
+					"other":      "config",
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
+			name:       "updates existing tiger entry idempotently",
+			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", idempotentPath},
+			wantStdout: installSuccessOutput("cursor", idempotentPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				want := map[string]any{
+					"mcpServers": map[string]any{
+						"existing": map[string]any{"command": "existing", "args": []any{"arg1"}},
+						"tiger":    tigerServerEntry(),
+					},
+				}
+				assertJSONFile(t, idempotentPath, want)
+
+				// A second install must leave the config unchanged.
+				again := runCommand(t, []string{"mcp", "install", "cursor", "--no-backup", "--config-path", idempotentPath}, nil)
+				if again.err != nil {
+					t.Fatalf("second install failed: %v", again.err)
+				}
+				assertJSONFile(t, idempotentPath, want)
+			}},
+		},
+		{
+			name:       "handles empty config file and backs it up",
+			args:       []string{"mcp", "install", "cursor", "--config-path", emptyPath},
+			wantStdout: installSuccessOutput("cursor", emptyPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, emptyPath, map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+				backups := backupFiles(t, emptyPath)
+				if len(backups) != 1 {
+					t.Fatalf("expected 1 backup file, got %v", backups)
+				}
+				content, err := os.ReadFile(backups[0])
+				if err != nil {
+					t.Fatalf("failed to read backup: %v", err)
+				}
+				if len(content) != 0 {
+					t.Errorf("backup of empty file should be empty, got %q", content)
+				}
+			}},
+		},
+		{
+			name:       "creates backup by default",
+			args:       []string{"mcp", "install", "cursor", "--config-path", backupPath},
+			wantStdout: installSuccessOutput("cursor", backupPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				backups := backupFiles(t, backupPath)
+				if len(backups) != 1 {
+					t.Fatalf("expected 1 backup file, got %v", backups)
+				}
+				content, err := os.ReadFile(backups[0])
+				if err != nil {
+					t.Fatalf("failed to read backup: %v", err)
+				}
+				assertOutput(t, string(content), backupInitial)
+				assertJSONFile(t, backupPath, map[string]any{
+					"mcpServers": map[string]any{
+						"existing": map[string]any{"command": "test", "args": []any{"arg1"}},
+						"tiger":    tigerServerEntry(),
+					},
+				})
+
+				// A second install creates a second, distinct backup.
+				again := runCommand(t, []string{"mcp", "install", "cursor", "--config-path", backupPath}, nil)
+				if again.err != nil {
+					t.Fatalf("second install failed: %v", again.err)
+				}
+				if backups := backupFiles(t, backupPath); len(backups) != 2 {
+					t.Errorf("expected 2 distinct backup files, got %v", backups)
+				}
+			}},
+		},
+		{
+			name:       "backup preserves file permissions",
+			args:       []string{"mcp", "install", "cursor", "--config-path", permsPath},
+			wantStdout: installSuccessOutput("cursor", permsPath),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				backups := backupFiles(t, permsPath)
+				if len(backups) != 1 {
+					t.Fatalf("expected 1 backup file, got %v", backups)
+				}
+				for _, p := range append(backups, permsPath) {
+					info, err := os.Stat(p)
+					if err != nil {
+						t.Fatalf("failed to stat %s: %v", p, err)
+					}
+					if got := info.Mode().Perm(); got != 0600 {
+						t.Errorf("%s mode = %o, want 0600", p, got)
+					}
+				}
+			}},
+		},
+		{
+			// claude-code installs via the client's own CLI rather than JSON
+			// patching; the stub on PATH records the exact command run.
+			name: "cli-based client runs the client's install command",
+			args: []string{"mcp", "install", "claude-code"},
+			opts: []runOption{
+				withEnv("PATH", stubBin),
+				withEnv("HOME", cliHome),
+			},
+			wantStdout: installSuccessOutput("claude-code", filepath.Join(cliHome, ".claude.json")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				argv, err := os.ReadFile(argvFile)
+				if err != nil {
+					t.Fatalf("claude stub was not invoked: %v", err)
+				}
+				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\ntiger\nmcp\nstart\n")
+			}},
+		},
+		{
+			name:       "default config path under HOME",
+			args:       []string{"mcp", "install", "cursor", "--no-backup"},
+			opts:       []runOption{withEnv("HOME", home)},
+			wantStdout: installSuccessOutput("cursor", filepath.Join(home, ".cursor", "mcp.json")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, filepath.Join(home, ".cursor", "mcp.json"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
+			name:       "client name is case-insensitive",
+			args:       []string{"mcp", "install", "CURSOR", "--no-backup", "--config-path", path("upper")},
+			wantStdout: installSuccessOutput("CURSOR", path("upper")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, path("upper"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
+			name:       "add alias",
+			args:       []string{"mcp", "add", "cursor", "--no-backup", "--config-path", path("alias")},
+			wantStdout: installSuccessOutput("cursor", path("alias")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, path("alias"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
+			// The backup read must fail, so the config sits in a directory the
+			// setup hook makes unreadable (and restores, so t.TempDir can
+			// clean up). Root ignores file permissions, hence the skip.
+			name: "backup fails when config is unreadable",
+			args: []string{"mcp", "install", "cursor", "--config-path", lockedConfigPath},
+			opts: []runOption{withSetup(func(t *testing.T) {
+				if os.Geteuid() == 0 {
+					t.Skip("cannot test permission errors as root user")
+				}
+				if err := os.MkdirAll(lockedDir, 0755); err != nil {
+					t.Fatalf("failed to create dir: %v", err)
+				}
+				if err := os.WriteFile(lockedConfigPath, []byte(`{"test": "data"}`), 0644); err != nil {
+					t.Fatalf("failed to seed config file: %v", err)
+				}
+				if err := os.Chmod(lockedDir, 0444); err != nil {
+					t.Fatalf("failed to chmod dir: %v", err)
+				}
+				t.Cleanup(func() { os.Chmod(lockedDir, 0755) })
+			})},
+			wantErr: fmt.Sprintf("failed to create backup: failed to read original config file: open %s: permission denied", lockedConfigPath),
+		},
+	})
+}
+
+// TestFindClientConfig covers the client-name lookup table: behavior that the
+// command-level cases only exercise for cursor.
+func TestFindClientConfig(t *testing.T) {
+	mappings := []struct {
+		clientName   string
+		expectedType MCPClient
+		expectedName string
 	}{
-		{
-			name:                 "empty config file",
-			initialConfig:        `{}`,
-			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]any{
-				"mcpServers": map[string]any{
-					"tiger": map[string]any{
-						"command": "tiger",
-						"args":    []any{"mcp", "start"},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name:                 "config with existing mcpServers",
-			initialConfig:        `{"mcpServers": {"existing": {"command": "existing", "args": ["test"]}}}`,
-			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]any{
-				"mcpServers": map[string]any{
-					"existing": map[string]any{
-						"command": "existing",
-						"args":    []any{"test"},
-					},
-					"tiger": map[string]any{
-						"command": "tiger",
-						"args":    []any{"mcp", "start"},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name:                 "preserves multiple sibling servers",
-			initialConfig:        `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`,
-			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]any{
-				"mcpServers": map[string]any{
-					"server1": map[string]any{
-						"command": "cmd1",
-						"args":    []any{"arg1"},
-					},
-					"server2": map[string]any{
-						"command": "cmd2",
-						"args":    []any{"arg2", "arg3"},
-					},
-					"tiger": map[string]any{
-						"command": "tiger",
-						"args":    []any{"mcp", "start"},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name:                 "config without mcpServers section",
-			initialConfig:        `{"other": "config"}`,
-			mcpServersPathPrefix: "/mcpServers",
-			expectedResult: map[string]any{
-				"other": "config",
-				"mcpServers": map[string]any{
-					"tiger": map[string]any{
-						"command": "tiger",
-						"args":    []any{"mcp", "start"},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name:                 "different path prefix",
-			initialConfig:        `{}`,
-			mcpServersPathPrefix: "/servers",
-			expectedResult: map[string]any{
-				"servers": map[string]any{
-					"tiger": map[string]any{
-						"command": "tiger",
-						"args":    []any{"mcp", "start"},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name:                 "invalid JSON",
-			initialConfig:        `{invalid json`,
-			mcpServersPathPrefix: "/mcpServers",
-			expectedResult:       nil,
-			expectError:          true,
-		},
+		{"claude-code", ClaudeCode, "Claude Code"},
+		{"CLAUDE-CODE", ClaudeCode, "Claude Code"},
+		{"cursor", Cursor, "Cursor"},
+		{"CURSOR", Cursor, "Cursor"},
+		{"windsurf", Windsurf, "Windsurf"},
+		{"WindSurf", Windsurf, "Windsurf"},
+		{"codex", Codex, "Codex"},
+		{"CODEX", Codex, "Codex"},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory and config file
-			tempDir := t.TempDir()
-			configPath := filepath.Join(tempDir, "config.json")
-
-			// Write initial config
-			err := os.WriteFile(configPath, []byte(tt.initialConfig), 0644)
-			require.NoError(t, err)
-
-			// Call the function under test
-			err = addMCPServerViaJSON(configPath, tt.mcpServersPathPrefix, "tiger", "tiger", []string{"mcp", "start"})
-
-			if tt.expectError {
-				assert.Error(t, err)
-				return
+	for _, m := range mappings {
+		t.Run(m.clientName, func(t *testing.T) {
+			cfg, err := findClientConfig(m.clientName)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-
-			require.NoError(t, err)
-
-			// Read the result
-			resultBytes, err := os.ReadFile(configPath)
-			require.NoError(t, err)
-
-			// Parse the result
-			var result map[string]any
-			err = json.Unmarshal(resultBytes, &result)
-			require.NoError(t, err)
-
-			// Compare with expected result
-			if tt.expectedResult != nil {
-				assert.Equal(t, tt.expectedResult, result)
+			if cfg.ClientType != m.expectedType {
+				t.Errorf("ClientType = %q, want %q", cfg.ClientType, m.expectedType)
 			}
-
-			// Verify the file is valid JSON
-			assert.True(t, json.Valid(resultBytes), "Result should be valid JSON")
+			if cfg.Name != m.expectedName {
+				t.Errorf("Name = %q, want %q", cfg.Name, m.expectedName)
+			}
 		})
 	}
-}
 
-func TestAddTigerMCPServerFileOperations(t *testing.T) {
-	t.Run("creates directory if it doesn't exist", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "nested", "dir", "config.json")
-
-		// Directory doesn't exist yet
-		_, err := os.Stat(filepath.Dir(configPath))
-		assert.True(t, os.IsNotExist(err))
-
-		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
-		require.NoError(t, err)
-
-		// Directory should now exist
-		_, err = os.Stat(filepath.Dir(configPath))
-		assert.NoError(t, err)
-
-		// Config file should exist
-		_, err = os.Stat(configPath)
-		assert.NoError(t, err)
-	})
-
-	t.Run("handles non-existent config file", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "nonexistent.json")
-
-		err := addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
-		require.NoError(t, err)
-
-		// File should now exist with correct content
-		resultBytes, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-
-		var result map[string]any
-		err = json.Unmarshal(resultBytes, &result)
-		require.NoError(t, err)
-
-		expected := map[string]any{
-			"mcpServers": map[string]any{
-				"tiger": map[string]any{
-					"command": "tiger",
-					"args":    []any{"mcp", "start"},
-				},
-			},
+	t.Run("every client is installable", func(t *testing.T) {
+		for _, cfg := range supportedClients {
+			found, err := findClientConfig(cfg.EditorNames[0])
+			if err != nil {
+				t.Fatalf("findClientConfig(%q) failed: %v", cfg.EditorNames[0], err)
+			}
+			if found.Name == "" {
+				t.Errorf("%s: Name should not be empty", cfg.ClientType)
+			}
+			// Every client needs an install mechanism: JSON patching (path
+			// prefix) or a CLI install command.
+			if found.MCPServersPathPrefix == "" && found.buildInstallCommand == nil {
+				t.Errorf("%s: needs MCPServersPathPrefix or buildInstallCommand", cfg.ClientType)
+			}
+			// CLI-only clients (no config paths) must have an install command.
+			if len(found.ConfigPaths) == 0 && found.buildInstallCommand == nil {
+				t.Errorf("%s: CLI-only clients must have buildInstallCommand", cfg.ClientType)
+			}
 		}
-		assert.Equal(t, expected, result)
-	})
-
-	t.Run("handles empty config file", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "empty.json")
-
-		// Create empty file
-		err := os.WriteFile(configPath, []byte(""), 0644)
-		require.NoError(t, err)
-
-		err = addMCPServerViaJSON(configPath, "/mcpServers", "tiger", "tiger", []string{"mcp", "start"})
-		require.NoError(t, err)
-
-		// File should now have correct content
-		resultBytes, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-
-		var result map[string]any
-		err = json.Unmarshal(resultBytes, &result)
-		require.NoError(t, err)
-
-		expected := map[string]any{
-			"mcpServers": map[string]any{
-				"tiger": map[string]any{
-					"command": "tiger",
-					"args":    []any{"mcp", "start"},
-				},
-			},
-		}
-		assert.Equal(t, expected, result)
 	})
 }
 
-func TestCreateConfigBackup(t *testing.T) {
-	t.Run("creates backup for existing config file", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		originalContent := `{"mcpServers": {"test": {"command": "test", "args": ["arg1"]}}}`
-
-		// Create original config file
-		err := os.WriteFile(configPath, []byte(originalContent), 0644)
-		require.NoError(t, err)
-
-		// Create backup
-		backupPath, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		require.NotEmpty(t, backupPath, "backup path should not be empty")
-
-		// Verify backup path format
-		expectedPrefix := configPath + ".backup."
-		assert.True(t, strings.HasPrefix(backupPath, expectedPrefix), "backup path should have correct prefix")
-
-		// Verify backup file exists
-		_, err = os.Stat(backupPath)
-		assert.NoError(t, err, "backup file should exist")
-
-		// Verify backup content matches original
-		backupContent, err := os.ReadFile(backupPath)
-		require.NoError(t, err)
-		assert.Equal(t, originalContent, string(backupContent), "backup content should match original")
-
-		// Verify original file is unchanged
-		originalAfterBackup, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-		assert.Equal(t, originalContent, string(originalAfterBackup), "original file should be unchanged")
-	})
-
-	t.Run("returns empty string for non-existent config file", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "nonexistent.json")
-
-		// Config file doesn't exist
-		_, err := os.Stat(configPath)
-		assert.True(t, os.IsNotExist(err), "config file should not exist")
-
-		// Create backup should return empty string and no error
-		backupPath, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		assert.Empty(t, backupPath, "backup path should be empty for non-existent file")
-	})
-
-	t.Run("creates backup with unique timestamp", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		originalContent := `{"test": "data"}`
-
-		// Create original config file
-		err := os.WriteFile(configPath, []byte(originalContent), 0644)
-		require.NoError(t, err)
-
-		// Create first backup
-		backupPath1, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		require.NotEmpty(t, backupPath1)
-
-		// Wait a moment to ensure different timestamp
-		time.Sleep(time.Second + 10*time.Millisecond)
-
-		// Create second backup
-		backupPath2, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		require.NotEmpty(t, backupPath2)
-
-		// Backup paths should be different
-		assert.NotEqual(t, backupPath1, backupPath2, "backup paths should have different timestamps")
-
-		// Both backup files should exist
-		_, err = os.Stat(backupPath1)
-		assert.NoError(t, err, "first backup should exist")
-		_, err = os.Stat(backupPath2)
-		assert.NoError(t, err, "second backup should exist")
-	})
-
-	t.Run("handles empty config file", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "empty.json")
-
-		// Create empty config file
-		err := os.WriteFile(configPath, []byte(""), 0644)
-		require.NoError(t, err)
-
-		// Create backup
-		backupPath, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		require.NotEmpty(t, backupPath)
-
-		// Verify backup exists and is empty
-		backupContent, err := os.ReadFile(backupPath)
-		require.NoError(t, err)
-		assert.Empty(t, backupContent, "backup of empty file should be empty")
-	})
-
-	t.Run("preserves file permissions", func(t *testing.T) {
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		originalContent := `{"test": "data"}`
-
-		// Create original config file with specific permissions
-		err := os.WriteFile(configPath, []byte(originalContent), 0600)
-		require.NoError(t, err)
-
-		// Create backup
-		backupPath, err := createConfigBackup(configPath)
-		require.NoError(t, err)
-		require.NotEmpty(t, backupPath)
-
-		// Check backup file permissions
-		backupInfo, err := os.Stat(backupPath)
-		require.NoError(t, err)
-
-		// The backup should preserve the original file's permissions (0600)
-		expectedMode := os.FileMode(0600)
-		assert.Equal(t, expectedMode, backupInfo.Mode().Perm(), "backup should preserve original file permissions")
-	})
-
-	t.Run("handles permission errors gracefully", func(t *testing.T) {
-		if os.Geteuid() == 0 {
-			t.Skip("Cannot test permission errors as root user")
+// TestFindClientConfigFile covers config file discovery, including the
+// per-client fallback paths and their equivalence with toolhive's notion of
+// each client's config location.
+func TestFindClientConfigFile(t *testing.T) {
+	t.Run("errors when no config paths provided", func(t *testing.T) {
+		for _, paths := range [][]string{{}, nil} {
+			if _, err := findClientConfigFile(paths); err == nil {
+				t.Errorf("findClientConfigFile(%v) should error", paths)
+			} else {
+				assertOutput(t, err.Error(), "no config paths provided")
+			}
 		}
-
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		originalContent := `{"test": "data"}`
-
-		// Create original config file
-		err := os.WriteFile(configPath, []byte(originalContent), 0644)
-		require.NoError(t, err)
-
-		// Make the directory read-only to simulate permission error
-		err = os.Chmod(tempDir, 0444)
-		require.NoError(t, err)
-
-		// Restore permissions after test
-		defer func() {
-			os.Chmod(tempDir, 0755)
-		}()
-
-		// Create backup should fail due to permission error
-		backupPath, err := createConfigBackup(configPath)
-		assert.Error(t, err, "should fail due to permission error")
-		assert.Empty(t, backupPath, "backup path should be empty on error")
-		assert.Contains(t, err.Error(), "failed to read original config file", "error should mention read failure")
-	})
-}
-
-func TestExpandPath(t *testing.T) {
-	// Get the actual home directory for comparison
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err, "should be able to get user home directory")
-
-	t.Run("expands tilde to home directory", func(t *testing.T) {
-		result := util.ExpandPath("~/config.json")
-		expected := filepath.Join(homeDir, "config.json")
-		assert.Equal(t, expected, result, "should expand tilde to home directory")
 	})
 
-	t.Run("expands tilde with subdirectory", func(t *testing.T) {
-		result := util.ExpandPath("~/.config/tiger/config.json")
-		expected := filepath.Join(homeDir, ".config/tiger/config.json")
-		assert.Equal(t, expected, result, "should expand tilde with subdirectory path")
+	t.Run("finds existing config file", func(t *testing.T) {
+		configPath := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+			t.Fatal(err)
+		}
+		got, err := findClientConfigFile([]string{configPath})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertOutput(t, got, configPath)
 	})
 
-	t.Run("does not modify paths without tilde", func(t *testing.T) {
-		testPath := "/absolute/path/config.json"
-		result := util.ExpandPath(testPath)
-		assert.Equal(t, testPath, result, "should not modify absolute paths without tilde")
+	t.Run("falls back to first path when none exist", func(t *testing.T) {
+		dir := t.TempDir()
+		fallback := filepath.Join(dir, "fallback.json")
+		got, err := findClientConfigFile([]string{fallback, filepath.Join(dir, "a.json"), filepath.Join(dir, "b.json")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertOutput(t, got, fallback)
 	})
 
-	t.Run("does not modify relative paths without tilde", func(t *testing.T) {
-		testPath := "relative/path/config.json"
-		result := util.ExpandPath(testPath)
-		assert.Equal(t, testPath, result, "should not modify relative paths without tilde")
+	t.Run("prefers first existing file", func(t *testing.T) {
+		dir := t.TempDir()
+		first := filepath.Join(dir, "first.json")
+		second := filepath.Join(dir, "second.json")
+		for _, p := range []string{first, second} {
+			if err := os.WriteFile(p, []byte(`{}`), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := findClientConfigFile([]string{first, second})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertOutput(t, got, first)
 	})
 
 	t.Run("expands environment variables", func(t *testing.T) {
-		// Set a test environment variable
-		testEnvVar := "TEST_EXPAND_PATH_VAR"
-		testValue := "/test/env/path"
-		t.Setenv(testEnvVar, testValue)
-
-		result := util.ExpandPath("$" + testEnvVar + "/config.json")
-		expected := testValue + "/config.json"
-		assert.Equal(t, expected, result, "should expand environment variables")
-	})
-
-	t.Run("expands environment variables with braces", func(t *testing.T) {
-		testEnvVar := "TEST_EXPAND_PATH_BRACES"
-		testValue := "/test/env/braces"
-		t.Setenv(testEnvVar, testValue)
-
-		result := util.ExpandPath("${" + testEnvVar + "}/config.json")
-		expected := testValue + "/config.json"
-		assert.Equal(t, expected, result, "should expand environment variables with braces")
-	})
-
-	t.Run("expands both environment variables and tilde", func(t *testing.T) {
-		testEnvVar := "TEST_EXPAND_PATH_BOTH"
-		testValue := "Documents"
-		t.Setenv(testEnvVar, testValue)
-
-		result := util.ExpandPath("~/$" + testEnvVar + "/config.json")
-		expected := filepath.Join(homeDir, testValue, "config.json")
-		assert.Equal(t, expected, result, "should expand both environment variables and tilde")
-	})
-
-	t.Run("handles undefined environment variables", func(t *testing.T) {
-		result := util.ExpandPath("$UNDEFINED_ENV_VAR/config.json")
-		// os.ExpandEnv replaces undefined variables with empty string
-		expected := "/config.json"
-		assert.Equal(t, expected, result, "should replace undefined env vars with empty string")
-	})
-
-	t.Run("handles tilde not at beginning", func(t *testing.T) {
-		testPath := "/some/path/~/config.json"
-		result := util.ExpandPath(testPath)
-		// Should not expand tilde that's not at the beginning
-		assert.Equal(t, testPath, result, "should not expand tilde that's not at path beginning")
-	})
-
-	t.Run("handles just tilde", func(t *testing.T) {
-		result := util.ExpandPath("~")
-		// Just tilde should expand to home directory
-		assert.Equal(t, homeDir, result, "should expand bare tilde to home directory")
-	})
-
-	t.Run("handles tilde with just slash", func(t *testing.T) {
-		result := util.ExpandPath("~/")
-		expected := filepath.Join(homeDir, "")
-		assert.Equal(t, expected, result, "should expand tilde with just slash")
-	})
-
-	t.Run("handles empty path", func(t *testing.T) {
-		result := util.ExpandPath("")
-		assert.Equal(t, "", result, "should handle empty path")
-	})
-}
-
-func TestFindClientConfig(t *testing.T) {
-	t.Run("finds client config for supported client names", func(t *testing.T) {
-		testCases := []struct {
-			clientName   string
-			expectedType MCPClient
-			expectedName string
-		}{
-			{"claude-code", ClaudeCode, "Claude Code"},
-			{"cursor", Cursor, "Cursor"},
-			{"windsurf", Windsurf, "Windsurf"},
-			{"codex", Codex, "Codex"},
+		dir := t.TempDir()
+		configPath := filepath.Join(dir, "config.json")
+		if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+			t.Fatal(err)
 		}
-
-		for _, tc := range testCases {
-			t.Run(tc.clientName, func(t *testing.T) {
-				result, err := findClientConfig(tc.clientName)
-				require.NoError(t, err, "should not error for supported client")
-				require.NotNil(t, result, "should return a config")
-				assert.Equal(t, tc.expectedType, result.ClientType, "should have correct client type")
-				assert.Equal(t, tc.expectedName, result.Name, "should have correct name")
-				assert.NotEmpty(t, result.EditorNames, "should have editor names")
-			})
+		t.Setenv("FINDCONFIGFILE_TEST_DIR", dir)
+		got, err := findClientConfigFile([]string{"$FINDCONFIGFILE_TEST_DIR/config.json"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
+		assertOutput(t, got, configPath)
 	})
 
-	t.Run("handles case insensitive client names", func(t *testing.T) {
-		testCases := []struct {
-			clientName   string
-			expectedType MCPClient
-		}{
-			{"CLAUDE-CODE", ClaudeCode},
-			{"CURSOR", Cursor},
-			{"WindSurf", Windsurf},
-			{"CODEX", Codex},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.clientName, func(t *testing.T) {
-				result, err := findClientConfig(tc.clientName)
-				require.NoError(t, err, "should not error for supported client regardless of case")
-				require.NotNil(t, result, "should return a config")
-				assert.Equal(t, tc.expectedType, result.ClientType, "should map to correct client type")
-			})
-		}
-	})
-
-	t.Run("returns error for unsupported client", func(t *testing.T) {
-		result, err := findClientConfig("unsupported-editor")
-		assert.Error(t, err, "should error for unsupported client")
-		assert.Nil(t, result, "should return nil config")
-		assert.Contains(t, err.Error(), "unsupported client: unsupported-editor", "error should mention the unsupported client")
-		assert.Contains(t, err.Error(), "Supported clients:", "error should list supported clients")
-		// Verify it includes some known supported clients
-		assert.Contains(t, err.Error(), "claude-code", "error should include claude-code in supported list")
-		assert.Contains(t, err.Error(), "cursor", "error should include cursor in supported list")
-	})
-
-	t.Run("handles empty client name", func(t *testing.T) {
-		result, err := findClientConfig("")
-		assert.Error(t, err, "should error for empty client name")
-		assert.Nil(t, result, "should return nil config")
-		assert.Contains(t, err.Error(), "unsupported client:", "error should mention unsupported client")
-	})
-
-	t.Run("verifies client config structure", func(t *testing.T) {
-		// Test that each client config has required fields populated
+	t.Run("per-client fallback paths", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
 		for _, cfg := range supportedClients {
-			t.Run(string(cfg.ClientType), func(t *testing.T) {
-				// Use the first editor name to look up the config
-				config, err := findClientConfig(cfg.EditorNames[0])
-				require.NoError(t, err)
-				require.NotNil(t, config)
+			if len(cfg.ConfigPaths) == 0 {
+				continue
+			}
+			got, err := findClientConfigFile(cfg.ConfigPaths)
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", cfg.Name, err)
+				continue
+			}
+			if want := util.ExpandPath(cfg.ConfigPaths[0]); got != want {
+				t.Errorf("%s: fallback = %q, want %q", cfg.Name, got, want)
+			}
+		}
+	})
 
-				assert.NotEmpty(t, config.Name, "Name should not be empty")
-				assert.NotEmpty(t, config.EditorNames, "EditorNames should not be empty")
-
-				// ConfigPaths can be empty for CLI-only clients (like VS Code)
-				// Either MCPServersPathPrefix or buildInstallCommand should be set
-				hasPathPrefix := config.MCPServersPathPrefix != ""
-				hasBuildInstallCommand := config.buildInstallCommand != nil
-				assert.True(t, hasPathPrefix || hasBuildInstallCommand,
-					"Either MCPServersPathPrefix or buildInstallCommand should be set for %s", cfg.ClientType)
-
-				// If ConfigPaths is empty, buildInstallCommand must be set (CLI-only client)
-				if len(config.ConfigPaths) == 0 {
-					assert.NotNil(t, config.buildInstallCommand,
-						"CLI-only clients must have buildInstallCommand set for %s", cfg.ClientType)
+	// Our hardcoded ConfigPaths must agree with the toolhive library about
+	// where each client keeps its config.
+	t.Run("equivalent to toolhive", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		toolhiveClients := map[MCPClient]client.ClientApp{
+			ClaudeCode: client.ClaudeCode,
+			Cursor:     client.Cursor,
+			Windsurf:   client.Windsurf,
+		}
+		for _, cfg := range supportedClients {
+			toolhiveType, ok := toolhiveClients[cfg.ClientType]
+			if !ok {
+				continue
+			}
+			t.Run(cfg.Name, func(t *testing.T) {
+				// Create the config file at our first ConfigPath so both
+				// systems resolve an existing file.
+				expandedPath := util.ExpandPath(cfg.ConfigPaths[0])
+				if err := os.MkdirAll(filepath.Dir(expandedPath), 0755); err != nil {
+					t.Fatal(err)
 				}
+				if err := os.WriteFile(expandedPath, []byte(`{"mcpServers":{}}`), 0644); err != nil {
+					t.Fatal(err)
+				}
+
+				ourPath, err := findClientConfigFile(cfg.ConfigPaths)
+				if err != nil {
+					t.Fatalf("findClientConfigFile failed: %v", err)
+				}
+				toolhiveConfig, err := client.FindClientConfig(toolhiveType)
+				if err != nil {
+					t.Fatalf("toolhive FindClientConfig failed: %v", err)
+				}
+
+				ourAbs, err := filepath.Abs(ourPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				toolhiveAbs, err := filepath.Abs(toolhiveConfig.Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertOutput(t, ourAbs, toolhiveAbs)
 			})
 		}
 	})
 }
 
+// TestAddMCPServerViaCLI covers the CLI-based install path, which the command
+// tests can't reach without real client binaries on PATH.
 func TestAddMCPServerViaCLI(t *testing.T) {
-	t.Run("returns error when no install command configured", func(t *testing.T) {
-		clientCfg := &clientConfig{
-			ClientType:          "test-client",
-			Name:                "Test Client",
-			buildInstallCommand: nil, // No build function
+	t.Run("errors when no install command configured", func(t *testing.T) {
+		cfg := &clientConfig{ClientType: "test-client", Name: "Test Client"}
+		err := addMCPServerViaCLI(cfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
+		if err == nil {
+			t.Fatal("expected error, got nil")
 		}
-
-		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		assert.Error(t, err, "should error when no install command configured")
-		assert.Contains(t, err.Error(), "no install command configured for client Test Client", "error should mention missing install command")
+		assertOutput(t, err.Error(), "no install command configured for client Test Client")
 	})
 
-	t.Run("attempts to execute command when configured", func(t *testing.T) {
-		// Use a command that will fail but test that we get to the execution stage
-		clientCfg := &clientConfig{
+	t.Run("errors when command execution fails", func(t *testing.T) {
+		cfg := &clientConfig{
 			ClientType: "test-client",
 			Name:       "Test Client",
 			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 				return []string{"nonexistent-command-12345", "arg1", "arg2"}, nil
 			},
 		}
-
-		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		// We expect this to fail since the command doesn't exist, but it shows we got past validation
-		assert.Error(t, err, "should error when command execution fails")
-		assert.Contains(t, err.Error(), "failed to run Test Client installation command", "error should mention installation command failure")
-	})
-
-	t.Run("handles client config with single command", func(t *testing.T) {
-		clientCfg := &clientConfig{
-			ClientType: "test-client",
-			Name:       "Test Client",
-			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-				return []string{"echo"}, nil // Command with no args - should work
-			},
+		err := addMCPServerViaCLI(cfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
+		if err == nil {
+			t.Fatal("expected error, got nil")
 		}
-
-		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		// echo command should succeed
-		assert.NoError(t, err, "should not error for valid echo command")
-	})
-
-	t.Run("handles client config with command and args", func(t *testing.T) {
-		clientCfg := &clientConfig{
-			ClientType: "test-client",
-			Name:       "Test Client",
-			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-				return []string{"echo", "test", "output"}, nil // Command with args
-			},
+		if !strings.Contains(err.Error(), "failed to run Test Client installation command") {
+			t.Errorf("error should mention installation command failure, got: %v", err)
 		}
-
-		err := addMCPServerViaCLI(clientCfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		// echo command should succeed
-		assert.NoError(t, err, "should not error for valid echo command with args")
-	})
-}
-
-func TestFindClientConfigFile(t *testing.T) {
-	t.Run("returns error when no config paths provided", func(t *testing.T) {
-		result, err := findClientConfigFile([]string{})
-		assert.Error(t, err, "should error when no config paths provided")
-		assert.Empty(t, result, "should return empty path")
-		assert.Contains(t, err.Error(), "no config paths provided", "error should mention no config paths")
 	})
 
-	t.Run("returns error when config paths is nil", func(t *testing.T) {
-		result, err := findClientConfigFile(nil)
-		assert.Error(t, err, "should error when config paths is nil")
-		assert.Empty(t, result, "should return empty path")
-		assert.Contains(t, err.Error(), "no config paths provided", "error should mention no config paths")
-	})
-
-	t.Run("finds existing config file", func(t *testing.T) {
-		// Create a temporary file
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		err := os.WriteFile(configPath, []byte(`{}`), 0644)
-		require.NoError(t, err)
-
-		result, err := findClientConfigFile([]string{configPath})
-		assert.NoError(t, err, "should not error when file exists")
-		assert.Equal(t, configPath, result, "should return the existing file path")
-	})
-
-	t.Run("returns fallback path when no files exist", func(t *testing.T) {
-		tempDir := t.TempDir()
-		fallbackPath := filepath.Join(tempDir, "fallback.json")
-		nonExistentPath1 := filepath.Join(tempDir, "nonexistent1.json")
-		nonExistentPath2 := filepath.Join(tempDir, "nonexistent2.json")
-
-		result, err := findClientConfigFile([]string{fallbackPath, nonExistentPath1, nonExistentPath2})
-		assert.NoError(t, err, "should not error when using fallback")
-		assert.Equal(t, fallbackPath, result, "should return the fallback (first) path")
-	})
-
-	t.Run("finds first existing file when multiple exist", func(t *testing.T) {
-		tempDir := t.TempDir()
-
-		// Create multiple config files
-		firstPath := filepath.Join(tempDir, "first.json")
-		secondPath := filepath.Join(tempDir, "second.json")
-		err := os.WriteFile(firstPath, []byte(`{}`), 0644)
-		require.NoError(t, err)
-		err = os.WriteFile(secondPath, []byte(`{}`), 0644)
-		require.NoError(t, err)
-
-		result, err := findClientConfigFile([]string{firstPath, secondPath})
-		assert.NoError(t, err, "should not error when files exist")
-		assert.Equal(t, firstPath, result, "should return the first existing file")
-	})
-
-	t.Run("expands paths with environment variables and tilde", func(t *testing.T) {
-		// Create a file in a temporary directory
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "config.json")
-		err := os.WriteFile(configPath, []byte(`{}`), 0644)
-		require.NoError(t, err)
-
-		// Set up environment variable
-		testVar := "FINDCONFIGFILE_TEST_DIR"
-		t.Setenv(testVar, tempDir)
-
-		// Use environment variable in path
-		envPath := "$" + testVar + "/config.json"
-		result, err := findClientConfigFile([]string{envPath})
-		assert.NoError(t, err, "should not error with environment variable path")
-		assert.Equal(t, configPath, result, "should expand environment variable and find file")
-	})
-}
-
-func TestInstallMCPForEditor_Integration(t *testing.T) {
-	// Override getTigerExecutablePath to return "tiger" for tests
-	oldFunc := tigerExecutablePathFunc
-	tigerExecutablePathFunc = func() (string, error) {
-		return "tiger", nil
-	}
-	defer func() {
-		tigerExecutablePathFunc = oldFunc
-	}()
-
-	t.Run("installs for Cursor with JSON config", func(t *testing.T) {
-		// Use Cursor since it uses JSON-based config that we can fully control
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "mcp.json")
-
-		// Create initial empty config
-		initialConfig := `{"mcpServers": {}}`
-		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
-		require.NoError(t, err, "should create initial config file")
-
-		// Call installTigerMCPForClient to install Tiger MCP server
-		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
-		require.NoError(t, err, "installTigerMCPForClient should succeed")
-
-		// Verify the config file was modified
-		configContent, err := os.ReadFile(configPath)
-		require.NoError(t, err, "should be able to read config file")
-
-		var config map[string]any
-		err = json.Unmarshal(configContent, &config)
-		require.NoError(t, err, "config should be valid JSON")
-
-		// Check that mcpServers exists and contains tiger
-		mcpServers, exists := config["mcpServers"].(map[string]any)
-		require.True(t, exists, "mcpServers should exist in config")
-
-		tiger, exists := mcpServers["tiger"].(map[string]any)
-		require.True(t, exists, "tiger should be added to mcpServers")
-
-		assert.Equal(t, "tiger", tiger["command"], "command should be 'tiger'")
-		args, ok := tiger["args"].([]any)
-		require.True(t, ok, "args should be an array")
-		require.Len(t, args, 2, "should have two arguments")
-		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
-		assert.Equal(t, "start", args[1], "second arg should be 'start'")
-	})
-
-	t.Run("creates backup when requested", func(t *testing.T) {
-		// Create a temporary config file for Cursor
-		tempDir := t.TempDir()
-		configPath := filepath.Join(tempDir, "mcp.json")
-
-		initialConfig := `{"mcpServers": {"existing": {"command": "test", "args": ["arg1"]}}}`
-		err := os.WriteFile(configPath, []byte(initialConfig), 0644)
-		require.NoError(t, err)
-
-		// Call installTigerMCPForClient with backup enabled for Cursor
-		err = installTigerMCPForClient(discardCmd(), "cursor", true, configPath)
-		require.NoError(t, err, "installTigerMCPForClient should succeed with backup")
-
-		// Check that a backup file was created
-		backupFiles, err := filepath.Glob(configPath + ".backup.*")
-		require.NoError(t, err, "should be able to glob for backup files")
-		assert.NotEmpty(t, backupFiles, "backup file should be created")
-
-		// Verify backup contains original content
-		if len(backupFiles) > 0 {
-			backupContent, err := os.ReadFile(backupFiles[0])
-			require.NoError(t, err, "should be able to read backup file")
-			assert.Equal(t, initialConfig, string(backupContent), "backup should contain original config")
+	// The install commands themselves would exec the real client binaries, so
+	// pin each CLI-based client's exact argv here instead. The command-level
+	// "cli-based client" case executes claude-code's end-to-end via a stub.
+	t.Run("builds the expected command per client", func(t *testing.T) {
+		want := map[MCPClient][]string{
+			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
+			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
+			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
+			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
+			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},
 		}
-
-		// Verify config was modified to include tiger
-		configContent, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-
-		var config map[string]any
-		err = json.Unmarshal(configContent, &config)
-		require.NoError(t, err)
-
-		mcpServers := config["mcpServers"].(map[string]any)
-		assert.Contains(t, mcpServers, "tiger", "tiger should be added")
-		assert.Contains(t, mcpServers, "existing", "existing server should be preserved")
-	})
-
-	t.Run("handles unsupported editor", func(t *testing.T) {
-		err := installTigerMCPForClient(discardCmd(), "unsupported-editor", false, "")
-		assert.Error(t, err, "should error for unsupported editor")
-		assert.Contains(t, err.Error(), "unsupported client", "error should mention unsupported client")
-	})
-
-	t.Run("is idempotent - can install multiple times", func(t *testing.T) {
-		// Create temp directory for test config
-		tempDir, err := os.MkdirTemp("", "test-mcp-idempotent-*")
-		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
-
-		configPath := filepath.Join(tempDir, "mcp.json")
-
-		// Create initial config with mcpServers including an OLD tiger entry
-		initialConfig := `{
-			"mcpServers": {
-				"existing": {
-					"command": "existing",
-					"args": ["arg1", "arg2"]
-				},
-				"tiger": {
-					"command": "/old/path/to/tiger",
-					"args": ["old", "args"]
-				}
+		for _, cfg := range supportedClients {
+			if cfg.buildInstallCommand == nil {
+				continue
 			}
-		}`
-		err = os.WriteFile(configPath, []byte(initialConfig), 0644)
-		require.NoError(t, err)
-
-		// First installation (should update existing tiger entry)
-		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
-		require.NoError(t, err, "first installation should succeed")
-
-		// Read config after first installation
-		content1, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-
-		var config1 map[string]any
-		err = json.Unmarshal(content1, &config1)
-		require.NoError(t, err)
-
-		// Verify tiger was updated
-		mcpServers1 := config1["mcpServers"].(map[string]any)
-		assert.Contains(t, mcpServers1, "tiger", "tiger should exist after install")
-		assert.Contains(t, mcpServers1, "existing", "existing server should be preserved")
-
-		tigerConfig := mcpServers1["tiger"].(map[string]any)
-		assert.Equal(t, "tiger", tigerConfig["command"], "command should be updated to 'tiger' in test mode")
-
-		args := tigerConfig["args"].([]any)
-		assert.Equal(t, 2, len(args), "should have 2 args")
-		assert.Equal(t, "mcp", args[0], "first arg should be 'mcp'")
-		assert.Equal(t, "start", args[1], "second arg should be 'start'")
-
-		// Second installation (should be idempotent, no changes)
-		err = installTigerMCPForClient(discardCmd(), "cursor", false, configPath)
-		require.NoError(t, err, "second installation should succeed")
-
-		// Read config after second installation
-		content2, err := os.ReadFile(configPath)
-		require.NoError(t, err)
-
-		var config2 map[string]any
-		err = json.Unmarshal(content2, &config2)
-		require.NoError(t, err)
-
-		// Verify config is identical after second install
-		mcpServers2 := config2["mcpServers"].(map[string]any)
-		assert.Contains(t, mcpServers2, "tiger", "tiger should still exist after second install")
-		assert.Contains(t, mcpServers2, "existing", "existing server should still be preserved")
-
-		// Verify only one tiger entry exists (not duplicated)
-		assert.Equal(t, len(mcpServers1), len(mcpServers2), "number of MCP servers should not increase")
-
-		// Verify tiger config is still correct
-		tigerConfig2 := mcpServers2["tiger"].(map[string]any)
-		assert.Equal(t, tigerConfig, tigerConfig2, "tiger config should remain the same")
+			wantCmd, ok := want[cfg.ClientType]
+			if !ok {
+				t.Errorf("%s: CLI-based client missing from expected command table", cfg.ClientType)
+				continue
+			}
+			got, err := cfg.BuildInstallCommand("tiger", "/path/to/tiger", []string{"mcp", "start"})
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", cfg.ClientType, err)
+				continue
+			}
+			if diff := cmp.Diff(wantCmd, got); diff != "" {
+				t.Errorf("%s: install command mismatch (-want +got):\n%s", cfg.ClientType, diff)
+			}
+		}
 	})
+}
+
+// TestAddMCPServerViaJSON covers the path-prefix parameterization, which the
+// command tests can't reach: every supported JSON client uses /mcpServers.
+func TestAddMCPServerViaJSON(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := addMCPServerViaJSON(configPath, "/servers", "tiger", "tiger", []string{"mcp", "start"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertJSONFile(t, configPath, map[string]any{
+		"servers": map[string]any{"tiger": tigerServerEntry()},
+	})
+}
+
+// TestExpandPath covers the path expansion the install command relies on for
+// --config-path and the built-in client config locations.
+func TestExpandPath(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to get home directory: %v", err)
+	}
+
+	t.Setenv("TEST_EXPAND_PATH_VAR", "/test/env/path")
+	t.Setenv("TEST_EXPAND_PATH_SUBDIR", "Documents")
+
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"tilde", "~/config.json", filepath.Join(homeDir, "config.json")},
+		{"tilde with subdirectory", "~/.config/tiger/config.json", filepath.Join(homeDir, ".config/tiger/config.json")},
+		{"absolute path unchanged", "/absolute/path/config.json", "/absolute/path/config.json"},
+		{"relative path unchanged", "relative/path/config.json", "relative/path/config.json"},
+		{"env var", "$TEST_EXPAND_PATH_VAR/config.json", "/test/env/path/config.json"},
+		{"env var with braces", "${TEST_EXPAND_PATH_VAR}/config.json", "/test/env/path/config.json"},
+		{"tilde and env var", "~/$TEST_EXPAND_PATH_SUBDIR/config.json", filepath.Join(homeDir, "Documents", "config.json")},
+		{"undefined env var becomes empty", "$UNDEFINED_ENV_VAR/config.json", "/config.json"},
+		{"tilde not at beginning unchanged", "/some/path/~/config.json", "/some/path/~/config.json"},
+		{"bare tilde", "~", homeDir},
+		{"tilde with trailing slash", "~/", homeDir},
+		{"empty path", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertOutput(t, util.ExpandPath(tt.path), tt.want)
+		})
+	}
 }

@@ -27,12 +27,7 @@ func TestNewTigerClientUserAgent(t *testing.T) {
 	defer server.Close()
 
 	// Setup test config with the test server URL
-	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
-		"api_url": server.URL,
-	})
-	if err != nil {
-		t.Fatalf("Failed to setup test config: %v", err)
-	}
+	cfg := &config.Config{ConfigDir: t.TempDir(), APIURL: server.URL}
 
 	// Create a new Tiger client
 	client, err := api.NewTigerClient(cfg, "test-api-key")
@@ -73,12 +68,7 @@ func TestNewTigerClientAuthorizationHeader(t *testing.T) {
 	defer server.Close()
 
 	// Setup test config with the test server URL
-	cfg, err := config.UseTestConfig(t.TempDir(), map[string]any{
-		"api_url": server.URL,
-	})
-	if err != nil {
-		t.Fatalf("Failed to setup test config: %v", err)
-	}
+	cfg := &config.Config{ConfigDir: t.TempDir(), APIURL: server.URL}
 
 	// Create a new Tiger client with a test API key
 	apiKey := "test-api-key:test-secret-key"

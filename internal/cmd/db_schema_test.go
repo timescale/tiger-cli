@@ -1,105 +1,116 @@
 package cmd
 
 import (
-	"strings"
+	"errors"
+	"net/http"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestDBSchema_NoServiceID(t *testing.T) {
-	tmpDir := setupDBTest(t)
+func TestDbSchemaCmd(t *testing.T) {
+	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				s.Status = status
+			}))
+		}
+	}
 
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url": "https://api.tigerdata.com/public/v1",
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "not logged in",
+			args:    []string{"db", "schema", "svc-12345"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
+		},
+		{
+			name:    "missing service id",
+			args:    []string{"db", "schema"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			// Paused readiness stops the command before any connection attempt,
+			// proving the config default reached the service lookup.
+			name:    "default service id from config",
+			args:    []string{"db", "schema"},
+			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr: "service is paused",
+		},
+		{
+			name: "network error",
+			args: []string{"db", "schema", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+		},
+		{
+			name: "API error",
+			args: []string{"db", "schema", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusNotFound),
+						JSON4XX:      &api.Error{Message: new("service not found")},
+					}, nil)
+			},
+			wantErr: "service not found",
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "nil response body",
+			args: []string{"db", "schema", "svc-12345"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+		},
+		{
+			name:    "service paused",
+			args:    []string{"db", "schema", "svc-12345"},
+			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr: "service is paused",
+		},
+		{
+			name:    "service pausing",
+			args:    []string{"db", "schema", "svc-12345"},
+			setup:   setupGetWithStatus(api.DeployStatusPAUSING),
+			wantErr: "service is paused",
+		},
+		{
+			name:    "service not ready",
+			args:    []string{"db", "schema", "svc-12345"},
+			setup:   setupGetWithStatus(api.DeployStatusQUEUED),
+			wantErr: "service is not ready",
+		},
+		{
+			name:    "pooled without pooler",
+			args:    []string{"db", "schema", "svc-12345", "--pooled"},
+			setup:   setupGetWithStatus(api.DeployStatusREADY),
+			wantErr: "connection pooler not available for this service",
+		},
+		{
+			// The replica has no pooler, so --pooled warns and falls back; the
+			// not-ready status then stops the command before any connection.
+			name: "replica pooled without pooler warns before readiness check",
+			args: []string{"db", "schema", "rep-67890", "--pooled"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
+					s.Status = api.DeployStatusQUEUED
+				}))
+				expectGetService(m, "svc-12345", sampleService())
+			},
+			wantErr:    "service is not ready",
+			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: service is not ready\n",
+		},
 	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	mockTestPAT(t)
-
-	_, err = executeDBCommand(t.Context(), "db", "schema")
-	if err == nil {
-		t.Fatal("Expected error when no service ID is provided or configured")
-	}
-	if !strings.Contains(err.Error(), "service ID is required") {
-		t.Errorf("Expected error about missing service ID, got: %v", err)
-	}
-}
-
-func TestDBSchema_NoAuth(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	mockNotLoggedIn(t)
-
-	_, err = executeDBCommand(t.Context(), "db", "schema")
-	if err == nil {
-		t.Fatal("Expected error when not authenticated")
-	}
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Expected authentication error, got: %v", err)
-	}
-}
-
-// withMockService overrides getServiceDetailsFunc to return the given service,
-// restoring the original when the test ends.
-func withMockService(t *testing.T, service api.Service) {
-	t.Helper()
-	original := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return service, nil
-	}
-	t.Cleanup(func() { getServiceDetailsFunc = original })
-}
-
-// TestDBSchema_NotReadyStates checks that the command surfaces the readiness
-// guard's error before any connection attempt. The full status->error matrix is
-// covered by TestCheckServiceReady; here we only verify it propagates.
-func TestDBSchema_NotReadyStates(t *testing.T) {
-	tests := []struct {
-		name    string
-		status  api.DeployStatus
-		wantMsg string
-	}{
-		{"paused", api.DeployStatusPAUSED, "service is paused"},
-		{"not ready", api.DeployStatusQUEUED, "service is not ready"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := setupDBTest(t)
-			if _, err := config.UseTestConfig(tmpDir, map[string]any{
-				"api_url":    "https://api.tigerdata.com/public/v1",
-				"service_id": "svc-12345",
-			}); err != nil {
-				t.Fatalf("Failed to save test config: %v", err)
-			}
-
-			mockTestPAT(t)
-			withMockService(t, api.Service{
-				ServiceID: "svc-12345",
-				Status:    tt.status,
-			})
-
-			_, err := executeDBCommand(t.Context(), "db", "schema")
-			if err == nil {
-				t.Fatalf("Expected error for a %s service", tt.name)
-			}
-			if !strings.Contains(err.Error(), tt.wantMsg) {
-				t.Errorf("Expected %q, got: %v", tt.wantMsg, err)
-			}
-		})
-	}
 }

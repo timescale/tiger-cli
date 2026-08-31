@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/zalando/go-keyring"
 	"os"
 	"regexp"
 	"strings"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // setupIntegrationTest sets up isolated test environment with temporary config directory
@@ -36,7 +36,7 @@ func setupIntegrationTest(t *testing.T) string {
 	if apiURL := os.Getenv("TIGER_API_URL_INTEGRATION"); apiURL != "" {
 		// Use a simple command execution without the full executeIntegrationCommand wrapper
 		// to avoid circular dependencies during setup
-		rootCmd, err := buildRootCmd(t.Context())
+		rootCmd, _, err := buildRootCmd(t.Context())
 		if err != nil {
 			t.Fatalf("Failed to build root command during setup: %v", err)
 		}
@@ -60,7 +60,7 @@ func setupIntegrationTest(t *testing.T) string {
 // executeIntegrationCommand executes a CLI command for integration testing
 func executeIntegrationCommand(ctx context.Context, args ...string) (string, error) {
 	// Use buildRootCmd() to get a complete root command with all flags and subcommands
-	testRoot, err := buildRootCmd(ctx)
+	testRoot, _, err := buildRootCmd(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +128,7 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 // TestServiceLifecycleIntegration tests the complete authentication and service lifecycle:
 // login -> status -> create -> get -> update-password -> delete -> logout
 func TestServiceLifecycleIntegration(t *testing.T) {
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
@@ -1351,7 +1351,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	if publicKey == "" || secretKey == "" {
 		t.Skip("Skipping service not found test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
@@ -1478,7 +1478,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
 	existingServiceID := os.Getenv("TIGER_EXISTING_SERVICE_ID_INTEGRATION") // Optional: use existing service
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	if publicKey == "" || secretKey == "" {
 		t.Skip("Skipping integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
@@ -1543,7 +1543,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	// Check if we have valid integration test credentials
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 
 	if publicKey == "" || secretKey == "" {
 		t.Skip("Skipping authentication error integration test: TIGER_PUBLIC_KEY_INTEGRATION and TIGER_SECRET_KEY_INTEGRATION must be set")
@@ -1696,7 +1696,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 
 // TestServiceForkIntegration tests forking a service with --now strategy and validates data is correctly copied
 func TestServiceForkIntegration(t *testing.T) {
-	config.SetTestServiceName(t)
+	keyring.MockInit()
 	// Check for required environment variables
 	publicKey := os.Getenv("TIGER_PUBLIC_KEY_INTEGRATION")
 	secretKey := os.Getenv("TIGER_SECRET_KEY_INTEGRATION")

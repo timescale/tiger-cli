@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/zalando/go-keyring"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,27 +10,12 @@ import (
 func setupCredentialTest(t *testing.T) (string, *Config) {
 	t.Helper()
 
-	// Use a unique service name for this test to avoid conflicts
-	SetTestServiceName(t)
+	// Give the test a fresh, empty in-memory keyring
+	keyring.MockInit()
 
-	// Create temporary directory for test config
-	tmpDir, err := os.MkdirTemp("", "tiger-api-key-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	cfg, err := UseTestConfig(tmpDir, map[string]any{})
-	if err != nil {
-		t.Fatalf("Failed to use test config: %v", err)
-	}
-
-	// Clean up any existing credentials in the test directory
-	cfg.RemoveCredentials()
-
-	t.Cleanup(func() {
-		cfg.RemoveCredentials()
-		os.RemoveAll(tmpDir)
-	})
+	tmpDir := t.TempDir()
+	cfg := &Config{ConfigDir: tmpDir}
+	t.Cleanup(func() { cfg.RemoveCredentials() })
 
 	return tmpDir, cfg
 }
@@ -38,7 +24,7 @@ func TestStoreCredentialsToFile(t *testing.T) {
 	tmpDir, cfg := setupCredentialTest(t)
 
 	// Store credentials in new JSON format
-	if err := cfg.StoreCredentialsToFile("public:secret", "project123"); err != nil {
+	if err := cfg.storeCredentialsToFile("public:secret", "project123"); err != nil {
 		t.Fatalf("Failed to store credentials to file: %v", err)
 	}
 
@@ -76,8 +62,7 @@ func TestGetCredentialsFromFile(t *testing.T) {
 		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 
-	// Get credentials - should get from file since keyring is empty
-	// (each test uses a unique keyring service name)
+	// Get credentials - should get from file since the mock keyring is empty
 	creds, err := cfg.GetStoredCredentials()
 	if err != nil {
 		t.Fatalf("Failed to get credentials from file: %v", err)

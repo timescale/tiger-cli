@@ -1,193 +1,288 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
-func TestMCPGetCommand(t *testing.T) {
-	// toolExpectation defines what sections we expect for each tool
-	type toolExpectation struct {
-		name       string
-		parameters bool
-		output     bool
-	}
+func TestMCPGetCmd(t *testing.T) {
+	// service_get exercises the full text layout: annotation tags, description,
+	// a Parameters section, and a nested Output schema.
+	serviceGetText := `Get Service Details [read-only] [open-world]
 
-	// promptExpectation defines what sections we expect for each prompt
-	type promptExpectation struct {
-		name      string
-		arguments bool
-	}
+Tool name: service_get
 
-	// Expected tools with their section expectations
-	expectedTools := []toolExpectation{
-		{name: "db_execute_query", parameters: true, output: true},
-		{name: "search_docs", parameters: true, output: true},
-		{name: "service_create", parameters: true, output: true},
-		{name: "service_fork", parameters: true, output: true},
-		{name: "service_get", parameters: true, output: true},
-		{name: "service_list", parameters: false, output: true},
-		{name: "service_start", parameters: true, output: true},
-		{name: "service_stop", parameters: true, output: true},
-		{name: "service_update_password", parameters: true, output: true},
-		{name: "view_skill", parameters: true, output: true},
-	}
+Description:
+Get detailed information for a specific database service. Returns connection endpoints, replica configuration, resource allocation, creation time, and status.
 
-	// Expected prompts with their section expectations
-	expectedPrompts := []promptExpectation{
-		{name: "design-postgres-tables", arguments: false},
-		{name: "find-hypertable-candidates", arguments: false},
-		{name: "migrate-postgres-tables-to-hypertables", arguments: false},
-		{name: "setup-timescaledb-hypertables", arguments: false},
-	}
+Parameters:
+  • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
+  • with_password: boolean - Whether to include the password in the response and connection string. NEVER set to true unless the user explicitly asks for the password. (default: false)
 
-	t.Run("Invalid capability name", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
+Output:
+  • service (required): object
+    • connection_string (required): string - PostgreSQL connection string (password embedded only if with_password=true)
+    • created: string
+    • direct_endpoint: string - Direct database connection endpoint
+    • id (required): string - Service identifier (10-character alphanumeric string)
+    • name (required): string
+    • password: string - Password for tsdbadmin user (only included if with_password=true)
+    • pooler_endpoint: string - Connection pooler endpoint
+    • region (required): string
+    • replicas (required): integer - Number of HA replicas (0=single node/no HA, 1+=HA enabled)
+    • resources: object, null
+      • cpu: string - CPU allocation (e.g., '0.5 cores', '1 core')
+      • memory: string - Memory allocation (e.g., '2 GB', '4 GB')
+    • status (required): string - Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+    • type (required): string
 
-		// Execute with invalid capability name
-		_, err := executeCommand(t, rootCmd, []string{"mcp", "get", "nonexistent_capability"})
-		assert.Error(t, err, "should error for nonexistent capability")
-		assert.Contains(t, err.Error(), "not found", "error should mention capability not found")
-	})
+`
 
-	t.Run("Valid tools", func(t *testing.T) {
-		for _, tool := range expectedTools {
-			t.Run(tool.name, func(t *testing.T) {
-				t.Run("Table", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name})
+	// service_list takes no parameters, so its text output has no Parameters
+	// section.
+	serviceListText := `List Database Services [read-only] [open-world]
 
-					lines := strings.Split(output, "\n")
-					require.NotEmpty(t, lines, "output should not be empty")
+Tool name: service_list
 
-					// Check for tool name line
-					assert.Contains(t, output, fmt.Sprintf("Tool name: %s", tool.name), "output should contain tool name line")
+Description:
+List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.
 
-					// Check for description section
-					assert.Contains(t, output, "Description:", "output should contain 'Description:' section")
+Output:
+  • services (required): []object, null
+    • created: string
+    • id (required): string - Service identifier (10-character alphanumeric string)
+    • name (required): string
+    • region (required): string
+    • resources: object, null
+      • cpu: string - CPU allocation (e.g., '0.5 cores', '1 core')
+      • memory: string - Memory allocation (e.g., '2 GB', '4 GB')
+    • status (required): string - Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+    • type (required): string
 
-					// Check for parameters section if expected
-					if tool.parameters {
-						assert.Contains(t, output, "Parameters:", "output should contain 'Parameters:' section")
-					}
+`
 
-					// Check for output section if expected
-					if tool.output {
-						assert.Contains(t, output, "Output:", "output should contain 'Output:' section")
-					}
-				})
+	serviceListJSON := `{
+  "annotations": {
+    "idempotentHint": false,
+    "openWorldHint": true,
+    "readOnlyHint": true,
+    "title": "List Database Services"
+  },
+  "description": "List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.",
+  "inputSchema": {
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "name": "service_list",
+  "outputSchema": {
+    "additionalProperties": false,
+    "properties": {
+      "services": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "created": {
+              "type": "string"
+            },
+            "id": {
+              "description": "Service identifier (10-character alphanumeric string)",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "resources": {
+              "additionalProperties": false,
+              "properties": {
+                "cpu": {
+                  "description": "CPU allocation (e.g., '0.5 cores', '1 core')",
+                  "type": "string"
+                },
+                "memory": {
+                  "description": "Memory allocation (e.g., '2 GB', '4 GB')",
+                  "type": "string"
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "status": {
+              "description": "Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)",
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "status",
+            "type",
+            "region"
+          ],
+          "type": "object"
+        },
+        "type": [
+          "null",
+          "array"
+        ]
+      }
+    },
+    "required": [
+      "services"
+    ],
+    "type": "object"
+  },
+  "title": "List Database Services"
+}
+`
 
-				t.Run("JSON", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "json"})
+	serviceListYAML := `annotations:
+  idempotentHint: false
+  openWorldHint: true
+  readOnlyHint: true
+  title: List Database Services
+description: List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.
+inputSchema:
+  additionalProperties: false
+  type: object
+name: service_list
+outputSchema:
+  additionalProperties: false
+  properties:
+    services:
+      items:
+        additionalProperties: false
+        properties:
+          created:
+            type: string
+          id:
+            description: Service identifier (10-character alphanumeric string)
+            type: string
+          name:
+            type: string
+          region:
+            type: string
+          resources:
+            additionalProperties: false
+            properties:
+              cpu:
+                description: CPU allocation (e.g., '0.5 cores', '1 core')
+                type: string
+              memory:
+                description: Memory allocation (e.g., '2 GB', '4 GB')
+                type: string
+            type:
+              - "null"
+              - object
+          status:
+            description: Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+            type: string
+          type:
+            type: string
+        required:
+          - id
+          - name
+          - status
+          - type
+          - region
+        type: object
+      type:
+        - "null"
+        - array
+  required:
+    - services
+  type: object
+title: List Database Services
+`
 
-					// Should be valid JSON
-					var toolData map[string]any
-					err := json.Unmarshal([]byte(output), &toolData)
-					require.NoError(t, err, "output should be valid JSON")
+	metricsAvailableText := `List Available Metric Series [read-only]
 
-					// Check for all expected top-level fields
-					assert.Contains(t, toolData, "name", "tool should have name field")
-					assert.Contains(t, toolData, "description", "tool should have description field")
-					assert.Contains(t, toolData, "title", "tool should have title field")
-					assert.Contains(t, toolData, "annotations", "tool should have annotations field")
-					assert.Contains(t, toolData, "inputSchema", "tool should have inputSchema field")
-					assert.Contains(t, toolData, "outputSchema", "tool should have outputSchema field")
-					assert.Equal(t, tool.name, toolData["name"], "tool name should match")
-				})
+Tool name: service_metrics_available
 
-				t.Run("YAML", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", tool.name, "-o", "yaml"})
+Description:
+List the names of all metric series available for a service. Call this first to discover what metrics exist before fetching data with service_metrics_series.
 
-					// Should be valid YAML
-					var toolData map[string]any
-					err := yaml.Unmarshal([]byte(output), &toolData)
-					require.NoError(t, err, "output should be valid YAML")
+Parameters:
+  • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
 
-					// Check for all expected top-level fields
-					assert.Contains(t, toolData, "name", "tool should have name field")
-					assert.Contains(t, toolData, "description", "tool should have description field")
-					assert.Contains(t, toolData, "title", "tool should have title field")
-					assert.Contains(t, toolData, "annotations", "tool should have annotations field")
-					assert.Contains(t, toolData, "inputSchema", "tool should have inputSchema field")
-					assert.Contains(t, toolData, "outputSchema", "tool should have outputSchema field")
-					assert.Equal(t, tool.name, toolData["name"], "tool name should match")
-				})
-			})
-		}
-	})
+Output:
+  • series (required): []string, null
 
-	t.Run("Valid prompts", func(t *testing.T) {
-		for _, prompt := range expectedPrompts {
-			t.Run(prompt.name, func(t *testing.T) {
-				t.Run("Table", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name})
+`
 
-					lines := strings.Split(output, "\n")
-					require.NotEmpty(t, lines, "output should not be empty")
-
-					// Check for prompt name line
-					assert.Contains(t, output, fmt.Sprintf("Prompt name: %s", prompt.name), "output should contain prompt name line")
-
-					// Check for description section
-					assert.Contains(t, output, "Description:", "output should contain 'Description:' section")
-
-					// Check for arguments section if expected
-					if prompt.arguments {
-						assert.Contains(t, output, "Arguments:", "output should contain 'Arguments:' section")
-					}
-				})
-
-				t.Run("JSON", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "json"})
-
-					// Should be valid JSON
-					var promptData map[string]any
-					err := json.Unmarshal([]byte(output), &promptData)
-					require.NoError(t, err, "output should be valid JSON")
-
-					// Check for all expected top-level fields
-					assert.Contains(t, promptData, "name", "prompt should have name field")
-					assert.Contains(t, promptData, "description", "prompt should have description field")
-					assert.Contains(t, promptData, "title", "prompt should have title field")
-					assert.Equal(t, prompt.name, promptData["name"], "prompt name should match")
-
-					// Check for arguments field if expected
-					if prompt.arguments {
-						assert.Contains(t, promptData, "arguments", "prompt should have arguments field")
-					}
-				})
-
-				t.Run("YAML", func(t *testing.T) {
-					rootCmd, _ := setupMCPTest(t)
-					output := captureCommandOutput(t, rootCmd, []string{"mcp", "get", prompt.name, "-o", "yaml"})
-
-					// Should be valid YAML
-					var promptData map[string]any
-					err := yaml.Unmarshal([]byte(output), &promptData)
-					require.NoError(t, err, "output should be valid YAML")
-
-					// Check for all expected top-level fields
-					assert.Contains(t, promptData, "name", "prompt should have name field")
-					assert.Contains(t, promptData, "description", "prompt should have description field")
-					assert.Contains(t, promptData, "title", "prompt should have title field")
-					assert.Equal(t, prompt.name, promptData["name"], "prompt name should match")
-
-					// Check for arguments field if expected
-					if prompt.arguments {
-						assert.Contains(t, promptData, "arguments", "prompt should have arguments field")
-					}
-				})
-			})
-		}
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "missing argument",
+			args:    []string{"mcp", "get"},
+			opts:    noDocsProxy(nil),
+			wantErr: "accepts 1 arg(s), received 0",
+		},
+		{
+			name:    "not found",
+			args:    []string{"mcp", "get", "nonexistent"},
+			opts:    noDocsProxy(nil),
+			wantErr: `capability "nonexistent" not found`,
+		},
+		{
+			name:       "text output with parameters",
+			args:       []string{"mcp", "get", "service_get"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceGetText,
+		},
+		{
+			name:       "text output without parameters",
+			args:       []string{"mcp", "get", "service_list"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceListText,
+		},
+		{
+			name:       "json output",
+			args:       []string{"mcp", "get", "service_list", "-o", "json"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceListJSON,
+		},
+		{
+			name:       "yaml output",
+			args:       []string{"mcp", "get", "service_list", "-o", "yaml"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceListYAML,
+		},
+		{
+			name:       "describe alias",
+			args:       []string{"mcp", "describe", "service_list"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceListText,
+		},
+		{
+			name:       "show alias",
+			args:       []string{"mcp", "show", "service_list"},
+			opts:       noDocsProxy(nil),
+			wantStdout: serviceListText,
+		},
+		{
+			name:    "read-only mode hides write tools",
+			args:    []string{"mcp", "get", "service_create"},
+			opts:    noDocsProxy(map[string]any{"read_only": true}),
+			wantErr: `capability "service_create" not found`,
+		},
+		{
+			name:    "experimental tool hidden by default",
+			args:    []string{"mcp", "get", "service_metrics_available"},
+			opts:    noDocsProxy(nil),
+			wantErr: `capability "service_metrics_available" not found`,
+		},
+		{
+			name: "experimental tool visible with gate on",
+			args: []string{"mcp", "get", "service_metrics_available"},
+			opts: append(noDocsProxy(nil),
+				withEnv("TIGER_EXPERIMENTAL", "true")),
+			wantStdout: metricsAvailableText,
+		},
 	})
 }

@@ -3,153 +3,161 @@ package cmd
 import (
 	"encoding/json"
 	"slices"
-	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
-func TestMCPListCommand(t *testing.T) {
-
-	// Expected tools and prompts that should be present in all output formats
-	expectedTools := []string{
+func TestMCPListCmd(t *testing.T) {
+	defaultTools := []string{
 		"db_execute_query",
 		"db_schema",
-		"search_docs",
 		"service_create",
 		"service_fork",
 		"service_get",
 		"service_list",
+		"service_logs",
+		"service_resize",
 		"service_start",
 		"service_stop",
 		"service_update_password",
-		"view_skill",
 	}
 
-	expectedPrompts := []string{
-		"design-postgres-tables",
-		"find-hypertable-candidates",
-		"migrate-postgres-tables-to-hypertables",
-		"setup-timescaledb-hypertables",
-	}
+	wantText := `┌──────┬─────────────────────────┐
+│ TYPE │          NAME           │
+├──────┼─────────────────────────┤
+│ tool │ db_execute_query        │
+│ tool │ db_schema               │
+│ tool │ service_create          │
+│ tool │ service_fork            │
+│ tool │ service_get             │
+│ tool │ service_list            │
+│ tool │ service_logs            │
+│ tool │ service_resize          │
+│ tool │ service_start           │
+│ tool │ service_stop            │
+│ tool │ service_update_password │
+└──────┴─────────────────────────┘
+`
 
-	// Helper function to validate capabilities map structure and contents
-	validateCapabilities := func(t *testing.T, capabilities map[string]any) {
-		t.Helper()
+	// Read-only mode skips the service-mutating tools at registration time.
+	wantTextReadOnly := `┌──────┬──────────────────┐
+│ TYPE │       NAME       │
+├──────┼──────────────────┤
+│ tool │ db_execute_query │
+│ tool │ db_schema        │
+│ tool │ service_get      │
+│ tool │ service_list     │
+│ tool │ service_logs     │
+└──────┴──────────────────┘
+`
 
-		// Should have the expected structure
-		assert.Contains(t, capabilities, "tools", "should contain tools")
-		assert.Contains(t, capabilities, "prompts", "should contain prompts")
-		assert.Contains(t, capabilities, "resources", "should contain resources")
-		assert.Contains(t, capabilities, "resource_templates", "should contain resource_templates")
+	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
+	wantTextExperimental := `┌──────┬───────────────────────────┐
+│ TYPE │           NAME            │
+├──────┼───────────────────────────┤
+│ tool │ db_execute_query          │
+│ tool │ db_schema                 │
+│ tool │ service_backups           │
+│ tool │ service_create            │
+│ tool │ service_fork              │
+│ tool │ service_get               │
+│ tool │ service_list              │
+│ tool │ service_logs              │
+│ tool │ service_metrics_available │
+│ tool │ service_metrics_series    │
+│ tool │ service_resize            │
+│ tool │ service_start             │
+│ tool │ service_stop              │
+│ tool │ service_update_password   │
+└──────┴───────────────────────────┘
+`
 
-		// Verify tools is an array
-		tools, ok := capabilities["tools"].([]any)
-		require.True(t, ok, "tools should be an array")
-		assert.NotEmpty(t, tools, "should have at least one tool")
-
-		// Extract tool names
-		var toolNames []string
-		for _, toolItem := range tools {
-			tool, ok := toolItem.(map[string]any)
-			require.True(t, ok, "tool should be an object")
-			assert.Contains(t, tool, "name", "tool should have name field")
-			assert.Contains(t, tool, "description", "tool should have description field")
-			toolNames = append(toolNames, tool["name"].(string))
-		}
-
-		// Check all expected tools are present
-		for _, expectedTool := range expectedTools {
-			assert.Contains(t, toolNames, expectedTool, "should contain %s tool", expectedTool)
-		}
-
-		// Verify prompts is an array
-		prompts, ok := capabilities["prompts"].([]any)
-		require.True(t, ok, "prompts should be an array")
-		assert.NotEmpty(t, prompts, "should have at least one prompt")
-
-		// Extract prompt names
-		var promptNames []string
-		for _, promptItem := range prompts {
-			prompt, ok := promptItem.(map[string]any)
-			require.True(t, ok, "prompt should be an object")
-			assert.Contains(t, prompt, "name", "prompt should have name field")
-			promptNames = append(promptNames, prompt["name"].(string))
-		}
-
-		// Check all expected prompts are present
-		for _, expectedPrompt := range expectedPrompts {
-			assert.Contains(t, promptNames, expectedPrompt, "should contain %s prompt", expectedPrompt)
-		}
-	}
-
-	t.Run("Table format", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
-
-		// Execute the list command
-		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list"})
-		lines := strings.Split(output, "\n")
-
-		// Should contain table headers
-		assert.Contains(t, output, "TYPE", "output should contain TYPE header")
-		assert.Contains(t, output, "NAME", "output should contain NAME header")
-
-		// Build expected lines with type and name
-		expectedLines := make(map[string]string)
-		for _, tool := range expectedTools {
-			expectedLines[tool] = "tool"
-		}
-		for _, prompt := range expectedPrompts {
-			expectedLines[prompt] = "prompt"
-		}
-
-		// Check each expected capability appears with correct type
-		for name, expectedType := range expectedLines {
-			if !slices.ContainsFunc(lines, func(line string) bool {
-				return strings.Contains(line, expectedType) && strings.Contains(line, name)
-			}) {
-				t.Errorf("Output should contain line with type '%s' and name '%s', got: %s", expectedType, name, output)
+	// matchCapabilities parses structured (JSON/YAML) output and verifies the
+	// capability structure and the exact set of listed tools. Full schemas are
+	// too large to exact-match; the text cases pin the capability list.
+	matchCapabilities := func(unmarshal func([]byte, any) error) matcher {
+		return matchFunc(func(t *testing.T, got string) {
+			var capabilities map[string]any
+			if err := unmarshal([]byte(got), &capabilities); err != nil {
+				t.Fatalf("failed to parse output: %v", err)
 			}
-		}
-	})
 
-	t.Run("JSON format", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
+			for _, key := range []string{"tools", "prompts", "resources", "resource_templates"} {
+				if _, ok := capabilities[key]; !ok {
+					t.Errorf("output missing %q key", key)
+				}
+			}
 
-		// Execute the list command with JSON output
-		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "json"})
+			tools, ok := capabilities["tools"].([]any)
+			if !ok {
+				t.Fatalf("tools is not an array: %T", capabilities["tools"])
+			}
 
-		// Should be valid JSON
-		var capabilities map[string]any
-		err := json.Unmarshal([]byte(output), &capabilities)
-		require.NoError(t, err, "output should be valid JSON")
+			var names []string
+			for _, item := range tools {
+				tool, ok := item.(map[string]any)
+				if !ok {
+					t.Fatalf("tool is not an object: %T", item)
+				}
+				name, _ := tool["name"].(string)
+				if name == "" {
+					t.Error("tool missing name field")
+				}
+				if desc, _ := tool["description"].(string); desc == "" {
+					t.Errorf("tool %q missing description field", name)
+				}
+				names = append(names, name)
+			}
+			if !slices.Equal(names, defaultTools) {
+				t.Errorf("tool names mismatch:\ngot:  %v\nwant: %v", names, defaultTools)
+			}
+		})
+	}
 
-		// Validate structure and contents
-		validateCapabilities(t, capabilities)
-	})
-
-	t.Run("YAML format", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
-
-		// Execute the list command with YAML output
-		output := captureCommandOutput(t, rootCmd, []string{"mcp", "list", "-o", "yaml"})
-
-		// Should be valid YAML
-		var capabilities map[string]any
-		err := yaml.Unmarshal([]byte(output), &capabilities)
-		require.NoError(t, err, "output should be valid YAML")
-
-		// Validate structure and contents
-		validateCapabilities(t, capabilities)
-	})
-
-	t.Run("Invalid output format", func(t *testing.T) {
-		rootCmd, _ := setupMCPTest(t)
-
-		// Execute with invalid output format should fail
-		_, err := executeCommand(t, rootCmd, []string{"mcp", "list", "-o", "invalid"})
-		assert.Error(t, err, "should error for invalid output format")
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "invalid output format",
+			args:    []string{"mcp", "list", "-o", "invalid"},
+			opts:    noDocsProxy(nil),
+			wantErr: `invalid argument "invalid" for "-o, --output" flag: invalid output format: invalid (must be one of: json, yaml, table)`,
+		},
+		{
+			name:       "text output",
+			args:       []string{"mcp", "list"},
+			opts:       noDocsProxy(nil),
+			wantStdout: wantText,
+		},
+		{
+			name:       "ls alias",
+			args:       []string{"mcp", "ls"},
+			opts:       noDocsProxy(nil),
+			wantStdout: wantText,
+		},
+		{
+			name:       "json output",
+			args:       []string{"mcp", "list", "-o", "json"},
+			opts:       noDocsProxy(nil),
+			wantStdout: matchCapabilities(json.Unmarshal),
+		},
+		{
+			name:       "yaml output",
+			args:       []string{"mcp", "list", "-o", "yaml"},
+			opts:       noDocsProxy(nil),
+			wantStdout: matchCapabilities(yaml.Unmarshal),
+		},
+		{
+			name:       "read-only mode skips write tools",
+			args:       []string{"mcp", "list"},
+			opts:       noDocsProxy(map[string]any{"read_only": true}),
+			wantStdout: wantTextReadOnly,
+		},
+		{
+			name: "experimental adds metrics tools",
+			args: []string{"mcp", "list"},
+			opts: append(noDocsProxy(nil),
+				withEnv("TIGER_EXPERIMENTAL", "true")),
+			wantStdout: wantTextExperimental,
+		},
 	})
 }

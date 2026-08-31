@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/zalando/go-keyring"
 	"os"
 	"path/filepath"
 	"strings"
@@ -327,7 +328,7 @@ func TestPasswordStorage_DifferentRoles(t *testing.T) {
 			name:    "KeyringStorage",
 			storage: &KeyringStorage{},
 			setup: func(t *testing.T) {
-				config.SetTestServiceName(t)
+				keyring.MockInit()
 			},
 			cleanup: func(t *testing.T, service api.Service, roles []string) {
 				storage := &KeyringStorage{}
@@ -794,8 +795,8 @@ func TestPasswordStorage_OverwritePreviousValue(t *testing.T) {
 			name:    "KeyringStorage",
 			storage: &KeyringStorage{},
 			setup: func(t *testing.T) {
-				// Use a unique service name for this test to avoid conflicts
-				config.SetTestServiceName(t)
+				// Give the test a fresh, empty in-memory keyring
+				keyring.MockInit()
 			},
 			cleanup: func(t *testing.T, service api.Service) {
 				storage := &KeyringStorage{}

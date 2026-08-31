@@ -1,185 +1,196 @@
 package cmd
 
 import (
-	"strings"
+	"errors"
+	"net/http"
 	"testing"
 	"time"
 
 	"golang.org/x/oauth2"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// setupProjectTest prepares an OAuth login against a mock API server that
-// serves the given projects, with currentProjectID as the active project and
-// an optional default service.
-func setupProjectTest(t *testing.T, projects []api.Project, currentProjectID, serviceID string) {
-	t.Helper()
-	setupOAuthTest(t, projects, currentProjectID)
-
-	cfg := testConfig(t)
-	if serviceID != "" {
-		if err := cfg.Set("service_id", serviceID); err != nil {
-			t.Fatalf("Failed to set service_id: %v", err)
-		}
-	}
-
-	token := &oauth2.Token{
+func TestProjectUseCmd(t *testing.T) {
+	// An OAuth login for the harness's current project (testProjectID), which
+	// switching away from requires.
+	oauthToken := &oauth2.Token{
 		AccessToken:  "valid-access-token",
 		RefreshToken: "valid-refresh-token",
 		Expiry:       time.Now().Add(time.Hour),
 	}
-	if err := cfg.StoreOAuthCredentials(token, currentProjectID); err != nil {
-		t.Fatalf("Failed to store OAuth credentials: %v", err)
-	}
-}
+	oauthLogin := withStoredCredentials(config.Credentials{
+		OAuth:     oauthToken,
+		ProjectID: testProjectID,
+	})
 
-func TestProjectUse_Switch(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
+	setupProjects := func(projects []api.Project) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			m.EXPECT().GetProjectsWithResponse(validCtx).
+				Return(&api.GetProjectsResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &projects,
+				}, nil)
+		}
+	}
+	bothProjects := setupProjects([]api.Project{
+		{ID: testProjectID, Name: "Old Project"},
 		{ID: "project-new", Name: "New Project"},
-	}, "project-old", "svc-123")
+	})
 
-	output, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
-	if err != nil {
-		t.Fatalf("Switch failed: %v", err)
-	}
-
-	expectedOutput := "Cleared default service (config key service_id): it belonged to the previous project\n" +
-		"Switched to project project-new\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: %q", output)
-	}
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.ProjectID != "project-new" {
-		t.Errorf("Expected project ID 'project-new', got %q", stored.ProjectID)
-	}
-	if stored.OAuth == nil || stored.OAuth.AccessToken != "valid-access-token" {
-		t.Errorf("Expected OAuth token to be preserved, got %+v", stored.OAuth)
+	// checkStoredProject asserts which project the stored credentials point at
+	// and that the OAuth token survived.
+	checkStoredProject := func(want string) checkFunc {
+		return func(t *testing.T, result cmdResult) {
+			t.Helper()
+			stored, err := readStoredCredentials(t, result.configDir)
+			if err != nil {
+				t.Fatalf("failed to get stored credentials: %v", err)
+			}
+			if stored.ProjectID != want {
+				t.Errorf("stored project ID = %q, want %q", stored.ProjectID, want)
+			}
+			if stored.OAuth == nil || stored.OAuth.AccessToken != "valid-access-token" {
+				t.Errorf("expected OAuth token to be preserved, got: %+v", stored.OAuth)
+			}
+		}
 	}
 
-	if serviceID := testConfig(t).ServiceID; serviceID != "" {
-		t.Errorf("Expected service_id to be cleared, got %q", serviceID)
-	}
-}
-
-func TestProjectUse_SameProject(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-	}, "project-old", "svc-123")
-
-	output, err := executeAuthCommand(t.Context(), "project", "use", "project-old")
-	if err != nil {
-		t.Fatalf("Command failed: %v", err)
-	}
-	if output != "Already using project project-old\n" {
-		t.Errorf("Unexpected output: %q", output)
-	}
-
-	// A no-op switch keeps the default service.
-	if serviceID := testConfig(t).ServiceID; serviceID != "svc-123" {
-		t.Errorf("Expected service_id to be kept, got %q", serviceID)
-	}
-}
-
-func TestProjectUse_NoAccess(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-	}, "project-old", "")
-
-	output, err := executeAuthCommand(t.Context(), "project", "use", "project-unknown")
-	if err == nil {
-		t.Fatal("Expected error for inaccessible project")
-	}
-	if !strings.Contains(err.Error(), "no access to the requested project") {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// The requested ID is echoed on stderr, not in the error.
-	if !strings.Contains(output, "Project project-unknown is not among your accessible projects") {
-		t.Errorf("Expected stderr to name the project, got: %q", output)
-	}
-	assertExitCode(t, err, common.ExitInvalidParameters)
-
-	stored, err := testConfig(t).GetStoredCredentials()
-	if err != nil {
-		t.Fatalf("Failed to get stored credentials: %v", err)
-	}
-	if stored.ProjectID != "project-old" {
-		t.Errorf("Expected project ID to stay 'project-old', got %q", stored.ProjectID)
-	}
-}
-
-func TestProjectUse_APIKeyLogin(t *testing.T) {
-	setupAuthTest(t)
-
-	if err := testConfig(t).StoreCredentials("pub:sec", "project-old"); err != nil {
-		t.Fatalf("Failed to store credentials: %v", err)
-	}
-
-	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
-	if err == nil {
-		t.Fatal("Expected error for API key login")
-	}
-	if !strings.Contains(err.Error(), "an API key is scoped to a single project") {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	assertExitCode(t, err, common.ExitAuthenticationError)
-}
-
-func TestProjectUse_EnvAPIKeys(t *testing.T) {
-	tmpDir := setupAuthTest(t)
-	// Keep the env-key validation in wrapCommands off the network.
-	if _, err := config.UseTestConfig(tmpDir, map[string]any{"api_url": "http://localhost:1"}); err != nil {
-		t.Fatalf("Failed to write test config: %v", err)
-	}
-	t.Setenv("TIGER_PUBLIC_KEY", "env-public")
-	t.Setenv("TIGER_SECRET_KEY", "env-secret")
-
-	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
-	if err == nil {
-		t.Fatal("Expected error with env API keys set")
-	}
-	if !strings.Contains(err.Error(), "cannot switch projects while TIGER_PUBLIC_KEY/TIGER_SECRET_KEY are set") {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	assertExitCode(t, err, common.ExitAuthenticationError)
-}
-
-func TestProjectUse_EnvServiceID(t *testing.T) {
-	setupProjectTest(t, []api.Project{
-		{ID: "project-old", Name: "Old Project"},
-		{ID: "project-new", Name: "New Project"},
-	}, "project-old", "")
-	t.Setenv("TIGER_SERVICE_ID", "svc-env")
-
-	output, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
-	if err != nil {
-		t.Fatalf("Switch failed: %v", err)
-	}
-
-	// The env-provided default can't be cleared, so the command must warn
-	// instead of claiming it was cleared.
-	expectedOutput := "Warning: the default service from --service-id/TIGER_SERVICE_ID belongs to the previous project and is still in effect\n" +
-		"Switched to project project-new\n"
-	if output != expectedOutput {
-		t.Errorf("Unexpected output: %q", output)
-	}
-}
-
-func TestProjectUse_NotLoggedIn(t *testing.T) {
-	setupAuthTest(t)
-
-	_, err := executeAuthCommand(t.Context(), "project", "use", "project-new")
-	if err == nil {
-		t.Fatal("Expected error when not logged in")
-	}
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "rejects missing argument",
+			args:    []string{"project", "use"},
+			wantErr: "accepts 1 arg(s), received 0",
+		},
+		{
+			name: "rejects env API keys",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{
+				withEnv("TIGER_PUBLIC_KEY", "env-public"),
+				withEnv("TIGER_SECRET_KEY", "env-secret"),
+			},
+			wantErr: "cannot switch projects while TIGER_PUBLIC_KEY/TIGER_SECRET_KEY are set: an API key is scoped to a single project",
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
+		},
+		{
+			name:    "not logged in",
+			args:    []string{"project", "use", "project-new"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
+		},
+		{
+			// The client is available (e.g. still cached) but nothing is stored:
+			// the command needs the stored OAuth token to rewrite.
+			name:    "no stored credentials",
+			args:    []string{"project", "use", "project-new"},
+			wantErr: "not logged in",
+		},
+		{
+			name: "rejects API key login",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{withStoredCredentials(config.Credentials{
+				APIKey:    "pub:sec",
+				ProjectID: testProjectID,
+			})},
+			wantErr: "an API key is scoped to a single project. Run 'tiger auth login' without --public-key/--secret-key",
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
+		},
+		{
+			name: "already using project",
+			args: []string{"project", "use", testProjectID},
+			opts: []runOption{
+				oauthLogin,
+				withConfig(map[string]any{"service_id": "svc-123"}),
+			},
+			wantStdout: "Already using project " + testProjectID + "\n",
+			// A no-op switch keeps the default service.
+			checks: []checkFunc{checkDefaultService("svc-123")},
+		},
+		{
+			name: "network error listing projects",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{oauthLogin},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to list projects: connection refused",
+		},
+		{
+			name: "API error listing projects",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{oauthLogin},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetProjectsWithResponse(validCtx).
+					Return(&api.GetProjectsResponse{
+						HTTPResponse: httpResponse(http.StatusInternalServerError),
+						JSON4XX:      &api.ClientError{Message: new("internal error")},
+					}, nil)
+			},
+			wantErr: "internal error",
+			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
+		},
+		{
+			name:    "no access to requested project",
+			args:    []string{"project", "use", "project-unknown"},
+			opts:    []runOption{oauthLogin},
+			setup:   setupProjects([]api.Project{{ID: testProjectID, Name: "Old Project"}}),
+			wantErr: "no access to the requested project",
+			wantStderr: "Project project-unknown is not among your accessible projects\n" +
+				"Error: no access to the requested project\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitInvalidParameters),
+				checkStoredProject(testProjectID),
+			},
+		},
+		{
+			name: "switch clears default service",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{
+				oauthLogin,
+				withConfig(map[string]any{"service_id": "svc-123"}),
+			},
+			setup:      bothProjects,
+			wantStdout: "Switched to project project-new\n",
+			wantStderr: "Cleared default service (config key service_id): it belonged to the previous project\n",
+			checks: []checkFunc{
+				checkStoredProject("project-new"),
+				checkDefaultService(""),
+			},
+		},
+		{
+			name:       "switch without default service",
+			args:       []string{"project", "use", "project-new"},
+			opts:       []runOption{oauthLogin},
+			setup:      bothProjects,
+			wantStdout: "Switched to project project-new\n",
+			checks:     []checkFunc{checkStoredProject("project-new")},
+		},
+		{
+			// A default service from the environment can't be cleared, so the
+			// command warns that it still points at the previous project.
+			name: "switch warns about env default service",
+			args: []string{"project", "use", "project-new"},
+			opts: []runOption{
+				oauthLogin,
+				withEnv("TIGER_SERVICE_ID", "svc-env"),
+			},
+			setup:      bothProjects,
+			wantStdout: "Switched to project project-new\n",
+			wantStderr: "Warning: the default service from --service-id/TIGER_SERVICE_ID belongs to the previous project and is still in effect\n",
+			checks:     []checkFunc{checkStoredProject("project-new")},
+		},
+		{
+			name:       "switch alias",
+			args:       []string{"project", "switch", "project-new"},
+			opts:       []runOption{oauthLogin},
+			setup:      bothProjects,
+			wantStdout: "Switched to project project-new\n",
+			checks:     []checkFunc{checkStoredProject("project-new")},
+		},
+	})
 }

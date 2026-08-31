@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -14,8 +13,12 @@ import (
 
 // Keyring parameters
 const (
-	keyringServiceName = "tiger-cli"
-	keyringUsername    = "credentials"
+	// KeyringServiceName is the service name for all Tiger CLI keyring
+	// entries (stored credentials here, saved service passwords in
+	// internal/common).
+	KeyringServiceName = "tiger-cli"
+
+	keyringUsername = "credentials"
 )
 
 // storedCredentials represents the JSON structure for stored credentials.
@@ -32,36 +35,6 @@ type Credentials struct {
 	APIKey    string
 	OAuth     *oauth2.Token
 	ProjectID string
-}
-
-// testServiceNameOverride allows tests to override the service name for isolation
-var testServiceNameOverride string
-
-// GetServiceName returns the appropriate service name for keyring operations
-func GetServiceName() string {
-	// Tests should set a unique service name to avoid conflicts
-	if testServiceNameOverride != "" {
-		return testServiceNameOverride
-	}
-
-	// In test mode without an override, panic to catch missing test setup
-	if testing.Testing() {
-		panic("test must call SetTestServiceName() to set a unique keyring service name")
-	}
-
-	return keyringServiceName
-}
-
-// SetTestServiceName sets a unique service name for testing based on the test name
-// This allows tests to use unique service names to avoid conflicts when running in parallel
-// The cleanup is automatically registered with t.Cleanup()
-func SetTestServiceName(t *testing.T) {
-	testServiceNameOverride = "tiger-test-" + t.Name()
-
-	// Automatically clean up when the test finishes
-	t.Cleanup(func() {
-		testServiceNameOverride = ""
-	})
 }
 
 func (c *Config) credentialsFileName() string {
@@ -88,8 +61,10 @@ func (c *Config) StoreOAuthCredentials(token *oauth2.Token, projectID string) er
 	})
 }
 
-// StoreCredentialsToFile stores credentials to file (test helper)
-func (c *Config) StoreCredentialsToFile(apiKey, projectID string) error {
+// storeCredentialsToFile stores credentials in the config dir's fallback file,
+// bypassing the keyring. Only the file-fallback tests call it directly; normal
+// storage goes through StoreCredentials, which tries the keyring first.
+func (c *Config) storeCredentialsToFile(apiKey, projectID string) error {
 	creds := storedCredentials{
 		APIKey:    apiKey,
 		ProjectID: projectID,
@@ -116,7 +91,7 @@ func (c *Config) storeCredentials(creds storedCredentials) error {
 }
 
 func storeToKeyring(credentials string) error {
-	return keyring.Set(GetServiceName(), keyringUsername, credentials)
+	return keyring.Set(KeyringServiceName, keyringUsername, credentials)
 }
 
 // storeToFile stores credentials to ~/.config/tiger/credentials with restricted permissions
@@ -171,7 +146,7 @@ func (c *Config) GetStoredCredentials() (*Credentials, error) {
 
 // loadCredentialsBlob returns the raw JSON blob from keyring or file fallback.
 func (c *Config) loadCredentialsBlob() (string, error) {
-	if blob, err := keyring.Get(GetServiceName(), keyringUsername); err == nil {
+	if blob, err := keyring.Get(KeyringServiceName, keyringUsername); err == nil {
 		if blob == "" {
 			return "", ErrNotLoggedIn
 		}
@@ -201,7 +176,7 @@ func (c *Config) RemoveCredentials() error {
 
 // removeCredentialsFromKeyring removes credentials from keyring (test helper)
 func removeCredentialsFromKeyring() {
-	keyring.Delete(GetServiceName(), keyringUsername)
+	keyring.Delete(KeyringServiceName, keyringUsername)
 }
 
 // removeCredentialsFile removes credentials file

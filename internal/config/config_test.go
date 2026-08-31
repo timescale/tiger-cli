@@ -11,23 +11,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
+// setupTestConfig returns an isolated, empty config directory. No config file
+// is written: tests that need one write it themselves, so a test named for a
+// missing file really runs without one.
 func setupTestConfig(t *testing.T) string {
 	t.Helper()
-
-	// Create temporary directory for test config
-	tmpDir, err := os.MkdirTemp("", "tiger-test-config-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	if _, err := UseTestConfig(tmpDir, map[string]any{}); err != nil {
-		t.Fatalf("Failed to setup Viper: %v", err)
-	}
-
-	t.Cleanup(func() {
-		os.RemoveAll(tmpDir)
-	})
-
-	return tmpDir
+	return t.TempDir()
 }
 
 func TestLoad_DefaultValues(t *testing.T) {
@@ -270,26 +259,24 @@ func TestLoad_IndependentInstances(t *testing.T) {
 	}
 }
 
-func TestSave(t *testing.T) {
+// Set writes through to the config file, not just the in-memory struct, so a
+// separately loaded Config sees the same values.
+func TestSet_PersistsToDisk(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
-	cfg, err := UseTestConfig(tmpDir, map[string]any{
+	cfg := &Config{ConfigDir: tmpDir}
+	values := map[string]string{
 		"api_url":    "https://test.api.com/v1",
 		"service_id": "test-service",
 		"output":     "json",
-		"analytics":  false,
-	})
-	if err != nil {
-		t.Fatalf("UseTestConfig() failed: %v", err)
+		"analytics":  "false",
+	}
+	for key, value := range values {
+		if err := cfg.Set(key, value); err != nil {
+			t.Fatalf("Set(%q, %q) failed: %v", key, value, err)
+		}
 	}
 
-	// Verify file was created
-	configFile := GetConfigFile(tmpDir)
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		t.Error("Config file was not created")
-	}
-
-	// Load and verify content
 	os.Setenv("TIGER_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("TIGER_CONFIG_DIR")
 
@@ -699,17 +686,15 @@ func TestExpandPath(t *testing.T) {
 	}
 }
 
-func TestSave_CreateDirectory(t *testing.T) {
+func TestSet_CreatesConfigDirectory(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 
 	// Use non-existent subdirectory
 	configDir := filepath.Join(tmpDir, "nested", "config")
 
-	_, err := UseTestConfig(configDir, map[string]any{
-		"api_url": "https://test.api.com/v1",
-	})
-	if err != nil {
-		t.Fatalf("UseTestConfig() failed: %v", err)
+	cfg := &Config{ConfigDir: configDir}
+	if err := cfg.Set("api_url", "https://test.api.com/v1"); err != nil {
+		t.Fatalf("Set() failed: %v", err)
 	}
 
 	// Verify directory was created
@@ -724,8 +709,6 @@ func TestSave_CreateDirectory(t *testing.T) {
 	}
 }
 
-// Each Load uses its own viper instance, so there's no global state to carry a
-// stale value across loads.
 func TestLoad_RereadsEnvironment(t *testing.T) {
 	tmpDir := setupTestConfig(t)
 

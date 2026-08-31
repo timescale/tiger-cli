@@ -1,558 +1,219 @@
 package cmd
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestDBSavePassword_ExplicitPassword(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	// Set keyring as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-save-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
+func TestDbSavePasswordCmd(t *testing.T) {
+	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
+		expectGetService(m, "svc-12345", sampleService())
 	}
 
-	// Mock getServiceDetailsFunc to return a test service
-	serviceID := "svc-save-test"
-	projectID := "test-project-123"
-	host := "test-host.com"
-	port := 5432
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
-		},
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	testPassword := "explicit-password-123"
-
-	// Execute save-password with explicit password
-	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed, got error: %v", err)
-	}
-
-	// Verify success message
-	if !strings.Contains(output, "Password saved successfully") {
-		t.Errorf("Expected success message, got: %s", output)
-	}
-	if !strings.Contains(output, serviceID) {
-		t.Errorf("Expected service ID in output, got: %s", output)
-	}
-
-	// Verify password was actually saved
-	storage := common.GetPasswordStorage(testConfig(t))
-	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved password: %v", err)
-	}
-	defer storage.Remove(mockService, "tsdbadmin")
-
-	if retrievedPassword != testPassword {
-		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
-	}
-}
-
-// TestDBSavePassword_ReplicaResolvesToParent verifies that passing a read
-// replica id stores the password against the parent primary, so it is found by
-// the connect/test-connection read path.
-func TestDBSavePassword_ReplicaResolvesToParent(t *testing.T) {
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	const projectID = "test-project-123"
-	port := 5432
-	primaryHost := "svcprimary.example.com"
-	replicaHost := "replica.example.com"
-	primary := api.Service{
-		ServiceID: "svcprimary",
-		ProjectID: projectID,
-		Endpoint:  &api.Endpoint{Host: &primaryHost, Port: &port},
-	}
-	replica := api.Service{
-		ServiceID: "rep1234567",
-		ProjectID: projectID,
-		Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
-		ForkedFrom: &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new(projectID),
-			ServiceID: new("svcprimary"),
-		},
-	}
-
-	// Serve the parent primary lookup; the replica itself comes from the mocked
-	// getServiceDetailsFunc, so only the parent fetch reaches the API.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		if parts[len(parts)-1] == "svcprimary" {
-			_ = json.NewEncoder(w).Encode(primary)
-			return
+	// checkKeyringPassword asserts the mock keyring holds want for role.
+	checkKeyringPassword := func(role, want string) checkFunc {
+		return func(t *testing.T, result cmdResult) {
+			t.Helper()
+			got, err := (&common.KeyringStorage{}).Get(sampleService(), role)
+			if err != nil {
+				t.Fatalf("failed to read saved password: %v", err)
+			}
+			if got != want {
+				t.Errorf("expected stored password %q, got %q", want, got)
+			}
 		}
-		w.WriteHeader(http.StatusNotFound)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "not found"})
-	}))
-	defer srv.Close()
-
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    srv.URL,
-		"project_id": projectID,
-		"service_id": "rep1234567",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
 	}
 
-	mockTestPAT(t)
-	originalGetServiceDetails := getServiceDetailsFunc
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return replica, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
+	// pgpass entry prefix for sampleService's endpoint and the default role.
+	const pgpassPrefix = "svc-12345.project.tsdb.cloud.timescale.com:5432:tsdb:tsdbadmin:"
+	pgpassHome := t.TempDir()
+	overwriteHome := t.TempDir()
 
-	const testPassword = "replica-parent-pw"
-	output, err := executeDBCommand(t.Context(), "db", "save-password", "rep1234567", "--password="+testPassword)
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed, got error: %v", err)
-	}
-	if !strings.Contains(output, "svcprimary") {
-		t.Errorf("expected parent primary id in output, got: %s", output)
-	}
-
-	storage := common.GetPasswordStorage(testConfig(t))
-	// Stored against the parent primary, matching the connect read path.
-	got, err := storage.Get(primary, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("expected password stored under primary, got error: %v", err)
-	}
-	defer storage.Remove(primary, "tsdbadmin")
-	if got != testPassword {
-		t.Errorf("expected %q under primary, got %q", testPassword, got)
-	}
-	// Not stored under the replica id.
-	if pw, err := storage.Get(replica, "tsdbadmin"); err == nil && pw != "" {
-		t.Errorf("expected no password under replica, got %q", pw)
-	}
-}
-
-func TestDBSavePassword_EnvironmentVariable(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	// Set keyring as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-env-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock getServiceDetailsFunc to return a test service
-	serviceID := "svc-env-test"
-	projectID := "test-project-123"
-	host := "test-host.com"
-	port := 5432
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
+	runCmdTests(t, []cmdTest{
+		{
+			name:    "not logged in",
+			args:    []string{"db", "save-password", "svc-12345", "--password=pw"},
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
+			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	// Set environment variable
-	testPassword := "env-password-456"
-	os.Setenv("TIGER_NEW_PASSWORD", testPassword)
-	defer os.Unsetenv("TIGER_NEW_PASSWORD")
-
-	// Execute save-password without --password flag (should use env var)
-	output, err := executeDBCommand(t.Context(), "db", "save-password")
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed with env var, got error: %v", err)
-	}
-
-	// Verify success message
-	if !strings.Contains(output, "Password saved successfully") {
-		t.Errorf("Expected success message, got: %s", output)
-	}
-
-	// Verify password was actually saved
-	storage := common.GetPasswordStorage(testConfig(t))
-	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved password: %v", err)
-	}
-	defer storage.Remove(mockService, "tsdbadmin")
-
-	if retrievedPassword != testPassword {
-		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
-	}
-}
-
-func TestDBSavePassword_InteractivePrompt(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	// Set keyring as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-interactive-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock getServiceDetailsFunc to return a test service
-	serviceID := "svc-interactive-test"
-	projectID := "test-project-123"
-	host := "test-host.com"
-	port := 5432
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
+		{
+			name:    "service ID required",
+			args:    []string{"db", "save-password", "--password=pw"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	// Make sure TIGER_NEW_PASSWORD is not set
-	os.Unsetenv("TIGER_NEW_PASSWORD")
-
-	// Prepare the password input
-	testPassword := "interactive-password-999"
-
-	// Mock TTY check to return true (simulate terminal)
-	stubIsTerminal(t, true)
-
-	// Mock password reading to return our test password
-	stubReadPassword(t, testPassword)
-
-	// Execute save-password without --password flag or env var
-	output, err := executeDBCommand(t.Context(), "db", "save-password")
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed with interactive input, got error: %v", err)
-	}
-
-	// Verify the prompt was shown
-	if !strings.Contains(output, "Enter password:") {
-		t.Errorf("Expected password prompt, got: %s", output)
-	}
-
-	// Verify success message
-	if !strings.Contains(output, "Password saved successfully") {
-		t.Errorf("Expected success message, got: %s", output)
-	}
-
-	// Verify password was actually saved
-	storage := common.GetPasswordStorage(testConfig(t))
-	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved password: %v", err)
-	}
-	defer storage.Remove(mockService, "tsdbadmin")
-
-	if retrievedPassword != testPassword {
-		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
-	}
-}
-
-func TestDBSavePassword_InteractivePromptEmpty(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-empty-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock getServiceDetailsFunc to return a test service
-	serviceID := "svc-empty-test"
-	projectID := "test-project-123"
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	// Make sure TIGER_NEW_PASSWORD is not set
-	os.Unsetenv("TIGER_NEW_PASSWORD")
-
-	// Mock TTY check to return true (simulate terminal)
-	stubIsTerminal(t, true)
-
-	// Mock password reading to return empty password
-	stubReadPassword(t, "")
-
-	// Execute the command
-	_, err = executeDBCommand(t.Context(), "db", "save-password")
-	if err == nil {
-		t.Fatal("Expected error when user provides empty password interactively")
-	}
-
-	// Verify the error message
-	if !strings.Contains(err.Error(), "password cannot be empty") {
-		t.Errorf("Expected 'password cannot be empty' error, got: %v", err)
-	}
-}
-
-func TestDBSavePassword_CustomRole(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	// Set keyring as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "keyring")
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-role-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock getServiceDetailsFunc to return a test service
-	serviceID := "svc-role-test"
-	projectID := "test-project-123"
-	host := "test-host.com"
-	port := 5432
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
+		{
+			name: "network error fetching service",
+			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
 		},
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	testPassword := "readonly-password-789"
-	customRole := "readonly"
-
-	// Execute with custom role
-	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword, "--role", customRole)
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed with custom role, got error: %v", err)
-	}
-
-	// Verify success message shows the custom role
-	if !strings.Contains(output, "Password saved successfully") {
-		t.Errorf("Expected success message, got: %s", output)
-	}
-	if !strings.Contains(output, customRole) {
-		t.Errorf("Expected role %q in output, got: %s", customRole, output)
-	}
-
-	// Verify password was saved for the custom role
-	storage := common.GetPasswordStorage(testConfig(t))
-	retrievedPassword, err := storage.Get(mockService, customRole)
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved password for role %s: %v", customRole, err)
-	}
-	defer storage.Remove(mockService, customRole)
-
-	if retrievedPassword != testPassword {
-		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
-	}
-
-	// Verify that tsdbadmin role doesn't have this password
-	_, err = storage.Get(mockService, "tsdbadmin")
-	if err == nil {
-		t.Error("Expected error when retrieving password for different role, but got none")
-	}
-}
-
-func TestDBSavePassword_NoServiceID(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config with project ID but no default service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-	mockTestPAT(t)
-
-	// No need to mock service details since it should fail before reaching getServiceDetailsFunc
-
-	// Execute save-password without service ID
-	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
-	if err == nil {
-		t.Fatal("Expected error when no service ID is provided or configured")
-	}
-
-	if !strings.Contains(err.Error(), "service ID is required") {
-		t.Errorf("Expected error about missing service ID, got: %v", err)
-	}
-}
-
-func TestDBSavePassword_NoAuth(t *testing.T) {
-	tmpDir := setupDBTest(t)
-
-	// Set up config with project ID and service ID
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "https://api.tigerdata.com/public/v1",
-		"project_id": "test-project-123",
-		"service_id": "svc-12345",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock authentication failure
-	mockNotLoggedIn(t)
-
-	// Execute save-password command
-	_, err = executeDBCommand(t.Context(), "db", "save-password", "--password=test-password")
-	if err == nil {
-		t.Fatal("Expected error when not authenticated")
-	}
-
-	if !strings.Contains(err.Error(), "authentication required") {
-		t.Errorf("Expected authentication error, got: %v", err)
-	}
-}
-
-func TestDBSavePassword_PgpassStorage(t *testing.T) {
-	// Use a unique service name for this test to avoid conflicts
-	config.SetTestServiceName(t)
-	tmpDir := setupDBTest(t)
-
-	// Set pgpass as the password storage method for this test
-	t.Setenv("TIGER_PASSWORD_STORAGE", "pgpass")
-
-	// Set up config
-	_, err := config.UseTestConfig(tmpDir, map[string]any{
-		"api_url":    "http://localhost:9999",
-		"project_id": "test-project-123",
-		"service_id": "svc-pgpass-test",
-	})
-	if err != nil {
-		t.Fatalf("Failed to save test config: %v", err)
-	}
-
-	// Mock getServiceDetailsFunc to return a test service with endpoint (required for pgpass)
-	serviceID := "svc-pgpass-test"
-	projectID := "test-project-123"
-	host := "pgpass-host.com"
-	port := 5432
-	mockService := api.Service{
-		ServiceID: serviceID,
-		ProjectID: projectID,
-		Endpoint: &api.Endpoint{
-			Host: &host,
-			Port: &port,
+		{
+			name: "API error fetching service",
+			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusNotFound),
+						JSON4XX:      &api.Error{Message: new("service not found")},
+					}, nil)
+			},
+			wantErr: "service not found",
+			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
-	}
-
-	originalGetServiceDetails := getServiceDetailsFunc
-	mockTestPAT(t)
-	getServiceDetailsFunc = func(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-		return mockService, nil
-	}
-	defer func() { getServiceDetailsFunc = originalGetServiceDetails }()
-
-	testPassword := "pgpass-password-101"
-
-	// Execute with pgpass storage
-	output, err := executeDBCommand(t.Context(), "db", "save-password", "--password="+testPassword)
-	if err != nil {
-		t.Fatalf("Expected save-password to succeed with pgpass, got error: %v", err)
-	}
-
-	// Verify success message
-	if !strings.Contains(output, "Password saved successfully") {
-		t.Errorf("Expected success message, got: %s", output)
-	}
-
-	// Verify password was saved in pgpass storage
-	storage := common.GetPasswordStorage(testConfig(t))
-	retrievedPassword, err := storage.Get(mockService, "tsdbadmin")
-	if err != nil {
-		t.Fatalf("Failed to retrieve saved password from pgpass: %v", err)
-	}
-	defer storage.Remove(mockService, "tsdbadmin")
-
-	if retrievedPassword != testPassword {
-		t.Errorf("Expected password %q, got %q", testPassword, retrievedPassword)
-	}
+		{
+			name: "nil response body",
+			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+					Return(&api.GetServiceResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      nil,
+					}, nil)
+			},
+			wantErr: "empty response from API",
+		},
+		{
+			name:    "empty password via flag",
+			args:    []string{"db", "save-password", "svc-12345", "--password="},
+			setup:   setupGetService,
+			wantErr: "password cannot be empty when provided via --password flag",
+		},
+		{
+			name:    "no password without a TTY",
+			args:    []string{"db", "save-password", "svc-12345"},
+			setup:   setupGetService,
+			wantErr: "TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable",
+		},
+		{
+			name:       "empty password at prompt",
+			args:       []string{"db", "save-password", "svc-12345"},
+			opts:       []runOption{withIsTerminal(true), withReadPassword("")},
+			setup:      setupGetService,
+			wantErr:    "password cannot be empty",
+			wantStderr: "Enter password: \nError: password cannot be empty\n",
+		},
+		{
+			name:       "saves password from flag",
+			args:       []string{"db", "save-password", "svc-12345", "--password=flag-pw"},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
+		},
+		{
+			name:       "default service ID from config",
+			args:       []string{"db", "save-password", "--password=default-pw"},
+			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "default-pw")},
+		},
+		{
+			name:       "saves password from TIGER_NEW_PASSWORD",
+			args:       []string{"db", "save-password", "svc-12345"},
+			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "env-pw")},
+		},
+		{
+			name:       "flag takes precedence over TIGER_NEW_PASSWORD",
+			args:       []string{"db", "save-password", "svc-12345", "--password=flag-pw"},
+			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
+		},
+		{
+			name:       "prompts for password on a TTY",
+			args:       []string{"db", "save-password", "svc-12345"},
+			opts:       []runOption{withIsTerminal(true), withReadPassword("prompt-pw")},
+			setup:      setupGetService,
+			wantStderr: "Enter password: \nPassword saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "prompt-pw")},
+		},
+		{
+			name:       "custom role",
+			args:       []string{"db", "save-password", "svc-12345", "--password=readonly-pw", "--role", "readonly"},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: readonly)\n",
+			checks: []checkFunc{checkKeyringPassword("readonly", "readonly-pw"), func(t *testing.T, result cmdResult) {
+				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
+					t.Errorf("expected no password stored for tsdbadmin, got %q", pw)
+				}
+			}},
+		},
+		{
+			name:       "pgpass storage",
+			args:       []string{"db", "save-password", "svc-12345", "--password=pgpass-pw", "--password-storage", "pgpass"},
+			opts:       []runOption{withEnv("HOME", pgpassHome)},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				data, err := os.ReadFile(filepath.Join(pgpassHome, ".pgpass"))
+				if err != nil {
+					t.Fatalf("failed to read .pgpass: %v", err)
+				}
+				assertOutput(t, string(data), pgpassPrefix+"pgpass-pw\n")
+			}},
+		},
+		{
+			name:       "pgpass save overwrites existing entry",
+			args:       []string{"db", "save-password", "svc-12345", "--password=first-pw", "--password-storage", "pgpass"},
+			opts:       []runOption{withEnv("HOME", overwriteHome)},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				second := runCommand(t,
+					[]string{"db", "save-password", "svc-12345", "--password=second-pw", "--password-storage", "pgpass"},
+					setupGetService,
+					withEnv("HOME", overwriteHome))
+				if second.err != nil {
+					t.Fatalf("second save failed: %v", second.err)
+				}
+				data, err := os.ReadFile(filepath.Join(overwriteHome, ".pgpass"))
+				if err != nil {
+					t.Fatalf("failed to read .pgpass: %v", err)
+				}
+				assertOutput(t, string(data), pgpassPrefix+"second-pw\n")
+			}},
+		},
+		{
+			name:       "none storage saves nothing",
+			args:       []string{"db", "save-password", "svc-12345", "--password=none-pw", "--password-storage", "none"},
+			setup:      setupGetService,
+			wantStderr: "Password saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
+					t.Errorf("expected no stored password, got %q", pw)
+				}
+			}},
+		},
+		{
+			name: "replica ID saves against parent primary",
+			args: []string{"db", "save-password", "rep-67890", "--password=replica-pw"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "rep-67890", sampleReplica())
+				setupGetService(m)
+			},
+			wantStderr: "Read replicas share the primary's credentials; saving against primary svc-12345.\nPassword saved successfully for service svc-12345 (role: tsdbadmin)\n",
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				// Stored against the parent primary, matching the connect read path.
+				checkKeyringPassword("tsdbadmin", "replica-pw")(t, result)
+				if pw, err := (&common.KeyringStorage{}).Get(sampleReplica(), "tsdbadmin"); err == nil {
+					t.Errorf("expected no password stored under the replica ID, got %q", pw)
+				}
+			}},
+		},
+	})
 }

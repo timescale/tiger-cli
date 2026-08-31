@@ -53,6 +53,13 @@ go test -v ./...
 go test -cover ./...
 ```
 
+Unit tests are fully isolated from your machine: they run against a temporary
+config directory, an in-memory keyring (never the system keyring), and a mocked
+API client, so no credentials, config files, or network access are needed.
+Command tests are table-driven and share a single harness in
+`internal/cmd/main_test.go` — see the "Unit Test Pattern" section in CLAUDE.md
+when adding tests.
+
 ## Integration Tests
 
 Integration tests execute real API calls against a Tiger environment to validate end-to-end functionality. These tests require valid credentials and will create/delete actual resources.
