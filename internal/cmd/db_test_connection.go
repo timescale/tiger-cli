@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -110,7 +111,7 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 	conn, err := pgx.Connect(ctx, connectionString)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
-		if isContextDeadlineExceeded(err) {
+		if isConnectionTimeout(err) {
 			cmd.PrintErrf("Connection timeout after %v\n", timeout)
 			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
@@ -130,7 +131,7 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 	err = conn.Ping(ctx)
 	if err != nil {
 		// Determine the appropriate exit code based on error type
-		if isContextDeadlineExceeded(err) {
+		if isConnectionTimeout(err) {
 			cmd.PrintErrf("Connection timeout after %v\n", timeout)
 			return common.ExitWithCode(common.ExitTimeout, err) // Connection timeout
 		}
@@ -150,9 +151,17 @@ func testDatabaseConnection(ctx context.Context, connectionString string, timeou
 	return nil // Server is accepting connections normally
 }
 
-// isContextDeadlineExceeded checks if the error is due to context timeout
-func isContextDeadlineExceeded(err error) bool {
-	return errors.Is(err, context.DeadlineExceeded)
+// isConnectionTimeout checks if the error is due to the connection timeout:
+// either the context's own deadline error, or a network timeout — the dialer
+// applies the context deadline to the socket, so the same expiry can surface
+// as an i/o timeout instead (which error wins varies by platform and pgx
+// version).
+func isConnectionTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // isConnectionRejected determines if the connection was actively rejected vs unreachable

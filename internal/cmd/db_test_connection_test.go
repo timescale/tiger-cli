@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -142,6 +145,49 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			checks:     []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 	})
+}
+
+// TestIsConnectionTimeout stays at helper level: which error shape a deadline
+// surfaces as varies by platform and pgx version (the command-level
+// "connection timeout" case sees only this machine's), so the shapes are
+// covered synthetically.
+func TestIsConnectionTimeout(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "context deadline exceeded",
+			err:  fmt.Errorf("failed to connect: %w", context.DeadlineExceeded),
+			want: true,
+		},
+		{
+			// How the dialer surfaces the deadline on Linux: an i/o timeout
+			// net error, without context.DeadlineExceeded in the chain.
+			name: "network timeout",
+			err:  fmt.Errorf("failed to connect: %w", &net.OpError{Op: "dial", Err: os.ErrDeadlineExceeded}),
+			want: true,
+		},
+		{
+			name: "non-timeout network error",
+			err:  fmt.Errorf("failed to connect: %w", &net.OpError{Op: "dial", Err: errors.New("connection refused")}),
+			want: false,
+		},
+		{
+			name: "unrelated error",
+			err:  errors.New("something else"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isConnectionTimeout(tt.err); got != tt.want {
+				t.Errorf("isConnectionTimeout(%v) = %t, want %t", tt.err, got, tt.want)
+			}
+		})
+	}
 }
 
 // TestIsConnectionRejected stays at helper level: a real 57P03 rejection needs
