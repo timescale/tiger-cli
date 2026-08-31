@@ -92,10 +92,20 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			target, err := lookupConnectionTarget(cmd, app, serviceArgs)
+			serviceID, err := getServiceID(cfg, serviceArgs)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -114,7 +124,7 @@ Examples:
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := selectConnection(cmd.Context(), cmd, app, target, opts, dbConnectNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, cfg, client, projectID, target, opts, dbConnectNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -167,16 +177,13 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 func selectConnection(
 	ctx context.Context,
 	cmd *cobra.Command,
-	app *common.App,
+	cfg *config.Config,
+	client api.ClientWithResponsesInterface,
+	projectID string,
 	target *common.ConnectionTarget,
 	opts common.ConnectionDetailsOptions,
 	noReplicaPrompt bool,
 ) (*common.ConnectionDetails, error) {
-	cfg, client, projectID, err := app.GetAll()
-	if err != nil {
-		return nil, err
-	}
-
 	// chosen is what we connect to; the menu below may replace it with a replica.
 	chosen := target
 
@@ -205,7 +212,9 @@ func selectConnection(
 	// is already in opts and only adds to the restriction.
 	opts.ReadOnly = opts.ReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(chosen.ConnectionService)) != nil
 
-	details, err := buildConnectionDetailsForTarget(cmd, cfg, chosen, opts)
+	warnReplicaPooler(cmd, chosen, opts.Pooled)
+
+	details, err := chosen.Details(cfg, opts)
 	if err != nil {
 		return nil, err
 	}

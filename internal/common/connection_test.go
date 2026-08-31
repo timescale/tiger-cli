@@ -480,7 +480,7 @@ func TestBuildConnectionString_WithPassword_InvalidServiceEndpoint(t *testing.T)
 	}
 }
 
-func TestGetConnectionDetailsFor(t *testing.T) {
+func TestGetConnectionDetailsForReplica(t *testing.T) {
 	primaryHost := "primary.example.com"
 	replicaHost := "replica.example.com"
 	poolerHost := "replica-pooler.example.com"
@@ -505,7 +505,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"})
+		details, err := getConnectionDetails(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -533,7 +533,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			},
 		}
 
-		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := getConnectionDetails(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -551,7 +551,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 			Endpoint:  &api.Endpoint{Host: &replicaHost, Port: &port},
 		}
 
-		details, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
+		details, err := getConnectionDetails(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin", Pooled: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -565,7 +565,7 @@ func TestGetConnectionDetailsFor(t *testing.T) {
 
 	t.Run("error when endpoint missing", func(t *testing.T) {
 		conn := api.Service{ServiceID: "rep-1"}
-		if _, err := GetConnectionDetailsFor(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
+		if _, err := getConnectionDetails(testConfig(""), conn, primary, ConnectionDetailsOptions{Role: "tsdbadmin"}); err == nil {
 			t.Fatal("expected error for missing connection endpoint")
 		}
 	})

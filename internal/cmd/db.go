@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func buildDbCmd(app *common.App) *cobra.Command {
@@ -21,27 +22,21 @@ func buildDbCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildDbSavePasswordCmd(app))
 	cmd.AddCommand(buildDbCreateCmd(app))
 	cmd.AddCommand(buildDbSchemaCmd(app))
+	cmd.AddCommand(buildDbQueryCmd(app))
 
 	return cmd
 }
 
-// lookupConnectionTarget looks up the target named by args, which may be a
-// primary service ID or a read replica set ID. This lets a replica ID work
-// anywhere a service ID does across the db connection commands.
-func lookupConnectionTarget(cmd *cobra.Command, app *common.App, args []string) (*common.ConnectionTarget, error) {
-	service, err := getServiceDetails(cmd, app, args)
-	if err != nil {
-		return nil, err
+// handleDatabaseError turns the readiness sentinels into guidance naming the
+// command that resolves them. Every other error passes through unchanged.
+func handleDatabaseError(err error, serviceID string) error {
+	switch {
+	case errors.Is(err, common.ErrPaused):
+		return fmt.Errorf("%w — start it with 'tiger service start %s'", common.ErrPaused, serviceID)
+	case errors.Is(err, common.ErrNotReady):
+		return fmt.Errorf("%w — check its status with 'tiger service get %s' and try again", common.ErrNotReady, serviceID)
 	}
-
-	client, projectID, err := app.GetClient()
-	if err != nil {
-		return nil, err
-	}
-
-	// The API resolves both primary and read replica IDs via GetService; a read
-	// replica comes back linked to its parent, whose credentials it shares.
-	return common.ResolveConnectionTarget(cmd.Context(), client, projectID, service)
+	return err
 }
 
 // warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
@@ -50,31 +45,4 @@ func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pool
 	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
 		cmd.PrintErrf("⚠️  Warning: %s\n", warning)
 	}
-}
-
-// buildConnectionDetailsForTarget builds connection details for a target,
-// warning first when a replica falls back from a requested pooler.
-func buildConnectionDetailsForTarget(cmd *cobra.Command, cfg *config.Config, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
-	warnReplicaPooler(cmd, target, opts.Pooled)
-	return target.Details(cfg, opts)
-}
-
-// getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-	cfg, client, projectID, err := app.GetAll()
-	if err != nil {
-		return api.Service{}, err
-	}
-
-	// Determine service ID
-	serviceID, err := getServiceID(cfg, args)
-	if err != nil {
-		return api.Service{}, err
-	}
-
-	service, err := common.GetService(cmd.Context(), client, projectID, serviceID)
-	if err != nil {
-		return api.Service{}, err
-	}
-	return *service, nil
 }

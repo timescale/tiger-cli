@@ -14,6 +14,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // setupIntegrationTest sets up isolated test environment with temporary config directory
@@ -1533,6 +1534,67 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			t.Logf("Database connection test failed (this may be expected): %v\nOutput: %s", err, output)
 		} else {
 			t.Logf("Database connection test succeeded: %s", output)
+		}
+	})
+
+	// `tiger db query` needs a working password (keyring, ~/.pgpass, or
+	// PGPASSWORD), so like the connection test above it tolerates a connection
+	// failure but checks the results whenever it does connect.
+	t.Run("DatabaseQuery", func(t *testing.T) {
+		t.Logf("Running a query against service: %s", existingServiceID)
+
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "query", existingServiceID,
+			"--read-only",
+			"-c", "SELECT 41 + 1 AS answer; SELECT NULL::text AS nothing",
+		)
+		if err != nil {
+			t.Logf("Database query failed (this may be expected): %v\nOutput: %s", err, output)
+			return
+		}
+
+		// Two statements, so two result sets: the computed value, then a NULL.
+		for _, want := range []string{"answer", "42", "(1 row)", "nothing", "NULL"} {
+			if !strings.Contains(output, want) {
+				t.Errorf("query output missing %q:\n%s", want, output)
+			}
+		}
+	})
+
+	t.Run("DatabaseQueryJSON", func(t *testing.T) {
+		output, err := executeIntegrationCommand(
+			t.Context(),
+			"db", "query", existingServiceID,
+			"--read-only", "-o", "json",
+			"-c", "SELECT 1234567890123456789::int8 AS big, NULL::int AS nul",
+		)
+		if err != nil {
+			t.Logf("Database query failed (this may be expected): %v\nOutput: %s", err, output)
+			return
+		}
+
+		var result struct {
+			ResultSets []common.ResultSet `json:"result_sets"`
+		}
+		if err := json.Unmarshal([]byte(output), &result); err != nil {
+			t.Fatalf("failed to parse query output as JSON: %v\nOutput: %s", err, output)
+		}
+		if len(result.ResultSets) != 1 {
+			t.Fatalf("expected 1 result set, got %d", len(result.ResultSets))
+		}
+
+		rows := util.Deref(result.ResultSets[0].Rows)
+		if len(rows) != 1 || len(rows[0]) != 2 {
+			t.Fatalf("expected one two-column row, got %v", rows)
+		}
+		// Values come back as Postgres' own text, so a bigint past 2^53 keeps
+		// every digit and a SQL NULL stays null rather than becoming a string.
+		if got := util.Deref(rows[0][0]); got != "1234567890123456789" {
+			t.Errorf("big = %q, want %q", got, "1234567890123456789")
+		}
+		if rows[0][1] != nil {
+			t.Errorf("nul = %q, want null", util.Deref(rows[0][1]))
 		}
 	})
 }

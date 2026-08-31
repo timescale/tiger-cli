@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -30,6 +31,16 @@ func sampleReplica(overrides ...func(*api.Service)) api.Service {
 }
 
 // expectGetService expects one GetService call for id, returning svc.
+// pausedMsg and notReadyMsg build the readiness errors handleDatabaseError
+// returns, which name the service the command was pointed at.
+func pausedMsg(serviceID string) string {
+	return fmt.Sprintf("service is paused — start it with 'tiger service start %s'", serviceID)
+}
+
+func notReadyMsg(serviceID string) string {
+	return fmt.Sprintf("service is not ready — check its status with 'tiger service get %s' and try again", serviceID)
+}
+
 func expectGetService(m *mocks.MockClientWithResponsesInterface, id string, svc api.Service) {
 	m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, id).
 		Return(&api.GetServiceResponse{

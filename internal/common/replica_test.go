@@ -67,54 +67,6 @@ func replicaService() api.Service {
 	}
 }
 
-func TestResolveConnectionTarget_Primary(t *testing.T) {
-	primary := primaryService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary})
-
-	target, err := ResolveConnectionTarget(context.Background(), client, "proj1", primary)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if target.IsReplica {
-		t.Fatal("expected a primary target")
-	}
-	if target.ConnectionService.ServiceID != "svcprimary" || target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected connect and credential to be the primary, got %+v", target)
-	}
-}
-
-func TestResolveConnectionTarget_Replica(t *testing.T) {
-	primary := primaryService()
-	replica := replicaService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary})
-
-	target, err := ResolveConnectionTarget(context.Background(), client, "proj1", replica)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !target.IsReplica {
-		t.Fatal("expected a replica target")
-	}
-	// Connect to the replica's own endpoint.
-	if target.ConnectionService.ServiceID != "rep1234567" {
-		t.Errorf("expected connect service rep1234567, got %q", target.ConnectionService.ServiceID)
-	}
-	// Credentials resolve against the parent primary (fetched via GetService).
-	if target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected credential service svcprimary, got %q", target.CredentialService.ServiceID)
-	}
-}
-
-func TestResolveConnectionTarget_ReplicaParentFetchFails(t *testing.T) {
-	replica := replicaService()
-	// Parent svcprimary is absent from the server → parent fetch 404s.
-	client := serviceTestClient(t, map[string]api.Service{})
-
-	if _, err := ResolveConnectionTarget(context.Background(), client, "proj1", replica); err == nil {
-		t.Fatal("expected an error when the parent service can't be fetched, got nil")
-	}
-}
-
 func TestResolveConnectionTargetByID(t *testing.T) {
 	primary := primaryService()
 	replica := replicaService()
@@ -243,5 +195,33 @@ func TestReplicaPoolerWarning(t *testing.T) {
 				t.Errorf("warning = %q, wantWarning = %v", warning, tc.wantWarning)
 			}
 		})
+	}
+}
+
+func TestResolveConnectionTargetByID_ReplicaParentFetchFails(t *testing.T) {
+	// The replica itself resolves, but its parent is absent from the server.
+	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replicaService()})
+
+	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567"); err == nil {
+		t.Fatal("expected an error when the parent service can't be fetched, got nil")
+	}
+}
+
+func TestResolveConnectionTargetByID_ReplicaWithoutParentID(t *testing.T) {
+	// A standby with no parent recorded has nowhere else to look for
+	// credentials, so it stands in as its own credential service.
+	replica := replicaService()
+	replica.ForkedFrom.ServiceID = nil
+	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replica})
+
+	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !target.IsReplica {
+		t.Error("expected a replica target")
+	}
+	if target.CredentialService.ServiceID != "rep1234567" {
+		t.Errorf("expected the replica as its own credential service, got %q", target.CredentialService.ServiceID)
 	}
 }
