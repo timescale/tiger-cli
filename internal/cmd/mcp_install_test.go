@@ -18,7 +18,7 @@ import (
 // testClientMapping pairs our Tiger client types with their corresponding toolhive types for testing
 type testClientMapping struct {
 	ClientType         MCPClient
-	ToolhiveClientType client.MCPClient
+	ToolhiveClientType client.ClientApp
 }
 
 // testClientMappings defines which clients we want to test for equivalence between ConfigPaths and toolhive
