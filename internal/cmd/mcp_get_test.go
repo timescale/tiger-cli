@@ -62,6 +62,7 @@ Output:
 
 	serviceListJSON := `{
   "annotations": {
+    "idempotentHint": false,
     "openWorldHint": true,
     "readOnlyHint": true,
     "title": "List Database Services"
@@ -142,6 +143,7 @@ Output:
 `
 
 	serviceListYAML := `annotations:
+  idempotentHint: false
   openWorldHint: true
   readOnlyHint: true
   title: List Database Services

@@ -522,7 +522,7 @@ func TestFindClientConfigFile(t *testing.T) {
 	// where each client keeps its config.
 	t.Run("equivalent to toolhive", func(t *testing.T) {
 		t.Setenv("HOME", t.TempDir())
-		toolhiveClients := map[MCPClient]client.MCPClient{
+		toolhiveClients := map[MCPClient]client.ClientApp{
 			ClaudeCode: client.ClaudeCode,
 			Cursor:     client.Cursor,
 			Windsurf:   client.Windsurf,
