@@ -53,24 +53,27 @@ func TestMCPListCmd(t *testing.T) {
 `
 
 	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
-	wantTextExperimental := `┌──────┬───────────────────────────┐
-│ TYPE │           NAME            │
-├──────┼───────────────────────────┤
-│ tool │ db_execute_query          │
-│ tool │ db_schema                 │
-│ tool │ service_backups           │
-│ tool │ service_create            │
-│ tool │ service_fork              │
-│ tool │ service_get               │
-│ tool │ service_list              │
-│ tool │ service_logs              │
-│ tool │ service_metrics_available │
-│ tool │ service_metrics_series    │
-│ tool │ service_resize            │
-│ tool │ service_start             │
-│ tool │ service_stop              │
-│ tool │ service_update_password   │
-└──────┴───────────────────────────┘
+	wantTextExperimental := `┌──────┬──────────────────────────────┐
+│ TYPE │             NAME             │
+├──────┼──────────────────────────────┤
+│ tool │ db_execute_query             │
+│ tool │ db_schema                    │
+│ tool │ service_backup_list          │
+│ tool │ service_backup_region_add    │
+│ tool │ service_backup_region_list   │
+│ tool │ service_backup_region_remove │
+│ tool │ service_create               │
+│ tool │ service_fork                 │
+│ tool │ service_get                  │
+│ tool │ service_list                 │
+│ tool │ service_logs                 │
+│ tool │ service_metrics_available    │
+│ tool │ service_metrics_series       │
+│ tool │ service_resize               │
+│ tool │ service_start                │
+│ tool │ service_stop                 │
+│ tool │ service_update_password      │
+└──────┴──────────────────────────────┘
 `
 
 	// matchCapabilities parses structured (JSON/YAML) output and verifies the
