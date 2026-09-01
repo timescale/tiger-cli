@@ -16,12 +16,12 @@ import (
 )
 
 func buildDbQueryCmd(app *common.App) *cobra.Command {
-	var dbQueryCommand string
-	var dbQueryFile string
-	var dbQueryRole string
-	var dbQueryPooled bool
-	var dbQueryReadOnly bool
-	var dbQueryTimeout time.Duration
+	var command string
+	var file string
+	var role string
+	var pooled bool
+	var readOnly bool
+	var timeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:     "query [service-id]",
@@ -85,8 +85,8 @@ Examples:
 				return err
 			}
 
-			if dbQueryTimeout < 0 {
-				return fmt.Errorf("timeout must be positive or zero, got %v", dbQueryTimeout)
+			if timeout < 0 {
+				return fmt.Errorf("timeout must be positive or zero, got %v", timeout)
 			}
 
 			// Resolve the service before reading the query: with no --command
@@ -102,27 +102,27 @@ Examples:
 				return err
 			}
 
-			query, err := readQuery(cmd, dbQueryCommand, dbQueryFile)
+			query, err := readQuery(cmd, command, file)
 			if err != nil {
 				return err
 			}
 
-			warnReplicaPooler(cmd, target, dbQueryPooled)
+			warnReplicaPooler(cmd, target, pooled)
 
 			ctx := cmd.Context()
-			if dbQueryTimeout > 0 {
+			if timeout > 0 {
 				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, dbQueryTimeout)
+				ctx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
 			}
 
 			result, err := common.ExecuteQuery(ctx, cfg, target, common.ExecuteQueryArgs{
 				Query:  query,
-				Role:   dbQueryRole,
-				Pooled: dbQueryPooled,
+				Role:   role,
+				Pooled: pooled,
 				// --read-only only adds to whatever read-only mode already
-				// imposes, which under prod mode turns on the target's tag.
-				ReadOnly: dbQueryReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
+				// imposes, which under prod mode depends on the target's tag.
+				ReadOnly: readOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
 			})
 			if err != nil {
 				return handleDatabaseError(err, target.ConnectionService.ServiceID)
@@ -139,12 +139,12 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&dbQueryCommand, "command", "c", "", "SQL query to execute (reads from stdin if neither --command nor --file is given)")
-	cmd.Flags().StringVarP(&dbQueryFile, "file", "f", "", "Path to a SQL file to execute")
-	cmd.Flags().StringVar(&dbQueryRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbQueryPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().BoolVar(&dbQueryReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
-	cmd.Flags().DurationVar(&dbQueryTimeout, "timeout", 0, "Query timeout duration (e.g., 30s, 5m). Use 0 for no timeout")
+	cmd.Flags().StringVarP(&command, "command", "c", "", "SQL query to execute (reads from stdin if neither --command nor --file is given)")
+	cmd.Flags().StringVarP(&file, "file", "f", "", "Path to a SQL file to execute")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Query timeout duration (e.g., 30s, 5m). Use 0 for no timeout")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (table, json, yaml)")
 	cmd.MarkFlagsMutuallyExclusive("command", "file")
 
@@ -252,8 +252,7 @@ func renderResultSet(cmd *cobra.Command, rs common.ResultSet) error {
 	}
 	table.Header(headers...)
 
-	rows := util.Deref(rs.Rows)
-	for _, row := range rows {
+	for _, row := range rs.Rows {
 		values := make([]any, len(row))
 		for i, val := range row {
 			if val == nil {
@@ -269,10 +268,10 @@ func renderResultSet(cmd *cobra.Command, rs common.ResultSet) error {
 		return err
 	}
 
-	if len(rows) == 1 {
-		cmd.Printf("(%d row)\n\n", len(rows))
+	if len(rs.Rows) == 1 {
+		cmd.Printf("(%d row)\n\n", len(rs.Rows))
 	} else {
-		cmd.Printf("(%d rows)\n\n", len(rows))
+		cmd.Printf("(%d rows)\n\n", len(rs.Rows))
 	}
 	return nil
 }

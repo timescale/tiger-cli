@@ -18,16 +18,16 @@ type Column struct {
 	Type string `json:"type"`
 }
 
-// ResultSet is the result of a single statement. Rows is a pointer so a
-// statement that returns no rows at all (DDL, INSERT/UPDATE/DELETE) omits the
-// field entirely, while a SELECT that matched nothing still reports an empty
-// list.
+// ResultSet is the result of a single statement. Rows uses omitzero rather than
+// omitempty so the two empty cases stay distinct: a statement that returns no
+// rows at all (DDL, INSERT/UPDATE/DELETE) leaves it nil and omits the field,
+// while a SELECT that matched nothing reports an empty list.
 type ResultSet struct {
-	CommandTag   string       `json:"command_tag"`
-	Columns      []Column     `json:"columns,omitempty"`
-	Rows         *[][]*string `json:"rows,omitempty"`
-	RowsAffected int64        `json:"rows_affected"`
-	Truncated    bool         `json:"truncated,omitempty"`
+	CommandTag   string      `json:"command_tag"`
+	Columns      []Column    `json:"columns,omitempty"`
+	Rows         [][]*string `json:"rows,omitzero"`
+	RowsAffected int64       `json:"rows_affected"`
+	Truncated    bool        `json:"truncated,omitempty"`
 }
 
 // QueryResult is the complete result of a query execution. Callers render it
@@ -259,7 +259,7 @@ func processResultSet(conn *pgx.Conn, rows pgx.Rows, maxRows int, remainingBytes
 	return ResultSet{
 		CommandTag:   commandTag.String(),
 		Columns:      columns,
-		Rows:         util.PtrIfNonNil(resultRows),
+		Rows:         resultRows,
 		RowsAffected: commandTag.RowsAffected(),
 		Truncated:    truncated,
 	}, nil

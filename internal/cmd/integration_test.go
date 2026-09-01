@@ -1584,7 +1584,7 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			t.Fatalf("expected 1 result set, got %d", len(result.ResultSets))
 		}
 
-		rows := util.Deref(result.ResultSets[0].Rows)
+		rows := result.ResultSets[0].Rows
 		if len(rows) != 1 || len(rows[0]) != 2 {
 			t.Fatalf("expected one two-column row, got %v", rows)
 		}

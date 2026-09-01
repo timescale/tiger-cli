@@ -9,31 +9,48 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// withExecuteQuery stubs common.ExecuteQuery, which is otherwise the point
-// where the command would open a real database connection. The stub records
-// what the command asked for so a case can assert on it, and hands back result.
-func withExecuteQuery(result *common.QueryResult, err error, record ...*common.ExecuteQueryArgs) runOption {
+// queryArgs records the arguments the command handed to common.ExecuteQuery.
+// withExecuteQuery clears it at the start of each run and checkQueryArgs asserts
+// on it, so the two always describe the same invocation.
+var queryArgs common.ExecuteQueryArgs
+
+// withExecuteQuery stubs common.ExecuteQuery — otherwise the point where the
+// command would open a real database connection — to return result and err.
+func withExecuteQuery(result *common.QueryResult, err error) runOption {
 	return withSetup(func(t *testing.T) {
 		original := common.ExecuteQuery
+		queryArgs = common.ExecuteQueryArgs{}
 		common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, args common.ExecuteQueryArgs) (*common.QueryResult, error) {
-			for _, into := range record {
-				*into = args
-			}
+			queryArgs = args
 			return result, err
 		}
 		t.Cleanup(func() { common.ExecuteQuery = original })
 	})
 }
 
+// checkQueryArgs asserts what the command passed to common.ExecuteQuery: the
+// query it resolved from its various sources, and the connection options. A case
+// where the stub never ran fails here against the zero value.
+func checkQueryArgs(want common.ExecuteQueryArgs) checkFunc {
+	return func(t *testing.T, _ cmdResult) {
+		t.Helper()
+		if diff := cmp.Diff(want, queryArgs); diff != "" {
+			t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
+		}
+	}
+}
+
 // queryRows builds the row list of a result set from plain strings, with "" for
 // a SQL NULL.
-func queryRows(rows ...[]string) *[][]*string {
+func queryRows(rows ...[]string) [][]*string {
 	out := make([][]*string, 0, len(rows))
 	for _, row := range rows {
 		values := make([]*string, len(row))
@@ -44,7 +61,7 @@ func queryRows(rows ...[]string) *[][]*string {
 		}
 		out = append(out, values)
 	}
-	return &out
+	return out
 }
 
 // selectResult is a two-column, two-row SELECT result, the second row's name
@@ -69,9 +86,15 @@ func TestDbQueryCmd(t *testing.T) {
 		expectGetService(m, "svc-12345", sampleService())
 	}
 
+	// The cases that assert what reached common.ExecuteQuery stub it out and
+	// hand back an empty result, which renders nothing.
+	stubQuery := func(opts ...runOption) []runOption {
+		return append([]runOption{withExecuteQuery(&common.QueryResult{}, nil)}, opts...)
+	}
+
 	sqlDir := t.TempDir()
 	sqlFile := filepath.Join(sqlDir, "query.sql")
-	if err := os.WriteFile(sqlFile, []byte("SELECT * FROM users"), 0o600); err != nil {
+	if err := os.WriteFile(sqlFile, []byte("SELECT * FROM users;\n"), 0o600); err != nil {
 		t.Fatalf("failed to write SQL file: %v", err)
 	}
 
@@ -125,6 +148,38 @@ func TestDbQueryCmd(t *testing.T) {
 			name:    "too many args",
 			args:    []string{"db", "query", "svc-12345", "extra"},
 			wantErr: "accepts at most 1 arg(s), received 2",
+		},
+		{
+			// read_only=all opens the session read-only without the flag. The
+			// gate is on the session, not the command: the query still runs.
+			name:   "read_only all",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  setupGetService,
+			opts:   stubQuery(withConfig(map[string]any{"read_only": "all"})),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true})},
+		},
+		{
+			// Legacy boolean value, still accepted as an alias for "all".
+			name:   "read_only true",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  setupGetService,
+			opts:   stubQuery(withConfig(map[string]any{"read_only": true})),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true})},
+		},
+		{
+			name:   "read_only prod, PROD service",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  expectTaggedService("PROD"),
+			opts:   stubQuery(withConfig(map[string]any{"read_only": "prod"})),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true})},
+		},
+		{
+			// prod mode leaves DEV services writable.
+			name:   "read_only prod, DEV service",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  expectTaggedService("DEV"),
+			opts:   stubQuery(withConfig(map[string]any{"read_only": "prod"})),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"})},
 		},
 		{
 			name: "network error",
@@ -266,6 +321,45 @@ func TestDbQueryCmd(t *testing.T) {
 `,
 		},
 		{
+			// omitzero keeps the two empty cases distinct: a SELECT that matched
+			// nothing still reports "rows": [], where a statement returning no
+			// rows at all omits the field.
+			name:  "json output distinguishes an empty select from no rows at all",
+			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id FROM users WHERE false; SET application_name = 'x'", "-o", "json"},
+			setup: setupGetService,
+			opts: []runOption{withExecuteQuery(&common.QueryResult{
+				ResultSets: []common.ResultSet{
+					{
+						CommandTag: "SELECT 0",
+						Columns:    []common.Column{{Name: "id", Type: "int4"}},
+						Rows:       queryRows(),
+					},
+					{CommandTag: "SET"},
+				},
+			}, nil)},
+			wantStdout: `{
+  "result_sets": [
+    {
+      "command_tag": "SELECT 0",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4"
+        }
+      ],
+      "rows": [],
+      "rows_affected": 0
+    },
+    {
+      "command_tag": "SET",
+      "rows_affected": 0
+    }
+  ],
+  "execution_time": "0s"
+}
+`,
+		},
+		{
 			name:  "yaml output",
 			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users", "-o", "yaml"},
 			setup: setupGetService,
@@ -288,141 +382,55 @@ result_sets:
     rows_affected: 2
 `,
 		},
-	})
-}
-
-// TestDbQueryCmdArgs covers what the command passes down to common.ExecuteQuery:
-// the query it resolved from its various sources, and the connection options.
-func TestDbQueryCmdArgs(t *testing.T) {
-	var got common.ExecuteQueryArgs
-
-	tests := []struct {
-		name string
-		args []string
-		opts []runOption
-		tag  string // environment tag on the service, for the read_only=prod cases
-		want common.ExecuteQueryArgs
-	}{
 		{
-			name: "defaults",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"},
+			name:   "defaults",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  setupGetService,
+			opts:   stubQuery(),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"})},
 		},
 		{
-			name: "query read from stdin",
-			args: []string{"db", "query", "svc-12345"},
-			opts: []runOption{withStdin("SELECT 1;\nSELECT 2;\n")},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1;\nSELECT 2;", Role: "tsdbadmin"},
+			// util.ReadAll trims the trailing newline; the statements themselves
+			// reach the database untouched.
+			name:   "query read from stdin",
+			args:   []string{"db", "query", "svc-12345"},
+			setup:  setupGetService,
+			opts:   stubQuery(withStdin("SELECT 1;\nSELECT 2;\n")),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1;\nSELECT 2;", Role: "tsdbadmin"})},
 		},
 		{
-			name: "role, pooled and read-only flags",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--role", "readonly", "--pooled", "--read-only"},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "readonly", Pooled: true, ReadOnly: true},
+			// File contents are passed through as read, newline and all, and the
+			// command is reachable by its `sql` alias.
+			name:   "query read from a file, via the sql alias",
+			args:   []string{"db", "sql", "svc-12345", "-f", sqlFile},
+			setup:  setupGetService,
+			opts:   stubQuery(),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT * FROM users;\n", Role: "tsdbadmin"})},
+		},
+		{
+			name:   "role, pooled and read-only flags",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--role", "readonly", "--pooled", "--read-only"},
+			setup:  setupGetService,
+			opts:   stubQuery(),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "readonly", Pooled: true, ReadOnly: true})},
 		},
 		{
 			// Whitespace-only SQL is passed through for the database to report
 			// on, rather than being second-guessed here.
-			name: "whitespace-only query reaches the database",
-			args: []string{"db", "query", "svc-12345", "-c", "   "},
-			want: common.ExecuteQueryArgs{Query: "   ", Role: "tsdbadmin"},
-		},
-		{
-			// read_only=all forces a read-only session without the flag.
-			name: "read_only all",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			opts: []runOption{withConfig(map[string]any{"read_only": "all"})},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true},
-		},
-		{
-			// Legacy boolean value, still accepted as an alias for "all".
-			name: "read_only true",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			opts: []runOption{withConfig(map[string]any{"read_only": true})},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true},
-		},
-		{
-			name: "read_only prod, PROD service",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			tag:  "PROD",
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin", ReadOnly: true},
-		},
-		{
-			// prod mode leaves DEV services writable.
-			name: "read_only prod, DEV service",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			tag:  "DEV",
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"},
+			name:   "whitespace-only query reaches the database",
+			args:   []string{"db", "query", "svc-12345", "-c", "   "},
+			setup:  setupGetService,
+			opts:   stubQuery(),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "   ", Role: "tsdbadmin"})},
 		},
 		{
 			// Row caps protect an agent's context, so they're MCP-only: the CLI
 			// asks for everything the query produced.
-			name: "no row or byte caps",
-			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			opts: []runOption{withConfig(map[string]any{"mcp_max_rows": 10})},
-			want: common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"},
+			name:   "no row or byte caps",
+			args:   []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup:  setupGetService,
+			opts:   stubQuery(withConfig(map[string]any{"mcp_max_rows": 10})),
+			checks: []checkFunc{checkQueryArgs(common.ExecuteQueryArgs{Query: "SELECT 1", Role: "tsdbadmin"})},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got = common.ExecuteQueryArgs{}
-			opts := append(tt.opts, withExecuteQuery(&common.QueryResult{}, nil, &got))
-
-			setup := func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService())
-			}
-			if tt.tag != "" {
-				setup = expectTaggedService(tt.tag)
-			}
-
-			result := runCommand(t, tt.args, setup, opts...)
-			if result.err != nil {
-				t.Fatalf("unexpected error: %v", result.err)
-			}
-
-			if got.Query != tt.want.Query {
-				t.Errorf("query = %q, want %q", got.Query, tt.want.Query)
-			}
-			if got.Role != tt.want.Role {
-				t.Errorf("role = %q, want %q", got.Role, tt.want.Role)
-			}
-			if got.Pooled != tt.want.Pooled {
-				t.Errorf("pooled = %t, want %t", got.Pooled, tt.want.Pooled)
-			}
-			if got.ReadOnly != tt.want.ReadOnly {
-				t.Errorf("read-only = %t, want %t", got.ReadOnly, tt.want.ReadOnly)
-			}
-			if got.MaxRows != tt.want.MaxRows {
-				t.Errorf("max rows = %d, want %d", got.MaxRows, tt.want.MaxRows)
-			}
-			if got.MaxBytes != tt.want.MaxBytes {
-				t.Errorf("max bytes = %d, want %d", got.MaxBytes, tt.want.MaxBytes)
-			}
-		})
-	}
-}
-
-// TestDbQueryCmdFileInput checks the --file path end to end, including the
-// alias the command is also reachable by.
-func TestDbQueryCmdFileInput(t *testing.T) {
-	sqlFile := filepath.Join(t.TempDir(), "query.sql")
-	if err := os.WriteFile(sqlFile, []byte("SELECT * FROM users;\n"), 0o600); err != nil {
-		t.Fatalf("failed to write SQL file: %v", err)
-	}
-
-	var got common.ExecuteQueryArgs
-	result := runCommand(t, []string{"db", "sql", "svc-12345", "-f", sqlFile},
-		func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "svc-12345", sampleService())
-		},
-		withExecuteQuery(&common.QueryResult{}, nil, &got))
-	if result.err != nil {
-		t.Fatalf("unexpected error: %v", result.err)
-	}
-
-	if want := "SELECT * FROM users;\n"; got.Query != want {
-		t.Errorf("query = %q, want %q", got.Query, want)
-	}
+	})
 }
