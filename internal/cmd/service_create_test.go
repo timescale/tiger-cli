@@ -67,10 +67,40 @@ func TestServiceCreateCmd(t *testing.T) {
 			wantErr: notLoggedInMsg,
 		},
 		{
-			name:    "read-only mode",
+			name:    "read-only all refuses",
 			args:    []string{"service", "create", "--name", "test-service"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			// prod gates create on the tag it is about to request rather than
+			// on any existing service, so no fetch happens: allowing the
+			// create would produce a service the same mode then refuses to
+			// stop, resize, or delete.
+			name:    "read-only prod refuses requested PROD",
+			args:    []string{"service", "create", "--name", "test-service", "--environment", "PROD"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			name: "read-only prod allows requested DEV",
+			args: []string{"service", "create", "--name", "test-service", "--environment", "DEV", "--no-wait"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStdout: sampleServiceCreateTable,
+			wantStderr: `🚀 Creating service 'test-service'...
+✅ Service creation request accepted!
+📋 Service ID: svc-12345
+🎯 Set service 'svc-12345' as default service.
+⏳ Service is being created. Use 'tiger service list' to check status.
+`,
+			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
 			name: "network error",

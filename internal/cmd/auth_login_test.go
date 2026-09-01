@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,7 +28,7 @@ func TestAuthLoginCmd(t *testing.T) {
 	authInfoServer := startMockAuthInfoServer(t)
 	// read_only is pinned so the post-login prompt never fires in these cases:
 	// a stored value is what makes offerProdProtection skip it. The prompt has
-	// its own TestOfferProdProtection.
+	// its own case group at the end of the table.
 	patURLs := map[string]any{"api_url": authInfoServer.URL, "read_only": "off"}
 
 	// OAuth flow cases. The flow's stderr embeds a random state and callback
@@ -255,6 +254,126 @@ func TestAuthLoginCmd(t *testing.T) {
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkDefaultService("svc-before")},
 		},
+
+		// Post-login read-only prompt cases. The menu itself is a Bubble Tea
+		// program (covered by TestReadOnlyModel_KeySelection); here it is
+		// stubbed via withSelectReadOnlyMode. The skip cases stub an answer
+		// that would be stored if the menu were wrongly shown, so the absence
+		// of a stored value is what proves it wasn't.
+		{
+			name: "read-only prompt stores prod",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyProd, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\nServices tagged PROD are now protected from writes.\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "prod"})},
+		},
+		{
+			name: "read-only prompt stores all",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyAll, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\nAll services are now protected from writes.\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "all"})},
+		},
+		{
+			// "off" is a real answer: it is stored (so the next login won't
+			// ask again) but confirms nothing.
+			name: "read-only prompt stores off silently",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyOff, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "off"})},
+		},
+		{
+			// Dismissing is not an answer: nothing is recorded, the next login
+			// asks again, and nextSteps says how to set it by hand.
+			name: "read-only prompt dismissed records nothing",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode("", false),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(false),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
+		},
+		{
+			name: "read-only prompt skipped without TTY",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withSelectReadOnlyMode(config.ReadOnlyProd, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(false),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
+		},
+		{
+			name: "read-only prompt skipped when already declined",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL, "read_only": "off"}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyProd, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "off"})},
+		},
+		{
+			name: "read-only prompt skipped when already opted in",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL, "read_only": "prod"}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyOff, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "prod"})},
+		},
+		{
+			name: "read-only prompt skipped when already set to all",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL, "read_only": "all"}),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyProd, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "all"})},
+		},
+		{
+			// TIGER_READ_ONLY outranks the config file, so a mode chosen at
+			// the prompt would be a lie: nothing is asked or stored.
+			name: "read-only prompt skipped when env var set",
+			args: []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
+			opts: []runOption{
+				withConfig(map[string]any{"api_url": authInfoServer.URL}),
+				withEnv("TIGER_READ_ONLY", "all"),
+				withIsTerminal(true),
+				withSelectReadOnlyMode(config.ReadOnlyProd, true),
+			},
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStderr: "Validating API key...\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
+		},
 	})
 }
 
@@ -386,6 +505,16 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 	}
 }
 
+// withSelectReadOnlyMode stubs the post-login read-only menu to return the
+// given answer (chose=false means dismissed without choosing).
+func withSelectReadOnlyMode(mode config.ReadOnlyMode, chose bool) runOption {
+	return withSetup(func(t *testing.T) {
+		original := selectReadOnlyMode
+		selectReadOnlyMode = func(*cobra.Command) (config.ReadOnlyMode, bool) { return mode, chose }
+		t.Cleanup(func() { selectReadOnlyMode = original })
+	})
+}
+
 // withSelectProject makes the interactive project picker select the project at
 // the given index for the duration of the test.
 func withSelectProject(index int) runOption {
@@ -479,105 +608,12 @@ func checkStoredAPIKey(apiKey, projectID string) checkFunc {
 	}
 }
 
-// TestOfferProdProtection covers the post-login read-only prompt with the menu
-// itself stubbed out; TestReadOnlyModel_KeySelection covers the menu. The
-// "already ..." cases guard the ask-exactly-once property, which a stored
-// read_only value is the only thing enforcing.
-func TestOfferProdProtection(t *testing.T) {
-	tests := []struct {
-		name string
-		// preexisting is empty when read_only is absent from the file.
-		preexisting string
-		// answer is what the menu returns; "" means dismissed without choosing.
-		answer config.ReadOnlyMode
-		// env is TIGER_READ_ONLY, which outranks the config file.
-		env         string
-		notATTY     bool
-		wantMenu    bool
-		wantStored  string // "" = key must stay absent
-		wantMessage string // "" = nothing printed
-		// wantReadOnlySet is the return value, which decides whether the caller
-		// prints the "tiger config set read_only" bullet - false means it does.
-		wantReadOnlySet bool
-	}{
-		{name: "prod stores prod", answer: config.ReadOnlyProd, wantMenu: true, wantStored: "prod", wantMessage: "Services tagged PROD are now protected", wantReadOnlySet: true},
-		{name: "all stores all", answer: config.ReadOnlyAll, wantMenu: true, wantStored: "all", wantMessage: "All services are now protected", wantReadOnlySet: true},
-		{name: "off stores off silently", answer: config.ReadOnlyOff, wantMenu: true, wantStored: "off", wantReadOnlySet: true},
-		{name: "dismissed records nothing", answer: "", wantMenu: true, wantStored: ""},
-		{name: "not a terminal skips silently", answer: config.ReadOnlyProd, notATTY: true, wantStored: ""},
-		{name: "already declined", preexisting: "off", answer: config.ReadOnlyProd, wantStored: "off", wantReadOnlySet: true},
-		{name: "already opted in", preexisting: "prod", answer: config.ReadOnlyOff, wantStored: "prod", wantReadOnlySet: true},
-		{name: "already set to all", preexisting: "all", answer: config.ReadOnlyProd, wantStored: "all", wantReadOnlySet: true},
-		// The env var wins over the file, so writing a choice there would be a lie.
-		{name: "env var answers it without prompting", env: "all", answer: config.ReadOnlyProd, wantStored: "", wantReadOnlySet: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			if tt.env != "" {
-				t.Setenv("TIGER_READ_ONLY", tt.env)
-			}
-			values := map[string]any{}
-			if tt.preexisting != "" {
-				values["read_only"] = tt.preexisting
-			}
-			writeConfigFile(t, tmpDir, values)
-			cfg, err := config.Load(testFlags(t, tmpDir))
-			if err != nil {
-				t.Fatalf("config.Load failed: %v", err)
-			}
-			stubIsTerminal(t, !tt.notATTY)
-
-			shown := false
-			original := selectReadOnlyMode
-			t.Cleanup(func() { selectReadOnlyMode = original })
-			selectReadOnlyMode = func(_ *cobra.Command) (config.ReadOnlyMode, bool) {
-				shown = true
-				return tt.answer, tt.answer != ""
-			}
-
-			cmd := &cobra.Command{}
-			cmd.SetContext(t.Context())
-			errOut := new(bytes.Buffer)
-			cmd.SetOut(new(bytes.Buffer))
-			cmd.SetErr(errOut)
-
-			readOnlySet := offerProdProtection(cmd, cfg)
-
-			if shown != tt.wantMenu {
-				t.Errorf("menu shown = %t, want %t", shown, tt.wantMenu)
-			}
-			if readOnlySet != tt.wantReadOnlySet {
-				t.Errorf("readOnlySet = %t, want %t", readOnlySet, tt.wantReadOnlySet)
-			}
-
-			stored, err := config.LoadForOutput(tmpDir, false, true)
-			if err != nil {
-				t.Fatalf("LoadForOutput failed: %v", err)
-			}
-			got := ""
-			if stored.ReadOnly != nil {
-				got = string(*stored.ReadOnly)
-			}
-			if got != tt.wantStored {
-				t.Errorf("stored read_only = %q, want %q", got, tt.wantStored)
-			}
-
-			if tt.wantMessage == "" {
-				if errOut.Len() != 0 {
-					t.Errorf("expected no output, got %q", errOut.String())
-				}
-			} else if !strings.Contains(errOut.String(), tt.wantMessage) {
-				t.Errorf("expected %q in output, got %q", tt.wantMessage, errOut.String())
-			}
-		})
-	}
-}
-
 // TestReadOnlyModel_KeySelection checks that every mode is reachable and that
 // dismissing leaves chosen empty, which is what keeps a quit from being recorded
-// as picking whichever mode the cursor rested on.
+// as picking whichever mode the cursor rested on. Helper-level because the menu
+// is a Bubble Tea model that needs a real TTY to run through the command; the
+// command tests stub it via withSelectReadOnlyMode (same precedent as
+// TestConnectTargetModel).
 func TestReadOnlyModel_KeySelection(t *testing.T) {
 	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
 	// stringifies to "\x03" and would match nothing.

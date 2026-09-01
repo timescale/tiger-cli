@@ -37,10 +37,31 @@ func TestServiceDeleteCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
-			name:    "read-only mode",
+			name:    "read-only all refuses",
 			args:    []string{"service", "delete", "svc-12345"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			// prod judges the service by its environment tag, so the gate
+			// fetches it. Only the tag lookup is registered: an attempted
+			// mutation fails as an unexpected call.
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "delete", "svc-12345"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup:   expectTaggedService("PROD"),
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			name: "read-only prod allows DEV service",
+			args: []string{"service", "delete", "svc-12345", "--confirm", "--no-wait"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectTaggedService("DEV")(m)
+				setupDelete(m)
+			},
+			wantStderr: "\U0001f5d1\ufe0f  Delete request accepted for service 'svc-12345'.\n" +
+				"\U0001f4a1 Use 'tiger service list' to check deletion status.\n",
 		},
 		{
 			name:    "non-TTY without confirm",
