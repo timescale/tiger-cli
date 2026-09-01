@@ -29,7 +29,7 @@ const (
 	DefaultMCPMaxRows      = 100
 	DefaultOutput          = "table"
 	DefaultPasswordStorage = "keyring"
-	DefaultReadOnly        = false
+	DefaultReadOnly        = ReadOnlyOff
 	DefaultReleasesURL     = "https://cli.tigerdata.com"
 	DefaultVersionCheck    = true
 
@@ -38,6 +38,61 @@ const (
 	// initial PKCE flow and refresh-token grants.
 	TigerCLIClientID = "45e1b16d-e435-4049-97b2-8daad150818c"
 )
+
+// ReadOnlyMode selects which services read-only mode protects from mutating
+// operations. The legacy booleans map onto it: true is ReadOnlyAll, false is
+// ReadOnlyOff.
+type ReadOnlyMode string
+
+const (
+	ReadOnlyAll  ReadOnlyMode = "all"  // every service
+	ReadOnlyProd ReadOnlyMode = "prod" // only services tagged PROD
+	ReadOnlyOff  ReadOnlyMode = "off"  // none
+)
+
+// BlocksAll reports whether the mode blocks writes to every service. It's the
+// only verdict reachable without knowing the target.
+func (m ReadOnlyMode) BlocksAll() bool {
+	return m == ReadOnlyAll
+}
+
+// parseReadOnlyMode converts a user-supplied read_only value into a ReadOnlyMode,
+// still accepting the booleans this option took before the modes existed.
+func parseReadOnlyMode(value string) (ReadOnlyMode, error) {
+	trimmed := strings.TrimSpace(value)
+
+	// Empty means unset. Erroring would be unrecoverable — config.Load runs for
+	// every command, so even `config set` couldn't repair the file.
+	if trimmed == "" {
+		return ReadOnlyOff, nil
+	}
+
+	// Matched case-insensitively, unlike `output` and `password_storage`: PROD is
+	// how the tag is spelled everywhere else, so it's the spelling most likely to
+	// be copied, and ParseBool below is case-insensitive anyway.
+	lowered := strings.ToLower(trimmed)
+
+	switch mode := ReadOnlyMode(lowered); mode {
+	case ReadOnlyAll, ReadOnlyProd, ReadOnlyOff:
+		return mode, nil
+	}
+
+	// `on` pairs with the `off` mode name; strconv.ParseBool rejects it.
+	if lowered == "on" {
+		return ReadOnlyAll, nil
+	}
+
+	// ParseBool also covers 1/0 and t/f, which is what viper's weak typing
+	// produces for a boolean config value.
+	if b, err := strconv.ParseBool(trimmed); err == nil {
+		if b {
+			return ReadOnlyAll, nil
+		}
+		return ReadOnlyOff, nil
+	}
+
+	return "", fmt.Errorf("invalid read_only value: %s (must be all, prod, or off)", value)
+}
 
 var defaultValues = map[string]any{
 	"analytics":        DefaultAnalytics,
@@ -70,20 +125,20 @@ var flagBindings = map[string]string{
 // Config holds the effective configuration for a single command invocation,
 // resolved through viper's normal precedence (flag > env > file > default).
 type Config struct {
-	APIURL          string `mapstructure:"api_url"`
-	Analytics       bool   `mapstructure:"analytics"`
-	Color           bool   `mapstructure:"color"`
-	ConsoleURL      string `mapstructure:"console_url"`
-	DocsMCP         bool   `mapstructure:"docs_mcp"`
-	DocsMCPURL      string `mapstructure:"docs_mcp_url"`
-	GatewayURL      string `mapstructure:"gateway_url"`
-	MCPMaxRows      int    `mapstructure:"mcp_max_rows"`
-	Output          string `mapstructure:"output"`
-	PasswordStorage string `mapstructure:"password_storage"`
-	ReadOnly        bool   `mapstructure:"read_only"`
-	ReleasesURL     string `mapstructure:"releases_url"`
-	ServiceID       string `mapstructure:"service_id"`
-	VersionCheck    bool   `mapstructure:"version_check"`
+	APIURL          string       `mapstructure:"api_url"`
+	Analytics       bool         `mapstructure:"analytics"`
+	Color           bool         `mapstructure:"color"`
+	ConsoleURL      string       `mapstructure:"console_url"`
+	DocsMCP         bool         `mapstructure:"docs_mcp"`
+	DocsMCPURL      string       `mapstructure:"docs_mcp_url"`
+	GatewayURL      string       `mapstructure:"gateway_url"`
+	MCPMaxRows      int          `mapstructure:"mcp_max_rows"`
+	Output          string       `mapstructure:"output"`
+	PasswordStorage string       `mapstructure:"password_storage"`
+	ReadOnly        ReadOnlyMode `mapstructure:"read_only"`
+	ReleasesURL     string       `mapstructure:"releases_url"`
+	ServiceID       string       `mapstructure:"service_id"`
+	VersionCheck    bool         `mapstructure:"version_check"`
 
 	ConfigDir string         `mapstructure:"-"`
 	flags     *pflag.FlagSet `mapstructure:"-"`
@@ -92,20 +147,20 @@ type Config struct {
 // ConfigOutput is the shape `tiger config show` renders. Every field is a
 // pointer so unset values can be omitted when defaults are suppressed.
 type ConfigOutput struct {
-	Analytics       *bool   `mapstructure:"analytics" json:"analytics,omitempty"`
-	APIURL          *string `mapstructure:"api_url" json:"api_url,omitempty"`
-	Color           *bool   `mapstructure:"color" json:"color,omitempty"`
-	ConsoleURL      *string `mapstructure:"console_url" json:"console_url,omitempty"`
-	DocsMCP         *bool   `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
-	DocsMCPURL      *string `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
-	GatewayURL      *string `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
-	MCPMaxRows      *int    `mapstructure:"mcp_max_rows" json:"mcp_max_rows,omitempty"`
-	Output          *string `mapstructure:"output" json:"output,omitempty"`
-	PasswordStorage *string `mapstructure:"password_storage" json:"password_storage,omitempty"`
-	ReadOnly        *bool   `mapstructure:"read_only" json:"read_only,omitempty"`
-	ReleasesURL     *string `mapstructure:"releases_url" json:"releases_url,omitempty"`
-	ServiceID       *string `mapstructure:"service_id" json:"service_id,omitempty"`
-	VersionCheck    *bool   `mapstructure:"version_check" json:"version_check,omitempty"`
+	Analytics       *bool         `mapstructure:"analytics" json:"analytics,omitempty"`
+	APIURL          *string       `mapstructure:"api_url" json:"api_url,omitempty"`
+	Color           *bool         `mapstructure:"color" json:"color,omitempty"`
+	ConsoleURL      *string       `mapstructure:"console_url" json:"console_url,omitempty"`
+	DocsMCP         *bool         `mapstructure:"docs_mcp" json:"docs_mcp,omitempty"`
+	DocsMCPURL      *string       `mapstructure:"docs_mcp_url" json:"docs_mcp_url,omitempty"`
+	GatewayURL      *string       `mapstructure:"gateway_url" json:"gateway_url,omitempty"`
+	MCPMaxRows      *int          `mapstructure:"mcp_max_rows" json:"mcp_max_rows,omitempty"`
+	Output          *string       `mapstructure:"output" json:"output,omitempty"`
+	PasswordStorage *string       `mapstructure:"password_storage" json:"password_storage,omitempty"`
+	ReadOnly        *ReadOnlyMode `mapstructure:"read_only" json:"read_only,omitempty"`
+	ReleasesURL     *string       `mapstructure:"releases_url" json:"releases_url,omitempty"`
+	ServiceID       *string       `mapstructure:"service_id" json:"service_id,omitempty"`
+	VersionCheck    *bool         `mapstructure:"version_check" json:"version_check,omitempty"`
 }
 
 // Load creates a new Config instance. The provided flag set is used to resolve
@@ -146,6 +201,13 @@ func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutp
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config for output: %w", err)
 	}
+	if cfg.ReadOnly != nil {
+		mode, err := parseReadOnlyMode(string(*cfg.ReadOnly))
+		if err != nil {
+			return nil, err
+		}
+		cfg.ReadOnly = &mode
+	}
 
 	return cfg, nil
 }
@@ -171,20 +233,32 @@ func (c *Config) reload() error {
 	if err := v.Unmarshal(c); err != nil {
 		return fmt.Errorf("error unmarshaling config: %w", err)
 	}
+
+	// read_only arrives as whatever its source held — viper's WeaklyTypedInput
+	// renders a YAML bool or int as "1"/"0" — so normalize it here rather than
+	// leaving a value no gate matches.
+	mode, err := parseReadOnlyMode(string(c.ReadOnly))
+	if err != nil {
+		return err
+	}
+	c.ReadOnly = mode
 	return nil
 }
 
-func (c *Config) Set(key, value string) error {
+// Set writes a config value and returns it as stored, which isn't always the
+// input: read_only normalizes legacy booleans into modes. Echo the return value
+// to the user, not the argument.
+func (c *Config) Set(key, value string) (string, error) {
 	// Validate and convert the value to the correct type for the config file
 	validated, err := validateValue(key, value)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Write to config file
 	configFile, err := c.EnsureConfigDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	v := viper.New()
@@ -194,10 +268,10 @@ func (c *Config) Set(key, value string) error {
 	v.Set(key, validated)
 
 	if err := v.WriteConfigAs(configFile); err != nil {
-		return fmt.Errorf("error writing config file: %w", err)
+		return "", fmt.Errorf("error writing config file: %w", err)
 	}
 
-	return c.reload()
+	return fmt.Sprint(validated), c.reload()
 }
 
 func (c *Config) Unset(key string) error {
@@ -274,7 +348,9 @@ func ValidConfigOptionValues(key string) []string {
 		return ValidOutputFormats()
 	case "password_storage":
 		return ValidPasswordStorageOptions()
-	case "analytics", "color", "docs_mcp", "read_only", "version_check":
+	case "read_only":
+		return ValidReadOnlyModes()
+	case "analytics", "color", "docs_mcp", "version_check":
 		return []string{"true", "false"}
 	default:
 		return nil
@@ -284,6 +360,10 @@ func ValidConfigOptionValues(key string) []string {
 // ValidPasswordStorageOptions returns the accepted values for password_storage.
 func ValidPasswordStorageOptions() []string {
 	return []string{"keyring", "pgpass", "none"}
+}
+
+func ValidReadOnlyModes() []string {
+	return []string{string(ReadOnlyAll), string(ReadOnlyProd), string(ReadOnlyOff)}
 }
 
 func GetConfigFile(dir string) string {
@@ -385,8 +465,21 @@ func validateValue(key, value string) (any, error) {
 	switch key {
 	case "api_url", "console_url", "docs_mcp_url", "gateway_url", "releases_url", "service_id":
 		return value, nil
-	case "analytics", "color", "docs_mcp", "read_only", "version_check":
+	case "analytics", "color", "docs_mcp", "version_check":
 		return parseBool(key, value)
+	case "read_only":
+		// parseReadOnlyMode reads empty as off so a malformed file can't brick every
+		// command. Typed here it's a slip, and silently turning protection off is
+		// the wrong way to resolve one — `unset` clears the key.
+		if strings.TrimSpace(value) == "" {
+			return nil, fmt.Errorf("invalid read_only value: %q (must be all, prod, or off; use `tiger config unset read_only` to clear it)", value)
+		}
+		// Stored as the canonical mode, cleaning up a legacy boolean in the file.
+		mode, err := parseReadOnlyMode(value)
+		if err != nil {
+			return nil, err
+		}
+		return string(mode), nil
 	case "mcp_max_rows":
 		return parsePositiveInt(key, value)
 	case "output":

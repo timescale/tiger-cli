@@ -14,6 +14,8 @@ import (
 // credentials to use. They're the same for a primary; for a read replica the
 // CredentialService is the parent primary, whose credentials it shares.
 type ConnectionTarget struct {
+	// ConnectionService alone decides a session's read-only verdict, so a replica
+	// is judged on its own environment tag rather than its primary's.
 	ConnectionService api.Service
 	CredentialService api.Service
 	IsReplica         bool
@@ -93,12 +95,20 @@ func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithRespo
 // a service's read replica sets (as listed via the /replicaSets endpoint). The
 // replica supplies the endpoint; the primary supplies the credentials.
 func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet) *ConnectionTarget {
+	// Carry the replica's own tag over. ReplicaSetMetadata and ServiceMetadata are
+	// separate types holding the same field, so it's copied rather than assigned.
+	var metadata *api.ServiceMetadata
+	if replica.Metadata != nil {
+		metadata = &api.ServiceMetadata{Environment: replica.Metadata.Environment}
+	}
+
 	return &ConnectionTarget{
 		ConnectionService: api.Service{
 			ServiceID:        replica.ID,
 			Name:             replica.Name,
 			Endpoint:         replica.Endpoint,
 			ConnectionPooler: replica.ConnectionPooler,
+			Metadata:         metadata,
 		},
 		CredentialService: primary,
 		IsReplica:         true,

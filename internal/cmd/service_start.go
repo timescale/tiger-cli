@@ -42,13 +42,13 @@ Examples:
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
-				return err
-			}
-
 			// Determine source service ID
 			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
+				return err
+			}
+
+			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
 				return err
 			}
 

@@ -76,7 +76,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceResizeOutput{}, err
 	}
 
-	if err := common.CheckReadOnly(cfg); err != nil {
+	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 

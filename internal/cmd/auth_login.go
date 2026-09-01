@@ -31,8 +31,21 @@ const nextStepsMessage = `
 • Install MCP server for your favorite AI coding tool: tiger mcp install
 • List existing services: tiger service list
 • Create a new service: tiger service create
-• Enable read-only mode: tiger config set read_only true
 `
+
+// readOnlyNextStep tells the user how to set read_only by hand. Printing it to
+// someone who just picked a mode from the menu would read as if their answer
+// didn't take, so it's only for logins that left the choice unmade.
+const readOnlyNextStep = "• Protect services from writes: tiger config set read_only prod (or all, off)\n"
+
+// nextSteps is the post-login message, picking up readOnlyNextStep when the
+// config file holds no read_only value.
+func nextSteps(readOnlySet bool) string {
+	if readOnlySet {
+		return nextStepsMessage
+	}
+	return nextStepsMessage + readOnlyNextStep
+}
 
 var (
 	// openBrowser can be overridden for testing
@@ -184,7 +197,165 @@ func finishLogin(cmd *cobra.Command, cfg *config.Config, prevProjectID, projectI
 		clearStaleDefaultService(cmd, cfg)
 	}
 	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
-	cmd.Print(nextStepsMessage)
+
+	readOnlySet := offerProdProtection(cmd, cfg)
+	cmd.Print(nextSteps(readOnlySet))
+}
+
+// offerProdProtection asks which services to protect from writes. Every choice
+// is recorded, so it asks exactly once — including of users who predate the
+// option. Choosing "off" stores read_only=off rather than leaving the key
+// absent, which a later login would read as never having been asked.
+//
+// It reports whether the config file now holds a read_only value, written just
+// now or by an earlier login. False means nobody has set one, so nextSteps says
+// how to do it by hand.
+func offerProdProtection(cmd *cobra.Command, cfg *config.Config) bool {
+	// TIGER_READ_ONLY outranks the config file, so a mode chosen here wouldn't
+	// take effect.
+	if os.Getenv("TIGER_READ_ONLY") != "" {
+		return true
+	}
+
+	stored, err := config.LoadForOutput(cfg.ConfigDir, false, true)
+	if err != nil {
+		// Can't tell whether it was ever answered, so don't ask — but do print the
+		// bullet, which is the harmless half of the two.
+		return false
+	}
+	if stored.ReadOnly != nil {
+		return true
+	}
+
+	// Both streams, per the convention: stdin so the answer can be read, stderr so
+	// the question can be seen. An unseen prompt reads as a hang.
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+		return false
+	}
+
+	mode, chose := selectReadOnlyMode(cmd)
+	if !chose {
+		// Dismissed rather than answered, so record nothing and ask again.
+		return false
+	}
+
+	if _, err := cfg.Set("read_only", string(mode)); err != nil {
+		cmd.PrintErrf("⚠️  Warning: could not set read_only: %v\n", err)
+		return false
+	}
+	if msg := readOnlyConfirmation(mode); msg != "" {
+		cmd.PrintErrln(msg)
+	}
+	return true
+}
+
+// readOnlyConfirmation is what to report after a mode is stored.
+func readOnlyConfirmation(mode config.ReadOnlyMode) string {
+	switch mode {
+	case config.ReadOnlyProd:
+		return "Services tagged PROD are now protected from writes."
+	case config.ReadOnlyAll:
+		return "All services are now protected from writes."
+	default:
+		return ""
+	}
+}
+
+// readOnlyChoice is one option in the post-login menu.
+type readOnlyChoice struct {
+	mode  config.ReadOnlyMode
+	label string
+}
+
+// readOnlyChoices lists every mode, so the menu doubles as the one place a new
+// user learns the option exists. Recommended mode first, which is also where
+// the cursor starts.
+var readOnlyChoices = []readOnlyChoice{
+	{config.ReadOnlyProd, "Services tagged PROD only (recommended)"},
+	{config.ReadOnlyAll, "Every service"},
+	{config.ReadOnlyOff, "Nothing - allow writes everywhere"},
+}
+
+// selectReadOnlyMode shows the menu and reports the chosen mode. The bool is
+// false when the user dismissed it without choosing, which is not an answer.
+var selectReadOnlyMode = selectReadOnlyModeImpl
+
+func selectReadOnlyModeImpl(cmd *cobra.Command) (config.ReadOnlyMode, bool) {
+	program := tea.NewProgram(readOnlyModel{},
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
+
+	finalModel, err := program.Run()
+	if err != nil {
+		// A menu we couldn't show is not a decline: leave the key absent so the
+		// next login asks again.
+		return "", false
+	}
+
+	chosen := finalModel.(readOnlyModel).chosen
+	return chosen, chosen != ""
+}
+
+// readOnlyModel is the menu. A zero chosen means dismissed, so quitting can't be
+// mistaken for picking the mode the cursor happened to rest on.
+type readOnlyModel struct {
+	cursor int
+	chosen config.ReadOnlyMode
+}
+
+func (m readOnlyModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m readOnlyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch key := msg.String(); key {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(readOnlyChoices)-1 {
+				m.cursor++
+			}
+		case "enter", "space":
+			m.chosen = readOnlyChoices[m.cursor].mode
+			return m, tea.Quit
+		default:
+			// Number keys jump straight to that option ('1' -> first, etc.).
+			if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
+				if idx := int(key[0] - '1'); idx < len(readOnlyChoices) {
+					m.cursor = idx
+					m.chosen = readOnlyChoices[idx].mode
+					return m, tea.Quit
+				}
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m readOnlyModel) View() tea.View {
+	var s strings.Builder
+	s.WriteString("Which services should be protected from writes?\n\n")
+
+	for i, choice := range readOnlyChoices {
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, choice.label))
+	}
+
+	// No "change it later" hint: dismissing prints the readOnlyNextStep bullet a
+	// few lines below, and "q to decide later" already says so anyway.
+	s.WriteString("\nUse ↑/↓ arrows or number keys to select, enter to confirm, q to decide later")
+	return tea.NewView(s.String())
 }
 
 func flagOrEnvVar(flagVal, envVarName string) string {

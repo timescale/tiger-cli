@@ -64,10 +64,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
-				return err
-			}
-
 			// Determine service ID
 			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
@@ -83,6 +79,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// At least one of CPU or memory must be specified
 			if cpuMemoryCfg == nil {
 				return fmt.Errorf("must specify at least one of --cpu or --memory")
+			}
+
+			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+				return err
 			}
 
 			// Display resize information

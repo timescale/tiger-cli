@@ -23,6 +23,7 @@ Output:
     • connection_string (required): string - PostgreSQL connection string (password embedded only if with_password=true)
     • created: string
     • direct_endpoint: string - Direct database connection endpoint
+    • environment (required): string - Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified.
     • id (required): string - Service identifier (10-character alphanumeric string)
     • name (required): string
     • password: string - Password for tsdbadmin user (only included if with_password=true)
@@ -49,6 +50,7 @@ List all database services in your Tiger Cloud project. Returns services with st
 Output:
   • services (required): []object, null
     • created: string
+    • environment (required): string - Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified.
     • id (required): string - Service identifier (10-character alphanumeric string)
     • name (required): string
     • region (required): string
@@ -81,6 +83,10 @@ Output:
           "additionalProperties": false,
           "properties": {
             "created": {
+              "type": "string"
+            },
+            "environment": {
+              "description": "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified.",
               "type": "string"
             },
             "id": {
@@ -123,7 +129,8 @@ Output:
             "name",
             "status",
             "type",
-            "region"
+            "region",
+            "environment"
           ],
           "type": "object"
         },
@@ -161,6 +168,9 @@ outputSchema:
         properties:
           created:
             type: string
+          environment:
+            description: Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified.
+            type: string
           id:
             description: Service identifier (10-character alphanumeric string)
             type: string
@@ -191,6 +201,7 @@ outputSchema:
           - status
           - type
           - region
+          - environment
         type: object
       type:
         - "null"

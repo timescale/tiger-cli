@@ -102,6 +102,11 @@ PostgreSQL Configuration Parameters That May Be Set:
 				return err
 			}
 
+			// Refuse here rather than letting the server reject the CREATE ROLE.
+			if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
+				return err
+			}
+
 			// A read replica is read-only, so a role can't be created there.
 			if common.IsReadReplica(service) {
 				return fmt.Errorf("%q is a read replica; create the role on its primary service %q instead",
