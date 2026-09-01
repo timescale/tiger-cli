@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -66,7 +67,12 @@ Examples:
 
 			cmd.PrintErrf("✅ Backups for service '%s' will now be copied to '%s'.\n", serviceID, region)
 
-			return outputBackupRegions(cmd, []api.BackupRegion{*resp.JSON201}, cfg.Output)
+			switch strings.ToLower(cfg.Output) {
+			case "json", "yaml":
+				return outputBackupRegions(cmd, []api.BackupRegion{*resp.JSON201}, cfg.Output)
+			default:
+				return nil
+			}
 		},
 	}
 
