@@ -180,7 +180,7 @@ Only the MCP server logs. `newLogger(w)` (`internal/cmd/logger_helper.go`) point
 
 The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (`proxy.go`).
 
-**Server state.** `NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger. Read-only mode, the experimental gate, and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), while the analytics middleware reloads the App on every request so handlers see current config and credentials. Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
+**Server state.** `NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger. The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
 
 **One file per tool**, named to match the tool (`service_create` → `service_create.go`), laid out in this order: the `<Tool>Input`/`<Tool>Output` structs and their `Schema()` methods, then `new<Tool>Tool()` returning the `*mcp.Tool`, then the `handle<Tool>` handler method on `*Server`, then helpers used only by that tool. Registration lives in `server.go` (`registerServiceTools`, `registerDatabaseTools`), so adding a tool means one new file plus one `addTool` line. Shared schema helpers and API-to-output conversion live in `utils.go`.
 
@@ -238,7 +238,15 @@ Command tests live in `internal/cmd`, one test file per command file, all table-
 
 After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation.
 
-Keep this file concise and high-level — it's pulled into every agent session, so unnecessary detail bloats context and distracts more than it helps. Describe the intent and the pattern; let the code be the source of truth for the details.
+### Maintaining This File
+
+This file is pulled into every agent session, so unnecessary detail bloats context and distracts more than it helps. When a change introduces or alters a pattern, update this file — but hold additions to its style:
+
+- **Concise and high-level.** Describe the intent and the pattern; let the code be the source of truth for the details. No code snippets or good/bad examples — name the file or identifier that models the pattern ("`tiger service create` is the model") and let the reader look there.
+- **State the current convention plainly**, without justifying it against historical or rejected alternatives — future readers don't need to know about patterns that no longer exist.
+- **Organized top-down.** Overview, architecture, and repository structure first; specific patterns and practices below. Put new guidance in the section where a reader would look for it — extend an existing section rather than appending a new one at the bottom, and give a topic its own section only when it outgrows its home.
+- **Complete sentences.** Concise means selective about what to include, not clipped fragments — a rule the reader has to re-read saves nothing.
+- **No enumerations that will drift.** Prefer pointing at a greppable identifier (`readOnlyGatedTools`) over listing its contents; keep an explicit list only where no such identifier exists and the inventory is doing real work (the CLI read-only gates).
 
 ## CI
 
