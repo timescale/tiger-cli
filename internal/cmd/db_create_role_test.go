@@ -40,6 +40,37 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
+			// The gate runs after the service fetch, before any connection
+			// attempt.
+			name:    "read-only all refuses",
+			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
+			setup:   expectTaggedService("DEV"),
+			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup:   expectTaggedService("PROD"),
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			// The missing endpoint stops the command right after the gate,
+			// proving prod let a DEV service through.
+			name: "read-only prod allows DEV service",
+			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				tag := "DEV"
+				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Metadata = &api.ServiceMetadata{Environment: &tag}
+					s.Endpoint = nil
+				}))
+			},
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+		{
 			// The missing endpoint stops the command before any connection
 			// attempt, proving the config default reached the service lookup.
 			name: "default service id from config",
