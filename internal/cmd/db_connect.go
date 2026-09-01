@@ -46,8 +46,9 @@ Authentication is handled automatically using:
 
 Use --read-only to open the psql session in Tiger Cloud's immutable read-only
 mode (writes and DDL are rejected by the server). The global read_only config
-option (or TIGER_READ_ONLY=true) also forces this behavior, so sessions started
-while read-only mode is on are always read-only.
+option (or TIGER_READ_ONLY) also forces this behavior: read_only=all makes every
+session read-only, and read_only=prod makes sessions against services tagged PROD
+read-only while leaving DEV services writable.
 
 When run in an interactive terminal, this command checks whether the service has
 any read replicas. If it does, it offers to connect to one of them instead of the
@@ -91,11 +92,6 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
-			if err != nil {
-				return err
-			}
-
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
@@ -113,7 +109,7 @@ Examples:
 			opts := common.ConnectionDetailsOptions{
 				Pooled:   dbConnectPooled,
 				Role:     dbConnectRole,
-				ReadOnly: dbConnectReadOnly || cfg.ReadOnly,
+				ReadOnly: dbConnectReadOnly,
 			}
 
 			// Connects straight to a replica named by ID, or offers the interactive
@@ -204,6 +200,10 @@ func selectConnection(
 			}
 		}
 	}
+
+	// The target is settled now, so read-only mode can have its say. --read-only
+	// is already in opts and only adds to the restriction.
+	opts.ReadOnly = opts.ReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(chosen.ConnectionService)) != nil
 
 	details, err := buildConnectionDetailsForTarget(cmd, cfg, chosen, opts)
 	if err != nil {
@@ -404,9 +404,13 @@ func connectWithPasswordMenu(
 		return fmt.Errorf("authentication failed and no TTY available for interactive password entry")
 	}
 
+	// Password reset is admin-only, and rotating the master password is a
+	// control-plane write, so read-only mode hides the option rather than
+	// offering what it would refuse.
+	canResetPassword := details.Role == "tsdbadmin" &&
+		common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) == nil
+
 	// Interactive recovery loop
-	// Only allow password reset for admin role
-	canResetPassword := details.Role == "tsdbadmin"
 	for {
 		option, err := selectPasswordRecoveryOption(cmd, canResetPassword)
 		if err != nil {

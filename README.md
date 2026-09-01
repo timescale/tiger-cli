@@ -252,7 +252,13 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `mcp_max_rows` - Maximum number of rows the `db_execute_query` MCP tool returns per result set before truncating, to limit how much data lands in an AI agent's context. Only applies to the MCP tool, not CLI commands. Default: `100`
 - `output` - Output format: `json`, `yaml`, or `table` (default: `table`)
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
-- `read_only` - When `true`, mutating operations are refused: the `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` CLI commands return an error, and their MCP equivalents are not registered, so they don't appear in `tools/list` and can't be called. `tiger db connect`, `tiger db connection-string`, and the `db_execute_query` MCP tool open the database session in Tiger Cloud's immutable read-only mode (writes and DDL are rejected by the server). Read commands/tools are unaffected — `tiger db schema` and the `db_schema` MCP tool always open a read-only session regardless of this setting. Default: `false`.
+- `read_only` - Which services this CLI may change: `all`, `prod`, or `off` (default: `off`, which protects nothing). An interactive `tiger auth login` offers a menu of the three modes, and records your choice either way, so it only asks until you answer once. `true` and `on` are accepted as aliases for `all`, and `false` for `off`, so existing config files and `TIGER_READ_ONLY=true` behave as before.
+
+  Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db connect`, `tiger db connection-string`, the `db_execute_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
+
+  - `all` protects every service, and the MCP write tools aren't registered at all, so they don't appear in `tools/list` and can't be called.
+  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` are gated on the `--environment` they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. Reading a service's tag costs one extra API call for `tiger service start`/`stop`/`resize`/`delete`, and the operation is refused if that lookup fails. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
+
 - `service_id` - Default service ID. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
@@ -266,7 +272,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_DOCS_MCP` - Enable/disable docs MCP proxy
 - `TIGER_OUTPUT` - Output format: `json`, `yaml`, or `table`
 - `TIGER_PASSWORD_STORAGE` - Password storage method: `keyring`, `pgpass`, or `none`
-- `TIGER_READ_ONLY` - When `true`, write/destructive CLI commands return an error, the corresponding Tiger MCP write tools are not registered, and `db_execute_query` runs against a read-only database connection
+- `TIGER_READ_ONLY` - Which services this CLI may change: `all`, `prod`, or `off` (same aliases as `read_only`)
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
 - `TIGER_SERVICE_ID` - Default service ID

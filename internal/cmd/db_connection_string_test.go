@@ -24,6 +24,17 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		expectGetService(m, "rep-67890", sampleReplica())
 		expectGetService(m, "svc-12345", sampleService())
 	}
+	// read_only=prod judges a service by this tag, so these cases need to set it.
+	tagged := func(env string) func(*api.Service) {
+		return func(s *api.Service) {
+			s.Metadata = &api.ServiceMetadata{Environment: &env}
+		}
+	}
+	setupGetTagged := func(env string) func(*mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectGetService(m, "svc-12345", sampleService(tagged(env)))
+		}
+	}
 	withPooler := func(s *api.Service) {
 		s.ConnectionPooler = &api.ConnectionPooler{
 			Endpoint: &api.Endpoint{
@@ -132,17 +143,45 @@ func TestDbConnectionStringCmd(t *testing.T) {
 			wantStdout: readOnlyURI,
 		},
 		{
-			name:       "read-only from config",
+			name:       "read-only from config all",
 			args:       []string{"db", "connection-string", "svc-12345"},
 			setup:      setupGet,
-			opts:       []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantStdout: readOnlyURI,
 		},
 		{
-			name:       "read-only flag and config",
+			name:       "read-only flag and config all",
 			args:       []string{"db", "connection-string", "svc-12345", "--read-only"},
 			setup:      setupGet,
-			opts:       []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
+			wantStdout: readOnlyURI,
+		},
+		{
+			name:       "config prod, PROD service",
+			args:       []string{"db", "connection-string", "svc-12345"},
+			setup:      setupGetTagged("PROD"),
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			wantStdout: readOnlyURI,
+		},
+		{
+			name:       "config prod, DEV service",
+			args:       []string{"db", "connection-string", "svc-12345"},
+			setup:      setupGetTagged("DEV"),
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			wantStdout: directURI,
+		},
+		{
+			name:       "config prod, untagged service",
+			args:       []string{"db", "connection-string", "svc-12345"},
+			setup:      setupGet,
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			wantStdout: directURI,
+		},
+		{
+			name:       "flag on beats config prod",
+			args:       []string{"db", "connection-string", "svc-12345", "--read-only"},
+			setup:      setupGetTagged("DEV"),
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: readOnlyURI,
 		},
 		{

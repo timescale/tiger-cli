@@ -28,7 +28,7 @@ const (
 │ mcp_max_rows     │ 100                                                           │
 │ output           │ table                                                         │
 │ password_storage │ keyring                                                       │
-│ read_only        │ false                                                         │
+│ read_only        │ off                                                           │
 │ releases_url     │ https://cli.tigerdata.com                                     │
 │ service_id       │                                                               │
 │ version_check    │ true                                                          │
@@ -46,7 +46,7 @@ const (
   "mcp_max_rows": 100,
   "output": "table",
   "password_storage": "keyring",
-  "read_only": false,
+  "read_only": "off",
   "releases_url": "https://cli.tigerdata.com",
   "service_id": "",
   "version_check": true
@@ -63,7 +63,7 @@ gateway_url: https://console.cloud.tigerdata.com/api
 mcp_max_rows: 100
 output: table
 password_storage: keyring
-read_only: false
+read_only: "off"
 releases_url: https://cli.tigerdata.com
 service_id: ""
 version_check: true
@@ -109,7 +109,7 @@ func TestConfigShowCmd(t *testing.T) {
 │ mcp_max_rows     │ 100                                                           │
 │ output           │ table                                                         │
 │ password_storage │ pgpass                                                        │
-│ read_only        │ false                                                         │
+│ read_only        │ off                                                           │
 │ releases_url     │ https://cli.tigerdata.com                                     │
 │ service_id       │ test-service                                                  │
 │ version_check    │ true                                                          │
@@ -135,7 +135,7 @@ func TestConfigShowCmd(t *testing.T) {
   "mcp_max_rows": 100,
   "output": "json",
   "password_storage": "keyring",
-  "read_only": false,
+  "read_only": "off",
   "releases_url": "https://cli.tigerdata.com",
   "service_id": "",
   "version_check": true
@@ -173,7 +173,7 @@ gateway_url: https://console.cloud.tigerdata.com/api
 mcp_max_rows: 100
 output: yaml
 password_storage: keyring
-read_only: false
+read_only: "off"
 releases_url: https://cli.tigerdata.com
 service_id: ""
 version_check: true
@@ -216,7 +216,7 @@ version_check: true
 │ mcp_max_rows     │ 100                                                           │
 │ output           │ table                                                         │
 │ password_storage │ keyring                                                       │
-│ read_only        │ false                                                         │
+│ read_only        │ off                                                           │
 │ releases_url     │ https://cli.tigerdata.com                                     │
 │ service_id       │ env-service                                                   │
 │ version_check    │ true                                                          │
@@ -249,7 +249,7 @@ version_check: true
 │ mcp_max_rows     │ 100                                                           │
 │ output           │ table                                                         │
 │ password_storage │ keyring                                                       │
-│ read_only        │ false                                                         │
+│ read_only        │ off                                                           │
 │ releases_url     │ https://cli.tigerdata.com                                     │
 │ service_id       │                                                               │
 │ version_check    │ true                                                          │
@@ -276,7 +276,7 @@ version_check: true
 │ mcp_max_rows     │ 100                                                           │
 │ output           │ table                                                         │
 │ password_storage │ keyring                                                       │
-│ read_only        │ false                                                         │
+│ read_only        │ off                                                           │
 │ releases_url     │ https://cli.tigerdata.com                                     │
 │ service_id       │                                                               │
 │ version_check    │ false                                                         │

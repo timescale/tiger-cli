@@ -53,9 +53,11 @@ type Server struct {
 	app *common.App
 }
 
-// addTool registers an MCP tool, skipping readOnlyGatedTools in read-only mode.
-func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
-	if readOnly && slices.Contains(readOnlyGatedTools, t.Name) {
+// addTool registers an MCP tool, skipping readOnlyGatedTools under read_only=all.
+// Under prod they stay registered — they still work on DEV services — and refuse
+// per call in the handler, once the target is known.
+func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	if mode.BlocksAll() && slices.Contains(readOnlyGatedTools, t.Name) {
 		s.logger.Info("Skipping write tool in read-only mode", slog.String("tool", t.Name))
 		return
 	}
@@ -65,17 +67,27 @@ func addTool[In, Out any](s *Server, readOnly bool, t *mcp.Tool, h mcp.ToolHandl
 // buildServerInstructions returns the `instructions` string the MCP SDK sends
 // to clients at initialize. Evaluated once at server start, like tool registration.
 func buildServerInstructions(cfg *config.Config) string {
-	intro := "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
+	const (
+		intro        = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
+		capabilities = "Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+	)
 
-	if cfg == nil || !cfg.ReadOnly {
+	switch cfg.ReadOnly {
+	case config.ReadOnlyAll:
+		// The write tools aren't registered, so announce the mode instead of
+		// advertising them.
 		return intro +
-			"Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, or modify services. " +
+			"db_execute_query connects read-only, so writes and DDL are rejected by the server."
+	case config.ReadOnlyProd:
+		// The write tools are registered, so keep advertising them but explain
+		// the refusals — otherwise one looks like a bug.
+		return intro + capabilities + " " +
+			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_execute_query connects to them read-only, so writes and DDL are rejected by the server. " +
+			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it."
+	default:
+		return intro + capabilities
 	}
-	// Read-only mode: announce the mode and the blocked operations so the model
-	// won't attempt them.
-	return intro +
-		"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, or modify services. " +
-		"db_execute_query connects read-only, so writes and DDL are rejected by the server."
 }
 
 // NewServer creates a new Tiger MCP server instance. The app must already be
@@ -101,8 +113,8 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 		app:       app,
 	}
 
-	// Register all tools (including proxied docs tools). readOnly and
-	// experimental are captured here and threaded through registration only.
+	// Register all tools (including proxied docs tools). The read-only mode and
+	// experimental gate are captured here and threaded through registration only.
 	// experimental follows the ghost pattern — env-var only, undocumented; see
 	// CLAUDE.md's "Experimental Feature Gating".
 	server.registerTools(ctx, cfg.ReadOnly, app.Experimental)
@@ -135,12 +147,12 @@ func (s *Server) HTTPHandler() http.Handler {
 }
 
 // registerTools registers all available MCP tools
-func (s *Server) registerTools(ctx context.Context, readOnly, experimental bool) {
+func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, experimental bool) {
 	// Service management tools
-	s.registerServiceTools(readOnly, experimental)
+	s.registerServiceTools(mode, experimental)
 
 	// Database operation tools
-	s.registerDatabaseTools(readOnly)
+	s.registerDatabaseTools(mode)
 
 	// TODO: Register more tool groups
 
@@ -149,31 +161,31 @@ func (s *Server) registerTools(ctx context.Context, readOnly, experimental bool)
 }
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
-func (s *Server) registerServiceTools(readOnly, experimental bool) {
-	addTool(s, readOnly, newServiceListTool(), s.handleServiceList)
-	addTool(s, readOnly, newServiceGetTool(), s.handleServiceGet)
-	addTool(s, readOnly, newServiceCreateTool(), s.handleServiceCreate)
-	addTool(s, readOnly, newServiceForkTool(), s.handleServiceFork)
-	addTool(s, readOnly, newServiceUpdatePasswordTool(), s.handleServiceUpdatePassword)
-	addTool(s, readOnly, newServiceStartTool(), s.handleServiceStart)
-	addTool(s, readOnly, newServiceStopTool(), s.handleServiceStop)
-	addTool(s, readOnly, newServiceResizeTool(), s.handleServiceResize)
-	addTool(s, readOnly, newServiceLogsTool(), s.handleServiceLogs)
+func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental bool) {
+	addTool(s, mode, newServiceListTool(), s.handleServiceList)
+	addTool(s, mode, newServiceGetTool(), s.handleServiceGet)
+	addTool(s, mode, newServiceCreateTool(), s.handleServiceCreate)
+	addTool(s, mode, newServiceForkTool(), s.handleServiceFork)
+	addTool(s, mode, newServiceUpdatePasswordTool(), s.handleServiceUpdatePassword)
+	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
+	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
+	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 
 	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They
 	// are registered only when the experimental gate is on at server startup;
 	// the user must restart the MCP server after toggling the gate. Handler
 	// bodies re-check the gate defensively in case config changes mid-session.
 	if experimental {
-		addTool(s, readOnly, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
-		addTool(s, readOnly, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
-		addTool(s, readOnly, newServiceBackupsTool(), s.handleServiceBackups)
+		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
+		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
+		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
 	}
 }
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
-func (s *Server) registerDatabaseTools(readOnly bool) {
-	addTool(s, readOnly, newDBExecuteQueryTool(), s.handleDBExecuteQuery)
+func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
+	addTool(s, mode, newDBExecuteQueryTool(), s.handleDBExecuteQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
 }

@@ -407,11 +407,17 @@ func withEnv(key, value string) runOption {
 // of the test (true lets commands take their interactive path against a
 // non-TTY stdin). Use this with withStdin to simulate interactive input.
 func withIsTerminal(isTerminal bool) runOption {
-	return withSetup(func(t *testing.T) {
-		original := util.IsTerminal
-		util.IsTerminal = func(any) bool { return isTerminal }
-		t.Cleanup(func() { util.IsTerminal = original })
-	})
+	return withSetup(func(t *testing.T) { stubIsTerminal(t, isTerminal) })
+}
+
+// stubIsTerminal makes util.IsTerminal report val for the duration of the test.
+// withIsTerminal is the runOption form; this is for tests that call a helper
+// directly rather than running a command.
+func stubIsTerminal(t *testing.T, val bool) {
+	t.Helper()
+	original := util.IsTerminal
+	util.IsTerminal = func(any) bool { return val }
+	t.Cleanup(func() { util.IsTerminal = original })
 }
 
 // withReadPassword makes util.ReadPassword return the given password. The real

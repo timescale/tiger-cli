@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/api"
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -162,6 +163,51 @@ func TestNewReplicaConnectionTarget(t *testing.T) {
 	}
 	if target.CredentialService.ServiceID != "svcprimary" {
 		t.Errorf("expected credential to be the primary, got %q", target.CredentialService.ServiceID)
+	}
+}
+
+// TestConnectionTargetReadOnlyVerdict checks that a replica is judged on its own
+// environment tag rather than its primary's, which requires that tag to survive
+// NewReplicaConnectionTarget.
+func TestConnectionTargetReadOnlyVerdict(t *testing.T) {
+	tagged := func(svc api.Service, tag string) api.Service {
+		if tag != "" {
+			svc.Metadata = &api.ServiceMetadata{Environment: new(tag)}
+		}
+		return svc
+	}
+
+	cases := []struct {
+		name        string
+		mode        config.ReadOnlyMode
+		primaryTag  string
+		replicaTag  string
+		wantSession bool
+	}{
+		{name: "off never forces read-only", mode: config.ReadOnlyOff, primaryTag: "PROD", replicaTag: "PROD"},
+		{name: "all always forces read-only", mode: config.ReadOnlyAll, wantSession: true},
+		{name: "prod leaves a DEV replica writable", mode: config.ReadOnlyProd, primaryTag: "DEV", replicaTag: "DEV"},
+		{name: "prod protects a PROD replica", mode: config.ReadOnlyProd, primaryTag: "DEV", replicaTag: "PROD", wantSession: true},
+		{name: "prod ignores the primary's tag", mode: config.ReadOnlyProd, primaryTag: "PROD", replicaTag: "DEV"},
+		{name: "prod leaves an untagged replica writable", mode: config.ReadOnlyProd, primaryTag: "PROD"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			primary := tagged(primaryService(), tt.primaryTag)
+			replica := api.ReadReplicaSet{ID: "rep1", Name: "rep"}
+			if tt.replicaTag != "" {
+				replica.Metadata = &api.ReplicaSetMetadata{Environment: new(tt.replicaTag)}
+			}
+
+			target := NewReplicaConnectionTarget(primary, replica)
+			cfg := &config.Config{ReadOnly: tt.mode}
+			got := CheckReadOnly(cfg, ServiceEnvironmentTag(target.ConnectionService)) != nil
+			if got != tt.wantSession {
+				t.Errorf("CheckReadOnly(read_only=%q, primary=%q, replica=%q) != nil = %t, want %t",
+					tt.mode, tt.primaryTag, tt.replicaTag, got, tt.wantSession)
+			}
+		})
 	}
 }
 

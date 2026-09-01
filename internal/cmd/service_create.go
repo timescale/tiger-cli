@@ -119,12 +119,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			if err := common.CheckReadOnly(cfg); err != nil {
+			// Gate on the requested tag: under prod mode, creating DEV is
+			// allowed and creating PROD is not.
+			environmentTag := api.EnvironmentTag(createEnvironment)
+			if err := common.CheckReadOnly(cfg, environmentTag); err != nil {
 				return err
 			}
 
 			// Prepare service creation request
-			environmentTag := api.EnvironmentTag(createEnvironment)
 			serviceCreateReq := api.ServiceCreate{
 				Name:           createServiceName,
 				Addons:         util.ConvertStringSlicePtr[api.ServiceCreateAddons](addons),

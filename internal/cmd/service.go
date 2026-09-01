@@ -190,6 +190,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) != nil,
 	}
 
 	if connectionDetails, err := common.GetConnectionDetails(cfg, service, opts); err != nil {
@@ -234,7 +235,7 @@ func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, service api.Se
 
 // setDefaultService sets the given service as the default service in the configuration
 func setDefaultService(cmd *cobra.Command, cfg *config.Config, serviceID string) error {
-	if err := cfg.Set("service_id", serviceID); err != nil {
+	if _, err := cfg.Set("service_id", serviceID); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 

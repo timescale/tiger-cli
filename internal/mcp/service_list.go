@@ -32,13 +32,14 @@ func (ServiceListOutput) Schema() *jsonschema.Schema {
 
 // ServiceInfo represents simplified service information for MCP output
 type ServiceInfo struct {
-	ServiceID string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
-	Name      string        `json:"name"`
-	Status    string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
-	Type      string        `json:"type"`
-	Region    string        `json:"region"`
-	Created   string        `json:"created,omitempty"`
-	Resources *ResourceInfo `json:"resources,omitempty"`
+	ServiceID   string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
+	Name        string        `json:"name"`
+	Status      string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Type        string        `json:"type"`
+	Region      string        `json:"region"`
+	Created     string        `json:"created,omitempty"`
+	Environment string        `json:"environment" jsonschema:"Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."`
+	Resources   *ResourceInfo `json:"resources,omitempty"`
 }
 
 func (ServiceInfo) Schema() *jsonschema.Schema {
@@ -108,6 +109,9 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		Type:      string(service.ServiceType),
 		Region:    service.RegionCode,
 		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
+		// The read_only=prod instructions point the model at this field, so a list
+		// result has to carry it too, not just ServiceDetail.
+		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
 	// Add resource information if available

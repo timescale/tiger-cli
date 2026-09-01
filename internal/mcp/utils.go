@@ -61,6 +61,7 @@ type ServiceDetail struct {
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
+	Environment      string        `json:"environment" jsonschema:"Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
 	Replicas         int           `json:"replicas" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
 	DirectEndpoint   string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
@@ -84,6 +85,8 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Type:      string(service.ServiceType),
 		Region:    service.RegionCode,
 		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
+		// The read_only=prod instructions tell the model to check this first.
+		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
 	// Add resource information if available
@@ -149,6 +152,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Role:            "tsdbadmin",
 		WithPassword:    withPassword,
 		InitialPassword: util.Deref(service.InitialPassword),
+		ReadOnly:        common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)) != nil,
 	}); err != nil {
 		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
 	} else {

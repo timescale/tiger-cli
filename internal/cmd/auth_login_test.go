@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -25,7 +27,10 @@ func TestAuthLoginCmd(t *testing.T) {
 	// public key are rejected, everything else is accepted with the project ID
 	// "test-project-id".
 	authInfoServer := startMockAuthInfoServer(t)
-	patURLs := map[string]any{"api_url": authInfoServer.URL}
+	// read_only is pinned so the post-login prompt never fires in these cases:
+	// a stored value is what makes offerProdProtection skip it. The prompt has
+	// its own TestOfferProdProtection.
+	patURLs := map[string]any{"api_url": authInfoServer.URL, "read_only": "off"}
 
 	// OAuth flow cases. The flow's stderr embeds a random state and callback
 	// port, so it is matched with matchOAuthStderr rather than exactly.
@@ -73,7 +78,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withReadPassword("prompted-secret"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your secret key: \nValidating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:prompted-secret", "test-project-id")},
 		},
@@ -85,7 +90,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withStdin("prompted-public\n"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your public key: Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("prompted-public:test-secret-key", "test-project-id")},
 		},
@@ -111,7 +116,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "stores credentials from flags",
 			args:       []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
 			opts:       []runOption{withConfig(patURLs)},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
@@ -140,7 +145,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				"--project-id", "test-project-id",
 			},
 			opts:       []runOption{withConfig(patURLs)},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
@@ -152,7 +157,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withEnv("TIGER_PUBLIC_KEY", "env-public-key"),
 				withEnv("TIGER_SECRET_KEY", "env-secret-key"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id")},
 		},
@@ -160,7 +165,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth single project",
 			args:       []string{"auth", "login"},
 			opts:       oauthOpts(singleProject.URL),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
@@ -169,7 +174,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth multiple projects with interactive selection",
 			args:       []string{"auth", "login"},
 			opts:       oauthOpts(multiProject.URL, withIsTerminal(true), withSelectProject(2)),
-			wantStdout: "Successfully logged in (project: project-789)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-789)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(multiProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-789")},
 		},
@@ -187,7 +192,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth project-id flag skips selection",
 			args:       []string{"auth", "login", "--project-id", "project-456"},
 			opts:       oauthOpts(multiProject.URL),
-			wantStdout: "Successfully logged in (project: project-456)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-456)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(multiProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-456")},
 		},
@@ -223,7 +228,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"}),
 				withStoredCredentials(prevOAuthCredentials("project-old"))),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
 				"Cleared default service (config key service_id): it belonged to the previous project\n")),
 			checks: []checkFunc{checkDefaultService("")},
@@ -235,7 +240,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			args: []string{"auth", "login"},
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"})),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
 				"Cleared default service (config key service_id): it belonged to the previous project\n")),
 			checks: []checkFunc{checkDefaultService("")},
@@ -246,7 +251,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"}),
 				withStoredCredentials(prevOAuthCredentials("project-123"))),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextStepsMessage,
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkDefaultService("svc-before")},
 		},
@@ -344,6 +349,8 @@ func oauthURLs(serverURL string) map[string]any {
 		"console_url": serverURL,
 		"gateway_url": serverURL,
 		"api_url":     serverURL,
+		// See patURLs: pinned so the post-login prompt stays out of these cases.
+		"read_only": "off",
 	}
 }
 
@@ -469,5 +476,136 @@ func checkStoredAPIKey(apiKey, projectID string) checkFunc {
 		if creds.ProjectID != projectID {
 			t.Errorf("stored project ID = %q, want %q", creds.ProjectID, projectID)
 		}
+	}
+}
+
+// TestOfferProdProtection covers the post-login read-only prompt with the menu
+// itself stubbed out; TestReadOnlyModel_KeySelection covers the menu. The
+// "already ..." cases guard the ask-exactly-once property, which a stored
+// read_only value is the only thing enforcing.
+func TestOfferProdProtection(t *testing.T) {
+	tests := []struct {
+		name string
+		// preexisting is empty when read_only is absent from the file.
+		preexisting string
+		// answer is what the menu returns; "" means dismissed without choosing.
+		answer config.ReadOnlyMode
+		// env is TIGER_READ_ONLY, which outranks the config file.
+		env         string
+		notATTY     bool
+		wantMenu    bool
+		wantStored  string // "" = key must stay absent
+		wantMessage string // "" = nothing printed
+		// wantReadOnlySet is the return value, which decides whether the caller
+		// prints the "tiger config set read_only" bullet - false means it does.
+		wantReadOnlySet bool
+	}{
+		{name: "prod stores prod", answer: config.ReadOnlyProd, wantMenu: true, wantStored: "prod", wantMessage: "Services tagged PROD are now protected", wantReadOnlySet: true},
+		{name: "all stores all", answer: config.ReadOnlyAll, wantMenu: true, wantStored: "all", wantMessage: "All services are now protected", wantReadOnlySet: true},
+		{name: "off stores off silently", answer: config.ReadOnlyOff, wantMenu: true, wantStored: "off", wantReadOnlySet: true},
+		{name: "dismissed records nothing", answer: "", wantMenu: true, wantStored: ""},
+		{name: "not a terminal skips silently", answer: config.ReadOnlyProd, notATTY: true, wantStored: ""},
+		{name: "already declined", preexisting: "off", answer: config.ReadOnlyProd, wantStored: "off", wantReadOnlySet: true},
+		{name: "already opted in", preexisting: "prod", answer: config.ReadOnlyOff, wantStored: "prod", wantReadOnlySet: true},
+		{name: "already set to all", preexisting: "all", answer: config.ReadOnlyProd, wantStored: "all", wantReadOnlySet: true},
+		// The env var wins over the file, so writing a choice there would be a lie.
+		{name: "env var answers it without prompting", env: "all", answer: config.ReadOnlyProd, wantStored: "", wantReadOnlySet: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			if tt.env != "" {
+				t.Setenv("TIGER_READ_ONLY", tt.env)
+			}
+			values := map[string]any{}
+			if tt.preexisting != "" {
+				values["read_only"] = tt.preexisting
+			}
+			writeConfigFile(t, tmpDir, values)
+			cfg, err := config.Load(testFlags(t, tmpDir))
+			if err != nil {
+				t.Fatalf("config.Load failed: %v", err)
+			}
+			stubIsTerminal(t, !tt.notATTY)
+
+			shown := false
+			original := selectReadOnlyMode
+			t.Cleanup(func() { selectReadOnlyMode = original })
+			selectReadOnlyMode = func(_ *cobra.Command) (config.ReadOnlyMode, bool) {
+				shown = true
+				return tt.answer, tt.answer != ""
+			}
+
+			cmd := &cobra.Command{}
+			cmd.SetContext(t.Context())
+			errOut := new(bytes.Buffer)
+			cmd.SetOut(new(bytes.Buffer))
+			cmd.SetErr(errOut)
+
+			readOnlySet := offerProdProtection(cmd, cfg)
+
+			if shown != tt.wantMenu {
+				t.Errorf("menu shown = %t, want %t", shown, tt.wantMenu)
+			}
+			if readOnlySet != tt.wantReadOnlySet {
+				t.Errorf("readOnlySet = %t, want %t", readOnlySet, tt.wantReadOnlySet)
+			}
+
+			stored, err := config.LoadForOutput(tmpDir, false, true)
+			if err != nil {
+				t.Fatalf("LoadForOutput failed: %v", err)
+			}
+			got := ""
+			if stored.ReadOnly != nil {
+				got = string(*stored.ReadOnly)
+			}
+			if got != tt.wantStored {
+				t.Errorf("stored read_only = %q, want %q", got, tt.wantStored)
+			}
+
+			if tt.wantMessage == "" {
+				if errOut.Len() != 0 {
+					t.Errorf("expected no output, got %q", errOut.String())
+				}
+			} else if !strings.Contains(errOut.String(), tt.wantMessage) {
+				t.Errorf("expected %q in output, got %q", tt.wantMessage, errOut.String())
+			}
+		})
+	}
+}
+
+// TestReadOnlyModel_KeySelection checks that every mode is reachable and that
+// dismissing leaves chosen empty, which is what keeps a quit from being recorded
+// as picking whichever mode the cursor rested on.
+func TestReadOnlyModel_KeySelection(t *testing.T) {
+	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
+	// stringifies to "\x03" and would match nothing.
+	cases := []struct {
+		name string
+		keys []tea.KeyPressMsg
+		want config.ReadOnlyMode // "" = dismissed
+	}{
+		{"enter takes the recommended default", []tea.KeyPressMsg{{Code: tea.KeyEnter}}, config.ReadOnlyProd},
+		{"space takes it too", []tea.KeyPressMsg{{Code: tea.KeySpace}}, config.ReadOnlyProd},
+		{"'2' selects all", []tea.KeyPressMsg{{Code: '2'}}, config.ReadOnlyAll},
+		{"'3' selects off", []tea.KeyPressMsg{{Code: '3'}}, config.ReadOnlyOff},
+		{"down then enter selects all", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeyEnter}}, config.ReadOnlyAll},
+		{"q dismisses", []tea.KeyPressMsg{{Code: 'q'}}, ""},
+		{"esc dismisses", []tea.KeyPressMsg{{Code: tea.KeyEsc}}, ""},
+		{"ctrl+c dismisses", []tea.KeyPressMsg{{Code: 'c', Mod: tea.ModCtrl}}, ""},
+		{"cursor can't run past the end", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyEnter}}, config.ReadOnlyOff},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var m tea.Model = readOnlyModel{}
+			for _, key := range tc.keys {
+				m, _ = m.Update(key)
+			}
+			if got := m.(readOnlyModel).chosen; got != tc.want {
+				t.Errorf("chosen = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
