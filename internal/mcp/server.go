@@ -25,19 +25,22 @@ const (
 // MCP tool names. Centralized so the read-only gate (see errors.go) and the
 // tool registrations share a single source of truth.
 const (
-	toolServiceList             = "service_list"
-	toolServiceGet              = "service_get"
-	toolServiceCreate           = "service_create"
-	toolServiceFork             = "service_fork"
-	toolServiceStart            = "service_start"
-	toolServiceStop             = "service_stop"
-	toolServiceResize           = "service_resize"
-	toolServiceUpdatePassword   = "service_update_password"
-	toolServiceLogs             = "service_logs"
-	toolServiceMetricsAvailable = "service_metrics_available"
-	toolServiceMetricsSeries    = "service_metrics_series"
-	toolServiceBackups          = "service_backups"
-	toolDBExecuteQuery          = "db_execute_query"
+	toolServiceList               = "service_list"
+	toolServiceGet                = "service_get"
+	toolServiceCreate             = "service_create"
+	toolServiceFork               = "service_fork"
+	toolServiceStart              = "service_start"
+	toolServiceStop               = "service_stop"
+	toolServiceResize             = "service_resize"
+	toolServiceUpdatePassword     = "service_update_password"
+	toolServiceLogs               = "service_logs"
+	toolServiceMetricsAvailable   = "service_metrics_available"
+	toolServiceMetricsSeries      = "service_metrics_series"
+	toolServiceBackups            = "service_backups"
+	toolServiceBackupRegionList   = "service_backup_region_list"
+	toolServiceBackupRegionAdd    = "service_backup_region_add"
+	toolServiceBackupRegionRemove = "service_backup_region_remove"
+	toolDBExecuteQuery            = "db_execute_query"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality
@@ -180,6 +183,9 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
+		addTool(s, mode, newServiceBackupRegionListTool(), s.handleServiceBackupRegionList)
+		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)
+		addTool(s, mode, newServiceBackupRegionRemoveTool(), s.handleServiceBackupRegionRemove)
 	}
 }
 

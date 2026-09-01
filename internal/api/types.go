@@ -225,6 +225,21 @@ type Backup struct {
 // - `UNKNOWN`: an unrecognized state.
 type BackupCopyStatus string
 
+// BackupRegion A region that receives copies of a service's backups.
+type BackupRegion struct {
+	// Created When the region was added.
+	Created *time.Time `json:"created,omitempty"`
+
+	// RegionCode The region backups are copied to.
+	RegionCode string `json:"region_code"`
+}
+
+// BackupRegionCreate The region to start copying a service's backups to.
+type BackupRegionCreate struct {
+	// RegionCode The region to copy backups to. It cannot be the region the service runs in.
+	RegionCode string `json:"region_code"`
+}
+
 // BackupRegionState A region storing a copy of a backup.
 type BackupRegionState struct {
 	// RegionCode The region storing the copy.
@@ -840,6 +855,9 @@ type VPCRename struct {
 	Name string `json:"name"`
 }
 
+// BackupRegionCode defines model for BackupRegionCode.
+type BackupRegionCode = string
+
 // PeeringID defines model for PeeringId.
 type PeeringID = string
 
@@ -928,6 +946,9 @@ type CreateServiceJSONRequestBody = ServiceCreate
 
 // AttachServiceToVPCJSONRequestBody defines body for AttachServiceToVPC for application/json ContentType.
 type AttachServiceToVPCJSONRequestBody = ServiceVPCInput
+
+// CreateBackupRegionJSONRequestBody defines body for CreateBackupRegion for application/json ContentType.
+type CreateBackupRegionJSONRequestBody = BackupRegionCreate
 
 // DetachServiceFromVPCJSONRequestBody defines body for DetachServiceFromVPC for application/json ContentType.
 type DetachServiceFromVPCJSONRequestBody = ServiceVPCInput

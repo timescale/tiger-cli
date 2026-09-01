@@ -42,6 +42,7 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	if app.Experimental {
 		cmd.AddCommand(buildServiceMetricsCmd(app))
 		cmd.AddCommand(buildServiceBackupsCmd(app))
+		cmd.AddCommand(buildServiceBackupRegionCmd(app))
 	}
 
 	return cmd
