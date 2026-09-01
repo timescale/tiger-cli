@@ -14,7 +14,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// buildServiceBackupRegionListCmd creates the backup-region list subcommand.
+// buildServiceBackupRegionListCmd creates the region list subcommand.
 func buildServiceBackupRegionListCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list [service-id]",
@@ -28,13 +28,13 @@ from your configuration.
 
 Examples:
   # List backup regions for the default service
-  tiger service backup-region list
+  tiger service backup region list
 
   # List backup regions for a specific service
-  tiger service backup-region list svc-12345
+  tiger service backup region list svc-12345
 
   # Output as JSON
-  tiger service backup-region list -o json`,
+  tiger service backup region list -o json`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,

@@ -36,7 +36,7 @@ const (
 	toolServiceLogs               = "service_logs"
 	toolServiceMetricsAvailable   = "service_metrics_available"
 	toolServiceMetricsSeries      = "service_metrics_series"
-	toolServiceBackups            = "service_backups"
+	toolServiceBackupList         = "service_backup_list"
 	toolServiceBackupRegionList   = "service_backup_region_list"
 	toolServiceBackupRegionAdd    = "service_backup_region_add"
 	toolServiceBackupRegionRemove = "service_backup_region_remove"
@@ -182,7 +182,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	if experimental {
 		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
-		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
+		addTool(s, mode, newServiceBackupListTool(), s.handleServiceBackupList)
 		addTool(s, mode, newServiceBackupRegionListTool(), s.handleServiceBackupRegionList)
 		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)
 		addTool(s, mode, newServiceBackupRegionRemoveTool(), s.handleServiceBackupRegionRemove)

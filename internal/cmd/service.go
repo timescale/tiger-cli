@@ -41,8 +41,7 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	// Experimental commands, unregistered until the preview graduates.
 	if app.Experimental {
 		cmd.AddCommand(buildServiceMetricsCmd(app))
-		cmd.AddCommand(buildServiceBackupsCmd(app))
-		cmd.AddCommand(buildServiceBackupRegionCmd(app))
+		cmd.AddCommand(buildServiceBackupCmd(app))
 	}
 
 	return cmd

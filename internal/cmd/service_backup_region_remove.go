@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// buildServiceBackupRegionRemoveCmd creates the backup-region remove subcommand.
+// buildServiceBackupRegionRemoveCmd creates the region remove subcommand.
 func buildServiceBackupRegionRemoveCmd(app *common.App) *cobra.Command {
 	var region string
 
@@ -26,10 +26,10 @@ from your configuration.
 
 Examples:
   # Stop copying the default service's backups to eu-central-1
-  tiger service backup-region remove --region eu-central-1
+  tiger service backup region remove --region eu-central-1
 
   # Stop copying a specific service's backups to eu-central-1
-  tiger service backup-region remove svc-12345 --region eu-central-1`,
+  tiger service backup region remove svc-12345 --region eu-central-1`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,

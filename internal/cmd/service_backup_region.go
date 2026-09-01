@@ -6,12 +6,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// buildServiceBackupRegionCmd creates the backup-region subcommand group. The
-// endpoints are marked preview upstream, so registration is gated on
-// TIGER_EXPERIMENTAL in buildServiceCmd.
+// buildServiceBackupRegionCmd creates the region subcommand group, nested
+// under `service backup`. The endpoints are marked preview upstream, so
+// registration is gated on TIGER_EXPERIMENTAL in buildServiceCmd.
 func buildServiceBackupRegionCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup-region",
+		Use:   "region",
 		Short: "Manage a service's cross-region backup copies",
 		Long: `Manage the additional regions a service's backups are copied to.
 

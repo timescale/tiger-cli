@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// buildServiceBackupRegionAddCmd creates the backup-region add subcommand.
+// buildServiceBackupRegionAddCmd creates the region add subcommand.
 func buildServiceBackupRegionAddCmd(app *common.App) *cobra.Command {
 	var region string
 
@@ -27,10 +27,10 @@ from your configuration.
 
 Examples:
   # Copy the default service's backups to eu-central-1
-  tiger service backup-region add --region eu-central-1
+  tiger service backup region add --region eu-central-1
 
   # Copy a specific service's backups to eu-central-1
-  tiger service backup-region add svc-12345 --region eu-central-1`,
+  tiger service backup region add svc-12345 --region eu-central-1`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
