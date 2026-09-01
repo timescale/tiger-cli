@@ -71,10 +71,31 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
-			name:    "read-only mode",
+			name:    "read-only all refuses",
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			// prod judges the fetched service by its environment tag; no
+			// update expectation is registered, so an attempted mutation
+			// fails as an unexpected call.
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup:   expectTaggedService("PROD"),
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			name: "read-only prod allows DEV service",
+			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectTaggedService("DEV")(m)
+				setupUpdate("newpass123")(m)
+			},
+			wantStderr: savedStderr,
+			checks:     []checkFunc{checkStoredPassword("svc-12345", "newpass123")},
 		},
 		{
 			name:    "missing service id",

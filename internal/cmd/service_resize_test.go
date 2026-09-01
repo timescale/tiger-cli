@@ -22,10 +22,37 @@ func TestServiceResizeCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
-			name:    "read-only mode",
+			name:    "read-only all refuses",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			// prod judges the service by its environment tag, so the gate
+			// fetches it. Only the tag lookup is registered: an attempted
+			// mutation fails as an unexpected call.
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup:   expectTaggedService("PROD"),
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			name: "read-only prod allows DEV service",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectTaggedService("DEV")(m)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
+✅ Resize request accepted for service 'svc-12345'!
+💡 Use 'tiger service get' to check service status.
+`,
 		},
 		{
 			name:    "missing service id",

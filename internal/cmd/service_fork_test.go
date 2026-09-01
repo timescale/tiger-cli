@@ -69,10 +69,33 @@ PGUSER=tsdbadmin
 			wantErr: notLoggedInMsg,
 		},
 		{
-			name:    "read-only mode",
+			name:    "read-only all refuses",
 			args:    []string{"service", "fork", "svc-12345", "--now"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": true})},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
+		},
+		{
+			// prod gates fork on the tag requested for the fork, not the
+			// source's: forking a PROD source reads production without
+			// changing it, so only the fork's own tag matters.
+			name:    "read-only prod refuses requested PROD",
+			args:    []string{"service", "fork", "svc-12345", "--now", "--environment", "PROD"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+		},
+		{
+			name: "read-only prod allows requested DEV",
+			args: []string{"service", "fork", "svc-12345", "--now", "--environment", "DEV", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
+					Return(&api.ForkServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &forked,
+					}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state..."),
 		},
 		{
 			name:    "missing service id",
