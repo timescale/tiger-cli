@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -158,6 +160,114 @@ func TestConnectionTargetReadOnlyVerdict(t *testing.T) {
 			if got != tt.wantSession {
 				t.Errorf("CheckReadOnly(read_only=%q, primary=%q, replica=%q) != nil = %t, want %t",
 					tt.mode, tt.primaryTag, tt.replicaTag, got, tt.wantSession)
+			}
+		})
+	}
+}
+
+// TestConnectionTargetDetails covers Details, the exported way onto the
+// endpoint/credential split: which endpoint it selects, and the pooler policy
+// that deliberately differs between a primary and a replica.
+func TestConnectionTargetDetails(t *testing.T) {
+	pooler := &api.ConnectionPooler{
+		Endpoint: &api.Endpoint{
+			Host: new("replica-pooler.example.com"),
+			Port: new(6432),
+		},
+	}
+
+	// The replica supplies the endpoint, the primary the credentials — which
+	// aren't exercised here, since WithPassword is off.
+	replicaTarget := func(overrides ...func(*api.Service)) *ConnectionTarget {
+		svc := replicaService()
+		for _, override := range overrides {
+			override(&svc)
+		}
+		return &ConnectionTarget{ConnectionService: svc, CredentialService: primaryService(), IsReplica: true}
+	}
+
+	cases := []struct {
+		name    string
+		target  *ConnectionTarget
+		pooled  bool
+		want    *ConnectionDetails
+		wantErr string
+	}{
+		{
+			name:   "replica connects to its own direct endpoint",
+			target: replicaTarget(),
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica.example.com",
+				Port:     5432,
+				Database: "tsdb",
+			},
+		},
+		{
+			name: "replica uses its pooler when one is available",
+			target: replicaTarget(func(s *api.Service) {
+				s.ConnectionPooler = pooler
+			}),
+			pooled: true,
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica-pooler.example.com",
+				Port:     6432,
+				Database: "tsdb",
+				IsPooler: true,
+			},
+		},
+		{
+			// A replica with no pooler falls back rather than failing; the
+			// caller surfaces that via ReplicaPoolerWarning.
+			name:   "replica falls back to direct when its pooler is missing",
+			target: replicaTarget(),
+			pooled: true,
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica.example.com",
+				Port:     5432,
+				Database: "tsdb",
+			},
+		},
+		{
+			// For a primary the same request is a hard error instead.
+			name:    "primary refuses when its pooler is missing",
+			target:  &ConnectionTarget{ConnectionService: primaryService(), CredentialService: primaryService()},
+			pooled:  true,
+			wantErr: "connection pooler not available for this service",
+		},
+		{
+			name: "missing endpoint is reported",
+			target: replicaTarget(func(s *api.Service) {
+				s.Endpoint = nil
+			}),
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			details, err := tc.target.Details(testConfig(""), ConnectionDetailsOptions{
+				Role:   "tsdbadmin",
+				Pooled: tc.pooled,
+			})
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error %q, got nil", tc.wantErr)
+				}
+				if err.Error() != tc.wantErr {
+					t.Errorf("error = %q, want %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// AllowUnexported covers readOnly, which no case here sets.
+			if diff := cmp.Diff(tc.want, details, cmp.AllowUnexported(ConnectionDetails{})); diff != "" {
+				t.Errorf("Details() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
