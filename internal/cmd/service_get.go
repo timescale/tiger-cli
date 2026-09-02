@@ -71,7 +71,7 @@ the service including configuration, status, endpoints, and resource usage.`,
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
 
 	return cmd
 }

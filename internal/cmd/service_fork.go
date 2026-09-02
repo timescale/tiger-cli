@@ -251,10 +251,10 @@ You can override any of these defaults with the corresponding flags.`,
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
-	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
-	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "environment", environmentCompletion)
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }

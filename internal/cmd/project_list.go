@@ -34,9 +34,8 @@ func buildProjectListCmd(app *common.App) *cobra.Command {
 
 The active project — the one subsequent commands operate on — is marked in the
 output. Use 'tiger project use' to switch to another one.`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
