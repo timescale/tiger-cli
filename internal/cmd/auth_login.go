@@ -47,11 +47,12 @@ func nextSteps(readOnlySet bool) string {
 	return nextStepsMessage + readOnlyNextStep
 }
 
-var (
-	// deviceFallbackGrace is how long an opened browser gets to finish the
-	// redirect before the device code is printed too. Overridden in tests.
-	deviceFallbackGrace = 10 * time.Second
+const (
+	// browserAuthTimeout is how long the redirect flow waits for the callback.
+	browserAuthTimeout = 5 * time.Minute
+)
 
+var (
 	// deviceRetryDelay spaces pollDeviceToken's retries. Overridden in tests.
 	deviceRetryDelay = 2 * time.Second
 
@@ -60,10 +61,9 @@ var (
 	defaultDeviceCodeTTL = 15 * time.Minute
 )
 
-// errServiceUnavailable is a failure to answer rather than a verdict. Both
-// halves of the login redeem their code at the same endpoint, so it sinks the
-// redirect as surely as the device code.
-var errServiceUnavailable = errors.New("the authorization service is unavailable - try again in a moment")
+// errBrowserOpenFailed means the redirect flow never started, which is the one
+// condition the device code stands in for.
+var errBrowserOpenFailed = errors.New("failed to open browser")
 
 var (
 	// openBrowser can be overridden for testing
@@ -94,9 +94,8 @@ The OAuth flow will:
 - Let you select a project (if you have multiple)
 - Store an OAuth session for the selected project
 
-If the browser cannot be opened, or its redirect back to this machine never arrives, the
-command prints a short code to enter in a browser on any other machine and carries on from
-there. Use --headless to go straight to that flow.
+If the browser cannot be opened, the command prints a short code to enter in a browser on
+any other machine instead. Use --headless to go straight to that flow.
 
 Use --project-id to pick the project up front and skip the interactive selection. After
 logging in, you can switch projects with 'tiger project use'.
@@ -458,18 +457,28 @@ func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.Cl
 
 func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 	if l.headless {
-		oauthCfg, da, err := l.startDeviceAuth(ctx)
-		if err != nil {
-			return nil, common.ExitWithCode(common.ExitAuthenticationError, err)
-		}
-		return l.pollDeviceToken(ctx, oauthCfg, da)
+		return l.getTokenViaDeviceFlow(ctx)
 	}
-	return l.getTokenViaBrowser(ctx)
+	token, err := l.getTokenViaBrowser(ctx)
+	if errors.Is(err, errBrowserOpenFailed) {
+		l.cmd.PrintErrln("Falling back to device authorization...")
+		return l.getTokenViaDeviceFlow(ctx)
+	}
+	return token, err
 }
 
-// getTokenViaBrowser runs the redirect flow, falling back to the device flow
-// when the browser can't finish it. The listener stays up either way, so
-// whichever completes first wins.
+// getTokenViaDeviceFlow authorizes with a code the user enters in a browser on
+// any machine, for when this one has no browser to redirect back from.
+func (l *oauthLogin) getTokenViaDeviceFlow(ctx context.Context) (*oauth2.Token, error) {
+	oauthCfg, da, err := l.startDeviceAuth(ctx)
+	if err != nil {
+		return nil, common.ExitWithCode(common.ExitAuthenticationError, err)
+	}
+	return l.pollDeviceToken(ctx, oauthCfg, da)
+}
+
+// getTokenViaBrowser runs the redirect flow, which owns the login until it
+// finishes: a browser that opened is the one place the user is authorizing.
 func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, error) {
 	codeVerifier := oauth2.GenerateVerifier()
 
@@ -497,80 +506,15 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 
 	// A browser that never opened can't complete the redirect, and navigating
 	// there by hand won't either: it targets a port on this machine.
-	browserOpened := true
-	grace := deviceFallbackGrace
 	if err := openBrowser(authURL); err != nil {
 		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
-		browserOpened = false
-		grace = 0
+		return nil, errBrowserOpenFailed
 	}
 
 	select {
 	case result := <-server.resultChan:
 		return result.token, result.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-time.After(grace):
-	}
-
-	oauthCfg, da, err := l.startDeviceAuth(ctx)
-	if err != nil {
-		// The redirect may still land, so keep waiting on it.
-		l.cmd.PrintErrf("Could not fall back to a device code: %s\n", err)
-		return l.waitForBrowser(ctx, server.resultChan)
-	}
-
-	// The browser is open, just on a page whose redirect can't reach us.
-	if browserOpened {
-		if err := openBrowser(da.VerificationURI); err != nil {
-			l.cmd.PrintErrf("Could not open %s automatically: %s\n", da.VerificationURI, err)
-		}
-	}
-
-	// The redirect may still complete while the user types the code.
-	raceCtx, cancel := context.WithCancel(ctx)
-
-	device := make(chan oauthResult, 1)
-	go func() {
-		// Closing keeps the drain below from blocking once the race has taken
-		// the result.
-		defer close(device)
-		token, err := l.pollDeviceToken(raceCtx, oauthCfg, da)
-		device <- oauthResult{token: token, err: err}
-	}()
-
-	// The poll prints to the same stderr as this goroutine, so stop it and let
-	// it finish before anything else is written.
-	defer func() {
-		cancel()
-		<-device
-	}()
-
-	select {
-	case result := <-server.resultChan:
-		return result.token, result.err
-	case result := <-device:
-		// Only a device success ends the race: the redirect may still land --
-		// unless nothing is answering, which its code exchange would hit too.
-		if result.err == nil {
-			return result.token, nil
-		}
-		if errors.Is(result.err, errServiceUnavailable) {
-			return nil, result.err
-		}
-		l.cmd.PrintErrf("Device authorization failed: %s\n", result.err)
-		return l.waitForBrowser(ctx, server.resultChan)
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-// waitForBrowser waits on the redirect alone, with no device code to race it.
-func (l *oauthLogin) waitForBrowser(ctx context.Context, results <-chan oauthResult) (*oauth2.Token, error) {
-	select {
-	case result := <-results:
-		return result.token, result.err
-	case <-time.After(5 * time.Minute):
+	case <-time.After(browserAuthTimeout):
 		return nil, errors.New("authorization timeout - no callback received within 5 minutes")
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -631,7 +575,8 @@ func (l *oauthLogin) pollDeviceToken(ctx context.Context, oauthCfg oauth2.Config
 		// error code, not the type, marks a verdict.
 		if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 			if isServerFailure(retrieveErr) {
-				return nil, common.ExitWithCode(common.ExitAuthenticationError, errServiceUnavailable)
+				return nil, common.ExitWithCode(common.ExitAuthenticationError,
+					errors.New("the authorization service is unavailable - try again in a moment"))
 			}
 			if retrieveErr.ErrorCode != "" {
 				return nil, deviceAuthFailure(retrieveErr.ErrorCode, retrieveErr.ErrorDescription)
@@ -702,6 +647,16 @@ type oauthResult struct {
 	err   error
 }
 
+// sendResult delivers the first result and drops the rest. The race is decided
+// by the first, and a handler blocked on a full channel would stay open, which
+// is enough to keep Shutdown from ever returning.
+func sendResult(ch chan<- oauthResult, result oauthResult) {
+	select {
+	case ch <- result:
+	default:
+	}
+}
+
 func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oauthServer, error) {
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -733,9 +688,9 @@ func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oaut
 	server := &http.Server{Handler: mux}
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			resultChan <- oauthResult{
+			sendResult(resultChan, oauthResult{
 				err: fmt.Errorf("failed to serve requests: %w", err),
-			}
+			})
 		}
 	}()
 
@@ -789,13 +744,11 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Redirect to success page
 	http.Redirect(w, r, c.successURL, http.StatusTemporaryRedirect)
 
-	c.resultChan <- oauthResult{
-		token: token,
-	}
+	sendResult(c.resultChan, oauthResult{token: token})
 }
 
 func (c *oauthCallback) sendError(err error) {
-	c.resultChan <- oauthResult{err: err}
+	sendResult(c.resultChan, oauthResult{err: err})
 }
 
 func openBrowserImpl(url string) error {
