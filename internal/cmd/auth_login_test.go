@@ -757,7 +757,7 @@ var (
 )
 
 // deviceVerificationURI is what the mock code endpoint reports.
-const deviceVerificationURI = "https://console.example.com/activate"
+const deviceVerificationURI = "https://console.example.com/oauth/device"
 
 // deviceInstructions is the device flow's stderr.
 const deviceInstructions = "\nTo authenticate, visit: " + deviceVerificationURI + "\n" +
@@ -769,10 +769,9 @@ const deviceRetryNotice = "Authorization check failed, retrying: " +
 	"oauth2: cannot fetch token: 429 Too Many Requests\nResponse: too many requests\n\n"
 
 // startMockDeviceServer backs the device flow: the code endpoint, the token
-// endpoint (answering polls from replies in order, the last repeating), the
-// authorization_code exchange a racing redirect uses, and the project listing.
-// expiresIn becomes DeviceAccessToken's deadline, so a small value exercises a
-// code that runs out on its own.
+// endpoint (answering polls from replies in order, the last repeating), and
+// the project listing. expiresIn becomes DeviceAccessToken's deadline, so a
+// small value exercises a code that runs out on its own.
 func startMockDeviceServer(t *testing.T, projects []api.Project, expiresIn int, replies ...deviceReply) *httptest.Server {
 	t.Helper()
 
@@ -802,12 +801,6 @@ func startMockDeviceServer(t *testing.T, projects []api.Project, expiresIn int, 
 	mux.HandleFunc("POST /idp/external/cli/token", func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "failed to parse form", http.StatusBadRequest)
-			return
-		}
-		// The redirect winning the race exchanges its code at the same endpoint.
-		if r.FormValue("grant_type") == "authorization_code" {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(deviceTokens.body)
 			return
 		}
 		if got := r.FormValue("grant_type"); got != "urn:ietf:params:oauth:grant-type:device_code" {
@@ -843,10 +836,6 @@ func startMockDeviceServer(t *testing.T, projects []api.Project, expiresIn int, 
 	mux.HandleFunc("GET /projects", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(projects)
-	})
-
-	mux.HandleFunc("GET /oauth/code/success", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
 	})
 
 	server := httptest.NewServer(mux)
@@ -886,8 +875,8 @@ func withNoBrowserOpen() runOption {
 	})
 }
 
-// TestAuthLoginDeviceFlow covers --headless, the fallback from the redirect
-// flow, and each ending the server can hand back. Polls cost 1s each.
+// TestAuthLoginDeviceFlow covers --headless, the fallback from a browser that
+// won't open, and each ending the server can hand back. Polls cost 1s each.
 func TestAuthLoginDeviceFlow(t *testing.T) {
 	projects := []api.Project{{ID: "project-123", Name: "Test Project"}}
 

@@ -47,10 +47,8 @@ func nextSteps(readOnlySet bool) string {
 	return nextStepsMessage + readOnlyNextStep
 }
 
-const (
-	// browserAuthTimeout is how long the redirect flow waits for the callback.
-	browserAuthTimeout = 5 * time.Minute
-)
+// browserAuthTimeout is how long the redirect flow waits for the callback.
+const browserAuthTimeout = 5 * time.Minute
 
 var (
 	// deviceRetryDelay spaces pollDeviceToken's retries. Overridden in tests.
@@ -477,8 +475,8 @@ func (l *oauthLogin) getTokenViaDeviceFlow(ctx context.Context) (*oauth2.Token, 
 	return l.pollDeviceToken(ctx, oauthCfg, da)
 }
 
-// getTokenViaBrowser runs the redirect flow, which owns the login until it
-// finishes: a browser that opened is the one place the user is authorizing.
+// getTokenViaBrowser runs the redirect flow. An open browser owns the login
+// until it finishes: that is where the user is authorizing.
 func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, error) {
 	codeVerifier := oauth2.GenerateVerifier()
 
@@ -494,7 +492,7 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	}
 	defer func() {
 		// Shutdown gives up on a canceled context while a connection is still
-		// active -- the callback that just won the race -- so it gets a live one.
+		// active -- the callback that just delivered -- so it gets a live one.
 		if err := server.server.Shutdown(context.WithoutCancel(ctx)); err != nil {
 			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
 		}
@@ -504,8 +502,8 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
 	l.cmd.PrintErrln("Opening browser for authentication...")
 
-	// A browser that never opened can't complete the redirect, and navigating
-	// there by hand won't either: it targets a port on this machine.
+	// Navigating to the URL by hand wouldn't help either: it redirects to a
+	// port on this machine.
 	if err := openBrowser(authURL); err != nil {
 		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
 		return nil, errBrowserOpenFailed
@@ -515,7 +513,7 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	case result := <-server.resultChan:
 		return result.token, result.err
 	case <-time.After(browserAuthTimeout):
-		return nil, errors.New("authorization timeout - no callback received within 5 minutes")
+		return nil, fmt.Errorf("authorization timeout - no callback received within %v", browserAuthTimeout)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -647,9 +645,9 @@ type oauthResult struct {
 	err   error
 }
 
-// sendResult delivers the first result and drops the rest. The race is decided
-// by the first, and a handler blocked on a full channel would stay open, which
-// is enough to keep Shutdown from ever returning.
+// sendResult delivers the first result and drops the rest: the login is
+// decided by the first, and a handler blocked on a full channel would stay
+// open, which is enough to keep Shutdown from ever returning.
 func sendResult(ch chan<- oauthResult, result oauthResult) {
 	select {
 	case ch <- result:
