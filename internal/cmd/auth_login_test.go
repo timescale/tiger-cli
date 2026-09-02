@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -644,4 +645,426 @@ func TestReadOnlyModel_KeySelection(t *testing.T) {
 			}
 		})
 	}
+}
+
+// deviceReply is one canned token-endpoint response for a device poll.
+type deviceReply struct {
+	status int
+	// body is marshalled as JSON; nil sends a short text body instead.
+	body map[string]any
+}
+
+var (
+	devicePending = deviceReply{http.StatusBadRequest, map[string]any{
+		"error":             "authorization_pending",
+		"error_description": "The authorization request is still pending.",
+	}}
+	deviceExpired = deviceReply{http.StatusBadRequest, map[string]any{
+		"error":             "expired_token",
+		"error_description": "The device code has expired.",
+	}}
+	// FusionAuth's answer for a code already redeemed, or never issued.
+	deviceConsumed = deviceReply{http.StatusBadRequest, map[string]any{
+		"error":             "invalid_request",
+		"error_description": "invalid_device_code",
+	}}
+	// A 502 with a non-OAuth body, as an ingress or WAF returns. It reaches the
+	// CLI as a RetrieveError with no ErrorCode, which is what makes it retryable.
+	deviceBadGateway = deviceReply{http.StatusBadGateway, nil}
+	// The gateway's own answer to a transient upstream failure: OAuth-shaped,
+	// but a 500, so the code describes the gateway rather than the device flow.
+	deviceServerError = deviceReply{http.StatusInternalServerError, map[string]any{
+		"error":             "server_error",
+		"error_description": "Failed to exchange device code",
+	}}
+	deviceTokens = deviceReply{http.StatusOK, map[string]any{
+		"access_token":  "mock-access-token-12345",
+		"refresh_token": "mock-refresh-token-67890",
+		"expires_in":    3600,
+	}}
+)
+
+// deviceVerificationURI is what the mock code endpoint reports.
+const deviceVerificationURI = "https://console.example.com/activate"
+
+// deviceInstructions is the device flow's stderr.
+const deviceInstructions = "\nTo authenticate, visit: " + deviceVerificationURI + "\n" +
+	"and enter code: K7QP3XVR\n\n" +
+	"Waiting for authorization (this can take a few seconds after you enter the code)...\n"
+
+// badGatewayErr is how deviceBadGateway reaches the CLI, and serverErrorErr
+// how deviceServerError does.
+const (
+	badGatewayErr  = "oauth2: cannot fetch token: 502 Bad Gateway\nResponse: bad gateway"
+	serverErrorErr = `oauth2: "server_error" "Failed to exchange device code"`
+)
+
+// deviceRetryNotice is printed before re-entering polling after a 502, and
+// deviceServerErrorNotice after the gateway's own 500.
+const (
+	deviceRetryNotice       = "Authorization check failed, retrying: " + badGatewayErr + "\n"
+	deviceServerErrorNotice = "Authorization check failed, retrying: " + serverErrorErr + "\n"
+)
+
+// startMockDeviceServer backs the device flow: the code endpoint, the token
+// endpoint (answering polls from replies in order, the last repeating), the
+// authorization_code exchange a racing redirect uses, and the project listing.
+// expiresIn becomes DeviceAccessToken's deadline, so a small value exercises a
+// code that runs out on its own.
+func startMockDeviceServer(t *testing.T, projects []api.Project, expiresIn int, replies ...deviceReply) *httptest.Server {
+	t.Helper()
+
+	var mu sync.Mutex
+	polls := 0
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /idp/external/cli/device/code", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "failed to parse form", http.StatusBadRequest)
+			return
+		}
+		if got := r.FormValue("client_id"); got != config.TigerCLIClientID {
+			t.Errorf("device code client_id = %q, want %q", got, config.TigerCLIClientID)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"device_code":      "mock-device-code",
+			"user_code":        "K7QP3XVR",
+			"verification_uri": deviceVerificationURI,
+			"expires_in":       expiresIn,
+			"interval":         1,
+		})
+	})
+
+	mux.HandleFunc("POST /idp/external/cli/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "failed to parse form", http.StatusBadRequest)
+			return
+		}
+		// The redirect winning the race exchanges its code at the same endpoint.
+		if r.FormValue("grant_type") == "authorization_code" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(deviceTokens.body)
+			return
+		}
+		if got := r.FormValue("grant_type"); got != "urn:ietf:params:oauth:grant-type:device_code" {
+			t.Errorf("token grant_type = %q, want the device code grant", got)
+			http.Error(w, "unsupported grant", http.StatusBadRequest)
+			return
+		}
+		// The redeemable half must be presented, and the client identified.
+		if got := r.FormValue("device_code"); got != "mock-device-code" {
+			t.Errorf("device_code = %q, want %q", got, "mock-device-code")
+		}
+		if got := r.FormValue("client_id"); got != config.TigerCLIClientID {
+			t.Errorf("token client_id = %q, want %q", got, config.TigerCLIClientID)
+		}
+		if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "tiger-cli/") {
+			t.Errorf("device poll User-Agent = %q, want \"tiger-cli/\" prefix", ua)
+		}
+
+		mu.Lock()
+		reply := replies[min(polls, len(replies)-1)]
+		polls++
+		mu.Unlock()
+
+		if reply.body == nil {
+			w.WriteHeader(reply.status)
+			w.Write([]byte("bad gateway"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(reply.status)
+		json.NewEncoder(w).Encode(reply.body)
+	})
+
+	mux.HandleFunc("GET /projects", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(projects)
+	})
+
+	mux.HandleFunc("GET /oauth/code/success", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
+}
+
+// withDeviceTiming shrinks the device flow's waits so tests don't sleep out
+// their production durations. The 1s poll interval is x/oauth2's own floor.
+func withDeviceTiming(grace, retryDelay time.Duration) runOption {
+	return withSetup(func(t *testing.T) {
+		origGrace, origRetry := deviceFallbackGrace, deviceRetryDelay
+		deviceFallbackGrace, deviceRetryDelay = grace, retryDelay
+		t.Cleanup(func() {
+			deviceFallbackGrace, deviceRetryDelay = origGrace, origRetry
+		})
+	})
+}
+
+// callbackOnFallback simulates a browser that opens the auth URL but can't
+// reach this machine, forcing the fallback, then completes that redirect delay
+// after the device code page opens. Zero lands it before the first poll; a
+// longer delay lands it after the device flow's own verdict.
+func callbackOnFallback(t *testing.T, delay time.Duration) func(string) error {
+	t.Helper()
+	complete := mockOpenBrowser(t)
+	var authURL string
+	return func(target string) error {
+		if authURL == "" {
+			authURL = target
+			return nil
+		}
+		if delay == 0 {
+			return complete(authURL)
+		}
+		// A failure here leaves the login waiting on a redirect that never
+		// lands, which the test reports as a hang.
+		go func() {
+			time.Sleep(delay)
+			complete(authURL)
+		}()
+		return nil
+	}
+}
+
+// withDeviceCodeTTL shrinks the bound the CLI supplies when the gateway omits
+// expires_in, so a test doesn't sit out its production duration.
+func withDeviceCodeTTL(ttl time.Duration) runOption {
+	return withSetup(func(t *testing.T) {
+		original := defaultDeviceCodeTTL
+		defaultDeviceCodeTTL = ttl
+		t.Cleanup(func() { defaultDeviceCodeTTL = original })
+	})
+}
+
+// withNoBrowserOpen fails the test if the login tries to open a browser.
+func withNoBrowserOpen() runOption {
+	return withSetup(func(t *testing.T) {
+		original := openBrowser
+		openBrowser = func(url string) error {
+			t.Errorf("unexpected browser open: %s", url)
+			return nil
+		}
+		t.Cleanup(func() { openBrowser = original })
+	})
+}
+
+// TestAuthLoginDeviceFlow covers --headless, the fallback from the redirect
+// flow, and each ending the server can hand back. Polls cost 1s each.
+func TestAuthLoginDeviceFlow(t *testing.T) {
+	projects := []api.Project{{ID: "project-123", Name: "Test Project"}}
+
+	const ttl = 900 // seconds, as configured on the tenant
+
+	success := startMockDeviceServer(t, projects, ttl, deviceTokens)
+	pendingThenTokens := startMockDeviceServer(t, projects, ttl, devicePending, deviceTokens)
+	expired := startMockDeviceServer(t, projects, ttl, deviceExpired)
+	consumed := startMockDeviceServer(t, projects, ttl, deviceConsumed)
+	flaky := startMockDeviceServer(t, projects, ttl, deviceBadGateway, deviceTokens)
+	unavailable := startMockDeviceServer(t, projects, ttl, deviceServerError, deviceTokens)
+	downThenUp := startMockDeviceServer(t, projects, ttl,
+		deviceBadGateway, deviceBadGateway, deviceBadGateway, deviceTokens)
+	// A code too short-lived to use: DeviceAccessToken hits its own deadline
+	// first. Nonzero matters -- expires_in=0 takes the fallback deadline below.
+	stale := startMockDeviceServer(t, projects, 1, devicePending)
+	// No expires_in at all, so x/oauth2 has no deadline of its own to install.
+	noExpiry := startMockDeviceServer(t, projects, 0, devicePending)
+	// Never authorized, so only the redirect can end the race.
+	pending := startMockDeviceServer(t, projects, ttl, devicePending)
+	// A gateway that can't issue a code pair at all.
+	noCode := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(noCode.Close)
+
+	loggedIn := "Successfully logged in (project: project-123)\n" + nextSteps(true)
+
+	expiredErr := "failed to authenticate via OAuth: the code expired before it was authorized - run 'tiger auth login' again for a new code"
+	consumedErr := "failed to authenticate via OAuth: the code is no longer valid - run 'tiger auth login' again for a new code"
+	noCodeErr := "failed to authenticate via OAuth: failed to start device authorization: " +
+		"oauth2: cannot fetch token: 404 Not Found\nResponse: 404 page not found\n"
+
+	runCmdTests(t, []cmdTest{
+		{
+			// No browser is touched, and the code and URL are the whole output.
+			name:       "headless prints the code and stores the session",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(success.URL)), withNoBrowserOpen()},
+			wantStdout: loggedIn,
+			wantStderr: deviceInstructions,
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// authorization_pending is a flow state: x/oauth2 polls on, silently.
+			name:       "headless keeps polling while authorization is pending",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(pendingThenTokens.URL)), withNoBrowserOpen()},
+			wantStdout: loggedIn,
+			wantStderr: deviceInstructions,
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// No code pair, no flow -- and still an authentication failure, so
+			// callers branching on the exit code classify it with the rest.
+			name:       "device code request failure ends the login",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(noCode.URL)), withNoBrowserOpen()},
+			wantErr:    noCodeErr,
+			wantStderr: "Error: " + noCodeErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			name:       "expired code ends the login with guidance",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(expired.URL)), withNoBrowserOpen()},
+			wantErr:    expiredErr,
+			wantStderr: deviceInstructions + "Error: " + expiredErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			// The codes ran out before the server said so; same message either way.
+			name:       "code that expires locally ends the login the same way",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(stale.URL)), withNoBrowserOpen()},
+			wantErr:    expiredErr,
+			wantStderr: deviceInstructions + "Error: " + expiredErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			// Without expires_in there is nothing to poll against, so the CLI
+			// supplies the bound rather than waiting on the codes forever.
+			name: "missing expires_in still bounds the wait",
+			args: []string{"auth", "login", "--headless"},
+			opts: []runOption{
+				withConfig(oauthURLs(noExpiry.URL)),
+				withNoBrowserOpen(),
+				withDeviceCodeTTL(2 * time.Second),
+			},
+			wantErr:    expiredErr,
+			wantStderr: deviceInstructions + "Error: " + expiredErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			// A consumed or unknown device_code, as a second racing poll gets.
+			name:       "consumed or unknown code ends the login immediately",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(consumed.URL)), withNoBrowserOpen()},
+			wantErr:    consumedErr,
+			wantStderr: deviceInstructions + "Error: " + consumedErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
+		},
+		{
+			// A mid-deploy 502 isn't a verdict, so polling re-enters and still wins.
+			name: "transient non-OAuth response is retried",
+			args: []string{"auth", "login", "--headless"},
+			opts: []runOption{
+				withConfig(oauthURLs(flaky.URL)),
+				withNoBrowserOpen(),
+				withDeviceTiming(time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: deviceInstructions + deviceRetryNotice,
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// The gateway answers a FusionAuth outage with an OAuth-shaped 500.
+			// The code it carries isn't a verdict, and the device_code outlives it.
+			name: "gateway failure is retried, not taken as a verdict",
+			args: []string{"auth", "login", "--headless"},
+			opts: []runOption{
+				withConfig(oauthURLs(unavailable.URL)),
+				withNoBrowserOpen(),
+				withDeviceTiming(time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: deviceInstructions + deviceServerErrorNotice,
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// Nothing but the codes' own lifetime bounds the retries, so a gateway
+			// down for several polls still ends in a login rather than a failure.
+			name: "polling keeps retrying a failing gateway",
+			args: []string{"auth", "login", "--headless"},
+			opts: []runOption{
+				withConfig(oauthURLs(downThenUp.URL)),
+				withNoBrowserOpen(),
+				withDeviceTiming(time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: deviceInstructions + strings.Repeat(deviceRetryNotice, 3),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// No browser to open: the fallback is immediate, and the misleading
+			// "navigate there by hand" advice is gone.
+			name:       "failed browser open falls back to the device flow",
+			args:       []string{"auth", "login"},
+			opts:       []runOption{withConfig(oauthURLs(success.URL))},
+			wantStdout: loggedIn,
+			wantStderr: matchOAuthStderr(success.URL, regexp.QuoteMeta(
+				"Failed to open browser: browser disabled in tests\n"+deviceInstructions)),
+			checks: []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// The browser opened where it can't reach this machine, so the redirect
+			// never lands; the code appears after the grace period.
+			name: "browser that never calls back falls back after the grace period",
+			args: []string{"auth", "login"},
+			opts: []runOption{
+				withConfig(oauthURLs(success.URL)),
+				withOpenBrowser(func(string) error { return nil }),
+				withDeviceTiming(10*time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: matchOAuthStderr(success.URL, regexp.QuoteMeta(deviceInstructions)),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// The redirect lands after the fallback printed a code: it wins, and
+			// the poll it was racing leaves nothing behind on the way out.
+			name: "redirect that lands after the fallback still wins",
+			args: []string{"auth", "login"},
+			opts: []runOption{
+				withConfig(oauthURLs(pending.URL)),
+				withOpenBrowser(callbackOnFallback(t, 0)),
+				withDeviceTiming(10*time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: matchOAuthStderr(pending.URL, regexp.QuoteMeta(deviceInstructions)),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// A device code the gateway rejects doesn't end a login the browser
+			// can still finish: the redirect is all that's left to wait on.
+			name: "device code failure keeps waiting on the redirect",
+			args: []string{"auth", "login"},
+			opts: []runOption{
+				withConfig(oauthURLs(consumed.URL)),
+				withOpenBrowser(callbackOnFallback(t, 2*time.Second)),
+				withDeviceTiming(10*time.Millisecond, time.Millisecond),
+			},
+			wantStdout: loggedIn,
+			wantStderr: matchOAuthStderr(consumed.URL, regexp.QuoteMeta(
+				deviceInstructions+"Device authorization failed: "+
+					"the code is no longer valid - run 'tiger auth login' again for a new code\n")),
+			checks: []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+	})
 }
