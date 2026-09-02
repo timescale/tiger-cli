@@ -105,9 +105,10 @@ All cobra commands must:
 
 1. Set `SilenceUsage: true` as a literal field on the `cobra.Command` struct of every leaf command (one with a `RunE`), so a bad flag or argument prints only the one-line error rather than a wall of usage text — and because it's on the struct literal, it's already set when cobra reports flag-parsing errors before `RunE` runs. Parent/group commands don't set it: their "unknown command" errors usefully show the available subcommands. `SilenceErrors` is separate and rarely needed — set it only on a command that already reports its own errors (`mcp start http` logs failures through slog).
 2. Set `ValidArgsFunction` or `ValidArgs` for shell completions — `ValidArgsFunction` for dynamic completions (e.g. service IDs), `ValidArgs` for static lists, and `cobra.NoFileCompletions` when no completions apply. The important thing is that one of these is always set, so completion never falls back to filenames.
-3. Use `RunE`, not `Run` (see [Command Architecture](#command-architecture)).
-4. Print through the command — `cmd.Print*` for stdout, `cmd.PrintErr*` for stderr — and read via `cmd.InOrStdin()`. Never use `fmt.Print*` (it bypasses the command's writers, so tests can't capture it) or `os.Stdin`/`os.Stdout`/`os.Stderr` directly — the sole exception is `buildRootCmd` wiring stdout and stderr onto the root command (see [Streams](#streams)). Reach for `cmd.OutOrStdout()`/`cmd.ErrOrStderr()` only where an `io.Writer` is genuinely required (serializers, `tablewriter`, `tea.WithOutput`, helpers in other packages).
-5. Pass `cmd.Context()` down into any long-running or cancellable operation, so commands exit promptly on Ctrl+C or SIGTERM.
+3. Register a completion for every flag whose values come from a known set, with `cmd.RegisterFlagCompletionFunc` alongside the flag's definition — `outputCompletion()` for `--output` is the one nearly every command with structured output needs.
+4. Use `RunE`, not `Run` (see [Command Architecture](#command-architecture)).
+5. Print through the command — `cmd.Print*` for stdout, `cmd.PrintErr*` for stderr — and read via `cmd.InOrStdin()`. Never use `fmt.Print*` (it bypasses the command's writers, so tests can't capture it) or `os.Stdin`/`os.Stdout`/`os.Stderr` directly — the sole exception is `buildRootCmd` wiring stdout and stderr onto the root command (see [Streams](#streams)). Reach for `cmd.OutOrStdout()`/`cmd.ErrOrStderr()` only where an `io.Writer` is genuinely required (serializers, `tablewriter`, `tea.WithOutput`, helpers in other packages).
+6. Pass `cmd.Context()` down into any long-running or cancellable operation, so commands exit promptly on Ctrl+C or SIGTERM.
 
 Further conventions:
 
