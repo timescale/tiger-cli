@@ -125,7 +125,7 @@ Examples:
 				ReadOnly: readOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
 			})
 			if err != nil {
-				return handleDatabaseError(err, target.ConnectionService.ServiceID)
+				return handleDatabaseError(err, target)
 			}
 
 			switch cfg.Output {

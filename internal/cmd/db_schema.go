@@ -74,7 +74,7 @@ Examples:
 				IncludeComments:    dbSchemaComments,
 			})
 			if err != nil {
-				return handleDatabaseError(err, target.ConnectionService.ServiceID)
+				return handleDatabaseError(err, target)
 			}
 
 			cmd.Print(common.FormatSchema(schema))

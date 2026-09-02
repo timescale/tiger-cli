@@ -3,6 +3,9 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
@@ -47,4 +50,28 @@ func expectGetService(m *mocks.MockClientWithResponsesInterface, id string, svc 
 			HTTPResponse: httpResponse(http.StatusOK),
 			JSON200:      &svc,
 		}, nil)
+}
+
+// TestIsPostgresAuthenticationError covers the auth-error classifier at the helper
+// level: exercising it through the command would need a real Postgres server.
+func TestIsPostgresAuthenticationError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil error", nil, false},
+		{"28P01 invalid_password", &pgconn.PgError{Code: "28P01"}, true},
+		{"28000 invalid_authorization_specification", &pgconn.PgError{Code: "28000"}, true},
+		{"57P03 cannot_connect_now", &pgconn.PgError{Code: "57P03"}, false},
+		{"3D000 database does not exist", &pgconn.PgError{Code: "3D000"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isPostgresAuthenticationError(tt.err); got != tt.want {
+				t.Errorf("isPostgresAuthenticationError(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
 }

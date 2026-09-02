@@ -12,7 +12,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -401,7 +400,7 @@ func connectWithPasswordMenu(
 	}
 
 	// Check if it's an auth error
-	if !isAuthenticationError(err) {
+	if !isPostgresAuthenticationError(err) {
 		// Non-auth error (network, timeout, etc.) - report it directly
 		return err
 	}
@@ -443,7 +442,7 @@ func connectWithPasswordMenu(
 			// Test, save, and launch
 			details.Password = password
 			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
-				if isAuthenticationError(err) {
+				if isPostgresAuthenticationError(err) {
 					cmd.PrintErrf("Password incorrect. Please try again.\n\n")
 					continue
 				}
@@ -488,18 +487,6 @@ func testConnectionWithPassword(ctx context.Context, details *common.ConnectionD
 		return err
 	}
 	return conn.Close(ctx)
-}
-
-// isAuthenticationError checks if the error is a PostgreSQL authentication failure
-func isAuthenticationError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Check for PostgreSQL error code 28P01 (invalid_password) or 28000 (invalid_authorization_specification)
-	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
-		return pgErr.Code == "28P01" || pgErr.Code == "28000"
-	}
-	return false
 }
 
 // passwordRecoveryOption represents the user's choice in the password recovery menu

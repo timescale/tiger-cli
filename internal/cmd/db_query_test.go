@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
@@ -217,6 +219,24 @@ func TestDbQueryCmd(t *testing.T) {
 				Role:  "tsdbadmin",
 			}, nil, common.ErrPaused)},
 			wantErr: pausedMsg("svc-12345"),
+		},
+		{
+			// A bare pgx auth failure says nothing about which password is
+			// wrong or how to fix it, so the command appends the recovery
+			// commands.
+			name:  "authentication failure explains how to fix it",
+			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setup: setupGetService,
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
+				Query: "SELECT 1",
+				Role:  "tsdbadmin",
+			}, nil, fmt.Errorf("failed to connect to database: %w", &pgconn.PgError{
+				Severity: "FATAL",
+				Code:     "28P01",
+				Message:  `password authentication failed for user "tsdbadmin"`,
+			}))},
+			wantErr: "failed to connect to database: FATAL: password authentication failed for user \"tsdbadmin\" (SQLSTATE 28P01)\n\n" +
+				"The stored password is missing or invalid. Save the current one with 'tiger db save-password svc-12345', or reset it with 'tiger service update-password svc-12345'",
 		},
 		{
 			name:  "query error",
