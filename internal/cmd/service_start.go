@@ -13,8 +13,8 @@ import (
 
 // buildServiceStartCmd creates the start subcommand
 func buildServiceStartCmd(app *common.App) *cobra.Command {
-	var startNoWait bool
-	var startWaitTimeout time.Duration
+	var noWait bool
+	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:     "start [service-id]",
@@ -73,13 +73,13 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			cmd.PrintErrf("▶️  Start request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
-			if startNoWait {
+			if noWait {
 				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become ready
-			cmd.PrintErrf("⏳ Waiting for service to start (wait timeout: %v)...\n", startWaitTimeout)
+			cmd.PrintErrf("⏳ Waiting for service to start (wait timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -90,7 +90,7 @@ This operation starts a service that is currently in an inactive/stopped state. 
 				},
 				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
-				Timeout:    startWaitTimeout,
+				Timeout:    waitTimeout,
 				TimeoutMsg: "service may still be starting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
@@ -105,8 +105,8 @@ This operation starts a service that is currently in an inactive/stopped state. 
 	}
 
 	// Add flags
-	cmd.Flags().BoolVar(&startNoWait, "no-wait", false, "Don't wait for the operation to complete")
-	cmd.Flags().DurationVar(&startWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	return cmd
 }
