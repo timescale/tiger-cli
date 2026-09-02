@@ -60,6 +60,11 @@ var (
 	defaultDeviceCodeTTL = 15 * time.Minute
 )
 
+// errServiceUnavailable is a failure to answer rather than a verdict. Both
+// halves of the login redeem their code at the same endpoint, so it sinks the
+// redirect as surely as the device code.
+var errServiceUnavailable = errors.New("the authorization service is unavailable - try again in a moment")
+
 var (
 	// openBrowser can be overridden for testing
 	openBrowser = openBrowserImpl
@@ -545,9 +550,13 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	case result := <-server.resultChan:
 		return result.token, result.err
 	case result := <-device:
-		// Only a device success ends the race: the redirect may still land.
+		// Only a device success ends the race: the redirect may still land --
+		// unless nothing is answering, which its code exchange would hit too.
 		if result.err == nil {
 			return result.token, nil
+		}
+		if errors.Is(result.err, errServiceUnavailable) {
+			return nil, result.err
 		}
 		l.cmd.PrintErrf("Device authorization failed: %s\n", result.err)
 		return l.waitForBrowser(ctx, server.resultChan)
@@ -604,11 +613,11 @@ func (l *oauthLogin) startDeviceAuth(ctx context.Context) (oauth2.Config, *oauth
 	return oauthCfg, da, nil
 }
 
-// pollDeviceToken polls until the gateway reaches a verdict: an OAuth error,
-// since x/oauth2 polls through authorization_pending and slow_down. A 5xx, or
-// an ingress response the gateway never saw, is retried for as long as the
-// codes last -- the device_code stays valid, and DeviceAccessToken's deadline
-// comes from da.Expiry.
+// pollDeviceToken polls until the authorization is decided: an OAuth error is
+// that verdict, since x/oauth2 polls through authorization_pending and
+// slow_down, and a 5xx ends it as a failure to answer. Anything else is
+// retried until the codes expire, a deadline DeviceAccessToken takes from
+// da.Expiry.
 func (l *oauthLogin) pollDeviceToken(ctx context.Context, oauthCfg oauth2.Config, da *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
 	ctx = deviceFlowContext(ctx)
 
@@ -618,14 +627,20 @@ func (l *oauthLogin) pollDeviceToken(ctx context.Context, oauthCfg oauth2.Config
 			return token, nil
 		}
 
-		// A non-2XX with an unparseable body is also a RetrieveError, but with
-		// no ErrorCode -- so the code, not the type, marks an OAuth verdict.
-		var retrieveErr *oauth2.RetrieveError
-		if errors.As(err, &retrieveErr) && retrieveErr.ErrorCode != "" && !isServerFailure(retrieveErr) {
-			return nil, deviceAuthFailure(retrieveErr.ErrorCode, retrieveErr.ErrorDescription)
+		// A non-2XX with an unparseable body is a RetrieveError too, so the
+		// error code, not the type, marks a verdict.
+		if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
+			if isServerFailure(retrieveErr) {
+				return nil, common.ExitWithCode(common.ExitAuthenticationError, errServiceUnavailable)
+			}
+			if retrieveErr.ErrorCode != "" {
+				return nil, deviceAuthFailure(retrieveErr.ErrorCode, retrieveErr.ErrorDescription)
+			}
 		}
-		// DeviceAccessToken's own deadline, from da.Expiry: the codes ran out.
-		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		// The codes ran out. Asking the clock, rather than reading it off the
+		// error: a request that times out on its own reports the same thing,
+		// and startDeviceAuth guarantees da.Expiry is set.
+		if !time.Now().Before(da.Expiry) {
 			return nil, deviceAuthFailure("expired_token", "")
 		}
 		if ctx.Err() != nil {
@@ -640,9 +655,8 @@ func (l *oauthLogin) pollDeviceToken(ctx context.Context, oauthCfg oauth2.Config
 	}
 }
 
-// isServerFailure reports whether an OAuth error arrived with a 5xx. The
-// gateway shapes its own transient failures as OAuth errors, so that code
-// describes the gateway, not the authorization: retry rather than give up.
+// isServerFailure reports whether a reply came back 5xx: a failure to answer
+// rather than a verdict, whether or not an OAuth error code came with it.
 func isServerFailure(err *oauth2.RetrieveError) bool {
 	return err.Response != nil && err.Response.StatusCode >= http.StatusInternalServerError
 }

@@ -668,11 +668,13 @@ var (
 		"error":             "invalid_request",
 		"error_description": "invalid_device_code",
 	}}
-	// A 502 with a non-OAuth body, as an ingress or WAF returns. It reaches the
-	// CLI as a RetrieveError with no ErrorCode, which is what makes it retryable.
+	// A 502 with a non-OAuth body: a 5xx is terminal whether or not an OAuth
+	// error came with it.
 	deviceBadGateway = deviceReply{http.StatusBadGateway, nil}
-	// The gateway's own answer to a transient upstream failure: OAuth-shaped,
-	// but a 500, so the code describes the gateway rather than the device flow.
+	// A 429, the shape that is neither a verdict nor a 5xx, so it is retried.
+	deviceRateLimited = deviceReply{http.StatusTooManyRequests, nil}
+	// An OAuth-shaped 500: the error code describes a failure to answer, not a
+	// verdict on the device flow.
 	deviceServerError = deviceReply{http.StatusInternalServerError, map[string]any{
 		"error":             "server_error",
 		"error_description": "Failed to exchange device code",
@@ -692,19 +694,9 @@ const deviceInstructions = "\nTo authenticate, visit: " + deviceVerificationURI 
 	"and enter code: K7QP3XVR\n\n" +
 	"Waiting for authorization (this can take a few seconds after you enter the code)...\n"
 
-// badGatewayErr is how deviceBadGateway reaches the CLI, and serverErrorErr
-// how deviceServerError does.
-const (
-	badGatewayErr  = "oauth2: cannot fetch token: 502 Bad Gateway\nResponse: bad gateway"
-	serverErrorErr = `oauth2: "server_error" "Failed to exchange device code"`
-)
-
-// deviceRetryNotice is printed before re-entering polling after a 502, and
-// deviceServerErrorNotice after the gateway's own 500.
-const (
-	deviceRetryNotice       = "Authorization check failed, retrying: " + badGatewayErr + "\n"
-	deviceServerErrorNotice = "Authorization check failed, retrying: " + serverErrorErr + "\n"
-)
+// deviceRetryNotice is printed before re-entering polling after a 429.
+const deviceRetryNotice = "Authorization check failed, retrying: " +
+	"oauth2: cannot fetch token: 429 Too Many Requests\nResponse: too many requests\n\n"
 
 // startMockDeviceServer backs the device flow: the code endpoint, the token
 // endpoint (answering polls from replies in order, the last repeating), the
@@ -770,8 +762,7 @@ func startMockDeviceServer(t *testing.T, projects []api.Project, expiresIn int, 
 		mu.Unlock()
 
 		if reply.body == nil {
-			w.WriteHeader(reply.status)
-			w.Write([]byte("bad gateway"))
+			http.Error(w, strings.ToLower(http.StatusText(reply.status)), reply.status)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -864,10 +855,9 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 	pendingThenTokens := startMockDeviceServer(t, projects, ttl, devicePending, deviceTokens)
 	expired := startMockDeviceServer(t, projects, ttl, deviceExpired)
 	consumed := startMockDeviceServer(t, projects, ttl, deviceConsumed)
-	flaky := startMockDeviceServer(t, projects, ttl, deviceBadGateway, deviceTokens)
-	unavailable := startMockDeviceServer(t, projects, ttl, deviceServerError, deviceTokens)
-	downThenUp := startMockDeviceServer(t, projects, ttl,
-		deviceBadGateway, deviceBadGateway, deviceBadGateway, deviceTokens)
+	throttled := startMockDeviceServer(t, projects, ttl, deviceRateLimited, deviceTokens)
+	badGateway := startMockDeviceServer(t, projects, ttl, deviceBadGateway)
+	unavailable := startMockDeviceServer(t, projects, ttl, deviceServerError)
 	// A code too short-lived to use: DeviceAccessToken hits its own deadline
 	// first. Nonzero matters -- expires_in=0 takes the fallback deadline below.
 	stale := startMockDeviceServer(t, projects, 1, devicePending)
@@ -883,6 +873,7 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 
 	expiredErr := "failed to authenticate via OAuth: the code expired before it was authorized - run 'tiger auth login' again for a new code"
 	consumedErr := "failed to authenticate via OAuth: the code is no longer valid - run 'tiger auth login' again for a new code"
+	unavailableErr := "failed to authenticate via OAuth: the authorization service is unavailable - try again in a moment"
 	noCodeErr := "failed to authenticate via OAuth: failed to start device authorization: " +
 		"oauth2: cannot fetch token: 404 Not Found\nResponse: 404 page not found\n"
 
@@ -971,11 +962,11 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 			},
 		},
 		{
-			// A mid-deploy 502 isn't a verdict, so polling re-enters and still wins.
-			name: "transient non-OAuth response is retried",
+			// Neither a verdict nor a failure to answer, so polling re-enters.
+			name: "throttled poll is retried",
 			args: []string{"auth", "login", "--headless"},
 			opts: []runOption{
-				withConfig(oauthURLs(flaky.URL)),
+				withConfig(oauthURLs(throttled.URL)),
 				withNoBrowserOpen(),
 				withDeviceTiming(time.Millisecond, time.Millisecond),
 			},
@@ -984,32 +975,30 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
 		{
-			// The gateway answers a FusionAuth outage with an OAuth-shaped 500.
-			// The code it carries isn't a verdict, and the device_code outlives it.
-			name: "gateway failure is retried, not taken as a verdict",
-			args: []string{"auth", "login", "--headless"},
-			opts: []runOption{
-				withConfig(oauthURLs(unavailable.URL)),
-				withNoBrowserOpen(),
-				withDeviceTiming(time.Millisecond, time.Millisecond),
+			// An OAuth-shaped 500 ends the login, but as a service failure: the
+			// code was never the problem, so it isn't blamed.
+			name:       "server failure ends the login without blaming the code",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(unavailable.URL)), withNoBrowserOpen()},
+			wantErr:    unavailableErr,
+			wantStderr: deviceInstructions + "Error: " + unavailableErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
 			},
-			wantStdout: loggedIn,
-			wantStderr: deviceInstructions + deviceServerErrorNotice,
-			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
 		{
-			// Nothing but the codes' own lifetime bounds the retries, so a gateway
-			// down for several polls still ends in a login rather than a failure.
-			name: "polling keeps retrying a failing gateway",
-			args: []string{"auth", "login", "--headless"},
-			opts: []runOption{
-				withConfig(oauthURLs(downThenUp.URL)),
-				withNoBrowserOpen(),
-				withDeviceTiming(time.Millisecond, time.Millisecond),
+			// A 5xx with no OAuth error in it says the same thing, so it ends the
+			// login the same way.
+			name:       "non-OAuth 5xx ends the login too",
+			args:       []string{"auth", "login", "--headless"},
+			opts:       []runOption{withConfig(oauthURLs(badGateway.URL)), withNoBrowserOpen()},
+			wantErr:    unavailableErr,
+			wantStderr: deviceInstructions + "Error: " + unavailableErr + "\n",
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
 			},
-			wantStdout: loggedIn,
-			wantStderr: deviceInstructions + strings.Repeat(deviceRetryNotice, 3),
-			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
 		{
 			// No browser to open: the fallback is immediate, and the misleading
@@ -1049,6 +1038,24 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 			wantStdout: loggedIn,
 			wantStderr: matchOAuthStderr(pending.URL, regexp.QuoteMeta(deviceInstructions)),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
+			// Nothing is answering, and the redirect would redeem its code at the
+			// same endpoint -- so the login ends there rather than waiting it out.
+			name: "server failure ends the race instead of waiting on the redirect",
+			args: []string{"auth", "login"},
+			opts: []runOption{
+				withConfig(oauthURLs(unavailable.URL)),
+				withOpenBrowser(func(string) error { return nil }),
+				withDeviceTiming(10*time.Millisecond, time.Millisecond),
+			},
+			wantErr: unavailableErr,
+			wantStderr: matchOAuthStderr(unavailable.URL, regexp.QuoteMeta(
+				deviceInstructions+"Error: "+unavailableErr+"\n")),
+			checks: []checkFunc{
+				checkExitCode(common.ExitAuthenticationError),
+				checkNoStoredCredentials,
+			},
 		},
 		{
 			// A device code the gateway rejects doesn't end a login the browser
