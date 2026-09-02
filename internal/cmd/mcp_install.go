@@ -44,10 +44,8 @@ The command will:
 - Merge with existing MCP server configurations (doesn't overwrite other servers)
 - Validate the configuration after installation
 
-If no client is specified, you'll be prompted to select one interactively.
-
-Examples:
-  # Interactive client selection
+If no client is specified, you'll be prompted to select one interactively.`, generateSupportedEditorsHelp()),
+		Example: `  # Interactive client selection
   tiger mcp install
 
   # Install for Claude Code (User scope - available in all projects)
@@ -60,7 +58,7 @@ Examples:
   tiger mcp install claude-code --no-backup
 
   # Use custom configuration file path
-  tiger mcp install claude-code --config-path ~/custom/config.json`, generateSupportedEditorsHelp()),
+  tiger mcp install claude-code --config-path ~/custom/config.json`,
 		Args:         cobra.MaximumNArgs(1),
 		ValidArgs:    getValidEditorNames(),
 		SilenceUsage: true,

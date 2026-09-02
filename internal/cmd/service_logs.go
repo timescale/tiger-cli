@@ -28,10 +28,8 @@ Fetches and displays logs from the specified service. By default, shows the last
 100 log entries. Supports filtering by time range.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
-
-Examples:
-  # View last 100 logs for default service (default behavior)
+from your configuration.`,
+		Example: `  # View last 100 logs for default service (default behavior)
   tiger service logs
 
   # View logs for specific service

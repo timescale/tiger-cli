@@ -34,10 +34,8 @@ Cloud's immutable read-only mode (writes and DDL are rejected by the server).
 The global read_only config option (or TIGER_READ_ONLY) also forces this
 behavior: read_only=all makes every connection string read-only, and
 read_only=prod makes those for services tagged PROD read-only while leaving DEV
-services writable.
-
-Examples:
-  # Get connection string for default service
+services writable.`,
+		Example: `  # Get connection string for default service
   tiger db connection-string
 
   # Get connection string for specific service

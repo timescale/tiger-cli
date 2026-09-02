@@ -85,10 +85,8 @@ service (config key service_id) is cleared, since it belongs to the project it w
 You may also provide API keys via flags or environment variables, in which case they will be used
 directly. The CLI will prompt for any missing information.
 
-You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings
-
-Examples:
-  # Interactive login with OAuth (opens browser)
+You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings`,
+		Example: `  # Interactive login with OAuth (opens browser)
   tiger auth login
 
   # OAuth login without the interactive project selection

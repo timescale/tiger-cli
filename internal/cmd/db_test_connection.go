@@ -35,10 +35,8 @@ Return Codes:
   0: Server is accepting connections normally
   1: Server is rejecting connections (e.g., during startup)
   2: No response to connection attempt (server unreachable)
-  3: No attempt made (e.g., invalid parameters)
-
-Examples:
-  # Test connection to default service
+  3: No attempt made (e.g., invalid parameters)`,
+		Example: `  # Test connection to default service
   tiger db test-connection
 
   # Test connection to specific service

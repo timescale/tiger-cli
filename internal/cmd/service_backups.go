@@ -29,10 +29,8 @@ Backups run automatically on a schedule; there is no command to create or delete
 one. To restore data, create a recovery fork with tiger service fork.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
-
-Examples:
-  # List backups for the default service
+from your configuration.`,
+		Example: `  # List backups for the default service
   tiger service backup
 
   # List backups for a specific service

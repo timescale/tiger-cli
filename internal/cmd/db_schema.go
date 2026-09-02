@@ -29,10 +29,8 @@ connection is opened in Tiger Cloud's immutable read-only mode.
 
 By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
-large and may embed implementation details.
-
-Examples:
-  # Show the schema of the default service
+large and may embed implementation details.`,
+		Example: `  # Show the schema of the default service
   tiger db schema
 
   # Show the schema of a specific service

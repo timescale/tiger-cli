@@ -22,10 +22,8 @@ func buildServiceStopCmd(app *common.App) *cobra.Command {
 		Short:   "Stop a running database service",
 		Long: `Stop a running database service.
 
-This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
-
-Examples:
-  # Stop a service (waits for completion by default)
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.`,
+		Example: `  # Stop a service (waits for completion by default)
   tiger service stop svc-12345
 
   # Stop service without waiting for completion

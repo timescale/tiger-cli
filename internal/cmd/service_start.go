@@ -22,10 +22,8 @@ func buildServiceStartCmd(app *common.App) *cobra.Command {
 		Short:   "Start a stopped database service",
 		Long: `Start a stopped database service.
 
-This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
-
-Examples:
-  # Start a service (waits for completion by default)
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.`,
+		Example: `  # Start a service (waits for completion by default)
   tiger service start svc-12345
 
   # Start service without waiting for completion

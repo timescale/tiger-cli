@@ -33,10 +33,8 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 Use 'tiger service metrics available-series' to discover valid metric names.
 
 Each labeled series (e.g. one per replica) is returned independently with its
-full list of raw data points.
-
-Examples:
-  # Fetch CPU usage for the last hour
+full list of raw data points.`,
+		Example: `  # Fetch CPU usage for the last hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
 

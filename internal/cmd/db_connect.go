@@ -56,10 +56,8 @@ requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
 You can also pass a read replica set ID to connect straight to that replica,
-skipping the prompt. Read replicas share the primary's credentials.
-
-Examples:
-  # Connect to default service
+skipping the prompt. Read replicas share the primary's credentials.`,
+		Example: `  # Connect to default service
   tiger db connect
   tiger db psql
 
