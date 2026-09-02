@@ -26,10 +26,8 @@ from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
 A read replica ID is rejected — read replicas share the primary's credentials,
-so update the password on the primary instead.
-
-Examples:
-  # Update password for default service, interactively prompts
+so update the password on the primary instead.`,
+		Example: `  # Update password for default service, interactively prompts
   tiger service update-password
 
   # Update password for default service

@@ -42,10 +42,8 @@ Read-Only Mode for AI Agents:
 The --read-only flag enables permanent read-only enforcement at the PostgreSQL level
 using the tsdb_admin.read_only_role extension setting. This is designed to provide
 safe database access for AI agents and automated tools that need to read production
-data without risk of modification.
-
-Examples:
-  # Create a role with global database access (uses default service, auto-generates password)
+data without risk of modification.`,
+		Example: `  # Create a role with global database access (uses default service, auto-generates password)
   tiger db create role --name ai_analyst --from tsdbadmin
 
   # Create a role for specific service

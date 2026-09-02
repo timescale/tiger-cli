@@ -24,10 +24,8 @@ func buildMCPHTTPCmd(app *common.App) *cobra.Command {
 		Short: "Start MCP server with HTTP transport",
 		Long: `Start the MCP server using HTTP transport.
 
-The server will automatically find an available port if the specified port is busy.
-
-Examples:
-  # Start HTTP server on default port 8080
+The server will automatically find an available port if the specified port is busy.`,
+		Example: `  # Start HTTP server on default port 8080
   tiger mcp start http
 
   # Start HTTP server on custom port

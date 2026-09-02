@@ -49,10 +49,8 @@ Use --read-only to open the session in Tiger Cloud's immutable read-only mode
 (writes and DDL are rejected by the server). The global read_only config option
 (or TIGER_READ_ONLY) also forces this behavior: read_only=all makes every session
 read-only, and read_only=prod makes sessions against services tagged PROD
-read-only while leaving DEV services writable.
-
-Examples:
-  # Select data from a table
+read-only while leaving DEV services writable.`,
+		Example: `  # Select data from a table
   tiger db query svc-12345 -c "SELECT * FROM users LIMIT 5"
 
   # Query the default service

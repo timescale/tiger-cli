@@ -29,10 +29,8 @@ allocated to your database service.
 
 The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will
-increase costs.
-
-Examples:
-  # Resize default service to 2 CPU cores and 8GB memory
+increase costs.`,
+		Example: `  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 
   # Resize specific service to 4 CPU cores and 16GB memory

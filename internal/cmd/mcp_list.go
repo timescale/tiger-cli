@@ -21,10 +21,8 @@ func buildMCPListCmd(app *common.App) *cobra.Command {
 		Short:   "List available MCP tools, prompts, and resources",
 		Long: `List all MCP tools, prompts, and resources exposed via the Tiger MCP server.
 
-The output can be formatted as a table, JSON, or YAML.
-
-Examples:
-  # List all capabilities in table format (default)
+The output can be formatted as a table, JSON, or YAML.`,
+		Example: `  # List all capabilities in table format (default)
   tiger mcp list
 
   # List as JSON

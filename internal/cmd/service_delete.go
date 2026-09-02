@@ -27,10 +27,8 @@ func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 This operation is irreversible. By default, you will be prompted to type the service ID
 to confirm deletion, unless you use the --confirm flag.
 
-Note for AI agents: Always confirm with the user before performing this destructive operation.
-
-Examples:
-  # Delete a service (with confirmation prompt)
+Note for AI agents: Always confirm with the user before performing this destructive operation.`,
+		Example: `  # Delete a service (with confirmation prompt)
   tiger service delete svc-12345
 
   # Delete service without confirmation prompt

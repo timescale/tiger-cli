@@ -26,10 +26,8 @@ from your configuration. The password can be provided via:
 3. Interactive prompt (if neither provided)
 
 The password will be saved according to your --password-storage setting
-(keyring, pgpass, or none).
-
-Examples:
-  # Save password with explicit value (highest precedence)
+(keyring, pgpass, or none).`,
+		Example: `  # Save password with explicit value (highest precedence)
   tiger db save-password svc-12345 --password=your-password
 
   # Using environment variable

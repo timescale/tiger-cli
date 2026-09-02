@@ -38,10 +38,8 @@ The default type of service created depends on your plan:
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 By default, the newly created service will be set as your default service for future
-commands. Use --no-set-default to prevent this behavior.
-
-Examples:
-  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
+commands. Use --no-set-default to prevent this behavior.`,
+		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 
   # Create a free TimescaleDB service

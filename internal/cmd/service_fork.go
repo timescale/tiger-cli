@@ -43,10 +43,8 @@ By default:
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.
-
-Examples:
-  # Fork a service at the current state
+You can override any of these defaults with the corresponding flags.`,
+		Example: `  # Fork a service at the current state
   tiger service fork svc-12345 --now
 
   # Fork a service at the last snapshot
