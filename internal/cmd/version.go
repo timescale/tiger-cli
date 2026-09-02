@@ -24,7 +24,7 @@ type VersionOutput struct {
 }
 
 func buildVersionCmd(app *common.App) *cobra.Command {
-	var checkVersion bool
+	var check bool
 
 	cmd := &cobra.Command{
 		Use:               "version",
@@ -45,7 +45,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 			}
 
 			updateAvailable := false
-			if checkVersion {
+			if check {
 				result, err := version.CheckForUpdate(cmd.Context(), cfg)
 				if err != nil {
 					// A failed check shouldn't fail the version command; warn and
@@ -85,7 +85,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
+	cmd.Flags().BoolVar(&check, "check", false, "Force checking for updates (regardless of last check time)")
 	cmd.Flags().VarP(new(outputWithBareFlag), "output", "o", "Output format (table, json, yaml, bare)")
 	cmd.RegisterFlagCompletionFunc("output", outputCompletion("bare"))
 

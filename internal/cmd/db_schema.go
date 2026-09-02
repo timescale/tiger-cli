@@ -7,12 +7,12 @@ import (
 )
 
 func buildDbSchemaCmd(app *common.App) *cobra.Command {
-	var dbSchemaSchema string
-	var dbSchemaInternal bool
-	var dbSchemaDefinitions bool
-	var dbSchemaComments bool
-	var dbSchemaRole string
-	var dbSchemaPooled bool
+	var schema string
+	var internal bool
+	var definitions bool
+	var comments bool
+	var role string
+	var pooled bool
 
 	cmd := &cobra.Command{
 		Use:   "schema [service-id]",
@@ -63,29 +63,29 @@ large and may embed implementation details.`,
 				return err
 			}
 
-			warnReplicaPooler(cmd, target, dbSchemaPooled)
+			warnReplicaPooler(cmd, target, pooled)
 
-			schema, err := common.FetchServiceSchema(cmd.Context(), cfg, target, dbSchemaRole, dbSchemaPooled, common.SchemaOptions{
-				Schema:             dbSchemaSchema,
-				IncludeInternal:    dbSchemaInternal,
-				IncludeDefinitions: dbSchemaDefinitions,
-				IncludeComments:    dbSchemaComments,
+			result, err := common.FetchServiceSchema(cmd.Context(), cfg, target, role, pooled, common.SchemaOptions{
+				Schema:             schema,
+				IncludeInternal:    internal,
+				IncludeDefinitions: definitions,
+				IncludeComments:    comments,
 			})
 			if err != nil {
 				return handleDatabaseError(err, target)
 			}
 
-			cmd.Print(common.FormatSchema(schema))
+			cmd.Print(common.FormatSchema(result))
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&dbSchemaSchema, "schema", "", "Restrict output to a single schema")
-	cmd.Flags().BoolVar(&dbSchemaInternal, "internal", false, "Include system schemas (pg_*, information_schema, TimescaleDB internals) and extension-owned objects")
-	cmd.Flags().BoolVar(&dbSchemaDefinitions, "definitions", false, "Include full object definitions (view SELECTs, function/procedure bodies)")
-	cmd.Flags().BoolVar(&dbSchemaComments, "comments", false, "Include object comments (COMMENT ON text)")
-	cmd.Flags().StringVar(&dbSchemaRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbSchemaPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&schema, "schema", "", "Restrict output to a single schema")
+	cmd.Flags().BoolVar(&internal, "internal", false, "Include system schemas (pg_*, information_schema, TimescaleDB internals) and extension-owned objects")
+	cmd.Flags().BoolVar(&definitions, "definitions", false, "Include full object definitions (view SELECTs, function/procedure bodies)")
+	cmd.Flags().BoolVar(&comments, "comments", false, "Include object comments (COMMENT ON text)")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
 
 	return cmd
 }

@@ -13,8 +13,8 @@ import (
 
 // buildServiceStopCmd creates the stop subcommand
 func buildServiceStopCmd(app *common.App) *cobra.Command {
-	var stopNoWait bool
-	var stopWaitTimeout time.Duration
+	var noWait bool
+	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:     "stop [service-id]",
@@ -73,13 +73,13 @@ This operation stops a service that is currently active/running. The service wil
 			cmd.PrintErrf("⏹️  Stop request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
-			if stopNoWait {
+			if noWait {
 				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become paused
-			cmd.PrintErrf("⏳ Waiting for service to stop (timeout: %v)...\n", stopWaitTimeout)
+			cmd.PrintErrf("⏳ Waiting for service to stop (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -90,7 +90,7 @@ This operation stops a service that is currently active/running. The service wil
 				},
 				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
-				Timeout:    stopWaitTimeout,
+				Timeout:    waitTimeout,
 				TimeoutMsg: "service may still be stopping",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
@@ -105,8 +105,8 @@ This operation stops a service that is currently active/running. The service wil
 	}
 
 	// Add flags
-	cmd.Flags().BoolVar(&stopNoWait, "no-wait", false, "Don't wait for the operation to complete")
-	cmd.Flags().DurationVar(&stopWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
 	return cmd
 }

@@ -15,9 +15,9 @@ import (
 )
 
 func buildDbPingCmd(app *common.App) *cobra.Command {
-	var dbPingTimeout time.Duration
-	var dbPingPooled bool
-	var dbPingRole string
+	var timeout time.Duration
+	var pooled bool
+	var role string
 
 	cmd := &cobra.Command{
 		Use:     "ping [service-id]",
@@ -69,12 +69,12 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			warnReplicaPooler(cmd, target, dbPingPooled)
+			warnReplicaPooler(cmd, target, pooled)
 
 			// Build connection string for testing with password (if available)
 			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
-				Pooled:       dbPingPooled,
-				Role:         dbPingRole,
+				Pooled:       pooled,
+				Role:         role,
 				WithPassword: true,
 			})
 			if err != nil {
@@ -82,19 +82,19 @@ Return Codes:
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
-			if dbPingTimeout < 0 {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbPingTimeout))
+			if timeout < 0 {
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details.String(), dbPingTimeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details.String(), timeout, cmd)
 		},
 	}
 
 	// Add flags for db ping command
-	cmd.Flags().DurationVarP(&dbPingTimeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
-	cmd.Flags().BoolVar(&dbPingPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbPingRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }
