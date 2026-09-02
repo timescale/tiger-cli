@@ -99,9 +99,8 @@ You can find your API credentials at: https://console.cloud.tigerdata.com/dashbo
   export TIGER_PUBLIC_KEY="your-public-key"
   export TIGER_SECRET_KEY="your-secret-key"
   tiger auth login`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 

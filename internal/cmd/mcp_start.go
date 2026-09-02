@@ -28,9 +28,8 @@ through Claude and other AI assistants. By default, it uses stdio transport.`,
 
   # Start with HTTP transport
   tiger mcp start http`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			return startStdioServer(cmd, app)

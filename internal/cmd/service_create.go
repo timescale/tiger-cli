@@ -77,9 +77,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
   # Create service with custom wait timeout
   tiger service create --name patient-db --wait-timeout 1h`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if name == "" {
@@ -227,11 +226,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
-	cmd.RegisterFlagCompletionFunc("addons", addonsCompletion)
-	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
-	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "addons", addonsCompletion)
+	registerFlagCompletion(cmd, "environment", environmentCompletion)
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }

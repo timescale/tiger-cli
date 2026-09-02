@@ -16,8 +16,9 @@ import (
 //
 // Cobra writes the candidates to stdout, one "value\tdescription" line each,
 // followed by a ":<directive>" line — 4 is ShellCompDirectiveNoFileComp, which
-// every completion here returns so shells don't fall back to filenames. The
-// trailing human-readable directive line goes to stderr.
+// nearly every completion here returns so shells don't fall back to filenames;
+// 8 and 16 filter to files and directories. The trailing human-readable
+// directive line goes to stderr.
 //
 // A completion that can't produce candidates (not logged in, API error) must
 // return none rather than an error: a broken completion should be invisible at
@@ -172,6 +173,37 @@ func TestCompletion(t *testing.T) {
 			opts:       noDocsProxy(nil),
 			wantStdout: "service_list\nservice_logs\n" + noFileComp,
 			wantStderr: directive,
+		},
+		{
+			// The root command's default directive, which is what keeps every
+			// flag without a registered completion from offering filenames.
+			name:       "a flag with no completion offers nothing",
+			args:       []string{"__complete", "service", "create", "--name", ""},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "a command with no argument completion offers nothing",
+			args:       []string{"__complete", "service", "list", ""},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--config-dir completes directories",
+			args:       []string{"__complete", "service", "get", "--config-dir", ""},
+			wantStdout: ":16\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveFilterDirs\n",
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The candidates are the extensions to filter by, not completions.
+			name:       "--config-path completes config files",
+			args:       []string{"__complete", "mcp", "install", "--config-path", ""},
+			wantStdout: "json\ntoml\n:8\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveFilterFileExt\n",
+			checks:     []checkFunc{checkNotLoaded},
 		},
 	})
 
