@@ -19,13 +19,12 @@ import (
 func buildServiceListCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:               "list",
-		Aliases:           []string{"ls"},
-		Short:             "List all services",
-		Long:              `List all database services in the current project.`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Use:          "list",
+		Aliases:      []string{"ls"},
+		Short:        "List all services",
+		Long:         `List all database services in the current project.`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
@@ -60,7 +59,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

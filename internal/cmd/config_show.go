@@ -17,13 +17,12 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 	var withEnv bool
 
 	cmd := &cobra.Command{
-		Use:               "show",
-		Aliases:           []string{"list", "ls"},
-		Short:             "Show current configuration",
-		Long:              `Display the current CLI configuration settings`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Use:          "show",
+		Aliases:      []string{"list", "ls"},
+		Short:        "Show current configuration",
+		Long:         `Display the current CLI configuration settings`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 
@@ -48,7 +47,7 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
 	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
 

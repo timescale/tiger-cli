@@ -61,6 +61,13 @@ tiger auth login
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)
 
+	// Complete nothing where no completion is registered, rather than falling
+	// back to filenames. Cobra checks this on the command and its parents, so
+	// setting it here covers every flag and argument in the tree. A flag that
+	// does want paths registers a completion for itself (fileCompletion,
+	// dirCompletion).
+	cmd.CompletionOptions.SetDefaultShellCompDirective(cobra.ShellCompDirectiveNoFileComp)
+
 	// Match flag names case-insensitively (e.g. `--Output` works the same as
 	// `--output`). Propagates to all subcommands added after this point.
 	cmd.SetGlobalNormalizationFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -76,7 +83,8 @@ tiger auth login
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().String("service-id", "", "service ID")
 	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
-	cmd.RegisterFlagCompletionFunc("password-storage", passwordStorageCompletion)
+	registerFlagCompletion(cmd, "password-storage", passwordStorageCompletion)
+	registerFlagCompletion(cmd, "config-dir", dirCompletion)
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd(app))

@@ -38,10 +38,9 @@ Examples:
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
-		SilenceErrors:     true, // HTTP server uses slog for all output, including errors
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true, // HTTP server uses slog for all output, including errors
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return startHTTPServer(cmd, app, httpHost, httpPort)
 		},

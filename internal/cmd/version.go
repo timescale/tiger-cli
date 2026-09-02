@@ -27,12 +27,11 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 	var checkVersion bool
 
 	cmd := &cobra.Command{
-		Use:               "version",
-		Short:             "Show version information",
-		Long:              `Display version, build time, and git commit information for the Tiger CLI`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Use:          "version",
+		Short:        "Show version information",
+		Long:         `Display version, build time, and git commit information for the Tiger CLI`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 
@@ -87,7 +86,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 
 	cmd.Flags().BoolVar(&checkVersion, "check", false, "Force checking for updates (regardless of last check time)")
 	cmd.Flags().VarP(new(outputWithBareFlag), "output", "o", "Output format (table, json, yaml, bare)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("bare"))
+	registerFlagCompletion(cmd, "output", outputCompletion("bare"))
 
 	return cmd
 }

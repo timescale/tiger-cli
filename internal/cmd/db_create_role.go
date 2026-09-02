@@ -164,7 +164,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
 	cmd.Flags().StringVar(&passwordFlag, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	cmd.MarkFlagRequired("name")
 

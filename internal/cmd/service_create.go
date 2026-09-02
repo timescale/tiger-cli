@@ -79,9 +79,8 @@ Allowed CPU/Memory Configurations:
   4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Auto-generate service name if not provided
 			if createServiceName == "" {
@@ -229,11 +228,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&createWithPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
-	cmd.RegisterFlagCompletionFunc("addons", addonsCompletion)
-	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
-	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "addons", addonsCompletion)
+	registerFlagCompletion(cmd, "environment", environmentCompletion)
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }

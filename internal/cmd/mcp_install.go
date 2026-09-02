@@ -90,6 +90,7 @@ Examples:
 	// Add flags
 	cmd.Flags().BoolVar(&noBackup, "no-backup", false, "Skip creating backup of existing configuration (default: create backup)")
 	cmd.Flags().StringVar(&configPath, "config-path", "", "Custom path to configuration file (overrides default locations)")
+	registerFlagCompletion(cmd, "config-path", fileCompletion("json", "toml"))
 
 	return cmd
 }

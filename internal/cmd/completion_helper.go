@@ -13,6 +13,25 @@ import (
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
+// registerFlagCompletion registers a shell completion function for a flag. A
+// failure means the flag doesn't exist or already has a completion — either is
+// a programming error in the command tree that would otherwise go unnoticed
+// until someone pressed Tab.
+func registerFlagCompletion(cmd *cobra.Command, flag string, f cobra.CompletionFunc) {
+	if err := cmd.RegisterFlagCompletionFunc(flag, f); err != nil {
+		panic(fmt.Sprintf("%s: %v", cmd.CommandPath(), err))
+	}
+}
+
+// dirCompletion completes directory names, and fileCompletion file names with
+// the given extensions. Completion defaults to offering nothing at all (see
+// buildRootCmd), so a flag that takes a path has to ask for these.
+var dirCompletion = cobra.FixedCompletions(nil, cobra.ShellCompDirectiveFilterDirs)
+
+func fileCompletion(extensions ...string) cobra.CompletionFunc {
+	return cobra.FixedCompletions(extensions, cobra.ShellCompDirectiveFilterFileExt)
+}
+
 // withAppLoad wraps a completion function, loading the config and API client
 // before invoking it. The App is only loaded automatically for wrapped commands
 // (see wrapCommands), not for the __complete command that drives live tab
