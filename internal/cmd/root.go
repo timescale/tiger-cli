@@ -85,6 +85,7 @@ tiger auth login
 	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
 	registerFlagCompletion(cmd, "password-storage", passwordStorageCompletion)
 	registerFlagCompletion(cmd, "config-dir", dirCompletion)
+	registerFlagCompletion(cmd, "service-id", serviceIDFlagCompletion(app))
 
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd(app))
