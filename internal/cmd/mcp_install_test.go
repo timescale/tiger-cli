@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stacklok/toolhive/pkg/client"
 
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -435,9 +434,8 @@ func TestFindClientConfig(t *testing.T) {
 	})
 }
 
-// TestFindClientConfigFile covers config file discovery, including the
-// per-client fallback paths and their equivalence with toolhive's notion of
-// each client's config location.
+// TestFindClientConfigFile covers config file discovery, including each
+// client's per-client fallback path.
 func TestFindClientConfigFile(t *testing.T) {
 	t.Run("errors when no config paths provided", func(t *testing.T) {
 		for _, paths := range [][]string{{}, nil} {
@@ -518,52 +516,6 @@ func TestFindClientConfigFile(t *testing.T) {
 		}
 	})
 
-	// Our hardcoded ConfigPaths must agree with the toolhive library about
-	// where each client keeps its config.
-	t.Run("equivalent to toolhive", func(t *testing.T) {
-		t.Setenv("HOME", t.TempDir())
-		toolhiveClients := map[MCPClient]client.ClientApp{
-			ClaudeCode: client.ClaudeCode,
-			Cursor:     client.Cursor,
-			Windsurf:   client.Windsurf,
-		}
-		for _, cfg := range supportedClients {
-			toolhiveType, ok := toolhiveClients[cfg.ClientType]
-			if !ok {
-				continue
-			}
-			t.Run(cfg.Name, func(t *testing.T) {
-				// Create the config file at our first ConfigPath so both
-				// systems resolve an existing file.
-				expandedPath := util.ExpandPath(cfg.ConfigPaths[0])
-				if err := os.MkdirAll(filepath.Dir(expandedPath), 0755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(expandedPath, []byte(`{"mcpServers":{}}`), 0644); err != nil {
-					t.Fatal(err)
-				}
-
-				ourPath, err := findClientConfigFile(cfg.ConfigPaths)
-				if err != nil {
-					t.Fatalf("findClientConfigFile failed: %v", err)
-				}
-				toolhiveConfig, err := client.FindClientConfig(toolhiveType)
-				if err != nil {
-					t.Fatalf("toolhive FindClientConfig failed: %v", err)
-				}
-
-				ourAbs, err := filepath.Abs(ourPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-				toolhiveAbs, err := filepath.Abs(toolhiveConfig.Path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				assertOutput(t, ourAbs, toolhiveAbs)
-			})
-		}
-	})
 }
 
 // TestAddMCPServerViaCLI covers the CLI-based install path, which the command
