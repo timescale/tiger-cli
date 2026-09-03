@@ -44,6 +44,9 @@ jobs:
       - name: Staticcheck
         run: go tool staticcheck ./...
 
+      - name: Govulncheck
+        run: go tool govulncheck ./...
+
       - name: Test
         env:
           TIGER_PUBLIC_KEY_INTEGRATION: ${{ secrets.TIGER_PUBLIC_KEY_INTEGRATION }}
