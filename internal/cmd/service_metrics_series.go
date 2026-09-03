@@ -123,9 +123,9 @@ full list of raw data points.`,
 	registerFlagCompletion(cmd, "role", metricsSeriesRoleCompletion)
 	registerFlagCompletion(cmd, "fn", metricsSeriesFnCompletion)
 
-	cmd.MarkFlagRequired("metric")
-	cmd.MarkFlagRequired("from")
-	cmd.MarkFlagRequired("to")
+	markFlagRequired(cmd, "metric")
+	markFlagRequired(cmd, "from")
+	markFlagRequired(cmd, "to")
 
 	return cmd
 }
