@@ -198,11 +198,20 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			// The candidates are the extensions to filter by, not completions.
-			name:       "--config-path completes config files",
+			// A client's config file can be named anything, so this asks for
+			// the shell's unfiltered file completion.
+			name:       "--config-path completes any file",
 			args:       []string{"__complete", "mcp", "install", "--config-path", ""},
-			wantStdout: "json\ntoml\n:8\n",
-			wantStderr: "Completion ended with directive: ShellCompDirectiveFilterFileExt\n",
+			wantStdout: ":0\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveDefault\n",
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// Same for a SQL file.
+			name:       "--file completes any file",
+			args:       []string{"__complete", "db", "query", "--file", ""},
+			wantStdout: ":0\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveDefault\n",
 			checks:     []checkFunc{checkNotLoaded},
 		},
 	})
