@@ -84,6 +84,7 @@ tiger auth login
 	cmd.PersistentFlags().Bool("version-check", true, "check for updates on startup")
 	registerFlagCompletion(cmd, "password-storage", passwordStorageCompletion)
 	registerFlagCompletion(cmd, "config-dir", dirCompletion)
+	registerFlagCompletion(cmd, "service-id", serviceIDFlagCompletion(app))
 
 	// --skip-update-check is the former spelling of --version-check=false, kept
 	// present (but hidden) for backwards compatibility. wrapCommands maps it onto

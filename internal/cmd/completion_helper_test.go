@@ -83,6 +83,22 @@ func TestCompletion(t *testing.T) {
 			wantStderr: directive,
 		},
 		{
+			name:       "--service-id lists services with their names",
+			args:       []string{"__complete", "service", "get", "--service-id", ""},
+			setup:      listServices,
+			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// The flag isn't positional, so unlike the argument it still
+			// completes once a service ID has been typed.
+			name:       "--service-id completes after a positional argument",
+			args:       []string{"__complete", "service", "get", "svc-12345", "--service-id", ""},
+			setup:      listServices,
+			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
 			name: "project ID lists projects with their names",
 			args: []string{"__complete", "project", "use", ""},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
