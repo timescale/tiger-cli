@@ -79,7 +79,7 @@ Place a helper by who calls it, working down this list until one matches:
 4. **A genuine standalone utility** — small and isolated, with no notion of a command → `internal/util`. Anything shaped around the CLI stays in `cmd` even if its signature looks generic.
 5. **Used by both CLI and MCP** → `internal/common`.
 
-Exception: all shell completion functions — both `ValidArgsFunction` completions and flag-value completions — live in `completion_helper.go`, however many commands use them. Register a flag's completion with `registerFlagCompletion`, which panics on the programming errors cobra reports by returning an error. A flag that takes a path is the one case that needs a completion just to opt back in to filenames: register `dirCompletion`, or `fileCompletion` with the extensions to filter by (or none, for any file).
+Exception: all shell completion functions — both `ValidArgsFunction` completions and flag-value completions — live in `completion_helper.go`, however many commands use them. Register a flag's completion with `registerFlagCompletion`, and mark a flag required with `markFlagRequired` — both live in `flag_helper.go` and panic on the programming errors cobra reports by returning an error. A flag that takes a path is the one case that needs a completion just to opt back in to filenames: register `dirCompletion`, or `fileCompletion` with the extensions to filter by (or none, for any file).
 
 ## Configuration
 

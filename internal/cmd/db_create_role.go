@@ -168,7 +168,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 
-	cmd.MarkFlagRequired("name")
+	markFlagRequired(cmd, "name")
 
 	return cmd
 }
