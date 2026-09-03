@@ -23,12 +23,16 @@ func registerFlagCompletion(cmd *cobra.Command, flag string, f cobra.CompletionF
 	}
 }
 
-// dirCompletion completes directory names, and fileCompletion file names with
-// the given extensions. Completion defaults to offering nothing at all (see
-// buildRootCmd), so a flag that takes a path has to ask for these.
+// dirCompletion completes directory names, and fileCompletion file names —
+// filtered to the given extensions, or any file when called with none.
+// Completion defaults to offering nothing at all (see buildRootCmd), so a flag
+// that takes a path has to ask for these.
 var dirCompletion = cobra.FixedCompletions(nil, cobra.ShellCompDirectiveFilterDirs)
 
 func fileCompletion(extensions ...string) cobra.CompletionFunc {
+	if len(extensions) == 0 {
+		return cobra.FixedCompletions(nil, cobra.ShellCompDirectiveDefault)
+	}
 	return cobra.FixedCompletions(extensions, cobra.ShellCompDirectiveFilterFileExt)
 }
 

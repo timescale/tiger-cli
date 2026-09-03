@@ -144,7 +144,8 @@ read-only while leaving DEV services writable.`,
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "Query timeout duration (e.g., 30s, 5m). Use 0 for no timeout")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (table, json, yaml)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "file", fileCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 	cmd.MarkFlagsMutuallyExclusive("command", "file")
 
 	return cmd
