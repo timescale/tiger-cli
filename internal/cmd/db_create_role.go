@@ -174,8 +174,8 @@ PostgreSQL Configuration Parameters That May Be Set:
 }
 
 // buildCreateRoleSQL generates the CREATE ROLE SQL statement with LOGIN, PASSWORD, and optional IN ROLE clause
-func buildCreateRoleSQL(name string, quotedPassword string, fromRoles []string) string {
-	sanitizedRoleName := pgx.Identifier{name}.Sanitize()
+func buildCreateRoleSQL(roleName string, quotedPassword string, fromRoles []string) string {
+	sanitizedRoleName := pgx.Identifier{roleName}.Sanitize()
 	createSQL := fmt.Sprintf("CREATE ROLE %s WITH LOGIN PASSWORD %s", sanitizedRoleName, quotedPassword)
 
 	// Add IN ROLE clause if fromRoles is specified
@@ -192,20 +192,20 @@ func buildCreateRoleSQL(name string, quotedPassword string, fromRoles []string) 
 }
 
 // buildReadOnlyAlterSQL generates the ALTER ROLE SQL statement for read-only enforcement
-func buildReadOnlyAlterSQL(name string) string {
-	sanitizedRoleName := pgx.Identifier{name}.Sanitize()
+func buildReadOnlyAlterSQL(roleName string) string {
+	sanitizedRoleName := pgx.Identifier{roleName}.Sanitize()
 	return fmt.Sprintf("ALTER ROLE %s SET tsdb_admin.read_only_role = true", sanitizedRoleName)
 }
 
 // buildStatementTimeoutAlterSQL generates the ALTER ROLE SQL statement for statement timeout configuration
-func buildStatementTimeoutAlterSQL(name string, timeout time.Duration) string {
-	sanitizedRoleName := pgx.Identifier{name}.Sanitize()
+func buildStatementTimeoutAlterSQL(roleName string, timeout time.Duration) string {
+	sanitizedRoleName := pgx.Identifier{roleName}.Sanitize()
 	timeoutMs := timeout.Milliseconds()
 	return fmt.Sprintf("ALTER ROLE %s SET statement_timeout = %d", sanitizedRoleName, timeoutMs)
 }
 
 // createRoleWithOptions creates a new PostgreSQL role with all specified options in a single transaction
-func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, name, rolePassword string, readOnly bool, statementTimeout time.Duration, fromRoles []string) error {
+func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePassword string, readOnly bool, statementTimeout time.Duration, fromRoles []string) error {
 	// Begin transaction for atomic operation
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -240,13 +240,13 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, name, rolePasswo
 		// Use timescale_functions.create_bare_readonly_role to create the role
 		// This function creates a read-only role that can inherit tsdbadmin privileges
 		if _, err := tx.Exec(ctx, "SELECT timescale_functions.create_bare_readonly_role($1, $2)",
-			name, rolePassword); err != nil {
+			roleName, rolePassword); err != nil {
 			return fmt.Errorf("failed to create role with create_bare_readonly_role: %w", err)
 		}
 
 		// Grant tsdbadmin privileges using the special function
 		if _, err := tx.Exec(ctx, "SELECT timescale_functions.grant_tsdbadmin_to_role($1)",
-			name); err != nil {
+			roleName); err != nil {
 			return fmt.Errorf("failed to grant tsdbadmin privileges: %w", err)
 		}
 
@@ -255,7 +255,7 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, name, rolePasswo
 		for _, role := range otherRoles {
 			grantSQL := fmt.Sprintf("GRANT %s TO %s",
 				pgx.Identifier{role}.Sanitize(),
-				pgx.Identifier{name}.Sanitize())
+				pgx.Identifier{roleName}.Sanitize())
 			if _, err := tx.Exec(ctx, grantSQL); err != nil {
 				return fmt.Errorf("failed to grant role %s: %w", role, err)
 			}
@@ -269,14 +269,14 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, name, rolePasswo
 		// Wrap password in single quotes for SQL literal
 		quotedPassword := "'" + rolePassword + "'"
 		// IN ROLE clause handles all role grants, so no need for separate GRANT statements
-		createSQL := buildCreateRoleSQL(name, quotedPassword, fromRoles)
+		createSQL := buildCreateRoleSQL(roleName, quotedPassword, fromRoles)
 		if _, err := tx.Exec(ctx, createSQL); err != nil {
 			return fmt.Errorf("failed to create role: %w", err)
 		}
 
 		// Configure read-only mode if requested
 		if readOnly {
-			alterSQL := buildReadOnlyAlterSQL(name)
+			alterSQL := buildReadOnlyAlterSQL(roleName)
 			if _, err := tx.Exec(ctx, alterSQL); err != nil {
 				return fmt.Errorf("failed to configure read-only mode: %w", err)
 			}
@@ -285,7 +285,7 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, name, rolePasswo
 
 	// Set statement timeout if requested
 	if statementTimeout > 0 {
-		alterSQL := buildStatementTimeoutAlterSQL(name, statementTimeout)
+		alterSQL := buildStatementTimeoutAlterSQL(roleName, statementTimeout)
 		if _, err := tx.Exec(ctx, alterSQL); err != nil {
 			return fmt.Errorf("failed to set statement timeout: %w", err)
 		}
@@ -329,9 +329,9 @@ type CreateRoleResult struct {
 }
 
 // outputCreateRoleResult formats and outputs the create role result
-func outputCreateRoleResult(cmd *cobra.Command, name string, readOnly bool, statementTimeout time.Duration, fromRoles []string, format string) error {
+func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, statementTimeout time.Duration, fromRoles []string, format string) error {
 	result := CreateRoleResult{
-		RoleName: name,
+		RoleName: roleName,
 		ReadOnly: readOnly,
 	}
 
@@ -351,7 +351,7 @@ func outputCreateRoleResult(cmd *cobra.Command, name string, readOnly bool, stat
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, result)
 	default: // table format
-		cmd.Printf("✓ Role '%s' created successfully\n", name)
+		cmd.Printf("✓ Role '%s' created successfully\n", roleName)
 		if readOnly {
 			cmd.Printf("  Read-only enforcement: enabled (permanent, role-based)\n")
 		}

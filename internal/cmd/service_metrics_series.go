@@ -21,7 +21,7 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var from string
 	var to string
 	var role string
-	var filter []string
+	var filters []string
 	var bucketSeconds int
 	var fn string
 
@@ -62,7 +62,7 @@ full list of raw data points.`,
 				return fmt.Errorf("--to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): %w", err)
 			}
 
-			labelFilters, err := parseMetricFilters(role, filter)
+			labelFilters, err := parseMetricFilters(role, filters)
 			if err != nil {
 				return err
 			}
@@ -115,7 +115,7 @@ full list of raw data points.`,
 	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339)")
 	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339)")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
-	cmd.Flags().StringSliceVar(&filter, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
+	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
