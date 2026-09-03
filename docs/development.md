@@ -182,6 +182,13 @@ Generation is configured by `internal/api/types.yaml` and
 conventions (`ServiceID`, `CPUMillis`) and prefix enum constants with their type
 name (`api.DeployStatusREADY`).
 
+`openapi.yaml` is a verbatim copy of the Tiger Cloud API's own spec, which is
+the source of truth. Don't edit it here, and don't edit the generated files
+either. To pick up an API change, sync `openapi.yaml` from the upstream spec and
+regenerate. If the CLI needs something the spec doesn't describe, the change has
+to land in the upstream spec first. CI runs `go generate ./...` and fails if the
+result differs from what's committed.
+
 ## Development Best Practices
 
 1. **Always use go fmt** after making file changes and before committing
