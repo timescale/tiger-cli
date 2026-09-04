@@ -106,6 +106,7 @@ const (
 	VSCode      MCPClient = "vscode"
 	Antigravity MCPClient = "antigravity"
 	KiroCLI     MCPClient = "kiro-cli"
+	Copilot     MCPClient = "copilot" // Both the IDE and the CLI
 )
 
 // MCPServerConfig represents the MCP server configuration
@@ -246,6 +247,17 @@ var supportedClients = []clientConfig{
 		},
 		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return []string{"kiro-cli", "mcp", "add", "--name", serverName, "--command", command, "--args", strings.Join(args, ",")}, nil
+		},
+	},
+	{
+		ClientType:  Copilot,
+		Name:        "GitHub Copilot CLI",
+		EditorNames: []string{"copilot", "copilot-cli"},
+		ConfigPaths: []string{
+			"~/.copilot/mcp-config.json",
+		},
+		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
 		},
 	},
 }
@@ -662,7 +674,7 @@ func createConfigBackup(configPath string) (string, error) {
 
 	// Get original file mode, fallback to 0600 if unavailable
 	origInfo, err := os.Stat(configPath)
-	var mode fs.FileMode = 0600
+	var mode fs.FileMode = 0o600
 	if err == nil {
 		mode = origInfo.Mode().Perm()
 	}
@@ -685,7 +697,7 @@ func createConfigBackup(configPath string) (string, error) {
 func addMCPServerViaJSON(configPath, mcpServersPathPrefix, serverName, command string, args []string) error {
 	// Create configuration directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create configuration directory %s: %w", configDir, err)
 	}
 
@@ -696,7 +708,7 @@ func addMCPServerViaJSON(configPath, mcpServersPathPrefix, serverName, command s
 	}
 
 	// Get original file mode to preserve it, fallback to 0600 for new files
-	var fileMode fs.FileMode = 0600
+	var fileMode fs.FileMode = 0o600
 	if info, err := os.Stat(configPath); err == nil {
 		fileMode = info.Mode().Perm()
 	}

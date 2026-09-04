@@ -150,6 +150,7 @@ tiger mcp install
 # Or specify your client directly
 tiger mcp install claude-code    # Claude Code
 tiger mcp install codex          # Codex
+tiger mcp install copilot        # GitHub Copilot CLI
 tiger mcp install cursor         # Cursor IDE
 tiger mcp install gemini         # Gemini CLI
 tiger mcp install vscode         # VS Code
