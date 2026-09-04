@@ -349,11 +349,11 @@ func runCommand(
 	// Always include flags that prevent side effects in tests:
 	// --config-dir: isolate from real config
 	// --analytics=false: prevent analytics calls on the mock
-	// --skip-update-check: prevent version check HTTP calls
+	// --version-check=false: prevent version check HTTP calls
 	baseArgs := []string{
 		"--config-dir", configDir,
 		"--analytics=false",
-		"--skip-update-check",
+		"--version-check=false",
 	}
 	cmd.SetArgs(append(baseArgs, args...))
 

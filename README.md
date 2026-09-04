@@ -287,7 +287,7 @@ These flags are available on all commands and take precedence over both environm
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
 - `--service-id <id>` - Specify service ID
-- `--skip-update-check` - Skip checking for updates on startup (default: `false`)
+- `--version-check` - Enable/disable checking for updates on startup
 - `-h, --help` - Show help information
 
 ## Contributing

@@ -68,14 +68,13 @@ tiger auth login
 	})
 
 	// Add persistent flags. Values are read back from the config (see
-	// flagBindings in internal/config) rather than from the flag variables, so
-	// only --skip-update-check — which isn't a config value — is captured here.
+	// flagBindings in internal/config) rather than from flag variables.
 	cmd.PersistentFlags().Bool("analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().Bool("color", true, "enable colored output")
 	cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().String("service-id", "", "service ID")
-	skipUpdateCheck := cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
+	cmd.PersistentFlags().Bool("version-check", true, "check for updates on startup")
 	cmd.RegisterFlagCompletionFunc("password-storage", passwordStorageCompletion)
 
 	// Add all subcommands
@@ -88,7 +87,7 @@ tiger auth login
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
 
-	wrapCommands(cmd, app, skipUpdateCheck)
+	wrapCommands(cmd, app)
 
 	return cmd, app, nil
 }
@@ -104,7 +103,7 @@ tiger auth login
 // keyring, and the network. Completion functions that do need the config or
 // client load on demand via withAppLoad. Group commands (`tiger service`) have no
 // RunE of their own and only print help, so they're skipped as well.
-func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
+func wrapCommands(cmd *cobra.Command, app *common.App) {
 	// Wrap this command's RunE if it exists
 	if cmd.RunE != nil {
 		originalRunE := cmd.RunE
@@ -124,7 +123,7 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 
 			// Check for a newer release in the background, printing the result
 			// after the command's own output.
-			defer versionCheck(c, cfg, *skipUpdateCheck)()
+			defer versionCheck(c, cfg)()
 
 			// Track analytics. The config and client are re-read from the App so
 			// changes the command made are reflected: `tiger config set analytics
@@ -149,7 +148,7 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 
 	// Recursively wrap all children
 	for _, child := range cmd.Commands() {
-		wrapCommands(child, app, skipUpdateCheck)
+		wrapCommands(child, app)
 	}
 }
 
@@ -160,10 +159,10 @@ func wrapCommands(cmd *cobra.Command, app *common.App, skipUpdateCheck *bool) {
 // The check is limited to interactive, non-CI terminals. `tiger version --check`
 // runs its own synchronous check and `tiger upgrade` performs its own version
 // comparison, so both are excluded to avoid a duplicate notice.
-func versionCheck(cmd *cobra.Command, cfg *config.Config, skipUpdateCheck bool) func() {
+func versionCheck(cmd *cobra.Command, cfg *config.Config) func() {
 	isVersionCheckCmd := cmd.Name() == "version" && cmd.Flag("check") != nil && cmd.Flag("check").Changed
 	isUpgradeCmd := cmd.Name() == "upgrade"
-	if !cfg.VersionCheck || skipUpdateCheck || isVersionCheckCmd || isUpgradeCmd ||
+	if !cfg.VersionCheck || isVersionCheckCmd || isUpgradeCmd ||
 		util.IsCI() || !util.IsTerminal(cmd.ErrOrStderr()) {
 		return func() {}
 	}
