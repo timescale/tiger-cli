@@ -18,7 +18,6 @@ import (
 )
 
 func buildStatusCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:               "status",
 		Aliases:           []string{"whoami"},
@@ -66,7 +65,6 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 
 // outputAuthInfo formats and outputs authentication information based on the specified format
 func outputAuthInfo(cmd *cobra.Command, authInfo api.AuthInfo, format string) error {
-
 	outputWriter := cmd.OutOrStdout()
 
 	switch strings.ToLower(format) {

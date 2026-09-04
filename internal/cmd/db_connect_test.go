@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"errors"
-	"github.com/zalando/go-keyring"
 	"io"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
+	"github.com/zalando/go-keyring"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"

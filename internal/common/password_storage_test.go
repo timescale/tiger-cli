@@ -2,11 +2,12 @@ package common
 
 import (
 	"fmt"
-	"github.com/zalando/go-keyring"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zalando/go-keyring"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"

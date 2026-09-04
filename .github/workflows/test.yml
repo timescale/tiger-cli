@@ -37,6 +37,9 @@ jobs:
           go generate ./...
           git diff --exit-code || { echo "::error::generated files are out of date; run 'go generate ./...' and commit the result (never edit generated files by hand)"; exit 1; }
 
+      - name: Format
+        run: go tool gofumpt -d . || { echo "::error::files are not gofumpt-formatted; run 'go tool gofumpt -w .' and commit the result"; exit 1; }
+
       - name: Build
         run: go build ./...
 

@@ -191,7 +191,7 @@ result differs from what's committed.
 
 ## Development Best Practices
 
-1. **Always use go fmt** after making file changes and before committing
+1. **Always format with gofumpt** (`go tool gofumpt -w .`) after making file changes and before committing; it's a stricter superset of `go fmt`, and CI fails on unformatted files
 2. **Write tests** for new functionality
 3. **Update documentation** when adding new features or commands
 4. **Follow the existing code structure** and patterns
@@ -207,7 +207,7 @@ result differs from what's committed.
 3. **Make your changes** following the code style and patterns
 4. **Add tests** for new functionality
 5. **Run all tests** to ensure nothing breaks: `go test ./...`
-6. **Run go fmt** to format your code: `go fmt ./...`
+6. **Run gofumpt** to format your code: `go tool gofumpt -w .`
 7. **Update documentation** if needed
 8. **Submit a pull request** with a clear description of changes
 

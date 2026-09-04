@@ -522,14 +522,14 @@ func checkDefaultService(want string) checkFunc {
 // which is what makes a seeded config file a real precedence test.
 func writeConfigFile(t *testing.T, configDir string, values map[string]any) {
 	t.Helper()
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
 	contents, err := yaml.Marshal(values)
 	if err != nil {
 		t.Fatalf("failed to marshal config values: %v", err)
 	}
-	if err := os.WriteFile(config.GetConfigFile(configDir), contents, 0600); err != nil {
+	if err := os.WriteFile(config.GetConfigFile(configDir), contents, 0o600); err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 }

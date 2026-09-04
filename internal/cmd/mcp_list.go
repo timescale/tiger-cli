@@ -14,7 +14,6 @@ import (
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
 func buildMCPListCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},

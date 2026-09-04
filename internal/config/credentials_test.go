@@ -1,10 +1,11 @@
 package config
 
 import (
-	"github.com/zalando/go-keyring"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/zalando/go-keyring"
 )
 
 func setupCredentialTest(t *testing.T) (string, *Config) {
@@ -36,7 +37,7 @@ func TestStoreCredentialsToFile(t *testing.T) {
 	}
 
 	// Check file permissions (should be 0600)
-	if info.Mode().Perm() != 0600 {
+	if info.Mode().Perm() != 0o600 {
 		t.Errorf("Expected file permissions 0600, got %o", info.Mode().Perm())
 	}
 
@@ -58,7 +59,7 @@ func TestGetCredentialsFromFile(t *testing.T) {
 	// Write credentials to file in JSON format
 	credentialsFile := filepath.Join(tmpDir, "credentials")
 	jsonData := `{"api_key":"public:secret","project_id":"project456"}`
-	if err := os.WriteFile(credentialsFile, []byte(jsonData), 0600); err != nil {
+	if err := os.WriteFile(credentialsFile, []byte(jsonData), 0o600); err != nil {
 		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 
@@ -96,7 +97,7 @@ func TestRemoveCredentialsFromFile(t *testing.T) {
 
 	// Write credentials to file
 	credentialsFile := filepath.Join(tmpDir, "credentials")
-	if err := os.WriteFile(credentialsFile, []byte(`{"api_key":"test:key","project_id":"test-proj"}`), 0600); err != nil {
+	if err := os.WriteFile(credentialsFile, []byte(`{"api_key":"test:key","project_id":"test-proj"}`), 0o600); err != nil {
 		t.Fatalf("Failed to write test credentials file: %v", err)
 	}
 

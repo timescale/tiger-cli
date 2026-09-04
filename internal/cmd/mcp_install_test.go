@@ -108,7 +108,7 @@ func TestMCPInstallCmd(t *testing.T) {
 	seed := func(caseName, content string, mode os.FileMode) string {
 		t.Helper()
 		p := path(caseName)
-		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatalf("failed to create config dir: %v", err)
 		}
 		if err := os.WriteFile(p, []byte(content), mode); err != nil {
@@ -122,19 +122,19 @@ func TestMCPInstallCmd(t *testing.T) {
 	stubBin := t.TempDir()
 	argvFile := filepath.Join(stubBin, "argv")
 	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
-	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0o755); err != nil {
 		t.Fatalf("failed to write claude stub: %v", err)
 	}
 	cliHome := t.TempDir()
 
-	mergePath := seed("merge", `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`, 0644)
-	otherPath := seed("other", `{"other": "config"}`, 0644)
-	idempotentPath := seed("idempotent", `{"mcpServers": {"existing": {"command": "existing", "args": ["arg1"]}, "tiger": {"command": "/old/path/to/tiger", "args": ["old", "args"]}}}`, 0644)
-	emptyPath := seed("empty", "", 0644)
+	mergePath := seed("merge", `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`, 0o644)
+	otherPath := seed("other", `{"other": "config"}`, 0o644)
+	idempotentPath := seed("idempotent", `{"mcpServers": {"existing": {"command": "existing", "args": ["arg1"]}, "tiger": {"command": "/old/path/to/tiger", "args": ["old", "args"]}}}`, 0o644)
+	emptyPath := seed("empty", "", 0o644)
 	backupInitial := `{"mcpServers": {"existing": {"command": "test", "args": ["arg1"]}}}`
-	backupPath := seed("backup", backupInitial, 0644)
-	permsPath := seed("perms", `{"test": "data"}`, 0600)
-	badPath := seed("bad", `{invalid json`, 0644)
+	backupPath := seed("backup", backupInitial, 0o644)
+	permsPath := seed("perms", `{"test": "data"}`, 0o600)
+	badPath := seed("bad", `{invalid json`, 0o644)
 
 	// For "backup fails when config is unreadable": the directory is made
 	// unreadable by that case's setup hook, so the paths are just declared here.
@@ -175,7 +175,7 @@ func TestMCPInstallCmd(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to stat config file: %v", err)
 				}
-				if got := info.Mode().Perm(); got != 0600 {
+				if got := info.Mode().Perm(); got != 0o600 {
 					t.Errorf("new config file mode = %o, want 0600", got)
 				}
 				if backups := backupFiles(t, path("fresh")); len(backups) != 0 {
@@ -299,7 +299,7 @@ func TestMCPInstallCmd(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed to stat %s: %v", p, err)
 					}
-					if got := info.Mode().Perm(); got != 0600 {
+					if got := info.Mode().Perm(); got != 0o600 {
 						t.Errorf("%s mode = %o, want 0600", p, got)
 					}
 				}
@@ -364,16 +364,16 @@ func TestMCPInstallCmd(t *testing.T) {
 				if os.Geteuid() == 0 {
 					t.Skip("cannot test permission errors as root user")
 				}
-				if err := os.MkdirAll(lockedDir, 0755); err != nil {
+				if err := os.MkdirAll(lockedDir, 0o755); err != nil {
 					t.Fatalf("failed to create dir: %v", err)
 				}
-				if err := os.WriteFile(lockedConfigPath, []byte(`{"test": "data"}`), 0644); err != nil {
+				if err := os.WriteFile(lockedConfigPath, []byte(`{"test": "data"}`), 0o644); err != nil {
 					t.Fatalf("failed to seed config file: %v", err)
 				}
-				if err := os.Chmod(lockedDir, 0444); err != nil {
+				if err := os.Chmod(lockedDir, 0o444); err != nil {
 					t.Fatalf("failed to chmod dir: %v", err)
 				}
-				t.Cleanup(func() { os.Chmod(lockedDir, 0755) })
+				t.Cleanup(func() { os.Chmod(lockedDir, 0o755) })
 			})},
 			wantErr: fmt.Sprintf("failed to create backup: failed to read original config file: open %s: permission denied", lockedConfigPath),
 		},
@@ -449,7 +449,7 @@ func TestFindClientConfigFile(t *testing.T) {
 
 	t.Run("finds existing config file", func(t *testing.T) {
 		configPath := filepath.Join(t.TempDir(), "config.json")
-		if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		got, err := findClientConfigFile([]string{configPath})
@@ -474,7 +474,7 @@ func TestFindClientConfigFile(t *testing.T) {
 		first := filepath.Join(dir, "first.json")
 		second := filepath.Join(dir, "second.json")
 		for _, p := range []string{first, second} {
-			if err := os.WriteFile(p, []byte(`{}`), 0644); err != nil {
+			if err := os.WriteFile(p, []byte(`{}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -488,7 +488,7 @@ func TestFindClientConfigFile(t *testing.T) {
 	t.Run("expands environment variables", func(t *testing.T) {
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "config.json")
-		if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		t.Setenv("FINDCONFIGFILE_TEST_DIR", dir)
@@ -515,7 +515,6 @@ func TestFindClientConfigFile(t *testing.T) {
 			}
 		}
 	})
-
 }
 
 // TestAddMCPServerViaCLI covers the CLI-based install path, which the command
@@ -583,7 +582,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 // command tests can't reach: every supported JSON client uses /mcpServers.
 func TestAddMCPServerViaJSON(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(configPath, []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := addMCPServerViaJSON(configPath, "/servers", "tiger", "tiger", []string{"mcp", "start"}); err != nil {

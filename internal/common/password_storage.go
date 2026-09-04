@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/zalando/go-keyring"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/zalando/go-keyring"
 )
 
 // buildPasswordKeyringUsername creates a unique keyring username for service passwords
@@ -135,7 +136,7 @@ func (p *PgpassStorage) Save(service api.Service, password string, role string) 
 	entry := fmt.Sprintf("%s:%s:%s:%s:%s\n", host, port, database, username, password)
 
 	// Append to .pgpass file with restricted permissions
-	file, err := os.OpenFile(pgpassPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(pgpassPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open .pgpass file: %w", err)
 	}
@@ -273,7 +274,7 @@ func (p *PgpassStorage) removeEntry(pgpassPath, host, port, username string) err
 	}
 
 	// Set proper permissions and replace the original file
-	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
+	if err := os.Chmod(tmpFile.Name(), 0o600); err != nil {
 		return fmt.Errorf("failed to set permissions on temporary file: %w", err)
 	}
 

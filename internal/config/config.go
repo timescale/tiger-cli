@@ -396,7 +396,7 @@ func getEffectiveConfigDir(flags *pflag.FlagSet) string {
 }
 
 func ensureConfigDir(configDir string) (string, error) {
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return "", fmt.Errorf("error creating config directory: %w (set TIGER_CONFIG_DIR or --config-dir to a writable path)", err)
 	}
 	return GetConfigFile(configDir), nil
