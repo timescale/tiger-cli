@@ -1,0 +1,3 @@
+internal/api/types.go -diff
+internal/api/client.go -diff
+internal/api/mocks/mock_client.go -diff
