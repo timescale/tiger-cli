@@ -130,7 +130,6 @@ func TestServiceListCmd(t *testing.T) {
     host: svc-12345.project.tsdb.cloud.timescale.com
     port: 5432
   host: svc-12345.project.tsdb.cloud.timescale.com
-  metrics: null
   name: test-service
   port: 5432
   project_id: test-project-123
@@ -152,7 +151,6 @@ func TestServiceListCmd(t *testing.T) {
     host: svc-67890.project.tsdb.cloud.timescale.com
     port: 5432
   host: svc-67890.project.tsdb.cloud.timescale.com
-  metrics: null
   name: analytics-db
   port: 5432
   project_id: test-project-123
@@ -207,7 +205,6 @@ const serviceListJSON = `[
       "host": "svc-12345.project.tsdb.cloud.timescale.com",
       "port": 5432
     },
-    "metrics": null,
     "name": "test-service",
     "project_id": "test-project-123",
     "region_code": "us-east-1",
@@ -236,7 +233,6 @@ const serviceListJSON = `[
       "host": "svc-67890.project.tsdb.cloud.timescale.com",
       "port": 5432
     },
-    "metrics": null,
     "name": "analytics-db",
     "project_id": "test-project-123",
     "region_code": "eu-west-1",

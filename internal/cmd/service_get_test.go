@@ -170,7 +170,6 @@ func TestServiceGetCmd(t *testing.T) {
     "host": "svc-12345.project.tsdb.cloud.timescale.com",
     "port": 5432
   },
-  "metrics": null,
   "name": "test-service",
   "project_id": "test-project-123",
   "region_code": "us-east-1",
@@ -207,7 +206,6 @@ endpoint:
   host: svc-12345.project.tsdb.cloud.timescale.com
   port: 5432
 host: svc-12345.project.tsdb.cloud.timescale.com
-metrics: null
 name: test-service
 port: 5432
 project_id: test-project-123

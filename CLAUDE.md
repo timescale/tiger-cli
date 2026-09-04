@@ -29,7 +29,7 @@ Use the official product names in all user-facing text (documentation, code comm
 - **`pkg/`** - Public Go packages. Contains `mcpinstall`, an API for installing MCP server configurations into AI coding assistants and editors, exposed as thin aliases over the `mcp install` logic in `internal/cmd`. Changes to install behavior are part of this package's public surface.
 - **`docs/`** - Documentation. `development.md` is the development guide (building from source, testing, contributing).
 - **`scripts/`** - Build and installation scripts (`install.sh`, `install.ps1`, completions generation) and the integration test runner (`test-integration.sh`).
-- **`openapi.yaml`** - OpenAPI spec for the Tiger Cloud API, from which the API client is generated.
+- **`openapi.yaml`** - OpenAPI spec for the Tiger Cloud API, from which the API client is generated. It is a verbatim copy synced from the API's own spec and is never edited here (see [Code Generation](#code-generation)).
 - **`.github/`** - GitHub Actions CI/CD workflows for testing (`test.yml`) and releases (`release.yml`).
 - **`.goreleaser.yaml`** - GoReleaser configuration for building and publishing releases.
 - **`Dockerfile`** - The container image published to `ghcr.io/timescale/tiger-cli`, which defaults to running `tiger mcp start`.
@@ -41,18 +41,22 @@ Use the official product names in all user-facing text (documentation, code comm
 ```bash
 go install ./...   # build and install the tiger binary
 go test ./...      # run all tests (integration tests skip without credentials)
-go generate ./...  # regenerate the API client and mocks after editing openapi.yaml
+go generate ./...  # regenerate the API client and mocks after syncing openapi.yaml
 ```
 
 You can also run without installing via `go run ./cmd/tiger --help`.
 
-Before committing, run `go fmt ./...`, `go vet ./...`, `go fix -diff ./...`, `go tool staticcheck ./...` (staticcheck is declared as a build-time tool in `go.mod`'s `tool` block), and `go test ./...`.
+Before committing, run `go fmt ./...`, `go vet ./...`, `go fix -diff ./...`, `go tool staticcheck ./...`, `go tool govulncheck ./...`, and `go test ./...` (staticcheck and govulncheck are declared as build-time tools in `go.mod`'s `tool` block).
 
 Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [any go test flags]`, which loads environment variables from `.env`, builds the binary, and defaults to `-run Integration`. Credentials come from `TIGER_PUBLIC_KEY_INTEGRATION`, `TIGER_SECRET_KEY_INTEGRATION`, and `TIGER_API_URL_INTEGRATION`. Optionally, `TIGER_EXISTING_SERVICE_ID_INTEGRATION` tests the database commands against an existing service, and `TIGER_UPGRADE_INTEGRATION` runs the upgrade test against the live release CDN.
 
+## Dependency Updates
+
+To upgrade dependencies, run `go get -u -t ./... tool` followed by `go mod tidy`. The `-t` flag and the `tool` target ensure test and tool dependencies are upgraded too, not just those imported by the main build. Then run `go generate ./...` to regenerate the API client and mocks with the new tool versions (CI fails on a stale regeneration), run the pre-commit checks from [Build & Test](#build--test), and commit the regenerated files with the `go.mod`/`go.sum` changes. If a transitive dependency breaks the build or generation, pin it back with `go get <module>@<version>` rather than skipping the upgrade.
+
 ## Code Generation
 
-The API client and mocks in `internal/api/` are generated from `openapi.yaml`. Never edit `client.go`, `types.go`, or `mocks/mock_client.go` by hand — edit the spec and run `go generate ./...` to regenerate everything. If the mock is stale, `go vet` will report that it no longer implements the client interface.
+The API client and mocks in `internal/api/` are generated from `openapi.yaml`, which is itself a verbatim copy of the Tiger Cloud API's own spec — the single source of truth. Nothing in this chain is edited by hand in this repo: not `client.go`, `types.go`, or `mocks/mock_client.go`, and not `openapi.yaml` either. If the CLI needs something the spec lacks, or the API returns something the spec doesn't describe, the change lands in the upstream spec first; then sync `openapi.yaml` from it and run `go generate ./...` to regenerate everything (CI enforces this — see [CI](#ci)). If the mock is stale, `go vet` will report that it no longer implements the client interface.
 
 Generation is configured by `internal/api/types.yaml` and `internal/api/client.yaml` rather than command-line flags. Both set `name-normalizer: ToCamelCaseWithInitialisms` (generated names capitalize initialisms the Go way: `ServiceID`, not `ServiceId`) and `always-prefix-enum-values: true` (enum constants are prefixed with their type: `api.DeployStatusREADY`, so values from different enums can't collide). Keep the two configs in sync with each other — changing either option renames identifiers across the whole codebase.
 
@@ -251,7 +255,7 @@ This file is pulled into every agent session, so unnecessary detail bloats conte
 
 ## CI
 
-`test.yml` runs the test suite on pull requests and pushes to `main`. CI needs no keyring setup — `TestMain` swaps in the in-memory mock.
+`test.yml` runs the test suite on pull requests and pushes to `main`. CI needs no keyring setup — `TestMain` swaps in the in-memory mock. It also runs `go generate ./...` and fails on any resulting diff, so hand edits to generated files or a stale regeneration after a spec change don't merge.
 
 ## Releases
 

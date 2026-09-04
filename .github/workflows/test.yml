@@ -32,6 +32,11 @@ jobs:
       - name: Mod
         run: go mod tidy --diff
 
+      - name: Generate
+        run: |
+          go generate ./...
+          git diff --exit-code || { echo "::error::generated files are out of date; run 'go generate ./...' and commit the result (never edit generated files by hand)"; exit 1; }
+
       - name: Build
         run: go build ./...
 
@@ -43,6 +48,9 @@ jobs:
 
       - name: Staticcheck
         run: go tool staticcheck ./...
+
+      - name: Govulncheck
+        run: go tool govulncheck ./...
 
       - name: Test
         env:
