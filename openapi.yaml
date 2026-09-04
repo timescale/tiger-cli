@@ -781,6 +781,84 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/backup-regions:
+    get:
+      operationId: getBackupRegions
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: List All Backup Regions
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves the additional regions this service's backups are copied to
+        (cross-region backups). The region the service runs in is not listed.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: A list of backup regions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupRegion'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    post:
+      operationId: createBackupRegion
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Add a Backup Region
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Starts copying this service's backups to another region. The region is
+        added immediately; existing backups are copied to it in the background.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupRegionCreate'
+      responses:
+        '201':
+          description: The region was added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRegion'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/backup-regions/{region_code}:
+    delete:
+      operationId: deleteBackupRegion
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Remove a Backup Region
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Stops copying this service's backups to a region. Copies already stored
+        there are deleted in the background and cannot be recovered.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BackupRegionCode'
+      responses:
+        '204':
+          description: The region no longer receives copies of this service's backups.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/metrics/available-series:
     get:
       operationId: getServiceMetricsAvailableSeries
@@ -1041,6 +1119,14 @@ components:
         type: string
         minLength: 3
         example: "alb8jicdpr"
+    BackupRegionCode:
+      name: region_code
+      in: path
+      required: true
+      description: The region backups are copied to.
+      schema:
+        type: string
+        example: "eu-central-1"
     VPCId:
       name: vpc_id
       in: path
@@ -1946,6 +2032,33 @@ components:
         - FULL
         - INCREMENTAL
         - UNKNOWN
+    BackupRegion:
+      x-tigerdata-preview: true
+      type: object
+      description: A region that receives copies of a service's backups.
+      required:
+        - region_code
+      properties:
+        region_code:
+          type: string
+          description: The region backups are copied to.
+          example: "eu-central-1"
+        created:
+          type: string
+          format: date-time
+          description: When the region was added.
+          example: "2026-01-15T09:30:00Z"
+    BackupRegionCreate:
+      x-tigerdata-preview: true
+      type: object
+      description: The region to start copying a service's backups to.
+      required:
+        - region_code
+      properties:
+        region_code:
+          type: string
+          description: The region to copy backups to. It cannot be the region the service runs in.
+          example: "eu-central-1"
     Project:
       type: object
       description: A project that organizes your Tiger Cloud resources, such as services and VPCs.

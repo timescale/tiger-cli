@@ -16,12 +16,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// buildServiceBackupsCmd creates the backup command for listing a service's
-// backups. The endpoint is marked preview upstream, so registration is gated on
-// TIGER_EXPERIMENTAL in buildServiceCmd.
-func buildServiceBackupsCmd(app *common.App) *cobra.Command {
+// buildServiceBackupListCmd creates the backup-list command for listing a
+// service's backups. The endpoint is marked preview upstream, so registration
+// is gated on TIGER_EXPERIMENTAL in buildServiceCmd.
+func buildServiceBackupListCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup [service-id]",
+		Use:   "list [service-id]",
 		Short: "List backups for a service",
 		Long: `List the full and incremental backups taken for a database service.
 
@@ -33,13 +33,13 @@ from your configuration.
 
 Examples:
   # List backups for the default service
-  tiger service backup
+  tiger service backup list
 
   # List backups for a specific service
-  tiger service backup svc-12345
+  tiger service backup list svc-12345
 
   # Output as JSON
-  tiger service backup -o json`,
+  tiger service backup list -o json`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
