@@ -50,6 +50,10 @@ Before committing, run `go fmt ./...`, `go vet ./...`, `go fix -diff ./...`, `go
 
 Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [any go test flags]`, which loads environment variables from `.env`, builds the binary, and defaults to `-run Integration`. Credentials come from `TIGER_PUBLIC_KEY_INTEGRATION`, `TIGER_SECRET_KEY_INTEGRATION`, and `TIGER_API_URL_INTEGRATION`. Optionally, `TIGER_EXISTING_SERVICE_ID_INTEGRATION` tests the database commands against an existing service, and `TIGER_UPGRADE_INTEGRATION` runs the upgrade test against the live release CDN.
 
+## Dependency Updates
+
+To upgrade dependencies, run `go get -u -t ./... tool` followed by `go mod tidy`. The `-t` flag and the `tool` target ensure test and tool dependencies are upgraded too, not just those imported by the main build. Then run `go generate ./...` to regenerate the API client and mocks with the new tool versions (CI fails on a stale regeneration), run the pre-commit checks from [Build & Test](#build--test), and commit the regenerated files with the `go.mod`/`go.sum` changes. If a transitive dependency breaks the build or generation, pin it back with `go get <module>@<version>` rather than skipping the upgrade.
+
 ## Code Generation
 
 The API client and mocks in `internal/api/` are generated from `openapi.yaml`, which is itself a verbatim copy of the Tiger Cloud API's own spec — the single source of truth. Nothing in this chain is edited by hand in this repo: not `client.go`, `types.go`, or `mocks/mock_client.go`, and not `openapi.yaml` either. If the CLI needs something the spec lacks, or the API returns something the spec doesn't describe, the change lands in the upstream spec first; then sync `openapi.yaml` from it and run `go generate ./...` to regenerate everything (CI enforces this — see [CI](#ci)). If the mock is stale, `go vet` will report that it no longer implements the client interface.
