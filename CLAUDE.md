@@ -46,7 +46,7 @@ go generate ./...  # regenerate the API client and mocks after syncing openapi.y
 
 You can also run without installing via `go run ./cmd/tiger --help`.
 
-Before committing, run `go fmt ./...`, `go vet ./...`, `go fix -diff ./...`, `go tool staticcheck ./...` (staticcheck is declared as a build-time tool in `go.mod`'s `tool` block), and `go test ./...`.
+Before committing, run `go fmt ./...`, `go vet ./...`, `go fix -diff ./...`, `go tool staticcheck ./...`, `go tool govulncheck ./...`, and `go test ./...` (staticcheck and govulncheck are declared as build-time tools in `go.mod`'s `tool` block).
 
 Integration tests run via `./scripts/test-integration.sh [-v] [-run Pattern] [any go test flags]`, which loads environment variables from `.env`, builds the binary, and defaults to `-run Integration`. Credentials come from `TIGER_PUBLIC_KEY_INTEGRATION`, `TIGER_SECRET_KEY_INTEGRATION`, and `TIGER_API_URL_INTEGRATION`. Optionally, `TIGER_EXISTING_SERVICE_ID_INTEGRATION` tests the database commands against an existing service, and `TIGER_UPGRADE_INTEGRATION` runs the upgrade test against the live release CDN.
 
