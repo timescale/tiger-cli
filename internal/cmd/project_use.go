@@ -22,10 +22,8 @@ is scoped to a single project. To use an API key for another project, run 'tiger
 with that project's keys instead.
 
 The default service (config key service_id) belongs to the project it was set in, so it is
-cleared when you switch away.
-
-Example:
-  tiger project use my-project-id`,
+cleared when you switch away.`,
+		Example:           `  tiger project use my-project-id`,
 		Args:              cobra.ExactArgs(1),
 		SilenceUsage:      true,
 		ValidArgsFunction: projectIDCompletion(app),

@@ -20,13 +20,12 @@ import (
 func buildStatusCmd(app *common.App) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:               "status",
-		Aliases:           []string{"whoami"},
-		Short:             "Show current authentication status and project ID",
-		Long:              "Displays whether you are logged in and shows your currently configured project ID.",
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Use:          "status",
+		Aliases:      []string{"whoami"},
+		Short:        "Show current authentication status and project ID",
+		Long:         "Displays whether you are logged in and shows your currently configured project ID.",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, _, err := app.GetAll()
 			if err != nil {
@@ -59,7 +58,7 @@ func buildStatusCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

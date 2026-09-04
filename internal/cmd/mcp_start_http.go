@@ -16,18 +16,16 @@ import (
 
 // buildMCPHTTPCmd creates the http subcommand with port/host flags
 func buildMCPHTTPCmd(app *common.App) *cobra.Command {
-	var httpPort int
-	var httpHost string
+	var port int
+	var host string
 
 	cmd := &cobra.Command{
 		Use:   "http",
 		Short: "Start MCP server with HTTP transport",
 		Long: `Start the MCP server using HTTP transport.
 
-The server will automatically find an available port if the specified port is busy.
-
-Examples:
-  # Start HTTP server on default port 8080
+The server will automatically find an available port if the specified port is busy.`,
+		Example: `  # Start HTTP server on default port 8080
   tiger mcp start http
 
   # Start HTTP server on custom port
@@ -38,18 +36,17 @@ Examples:
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
-		SilenceErrors:     true, // HTTP server uses slog for all output, including errors
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true, // HTTP server uses slog for all output, including errors
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return startHTTPServer(cmd, app, httpHost, httpPort)
+			return startHTTPServer(cmd, app, host, port)
 		},
 	}
 
 	// Add HTTP-specific flags
-	cmd.Flags().IntVar(&httpPort, "port", 8080, "Port to run HTTP server on")
-	cmd.Flags().StringVar(&httpHost, "host", "localhost", "Host to bind to")
+	cmd.Flags().IntVar(&port, "port", 8080, "Port to run HTTP server on")
+	cmd.Flags().StringVar(&host, "host", "localhost", "Host to bind to")
 
 	return cmd
 }

@@ -15,11 +15,11 @@ import (
 )
 
 func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
-	var roleName string
+	var name string
 	var readOnly bool
-	var fromRoles []string
+	var from []string
 	var statementTimeout time.Duration
-	var passwordFlag string
+	var password string
 
 	cmd := &cobra.Command{
 		Use:     "role [service-id]",
@@ -44,8 +44,20 @@ using the tsdb_admin.read_only_role extension setting. This is designed to provi
 safe database access for AI agents and automated tools that need to read production
 data without risk of modification.
 
-Examples:
-  # Create a role with global database access (uses default service, auto-generates password)
+Technical Details:
+This command executes PostgreSQL statements in a transaction to create and configure the role.
+
+CREATE ROLE Options Used:
+  - LOGIN: Always enabled to allow the role to connect
+  - PASSWORD: Always set (from flag, env var, or auto-generated)
+  - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
+
+PostgreSQL Configuration Parameters That May Be Set:
+  - tsdb_admin.read_only_role: Set to 'true' when --read-only flag is used
+    (enforces permanent read-only mode for the role)
+  - statement_timeout: Set when --statement-timeout flag is provided
+    (kills queries that exceed the specified duration, in milliseconds)`,
+		Example: `  # Create a role with global database access (uses default service, auto-generates password)
   tiger db create role --name ai_analyst --from tsdbadmin
 
   # Create a role for specific service
@@ -67,27 +79,13 @@ Examples:
   tiger db create role --name ai_analyst --password=my-secure-password
 
   # Create a role with password from environment variable
-  TIGER_NEW_PASSWORD=my-secure-password tiger db create role --name ai_analyst
-
-Technical Details:
-This command executes PostgreSQL statements in a transaction to create and configure the role.
-
-CREATE ROLE Options Used:
-  - LOGIN: Always enabled to allow the role to connect
-  - PASSWORD: Always set (from flag, env var, or auto-generated)
-  - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
-
-PostgreSQL Configuration Parameters That May Be Set:
-  - tsdb_admin.read_only_role: Set to 'true' when --read-only flag is used
-    (enforces permanent read-only mode for the role)
-  - statement_timeout: Set when --statement-timeout flag is provided
-    (kills queries that exceed the specified duration, in milliseconds)`,
+  TIGER_NEW_PASSWORD=my-secure-password tiger db create role --name ai_analyst`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments
-			if roleName == "" {
+			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
 
@@ -118,7 +116,7 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Get password
-			rolePassword, err := getPasswordForRole(passwordFlag)
+			rolePassword, err := getPasswordForRole(password)
 			if err != nil {
 				return fmt.Errorf("failed to determine password: %w", err)
 			}
@@ -144,12 +142,12 @@ PostgreSQL Configuration Parameters That May Be Set:
 			defer conn.Close(ctx)
 
 			// Create the role with all options in a transaction
-			if err := createRoleWithOptions(ctx, conn, roleName, rolePassword, readOnly, statementTimeout, fromRoles); err != nil {
+			if err := createRoleWithOptions(ctx, conn, name, rolePassword, readOnly, statementTimeout, from); err != nil {
 				return fmt.Errorf("failed to create role: %w", err)
 			}
 
 			// Save password to storage with the new role name
-			result, err := common.SavePasswordWithResult(cfg, *service, rolePassword, roleName)
+			result, err := common.SavePasswordWithResult(cfg, *service, rolePassword, name)
 			if err != nil {
 				cmd.PrintErrf("⚠️  Warning: %s\n", result.Message)
 			} else if !result.Success {
@@ -157,20 +155,20 @@ PostgreSQL Configuration Parameters That May Be Set:
 			}
 
 			// Output result in requested format
-			return outputCreateRoleResult(cmd, roleName, readOnly, statementTimeout, fromRoles, cfg.Output)
+			return outputCreateRoleResult(cmd, name, readOnly, statementTimeout, from, cfg.Output)
 		},
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&roleName, "name", "", "Role name to create (required)")
+	cmd.Flags().StringVar(&name, "name", "", "Role name to create (required)")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Enable permanent read-only enforcement via tsdb_admin.read_only_role")
-	cmd.Flags().StringSliceVar(&fromRoles, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
+	cmd.Flags().StringSliceVar(&from, "from", []string{}, "Roles to inherit grants from (e.g., --from app_role --from readonly_role or --from app_role,readonly_role)")
 	cmd.Flags().DurationVar(&statementTimeout, "statement-timeout", 0, "Set statement timeout for the role (e.g., 30s, 5m)")
-	cmd.Flags().StringVar(&passwordFlag, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
+	cmd.Flags().StringVar(&password, "password", "", "Password for the role. If not provided, checks TIGER_NEW_PASSWORD environment variable, otherwise auto-generates a secure random password.")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
-	cmd.MarkFlagRequired("name")
+	markFlagRequired(cmd, "name")
 
 	return cmd
 }
@@ -302,15 +300,15 @@ func createRoleWithOptions(ctx context.Context, conn *pgx.Conn, roleName, rolePa
 }
 
 // getPasswordForRole determines the password based on flags and environment
-func getPasswordForRole(passwordFlag string) (string, error) {
+func getPasswordForRole(password string) (string, error) {
 	// Priority order:
 	// 1. Explicit password value from --password flag
 	// 2. TIGER_NEW_PASSWORD environment variable
 	// 3. Auto-generate secure random password
 
-	if passwordFlag != "" {
+	if password != "" {
 		// Explicit password provided via --password flag
-		return passwordFlag, nil
+		return password, nil
 	}
 
 	// Check environment variable

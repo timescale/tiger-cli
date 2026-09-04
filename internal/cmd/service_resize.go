@@ -13,10 +13,10 @@ import (
 
 // buildServiceResizeCmd creates the resize subcommand
 func buildServiceResizeCmd(app *common.App) *cobra.Command {
-	var resizeCPU string
-	var resizeMemory string
-	var resizeNoWait bool
-	var resizeWaitTimeout time.Duration
+	var cpu string
+	var memory string
+	var noWait bool
+	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
 		Use:   "resize [service-id]",
@@ -31,8 +31,12 @@ The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will
 increase costs.
 
-Examples:
-  # Resize default service to 2 CPU cores and 8GB memory
+Allowed CPU/Memory Configurations:
+  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+		Example: `  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 
   # Resize specific service to 4 CPU cores and 16GB memory
@@ -48,13 +52,7 @@ Examples:
   tiger service resize --cpu 2000 --memory 8 --no-wait
 
   # Resize with custom wait timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
-
-Allowed CPU/Memory Configurations:
-  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
-  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
-
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
@@ -71,7 +69,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(resizeCPU, resizeMemory)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -113,13 +111,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.PrintErrf("✅ Resize request accepted for service '%s'!\n", serviceID)
 
 			// If not waiting, return early
-			if resizeNoWait {
+			if noWait {
 				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for resize to complete
-			cmd.PrintErrf("⏳ Waiting for resize to complete (timeout: %v)...\n", resizeWaitTimeout)
+			cmd.PrintErrf("⏳ Waiting for resize to complete (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -130,7 +128,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				},
 				Input:      cmd.InOrStdin(),
 				Output:     cmd.ErrOrStderr(),
-				Timeout:    resizeWaitTimeout,
+				Timeout:    waitTimeout,
 				TimeoutMsg: "service may still be resizing",
 			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
@@ -145,13 +143,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&resizeCPU, "cpu", "", "CPU allocation in millicores")
-	cmd.Flags().StringVar(&resizeMemory, "memory", "", "Memory allocation in gigabytes")
-	cmd.Flags().BoolVar(&resizeNoWait, "no-wait", false, "Don't wait for resize operation to complete")
-	cmd.Flags().DurationVar(&resizeWaitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
+	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
-	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedResizeCPUMemoryConfigs()))
-	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedResizeCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedResizeCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedResizeCPUMemoryConfigs()))
 
 	return cmd
 }

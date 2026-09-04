@@ -83,7 +83,7 @@ Place a helper by who calls it, working down this list until one matches:
 4. **A genuine standalone utility** — small and isolated, with no notion of a command → `internal/util`. Anything shaped around the CLI stays in `cmd` even if its signature looks generic.
 5. **Used by both CLI and MCP** → `internal/common`.
 
-Exception: all shell completion functions — both `ValidArgsFunction` completions and flag-value completions — live in `completion_helper.go`, however many commands use them.
+Exception: all shell completion functions — both `ValidArgsFunction` completions and flag-value completions — live in `completion_helper.go`, however many commands use them. Register a flag's completion with `registerFlagCompletion`, and mark a flag required with `markFlagRequired` — both live in `flag_helper.go` and panic on the programming errors cobra reports by returning an error. A flag that takes a path is the one case that needs a completion just to opt back in to filenames: register `dirCompletion`, or `fileCompletion` with the extensions to filter by (or none, for any file).
 
 ## Configuration
 
@@ -108,8 +108,8 @@ It's an env var **only**: deliberately not a config key, not a flag, and hidden 
 All cobra commands must:
 
 1. Set `SilenceUsage: true` as a literal field on the `cobra.Command` struct of every leaf command (one with a `RunE`), so a bad flag or argument prints only the one-line error rather than a wall of usage text — and because it's on the struct literal, it's already set when cobra reports flag-parsing errors before `RunE` runs. Parent/group commands don't set it: their "unknown command" errors usefully show the available subcommands. `SilenceErrors` is separate and rarely needed — set it only on a command that already reports its own errors (`mcp start http` logs failures through slog).
-2. Set `ValidArgsFunction` or `ValidArgs` for shell completions — `ValidArgsFunction` for dynamic completions (e.g. service IDs), `ValidArgs` for static lists, and `cobra.NoFileCompletions` when no completions apply. The important thing is that one of these is always set, so completion never falls back to filenames.
-3. Register a completion for every flag whose values come from a known set, with `cmd.RegisterFlagCompletionFunc` alongside the flag's definition — `outputCompletion()` for `--output` is the one nearly every command with structured output needs.
+2. Set `ValidArgsFunction` or `ValidArgs` when the command's arguments have completions to offer — `ValidArgsFunction` for dynamic ones (e.g. service IDs), `ValidArgs` for static lists. A command whose arguments have neither sets nothing: `buildRootCmd` sets the tree's default shell completion directive to `NoFileComp`, so anything without a registered completion — every argument and every flag — offers nothing rather than falling back to filenames.
+3. Register a completion for every flag whose values come from a known set, with `registerFlagCompletion` alongside the flag's definition — `outputCompletion()` for `--output` is the one nearly every command with structured output needs. A flag that takes a path registers one too, to opt back in to the filenames the default directive suppresses.
 4. Use `RunE`, not `Run` (see [Command Architecture](#command-architecture)).
 5. Print through the command — `cmd.Print*` for stdout, `cmd.PrintErr*` for stderr — and read via `cmd.InOrStdin()`. Never use `fmt.Print*` (it bypasses the command's writers, so tests can't capture it) or `os.Stdin`/`os.Stdout`/`os.Stderr` directly — the sole exception is `buildRootCmd` wiring stdout and stderr onto the root command (see [Streams](#streams)). Reach for `cmd.OutOrStdout()`/`cmd.ErrOrStderr()` only where an `io.Writer` is genuinely required (serializers, `tablewriter`, `tea.WithOutput`, helpers in other packages).
 6. Pass `cmd.Context()` down into any long-running or cancellable operation, so commands exit promptly on Ctrl+C or SIGTERM.
@@ -121,7 +121,7 @@ Further conventions:
 - **Boolean flags** follow the GitHub CLI pattern: the positive behavior is the default (no flag needed), and an explicit `--no-<feature>` flag disables it. Don't create mutually exclusive `--enable-X`/`--disable-X` pairs.
 - **Destructive operations** (delete, password rotation) require an explicit service ID with no default fallback, prompt the user to type the resource ID to confirm, and offer a `--confirm` flag to skip the prompt for automation. The prompt must be TTY-gated (see [Reading Stdin](#reading-stdin)), and the help text should include a "Note for AI agents: always confirm with the user before performing this destructive operation" warning.
 - **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService`, which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr.
-- **Help text** should document the default behavior, explain how to override it, and include examples of common usage.
+- **Help text** should document the default behavior and explain how to override it, with examples of common usage in the command's `Example` field rather than in `Long`.
 
 ## Output
 

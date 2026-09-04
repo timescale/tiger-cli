@@ -16,8 +16,9 @@ import (
 //
 // Cobra writes the candidates to stdout, one "value\tdescription" line each,
 // followed by a ":<directive>" line — 4 is ShellCompDirectiveNoFileComp, which
-// every completion here returns so shells don't fall back to filenames. The
-// trailing human-readable directive line goes to stderr.
+// nearly every completion here returns so shells don't fall back to filenames;
+// 8 and 16 filter to files and directories. The trailing human-readable
+// directive line goes to stderr.
 //
 // A completion that can't produce candidates (not logged in, API error) must
 // return none rather than an error: a broken completion should be invisible at
@@ -79,6 +80,22 @@ func TestCompletion(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantStdout: noFileComp,
+			wantStderr: directive,
+		},
+		{
+			name:       "--service-id lists services with their names",
+			args:       []string{"__complete", "service", "get", "--service-id", ""},
+			setup:      listServices,
+			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// The flag isn't positional, so unlike the argument it still
+			// completes once a service ID has been typed.
+			name:       "--service-id completes after a positional argument",
+			args:       []string{"__complete", "service", "get", "svc-12345", "--service-id", ""},
+			setup:      listServices,
+			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
 		{
@@ -172,6 +189,46 @@ func TestCompletion(t *testing.T) {
 			opts:       noDocsProxy(nil),
 			wantStdout: "service_list\nservice_logs\n" + noFileComp,
 			wantStderr: directive,
+		},
+		{
+			// The root command's default directive, which is what keeps every
+			// flag without a registered completion from offering filenames.
+			name:       "a flag with no completion offers nothing",
+			args:       []string{"__complete", "service", "create", "--name", ""},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "a command with no argument completion offers nothing",
+			args:       []string{"__complete", "service", "list", ""},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--config-dir completes directories",
+			args:       []string{"__complete", "service", "get", "--config-dir", ""},
+			wantStdout: ":16\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveFilterDirs\n",
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// A client's config file can be named anything, so this asks for
+			// the shell's unfiltered file completion.
+			name:       "--config-path completes any file",
+			args:       []string{"__complete", "mcp", "install", "--config-path", ""},
+			wantStdout: ":0\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveDefault\n",
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// Same for a SQL file.
+			name:       "--file completes any file",
+			args:       []string{"__complete", "db", "query", "--file", ""},
+			wantStdout: ":0\n",
+			wantStderr: "Completion ended with directive: ShellCompDirectiveDefault\n",
+			checks:     []checkFunc{checkNotLoaded},
 		},
 	})
 

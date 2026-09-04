@@ -9,10 +9,10 @@ import (
 )
 
 func buildDbConnectionStringCmd(app *common.App) *cobra.Command {
-	var dbConnectionStringPooled bool
-	var dbConnectionStringRole string
-	var dbConnectionStringWithPassword bool
-	var dbConnectionStringReadOnly bool
+	var pooled bool
+	var role string
+	var withPassword bool
+	var readOnly bool
 
 	cmd := &cobra.Command{
 		Use:     "connection-string [service-id]",
@@ -34,10 +34,8 @@ Cloud's immutable read-only mode (writes and DDL are rejected by the server).
 The global read_only config option (or TIGER_READ_ONLY) also forces this
 behavior: read_only=all makes every connection string read-only, and
 read_only=prod makes those for services tagged PROD read-only while leaving DEV
-services writable.
-
-Examples:
-  # Get connection string for default service
+services writable.`,
+		Example: `  # Get connection string for default service
   tiger db connection-string
 
   # Get connection string for specific service
@@ -73,19 +71,19 @@ Examples:
 				return err
 			}
 
-			warnReplicaPooler(cmd, target, dbConnectionStringPooled)
+			warnReplicaPooler(cmd, target, pooled)
 
 			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
-				Pooled:       dbConnectionStringPooled,
-				Role:         dbConnectionStringRole,
-				WithPassword: dbConnectionStringWithPassword,
-				ReadOnly:     dbConnectionStringReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
+				Pooled:       pooled,
+				Role:         role,
+				WithPassword: withPassword,
+				ReadOnly:     readOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
 			})
 			if err != nil {
 				return err
 			}
 
-			if dbConnectionStringWithPassword && details.Password == "" {
+			if withPassword && details.Password == "" {
 				return fmt.Errorf("password not available to include in connection string")
 			}
 
@@ -95,10 +93,10 @@ Examples:
 	}
 
 	// Add flags for db connection-string command
-	cmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbConnectionStringWithPassword, "with-password", false, "Include password in connection string (less secure)")
-	cmd.Flags().BoolVar(&dbConnectionStringReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in connection string (less secure)")
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 
 	return cmd
 }

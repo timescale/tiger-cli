@@ -28,10 +28,8 @@ Fetches and displays logs from the specified service. By default, shows the last
 100 log entries. Supports filtering by time range.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
-
-Examples:
-  # View last 100 logs for default service (default behavior)
+from your configuration.`,
+		Example: `  # View last 100 logs for default service (default behavior)
   tiger service logs
 
   # View logs for specific service
@@ -132,7 +130,7 @@ Examples:
 	cmd.Flags().TimeVar(&until, "until", time.Time{}, []string{time.RFC3339}, "Fetch logs before this timestamp (RFC3339 format, e.g., 2024-01-15T10:00:00Z)")
 	cmd.Flags().IntVar(&node, "node", 0, "Specific service node to fetch logs from (for services with HA replicas, 0 is valid)")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (text, json, yaml)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

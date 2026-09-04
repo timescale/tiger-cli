@@ -22,10 +22,8 @@ func buildMCPGetCmd(app *common.App) *cobra.Command {
 		Use:     "get <name>",
 		Aliases: []string{"describe", "show"},
 		Short:   "Get detailed information about a specific MCP capability",
-		Long: `Get detailed information about a specific MCP tool, prompt, resource, or resource template.
-
-Examples:
-  # Get details about a tool
+		Long:    `Get detailed information about a specific MCP tool, prompt, resource, or resource template.`,
+		Example: `  # Get details about a tool
   tiger mcp get service_create
 
   # Get details about a prompt
@@ -93,7 +91,7 @@ Examples:
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

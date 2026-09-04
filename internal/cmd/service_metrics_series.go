@@ -33,10 +33,8 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 Use 'tiger service metrics available-series' to discover valid metric names.
 
 Each labeled series (e.g. one per replica) is returned independently with its
-full list of raw data points.
-
-Examples:
-  # Fetch CPU usage for the last hour
+full list of raw data points.`,
+		Example: `  # Fetch CPU usage for the last hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
 
@@ -121,13 +119,13 @@ Examples:
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
-	cmd.RegisterFlagCompletionFunc("role", metricsSeriesRoleCompletion)
-	cmd.RegisterFlagCompletionFunc("fn", metricsSeriesFnCompletion)
+	registerFlagCompletion(cmd, "output", outputCompletion())
+	registerFlagCompletion(cmd, "role", metricsSeriesRoleCompletion)
+	registerFlagCompletion(cmd, "fn", metricsSeriesFnCompletion)
 
-	cmd.MarkFlagRequired("metric")
-	cmd.MarkFlagRequired("from")
-	cmd.MarkFlagRequired("to")
+	markFlagRequired(cmd, "metric")
+	markFlagRequired(cmd, "from")
+	markFlagRequired(cmd, "to")
 
 	return cmd
 }

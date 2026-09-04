@@ -13,6 +13,19 @@ import (
 	"github.com/timescale/tiger-cli/internal/mcp"
 )
 
+// dirCompletion completes directory names, and fileCompletion file names —
+// filtered to the given extensions, or any file when called with none.
+// Completion defaults to offering nothing at all (see buildRootCmd), so a flag
+// that takes a path has to ask for these.
+var dirCompletion = cobra.FixedCompletions(nil, cobra.ShellCompDirectiveFilterDirs)
+
+func fileCompletion(extensions ...string) cobra.CompletionFunc {
+	if len(extensions) == 0 {
+		return cobra.FixedCompletions(nil, cobra.ShellCompDirectiveDefault)
+	}
+	return cobra.FixedCompletions(extensions, cobra.ShellCompDirectiveFilterFileExt)
+}
+
 // withAppLoad wraps a completion function, loading the config and API client
 // before invoking it. The App is only loaded automatically for wrapped commands
 // (see wrapCommands), not for the __complete command that drives live tab
@@ -37,19 +50,32 @@ func serviceIDCompletion(app *common.App) cobra.CompletionFunc {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		services, err := listServices(cmd, app)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		results := make([]string, 0, len(services))
-		for _, service := range services {
-			if strings.HasPrefix(service.ServiceID, toComplete) {
-				results = append(results, cobra.CompletionWithDesc(service.ServiceID, service.Name))
-			}
-		}
-		return results, cobra.ShellCompDirectiveNoFileComp
+		return completeServiceIDs(cmd, app, toComplete)
 	})
+}
+
+// serviceIDFlagCompletion completes the global --service-id flag. Unlike the
+// positional completion, it offers IDs no matter how many arguments have been
+// typed — the flag is the same wherever it appears in the command line.
+func serviceIDFlagCompletion(app *common.App) cobra.CompletionFunc {
+	return withAppLoad(app, func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeServiceIDs(cmd, app, toComplete)
+	})
+}
+
+func completeServiceIDs(cmd *cobra.Command, app *common.App, toComplete string) ([]string, cobra.ShellCompDirective) {
+	services, err := listServices(cmd, app)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	results := make([]string, 0, len(services))
+	for _, service := range services {
+		if strings.HasPrefix(service.ServiceID, toComplete) {
+			results = append(results, cobra.CompletionWithDesc(service.ServiceID, service.Name))
+		}
+	}
+	return results, cobra.ShellCompDirectiveNoFileComp
 }
 
 func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {

@@ -15,9 +15,9 @@ import (
 )
 
 func buildDbTestConnectionCmd(app *common.App) *cobra.Command {
-	var dbTestConnectionTimeout time.Duration
-	var dbTestConnectionPooled bool
-	var dbTestConnectionRole string
+	var timeout time.Duration
+	var pooled bool
+	var role string
 
 	cmd := &cobra.Command{
 		Use:     "test-connection [service-id]",
@@ -35,10 +35,8 @@ Return Codes:
   0: Server is accepting connections normally
   1: Server is rejecting connections (e.g., during startup)
   2: No response to connection attempt (server unreachable)
-  3: No attempt made (e.g., invalid parameters)
-
-Examples:
-  # Test connection to default service
+  3: No attempt made (e.g., invalid parameters)`,
+		Example: `  # Test connection to default service
   tiger db test-connection
 
   # Test connection to specific service
@@ -71,12 +69,12 @@ Examples:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			warnReplicaPooler(cmd, target, dbTestConnectionPooled)
+			warnReplicaPooler(cmd, target, pooled)
 
 			// Build connection string for testing with password (if available)
 			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
-				Pooled:       dbTestConnectionPooled,
-				Role:         dbTestConnectionRole,
+				Pooled:       pooled,
+				Role:         role,
 				WithPassword: true,
 			})
 			if err != nil {
@@ -84,19 +82,19 @@ Examples:
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
-			if dbTestConnectionTimeout < 0 {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+			if timeout < 0 {
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", timeout))
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details.String(), dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details.String(), timeout, cmd)
 		},
 	}
 
 	// Add flags for db test-connection command
-	cmd.Flags().DurationVarP(&dbTestConnectionTimeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
-	cmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().DurationVarP(&timeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }

@@ -11,8 +11,8 @@ import (
 )
 
 func buildDbSavePasswordCmd(app *common.App) *cobra.Command {
-	var dbSavePasswordRole string
-	var dbSavePasswordValue string
+	var role string
+	var password string
 
 	cmd := &cobra.Command{
 		Use:   "save-password [service-id]",
@@ -26,10 +26,8 @@ from your configuration. The password can be provided via:
 3. Interactive prompt (if neither provided)
 
 The password will be saved according to your --password-storage setting
-(keyring, pgpass, or none).
-
-Examples:
-  # Save password with explicit value (highest precedence)
+(keyring, pgpass, or none).`,
+		Example: `  # Save password with explicit value (highest precedence)
   tiger db save-password svc-12345 --password=your-password
 
   # Using environment variable
@@ -75,7 +73,7 @@ Examples:
 
 			if cmd.Flags().Changed("password") {
 				// --password flag was provided
-				passwordToSave = dbSavePasswordValue
+				passwordToSave = password
 				if passwordToSave == "" {
 					return fmt.Errorf("password cannot be empty when provided via --password flag")
 				}
@@ -101,7 +99,7 @@ Examples:
 
 			// Save password using configured storage
 			storage := common.GetPasswordStorage(cfg)
-			if err := storage.Save(service, passwordToSave, dbSavePasswordRole); err != nil {
+			if err := storage.Save(service, passwordToSave, role); err != nil {
 				return fmt.Errorf("failed to save password: %w", err)
 			}
 
@@ -110,14 +108,14 @@ Examples:
 					service.ServiceID)
 			}
 			cmd.PrintErrf("Password saved successfully for service %s (role: %s)\n",
-				service.ServiceID, dbSavePasswordRole)
+				service.ServiceID, role)
 			return nil
 		},
 	}
 
 	// Add flags for db save-password command
-	cmd.Flags().StringVarP(&dbSavePasswordValue, "password", "p", "", "Password to save")
-	cmd.Flags().StringVar(&dbSavePasswordRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "Password to save")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }
