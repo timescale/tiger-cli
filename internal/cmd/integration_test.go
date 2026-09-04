@@ -12,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 )
 
 // setupIntegrationTest sets up isolated test environment with temporary config directory
@@ -440,6 +443,184 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		t.Logf("✅ psql command with updated password succeeded")
+	})
+
+	// These run against the service this test created, so the password
+	// `service create` stored is available and every assertion can be hard.
+	t.Run("DatabaseQuery", func(t *testing.T) {
+		if serviceID == "" {
+			t.Skip("No service ID available from create test")
+		}
+
+		// queryJSON runs a query with JSON output and returns the parsed result.
+		queryJSON := func(t *testing.T, query string) []common.ResultSet {
+			t.Helper()
+			output, err := executeIntegrationCommand(t.Context(),
+				"db", "query", serviceID, "-o", "json", "-c", query)
+			if err != nil {
+				t.Fatalf("query failed: %v\nOutput: %s", err, output)
+			}
+
+			var result struct {
+				ResultSets []common.ResultSet `json:"result_sets"`
+			}
+			if err := json.Unmarshal([]byte(output), &result); err != nil {
+				t.Fatalf("failed to parse query output as JSON: %v\nOutput: %s", err, output)
+			}
+			return result.ResultSets
+		}
+
+		// Parameters and the row cap have no CLI surface — the flags are
+		// deliberately MCP-only — so these call the shared entry point the way
+		// the MCP tool does.
+		cfg, err := config.Load(nil)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+		client, projectID, err := common.NewAPIClient(t.Context(), cfg)
+		if err != nil {
+			t.Fatalf("failed to build API client: %v", err)
+		}
+		target, err := common.ResolveConnectionTargetByID(t.Context(), client, projectID, serviceID)
+		if err != nil {
+			t.Fatalf("failed to resolve connection target: %v", err)
+		}
+
+		t.Run("TableOutput", func(t *testing.T) {
+			output, err := executeIntegrationCommand(t.Context(),
+				"db", "query", serviceID,
+				"-c", "SELECT 41 + 1 AS answer; SELECT NULL::text AS nothing")
+			if err != nil {
+				t.Fatalf("query failed: %v\nOutput: %s", err, output)
+			}
+
+			// One table per statement, each with its own row count.
+			for _, want := range []string{"answer", "42", "nothing", "NULL", "(1 row)"} {
+				if !strings.Contains(output, want) {
+					t.Errorf("query output missing %q:\n%s", want, output)
+				}
+			}
+		})
+
+		t.Run("MultipleResultSets", func(t *testing.T) {
+			// A temp table keeps this to the one session the command opens, so
+			// the statements leave nothing behind on the service.
+			sets := queryJSON(t, `
+				CREATE TEMP TABLE items (id int, name text);
+				INSERT INTO items VALUES (1, 'one'), (2, NULL);
+				SELECT id, name FROM items ORDER BY id;
+				SELECT id FROM items WHERE false`)
+
+			if len(sets) != 4 {
+				t.Fatalf("expected 4 result sets, got %d: %+v", len(sets), sets)
+			}
+
+			// Statements that return no rows report their tag and omit rows
+			// entirely; the SELECTs carry rows, empty but present when nothing
+			// matched.
+			if got := sets[0].CommandTag; got != "CREATE TABLE" {
+				t.Errorf("result set 0 command tag = %q, want %q", got, "CREATE TABLE")
+			}
+			if sets[0].Rows != nil {
+				t.Errorf("result set 0 rows = %v, want nil for a statement returning no rows", sets[0].Rows)
+			}
+			if got := sets[1].CommandTag; got != "INSERT 0 2" {
+				t.Errorf("result set 1 command tag = %q, want %q", got, "INSERT 0 2")
+			}
+			if got := sets[1].RowsAffected; got != 2 {
+				t.Errorf("result set 1 rows affected = %d, want 2", got)
+			}
+
+			wantRows := [][]*string{{new("1"), new("one")}, {new("2"), nil}}
+			if diff := cmp.Diff(wantRows, sets[2].Rows); diff != "" {
+				t.Errorf("result set 2 rows mismatch (-want +got):\n%s", diff)
+			}
+			if got := sets[3].Rows; got == nil || len(got) != 0 {
+				t.Errorf("result set 3 rows = %v, want an empty (non-nil) list", got)
+			}
+		})
+
+		t.Run("TextFormatFidelity", func(t *testing.T) {
+			// Values arrive as the text Postgres itself produced. These types
+			// are the ones a Go-typed decode would lose or mangle: a bigint
+			// past 2^53, a float8 infinity that can't be marshaled to JSON at
+			// all, and several whose Go representations don't round-trip.
+			sets := queryJSON(t, `SELECT
+				1234567890123456789::int8            AS big,
+				'Infinity'::float8                   AS inf,
+				'NaN'::numeric                       AS nan,
+				'11111111-2222-3333-4444-555555555555'::uuid AS id,
+				'1 year 2 mons 3 days 04:05:06'::interval    AS span,
+				'\x48656c6c6f'::bytea                AS bytes,
+				'2024-01-02'::date                   AS day,
+				NULL::text                           AS nothing`)
+
+			if len(sets) != 1 || len(sets[0].Rows) != 1 {
+				t.Fatalf("expected one row in one result set, got %+v", sets)
+			}
+
+			want := []*string{
+				new("1234567890123456789"),
+				new("Infinity"),
+				new("NaN"),
+				new("11111111-2222-3333-4444-555555555555"),
+				new("1 year 2 mons 3 days 04:05:06"),
+				new(`\x48656c6c6f`),
+				new("2024-01-02"),
+				nil,
+			}
+			if diff := cmp.Diff(want, sets[0].Rows[0]); diff != "" {
+				t.Errorf("row mismatch (-want +got):\n%s", diff)
+			}
+		})
+
+		t.Run("Parameters", func(t *testing.T) {
+			// Parameters switch the exec mode to the extended protocol, which
+			// still has to come back in text format for the scan to work.
+			result, err := common.ExecuteQuery(t.Context(), cfg, target, common.ExecuteQueryArgs{
+				Query:      "SELECT $1::text AS greeting, $2::int8 AS big",
+				Parameters: []string{"hello", "1234567890123456789"},
+				Role:       "tsdbadmin",
+			})
+			if err != nil {
+				t.Fatalf("query failed: %v", err)
+			}
+
+			if len(result.ResultSets) != 1 || len(result.ResultSets[0].Rows) != 1 {
+				t.Fatalf("expected one row in one result set, got %+v", result.ResultSets)
+			}
+			want := []*string{new("hello"), new("1234567890123456789")}
+			if diff := cmp.Diff(want, result.ResultSets[0].Rows[0]); diff != "" {
+				t.Errorf("row mismatch (-want +got):\n%s", diff)
+			}
+		})
+
+		t.Run("RowLimit", func(t *testing.T) {
+			result, err := common.ExecuteQuery(t.Context(), cfg, target, common.ExecuteQueryArgs{
+				Query:   "SELECT i FROM generate_series(1, 50) i",
+				Role:    "tsdbadmin",
+				MaxRows: 3,
+			})
+			if err != nil {
+				t.Fatalf("query failed: %v", err)
+			}
+
+			if len(result.ResultSets) != 1 {
+				t.Fatalf("expected 1 result set, got %d", len(result.ResultSets))
+			}
+			set := result.ResultSets[0]
+			if len(set.Rows) != 3 {
+				t.Errorf("returned %d rows, want the 3 the cap allows", len(set.Rows))
+			}
+			if !set.Truncated || !result.Truncated {
+				t.Errorf("truncated = %t (result) / %t (result set), want both true", result.Truncated, set.Truncated)
+			}
+			// The result set is drained past the cap, so the command tag still
+			// reports what the query really produced.
+			if set.RowsAffected != 50 {
+				t.Errorf("rows affected = %d, want 50", set.RowsAffected)
+			}
+		})
 	})
 
 	// Track created roles for testing (used by CreateRole_CountRoles and CreateRole_DuplicateError tests)

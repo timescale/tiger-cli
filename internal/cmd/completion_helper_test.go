@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
@@ -189,4 +191,33 @@ func TestCompletion(t *testing.T) {
 		}
 		checkNotLoaded(t, result)
 	})
+}
+
+// TestOutputFlagCompletion asserts that every --output flag in the tree has a
+// completion registered. Defining the flag and registering its completion are
+// two separate lines, so it's easy to add the first and forget the second —
+// this is the check that would catch that.
+func TestOutputFlagCompletion(t *testing.T) {
+	root, _, err := buildRootCmd(t.Context())
+	if err != nil {
+		t.Fatalf("buildRootCmd failed: %v", err)
+	}
+
+	var missing []string
+	var walk func(cmd *cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		if cmd.Flags().Lookup("output") != nil {
+			if _, ok := cmd.GetFlagCompletionFunc("output"); !ok {
+				missing = append(missing, cmd.CommandPath())
+			}
+		}
+		for _, sub := range cmd.Commands() {
+			walk(sub)
+		}
+	}
+	walk(root)
+
+	if len(missing) > 0 {
+		t.Errorf("commands with an --output flag but no completion for it: %v", missing)
+	}
 }

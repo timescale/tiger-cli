@@ -10,7 +10,7 @@ import (
 
 func TestMCPListCmd(t *testing.T) {
 	defaultTools := []string{
-		"db_execute_query",
+		"db_query",
 		"db_schema",
 		"service_create",
 		"service_fork",
@@ -26,7 +26,7 @@ func TestMCPListCmd(t *testing.T) {
 	wantText := `┌──────┬─────────────────────────┐
 │ TYPE │          NAME           │
 ├──────┼─────────────────────────┤
-│ tool │ db_execute_query        │
+│ tool │ db_query                │
 │ tool │ db_schema               │
 │ tool │ service_create          │
 │ tool │ service_fork            │
@@ -41,22 +41,22 @@ func TestMCPListCmd(t *testing.T) {
 `
 
 	// Read-only mode skips the service-mutating tools at registration time.
-	wantTextReadOnly := `┌──────┬──────────────────┐
-│ TYPE │       NAME       │
-├──────┼──────────────────┤
-│ tool │ db_execute_query │
-│ tool │ db_schema        │
-│ tool │ service_get      │
-│ tool │ service_list     │
-│ tool │ service_logs     │
-└──────┴──────────────────┘
+	wantTextReadOnly := `┌──────┬──────────────┐
+│ TYPE │     NAME     │
+├──────┼──────────────┤
+│ tool │ db_query     │
+│ tool │ db_schema    │
+│ tool │ service_get  │
+│ tool │ service_list │
+│ tool │ service_logs │
+└──────┴──────────────┘
 `
 
 	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
 	wantTextExperimental := `┌──────┬───────────────────────────┐
 │ TYPE │           NAME            │
 ├──────┼───────────────────────────┤
-│ tool │ db_execute_query          │
+│ tool │ db_query                  │
 │ tool │ db_schema                 │
 │ tool │ service_backups           │
 │ tool │ service_create            │

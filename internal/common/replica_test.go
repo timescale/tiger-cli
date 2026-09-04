@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
@@ -64,54 +66,6 @@ func replicaService() api.Service {
 			ProjectID: new("proj1"),
 			ServiceID: new("svcprimary"),
 		},
-	}
-}
-
-func TestResolveConnectionTarget_Primary(t *testing.T) {
-	primary := primaryService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary})
-
-	target, err := ResolveConnectionTarget(context.Background(), client, "proj1", primary)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if target.IsReplica {
-		t.Fatal("expected a primary target")
-	}
-	if target.ConnectionService.ServiceID != "svcprimary" || target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected connect and credential to be the primary, got %+v", target)
-	}
-}
-
-func TestResolveConnectionTarget_Replica(t *testing.T) {
-	primary := primaryService()
-	replica := replicaService()
-	client := serviceTestClient(t, map[string]api.Service{"svcprimary": primary})
-
-	target, err := ResolveConnectionTarget(context.Background(), client, "proj1", replica)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !target.IsReplica {
-		t.Fatal("expected a replica target")
-	}
-	// Connect to the replica's own endpoint.
-	if target.ConnectionService.ServiceID != "rep1234567" {
-		t.Errorf("expected connect service rep1234567, got %q", target.ConnectionService.ServiceID)
-	}
-	// Credentials resolve against the parent primary (fetched via GetService).
-	if target.CredentialService.ServiceID != "svcprimary" {
-		t.Errorf("expected credential service svcprimary, got %q", target.CredentialService.ServiceID)
-	}
-}
-
-func TestResolveConnectionTarget_ReplicaParentFetchFails(t *testing.T) {
-	replica := replicaService()
-	// Parent svcprimary is absent from the server → parent fetch 404s.
-	client := serviceTestClient(t, map[string]api.Service{})
-
-	if _, err := ResolveConnectionTarget(context.Background(), client, "proj1", replica); err == nil {
-		t.Fatal("expected an error when the parent service can't be fetched, got nil")
 	}
 }
 
@@ -211,6 +165,114 @@ func TestConnectionTargetReadOnlyVerdict(t *testing.T) {
 	}
 }
 
+// TestConnectionTargetDetails covers Details, the exported way onto the
+// endpoint/credential split: which endpoint it selects, and the pooler policy
+// that deliberately differs between a primary and a replica.
+func TestConnectionTargetDetails(t *testing.T) {
+	pooler := &api.ConnectionPooler{
+		Endpoint: &api.Endpoint{
+			Host: new("replica-pooler.example.com"),
+			Port: new(6432),
+		},
+	}
+
+	// The replica supplies the endpoint, the primary the credentials — which
+	// aren't exercised here, since WithPassword is off.
+	replicaTarget := func(overrides ...func(*api.Service)) *ConnectionTarget {
+		svc := replicaService()
+		for _, override := range overrides {
+			override(&svc)
+		}
+		return &ConnectionTarget{ConnectionService: svc, CredentialService: primaryService(), IsReplica: true}
+	}
+
+	cases := []struct {
+		name    string
+		target  *ConnectionTarget
+		pooled  bool
+		want    *ConnectionDetails
+		wantErr string
+	}{
+		{
+			name:   "replica connects to its own direct endpoint",
+			target: replicaTarget(),
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica.example.com",
+				Port:     5432,
+				Database: "tsdb",
+			},
+		},
+		{
+			name: "replica uses its pooler when one is available",
+			target: replicaTarget(func(s *api.Service) {
+				s.ConnectionPooler = pooler
+			}),
+			pooled: true,
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica-pooler.example.com",
+				Port:     6432,
+				Database: "tsdb",
+				IsPooler: true,
+			},
+		},
+		{
+			// A replica with no pooler falls back rather than failing; the
+			// caller surfaces that via ReplicaPoolerWarning.
+			name:   "replica falls back to direct when its pooler is missing",
+			target: replicaTarget(),
+			pooled: true,
+			want: &ConnectionDetails{
+				Role:     "tsdbadmin",
+				Host:     "replica.example.com",
+				Port:     5432,
+				Database: "tsdb",
+			},
+		},
+		{
+			// For a primary the same request is a hard error instead.
+			name:    "primary refuses when its pooler is missing",
+			target:  &ConnectionTarget{ConnectionService: primaryService(), CredentialService: primaryService()},
+			pooled:  true,
+			wantErr: "connection pooler not available for this service",
+		},
+		{
+			name: "missing endpoint is reported",
+			target: replicaTarget(func(s *api.Service) {
+				s.Endpoint = nil
+			}),
+			wantErr: "failed to build connection string: service endpoint not available",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			details, err := tc.target.Details(testConfig(""), ConnectionDetailsOptions{
+				Role:   "tsdbadmin",
+				Pooled: tc.pooled,
+			})
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error %q, got nil", tc.wantErr)
+				}
+				if err.Error() != tc.wantErr {
+					t.Errorf("error = %q, want %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// AllowUnexported covers readOnly, which no case here sets.
+			if diff := cmp.Diff(tc.want, details, cmp.AllowUnexported(ConnectionDetails{})); diff != "" {
+				t.Errorf("Details() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestReplicaPoolerWarning(t *testing.T) {
 	host := "h"
 	port := 6432
@@ -243,5 +305,33 @@ func TestReplicaPoolerWarning(t *testing.T) {
 				t.Errorf("warning = %q, wantWarning = %v", warning, tc.wantWarning)
 			}
 		})
+	}
+}
+
+func TestResolveConnectionTargetByID_ReplicaParentFetchFails(t *testing.T) {
+	// The replica itself resolves, but its parent is absent from the server.
+	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replicaService()})
+
+	if _, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567"); err == nil {
+		t.Fatal("expected an error when the parent service can't be fetched, got nil")
+	}
+}
+
+func TestResolveConnectionTargetByID_ReplicaWithoutParentID(t *testing.T) {
+	// A standby with no parent recorded has nowhere else to look for
+	// credentials, so it stands in as its own credential service.
+	replica := replicaService()
+	replica.ForkedFrom.ServiceID = nil
+	client := serviceTestClient(t, map[string]api.Service{"rep1234567": replica})
+
+	target, err := ResolveConnectionTargetByID(context.Background(), client, "proj1", "rep1234567")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !target.IsReplica {
+		t.Error("expected a replica target")
+	}
+	if target.CredentialService.ServiceID != "rep1234567" {
+		t.Errorf("expected the replica as its own credential service, got %q", target.CredentialService.ServiceID)
 	}
 }

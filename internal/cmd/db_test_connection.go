@@ -56,18 +56,25 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := lookupConnectionTarget(cmd, app, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
+
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+
+			warnReplicaPooler(cmd, target, dbTestConnectionPooled)
 
 			// Build connection string for testing with password (if available)
-			details, err := buildConnectionDetailsForTarget(cmd, cfg, target, common.ConnectionDetailsOptions{
+			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
 				Pooled:       dbTestConnectionPooled,
 				Role:         dbTestConnectionRole,
 				WithPassword: true,

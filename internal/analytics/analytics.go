@@ -26,6 +26,8 @@ var ignore = []string{
 	"password",
 	"new_password",
 	"query",
+	"command",
+	"file",
 	"parameters",
 }
 

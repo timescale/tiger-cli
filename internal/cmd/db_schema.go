@@ -50,12 +50,17 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			target, err := lookupConnectionTarget(cmd, app, args)
+			serviceID, err := getServiceID(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}
@@ -69,7 +74,7 @@ Examples:
 				IncludeComments:    dbSchemaComments,
 			})
 			if err != nil {
-				return err
+				return handleDatabaseError(err, target)
 			}
 
 			cmd.Print(common.FormatSchema(schema))

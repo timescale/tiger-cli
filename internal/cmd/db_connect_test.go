@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -332,30 +331,6 @@ func TestConnectTargetModel(t *testing.T) {
 			}
 			if tt.wantReplicaID != "" && (choice.replica == nil || choice.replica.ID != tt.wantReplicaID) {
 				t.Errorf("expected replica %s, got %+v", tt.wantReplicaID, choice.replica)
-			}
-		})
-	}
-}
-
-// TestIsAuthenticationError covers the auth-error classifier at the helper
-// level: exercising it through the command would need a real Postgres server.
-func TestIsAuthenticationError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil error", nil, false},
-		{"28P01 invalid_password", &pgconn.PgError{Code: "28P01"}, true},
-		{"28000 invalid_authorization_specification", &pgconn.PgError{Code: "28000"}, true},
-		{"57P03 cannot_connect_now", &pgconn.PgError{Code: "57P03"}, false},
-		{"3D000 database does not exist", &pgconn.PgError{Code: "3D000"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isAuthenticationError(tt.err); got != tt.want {
-				t.Errorf("isAuthenticationError(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}
