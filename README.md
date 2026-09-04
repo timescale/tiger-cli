@@ -96,7 +96,7 @@ tiger mcp install
 Tiger CLI provides the following commands:
 
 - `tiger auth` - Authentication management
-  - `login` - Log in to your Tiger account
+  - `login` - Log in to your Tiger account (use `--headless` to authorize with a short code in a browser on any machine)
   - `logout` - Log out from your Tiger account
   - `status` - Show current authentication status and project ID (alias: `whoami`)
 - `tiger project` - Project management

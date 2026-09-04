@@ -47,6 +47,22 @@ func nextSteps(readOnlySet bool) string {
 	return nextStepsMessage + readOnlyNextStep
 }
 
+// browserAuthTimeout is how long the redirect flow waits for the callback.
+const browserAuthTimeout = 5 * time.Minute
+
+var (
+	// deviceRetryDelay spaces pollDeviceToken's retries. Overridden in tests.
+	deviceRetryDelay = 2 * time.Second
+
+	// defaultDeviceCodeTTL bounds polling when the gateway omits expires_in.
+	// Overridden in tests.
+	defaultDeviceCodeTTL = 15 * time.Minute
+)
+
+// errBrowserOpenFailed means the redirect flow never started, which is the one
+// condition the device code stands in for.
+var errBrowserOpenFailed = errors.New("failed to open browser")
+
 var (
 	// openBrowser can be overridden for testing
 	openBrowser = openBrowserImpl
@@ -63,6 +79,7 @@ type credentials struct {
 func buildLoginCmd(app *common.App) *cobra.Command {
 	var flags credentials
 	var projectID string
+	var headless bool
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -74,6 +91,9 @@ The OAuth flow will:
 - Open your browser for authentication
 - Let you select a project (if you have multiple)
 - Store an OAuth session for the selected project
+
+If the browser cannot be opened, the command prints a short code to enter in a browser on
+any other machine instead. Use --headless to go straight to that flow.
 
 Use --project-id to pick the project up front and skip the interactive selection. After
 logging in, you can switch projects with 'tiger project use'.
@@ -93,6 +113,9 @@ Examples:
 
   # OAuth login without the interactive project selection
   tiger auth login --project-id my-project-id
+
+  # Login from a machine the browser redirect cannot reach (SSH session, container)
+  tiger auth login --headless
 
   # Login with keys (project ID will be auto-detected)
   tiger auth login --public-key your-public-key --secret-key your-secret-key
@@ -122,12 +145,14 @@ Examples:
 
 			if creds.publicKey == "" && creds.secretKey == "" {
 				l := &oauthLogin{
-					cfg:        cfg,
-					authURL:    cfg.ConsoleURL + "/oauth/authorize",
-					tokenURL:   cfg.GatewayURL + "/idp/external/cli/token",
-					successURL: cfg.ConsoleURL + "/oauth/code/success",
-					projectID:  projectID,
-					cmd:        cmd,
+					cfg:           cfg,
+					authURL:       cfg.ConsoleURL + "/oauth/authorize",
+					tokenURL:      cfg.GatewayURL + "/idp/external/cli/token",
+					deviceCodeURL: cfg.GatewayURL + "/idp/external/cli/device/code",
+					successURL:    cfg.ConsoleURL + "/oauth/code/success",
+					headless:      headless,
+					projectID:     projectID,
+					cmd:           cmd,
 				}
 
 				token, client, projectID, err := l.loginWithOAuth(cmd.Context())
@@ -186,6 +211,7 @@ Examples:
 	cmd.Flags().StringVar(&flags.publicKey, "public-key", "", "Public key for authentication")
 	cmd.Flags().StringVar(&flags.secretKey, "secret-key", "", "Secret key for authentication")
 	cmd.Flags().StringVar(&projectID, "project-id", "", "Project ID to log in to (skips interactive project selection)")
+	cmd.Flags().BoolVar(&headless, "headless", false, "Authorize by entering a code in a browser on any machine, instead of waiting for a redirect back to this one")
 
 	return cmd
 }
@@ -396,12 +422,14 @@ func promptForCredentials(cmd *cobra.Command, consoleURL string, creds credentia
 }
 
 type oauthLogin struct {
-	cfg        *config.Config
-	authURL    string
-	tokenURL   string
-	successURL string
-	projectID  string // from --project-id; empty means select interactively
-	cmd        *cobra.Command
+	cfg           *config.Config
+	authURL       string
+	tokenURL      string
+	deviceCodeURL string
+	successURL    string
+	headless      bool   // go straight to the device flow
+	projectID     string // from --project-id; empty means select interactively
+	cmd           *cobra.Command
 }
 
 func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.ClientWithResponses, string, error) {
@@ -426,6 +454,30 @@ func (l *oauthLogin) loginWithOAuth(ctx context.Context) (*oauth2.Token, *api.Cl
 }
 
 func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
+	if l.headless {
+		return l.getTokenViaDeviceFlow(ctx)
+	}
+	token, err := l.getTokenViaBrowser(ctx)
+	if errors.Is(err, errBrowserOpenFailed) {
+		l.cmd.PrintErrln("Falling back to device authorization...")
+		return l.getTokenViaDeviceFlow(ctx)
+	}
+	return token, err
+}
+
+// getTokenViaDeviceFlow authorizes with a code the user enters in a browser on
+// any machine, for when this one has no browser to redirect back from.
+func (l *oauthLogin) getTokenViaDeviceFlow(ctx context.Context) (*oauth2.Token, error) {
+	oauthCfg, da, err := l.startDeviceAuth(ctx)
+	if err != nil {
+		return nil, common.ExitWithCode(common.ExitAuthenticationError, err)
+	}
+	return l.pollDeviceToken(ctx, oauthCfg, da)
+}
+
+// getTokenViaBrowser runs the redirect flow. An open browser owns the login
+// until it finishes: that is where the user is authorizing.
+func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, error) {
 	codeVerifier := oauth2.GenerateVerifier()
 
 	// Random state guards against CSRF on the OAuth callback.
@@ -439,7 +491,9 @@ func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("failed to create local server: %w", err)
 	}
 	defer func() {
-		if err := server.server.Shutdown(ctx); err != nil {
+		// Shutdown gives up on a canceled context while a connection is still
+		// active -- the callback that just delivered -- so it gets a live one.
+		if err := server.server.Shutdown(context.WithoutCancel(ctx)); err != nil {
 			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
 		}
 	}()
@@ -447,18 +501,129 @@ func (l *oauthLogin) getOAuthToken(ctx context.Context) (*oauth2.Token, error) {
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
 	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
 	l.cmd.PrintErrln("Opening browser for authentication...")
+
+	// Navigating to the URL by hand wouldn't help either: it redirects to a
+	// port on this machine.
 	if err := openBrowser(authURL); err != nil {
-		l.cmd.PrintErrf("Failed to open browser: %s\nPlease manually navigate to the Auth URL.", err)
+		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
+		return nil, errBrowserOpenFailed
 	}
 
 	select {
 	case result := <-server.resultChan:
 		return result.token, result.err
-	case <-time.After(5 * time.Minute):
-		return nil, fmt.Errorf("authorization timeout - no callback received within 5 minutes")
+	case <-time.After(browserAuthTimeout):
+		return nil, fmt.Errorf("authorization timeout - no callback received within %v", browserAuthTimeout)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+// deviceFlowContext installs api.HTTPClient for the device flow's oauth2
+// requests: it stamps the CLI User-Agent and applies our 30s timeout.
+func deviceFlowContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, oauth2.HTTPClient, api.HTTPClient)
+}
+
+// startDeviceAuth asks the gateway for a code pair and tells the user where
+// to enter the short one. The redeemable device_code stays in this process.
+func (l *oauthLogin) startDeviceAuth(ctx context.Context) (oauth2.Config, *oauth2.DeviceAuthResponse, error) {
+	oauthCfg := oauth2.Config{
+		ClientID: config.TigerCLIClientID,
+		Endpoint: oauth2.Endpoint{
+			DeviceAuthURL: l.deviceCodeURL,
+			// Same endpoint as the redirect flow, different grant type.
+			TokenURL:  l.tokenURL,
+			AuthStyle: oauth2.AuthStyleInParams,
+		},
+	}
+
+	da, err := oauthCfg.DeviceAuth(deviceFlowContext(ctx))
+	if err != nil {
+		return oauth2.Config{}, nil, fmt.Errorf("failed to start device authorization: %w", err)
+	}
+
+	// The gateway floors interval but not expires_in, and x/oauth2 bounds
+	// polling only when it sent one -- so supply the bound ourselves.
+	if da.Expiry.IsZero() {
+		da.Expiry = time.Now().Add(defaultDeviceCodeTTL)
+	}
+
+	l.cmd.PrintErrf("\nTo authenticate, visit: %s\nand enter code: %s\n\n", da.VerificationURI, da.UserCode)
+	l.cmd.PrintErrln("Waiting for authorization (this can take a few seconds after you enter the code)...")
+
+	return oauthCfg, da, nil
+}
+
+// pollDeviceToken polls until the authorization is decided: an OAuth error is
+// that verdict, since x/oauth2 polls through authorization_pending and
+// slow_down, and a 5xx ends it as a failure to answer. Anything else is
+// retried until the codes expire, a deadline DeviceAccessToken takes from
+// da.Expiry.
+func (l *oauthLogin) pollDeviceToken(ctx context.Context, oauthCfg oauth2.Config, da *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
+	ctx = deviceFlowContext(ctx)
+
+	for {
+		token, err := oauthCfg.DeviceAccessToken(ctx, da)
+		if err == nil {
+			return token, nil
+		}
+
+		// A non-2XX with an unparseable body is a RetrieveError too, so the
+		// error code, not the type, marks a verdict.
+		if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
+			if isServerFailure(retrieveErr) {
+				return nil, common.ExitWithCode(common.ExitAuthenticationError,
+					errors.New("the authorization service is unavailable - try again in a moment"))
+			}
+			if retrieveErr.ErrorCode != "" {
+				return nil, deviceAuthFailure(retrieveErr.ErrorCode, retrieveErr.ErrorDescription)
+			}
+		}
+		// The codes ran out. Asking the clock, rather than reading it off the
+		// error: a request that times out on its own reports the same thing,
+		// and startDeviceAuth guarantees da.Expiry is set.
+		if !time.Now().Before(da.Expiry) {
+			return nil, deviceAuthFailure("expired_token", "")
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		l.cmd.PrintErrf("Authorization check failed, retrying: %s\n", err)
+		select {
+		case <-time.After(deviceRetryDelay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+// isServerFailure reports whether a reply came back 5xx: a failure to answer
+// rather than a verdict, whether or not an OAuth error code came with it.
+func isServerFailure(err *oauth2.RetrieveError) bool {
+	return err.Response != nil && err.Response.StatusCode >= http.StatusInternalServerError
+}
+
+// deviceAuthFailure turns the server's OAuth error into what the user sees.
+// All of these are terminal, and a fresh code is the fix for every one.
+func deviceAuthFailure(code, description string) error {
+	var msg string
+	switch code {
+	case "expired_token":
+		msg = "the code expired before it was authorized"
+	case "access_denied":
+		msg = "the authorization request was denied"
+	case "invalid_request", "invalid_grant":
+		// FusionAuth's answer for a code already redeemed, or never issued.
+		msg = "the code is no longer valid"
+	default:
+		msg = "authorization failed: " + code
+		if description != "" {
+			msg = "authorization failed: " + description
+		}
+	}
+	return common.ExitWithCode(common.ExitAuthenticationError,
+		errors.New(msg+" - run 'tiger auth login' again for a new code"))
 }
 
 func (l *oauthLogin) generateRandomState(length int) (string, error) {
@@ -478,6 +643,16 @@ type oauthServer struct {
 type oauthResult struct {
 	token *oauth2.Token
 	err   error
+}
+
+// sendResult delivers the first result and drops the rest: the login is
+// decided by the first, and a handler blocked on a full channel would stay
+// open, which is enough to keep Shutdown from ever returning.
+func sendResult(ch chan<- oauthResult, result oauthResult) {
+	select {
+	case ch <- result:
+	default:
+	}
 }
 
 func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oauthServer, error) {
@@ -511,9 +686,9 @@ func (l *oauthLogin) startOAuthServer(expectedState, codeVerifier string) (*oaut
 	server := &http.Server{Handler: mux}
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			resultChan <- oauthResult{
+			sendResult(resultChan, oauthResult{
 				err: fmt.Errorf("failed to serve requests: %w", err),
-			}
+			})
 		}
 	}()
 
@@ -567,13 +742,11 @@ func (c *oauthCallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Redirect to success page
 	http.Redirect(w, r, c.successURL, http.StatusTemporaryRedirect)
 
-	c.resultChan <- oauthResult{
-		token: token,
-	}
+	sendResult(c.resultChan, oauthResult{token: token})
 }
 
 func (c *oauthCallback) sendError(err error) {
-	c.resultChan <- oauthResult{err: err}
+	sendResult(c.resultChan, oauthResult{err: err})
 }
 
 func openBrowserImpl(url string) error {
