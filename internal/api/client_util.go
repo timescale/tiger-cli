@@ -129,18 +129,8 @@ func (e *Error) Error() string {
 	if e == nil {
 		return "unknown error"
 	}
-	msg := ""
-	if e.Message != nil {
-		msg = *e.Message
-	}
-	if e.Details != nil && *e.Details != "" {
-		if msg != "" {
-			return msg + ": " + *e.Details
-		}
-		return *e.Details
-	}
-	if msg != "" {
-		return msg
+	if e.Message != nil && *e.Message != "" {
+		return *e.Message
 	}
 	return "unknown error"
 }
