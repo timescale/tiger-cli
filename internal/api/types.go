@@ -281,9 +281,6 @@ type Error struct {
 	// Code A machine-readable error code.
 	Code *string `json:"code,omitempty"`
 
-	// Details additional context, sent by the API but not yet in its spec. Hand-added, not regenerated from openapi.yaml.
-	Details *string `json:"details,omitempty"`
-
 	// Message A human-readable error message.
 	Message *string `json:"message,omitempty"`
 }
