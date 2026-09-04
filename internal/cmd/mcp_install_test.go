@@ -155,7 +155,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
 		},
 		{
 			name:    "invalid existing config",
@@ -557,6 +557,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
 			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},
+			Copilot:    {"copilot", "mcp", "add", "tiger", "--", "/path/to/tiger", "mcp", "start"},
 		}
 		for _, cfg := range supportedClients {
 			if cfg.buildInstallCommand == nil {
