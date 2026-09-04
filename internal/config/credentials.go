@@ -97,11 +97,11 @@ func storeToKeyring(credentials string) error {
 // storeToFile stores credentials to ~/.config/tiger/credentials with restricted permissions
 func (c *Config) storeToFile(credentials string) error {
 	credentialsFile := c.credentialsFileName()
-	if err := os.MkdirAll(filepath.Dir(credentialsFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(credentialsFile), 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	file, err := os.OpenFile(credentialsFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	file, err := os.OpenFile(credentialsFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to create credentials file: %w", err)
 	}
