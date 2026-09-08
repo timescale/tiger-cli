@@ -122,6 +122,46 @@ func (mr *MockClientInterfaceMockRecorder) AttachServiceToVPCWithBody(ctx, proje
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachServiceToVPCWithBody", reflect.TypeOf((*MockClientInterface)(nil).AttachServiceToVPCWithBody), varargs...)
 }
 
+// CreateBackupRegion mocks base method.
+func (m *MockClientInterface) CreateBackupRegion(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.CreateBackupRegionJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateBackupRegion", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBackupRegion indicates an expected call of CreateBackupRegion.
+func (mr *MockClientInterfaceMockRecorder) CreateBackupRegion(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackupRegion", reflect.TypeOf((*MockClientInterface)(nil).CreateBackupRegion), varargs...)
+}
+
+// CreateBackupRegionWithBody mocks base method.
+func (m *MockClientInterface) CreateBackupRegionWithBody(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateBackupRegionWithBody", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBackupRegionWithBody indicates an expected call of CreateBackupRegionWithBody.
+func (mr *MockClientInterfaceMockRecorder) CreateBackupRegionWithBody(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackupRegionWithBody", reflect.TypeOf((*MockClientInterface)(nil).CreateBackupRegionWithBody), varargs...)
+}
+
 // CreateReplicaSet mocks base method.
 func (m *MockClientInterface) CreateReplicaSet(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.CreateReplicaSetJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
@@ -280,6 +320,26 @@ func (mr *MockClientInterfaceMockRecorder) CreateVPCWithBody(ctx, projectID, con
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVPCWithBody", reflect.TypeOf((*MockClientInterface)(nil).CreateVPCWithBody), varargs...)
+}
+
+// DeleteBackupRegion mocks base method.
+func (m *MockClientInterface) DeleteBackupRegion(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, regionCode api.BackupRegionCode, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, regionCode}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteBackupRegion", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteBackupRegion indicates an expected call of DeleteBackupRegion.
+func (mr *MockClientInterfaceMockRecorder) DeleteBackupRegion(ctx, projectID, serviceID, regionCode any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, regionCode}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBackupRegion", reflect.TypeOf((*MockClientInterface)(nil).DeleteBackupRegion), varargs...)
 }
 
 // DeleteReplicaSet mocks base method.
@@ -540,6 +600,26 @@ func (mr *MockClientInterfaceMockRecorder) GetAuthInfo(ctx any, reqEditors ...an
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfo", reflect.TypeOf((*MockClientInterface)(nil).GetAuthInfo), varargs...)
+}
+
+// GetBackupRegions mocks base method.
+func (m *MockClientInterface) GetBackupRegions(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBackupRegions", varargs...)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBackupRegions indicates an expected call of GetBackupRegions.
+func (mr *MockClientInterfaceMockRecorder) GetBackupRegions(ctx, projectID, serviceID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackupRegions", reflect.TypeOf((*MockClientInterface)(nil).GetBackupRegions), varargs...)
 }
 
 // GetBackups mocks base method.
@@ -1346,6 +1426,46 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) AttachServiceToVPCWithRe
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachServiceToVPCWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).AttachServiceToVPCWithResponse), varargs...)
 }
 
+// CreateBackupRegionWithBodyWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) CreateBackupRegionWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.CreateBackupRegionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, contentType, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateBackupRegionWithBodyWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.CreateBackupRegionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBackupRegionWithBodyWithResponse indicates an expected call of CreateBackupRegionWithBodyWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBackupRegionWithBodyWithResponse(ctx, projectID, serviceID, contentType, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackupRegionWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).CreateBackupRegionWithBodyWithResponse), varargs...)
+}
+
+// CreateBackupRegionWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) CreateBackupRegionWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, body api.CreateBackupRegionJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.CreateBackupRegionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, body}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateBackupRegionWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.CreateBackupRegionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBackupRegionWithResponse indicates an expected call of CreateBackupRegionWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateBackupRegionWithResponse(ctx, projectID, serviceID, body any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackupRegionWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).CreateBackupRegionWithResponse), varargs...)
+}
+
 // CreateReplicaSetWithBodyWithResponse mocks base method.
 func (m *MockClientWithResponsesInterface) CreateReplicaSetWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.CreateReplicaSetResponse, error) {
 	m.ctrl.T.Helper()
@@ -1504,6 +1624,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) CreateVPCWithResponse(ct
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVPCWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).CreateVPCWithResponse), varargs...)
+}
+
+// DeleteBackupRegionWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) DeleteBackupRegionWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, regionCode api.BackupRegionCode, reqEditors ...api.RequestEditorFn) (*api.DeleteBackupRegionResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID, regionCode}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteBackupRegionWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.DeleteBackupRegionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteBackupRegionWithResponse indicates an expected call of DeleteBackupRegionWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) DeleteBackupRegionWithResponse(ctx, projectID, serviceID, regionCode any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID, regionCode}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBackupRegionWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).DeleteBackupRegionWithResponse), varargs...)
 }
 
 // DeleteReplicaSetWithResponse mocks base method.
@@ -1764,6 +1904,26 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetAuthInfoWithResponse(
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthInfoWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetAuthInfoWithResponse), varargs...)
+}
+
+// GetBackupRegionsWithResponse mocks base method.
+func (m *MockClientWithResponsesInterface) GetBackupRegionsWithResponse(ctx context.Context, projectID api.ProjectID, serviceID api.ServiceID, reqEditors ...api.RequestEditorFn) (*api.GetBackupRegionsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, projectID, serviceID}
+	for _, a := range reqEditors {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBackupRegionsWithResponse", varargs...)
+	ret0, _ := ret[0].(*api.GetBackupRegionsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBackupRegionsWithResponse indicates an expected call of GetBackupRegionsWithResponse.
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetBackupRegionsWithResponse(ctx, projectID, serviceID any, reqEditors ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, projectID, serviceID}, reqEditors...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackupRegionsWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetBackupRegionsWithResponse), varargs...)
 }
 
 // GetBackupsWithResponse mocks base method.
