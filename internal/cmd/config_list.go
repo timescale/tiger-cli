@@ -12,15 +12,15 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildConfigShowCmd(app *common.App) *cobra.Command {
+func buildConfigListCmd(app *common.App) *cobra.Command {
 	var noDefaults bool
 	var withEnv bool
 
 	cmd := &cobra.Command{
-		Use:               "show",
-		Aliases:           []string{"list", "ls"},
-		Short:             "Show current configuration",
-		Long:              `Display the current CLI configuration settings`,
+		Use:               "list",
+		Aliases:           []string{"ls", "show"},
+		Short:             "List current configuration",
+		Long:              `List the current CLI configuration settings`,
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		SilenceUsage:      true,
@@ -28,7 +28,7 @@ func buildConfigShowCmd(app *common.App) *cobra.Command {
 			cfg := app.GetConfig()
 
 			// Values are re-read free of env and CLI flags (unless --with-env
-			// is given), so `config show -o json` reports the configured
+			// is given), so `config list -o json` reports the configured
 			// `output` value rather than the flag's.
 			cfgOut, err := config.LoadForOutput(cfg.ConfigDir, withEnv, noDefaults)
 			if err != nil {

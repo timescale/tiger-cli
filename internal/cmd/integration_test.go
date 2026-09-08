@@ -1600,13 +1600,13 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
-			name:             "db connection-string",
-			args:             []string{"db", "connection-string", nonExistentServiceID},
+			name:             "db uri",
+			args:             []string{"db", "uri", nonExistentServiceID},
 			expectedExitCode: common.ExitServiceNotFound,
 		},
 		{
-			name:             "db test-connection",
-			args:             []string{"db", "test-connection", nonExistentServiceID},
+			name:             "db ping",
+			args:             []string{"db", "ping", nonExistentServiceID},
 			expectedExitCode: common.ExitInvalidParameters,
 			reason:           "maintains compatibility with PostgreSQL tooling conventions",
 		},
@@ -1792,18 +1792,18 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 		args []string
 	}{
 		{
-			name: "db connection-string",
-			args: []string{"db", "connection-string", "non-existent-service"},
+			name: "db uri",
+			args: []string{"db", "uri", "non-existent-service"},
 		},
 		{
-			name: "db connect",
-			args: []string{"db", "connect", "non-existent-service"},
+			name: "db psql",
+			args: []string{"db", "psql", "non-existent-service"},
 		},
-		// Note: db test-connection follows pg_isready conventions, so it uses exit code 3 (common.ExitInvalidParameters)
+		// Note: db ping follows pg_isready conventions, so it uses exit code 3 (common.ExitInvalidParameters)
 		// for authentication issues, not common.ExitAuthenticationError like other commands
 		{
-			name: "db test-connection",
-			args: []string{"db", "test-connection", "non-existent-service"},
+			name: "db ping",
+			args: []string{"db", "ping", "non-existent-service"},
 		},
 	}
 
@@ -1852,8 +1852,8 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 				expectedExitCode := common.ExitAuthenticationError
 				expectedDescription := "authentication error"
 
-				// db test-connection follows pg_isready conventions and uses exit code 3
-				if tc.name == "db test-connection" {
+				// db ping follows pg_isready conventions and uses exit code 3
+				if tc.name == "db ping" {
 					expectedExitCode = common.ExitInvalidParameters
 					expectedDescription = "invalid parameters (pg_isready convention)"
 				}

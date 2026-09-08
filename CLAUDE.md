@@ -77,7 +77,7 @@ Every command gets its own file in `internal/cmd/`, named to match the command i
 
 Place a helper by who calls it, working down this list until one matches:
 
-1. **One command** → that command's file, even when the helper is large. `db_connect.go` holds the entire `db connect`/`psql` flow (read-replica selection, password recovery, the psql handoff) and `auth_login.go` the entire OAuth flow — a long file whose contents all serve one command is easier to follow than several short files with scattered entry points.
+1. **One command** → that command's file, even when the helper is large. `db_psql.go` holds the entire `db psql` flow (read-replica selection, password recovery, the psql handoff) and `auth_login.go` the entire OAuth flow — a long file whose contents all serve one command is easier to follow than several short files with scattered entry points.
 2. **Several commands in one group** → the group file (`service.go`, `db.go`).
 3. **Across groups** → a package-level `<topic>_helper.go` file. The `_helper.go` suffix is reserved for this, so every other file in `internal/cmd` is named after a command.
 4. **A genuine standalone utility** — small and isolated, with no notion of a command → `internal/util`. Anything shaped around the CLI stays in `cmd` even if its signature looks generic.
@@ -89,7 +89,7 @@ Exception: all shell completion functions — both `ValidArgsFunction` completio
 
 Configuration is layered, with precedence **flags > `TIGER_*` env vars > config file (`~/.config/tiger/config.yaml`) > defaults**. The complete list of options lives in `internal/config/config.go`, and the global flags in `internal/cmd/root.go` (the two don't correspond one-to-one).
 
-- **There is no global config.** `config.Load` builds a fresh viper instance per call; nothing reads the global viper instance. Commands and MCP handlers read configuration through the App — `app.GetAll()`, `app.GetConfig()`, or `app.GetClient()` — and never call `config.Load` themselves. The only places that load directly are `config.LoadForOutput` (for `tiger config show`) and tests.
+- **There is no global config.** `config.Load` builds a fresh viper instance per call; nothing reads the global viper instance. Commands and MCP handlers read configuration through the App — `app.GetAll()`, `app.GetConfig()`, or `app.GetClient()` — and never call `config.Load` themselves. The only places that load directly are `config.LoadForOutput` (for `tiger config list`) and tests.
 - **Pass what you read down the call chain.** Hand the `*config.Config` (plus client and project ID where needed) to the functions that need them rather than reloading. Don't pass the App into `internal/common` helpers — they take the specific values they use, which keeps them usable from both CLI and MCP.
 - **The App owns flag precedence.** `config.Load` binds the flags listed in `flagBindings` (`internal/config/config.go`) against the flag set it's given, so a flag bound for one command never leaks into another, and a command that doesn't define a flag simply skips it.
 - **Flags that override config values** must be added to `flagBindings` and declared *without* a bound variable (`cmd.Flags().String(...)`, or `Var(new(outputFlag), ...)` for validating flag types), so the only way to read the value is through the config. A variable in scope is an invitation to read the raw flag instead, silently bypassing the env var and config file. Flags that aren't config values stay plain local variables; one that only needs an env-var fallback can read the env var directly (see `--new-password` in `service_update_password.go`).
@@ -101,7 +101,7 @@ Configuration is layered, with precedence **flags > `TIGER_*` env vars > config 
 
 `TIGER_EXPERIMENTAL` gates commands and MCP tools that aren't ready to be public yet, for whatever reason — including, but not limited to, anything backed by a gateway endpoint marked `x-tigerdata-preview: true` in `openapi.yaml` (those request/response shapes are still in flux, so a surface built on one must always be gated).
 
-It's an env var **only**: deliberately not a config key, not a flag, and hidden from `tiger config show`. `buildRootCmd` reads it once into `app.Experimental`, and the CLI guards its `AddCommand` calls with it while the MCP server guards its `addTool` calls, so when the env var is off the gated commands and tools don't exist at all — no help entry, no completion, not advertised to MCP clients (restart the MCP server after toggling). **Never mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, or error messages.** When a feature graduates, delete the gates on both sides.
+It's an env var **only**: deliberately not a config key, not a flag, and hidden from `tiger config list`. `buildRootCmd` reads it once into `app.Experimental`, and the CLI guards its `AddCommand` calls with it while the MCP server guards its `addTool` calls, so when the env var is off the gated commands and tools don't exist at all — no help entry, no completion, not advertised to MCP clients (restart the MCP server after toggling). **Never mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, or error messages.** When a feature graduates, delete the gates on both sides.
 
 ## Command Patterns
 

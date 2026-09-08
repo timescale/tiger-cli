@@ -30,8 +30,8 @@ func mapstructureKeys(t *testing.T, v any) []string {
 
 // A config key has to be spelled out in several places that Go can't tie
 // together: defaultValues, the Config struct, the ConfigOutput struct that
-// `tiger config show` renders, and validateValue's switch. Missing one is
-// silent — a key absent from ConfigOutput just never appears in `config show`,
+// `tiger config list` renders, and validateValue's switch. Missing one is
+// silent — a key absent from ConfigOutput just never appears in `config list`,
 // and one absent from validateValue can't be set at all — so assert the lists
 // agree rather than relying on whoever adds the next key to find all four.
 func TestConfigKeyRegistriesAgree(t *testing.T) {

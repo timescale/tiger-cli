@@ -100,7 +100,7 @@ func TestCompletion(t *testing.T) {
 		},
 		{
 			// Config keys come straight from the registry, so this list is the
-			// same one `tiger config show` renders (see TestConfigShowCoversEveryKey).
+			// same one `tiger config list` renders (see TestConfigListCoversEveryKey).
 			name:       "config set completes keys",
 			args:       []string{"__complete", "config", "set", ""},
 			wantStdout: "analytics\napi_url\ncolor\nconsole_url\ndocs_mcp\ndocs_mcp_url\ngateway_url\nmcp_max_rows\noutput\npassword_storage\nread_only\nreleases_url\nservice_id\nversion_check\n" + noFileComp,

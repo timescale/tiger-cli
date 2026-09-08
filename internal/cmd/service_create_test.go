@@ -179,7 +179,7 @@ func TestServiceCreateCmd(t *testing.T) {
 🎯 Set service 'svc-12345' as default service.
 ⏳ Waiting for service to be ready (wait timeout: 30m0s)...
 🎉 Service is ready and running!
-🔌 Run 'tiger db connect' to connect to your new service
+🔌 Run 'tiger db psql' to connect to your new service
 `,
 			checks: []checkFunc{checkStoredPassword("svc-12345", "init-pass-123")},
 		},
@@ -203,7 +203,7 @@ func TestServiceCreateCmd(t *testing.T) {
 🔐 Password saved to system keyring for automatic authentication
 ⏳ Waiting for service to be ready (wait timeout: 30m0s)...
 🎉 Service is ready and running!
-🔌 Run 'tiger db connect svc-12345' to connect to your new service
+🔌 Run 'tiger db psql svc-12345' to connect to your new service
 `,
 			checks: []checkFunc{checkDefaultService("")},
 		},
