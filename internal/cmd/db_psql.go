@@ -62,9 +62,6 @@ Examples:
   # Connect to default service
   tiger db psql
 
-  # The connect alias works the same way
-  tiger db connect
-
   # Connect directly to a read replica by its ID
   tiger db psql rep1234567
 
