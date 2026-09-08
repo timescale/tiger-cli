@@ -77,6 +77,15 @@ tiger auth login
 	cmd.PersistentFlags().Bool("version-check", true, "check for updates on startup")
 	cmd.RegisterFlagCompletionFunc("password-storage", passwordStorageCompletion)
 
+	// --skip-update-check is the former spelling of --version-check=false, kept
+	// present (but hidden) for backwards compatibility. wrapCommands maps it onto
+	// --version-check before the config loads, so nothing else reads it.
+	cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
+	if err := cmd.PersistentFlags().MarkHidden("skip-update-check"); err != nil {
+		return nil, nil, err
+	}
+	cmd.MarkFlagsMutuallyExclusive("version-check", "skip-update-check")
+
 	// Add all subcommands
 	cmd.AddCommand(buildVersionCmd(app))
 	cmd.AddCommand(buildUpgradeCmd(app))
@@ -111,6 +120,9 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 			// Load the config and API client once for the whole invocation.
 			// c.Flags() carries the persistent flags inherited from parents, so
 			// flags take precedence over env vars and the config file.
+			if err := applySkipUpdateCheck(c.Flags()); err != nil {
+				return err
+			}
 			app.SetFlags(c.Flags())
 			cfg, _, _, err := app.Load(c.Context())
 			if err != nil {
@@ -150,6 +162,19 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 	for _, child := range cmd.Commands() {
 		wrapCommands(child, app)
 	}
+}
+
+// applySkipUpdateCheck maps the legacy --skip-update-check flag onto
+// --version-check, so the config binding sees a single setting.
+func applySkipUpdateCheck(flags *pflag.FlagSet) error {
+	if !flags.Changed("skip-update-check") {
+		return nil
+	}
+	skip, err := flags.GetBool("skip-update-check")
+	if err != nil {
+		return err
+	}
+	return flags.Set("version-check", strconv.FormatBool(!skip))
 }
 
 // versionCheck starts a background check for a newer release and returns the

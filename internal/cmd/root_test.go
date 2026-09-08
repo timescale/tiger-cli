@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/timescale/tiger-cli/internal/config"
@@ -33,9 +34,10 @@ func checkConfigValue(key string, get func(*config.Config) string, want string) 
 	})
 }
 
-func serviceID(cfg *config.Config) string { return cfg.ServiceID }
-func output(cfg *config.Config) string    { return cfg.Output }
-func apiURL(cfg *config.Config) string    { return cfg.APIURL }
+func serviceID(cfg *config.Config) string     { return cfg.ServiceID }
+func output(cfg *config.Config) string        { return cfg.Output }
+func apiURL(cfg *config.Config) string        { return cfg.APIURL }
+func versionChecks(cfg *config.Config) string { return strconv.FormatBool(cfg.VersionCheck) }
 
 func TestRootCmd(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
@@ -69,6 +71,20 @@ func TestRootCmd(t *testing.T) {
 			name:       "case-insensitive commands and flags",
 			args:       []string{"VERSION", "--Output", "bare"},
 			wantStdout: config.Version + "\n",
+		},
+		{
+			// The legacy --skip-update-check is mapped onto --version-check, so
+			// it overrides the env var the same way the new flag would.
+			name:       "legacy --skip-update-check disables the version check",
+			args:       []string{"--skip-update-check", "version", "-o", "bare"},
+			opts:       []runOption{withEnv("TIGER_VERSION_CHECK", "true")},
+			wantStdout: config.Version + "\n",
+			checks:     []checkFunc{checkConfigValue("version_check", versionChecks, "false")},
+		},
+		{
+			name:    "legacy --skip-update-check conflicts with --version-check",
+			args:    []string{"--skip-update-check", "--version-check=false", "version", "-o", "bare"},
+			wantErr: "if any flags in the group [version-check skip-update-check] are set none of the others can be; [skip-update-check version-check] were all set",
 		},
 	})
 
