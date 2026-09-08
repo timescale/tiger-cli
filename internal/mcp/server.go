@@ -37,7 +37,7 @@ const (
 	toolServiceMetricsAvailable = "service_metrics_available"
 	toolServiceMetricsSeries    = "service_metrics_series"
 	toolServiceBackups          = "service_backups"
-	toolDBExecuteQuery          = "db_execute_query"
+	toolDBQuery                 = "db_query"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality
@@ -78,12 +78,12 @@ func buildServerInstructions(cfg *config.Config) string {
 		// advertising them.
 		return intro +
 			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, or modify services. " +
-			"db_execute_query connects read-only, so writes and DDL are rejected by the server."
+			"db_query connects read-only, so writes and DDL are rejected by the server."
 	case config.ReadOnlyProd:
 		// The write tools are registered, so keep advertising them but explain
 		// the refusals — otherwise one looks like a bug.
 		return intro + capabilities + " " +
-			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_execute_query connects to them read-only, so writes and DDL are rejected by the server. " +
+			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_query connects to them read-only, so writes and DDL are rejected by the server. " +
 			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it."
 	default:
 		return intro + capabilities
@@ -185,7 +185,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 
 // registerDatabaseTools registers database operation tools with comprehensive schemas and descriptions
 func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
-	addTool(s, mode, newDBExecuteQueryTool(), s.handleDBExecuteQuery)
+	addTool(s, mode, newDBQueryTool(), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
 }

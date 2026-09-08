@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 
-	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
-	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func buildDbCmd(app *common.App) *cobra.Command {
@@ -21,27 +23,38 @@ func buildDbCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildDbSavePasswordCmd(app))
 	cmd.AddCommand(buildDbCreateCmd(app))
 	cmd.AddCommand(buildDbSchemaCmd(app))
+	cmd.AddCommand(buildDbQueryCmd(app))
 
 	return cmd
 }
 
-// lookupConnectionTarget looks up the target named by args, which may be a
-// primary service ID or a read replica set ID. This lets a replica ID work
-// anywhere a service ID does across the db connection commands.
-func lookupConnectionTarget(cmd *cobra.Command, app *common.App, args []string) (*common.ConnectionTarget, error) {
-	service, err := getServiceDetails(cmd, app, args)
-	if err != nil {
-		return nil, err
+// handleDatabaseError adds guidance to the failures whose fix isn't evident from
+// the message: the readiness sentinels, and a Postgres authentication failure,
+// which otherwise arrives as a bare pgx error saying nothing about the password
+// it was rejected for. Every other error passes through unchanged.
+func handleDatabaseError(err error, target *common.ConnectionTarget) error {
+	switch {
+	case errors.Is(err, common.ErrPaused):
+		return fmt.Errorf("%w — start it with 'tiger service start %s'", common.ErrPaused, target.ConnectionService.ServiceID)
+	case errors.Is(err, common.ErrNotReady):
+		return fmt.Errorf("%w — check its status with 'tiger service get %s' and try again", common.ErrNotReady, target.ConnectionService.ServiceID)
+	case isPostgresAuthenticationError(err):
+		// A read replica shares its primary's credentials, so the password
+		// belongs to the credential service rather than the one connected to.
+		serviceID := target.CredentialService.ServiceID
+		return fmt.Errorf("%w\n\nThe stored password is missing or invalid. Save the current one with 'tiger db save-password %s', or reset it with 'tiger service update-password %s'",
+			err, serviceID, serviceID)
 	}
+	return err
+}
 
-	client, projectID, err := app.GetClient()
-	if err != nil {
-		return nil, err
+// isPostgresAuthenticationError checks if the error is a PostgreSQL authentication failure
+func isPostgresAuthenticationError(err error) bool {
+	// Check for PostgreSQL error code 28P01 (invalid_password) or 28000 (invalid_authorization_specification)
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+		return pgErr.Code == "28P01" || pgErr.Code == "28000"
 	}
-
-	// The API resolves both primary and read replica IDs via GetService; a read
-	// replica comes back linked to its parent, whose credentials it shares.
-	return common.ResolveConnectionTarget(cmd.Context(), client, projectID, service)
+	return false
 }
 
 // warnReplicaPooler prints the replica pooler-fallback warning to stderr, if
@@ -50,31 +63,4 @@ func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pool
 	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
 		cmd.PrintErrf("⚠️  Warning: %s\n", warning)
 	}
-}
-
-// buildConnectionDetailsForTarget builds connection details for a target,
-// warning first when a replica falls back from a requested pooler.
-func buildConnectionDetailsForTarget(cmd *cobra.Command, cfg *config.Config, target *common.ConnectionTarget, opts common.ConnectionDetailsOptions) (*common.ConnectionDetails, error) {
-	warnReplicaPooler(cmd, target, opts.Pooled)
-	return target.Details(cfg, opts)
-}
-
-// getServiceDetails is a helper that handles common service lookup logic and returns the service details
-func getServiceDetails(cmd *cobra.Command, app *common.App, args []string) (api.Service, error) {
-	cfg, client, projectID, err := app.GetAll()
-	if err != nil {
-		return api.Service{}, err
-	}
-
-	// Determine service ID
-	serviceID, err := getServiceID(cfg, args)
-	if err != nil {
-		return api.Service{}, err
-	}
-
-	service, err := common.GetService(cmd.Context(), client, projectID, serviceID)
-	if err != nil {
-		return api.Service{}, err
-	}
-	return *service, nil
 }

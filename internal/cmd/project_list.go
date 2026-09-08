@@ -62,6 +62,7 @@ output. Use 'tiger project use' to switch to another one.`,
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
+	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
 
 	return cmd
 }
