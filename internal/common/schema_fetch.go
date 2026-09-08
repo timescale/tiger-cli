@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -20,15 +21,26 @@ func FetchServiceSchema(ctx context.Context, cfg *config.Config, target *Connect
 		return nil, err
 	}
 
-	// Introspection runs parameterless statements, so the simple protocol fits.
-	conn, err := ConnectTarget(ctx, cfg, target, ConnectionDetailsOptions{
+	details, err := target.Details(cfg, ConnectionDetailsOptions{
 		Pooled:       pooled,
 		Role:         role,
 		WithPassword: true,
 		ReadOnly:     true,
-	}, pgx.QueryExecModeSimpleProtocol)
+	})
 	if err != nil {
 		return nil, err
+	}
+
+	connConfig, err := pgx.ParseConfig(details.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+	// Introspection runs parameterless statements, so the simple protocol fits.
+	connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer conn.Close(context.Background())
 
