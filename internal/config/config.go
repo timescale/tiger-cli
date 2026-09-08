@@ -120,6 +120,7 @@ var flagBindings = map[string]string{
 	"output":           "output",
 	"password-storage": "password_storage",
 	"service-id":       "service_id",
+	"version-check":    "version_check",
 }
 
 // Config holds the effective configuration for a single command invocation,

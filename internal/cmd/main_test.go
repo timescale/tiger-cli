@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -349,11 +350,15 @@ func runCommand(
 	// Always include flags that prevent side effects in tests:
 	// --config-dir: isolate from real config
 	// --analytics=false: prevent analytics calls on the mock
-	// --skip-update-check: prevent version check HTTP calls
+	// --version-check=false: prevent version check HTTP calls. Omitted when
+	// the test passes the legacy --skip-update-check, which is mutually
+	// exclusive with it.
 	baseArgs := []string{
 		"--config-dir", configDir,
 		"--analytics=false",
-		"--skip-update-check",
+	}
+	if !slices.Contains(args, "--skip-update-check") {
+		baseArgs = append(baseArgs, "--version-check=false")
 	}
 	cmd.SetArgs(append(baseArgs, args...))
 

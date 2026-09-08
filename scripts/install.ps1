@@ -301,7 +301,7 @@ function Test-Installation {
 
     # Test that the binary is executable and get version
     try {
-        $installedVersion = & $binaryPath version -o bare --skip-update-check 2>$null | Select-Object -First 1
+        $installedVersion = & $binaryPath version -o bare --version-check=false 2>$null | Select-Object -First 1
         if ($installedVersion) {
             Write-Success "Tiger CLI installed successfully!"
             Write-Success "Version: $installedVersion"
