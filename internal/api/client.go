@@ -233,6 +233,50 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/attachToVPC (the `AttachServiceToVPC` operationId).
 	AttachServiceToVPC(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBackupRegions List All Backup Regions
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the additional regions this service's backups are copied to
+	// (cross-region backups). The region the service runs in is not listed.
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+	GetBackupRegions(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBackupRegionWithBody Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBackupRegion Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBackupRegion Remove a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops copying this service's backups to a region. Copies already stored
+	// there are deleted in the background and cannot be recovered.
+	//
+	// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+	DeleteBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetBackups List All Backups
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -916,6 +960,90 @@ func (c *Client) AttachServiceToVPCWithBody(ctx context.Context, projectID Proje
 // Corresponds with POST /projects/{project_id}/services/{service_id}/attachToVPC (the `AttachServiceToVPC` operationId).
 func (c *Client) AttachServiceToVPC(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAttachServiceToVPCRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBackupRegions List All Backup Regions
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the additional regions this service's backups are copied to
+// (cross-region backups). The region the service runs in is not listed.
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+func (c *Client) GetBackupRegions(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBackupRegionsRequest(c.Server, projectID, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBackupRegionWithBody Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *Client) CreateBackupRegionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBackupRegionRequestWithBody(c.Server, projectID, serviceID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBackupRegion Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *Client) CreateBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBackupRegionRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBackupRegion Remove a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops copying this service's backups to a region. Copies already stored
+// there are deleted in the background and cannot be recovered.
+//
+// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+func (c *Client) DeleteBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBackupRegionRequest(c.Server, projectID, serviceID, regionCode)
 	if err != nil {
 		return nil, err
 	}
@@ -2162,6 +2290,149 @@ func NewAttachServiceToVPCRequestWithBody(server string, projectID ProjectID, se
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetBackupRegionsRequest constructs an http.Request for the GetBackupRegions method
+func NewGetBackupRegionsRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateBackupRegionRequest calls the generic CreateBackupRegion builder with application/json body
+func NewCreateBackupRegionRequest(server string, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBackupRegionRequestWithBody(server, projectID, serviceID, "application/json", bodyReader)
+}
+
+// NewCreateBackupRegionRequestWithBody constructs an http.Request for the CreateBackupRegion method, with any body, and a specified content type
+func NewCreateBackupRegionRequestWithBody(server string, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBackupRegionRequest constructs an http.Request for the DeleteBackupRegion method
+func NewDeleteBackupRegionRequest(server string, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "region_code", regionCode, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -3938,6 +4209,54 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/attachToVPC (the `AttachServiceToVPC` operationId).
 	AttachServiceToVPCWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error)
 
+	// GetBackupRegionsWithResponse List All Backup Regions
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the additional regions this service's backups are copied to
+	// (cross-region backups). The region the service runs in is not listed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+	GetBackupRegionsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRegionsResponse, error)
+
+	// CreateBackupRegionWithBodyWithResponse Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error)
+
+	// CreateBackupRegionWithResponse Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error)
+
+	// DeleteBackupRegionWithResponse Remove a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops copying this service's backups to a region. Copies already stored
+	// there are deleted in the background and cannot be recovered.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+	DeleteBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*DeleteBackupRegionResponse, error)
+
 	// GetBackupsWithResponse List All Backups
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -4832,6 +5151,143 @@ func (r AttachServiceToVPCResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r AttachServiceToVPCResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBackupRegionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]BackupRegion
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBackupRegionsResponse) GetJSON200() *[]BackupRegion {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBackupRegionsResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBackupRegionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBackupRegionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBackupRegionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBackupRegionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateBackupRegionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *BackupRegion
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateBackupRegionResponse) GetJSON201() *BackupRegion {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateBackupRegionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateBackupRegionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateBackupRegionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBackupRegionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateBackupRegionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBackupRegionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteBackupRegionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBackupRegionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBackupRegionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBackupRegionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBackupRegionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6541,6 +6997,78 @@ func (c *ClientWithResponses) AttachServiceToVPCWithResponse(ctx context.Context
 	return ParseAttachServiceToVPCResponse(rsp)
 }
 
+// GetBackupRegionsWithResponse List All Backup Regions
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the additional regions this service's backups are copied to
+// (cross-region backups). The region the service runs in is not listed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+func (c *ClientWithResponses) GetBackupRegionsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRegionsResponse, error) {
+	rsp, err := c.GetBackupRegions(ctx, projectID, serviceID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBackupRegionsResponse(rsp)
+}
+
+// CreateBackupRegionWithBodyWithResponse Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *ClientWithResponses) CreateBackupRegionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error) {
+	rsp, err := c.CreateBackupRegionWithBody(ctx, projectID, serviceID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBackupRegionResponse(rsp)
+}
+
+// CreateBackupRegionWithResponse Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *ClientWithResponses) CreateBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error) {
+	rsp, err := c.CreateBackupRegion(ctx, projectID, serviceID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBackupRegionResponse(rsp)
+}
+
+// DeleteBackupRegionWithResponse Remove a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops copying this service's backups to a region. Copies already stored
+// there are deleted in the background and cannot be recovered.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+func (c *ClientWithResponses) DeleteBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*DeleteBackupRegionResponse, error) {
+	rsp, err := c.DeleteBackupRegion(ctx, projectID, serviceID, regionCode, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBackupRegionResponse(rsp)
+}
+
 // GetBackupsWithResponse List All Backups
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -7553,6 +8081,101 @@ func ParseAttachServiceToVPCResponse(rsp *http.Response) (*AttachServiceToVPCRes
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBackupRegionsResponse parses an HTTP response from a GetBackupRegionsWithResponse call
+func ParseGetBackupRegionsResponse(rsp *http.Response) (*GetBackupRegionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBackupRegionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []BackupRegion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateBackupRegionResponse parses an HTTP response from a CreateBackupRegionWithResponse call
+func ParseCreateBackupRegionResponse(rsp *http.Response) (*CreateBackupRegionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBackupRegionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest BackupRegion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBackupRegionResponse parses an HTTP response from a DeleteBackupRegionWithResponse call
+func ParseDeleteBackupRegionResponse(rsp *http.Response) (*DeleteBackupRegionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBackupRegionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
