@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceBackupsTool(t *testing.T) {
+func TestServiceBackupListTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	// The tool is experimental-gated (see the first case), so every other
@@ -77,34 +77,34 @@ func TestServiceBackupsTool(t *testing.T) {
 			// gate the server never advertises it and the SDK refuses the call
 			// itself — a transport error rather than a result.
 			name:        "not registered without the experimental gate",
-			tool:        toolServiceBackups,
+			tool:        toolServiceBackupList,
 			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "service_backups"`,
+			wantCallErr: `calling "tools/call": unknown tool "service_backup_list"`,
 		},
 		{
 			name:    "not logged in",
-			tool:    toolServiceBackups,
+			tool:    toolServiceBackupList,
 			args:    args,
 			opts:    []runOption{experimental, withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "service ID failing the schema pattern",
-			tool:    toolServiceBackups,
+			tool:    toolServiceBackupList,
 			args:    map[string]any{"service_id": "NOPE"},
 			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
 			name:    "missing service ID",
-			tool:    toolServiceBackups,
+			tool:    toolServiceBackupList,
 			args:    map[string]any{},
 			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: required: missing properties: ["service_id"]`,
 		},
 		{
 			name: "network error",
-			tool: toolServiceBackups,
+			tool: toolServiceBackupList,
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -115,7 +115,7 @@ func TestServiceBackupsTool(t *testing.T) {
 		},
 		{
 			name: "API error",
-			tool: toolServiceBackups,
+			tool: toolServiceBackupList,
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -129,7 +129,7 @@ func TestServiceBackupsTool(t *testing.T) {
 		},
 		{
 			name: "API error without a message body",
-			tool: toolServiceBackups,
+			tool: toolServiceBackupList,
 			args: args,
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -143,7 +143,7 @@ func TestServiceBackupsTool(t *testing.T) {
 		{
 			// A 200 with no parsed body is reported as no backups, not an error.
 			name:       "nil response body",
-			tool:       toolServiceBackups,
+			tool:       toolServiceBackupList,
 			args:       args,
 			opts:       []runOption{experimental},
 			mock:       expectBackups(nil),
@@ -153,7 +153,7 @@ func TestServiceBackupsTool(t *testing.T) {
 			// A JSON `null` array is normalized to an empty one, so the output
 			// stays a valid array.
 			name:       "null backups array",
-			tool:       toolServiceBackups,
+			tool:       toolServiceBackupList,
 			args:       args,
 			opts:       []runOption{experimental},
 			mock:       expectBackups(new([]api.Backup)),
@@ -161,7 +161,7 @@ func TestServiceBackupsTool(t *testing.T) {
 		},
 		{
 			name:       "no backups taken yet",
-			tool:       toolServiceBackups,
+			tool:       toolServiceBackupList,
 			args:       args,
 			opts:       []runOption{experimental},
 			mock:       expectBackups(&[]api.Backup{}),
@@ -169,7 +169,7 @@ func TestServiceBackupsTool(t *testing.T) {
 		},
 		{
 			name:       "backups listed",
-			tool:       toolServiceBackups,
+			tool:       toolServiceBackupList,
 			args:       args,
 			opts:       []runOption{experimental},
 			mock:       expectBackups(&backups),

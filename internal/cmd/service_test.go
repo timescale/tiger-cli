@@ -83,7 +83,7 @@ func TestServiceExperimentalGate(t *testing.T) {
 			name:       "backup registered when experimental",
 			args:       []string{"service", "backup", "--help"},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: matchHelp("List the full and incremental backups"),
+			wantStdout: matchHelp("Manage the backups taken for a database service"),
 		},
 	})
 }

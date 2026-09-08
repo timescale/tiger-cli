@@ -26,24 +26,27 @@ const (
 // MCP tool names. Centralized so readOnlyGatedTools and the tool registrations
 // share a single source of truth.
 const (
-	toolServiceList             = "service_list"
-	toolServiceGet              = "service_get"
-	toolServiceCreate           = "service_create"
-	toolServiceFork             = "service_fork"
-	toolServiceStart            = "service_start"
-	toolServiceStop             = "service_stop"
-	toolServiceResize           = "service_resize"
-	toolServiceRename           = "service_rename"
-	toolServiceUpdatePassword   = "service_update_password"
-	toolServiceDelete           = "service_delete"
-	toolServiceLogs             = "service_logs"
-	toolServiceMetricsAvailable = "service_metrics_available"
-	toolServiceMetricsDetails   = "service_metrics_details"
-	toolServiceMetricsSeries    = "service_metrics_series"
-	toolServiceBackups          = "service_backups"
-	toolDBQuery                 = "db_query"
-	toolDBSchema                = "db_schema"
-	toolFeedback                = "feedback"
+	toolServiceList               = "service_list"
+	toolServiceGet                = "service_get"
+	toolServiceCreate             = "service_create"
+	toolServiceFork               = "service_fork"
+	toolServiceStart              = "service_start"
+	toolServiceStop               = "service_stop"
+	toolServiceResize             = "service_resize"
+	toolServiceRename             = "service_rename"
+	toolServiceUpdatePassword     = "service_update_password"
+	toolServiceDelete             = "service_delete"
+	toolServiceLogs               = "service_logs"
+	toolServiceMetricsAvailable   = "service_metrics_available"
+	toolServiceMetricsDetails     = "service_metrics_details"
+	toolServiceMetricsSeries      = "service_metrics_series"
+	toolServiceBackupList         = "service_backup_list"
+	toolServiceBackupRegionList   = "service_backup_region_list"
+	toolServiceBackupRegionAdd    = "service_backup_region_add"
+	toolServiceBackupRegionRemove = "service_backup_region_remove"
+	toolDBQuery                   = "db_query"
+	toolDBSchema                  = "db_schema"
+	toolFeedback                  = "feedback"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality
@@ -69,6 +72,8 @@ var readOnlyGatedTools = []string{
 	toolServiceResize,
 	toolServiceRename,
 	toolServiceUpdatePassword,
+	toolServiceBackupRegionAdd,
+	toolServiceBackupRegionRemove,
 	toolServiceDelete,
 }
 
@@ -220,7 +225,10 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
 		addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
 		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
-		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
+		addTool(s, mode, newServiceBackupListTool(), s.handleServiceBackupList)
+		addTool(s, mode, newServiceBackupRegionListTool(), s.handleServiceBackupRegionList)
+		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)
+		addTool(s, mode, newServiceBackupRegionRemoveTool(), s.handleServiceBackupRegionRemove)
 	}
 }
 

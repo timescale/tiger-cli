@@ -14,35 +14,35 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// ServiceBackupsInput represents input for service_backups
-type ServiceBackupsInput struct {
+// ServiceBackupListInput represents input for service_backup_list
+type ServiceBackupListInput struct {
 	ServiceID string `json:"service_id"`
 }
 
-func (ServiceBackupsInput) Schema() *jsonschema.Schema {
-	schema := util.Must(jsonschema.For[ServiceBackupsInput](nil))
+func (ServiceBackupListInput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceBackupListInput](nil))
 	setServiceIDSchemaProperties(schema)
 	return schema
 }
 
-// ServiceBackupsOutput represents output for service_backups
-type ServiceBackupsOutput struct {
+// ServiceBackupListOutput represents output for service_backup_list
+type ServiceBackupListOutput struct {
 	Backups []api.Backup `json:"backups"`
 }
 
-func (ServiceBackupsOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceBackupsOutput](nil))
+func (ServiceBackupListOutput) Schema() *jsonschema.Schema {
+	return util.Must(jsonschema.For[ServiceBackupListOutput](nil))
 }
 
-func newServiceBackupsTool() *mcp.Tool {
+func newServiceBackupListTool() *mcp.Tool {
 	return &mcp.Tool{
-		Name:  toolServiceBackups,
+		Name:  toolServiceBackupList,
 		Title: "List Service Backups",
 		Description: "List the full and incremental backups taken for a service. " +
 			"Backups run automatically on a schedule; there is no tool to create or delete one. " +
 			"To restore data, fork the service with service_fork.",
-		InputSchema:  ServiceBackupsInput{}.Schema(),
-		OutputSchema: ServiceBackupsOutput{}.Schema(),
+		InputSchema:  ServiceBackupListInput{}.Schema(),
+		OutputSchema: ServiceBackupListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),
@@ -51,11 +51,11 @@ func newServiceBackupsTool() *mcp.Tool {
 	}
 }
 
-// handleServiceBackups handles the service_backups MCP tool
-func (s *Server) handleServiceBackups(ctx context.Context, req *mcp.CallToolRequest, input ServiceBackupsInput) (*mcp.CallToolResult, ServiceBackupsOutput, error) {
+// handleServiceBackupList handles the service_backup_list MCP tool
+func (s *Server) handleServiceBackupList(ctx context.Context, req *mcp.CallToolRequest, input ServiceBackupListInput) (*mcp.CallToolResult, ServiceBackupListOutput, error) {
 	client, projectID, err := s.app.GetClient()
 	if err != nil {
-		return nil, ServiceBackupsOutput{}, err
+		return nil, ServiceBackupListOutput{}, err
 	}
 
 	s.logger.Info("MCP: Listing service backups",
@@ -65,11 +65,11 @@ func (s *Server) handleServiceBackups(ctx context.Context, req *mcp.CallToolRequ
 
 	resp, err := client.GetBackupsWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
-		return nil, ServiceBackupsOutput{}, fmt.Errorf("failed to list backups: %w", err)
+		return nil, ServiceBackupListOutput{}, fmt.Errorf("failed to list backups: %w", err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return nil, ServiceBackupsOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+		return nil, ServiceBackupListOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
 	// Default to a non-nil slice so a missing body or a JSON null marshals to
@@ -79,5 +79,5 @@ func (s *Server) handleServiceBackups(ctx context.Context, req *mcp.CallToolRequ
 		backups = *resp.JSON200
 	}
 
-	return nil, ServiceBackupsOutput{Backups: backups}, nil
+	return nil, ServiceBackupListOutput{Backups: backups}, nil
 }
