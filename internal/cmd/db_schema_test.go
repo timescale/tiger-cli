@@ -38,7 +38,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			args:    []string{"db", "schema"},
 			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr: "service is paused",
+			wantErr: pausedMsg("svc-12345"),
 		},
 		{
 			name: "network error",
@@ -78,19 +78,19 @@ func TestDbSchemaCmd(t *testing.T) {
 			name:    "service paused",
 			args:    []string{"db", "schema", "svc-12345"},
 			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr: "service is paused",
+			wantErr: pausedMsg("svc-12345"),
 		},
 		{
 			name:    "service pausing",
 			args:    []string{"db", "schema", "svc-12345"},
 			setup:   setupGetWithStatus(api.DeployStatusPAUSING),
-			wantErr: "service is paused",
+			wantErr: pausedMsg("svc-12345"),
 		},
 		{
 			name:    "service not ready",
 			args:    []string{"db", "schema", "svc-12345"},
 			setup:   setupGetWithStatus(api.DeployStatusQUEUED),
-			wantErr: "service is not ready",
+			wantErr: notReadyMsg("svc-12345"),
 		},
 		{
 			name:    "pooled without pooler",
@@ -109,8 +109,8 @@ func TestDbSchemaCmd(t *testing.T) {
 				}))
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			wantErr:    "service is not ready",
-			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: service is not ready\n",
+			wantErr:    notReadyMsg("rep-67890"),
+			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
 		},
 	})
 }

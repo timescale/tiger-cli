@@ -23,16 +23,14 @@ type ConnectionTarget struct {
 
 // Details builds the target's connection details. A requested-but-unavailable
 // pooler is a hard error for a primary but silently falls back to direct for a
-// replica.
+// replica (see ReplicaPoolerWarning).
 func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOptions) (*ConnectionDetails, error) {
-	details, err := GetConnectionDetailsFor(cfg, t.ConnectionService, t.CredentialService, opts)
+	details, err := getConnectionDetails(cfg, t.ConnectionService, t.CredentialService, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connection string: %w", err)
 	}
-	if !t.IsReplica {
-		if err := details.RequirePooler(opts.Pooled); err != nil {
-			return nil, err
-		}
+	if opts.Pooled && !details.IsPooler && !t.IsReplica {
+		return nil, fmt.Errorf("connection pooler not available for this service")
 	}
 	return details, nil
 }
@@ -61,34 +59,33 @@ func IsReadReplica(service api.Service) bool {
 	return service.ForkedFrom != nil && util.Deref(service.ForkedFrom.IsStandby)
 }
 
-// ResolveConnectionTarget turns a fetched service into a ConnectionTarget. When
-// the service is a standby read replica, it connects to the replica but resolves
-// credentials against the parent primary, which is fetched here.
-func ResolveConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
-	if !IsReadReplica(service) {
-		return &ConnectionTarget{ConnectionService: service, CredentialService: service}, nil
+// ResolveConnectionTargetByID fetches the service named by id — which may be a
+// primary service ID or a read replica set ID, both of which GetService
+// resolves — and works out which service holds its credentials. A standby read
+// replica connects to its own endpoint but shares the parent primary's
+// password, so the parent is fetched here too.
+func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
+	service, err := GetService(ctx, client, projectID, id)
+	if err != nil {
+		return nil, err
 	}
 
+	if !IsReadReplica(*service) {
+		return &ConnectionTarget{ConnectionService: *service, CredentialService: *service}, nil
+	}
+
+	// A replica with no parent recorded has nowhere else to look, so it stands
+	// in as its own credential service.
 	parentID := util.DerefStr(service.ForkedFrom.ServiceID)
 	if parentID == "" {
-		return &ConnectionTarget{ConnectionService: service, CredentialService: service, IsReplica: true}, nil
+		return &ConnectionTarget{ConnectionService: *service, CredentialService: *service, IsReplica: true}, nil
 	}
 
 	parent, err := GetService(ctx, client, projectID, parentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
 	}
-	return &ConnectionTarget{ConnectionService: service, CredentialService: *parent, IsReplica: true}, nil
-}
-
-// ResolveConnectionTargetByID fetches a service (which may be a read replica) by
-// ID and resolves its ConnectionTarget.
-func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
-	service, err := GetService(ctx, client, projectID, id)
-	if err != nil {
-		return nil, err
-	}
-	return ResolveConnectionTarget(ctx, client, projectID, *service)
+	return &ConnectionTarget{ConnectionService: *service, CredentialService: *parent, IsReplica: true}, nil
 }
 
 // NewReplicaConnectionTarget builds a ConnectionTarget for connecting to one of
@@ -102,10 +99,19 @@ func NewReplicaConnectionTarget(primary api.Service, replica api.ReadReplicaSet)
 		metadata = &api.ServiceMetadata{Environment: replica.Metadata.Environment}
 	}
 
+	// Replica sets carry their own status enum. Map only "active" onto READY so
+	// a readiness check on this target (CheckServiceReady) treats every other
+	// state — creating, resizing, error — as not ready.
+	status := api.DeployStatus("")
+	if replica.Status == api.ReadReplicaSetStatusActive {
+		status = api.DeployStatusREADY
+	}
+
 	return &ConnectionTarget{
 		ConnectionService: api.Service{
 			ServiceID:        replica.ID,
 			Name:             replica.Name,
+			Status:           status,
 			Endpoint:         replica.Endpoint,
 			ConnectionPooler: replica.ConnectionPooler,
 			Metadata:         metadata,

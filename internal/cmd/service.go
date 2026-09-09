@@ -249,10 +249,10 @@ func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, s
 		return
 	} else if noSetDefault {
 		// If the service wasn't set as the default, include the serviceID in the command
-		cmd.PrintErrf("🔌 Run 'tiger db connect %s' to connect to your new service\n", serviceID)
+		cmd.PrintErrf("🔌 Run 'tiger db psql %s' to connect to your new service\n", serviceID)
 	} else {
 		// If the service was set as the default, no need to include the serviceID in the command
-		cmd.PrintErrf("🔌 Run 'tiger db connect' to connect to your new service\n")
+		cmd.PrintErrf("🔌 Run 'tiger db psql' to connect to your new service\n")
 	}
 }
 

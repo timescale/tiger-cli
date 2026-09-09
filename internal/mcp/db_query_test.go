@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -42,21 +44,6 @@ func TestResolveMaxRows(t *testing.T) {
 	}
 }
 
-func TestApproxRowSize(t *testing.T) {
-	// A small row should be smaller than a row with a large text value, and
-	// both should be positive. We don't assert exact byte counts (they track
-	// JSON encoding), only the ordering and positivity the byte budget relies on.
-	small := approxRowSize([]any{1, "a"})
-	large := approxRowSize([]any{1, strings.Repeat("x", 1000)})
-
-	if small <= 0 {
-		t.Errorf("approxRowSize(small) = %d, want > 0", small)
-	}
-	if large <= small {
-		t.Errorf("approxRowSize(large)=%d should exceed approxRowSize(small)=%d", large, small)
-	}
-}
-
 func TestTruncationNotice(t *testing.T) {
 	notice := truncationNotice(100)
 	// The notice must mention the actual cap and steer the model toward doing
@@ -68,8 +55,8 @@ func TestTruncationNotice(t *testing.T) {
 	}
 }
 
-func TestDBExecuteQueryOutputSchemaHasTruncationFields(t *testing.T) {
-	schema := DBExecuteQueryOutput{}.Schema()
+func TestDBQueryOutputSchemaHasTruncationFields(t *testing.T) {
+	schema := DBQueryOutput{}.Schema()
 	for _, name := range []string{"truncated", "notice"} {
 		prop, ok := schema.Properties[name]
 		if !ok {
@@ -82,5 +69,77 @@ func TestDBExecuteQueryOutputSchemaHasTruncationFields(t *testing.T) {
 	resultSet := schema.Properties["result_sets"].Items
 	if _, ok := resultSet.Properties["truncated"]; !ok {
 		t.Error("expected truncated property on result set schema")
+	}
+}
+
+func TestResolveQueryInput(t *testing.T) {
+	dir := t.TempDir()
+	sqlPath := filepath.Join(dir, "schema.sql")
+	if err := os.WriteFile(sqlPath, []byte("SELECT 1;\n"), 0o600); err != nil {
+		t.Fatalf("failed to write SQL file: %v", err)
+	}
+	emptyPath := filepath.Join(dir, "empty.sql")
+	if err := os.WriteFile(emptyPath, nil, 0o600); err != nil {
+		t.Fatalf("failed to write empty SQL file: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		query   string
+		file    string
+		want    string
+		wantErr string
+	}{
+		{
+			name:  "inline query",
+			query: "SELECT 1",
+			want:  "SELECT 1",
+		},
+		{
+			name: "query read from file",
+			file: sqlPath,
+			want: "SELECT 1;\n",
+		},
+		{
+			name:    "neither provided",
+			wantErr: "exactly one of 'query' or 'file' must be provided",
+		},
+		{
+			name:    "both provided",
+			query:   "SELECT 1",
+			file:    sqlPath,
+			wantErr: "exactly one of 'query' or 'file' must be provided",
+		},
+		{
+			name:    "missing file",
+			file:    filepath.Join(dir, "nope.sql"),
+			wantErr: "failed to read SQL file",
+		},
+		{
+			name:    "empty file",
+			file:    emptyPath,
+			wantErr: "is empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveQueryInput(tt.query, tt.file)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error = %q, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("query = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

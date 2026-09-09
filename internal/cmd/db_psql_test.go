@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-func TestDbConnectCmd(t *testing.T) {
+func TestDbPsqlCmd(t *testing.T) {
 	// A stub psql on PATH lets cases get past the LookPath check; every case
 	// that does so still fails before psql would actually run.
 	psqlDir := t.TempDir()
@@ -35,29 +34,29 @@ func TestDbConnectCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
-			args:    []string{"db", "connect", "svc-12345"},
+			args:    []string{"db", "psql", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "service ID required",
-			args:    []string{"db", "connect"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
-		},
-		{
-			name:    "psql alias",
 			args:    []string{"db", "psql"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
+			name:    "connect alias",
+			args:    []string{"db", "connect"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
 			name:    "args after -- are not the service ID",
-			args:    []string{"db", "connect", "--", "--single-transaction"},
+			args:    []string{"db", "psql", "--", "--single-transaction"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "default service ID from config with psql flags after --",
-			args: []string{"db", "connect", "--", "-c", "SELECT 1;"},
+			args: []string{"db", "psql", "--", "-c", "SELECT 1;"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -67,7 +66,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "service ID before -- separator",
-			args: []string{"db", "connect", "svc-12345", "--", "-c", "SELECT 1;"},
+			args: []string{"db", "psql", "svc-12345", "--", "-c", "SELECT 1;"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
@@ -76,7 +75,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "API error fetching service",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -89,7 +88,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "nil response body",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -101,7 +100,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "parent fetch fails for read replica",
-			args: []string{"db", "connect", "rep-67890"},
+			args: []string{"db", "psql", "rep-67890"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -111,7 +110,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "psql not found",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", "/nonexistent")},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService())
@@ -122,7 +121,7 @@ func TestDbConnectCmd(t *testing.T) {
 			// No GetReplicaSets expectation: a non-TTY stdin/stderr must skip
 			// the replica prompt entirely.
 			name: "non-TTY skips replica prompt",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(noEndpoint))
@@ -131,7 +130,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "--no-replica-prompt skips replica prompt on a TTY",
-			args: []string{"db", "connect", "svc-12345", "--no-replica-prompt"},
+			args: []string{"db", "psql", "svc-12345", "--no-replica-prompt"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(noEndpoint))
@@ -140,7 +139,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "replica target skips replica prompt",
-			args: []string{"db", "connect", "rep-67890"},
+			args: []string{"db", "psql", "rep-67890"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica(noEndpoint))
@@ -150,7 +149,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "replica listing failure warns and continues",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(noEndpoint))
@@ -162,7 +161,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "no replicas skips prompt on a TTY",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(noEndpoint))
@@ -176,7 +175,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "no connectable replicas skips prompt",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(noEndpoint))
@@ -202,7 +201,7 @@ func TestDbConnectCmd(t *testing.T) {
 		},
 		{
 			name: "--pooled without pooler",
-			args: []string{"db", "connect", "svc-12345", "--pooled"},
+			args: []string{"db", "psql", "svc-12345", "--pooled"},
 			opts: []runOption{withEnv("PATH", psqlDir)},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService())
@@ -216,7 +215,7 @@ func TestDbConnectCmd(t *testing.T) {
 			// password is stored, so the lookup warning comes first; the pgx
 			// error text is environment-dependent, hence the non-exact matches.
 			name: "non-auth connection error surfaces directly",
-			args: []string{"db", "connect", "svc-12345"},
+			args: []string{"db", "psql", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
@@ -332,30 +331,6 @@ func TestConnectTargetModel(t *testing.T) {
 			}
 			if tt.wantReplicaID != "" && (choice.replica == nil || choice.replica.ID != tt.wantReplicaID) {
 				t.Errorf("expected replica %s, got %+v", tt.wantReplicaID, choice.replica)
-			}
-		})
-	}
-}
-
-// TestIsAuthenticationError covers the auth-error classifier at the helper
-// level: exercising it through the command would need a real Postgres server.
-func TestIsAuthenticationError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"nil error", nil, false},
-		{"28P01 invalid_password", &pgconn.PgError{Code: "28P01"}, true},
-		{"28000 invalid_authorization_specification", &pgconn.PgError{Code: "28000"}, true},
-		{"57P03 cannot_connect_now", &pgconn.PgError{Code: "57P03"}, false},
-		{"3D000 database does not exist", &pgconn.PgError{Code: "3D000"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isAuthenticationError(tt.err); got != tt.want {
-				t.Errorf("isAuthenticationError(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
 	}

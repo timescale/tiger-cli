@@ -106,6 +106,7 @@ const (
 	VSCode      MCPClient = "vscode"
 	Antigravity MCPClient = "antigravity"
 	KiroCLI     MCPClient = "kiro-cli"
+	Copilot     MCPClient = "copilot" // Both the IDE and the CLI
 )
 
 // MCPServerConfig represents the MCP server configuration
@@ -246,6 +247,17 @@ var supportedClients = []clientConfig{
 		},
 		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return []string{"kiro-cli", "mcp", "add", "--name", serverName, "--command", command, "--args", strings.Join(args, ",")}, nil
+		},
+	},
+	{
+		ClientType:  Copilot,
+		Name:        "GitHub Copilot CLI",
+		EditorNames: []string{"copilot", "copilot-cli"},
+		ConfigPaths: []string{
+			"~/.copilot/mcp-config.json",
+		},
+		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
 		},
 	},
 }

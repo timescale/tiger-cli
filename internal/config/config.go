@@ -120,6 +120,7 @@ var flagBindings = map[string]string{
 	"output":           "output",
 	"password-storage": "password_storage",
 	"service-id":       "service_id",
+	"version-check":    "version_check",
 }
 
 // Config holds the effective configuration for a single command invocation,
@@ -144,7 +145,7 @@ type Config struct {
 	flags     *pflag.FlagSet `mapstructure:"-"`
 }
 
-// ConfigOutput is the shape `tiger config show` renders. Every field is a
+// ConfigOutput is the shape `tiger config list` renders. Every field is a
 // pointer so unset values can be omitted when defaults are suppressed.
 type ConfigOutput struct {
 	Analytics       *bool         `mapstructure:"analytics" json:"analytics,omitempty"`
@@ -179,7 +180,7 @@ func Load(flags *pflag.FlagSet) (*Config, error) {
 }
 
 // LoadForOutput loads config values for display purposes using a fresh viper
-// instance, independent of CLI flags. This keeps `tiger config show -o json`
+// instance, independent of CLI flags. This keeps `tiger config list -o json`
 // from reporting the flag's format as the configured `output` value.
 func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutput, error) {
 	v := viper.New()

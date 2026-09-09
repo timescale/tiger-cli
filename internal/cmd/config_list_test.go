@@ -12,10 +12,10 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
-// Full `config show` output for an all-defaults config, per format. Cases
+// Full `config list` output for an all-defaults config, per format. Cases
 // whose output differs use their own literals.
 const (
-	configShowDefaultsTable = `┌──────────────────┬───────────────────────────────────────────────────────────────┐
+	configListDefaultsTable = `┌──────────────────┬───────────────────────────────────────────────────────────────┐
 │     PROPERTY     │                             VALUE                             │
 ├──────────────────┼───────────────────────────────────────────────────────────────┤
 │ analytics        │ true                                                          │
@@ -35,7 +35,7 @@ const (
 └──────────────────┴───────────────────────────────────────────────────────────────┘
 `
 
-	configShowDefaultsJSON = `{
+	configListDefaultsJSON = `{
   "analytics": true,
   "api_url": "https://console.cloud.tigerdata.com/public/api/v1",
   "color": true,
@@ -53,7 +53,7 @@ const (
 }
 `
 
-	configShowDefaultsYAML = `analytics: true
+	configListDefaultsYAML = `analytics: true
 api_url: https://console.cloud.tigerdata.com/public/api/v1
 color: true
 console_url: https://console.cloud.tigerdata.com
@@ -70,7 +70,7 @@ version_check: true
 `
 )
 
-func TestConfigShowCmd(t *testing.T) {
+func TestConfigListCmd(t *testing.T) {
 	// A second config dir, pointed at by TIGER_CONFIG_DIR in one case to prove
 	// the --config-dir flag takes precedence over the env var.
 	envDir := t.TempDir()
@@ -79,17 +79,17 @@ func TestConfigShowCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "unexpected argument",
-			args:    []string{"config", "show", "extra"},
-			wantErr: `unknown command "extra" for "tiger config show"`,
+			args:    []string{"config", "list", "extra"},
+			wantErr: `unknown command "extra" for "tiger config list"`,
 		},
 		{
 			name:       "table output defaults",
-			args:       []string{"config", "show"},
-			wantStdout: configShowDefaultsTable,
+			args:       []string{"config", "list"},
+			wantStdout: configListDefaultsTable,
 		},
 		{
 			name: "table output with configured values",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{withConfig(map[string]any{
 				"api_url":          "https://test.api.com/v1",
 				"service_id":       "test-service",
@@ -118,7 +118,7 @@ func TestConfigShowCmd(t *testing.T) {
 		},
 		{
 			name: "json output from config file",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{withConfig(map[string]any{
 				"output":    "json",
 				"api_url":   "https://json.api.com/v1",
@@ -144,21 +144,21 @@ func TestConfigShowCmd(t *testing.T) {
 		},
 		{
 			name:       "output flag changes format but not reported value",
-			args:       []string{"config", "show", "-o", "json"},
-			wantStdout: configShowDefaultsJSON,
+			args:       []string{"config", "list", "-o", "json"},
+			wantStdout: configListDefaultsJSON,
 		},
 		{
 			name: "output env var changes format but not reported value",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{
 				withConfig(map[string]any{"output": "table"}),
 				withEnv("TIGER_OUTPUT", "json"),
 			},
-			wantStdout: configShowDefaultsJSON,
+			wantStdout: configListDefaultsJSON,
 		},
 		{
 			name: "yaml output from config file",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{withConfig(map[string]any{
 				"output":  "yaml",
 				"api_url": "https://yaml.api.com/v1",
@@ -181,12 +181,12 @@ version_check: true
 		},
 		{
 			name:       "yaml output via flag",
-			args:       []string{"config", "show", "-o", "yaml"},
-			wantStdout: configShowDefaultsYAML,
+			args:       []string{"config", "list", "-o", "yaml"},
+			wantStdout: configListDefaultsYAML,
 		},
 		{
 			name: "no-defaults shows only configured values",
-			args: []string{"config", "show", "--no-defaults"},
+			args: []string{"config", "list", "--no-defaults"},
 			opts: []runOption{withConfig(map[string]any{
 				"service_id": "test-service",
 				"analytics":  false,
@@ -201,7 +201,7 @@ version_check: true
 		},
 		{
 			name: "with-env applies env overrides",
-			args: []string{"config", "show", "--with-env"},
+			args: []string{"config", "list", "--with-env"},
 			opts: []runOption{withEnv("TIGER_SERVICE_ID", "env-service")},
 			wantStdout: `┌──────────────────┬───────────────────────────────────────────────────────────────┐
 │     PROPERTY     │                             VALUE                             │
@@ -225,13 +225,13 @@ version_check: true
 		},
 		{
 			name:       "env override ignored without with-env",
-			args:       []string{"config", "show"},
+			args:       []string{"config", "list"},
 			opts:       []runOption{withEnv("TIGER_SERVICE_ID", "env-service")},
-			wantStdout: configShowDefaultsTable,
+			wantStdout: configListDefaultsTable,
 		},
 		{
 			name: "config-dir flag overrides TIGER_CONFIG_DIR env var",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{
 				withConfig(map[string]any{"api_url": "https://flag-test.api.com/v1"}),
 				withEnv("TIGER_CONFIG_DIR", envDir),
@@ -261,7 +261,7 @@ version_check: true
 			// version_check_interval duration; 0 (checks disabled) must carry
 			// over to version_check=false rather than the default true.
 			name: "legacy version_check_interval 0 disables version_check",
-			args: []string{"config", "show"},
+			args: []string{"config", "list"},
 			opts: []runOption{withConfig(map[string]any{"version_check_interval": 0})},
 			wantStdout: `┌──────────────────┬───────────────────────────────────────────────────────────────┐
 │     PROPERTY     │                             VALUE                             │
@@ -284,25 +284,25 @@ version_check: true
 `,
 		},
 		{
-			name:       "list alias",
-			args:       []string{"config", "list"},
-			wantStdout: configShowDefaultsTable,
+			name:       "show alias",
+			args:       []string{"config", "show"},
+			wantStdout: configListDefaultsTable,
 		},
 		{
 			name:       "ls alias",
 			args:       []string{"config", "ls"},
-			wantStdout: configShowDefaultsTable,
+			wantStdout: configListDefaultsTable,
 		},
 	})
 }
 
-// Every config key must be visible in every `config show` format. The table is
+// Every config key must be visible in every `config list` format. The table is
 // rendered by a hand-written if-chain in outputTable and the other two by
 // ConfigOutput's json/yaml tags, so a newly added key can silently fail to
 // show up in one of them. The literal expectations above would still pass —
 // they only assert the keys that were there when they were written — so assert
 // the full key set against the registry instead.
-func TestConfigShowCoversEveryKey(t *testing.T) {
+func TestConfigListCoversEveryKey(t *testing.T) {
 	want := config.ValidConfigOptions()
 	slices.Sort(want)
 
@@ -310,12 +310,12 @@ func TestConfigShowCoversEveryKey(t *testing.T) {
 		t.Helper()
 		slices.Sort(got)
 		if !slices.Equal(want, got) {
-			t.Errorf("`config show` keys = %v, want %v", got, want)
+			t.Errorf("`config list` keys = %v, want %v", got, want)
 		}
 	}
 
 	t.Run("table", func(t *testing.T) {
-		result := runCommand(t, []string{"config", "show"}, nil)
+		result := runCommand(t, []string{"config", "list"}, nil)
 		var got []string
 		for line := range strings.SplitSeq(result.stdout, "\n") {
 			cells := strings.Split(line, "\u2502")
@@ -331,7 +331,7 @@ func TestConfigShowCoversEveryKey(t *testing.T) {
 	})
 
 	t.Run("json", func(t *testing.T) {
-		result := runCommand(t, []string{"config", "show", "-o", "json"}, nil)
+		result := runCommand(t, []string{"config", "list", "-o", "json"}, nil)
 		var values map[string]any
 		if err := json.Unmarshal([]byte(result.stdout), &values); err != nil {
 			t.Fatalf("failed to parse json output: %v", err)
@@ -340,7 +340,7 @@ func TestConfigShowCoversEveryKey(t *testing.T) {
 	})
 
 	t.Run("yaml", func(t *testing.T) {
-		result := runCommand(t, []string{"config", "show", "-o", "yaml"}, nil)
+		result := runCommand(t, []string{"config", "list", "-o", "yaml"}, nil)
 		var values map[string]any
 		if err := yaml.Unmarshal([]byte(result.stdout), &values); err != nil {
 			t.Fatalf("failed to parse yaml output: %v", err)

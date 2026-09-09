@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func TestDbConnectionStringCmd(t *testing.T) {
+func TestDbURICmd(t *testing.T) {
 	const (
 		directURI   = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n"
 		readOnlyURI = "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require&options=-c%20tsdb_admin.read_only_connection%3Dtrue\n"
@@ -36,19 +36,19 @@ func TestDbConnectionStringCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
-			args:    []string{"db", "connection-string", "svc-12345"},
+			args:    []string{"db", "uri", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing service id",
-			args:    []string{"db", "connection-string"},
+			args:    []string{"db", "uri"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
-			args: []string{"db", "connection-string", "svc-12345"},
+			args: []string{"db", "uri", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
@@ -57,7 +57,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name: "API error",
-			args: []string{"db", "connection-string", "svc-12345"},
+			args: []string{"db", "uri", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -70,7 +70,7 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name: "nil response body",
-			args: []string{"db", "connection-string", "svc-12345"},
+			args: []string{"db", "uri", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -82,32 +82,32 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name:       "positional service id",
-			args:       []string{"db", "connection-string", "svc-12345"},
-			setup:      setupGet,
-			wantStdout: directURI,
-		},
-		{
-			name:       "default service id from config",
-			args:       []string{"db", "connection-string"},
-			setup:      setupGet,
-			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantStdout: directURI,
-		},
-		{
-			name:       "uri alias",
 			args:       []string{"db", "uri", "svc-12345"},
 			setup:      setupGet,
 			wantStdout: directURI,
 		},
 		{
+			name:       "default service id from config",
+			args:       []string{"db", "uri"},
+			setup:      setupGet,
+			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			wantStdout: directURI,
+		},
+		{
+			name:       "connection-string alias",
+			args:       []string{"db", "connection-string", "svc-12345"},
+			setup:      setupGet,
+			wantStdout: directURI,
+		},
+		{
 			name:       "custom role",
-			args:       []string{"db", "connection-string", "svc-12345", "--role", "readonly"},
+			args:       []string{"db", "uri", "svc-12345", "--role", "readonly"},
 			setup:      setupGet,
 			wantStdout: "postgresql://readonly@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name: "pooled with pooler available",
-			args: []string{"db", "connection-string", "svc-12345", "--pooled"},
+			args: []string{"db", "uri", "svc-12345", "--pooled"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(withPooler))
 			},
@@ -115,73 +115,73 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name:    "pooled without pooler",
-			args:    []string{"db", "connection-string", "svc-12345", "--pooled"},
+			args:    []string{"db", "uri", "svc-12345", "--pooled"},
 			setup:   setupGet,
 			wantErr: "connection pooler not available for this service",
 		},
 		{
 			name:    "with-password without stored password",
-			args:    []string{"db", "connection-string", "svc-12345", "--with-password"},
+			args:    []string{"db", "uri", "svc-12345", "--with-password"},
 			setup:   setupGet,
 			wantErr: "password not available to include in connection string",
 		},
 		{
 			name:       "read-only flag",
-			args:       []string{"db", "connection-string", "svc-12345", "--read-only"},
+			args:       []string{"db", "uri", "svc-12345", "--read-only"},
 			setup:      setupGet,
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "read-only from config all",
-			args:       []string{"db", "connection-string", "svc-12345"},
+			args:       []string{"db", "uri", "svc-12345"},
 			setup:      setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "read-only flag and config all",
-			args:       []string{"db", "connection-string", "svc-12345", "--read-only"},
+			args:       []string{"db", "uri", "svc-12345", "--read-only"},
 			setup:      setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "config prod, PROD service",
-			args:       []string{"db", "connection-string", "svc-12345"},
+			args:       []string{"db", "uri", "svc-12345"},
 			setup:      expectTaggedService("PROD"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "config prod, DEV service",
-			args:       []string{"db", "connection-string", "svc-12345"},
+			args:       []string{"db", "uri", "svc-12345"},
 			setup:      expectTaggedService("DEV"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: directURI,
 		},
 		{
 			name:       "config prod, untagged service",
-			args:       []string{"db", "connection-string", "svc-12345"},
+			args:       []string{"db", "uri", "svc-12345"},
 			setup:      setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: directURI,
 		},
 		{
 			name:       "flag on beats config prod",
-			args:       []string{"db", "connection-string", "svc-12345", "--read-only"},
+			args:       []string{"db", "uri", "svc-12345", "--read-only"},
 			setup:      expectTaggedService("DEV"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "replica target uses replica endpoint",
-			args:       []string{"db", "connection-string", "rep-67890"},
+			args:       []string{"db", "uri", "rep-67890"},
 			setup:      setupGetReplica,
 			wantStdout: replicaURI,
 		},
 		{
 			name: "replica pooled with pooler uses replica pooler",
-			args: []string{"db", "connection-string", "rep-67890", "--pooled"},
+			args: []string{"db", "uri", "rep-67890", "--pooled"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
@@ -197,14 +197,14 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name:       "replica pooled without pooler falls back with warning",
-			args:       []string{"db", "connection-string", "rep-67890", "--pooled"},
+			args:       []string{"db", "uri", "rep-67890", "--pooled"},
 			setup:      setupGetReplica,
 			wantStdout: replicaURI,
 			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
 		},
 		{
 			name: "replica parent fetch error",
-			args: []string{"db", "connection-string", "rep-67890"},
+			args: []string{"db", "uri", "rep-67890"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -214,14 +214,14 @@ func TestDbConnectionStringCmd(t *testing.T) {
 		},
 		{
 			name:       "with-password includes stored password",
-			args:       []string{"db", "connection-string", "svc-12345", "--with-password"},
+			args:       []string{"db", "uri", "svc-12345", "--with-password"},
 			setup:      setupGet,
 			opts:       []runOption{withStoredPassword(sampleService(), "secret-pw")},
 			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica uses primary credentials",
-			args:       []string{"db", "connection-string", "rep-67890", "--with-password"},
+			args:       []string{"db", "uri", "rep-67890", "--with-password"},
 			setup:      setupGetReplica,
 			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
 			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",

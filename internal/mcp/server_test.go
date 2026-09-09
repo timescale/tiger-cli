@@ -16,7 +16,7 @@ var alwaysRegisteredTools = []string{
 	toolServiceList,
 	toolServiceGet,
 	toolServiceLogs,
-	toolDBExecuteQuery,
+	toolDBQuery,
 }
 
 // registeredToolNames returns the tool names a server advertises over a real

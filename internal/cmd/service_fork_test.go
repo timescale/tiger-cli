@@ -166,7 +166,7 @@ PGUSER=tsdbadmin
 🎯 Set service 'svc-67890' as default service.
 ⏳ Waiting for fork to complete (timeout: 30m0s)...
 🎉 Service fork completed successfully!
-🔌 Run 'tiger db connect' to connect to your new service
+🔌 Run 'tiger db psql' to connect to your new service
 `,
 			checks: []checkFunc{
 				checkDefaultService("svc-67890"),

@@ -14,14 +14,14 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbTestConnectionCmd(app *common.App) *cobra.Command {
-	var dbTestConnectionTimeout time.Duration
-	var dbTestConnectionPooled bool
-	var dbTestConnectionRole string
+func buildDbPingCmd(app *common.App) *cobra.Command {
+	var dbPingTimeout time.Duration
+	var dbPingPooled bool
+	var dbPingRole string
 
 	cmd := &cobra.Command{
-		Use:     "test-connection [service-id]",
-		Aliases: []string{"test", "ping"},
+		Use:     "ping [service-id]",
+		Aliases: []string{"test", "test-connection"},
 		Short:   "Test database connectivity",
 		Long: `Test database connectivity to a service.
 
@@ -39,37 +39,44 @@ Return Codes:
 
 Examples:
   # Test connection to default service
-  tiger db test-connection
+  tiger db ping
 
   # Test connection to specific service
-  tiger db test-connection svc-12345
+  tiger db ping svc-12345
 
   # Test connection with custom timeout (10 seconds)
-  tiger db test-connection svc-12345 --timeout 10s
+  tiger db ping svc-12345 --timeout 10s
 
   # Test connection with longer timeout (5 minutes)
-  tiger db test-connection svc-12345 --timeout 5m
+  tiger db ping svc-12345 --timeout 5m
 
   # Test connection with no timeout (wait indefinitely)
-  tiger db test-connection svc-12345 --timeout 0`,
+  tiger db ping svc-12345 --timeout 0`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := lookupConnectionTarget(cmd, app, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
+
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+
+			warnReplicaPooler(cmd, target, dbPingPooled)
 
 			// Build connection string for testing with password (if available)
-			details, err := buildConnectionDetailsForTarget(cmd, cfg, target, common.ConnectionDetailsOptions{
-				Pooled:       dbTestConnectionPooled,
-				Role:         dbTestConnectionRole,
+			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
+				Pooled:       dbPingPooled,
+				Role:         dbPingRole,
 				WithPassword: true,
 			})
 			if err != nil {
@@ -77,19 +84,19 @@ Examples:
 			}
 
 			// Validate timeout (Cobra handles parsing automatically)
-			if dbTestConnectionTimeout < 0 {
-				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbTestConnectionTimeout))
+			if dbPingTimeout < 0 {
+				return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf("timeout must be positive or zero, got %v", dbPingTimeout))
 			}
 
 			// Test the connection
-			return testDatabaseConnection(cmd.Context(), details.String(), dbTestConnectionTimeout, cmd)
+			return testDatabaseConnection(cmd.Context(), details.String(), dbPingTimeout, cmd)
 		},
 	}
 
-	// Add flags for db test-connection command
-	cmd.Flags().DurationVarP(&dbTestConnectionTimeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
-	cmd.Flags().BoolVar(&dbTestConnectionPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbTestConnectionRole, "role", "tsdbadmin", "Database role/username")
+	// Add flags for db ping command
+	cmd.Flags().DurationVarP(&dbPingTimeout, "timeout", "t", 3*time.Second, "Timeout duration (e.g., 30s, 5m, 1h). Use 0 for no timeout")
+	cmd.Flags().BoolVar(&dbPingPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbPingRole, "role", "tsdbadmin", "Database role/username")
 
 	return cmd
 }

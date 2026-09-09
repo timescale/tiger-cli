@@ -48,15 +48,20 @@ Examples:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
 
 			// Resolve the target so a read replica id stores the password against
 			// its parent primary: replicas share the primary's credentials, and
-			// connect/test-connection look the password up against the primary.
-			target, err := lookupConnectionTarget(cmd, app, args)
+			// psql/ping look the password up against the primary.
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
 			if err != nil {
 				return err
 			}

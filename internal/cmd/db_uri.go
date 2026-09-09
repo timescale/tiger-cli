@@ -8,17 +8,17 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func buildDbConnectionStringCmd(app *common.App) *cobra.Command {
-	var dbConnectionStringPooled bool
-	var dbConnectionStringRole string
-	var dbConnectionStringWithPassword bool
-	var dbConnectionStringReadOnly bool
+func buildDbURICmd(app *common.App) *cobra.Command {
+	var dbURIPooled bool
+	var dbURIRole string
+	var dbURIWithPassword bool
+	var dbURIReadOnly bool
 
 	cmd := &cobra.Command{
-		Use:     "connection-string [service-id]",
-		Aliases: []string{"uri"},
-		Short:   "Get connection string for a service",
-		Long: `Get a PostgreSQL connection string for connecting to a database service.
+		Use:     "uri [service-id]",
+		Aliases: []string{"connection-string"},
+		Short:   "Get connection URI for a service",
+		Long: `Get a PostgreSQL connection URI for connecting to a database service.
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. The connection string includes all necessary parameters
@@ -38,47 +38,54 @@ services writable.
 
 Examples:
   # Get connection string for default service
-  tiger db connection-string
+  tiger db uri
 
   # Get connection string for specific service
-  tiger db connection-string svc-12345
+  tiger db uri svc-12345
 
   # Get pooled connection string (uses connection pooler if available)
-  tiger db connection-string svc-12345 --pooled
+  tiger db uri svc-12345 --pooled
 
   # Get connection string with custom role/username
-  tiger db connection-string svc-12345 --role readonly
+  tiger db uri svc-12345 --role readonly
 
   # Get a read-only connection string
-  tiger db connection-string svc-12345 --read-only
+  tiger db uri svc-12345 --read-only
 
   # Get connection string with password included (less secure)
-  tiger db connection-string svc-12345 --with-password`,
+  tiger db uri svc-12345 --with-password`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, _, _, err := app.GetAll()
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			target, err := lookupConnectionTarget(cmd, app, args)
+			serviceID, err := getServiceID(cfg, args)
 			if err != nil {
 				return err
 			}
 
-			details, err := buildConnectionDetailsForTarget(cmd, cfg, target, common.ConnectionDetailsOptions{
-				Pooled:       dbConnectionStringPooled,
-				Role:         dbConnectionStringRole,
-				WithPassword: dbConnectionStringWithPassword,
-				ReadOnly:     dbConnectionStringReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
+			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			if err != nil {
+				return err
+			}
+
+			warnReplicaPooler(cmd, target, dbURIPooled)
+
+			details, err := target.Details(cfg, common.ConnectionDetailsOptions{
+				Pooled:       dbURIPooled,
+				Role:         dbURIRole,
+				WithPassword: dbURIWithPassword,
+				ReadOnly:     dbURIReadOnly || common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(target.ConnectionService)) != nil,
 			})
 			if err != nil {
 				return err
 			}
 
-			if dbConnectionStringWithPassword && details.Password == "" {
+			if dbURIWithPassword && details.Password == "" {
 				return fmt.Errorf("password not available to include in connection string")
 			}
 
@@ -87,11 +94,11 @@ Examples:
 		},
 	}
 
-	// Add flags for db connection-string command
-	cmd.Flags().BoolVar(&dbConnectionStringPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbConnectionStringRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbConnectionStringWithPassword, "with-password", false, "Include password in connection string (less secure)")
-	cmd.Flags().BoolVar(&dbConnectionStringReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
+	// Add flags for db uri command
+	cmd.Flags().BoolVar(&dbURIPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbURIRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&dbURIWithPassword, "with-password", false, "Include password in connection string (less secure)")
+	cmd.Flags().BoolVar(&dbURIReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
 
 	return cmd
 }

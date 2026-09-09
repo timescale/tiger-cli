@@ -122,7 +122,7 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 		IncludeComments:    input.Comments,
 	})
 	if err != nil {
-		return nil, DBSchemaOutput{}, err
+		return nil, DBSchemaOutput{}, handleDatabaseError(err)
 	}
 
 	return nil, DBSchemaOutput{SchemaText: common.FormatSchema(schema), Warning: warning}, nil
