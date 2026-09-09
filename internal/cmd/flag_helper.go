@@ -17,6 +17,19 @@ func markFlagRequired(cmd *cobra.Command, flag string) {
 	}
 }
 
+// markFlagHidden hides a flag from help output. It looks the flag up through
+// cmd.Flag so it works for persistent flags too, which cmd.Flags() doesn't
+// contain until parsing merges them in. A missing flag is a programming error in
+// the command tree that would otherwise go unnoticed until the flag showed up in
+// help output.
+func markFlagHidden(cmd *cobra.Command, flag string) {
+	f := cmd.Flag(flag)
+	if f == nil {
+		panic(fmt.Sprintf("%s: no such flag -%s", cmd.CommandPath(), flag))
+	}
+	f.Hidden = true
+}
+
 // registerFlagCompletion registers a shell completion function for a flag. A
 // failure means the flag doesn't exist or already has a completion — either is
 // a programming error in the command tree that would otherwise go unnoticed

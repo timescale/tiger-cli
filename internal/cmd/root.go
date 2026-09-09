@@ -90,9 +90,7 @@ tiger auth login
 	// present (but hidden) for backwards compatibility. wrapCommands maps it onto
 	// --version-check before the config loads, so nothing else reads it.
 	cmd.PersistentFlags().Bool("skip-update-check", false, "skip checking for updates on startup")
-	if err := cmd.PersistentFlags().MarkHidden("skip-update-check"); err != nil {
-		return nil, nil, err
-	}
+	markFlagHidden(cmd, "skip-update-check")
 	cmd.MarkFlagsMutuallyExclusive("version-check", "skip-update-check")
 
 	// Add all subcommands
