@@ -497,12 +497,12 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
 	l.cmd.PrintErrln("Opening browser for authentication...")
 
-	if err := openBrowser(authURL); err != nil {
-		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
-		return nil, errBrowserOpenFailed
-	}
+	browserErr := openBrowserAsync(authURL)
 
 	select {
+	case err := <-browserErr:
+		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
+		return nil, errBrowserOpenFailed
 	case result := <-server.resultChan:
 		return result.token, result.err
 	case <-time.After(browserAuthTimeout):
@@ -723,6 +723,11 @@ func (c *oauthCallback) sendError(err error) {
 	c.resultChan <- oauthResult{err: err}
 }
 
+// openBrowserImpl waits for the launcher to exit, which is how a browser that
+// can't be opened at all -- xdg-open with no display, say -- reports itself
+// rather than looking like a success. It usually exits as soon as the page is
+// handed off, but some Linux configurations keep it running for the life of the
+// browser, so call it through openBrowserAsync rather than directly.
 func openBrowserImpl(url string) error {
 	var cmd *exec.Cmd
 
@@ -736,7 +741,24 @@ func openBrowserImpl(url string) error {
 		cmd = exec.Command("xdg-open", url)
 	}
 
-	return cmd.Start()
+	return cmd.Run()
+}
+
+// openBrowserAsync opens the URL in a goroutine and returns a channel that
+// receives an error if the launcher fails. It exists so the login can wait for
+// the callback and for a failure to open at the same time, without blocking on
+// a launcher that runs for the life of the browser.
+func openBrowserAsync(url string) <-chan error {
+	errCh := make(chan error, 1)
+	// Read the var before the goroutine starts, so a test restoring it in
+	// t.Cleanup doesn't race this call.
+	open := openBrowser
+	go func() {
+		if err := open(url); err != nil {
+			errCh <- err
+		}
+	}()
+	return errCh
 }
 
 func (l *oauthLogin) selectProjectID(ctx context.Context, client *api.ClientWithResponses) (string, error) {

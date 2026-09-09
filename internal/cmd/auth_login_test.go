@@ -171,6 +171,16 @@ func TestAuthLoginCmd(t *testing.T) {
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
 		{
+			// Some launchers run for the life of the browser, so the login
+			// watches for a failure to open rather than waiting on the command.
+			name:       "browser that outlives the handoff doesn't stall the login",
+			args:       []string{"auth", "login"},
+			opts:       []runOption{withConfig(oauthURLs(singleProject.URL)), withOpenBrowser(browserThatStaysOpen(t))},
+			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStderr: matchOAuthStderr(singleProject.URL, ""),
+			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
+		},
+		{
 			// A callback that isn't ours -- a stale tab from an earlier login --
 			// is refused, and the login ends rather than accepting its code.
 			name:       "callback with a stale state is refused",
@@ -514,6 +524,22 @@ func mockOpenBrowser(t *testing.T) func(string) error {
 			return fmt.Errorf("callback request failed: %w", err)
 		}
 		return resp.Body.Close()
+	}
+}
+
+// browserThatStaysOpen hands the callback over and then keeps running, as a
+// launcher that exits only when the browser closes does.
+func browserThatStaysOpen(t *testing.T) func(string) error {
+	t.Helper()
+	complete := mockOpenBrowser(t)
+	closed := make(chan struct{})
+	t.Cleanup(func() { close(closed) })
+	return func(authURL string) error {
+		if err := complete(authURL); err != nil {
+			return err
+		}
+		<-closed
+		return nil
 	}
 }
 
