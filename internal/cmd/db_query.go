@@ -29,7 +29,7 @@ func buildDbQueryCmd(app *common.App) *cobra.Command {
 		Short:   "Execute a SQL query on a database",
 		Long: `Execute a SQL query against a database service and display the results.
 
-Unlike 'tiger db connect', this runs the query directly and does not require a
+Unlike 'tiger db psql', this runs the query directly and does not require a
 local psql installation.
 
 The service ID can be provided as an argument or will use the default service

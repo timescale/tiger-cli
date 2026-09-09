@@ -34,7 +34,7 @@ FROM ${BINARY_SOURCE} AS binary_source
 # Create final alpine image
 FROM alpine:3.23 AS final
 
-# Install psql for sake of `tiger db connect`
+# Install psql for sake of `tiger db psql`
 RUN apk add --update --no-cache postgresql-client
 
 # Create non-root user/group

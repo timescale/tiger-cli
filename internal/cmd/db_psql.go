@@ -20,16 +20,16 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-func buildDbConnectCmd(app *common.App) *cobra.Command {
-	var dbConnectPooled bool
-	var dbConnectRole string
-	var dbConnectReadOnly bool
-	var dbConnectNoReplicaPrompt bool
+func buildDbPsqlCmd(app *common.App) *cobra.Command {
+	var dbPsqlPooled bool
+	var dbPsqlRole string
+	var dbPsqlReadOnly bool
+	var dbPsqlNoReplicaPrompt bool
 
 	cmd := &cobra.Command{
-		Use:     "connect [service-id]",
-		Aliases: []string{"psql"},
-		Short:   "Connect to a database",
+		Use:     "psql [service-id]",
+		Aliases: []string{"connect"},
+		Short:   "Connect to a database with psql",
 		Long: `Connect to a database service using psql client.
 
 The service ID can be provided as an argument or will use the default service
@@ -60,32 +60,28 @@ skipping the prompt. Read replicas share the primary's credentials.
 
 Examples:
   # Connect to default service
-  tiger db connect
   tiger db psql
 
   # Connect directly to a read replica by its ID
-  tiger db connect rep1234567
+  tiger db psql rep1234567
 
   # Connect without the read replica prompt
-  tiger db connect svc-12345 --no-replica-prompt
+  tiger db psql svc-12345 --no-replica-prompt
 
   # Connect to specific service
-  tiger db connect svc-12345
   tiger db psql svc-12345
 
   # Connect using connection pooler
-  tiger db connect svc-12345 --pooled
   tiger db psql svc-12345 --pooled
 
   # Connect with custom role/username
-  tiger db connect svc-12345 --role readonly
   tiger db psql svc-12345 --role readonly
 
   # Connect in read-only mode (writes and DDL are rejected by the server)
-  tiger db connect svc-12345 --read-only
+  tiger db psql svc-12345 --read-only
 
   # Pass additional flags to psql (use -- to separate)
-  tiger db connect svc-12345 -- --single-transaction --quiet
+  tiger db psql svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc`,
 		Args:              cobra.ArbitraryArgs,
 		ValidArgsFunction: serviceIDCompletion(app),
@@ -116,14 +112,14 @@ Examples:
 			}
 
 			opts := common.ConnectionDetailsOptions{
-				Pooled:   dbConnectPooled,
-				Role:     dbConnectRole,
-				ReadOnly: dbConnectReadOnly,
+				Pooled:   dbPsqlPooled,
+				Role:     dbPsqlRole,
+				ReadOnly: dbPsqlReadOnly,
 			}
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := selectConnection(cmd.Context(), cmd, cfg, client, projectID, target, opts, dbConnectNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, cfg, client, projectID, target, opts, dbPsqlNoReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -137,11 +133,11 @@ Examples:
 		},
 	}
 
-	// Add flags for db connect command (works for both connect and psql)
-	cmd.Flags().BoolVar(&dbConnectPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbConnectRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbConnectReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
-	cmd.Flags().BoolVar(&dbConnectNoReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to a read replica")
+	// Add flags for db psql command
+	cmd.Flags().BoolVar(&dbPsqlPooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&dbPsqlRole, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&dbPsqlReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
+	cmd.Flags().BoolVar(&dbPsqlNoReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to a read replica")
 
 	return cmd
 }
@@ -169,7 +165,7 @@ func separateServiceAndPsqlArgs(cmd ArgsLenAtDashProvider, args []string) ([]str
 	return serviceArgs, psqlFlags
 }
 
-// selectConnection returns the connection details for `tiger db connect`. A
+// selectConnection returns the connection details for `tiger db psql`. A
 // replica target connects straight through; a primary in an interactive
 // terminal is offered a menu to pick the primary or one of its replicas (nil
 // details means the user cancelled).

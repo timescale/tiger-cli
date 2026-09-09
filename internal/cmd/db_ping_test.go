@@ -17,7 +17,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func TestDbTestConnectionCmd(t *testing.T) {
+func TestDbPingCmd(t *testing.T) {
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
 		expectGetService(m, "svc-12345", sampleService())
 	}
@@ -25,25 +25,30 @@ func TestDbTestConnectionCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
-			args:    []string{"db", "test-connection", "svc-12345"},
+			args:    []string{"db", "ping", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "missing service id",
-			args:    []string{"db", "test-connection"},
+			args:    []string{"db", "ping"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
-			name:    "missing service id via ping alias",
-			args:    []string{"db", "ping"},
+			name:    "missing service id via test alias",
+			args:    []string{"db", "test"},
+			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name:    "missing service id via test-connection alias",
+			args:    []string{"db", "test-connection"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "default service id from config",
-			args: []string{"db", "test-connection"},
+			args: []string{"db", "ping"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -54,12 +59,12 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		},
 		{
 			name:    "invalid timeout duration",
-			args:    []string{"db", "test-connection", "svc-12345", "--timeout", "invalid"},
+			args:    []string{"db", "ping", "svc-12345", "--timeout", "invalid"},
 			wantErr: "invalid argument \"invalid\" for \"-t, --timeout\" flag: time: invalid duration \"invalid\"",
 		},
 		{
 			name: "network error",
-			args: []string{"db", "test-connection", "svc-12345"},
+			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
@@ -69,7 +74,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		},
 		{
 			name: "API error",
-			args: []string{"db", "test-connection", "svc-12345"},
+			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -82,7 +87,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		},
 		{
 			name: "nil response body",
-			args: []string{"db", "test-connection", "svc-12345"},
+			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
@@ -95,14 +100,14 @@ func TestDbTestConnectionCmd(t *testing.T) {
 		},
 		{
 			name:    "pooled without pooler",
-			args:    []string{"db", "test-connection", "svc-12345", "--pooled"},
+			args:    []string{"db", "ping", "svc-12345", "--pooled"},
 			setup:   setupGet,
 			wantErr: "connection pooler not available for this service",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "negative timeout",
-			args:    []string{"db", "test-connection", "svc-12345", "--timeout=-5s"},
+			args:    []string{"db", "ping", "svc-12345", "--timeout=-5s"},
 			setup:   setupGet,
 			wantErr: "timeout must be positive or zero, got -5s",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -111,7 +116,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			// The dial is refused instantly; pgx's error text is
 			// environment-dependent, hence the non-exact matches.
 			name: "unreachable server",
-			args: []string{"db", "test-connection", "svc-12345"},
+			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
@@ -130,7 +135,7 @@ func TestDbTestConnectionCmd(t *testing.T) {
 			// until the --timeout deadline fires; pgx's error text is
 			// environment-dependent.
 			name: "connection timeout",
-			args: []string{"db", "test-connection", "svc-12345", "--timeout", "250ms"},
+			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}

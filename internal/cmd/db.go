@@ -17,9 +17,9 @@ func buildDbCmd(app *common.App) *cobra.Command {
 		Long:  `Database-specific operations including connection management, testing, and configuration.`,
 	}
 
-	cmd.AddCommand(buildDbConnectionStringCmd(app))
-	cmd.AddCommand(buildDbConnectCmd(app))
-	cmd.AddCommand(buildDbTestConnectionCmd(app))
+	cmd.AddCommand(buildDbURICmd(app))
+	cmd.AddCommand(buildDbPsqlCmd(app))
+	cmd.AddCommand(buildDbPingCmd(app))
 	cmd.AddCommand(buildDbSavePasswordCmd(app))
 	cmd.AddCommand(buildDbCreateCmd(app))
 	cmd.AddCommand(buildDbSchemaCmd(app))
