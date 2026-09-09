@@ -63,6 +63,8 @@ The API client and mocks in `internal/api/` are generated from `openapi.yaml`, w
 
 Generation is configured by `internal/api/types.yaml` and `internal/api/client.yaml` rather than command-line flags. Both set `name-normalizer: ToCamelCaseWithInitialisms` (generated names capitalize initialisms the Go way: `ServiceID`, not `ServiceId`) and `always-prefix-enum-values: true` (enum constants are prefixed with their type: `api.DeployStatusREADY`, so values from different enums can't collide). Keep the two configs in sync with each other — changing either option renames identifiers across the whole codebase.
 
+Generated files are marked `-diff linguist-generated=true` in `.gitattributes`: `-diff` keeps them out of local diffs (`git diff --text` shows the content when needed) and `linguist-generated` folds them in PR review on GitHub, which ignores `-diff`. Give any new generated artifact the same treatment.
+
 ## CLI Reference Docs
 
 `docs/cli/` is a generated Markdown reference with one file per command, produced by `cmd/generate-docs`, which walks the command tree with cobra's `doc` package. It runs under `go generate ./...`, so any change to a command, flag, or help text needs a regeneration (CI fails on a stale or missing file). The tool forces `TIGER_EXPERIMENTAL` off for the run, so gated commands never reach the docs.
