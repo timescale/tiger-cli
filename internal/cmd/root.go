@@ -19,6 +19,12 @@ import (
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
+// BuildRootCmd exposes the root command for tools like doc generators.
+func BuildRootCmd(ctx context.Context) (*cobra.Command, error) {
+	cmd, _, err := buildRootCmd(ctx)
+	return cmd, err
+}
+
 func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 	// Match command names and aliases case-insensitively (e.g. `tiger SERVICE
 	// LIST` works the same as `tiger service list`). Cobra only exposes this as
@@ -71,7 +77,7 @@ tiger auth login
 	// flagBindings in internal/config) rather than from flag variables.
 	cmd.PersistentFlags().Bool("analytics", true, "enable/disable usage analytics")
 	cmd.PersistentFlags().Bool("color", true, "enable colored output")
-	cmd.PersistentFlags().String("config-dir", config.GetDefaultConfigDir(), "config directory")
+	cmd.PersistentFlags().String("config-dir", config.DefaultConfigDir, "config directory")
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
 	cmd.PersistentFlags().String("service-id", "", "service ID")
 	cmd.PersistentFlags().Bool("version-check", true, "check for updates on startup")

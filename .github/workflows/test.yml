@@ -35,6 +35,7 @@ jobs:
       - name: Generate
         run: |
           go generate ./...
+          git add --intent-to-add . # so newly generated files (e.g. docs for a new command) show up in the diff
           git diff --exit-code || { echo "::error::generated files are out of date; run 'go generate ./...' and commit the result (never edit generated files by hand)"; exit 1; }
 
       - name: Build

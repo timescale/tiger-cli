@@ -108,6 +108,7 @@ go test ./internal/cmd -v -run Integration
 ```
 tiger-cli/
 ├── cmd/tiger/              # Main CLI entry point
+├── cmd/generate-docs/      # Renders docs/cli from the command tree (via go generate)
 ├── internal/               # Internal packages
 │   ├── api/                # Generated OpenAPI client (oapi-codegen)
 │   │   └── mocks/          # Generated mocks for testing
@@ -117,6 +118,7 @@ tiger-cli/
 │   ├── cmd/                # CLI commands (Cobra, one file per command)
 │   └── util/               # Shared utilities
 ├── docs/                   # Documentation
+│   └── cli/                # Generated CLI reference (one Markdown file per command)
 ├── openapi.yaml            # OpenAPI 3.0 specification for Tiger API
 └── tools.go                # Build-time dependencies
 ```
@@ -168,13 +170,15 @@ Everything else writes to stdout/stderr directly rather than logging.
 ## Code Generation
 
 ```bash
-# Generate OpenAPI client code and mocks from openapi.yaml
-go generate ./internal/api
+# Regenerate everything: the API client and mocks from openapi.yaml, and the
+# CLI reference docs in docs/cli from the command tree
+go generate ./...
 
 # Generates:
-# - client.go: HTTP client implementation
-# - types.go: Type definitions for API models
-# - mocks/mock_client.go: Mock implementations for testing
+# - internal/api/client.go: HTTP client implementation
+# - internal/api/types.go: Type definitions for API models
+# - internal/api/mocks/mock_client.go: Mock implementations for testing
+# - docs/cli/*.md: One Markdown reference page per CLI command
 ```
 
 Generation is configured by `internal/api/types.yaml` and
@@ -188,6 +192,33 @@ either. To pick up an API change, sync `openapi.yaml` from the upstream spec and
 regenerate. If the CLI needs something the spec doesn't describe, the change has
 to land in the upstream spec first. CI runs `go generate ./...` and fails if the
 result differs from what's committed.
+
+### CLI Reference Docs
+
+`docs/cli/` holds generated Markdown reference documentation for every CLI
+command, produced by `cmd/generate-docs`, which uses Cobra's `doc` package to
+walk the command tree and emit one file per command. It runs as part of
+`go generate ./...`, so regenerate whenever a command, flag, or help text
+changes; CI fails on a stale result just as it does for the API client. Don't
+edit the files by hand.
+
+The tool can also be run directly for other formats or to include experimental
+commands. The default output path is `./docs/cli` relative to the working
+directory, and `-clean` deletes that directory first:
+
+```bash
+go run ./cmd/generate-docs -clean
+```
+
+Flags:
+
+- `-out` — Output directory (default `./docs/cli`).
+- `-format` — Output format: `markdown`, `man`, `rest`, or `yaml` (default `markdown`).
+- `-frontmatter` — Prepend YAML frontmatter to Markdown files (default `false`).
+- `-clean` — Remove the output directory before generating (default `false`).
+- `-experimental` — Include experimental commands in the output (default `false`).
+  This sets `TIGER_EXPERIMENTAL` for the run, overriding any inherited value, so
+  released-only docs are produced by default.
 
 ## Development Best Practices
 

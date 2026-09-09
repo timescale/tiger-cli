@@ -16,7 +16,9 @@ Use the official product names in all user-facing text (documentation, code comm
 
 ## Repository Structure
 
-- **`cmd/`** - Binary entry points. Contains `tiger/main.go`, the main CLI binary, which sets up signal handling (SIGINT/SIGTERM cancel the command context), delegates to `cmd.Execute()`, and maps a `common.ExitCodeError` found anywhere in the returned error chain to the process exit code.
+- **`cmd/`** - Binary entry points.
+  - **`cmd/tiger/`** - The main CLI binary. Sets up signal handling (SIGINT/SIGTERM cancel the command context), delegates to `cmd.Execute()`, and maps a `common.ExitCodeError` found anywhere in the returned error chain to the process exit code.
+  - **`cmd/generate-docs/`** - Renders the CLI reference in `docs/cli/` from the command tree. Runs under `go generate` (see [CLI Reference Docs](#cli-reference-docs)).
 - **`internal/`** - All core application logic (non-public Go packages).
   - **`internal/cmd/`** - Cobra command implementations for all CLI commands (auth, project, service, db, config, mcp, version, upgrade, completion). Each command lives in its own file, named to match the command in snake_case (see [Command Architecture](#command-architecture)). `root.go` holds the root command, global flags, and command tree construction; files ending in `_helper.go` contain cross-group helpers rather than commands.
   - **`internal/api/`** - API client layer. Includes the OpenAPI-generated REST client (`client.go`, `types.go`), the shared HTTP client (`client_util.go`), and a generated mock of the client interface for testing (`mocks/`). **Never edit the generated files by hand** — see [Code Generation](#code-generation).
@@ -28,6 +30,7 @@ Use the official product names in all user-facing text (documentation, code comm
   - **`internal/version/`** - Version checking and update notifications.
 - **`pkg/`** - Public Go packages. Contains `mcpinstall`, an API for installing MCP server configurations into AI coding assistants and editors, exposed as thin aliases over the `mcp install` logic in `internal/cmd`. Changes to install behavior are part of this package's public surface.
 - **`docs/`** - Documentation. `development.md` is the development guide (building from source, testing, contributing).
+  - **`docs/cli/`** - The generated CLI reference, one Markdown file per command. Never edited by hand (see [CLI Reference Docs](#cli-reference-docs)).
 - **`scripts/`** - Build and installation scripts (`install.sh`, `install.ps1`, completions generation) and the integration test runner (`test-integration.sh`).
 - **`openapi.yaml`** - OpenAPI spec for the Tiger Cloud API, from which the API client is generated. It is a verbatim copy synced from the API's own spec and is never edited here (see [Code Generation](#code-generation)).
 - **`.github/`** - GitHub Actions CI/CD workflows for testing (`test.yml`) and releases (`release.yml`).
@@ -41,7 +44,7 @@ Use the official product names in all user-facing text (documentation, code comm
 ```bash
 go install ./...   # build and install the tiger binary
 go test ./...      # run all tests (integration tests skip without credentials)
-go generate ./...  # regenerate the API client and mocks after syncing openapi.yaml
+go generate ./...  # regenerate the API client, mocks, and the CLI reference docs
 ```
 
 You can also run without installing via `go run ./cmd/tiger --help`.
@@ -59,6 +62,10 @@ To upgrade dependencies, run `go get -u -t ./... tool` followed by `go mod tidy`
 The API client and mocks in `internal/api/` are generated from `openapi.yaml`, which is itself a verbatim copy of the Tiger Cloud API's own spec — the single source of truth. Nothing in this chain is edited by hand in this repo: not `client.go`, `types.go`, or `mocks/mock_client.go`, and not `openapi.yaml` either. If the CLI needs something the spec lacks, or the API returns something the spec doesn't describe, the change lands in the upstream spec first; then sync `openapi.yaml` from it and run `go generate ./...` to regenerate everything (CI enforces this — see [CI](#ci)). If the mock is stale, `go vet` will report that it no longer implements the client interface.
 
 Generation is configured by `internal/api/types.yaml` and `internal/api/client.yaml` rather than command-line flags. Both set `name-normalizer: ToCamelCaseWithInitialisms` (generated names capitalize initialisms the Go way: `ServiceID`, not `ServiceId`) and `always-prefix-enum-values: true` (enum constants are prefixed with their type: `api.DeployStatusREADY`, so values from different enums can't collide). Keep the two configs in sync with each other — changing either option renames identifiers across the whole codebase.
+
+## CLI Reference Docs
+
+`docs/cli/` is a generated Markdown reference with one file per command, produced by `cmd/generate-docs`, which walks the command tree with cobra's `doc` package. It runs under `go generate ./...`, so any change to a command, flag, or help text needs a regeneration (CI fails on a stale or missing file). The tool forces `TIGER_EXPERIMENTAL` off for the run, so gated commands never reach the docs.
 
 ## Command Architecture
 
@@ -241,7 +248,7 @@ Command tests live in `internal/cmd`, one test file per command file, all table-
 
 ## Documentation
 
-After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation.
+After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation, and run `go generate ./...` to regenerate the CLI reference in `docs/cli/`.
 
 ### Maintaining This File
 
@@ -255,7 +262,7 @@ This file is pulled into every agent session, so unnecessary detail bloats conte
 
 ## CI
 
-`test.yml` runs the test suite on pull requests and pushes to `main`. CI needs no keyring setup — `TestMain` swaps in the in-memory mock. It also runs `go generate ./...` and fails on any resulting diff, so hand edits to generated files or a stale regeneration after a spec change don't merge.
+`test.yml` runs the test suite on pull requests and pushes to `main`. CI needs no keyring setup — `TestMain` swaps in the in-memory mock. It also runs `go generate ./...` and fails on any resulting diff, so hand edits to generated files, a stale regeneration after a spec change, or a new command without its reference page don't merge.
 
 ## Releases
 
