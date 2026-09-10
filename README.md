@@ -134,6 +134,7 @@ Tiger CLI provides the following commands:
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
+- `tiger feedback` - Submit feedback, a bug report, or a support request to the Tiger Data team (pass the message as an argument or on stdin)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
 
