@@ -50,11 +50,9 @@ func nextSteps(readOnlySet bool) string {
 // browserAuthTimeout is how long the redirect flow waits for the callback.
 const browserAuthTimeout = 5 * time.Minute
 
-var (
-	// defaultDeviceCodeTTL bounds polling when the gateway omits expires_in.
-	// Overridden in tests.
-	defaultDeviceCodeTTL = 15 * time.Minute
-)
+// defaultDeviceCodeTTL bounds polling when the gateway omits expires_in.
+// Overridden in tests.
+var defaultDeviceCodeTTL = 15 * time.Minute
 
 // errBrowserOpenFailed means the redirect flow never started, which is the one
 // condition the device code stands in for.

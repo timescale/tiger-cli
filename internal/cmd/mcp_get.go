@@ -17,7 +17,6 @@ import (
 
 // buildMCPGetCmd creates the get subcommand for displaying detailed info on a specific MCP capability
 func buildMCPGetCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "get <name>",
 		Aliases: []string{"describe", "show"},
