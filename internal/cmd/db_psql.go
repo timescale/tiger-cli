@@ -21,10 +21,10 @@ import (
 )
 
 func buildDbPsqlCmd(app *common.App) *cobra.Command {
-	var dbPsqlPooled bool
-	var dbPsqlRole string
-	var dbPsqlReadOnly bool
-	var dbPsqlNoReplicaPrompt bool
+	var pooled bool
+	var role string
+	var readOnly bool
+	var noReplicaPrompt bool
 
 	cmd := &cobra.Command{
 		Use:     "psql [service-id]",
@@ -56,10 +56,8 @@ requested service. The prompt is automatically skipped when stdin is not a
 terminal (e.g. in scripts) or when the service has no read replicas.
 
 You can also pass a read replica set ID to connect straight to that replica,
-skipping the prompt. Read replicas share the primary's credentials.
-
-Examples:
-  # Connect to default service
+skipping the prompt. Read replicas share the primary's credentials.`,
+		Example: `  # Connect to default service
   tiger db psql
 
   # Connect directly to a read replica by its ID
@@ -112,14 +110,14 @@ Examples:
 			}
 
 			opts := common.ConnectionDetailsOptions{
-				Pooled:   dbPsqlPooled,
-				Role:     dbPsqlRole,
-				ReadOnly: dbPsqlReadOnly,
+				Pooled:   pooled,
+				Role:     role,
+				ReadOnly: readOnly,
 			}
 
 			// Connects straight to a replica named by ID, or offers the interactive
 			// replica menu for a primary. Returns nil details if the user cancels.
-			details, err := selectConnection(cmd.Context(), cmd, cfg, client, projectID, target, opts, dbPsqlNoReplicaPrompt)
+			details, err := selectConnection(cmd.Context(), cmd, cfg, client, projectID, target, opts, noReplicaPrompt)
 			if err != nil {
 				return err
 			}
@@ -134,10 +132,10 @@ Examples:
 	}
 
 	// Add flags for db psql command
-	cmd.Flags().BoolVar(&dbPsqlPooled, "pooled", false, "Use connection pooling")
-	cmd.Flags().StringVar(&dbPsqlRole, "role", "tsdbadmin", "Database role/username")
-	cmd.Flags().BoolVar(&dbPsqlReadOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
-	cmd.Flags().BoolVar(&dbPsqlNoReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to a read replica")
+	cmd.Flags().BoolVar(&pooled, "pooled", false, "Use connection pooling")
+	cmd.Flags().StringVar(&role, "role", "tsdbadmin", "Database role/username")
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Open the connection in Tiger Cloud's immutable read-only mode")
+	cmd.Flags().BoolVar(&noReplicaPrompt, "no-replica-prompt", false, "Don't prompt to connect to a read replica")
 
 	return cmd
 }

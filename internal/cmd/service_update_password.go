@@ -13,7 +13,7 @@ import (
 
 // buildServiceUpdatePasswordCmd creates a new update-password command
 func buildServiceUpdatePasswordCmd(app *common.App) *cobra.Command {
-	var updatePasswordValue string
+	var newPassword string
 	var autoGenerate bool
 
 	cmd := &cobra.Command{
@@ -26,10 +26,8 @@ from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
 A read replica ID is rejected — read replicas share the primary's credentials,
-so update the password on the primary instead.
-
-Examples:
-  # Update password for default service, interactively prompts
+so update the password on the primary instead.`,
+		Example: `  # Update password for default service, interactively prompts
   tiger service update-password
 
   # Update password for default service
@@ -72,7 +70,7 @@ Examples:
 			}
 
 			// The password comes from the flag, falling back to the env var
-			password := updatePasswordValue
+			password := newPassword
 			if password == "" {
 				password = os.Getenv("TIGER_NEW_PASSWORD")
 			}
@@ -134,7 +132,7 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&updatePasswordValue, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
+	cmd.Flags().StringVar(&newPassword, "new-password", "", "New password for the tsdbadmin user (can also be set via TIGER_NEW_PASSWORD env var)")
 	cmd.Flags().BoolVar(&autoGenerate, "auto-generate", false, "Auto-generate a secure password")
 	cmd.MarkFlagsMutuallyExclusive("new-password", "auto-generate")
 	return cmd
