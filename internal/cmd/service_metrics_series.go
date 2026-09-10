@@ -89,7 +89,7 @@ Examples:
 				body.BucketSeconds = &bs
 			}
 			if fn != "" {
-				f := api.MetricsSeriesRequestFn(strings.ToUpper(fn))
+				f := api.MetricsAggFn(strings.ToUpper(fn))
 				body.Fn = &f
 			}
 			if len(labelFilters) > 0 {
@@ -119,7 +119,7 @@ Examples:
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
-	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
+	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
 	cmd.RegisterFlagCompletionFunc("role", metricsSeriesRoleCompletion)

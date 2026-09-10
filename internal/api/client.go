@@ -167,6 +167,40 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/logout (the `Logout` operationId).
 	Logout(ctx context.Context, body LogoutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SubmitFeedbackWithBody Submit feedback
+	//
+	// Sends feedback, a bug report, or a support request to Tiger Data.
+	//
+	// The submitter's email address is resolved from the caller's
+	// credentials, and the client version and operating system from the
+	// `User-Agent` header, so neither is supplied in the body.
+	//
+	// Returns 204 No Content on success. This endpoint opens no support
+	// case and returns no ticket to track: use it for unsolicited feedback,
+	// and raise anything needing a tracked response through support.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+	SubmitFeedbackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitFeedback Submit feedback
+	//
+	// Sends feedback, a bug report, or a support request to Tiger Data.
+	//
+	// The submitter's email address is resolved from the caller's
+	// credentials, and the client version and operating system from the
+	// `User-Agent` header, so neither is supplied in the body.
+	//
+	// Returns 204 No Content on success. This endpoint opens no support
+	// case and returns no ticket to track: use it for unsolicited feedback,
+	// and raise anything needing a tracked response through support.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+	SubmitFeedback(ctx context.Context, body SubmitFeedbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetProjects List projects accessible to the authenticated caller
 	//
 	// Returns the projects the caller can access. PAT callers see only the
@@ -175,6 +209,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects (the `GetProjects` operationId).
 	GetProjects(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExporters List All Exporters
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves every exporter in a project, across every region.
+	//
+	// Corresponds with GET /projects/{project_id}/exporters (the `GetExporters` operationId).
+	GetExporters(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExporter Get an Exporter
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a single exporter.
+	//
+	// Corresponds with GET /projects/{project_id}/exporters/{exporter_id} (the `GetExporter` operationId).
+	GetExporter(ctx context.Context, projectID ProjectID, exporterID ExporterID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServices List All Services
 	//
@@ -233,6 +285,83 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/attachToVPC (the `AttachServiceToVPC` operationId).
 	AttachServiceToVPC(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBackupRegions List All Backup Regions
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the additional regions this service's backups are copied to
+	// (cross-region backups). The region the service runs in is not listed.
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+	GetBackupRegions(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBackupRegionWithBody Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBackupRegion Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBackupRegion Remove a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops copying this service's backups to a region. Copies already stored
+	// there are deleted in the background and cannot be recovered.
+	//
+	// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+	DeleteBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBackupRetention Get the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves how long this service keeps its backups.
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-retention (the `GetBackupRetention` operationId).
+	GetBackupRetention(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetBackupRetentionWithBody Set the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets how long this service keeps its backups. Shortening retention
+	// deletes the backups that no longer fit.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+	SetBackupRetentionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetBackupRetention Set the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets how long this service keeps its backups. Shortening retention
+	// deletes the backups that no longer fit.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+	SetBackupRetention(ctx context.Context, projectID ProjectID, serviceID ServiceID, body SetBackupRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetBackups List All Backups
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -269,6 +398,19 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/disablePooler (the `DisablePooler` operationId).
 	DisablePooler(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableDataTiering Enable Data Tiering for a Service
+	//
+	// Enables tiered storage on the service. Tiering policies move older,
+	// rarely-accessed data from the high-performance storage tier to a
+	// low-cost object storage tier. Tiered data stays queryable but becomes
+	// read-only.
+	//
+	// There is no way to disable tiering through this API. Contact Tiger
+	// Data support if you need to turn it off.
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/enableDataTiering (the `EnableDataTiering` operationId).
+	EnableDataTiering(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// EnablePooler Enable Connection Pooler for a Service
 	//
@@ -315,6 +457,18 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/available-series (the `GetServiceMetricsAvailableSeries` operationId).
 	GetServiceMetricsAvailableSeries(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetServiceMetricDetails Get details about a metric
+	//
+	// **Preview — this endpoint is experimental and may change without notice.**
+	//
+	// Returns descriptive metadata for a named metric: what it measures,
+	// its type, default aggregation, and any labels specific to it
+	// (beyond the region/role/ordinal labels every metric carries). Use
+	// getServiceMetricsAvailableSeries to discover valid metric names.
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
+	GetServiceMetricDetails(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServiceMetricsSeriesWithBody Get a metric series
 	//
@@ -780,6 +934,60 @@ func (c *Client) Logout(ctx context.Context, body LogoutJSONRequestBody, reqEdit
 	return c.Client.Do(req)
 }
 
+// SubmitFeedbackWithBody Submit feedback
+//
+// Sends feedback, a bug report, or a support request to Tiger Data.
+//
+// The submitter's email address is resolved from the caller's
+// credentials, and the client version and operating system from the
+// `User-Agent` header, so neither is supplied in the body.
+//
+// Returns 204 No Content on success. This endpoint opens no support
+// case and returns no ticket to track: use it for unsolicited feedback,
+// and raise anything needing a tracked response through support.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+func (c *Client) SubmitFeedbackWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitFeedbackRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitFeedback Submit feedback
+//
+// Sends feedback, a bug report, or a support request to Tiger Data.
+//
+// The submitter's email address is resolved from the caller's
+// credentials, and the client version and operating system from the
+// `User-Agent` header, so neither is supplied in the body.
+//
+// Returns 204 No Content on success. This endpoint opens no support
+// case and returns no ticket to track: use it for unsolicited feedback,
+// and raise anything needing a tracked response through support.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+func (c *Client) SubmitFeedback(ctx context.Context, body SubmitFeedbackJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitFeedbackRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetProjects List projects accessible to the authenticated caller
 //
 // Returns the projects the caller can access. PAT callers see only the
@@ -789,6 +997,44 @@ func (c *Client) Logout(ctx context.Context, body LogoutJSONRequestBody, reqEdit
 // Corresponds with GET /projects (the `GetProjects` operationId).
 func (c *Client) GetProjects(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetProjectsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExporters List All Exporters
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves every exporter in a project, across every region.
+//
+// Corresponds with GET /projects/{project_id}/exporters (the `GetExporters` operationId).
+func (c *Client) GetExporters(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExportersRequest(c.Server, projectID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExporter Get an Exporter
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a single exporter.
+//
+// Corresponds with GET /projects/{project_id}/exporters/{exporter_id} (the `GetExporter` operationId).
+func (c *Client) GetExporter(ctx context.Context, projectID ProjectID, exporterID ExporterID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExporterRequest(c.Server, projectID, exporterID)
 	if err != nil {
 		return nil, err
 	}
@@ -926,6 +1172,153 @@ func (c *Client) AttachServiceToVPC(ctx context.Context, projectID ProjectID, se
 	return c.Client.Do(req)
 }
 
+// GetBackupRegions List All Backup Regions
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the additional regions this service's backups are copied to
+// (cross-region backups). The region the service runs in is not listed.
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+func (c *Client) GetBackupRegions(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBackupRegionsRequest(c.Server, projectID, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBackupRegionWithBody Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *Client) CreateBackupRegionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBackupRegionRequestWithBody(c.Server, projectID, serviceID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBackupRegion Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *Client) CreateBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBackupRegionRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBackupRegion Remove a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops copying this service's backups to a region. Copies already stored
+// there are deleted in the background and cannot be recovered.
+//
+// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+func (c *Client) DeleteBackupRegion(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBackupRegionRequest(c.Server, projectID, serviceID, regionCode)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBackupRetention Get the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves how long this service keeps its backups.
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-retention (the `GetBackupRetention` operationId).
+func (c *Client) GetBackupRetention(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBackupRetentionRequest(c.Server, projectID, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetBackupRetentionWithBody Set the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets how long this service keeps its backups. Shortening retention
+// deletes the backups that no longer fit.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+func (c *Client) SetBackupRetentionWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetBackupRetentionRequestWithBody(c.Server, projectID, serviceID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetBackupRetention Set the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets how long this service keeps its backups. Shortening retention
+// deletes the backups that no longer fit.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+func (c *Client) SetBackupRetention(ctx context.Context, projectID ProjectID, serviceID ServiceID, body SetBackupRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetBackupRetentionRequest(c.Server, projectID, serviceID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetBackups List All Backups
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -993,6 +1386,29 @@ func (c *Client) DetachServiceFromVPC(ctx context.Context, projectID ProjectID, 
 // Corresponds with POST /projects/{project_id}/services/{service_id}/disablePooler (the `DisablePooler` operationId).
 func (c *Client) DisablePooler(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDisablePoolerRequest(c.Server, projectID, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableDataTiering Enable Data Tiering for a Service
+//
+// Enables tiered storage on the service. Tiering policies move older,
+// rarely-accessed data from the high-performance storage tier to a
+// low-cost object storage tier. Tiered data stays queryable but becomes
+// read-only.
+//
+// There is no way to disable tiering through this API. Contact Tiger
+// Data support if you need to turn it off.
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/enableDataTiering (the `EnableDataTiering` operationId).
+func (c *Client) EnableDataTiering(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableDataTieringRequest(c.Server, projectID, serviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1089,6 +1505,28 @@ func (c *Client) GetServiceLogs(ctx context.Context, projectID ProjectID, servic
 // Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/available-series (the `GetServiceMetricsAvailableSeries` operationId).
 func (c *Client) GetServiceMetricsAvailableSeries(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServiceMetricsAvailableSeriesRequest(c.Server, projectID, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetServiceMetricDetails Get details about a metric
+//
+// **Preview — this endpoint is experimental and may change without notice.**
+//
+// Returns descriptive metadata for a named metric: what it measures,
+// its type, default aggregation, and any labels specific to it
+// (beyond the region/role/ordinal labels every metric carries). Use
+// getServiceMetricsAvailableSeries to discover valid metric names.
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
+func (c *Client) GetServiceMetricDetails(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceMetricDetailsRequest(c.Server, projectID, serviceID, metricName)
 	if err != nil {
 		return nil, err
 	}
@@ -1922,6 +2360,46 @@ func NewLogoutRequestWithBody(server string, contentType string, body io.Reader)
 	return req, nil
 }
 
+// NewSubmitFeedbackRequest calls the generic SubmitFeedback builder with application/json body
+func NewSubmitFeedbackRequest(server string, body SubmitFeedbackJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSubmitFeedbackRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSubmitFeedbackRequestWithBody constructs an http.Request for the SubmitFeedback method, with any body, and a specified content type
+func NewSubmitFeedbackRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/feedback")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetProjectsRequest constructs an http.Request for the GetProjects method
 func NewGetProjectsRequest(server string) (*http.Request, error) {
 	var err error
@@ -1932,6 +2410,81 @@ func NewGetProjectsRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/projects")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetExportersRequest constructs an http.Request for the GetExporters method
+func NewGetExportersRequest(server string, projectID ProjectID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/exporters", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetExporterRequest constructs an http.Request for the GetExporter method
+func NewGetExporterRequest(server string, projectID ProjectID, exporterID ExporterID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "exporter_id", exporterID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/exporters/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2166,6 +2719,244 @@ func NewAttachServiceToVPCRequestWithBody(server string, projectID ProjectID, se
 	return req, nil
 }
 
+// NewGetBackupRegionsRequest constructs an http.Request for the GetBackupRegions method
+func NewGetBackupRegionsRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateBackupRegionRequest calls the generic CreateBackupRegion builder with application/json body
+func NewCreateBackupRegionRequest(server string, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBackupRegionRequestWithBody(server, projectID, serviceID, "application/json", bodyReader)
+}
+
+// NewCreateBackupRegionRequestWithBody constructs an http.Request for the CreateBackupRegion method, with any body, and a specified content type
+func NewCreateBackupRegionRequestWithBody(server string, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBackupRegionRequest constructs an http.Request for the DeleteBackupRegion method
+func NewDeleteBackupRegionRequest(server string, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "region_code", regionCode, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-regions/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBackupRetentionRequest constructs an http.Request for the GetBackupRetention method
+func NewGetBackupRetentionRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-retention", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetBackupRetentionRequest calls the generic SetBackupRetention builder with application/json body
+func NewSetBackupRetentionRequest(server string, projectID ProjectID, serviceID ServiceID, body SetBackupRetentionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetBackupRetentionRequestWithBody(server, projectID, serviceID, "application/json", bodyReader)
+}
+
+// NewSetBackupRetentionRequestWithBody constructs an http.Request for the SetBackupRetention method, with any body, and a specified content type
+func NewSetBackupRetentionRequestWithBody(server string, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/backup-retention", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetBackupsRequest constructs an http.Request for the GetBackups method
 func NewGetBackupsRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
 	var err error
@@ -2285,6 +3076,47 @@ func NewDisablePoolerRequest(server string, projectID ProjectID, serviceID Servi
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/services/%s/disablePooler", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableDataTieringRequest constructs an http.Request for the EnableDataTiering method
+func NewEnableDataTieringRequest(server string, projectID ProjectID, serviceID ServiceID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/enableDataTiering", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2549,6 +3381,54 @@ func NewGetServiceMetricsAvailableSeriesRequest(server string, projectID Project
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/services/%s/metrics/available-series", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetServiceMetricDetailsRequest constructs an http.Request for the GetServiceMetricDetails method
+func NewGetServiceMetricDetailsRequest(server string, projectID ProjectID, serviceID ServiceID, metricName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "service_id", serviceID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "metric_name", metricName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/%s/metrics/details/%s", pathParam0, pathParam1, pathParam2)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3864,6 +4744,40 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/logout (the `Logout` operationId).
 	LogoutWithResponse(ctx context.Context, body LogoutJSONRequestBody, reqEditors ...RequestEditorFn) (*LogoutResponse, error)
 
+	// SubmitFeedbackWithBodyWithResponse Submit feedback
+	//
+	// Sends feedback, a bug report, or a support request to Tiger Data.
+	//
+	// The submitter's email address is resolved from the caller's
+	// credentials, and the client version and operating system from the
+	// `User-Agent` header, so neither is supplied in the body.
+	//
+	// Returns 204 No Content on success. This endpoint opens no support
+	// case and returns no ticket to track: use it for unsolicited feedback,
+	// and raise anything needing a tracked response through support.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+	SubmitFeedbackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitFeedbackResponse, error)
+
+	// SubmitFeedbackWithResponse Submit feedback
+	//
+	// Sends feedback, a bug report, or a support request to Tiger Data.
+	//
+	// The submitter's email address is resolved from the caller's
+	// credentials, and the client version and operating system from the
+	// `User-Agent` header, so neither is supplied in the body.
+	//
+	// Returns 204 No Content on success. This endpoint opens no support
+	// case and returns no ticket to track: use it for unsolicited feedback,
+	// and raise anything needing a tracked response through support.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+	SubmitFeedbackWithResponse(ctx context.Context, body SubmitFeedbackJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitFeedbackResponse, error)
+
 	// GetProjectsWithResponse List projects accessible to the authenticated caller
 	//
 	// Returns the projects the caller can access. PAT callers see only the
@@ -3874,6 +4788,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects (the `GetProjects` operationId).
 	GetProjectsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetProjectsResponse, error)
+
+	// GetExportersWithResponse List All Exporters
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves every exporter in a project, across every region.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/exporters (the `GetExporters` operationId).
+	GetExportersWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetExportersResponse, error)
+
+	// GetExporterWithResponse Get an Exporter
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a single exporter.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/exporters/{exporter_id} (the `GetExporter` operationId).
+	GetExporterWithResponse(ctx context.Context, projectID ProjectID, exporterID ExporterID, reqEditors ...RequestEditorFn) (*GetExporterResponse, error)
 
 	// GetServicesWithResponse List All Services
 	//
@@ -3938,6 +4874,89 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/attachToVPC (the `AttachServiceToVPC` operationId).
 	AttachServiceToVPCWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body AttachServiceToVPCJSONRequestBody, reqEditors ...RequestEditorFn) (*AttachServiceToVPCResponse, error)
 
+	// GetBackupRegionsWithResponse List All Backup Regions
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the additional regions this service's backups are copied to
+	// (cross-region backups). The region the service runs in is not listed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+	GetBackupRegionsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRegionsResponse, error)
+
+	// CreateBackupRegionWithBodyWithResponse Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error)
+
+	// CreateBackupRegionWithResponse Add a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts copying this service's backups to another region. The region is
+	// added immediately; existing backups are copied to it in the background.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+	CreateBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error)
+
+	// DeleteBackupRegionWithResponse Remove a Backup Region
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops copying this service's backups to a region. Copies already stored
+	// there are deleted in the background and cannot be recovered.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+	DeleteBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*DeleteBackupRegionResponse, error)
+
+	// GetBackupRetentionWithResponse Get the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves how long this service keeps its backups.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-retention (the `GetBackupRetention` operationId).
+	GetBackupRetentionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRetentionResponse, error)
+
+	// SetBackupRetentionWithBodyWithResponse Set the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets how long this service keeps its backups. Shortening retention
+	// deletes the backups that no longer fit.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+	SetBackupRetentionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetBackupRetentionResponse, error)
+
+	// SetBackupRetentionWithResponse Set the Backup Retention Policy
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets how long this service keeps its backups. Shortening retention
+	// deletes the backups that no longer fit.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+	SetBackupRetentionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body SetBackupRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetBackupRetentionResponse, error)
+
 	// GetBackupsWithResponse List All Backups
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -3978,6 +4997,21 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project_id}/services/{service_id}/disablePooler (the `DisablePooler` operationId).
 	DisablePoolerWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*DisablePoolerResponse, error)
+
+	// EnableDataTieringWithResponse Enable Data Tiering for a Service
+	//
+	// Enables tiered storage on the service. Tiering policies move older,
+	// rarely-accessed data from the high-performance storage tier to a
+	// low-cost object storage tier. Tiered data stays queryable but becomes
+	// read-only.
+	//
+	// There is no way to disable tiering through this API. Contact Tiger
+	// Data support if you need to turn it off.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/{service_id}/enableDataTiering (the `EnableDataTiering` operationId).
+	EnableDataTieringWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*EnableDataTieringResponse, error)
 
 	// EnablePoolerWithResponse Enable Connection Pooler for a Service
 	//
@@ -4030,6 +5064,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/available-series (the `GetServiceMetricsAvailableSeries` operationId).
 	GetServiceMetricsAvailableSeriesWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetServiceMetricsAvailableSeriesResponse, error)
+
+	// GetServiceMetricDetailsWithResponse Get details about a metric
+	//
+	// **Preview — this endpoint is experimental and may change without notice.**
+	//
+	// Returns descriptive metadata for a named metric: what it measures,
+	// its type, default aggregation, and any labels specific to it
+	// (beyond the region/role/ordinal labels every metric carries). Use
+	// getServiceMetricsAvailableSeries to discover valid metric names.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
+	GetServiceMetricDetailsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*GetServiceMetricDetailsResponse, error)
 
 	// GetServiceMetricsSeriesWithBodyWithResponse Get a metric series
 	//
@@ -4557,6 +5605,47 @@ func (r LogoutResponse) ContentType() string {
 	return ""
 }
 
+type SubmitFeedbackResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r SubmitFeedbackResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r SubmitFeedbackResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SubmitFeedbackResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SubmitFeedbackResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SubmitFeedbackResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetProjectsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4599,6 +5688,102 @@ func (r GetProjectsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetProjectsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetExportersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]Exporter
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExportersResponse) GetJSON200() *[]Exporter {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetExportersResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExportersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExportersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExportersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExportersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetExporterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Exporter
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExporterResponse) GetJSON200() *Exporter {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetExporterResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExporterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExporterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExporterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExporterResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4838,6 +6023,239 @@ func (r AttachServiceToVPCResponse) ContentType() string {
 	return ""
 }
 
+type GetBackupRegionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]BackupRegion
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBackupRegionsResponse) GetJSON200() *[]BackupRegion {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBackupRegionsResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBackupRegionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBackupRegionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBackupRegionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBackupRegionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateBackupRegionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *BackupRegion
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateBackupRegionResponse) GetJSON201() *BackupRegion {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateBackupRegionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateBackupRegionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateBackupRegionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBackupRegionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateBackupRegionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBackupRegionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteBackupRegionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBackupRegionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBackupRegionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBackupRegionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBackupRegionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBackupRetentionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BackupRetentionByTime
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBackupRetentionResponse) GetJSON200() *BackupRetentionByTime {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBackupRetentionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBackupRetentionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBackupRetentionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBackupRetentionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBackupRetentionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetBackupRetentionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BackupRetentionByTime
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetBackupRetentionResponse) GetJSON200() *BackupRetentionByTime {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r SetBackupRetentionResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r SetBackupRetentionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetBackupRetentionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetBackupRetentionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetBackupRetentionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetBackupsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4976,6 +6394,54 @@ func (r DisablePoolerResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DisablePoolerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type EnableDataTieringResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Service
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EnableDataTieringResponse) GetJSON200() *Service {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r EnableDataTieringResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableDataTieringResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableDataTieringResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableDataTieringResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableDataTieringResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -5168,6 +6634,54 @@ func (r GetServiceMetricsAvailableSeriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetServiceMetricsAvailableSeriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetServiceMetricDetailsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MetricDetails
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetServiceMetricDetailsResponse) GetJSON200() *MetricDetails {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetServiceMetricDetailsResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetServiceMetricDetailsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServiceMetricDetailsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServiceMetricDetailsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetServiceMetricDetailsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6419,6 +7933,52 @@ func (c *ClientWithResponses) LogoutWithResponse(ctx context.Context, body Logou
 	return ParseLogoutResponse(rsp)
 }
 
+// SubmitFeedbackWithBodyWithResponse Submit feedback
+//
+// Sends feedback, a bug report, or a support request to Tiger Data.
+//
+// The submitter's email address is resolved from the caller's
+// credentials, and the client version and operating system from the
+// `User-Agent` header, so neither is supplied in the body.
+//
+// Returns 204 No Content on success. This endpoint opens no support
+// case and returns no ticket to track: use it for unsolicited feedback,
+// and raise anything needing a tracked response through support.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+func (c *ClientWithResponses) SubmitFeedbackWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitFeedbackResponse, error) {
+	rsp, err := c.SubmitFeedbackWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitFeedbackResponse(rsp)
+}
+
+// SubmitFeedbackWithResponse Submit feedback
+//
+// Sends feedback, a bug report, or a support request to Tiger Data.
+//
+// The submitter's email address is resolved from the caller's
+// credentials, and the client version and operating system from the
+// `User-Agent` header, so neither is supplied in the body.
+//
+// Returns 204 No Content on success. This endpoint opens no support
+// case and returns no ticket to track: use it for unsolicited feedback,
+// and raise anything needing a tracked response through support.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /feedback (the `SubmitFeedback` operationId).
+func (c *ClientWithResponses) SubmitFeedbackWithResponse(ctx context.Context, body SubmitFeedbackJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitFeedbackResponse, error) {
+	rsp, err := c.SubmitFeedback(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitFeedbackResponse(rsp)
+}
+
 // GetProjectsWithResponse List projects accessible to the authenticated caller
 //
 // Returns the projects the caller can access. PAT callers see only the
@@ -6434,6 +7994,40 @@ func (c *ClientWithResponses) GetProjectsWithResponse(ctx context.Context, reqEd
 		return nil, err
 	}
 	return ParseGetProjectsResponse(rsp)
+}
+
+// GetExportersWithResponse List All Exporters
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves every exporter in a project, across every region.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/exporters (the `GetExporters` operationId).
+func (c *ClientWithResponses) GetExportersWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetExportersResponse, error) {
+	rsp, err := c.GetExporters(ctx, projectID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExportersResponse(rsp)
+}
+
+// GetExporterWithResponse Get an Exporter
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a single exporter.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/exporters/{exporter_id} (the `GetExporter` operationId).
+func (c *ClientWithResponses) GetExporterWithResponse(ctx context.Context, projectID ProjectID, exporterID ExporterID, reqEditors ...RequestEditorFn) (*GetExporterResponse, error) {
+	rsp, err := c.GetExporter(ctx, projectID, exporterID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExporterResponse(rsp)
 }
 
 // GetServicesWithResponse List All Services
@@ -6541,6 +8135,131 @@ func (c *ClientWithResponses) AttachServiceToVPCWithResponse(ctx context.Context
 	return ParseAttachServiceToVPCResponse(rsp)
 }
 
+// GetBackupRegionsWithResponse List All Backup Regions
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the additional regions this service's backups are copied to
+// (cross-region backups). The region the service runs in is not listed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-regions (the `GetBackupRegions` operationId).
+func (c *ClientWithResponses) GetBackupRegionsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRegionsResponse, error) {
+	rsp, err := c.GetBackupRegions(ctx, projectID, serviceID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBackupRegionsResponse(rsp)
+}
+
+// CreateBackupRegionWithBodyWithResponse Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *ClientWithResponses) CreateBackupRegionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error) {
+	rsp, err := c.CreateBackupRegionWithBody(ctx, projectID, serviceID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBackupRegionResponse(rsp)
+}
+
+// CreateBackupRegionWithResponse Add a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts copying this service's backups to another region. The region is
+// added immediately; existing backups are copied to it in the background.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/backup-regions (the `CreateBackupRegion` operationId).
+func (c *ClientWithResponses) CreateBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body CreateBackupRegionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBackupRegionResponse, error) {
+	rsp, err := c.CreateBackupRegion(ctx, projectID, serviceID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBackupRegionResponse(rsp)
+}
+
+// DeleteBackupRegionWithResponse Remove a Backup Region
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops copying this service's backups to a region. Copies already stored
+// there are deleted in the background and cannot be recovered.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project_id}/services/{service_id}/backup-regions/{region_code} (the `DeleteBackupRegion` operationId).
+func (c *ClientWithResponses) DeleteBackupRegionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, regionCode BackupRegionCode, reqEditors ...RequestEditorFn) (*DeleteBackupRegionResponse, error) {
+	rsp, err := c.DeleteBackupRegion(ctx, projectID, serviceID, regionCode, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBackupRegionResponse(rsp)
+}
+
+// GetBackupRetentionWithResponse Get the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves how long this service keeps its backups.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/backup-retention (the `GetBackupRetention` operationId).
+func (c *ClientWithResponses) GetBackupRetentionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetBackupRetentionResponse, error) {
+	rsp, err := c.GetBackupRetention(ctx, projectID, serviceID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBackupRetentionResponse(rsp)
+}
+
+// SetBackupRetentionWithBodyWithResponse Set the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets how long this service keeps its backups. Shortening retention
+// deletes the backups that no longer fit.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+func (c *ClientWithResponses) SetBackupRetentionWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetBackupRetentionResponse, error) {
+	rsp, err := c.SetBackupRetentionWithBody(ctx, projectID, serviceID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetBackupRetentionResponse(rsp)
+}
+
+// SetBackupRetentionWithResponse Set the Backup Retention Policy
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets how long this service keeps its backups. Shortening retention
+// deletes the backups that no longer fit.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project_id}/services/{service_id}/backup-retention (the `SetBackupRetention` operationId).
+func (c *ClientWithResponses) SetBackupRetentionWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, body SetBackupRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetBackupRetentionResponse, error) {
+	rsp, err := c.SetBackupRetention(ctx, projectID, serviceID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetBackupRetentionResponse(rsp)
+}
+
 // GetBackupsWithResponse List All Backups
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -6604,6 +8323,27 @@ func (c *ClientWithResponses) DisablePoolerWithResponse(ctx context.Context, pro
 		return nil, err
 	}
 	return ParseDisablePoolerResponse(rsp)
+}
+
+// EnableDataTieringWithResponse Enable Data Tiering for a Service
+//
+// Enables tiered storage on the service. Tiering policies move older,
+// rarely-accessed data from the high-performance storage tier to a
+// low-cost object storage tier. Tiered data stays queryable but becomes
+// read-only.
+//
+// There is no way to disable tiering through this API. Contact Tiger
+// Data support if you need to turn it off.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/{service_id}/enableDataTiering (the `EnableDataTiering` operationId).
+func (c *ClientWithResponses) EnableDataTieringWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*EnableDataTieringResponse, error) {
+	rsp, err := c.EnableDataTiering(ctx, projectID, serviceID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableDataTieringResponse(rsp)
 }
 
 // EnablePoolerWithResponse Enable Connection Pooler for a Service
@@ -6686,6 +8426,26 @@ func (c *ClientWithResponses) GetServiceMetricsAvailableSeriesWithResponse(ctx c
 		return nil, err
 	}
 	return ParseGetServiceMetricsAvailableSeriesResponse(rsp)
+}
+
+// GetServiceMetricDetailsWithResponse Get details about a metric
+//
+// **Preview — this endpoint is experimental and may change without notice.**
+//
+// Returns descriptive metadata for a named metric: what it measures,
+// its type, default aggregation, and any labels specific to it
+// (beyond the region/role/ordinal labels every metric carries). Use
+// getServiceMetricsAvailableSeries to discover valid metric names.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
+func (c *ClientWithResponses) GetServiceMetricDetailsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*GetServiceMetricDetailsResponse, error) {
+	rsp, err := c.GetServiceMetricDetails(ctx, projectID, serviceID, metricName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceMetricDetailsResponse(rsp)
 }
 
 // GetServiceMetricsSeriesWithBodyWithResponse Get a metric series
@@ -7372,6 +9132,35 @@ func ParseLogoutResponse(rsp *http.Response) (*LogoutResponse, error) {
 	return response, nil
 }
 
+// ParseSubmitFeedbackResponse parses an HTTP response from a SubmitFeedbackWithResponse call
+func ParseSubmitFeedbackResponse(rsp *http.Response) (*SubmitFeedbackResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SubmitFeedbackResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetProjectsResponse parses an HTTP response from a GetProjectsWithResponse call
 func ParseGetProjectsResponse(rsp *http.Response) (*GetProjectsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -7388,6 +9177,72 @@ func ParseGetProjectsResponse(rsp *http.Response) (*GetProjectsResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []Project
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetExportersResponse parses an HTTP response from a GetExportersWithResponse call
+func ParseGetExportersResponse(rsp *http.Response) (*GetExportersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExportersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Exporter
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetExporterResponse parses an HTTP response from a GetExporterWithResponse call
+func ParseGetExporterResponse(rsp *http.Response) (*GetExporterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExporterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Exporter
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -7566,6 +9421,167 @@ func ParseAttachServiceToVPCResponse(rsp *http.Response) (*AttachServiceToVPCRes
 	return response, nil
 }
 
+// ParseGetBackupRegionsResponse parses an HTTP response from a GetBackupRegionsWithResponse call
+func ParseGetBackupRegionsResponse(rsp *http.Response) (*GetBackupRegionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBackupRegionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []BackupRegion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateBackupRegionResponse parses an HTTP response from a CreateBackupRegionWithResponse call
+func ParseCreateBackupRegionResponse(rsp *http.Response) (*CreateBackupRegionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBackupRegionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest BackupRegion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBackupRegionResponse parses an HTTP response from a DeleteBackupRegionWithResponse call
+func ParseDeleteBackupRegionResponse(rsp *http.Response) (*DeleteBackupRegionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBackupRegionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBackupRetentionResponse parses an HTTP response from a GetBackupRetentionWithResponse call
+func ParseGetBackupRetentionResponse(rsp *http.Response) (*GetBackupRetentionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBackupRetentionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BackupRetentionByTime
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetBackupRetentionResponse parses an HTTP response from a SetBackupRetentionWithResponse call
+func ParseSetBackupRetentionResponse(rsp *http.Response) (*SetBackupRetentionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetBackupRetentionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BackupRetentionByTime
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetBackupsResponse parses an HTTP response from a GetBackupsWithResponse call
 func ParseGetBackupsResponse(rsp *http.Response) (*GetBackupsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -7648,6 +9664,39 @@ func ParseDisablePoolerResponse(rsp *http.Response) (*DisablePoolerResponse, err
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SuccessMessage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEnableDataTieringResponse parses an HTTP response from a EnableDataTieringWithResponse call
+func ParseEnableDataTieringResponse(rsp *http.Response) (*EnableDataTieringResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableDataTieringResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Service
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -7780,6 +9829,39 @@ func ParseGetServiceMetricsAvailableSeriesResponse(rsp *http.Response) (*GetServ
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []string
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServiceMetricDetailsResponse parses an HTTP response from a GetServiceMetricDetailsWithResponse call
+func ParseGetServiceMetricDetailsResponse(rsp *http.Response) (*GetServiceMetricDetailsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServiceMetricDetailsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MetricDetails
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
