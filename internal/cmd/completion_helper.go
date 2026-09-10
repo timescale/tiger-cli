@@ -188,19 +188,21 @@ var passwordStorageCompletion = cobra.FixedCompletions(config.ValidPasswordStora
 var metricsSeriesRoleCompletion = cobra.FixedCompletions([]string{"PRIMARY", "REPLICA"}, cobra.ShellCompDirectiveNoFileComp)
 
 // metricsSeriesFnCompletion completes --fn on `service metrics series`, drawn
-// from the generated MetricsSeriesRequestFn enum.
+// from the generated MetricsAggFn enum.
 var metricsSeriesFnCompletion = cobra.FixedCompletions([]string{
-	string(api.MetricsSeriesRequestFnAVG),
-	string(api.MetricsSeriesRequestFnCOUNT),
-	string(api.MetricsSeriesRequestFnINCREASE),
-	string(api.MetricsSeriesRequestFnLAST),
-	string(api.MetricsSeriesRequestFnMAX),
-	string(api.MetricsSeriesRequestFnMIN),
-	string(api.MetricsSeriesRequestFnP50),
-	string(api.MetricsSeriesRequestFnP90),
-	string(api.MetricsSeriesRequestFnP99),
-	string(api.MetricsSeriesRequestFnRATE),
-	string(api.MetricsSeriesRequestFnSUM),
+	string(api.MetricsAggFnAVG),
+	string(api.MetricsAggFnCOUNT),
+	string(api.MetricsAggFnINCREASE),
+	string(api.MetricsAggFnLAST),
+	string(api.MetricsAggFnMAX),
+	string(api.MetricsAggFnMAXTOTAL),
+	string(api.MetricsAggFnMIN),
+	string(api.MetricsAggFnMINTOTAL),
+	string(api.MetricsAggFnP50),
+	string(api.MetricsAggFnP90),
+	string(api.MetricsAggFnP99),
+	string(api.MetricsAggFnRATE),
+	string(api.MetricsAggFnSUM),
 }, cobra.ShellCompDirectiveNoFileComp)
 
 // outputCompletion returns a completion func for --output/-o flags. extra
