@@ -2,10 +2,11 @@ package common
 
 import (
 	"fmt"
-	"github.com/zalando/go-keyring"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/zalando/go-keyring"
 
 	"github.com/timescale/tiger-cli/internal/api"
 )
@@ -351,7 +352,6 @@ func TestBuildConnectionString_WithPassword_NoStorage(t *testing.T) {
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
-
 	if err != nil {
 		t.Fatal("Expected no error when password storage is disabled, but got one")
 	}
@@ -390,7 +390,6 @@ func TestBuildConnectionString_WithPassword_NoPasswordAvailable(t *testing.T) {
 		Role:         "tsdbadmin",
 		WithPassword: true,
 	})
-
 	if err != nil {
 		t.Fatal("Expected no error when no password is available, but got one")
 	}

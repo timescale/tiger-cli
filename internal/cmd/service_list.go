@@ -17,7 +17,6 @@ import (
 
 // serviceListCmd represents the list command under service
 func buildServiceListCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:               "list",
 		Aliases:           []string{"ls"},
