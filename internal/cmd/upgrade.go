@@ -64,22 +64,17 @@ func buildUpgradeCmd(app *common.App) *cobra.Command {
 		Long: `Download and install the latest published version of the Tiger CLI, replacing the currently running binary.
 
 If Tiger CLI was installed via a package manager (Homebrew, apt, yum/dnf), the upgrade will be refused with a suggestion to use that package manager instead.`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runUpgrade(cmd, app, requestedVersion, force)
 		},
 	}
 
 	cmd.Flags().StringVar(&requestedVersion, "version", "", "specific version to install (e.g. v1.2.3). Defaults to latest.")
-	if err := cmd.Flags().MarkHidden("version"); err != nil {
-		panic(err)
-	}
+	markFlagHidden(cmd, "version")
 	cmd.Flags().BoolVar(&force, "force", false, "reinstall even if the current version already matches, or the binary was installed via a package manager")
-	if err := cmd.Flags().MarkHidden("force"); err != nil {
-		panic(err)
-	}
+	markFlagHidden(cmd, "force")
 
 	return cmd
 }

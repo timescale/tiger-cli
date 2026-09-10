@@ -64,7 +64,7 @@ analytics: false
 read_only: true
 `
 	configFile := GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -175,7 +175,7 @@ func TestLoad_ReadOnlyMode(t *testing.T) {
 			tmpDir := setupTestConfig(t)
 
 			if tt.fileBody != "" {
-				if err := os.WriteFile(GetConfigFile(tmpDir), []byte(tt.fileBody), 0644); err != nil {
+				if err := os.WriteFile(GetConfigFile(tmpDir), []byte(tt.fileBody), 0o644); err != nil {
 					t.Fatalf("Failed to write config file: %v", err)
 				}
 			}
@@ -232,7 +232,7 @@ func TestLoad_MigrateVersionCheck(t *testing.T) {
 			tmpDir := setupTestConfig(t)
 
 			configFile := GetConfigFile(tmpDir)
-			if err := os.WriteFile(configFile, []byte(tt.fileBody), 0644); err != nil {
+			if err := os.WriteFile(configFile, []byte(tt.fileBody), 0o644); err != nil {
 				t.Fatalf("Failed to write config file: %v", err)
 			}
 
@@ -306,7 +306,7 @@ output: table
 analytics: true
 `
 	configFile := GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
@@ -749,7 +749,7 @@ func TestLoad_ErrorHandling(t *testing.T) {
 invalid yaml content [
 `
 	configFile := GetConfigFile(tmpDir)
-	if err := os.WriteFile(configFile, []byte(invalidConfig), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(invalidConfig), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid config file: %v", err)
 	}
 
@@ -934,10 +934,10 @@ func TestEnsureConfigDir_ErrorSuggestsOverride(t *testing.T) {
 		t.Skip("cannot trigger mkdir failure as root")
 	}
 	parent := t.TempDir()
-	if err := os.Chmod(parent, 0500); err != nil {
+	if err := os.Chmod(parent, 0o500); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(parent, 0700) })
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
 
 	_, err := ensureConfigDir(filepath.Join(parent, "tiger"))
 	if err == nil {

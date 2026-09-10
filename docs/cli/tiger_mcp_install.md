@@ -29,7 +29,13 @@ The command will:
 
 If no client is specified, you'll be prompted to select one interactively.
 
-Examples:
+```
+tiger mcp install [client] [flags]
+```
+
+### Examples
+
+```
   # Interactive client selection
   tiger mcp install
 
@@ -44,9 +50,6 @@ Examples:
 
   # Use custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json
-
-```
-tiger mcp install [client] [flags]
 ```
 
 ### Options

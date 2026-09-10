@@ -12,12 +12,11 @@ import (
 
 func buildLogoutCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
-		Use:               "logout",
-		Short:             "Remove stored credentials",
-		Long:              `Remove stored credentials. For OAuth logins, also revokes the refresh token server-side.`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Use:          "logout",
+		Short:        "Remove stored credentials",
+		Long:         `Remove stored credentials. For OAuth logins, also revokes the refresh token server-side.`,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 

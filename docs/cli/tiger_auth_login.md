@@ -27,7 +27,13 @@ directly. The CLI will prompt for any missing information.
 
 You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings
 
-Examples:
+```
+tiger auth login [flags]
+```
+
+### Examples
+
+```
   # Interactive login with OAuth (opens browser)
   tiger auth login
 
@@ -44,9 +50,6 @@ Examples:
   export TIGER_PUBLIC_KEY="your-public-key"
   export TIGER_SECRET_KEY="your-secret-key"
   tiger auth login
-
-```
-tiger auth login [flags]
 ```
 
 ### Options

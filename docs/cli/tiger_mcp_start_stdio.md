@@ -6,12 +6,15 @@ Start MCP server with stdio transport
 
 Start the MCP server using standard input/output transport.
 
-Examples:
-  # Start with stdio transport
-  tiger mcp start stdio
-
 ```
 tiger mcp start stdio [flags]
+```
+
+### Examples
+
+```
+  # Start with stdio transport
+  tiger mcp start stdio
 ```
 
 ### Options

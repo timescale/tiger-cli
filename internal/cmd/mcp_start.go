@@ -19,10 +19,8 @@ func buildMCPStartCmd(app *common.App) *cobra.Command {
 		Long: `Start the Tiger Model Context Protocol (MCP) server for AI assistant integration.
 
 The MCP server provides programmatic access to Tiger Cloud platform resources
-through Claude and other AI assistants. By default, it uses stdio transport.
-
-Examples:
-  # Start with stdio transport (default)
+through Claude and other AI assistants. By default, it uses stdio transport.`,
+		Example: `  # Start with stdio transport (default)
   tiger mcp start
 
   # Start with stdio transport (explicit)
@@ -30,9 +28,8 @@ Examples:
 
   # Start with HTTP transport
   tiger mcp start http`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Default behavior when no subcommand is specified - use stdio
 			return startStdioServer(cmd, app)

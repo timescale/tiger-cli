@@ -12,7 +12,13 @@ Fetches and displays logs from the specified service. By default, shows the last
 The service ID can be provided as an argument or will use the default service
 from your configuration.
 
-Examples:
+```
+tiger service logs [service-id] [flags]
+```
+
+### Examples
+
+```
   # View last 100 logs for default service (default behavior)
   tiger service logs
 
@@ -30,9 +36,6 @@ Examples:
 
   # View last 1000 lines
   tiger service logs --tail 1000
-
-```
-tiger service logs [service-id] [flags]
 ```
 
 ### Options

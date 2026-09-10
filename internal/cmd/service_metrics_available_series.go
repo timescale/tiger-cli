@@ -13,7 +13,6 @@ import (
 
 // buildServiceMetricsAvailableSeriesCmd lists the metric series available for a service
 func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:          "available-series [service-id]",
 		Short:        "List available metric series",
@@ -62,6 +61,6 @@ func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 	return cmd
 }

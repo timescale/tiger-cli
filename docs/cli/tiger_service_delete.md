@@ -11,7 +11,13 @@ to confirm deletion, unless you use the --confirm flag.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.
 
-Examples:
+```
+tiger service delete [service-id] [flags]
+```
+
+### Examples
+
+```
   # Delete a service (with confirmation prompt)
   tiger service delete svc-12345
 
@@ -23,9 +29,6 @@ Examples:
 
   # Delete service with custom wait timeout
   tiger service delete svc-12345 --wait-timeout 15m
-
-```
-tiger service delete [service-id] [flags]
 ```
 
 ### Options

@@ -13,11 +13,14 @@ with that project's keys instead.
 The default service (config key service_id) belongs to the project it was set in, so it is
 cleared when you switch away.
 
-Example:
-  tiger project use my-project-id
-
 ```
 tiger project use <project-id> [flags]
+```
+
+### Examples
+
+```
+  tiger project use my-project-id
 ```
 
 ### Options

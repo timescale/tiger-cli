@@ -50,11 +50,9 @@ func nextSteps(readOnlySet bool) string {
 // browserAuthTimeout is how long the redirect flow waits for the callback.
 const browserAuthTimeout = 5 * time.Minute
 
-var (
-	// defaultDeviceCodeTTL bounds polling when the gateway omits expires_in.
-	// Overridden in tests.
-	defaultDeviceCodeTTL = 15 * time.Minute
-)
+// defaultDeviceCodeTTL bounds polling when the gateway omits expires_in.
+// Overridden in tests.
+var defaultDeviceCodeTTL = 15 * time.Minute
 
 // errBrowserOpenFailed means the redirect flow never started, which is the one
 // condition the device code stands in for.
@@ -102,10 +100,8 @@ service (config key service_id) is cleared, since it belongs to the project it w
 You may also provide API keys via flags or environment variables, in which case they will be used
 directly. The CLI will prompt for any missing information.
 
-You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings
-
-Examples:
-  # Interactive login with OAuth (opens browser)
+You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings`,
+		Example: `  # Interactive login with OAuth (opens browser)
   tiger auth login
 
   # OAuth login without the interactive project selection
@@ -121,9 +117,8 @@ Examples:
   export TIGER_PUBLIC_KEY="your-public-key"
   export TIGER_SECRET_KEY="your-secret-key"
   tiger auth login`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 

@@ -14,7 +14,19 @@ The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will
 increase costs.
 
-Examples:
+Allowed CPU/Memory Configurations:
+  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
+
+```
+tiger service resize [service-id] [flags]
+```
+
+### Examples
+
+```
   # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 
@@ -32,15 +44,6 @@ Examples:
 
   # Resize with custom wait timeout
   tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m
-
-Allowed CPU/Memory Configurations:
-  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
-  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
-
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
-
-```
-tiger service resize [service-id] [flags]
 ```
 
 ### Options

@@ -14,17 +14,14 @@ import (
 
 // buildMCPListCmd creates the list subcommand for displaying available MCP capabilities
 func buildMCPListCmd(app *common.App) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List available MCP tools, prompts, and resources",
 		Long: `List all MCP tools, prompts, and resources exposed via the Tiger MCP server.
 
-The output can be formatted as a table, JSON, or YAML.
-
-Examples:
-  # List all capabilities in table format (default)
+The output can be formatted as a table, JSON, or YAML.`,
+		Example: `  # List all capabilities in table format (default)
   tiger mcp list
 
   # List as JSON
@@ -32,9 +29,8 @@ Examples:
 
   # List as YAML
   tiger mcp list -o yaml`,
-		Args:              cobra.NoArgs,
-		ValidArgsFunction: cobra.NoFileCompletions,
-		SilenceUsage:      true,
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := app.GetConfig()
 
@@ -70,7 +66,7 @@ Examples:
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

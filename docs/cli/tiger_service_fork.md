@@ -18,7 +18,13 @@ By default:
 
 You can override any of these defaults with the corresponding flags.
 
-Examples:
+```
+tiger service fork [service-id] [flags]
+```
+
+### Examples
+
+```
   # Fork a service at the current state
   tiger service fork svc-12345 --now
 
@@ -42,9 +48,6 @@ Examples:
 
   # Fork with custom wait timeout
   tiger service fork svc-12345 --now --wait-timeout 45m
-
-```
-tiger service fork [service-id] [flags]
 ```
 
 ### Options

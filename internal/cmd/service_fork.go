@@ -16,17 +16,17 @@ import (
 
 // buildServiceForkCmd creates the fork subcommand
 func buildServiceForkCmd(app *common.App) *cobra.Command {
-	var forkServiceName string
-	var forkNoWait bool
-	var forkNoSetDefault bool
-	var forkWaitTimeout time.Duration
-	var forkNow bool
-	var forkLastSnapshot bool
-	var forkToTimestamp time.Time
-	var forkCPU string
-	var forkMemory string
-	var forkWithPassword bool
-	var forkEnvironment string
+	var name string
+	var noWait bool
+	var noSetDefault bool
+	var waitTimeout time.Duration
+	var now bool
+	var lastSnapshot bool
+	var toTimestamp time.Time
+	var cpu string
+	var memory string
+	var withPassword bool
+	var environment string
 
 	cmd := &cobra.Command{
 		Use:   "fork [service-id]",
@@ -43,10 +43,8 @@ By default:
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.
-
-Examples:
-  # Fork a service at the current state
+You can override any of these defaults with the corresponding flags.`,
+		Example: `  # Fork a service at the current state
   tiger service fork svc-12345 --now
 
   # Fork a service at the last snapshot
@@ -75,10 +73,10 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate timing flags first - exactly one must be specified
 			timingFlagsSet := 0
-			if forkNow {
+			if now {
 				timingFlagsSet++
 			}
-			if forkLastSnapshot {
+			if lastSnapshot {
 				timingFlagsSet++
 			}
 			toTimestampSet := cmd.Flags().Changed("to-timestamp")
@@ -94,9 +92,9 @@ Examples:
 			}
 
 			// Validate and normalize environment tag (case-insensitive)
-			forkEnvironment = strings.ToUpper(forkEnvironment)
-			if !slices.Contains(validEnvironmentTags, forkEnvironment) {
-				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), forkEnvironment)
+			environment = strings.ToUpper(environment)
+			if !slices.Contains(validEnvironmentTags, environment) {
+				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -106,7 +104,7 @@ Examples:
 
 			// Gate on the fork's own tag: under prod mode, forking a PROD source
 			// into a DEV fork is allowed — it reads production without changing it.
-			environmentTag := api.EnvironmentTag(forkEnvironment)
+			environmentTag := api.EnvironmentTag(environment)
 			if err := common.CheckReadOnly(cfg, environmentTag); err != nil {
 				return err
 			}
@@ -118,7 +116,7 @@ Examples:
 			}
 
 			// Use provided custom values, validate against allowed combinations
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(forkCPU, forkMemory)
+			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -127,13 +125,13 @@ Examples:
 			var forkStrategy api.ForkStrategy
 			var targetTime *time.Time
 
-			if forkNow {
+			if now {
 				forkStrategy = api.ForkStrategyNOW
-			} else if forkLastSnapshot {
+			} else if lastSnapshot {
 				forkStrategy = api.ForkStrategyLASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.ForkStrategyPITR
-				targetTime = new(forkToTimestamp)
+				targetTime = new(toTimestamp)
 			}
 
 			// Display what we're about to do
@@ -147,7 +145,7 @@ Examples:
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
 			}
 			// Prepare output message for name
-			displayName := forkServiceName
+			displayName := name
 			if !cmd.Flags().Changed("name") {
 				displayName = "(auto-generated)"
 			}
@@ -163,8 +161,8 @@ Examples:
 			}
 
 			// Only set optional fields if flags were provided
-			if forkServiceName != "" {
-				forkReq.Name = &forkServiceName
+			if name != "" {
+				forkReq.Name = &name
 			}
 
 			// Make API call to fork service
@@ -191,7 +189,7 @@ Examples:
 			passwordSaved := handlePasswordSaving(cmd, cfg, forkedService, util.Deref(forkedService.InitialPassword))
 
 			// Set as default service unless --no-set-default is used
-			if !forkNoSetDefault {
+			if !noSetDefault {
 				if err := setDefaultService(cmd, cfg, forkedServiceID); err != nil {
 					// Log warning but don't fail the command
 					cmd.PrintErrf("⚠️  Warning: Failed to set service as default: %v\n", err)
@@ -200,11 +198,11 @@ Examples:
 
 			// Handle wait behavior
 			var waitErr error
-			if forkNoWait {
+			if noWait {
 				cmd.PrintErrf("⏳ Service is being forked. Use 'tiger service list' to check status.\n")
 			} else {
 				// Wait for service to be ready
-				cmd.PrintErrf("⏳ Waiting for fork to complete (timeout: %v)...\n", forkWaitTimeout)
+				cmd.PrintErrf("⏳ Waiting for fork to complete (timeout: %v)...\n", waitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 					Client:    client,
 					ProjectID: projectID,
@@ -215,17 +213,17 @@ Examples:
 					},
 					Input:      cmd.InOrStdin(),
 					Output:     cmd.ErrOrStderr(),
-					Timeout:    forkWaitTimeout,
+					Timeout:    waitTimeout,
 					TimeoutMsg: "service may still be provisioning",
 				}); waitErr != nil {
 					cmd.PrintErrf("❌ Error: %s\n", waitErr)
 				} else {
 					cmd.PrintErrf("🎉 Service fork completed successfully!\n")
-					printConnectMessage(cmd, passwordSaved, forkNoSetDefault, forkedServiceID)
+					printConnectMessage(cmd, passwordSaved, noSetDefault, forkedServiceID)
 				}
 			}
 
-			if err := outputService(cmd, cfg, forkedService, cfg.Output, forkWithPassword, false); err != nil {
+			if err := outputService(cmd, cfg, forkedService, cfg.Output, withPassword, false); err != nil {
 				cmd.PrintErrf("⚠️  Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -236,27 +234,27 @@ Examples:
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&forkServiceName, "name", "", "Name for the forked service (defaults to '{source-name}-fork')")
-	cmd.Flags().BoolVar(&forkNoWait, "no-wait", false, "Don't wait for fork operation to complete")
-	cmd.Flags().BoolVar(&forkNoSetDefault, "no-set-default", false, "Don't set this service as the default service")
-	cmd.Flags().DurationVar(&forkWaitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
+	cmd.Flags().StringVar(&name, "name", "", "Name for the forked service (defaults to '{source-name}-fork')")
+	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for fork operation to complete")
+	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
+	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
 	// Timing strategy flags
-	cmd.Flags().BoolVar(&forkNow, "now", false, "Fork at the current database state (creates new snapshot or uses WAL replay)")
-	cmd.Flags().BoolVar(&forkLastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
-	cmd.Flags().TimeVar(&forkToTimestamp, "to-timestamp", time.Time{}, []string{time.RFC3339}, "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
+	cmd.Flags().BoolVar(&now, "now", false, "Fork at the current database state (creates new snapshot or uses WAL replay)")
+	cmd.Flags().BoolVar(&lastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
+	cmd.Flags().TimeVar(&toTimestamp, "to-timestamp", time.Time{}, []string{time.RFC3339}, "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
 
 	// Resource customization flags
-	cmd.Flags().StringVar(&forkCPU, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
-	cmd.Flags().StringVar(&forkMemory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
-	cmd.Flags().StringVar(&forkEnvironment, "environment", "DEV", "Environment tag (DEV or PROD)")
-	cmd.Flags().BoolVar(&forkWithPassword, "with-password", false, "Include password in output")
+	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
+	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
+	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")
+	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
 
-	cmd.RegisterFlagCompletionFunc("environment", environmentCompletion)
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
-	cmd.RegisterFlagCompletionFunc("cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	cmd.RegisterFlagCompletionFunc("memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "environment", environmentCompletion)
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
 
 	return cmd
 }

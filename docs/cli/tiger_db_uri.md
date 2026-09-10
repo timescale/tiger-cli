@@ -22,7 +22,13 @@ behavior: read_only=all makes every connection string read-only, and
 read_only=prod makes those for services tagged PROD read-only while leaving DEV
 services writable.
 
-Examples:
+```
+tiger db uri [service-id] [flags]
+```
+
+### Examples
+
+```
   # Get connection string for default service
   tiger db uri
 
@@ -40,9 +46,6 @@ Examples:
 
   # Get connection string with password included (less secure)
   tiger db uri svc-12345 --with-password
-
-```
-tiger db uri [service-id] [flags]
 ```
 
 ### Options

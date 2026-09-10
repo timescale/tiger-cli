@@ -13,7 +13,13 @@ from your configuration. This command updates the master password for the
 A read replica ID is rejected — read replicas share the primary's credentials,
 so update the password on the primary instead.
 
-Examples:
+```
+tiger service update-password [service-id] [flags]
+```
+
+### Examples
+
+```
   # Update password for default service, interactively prompts
   tiger service update-password
 
@@ -35,9 +41,6 @@ Examples:
 
   # Auto-generate a secure password
   tiger service update-password --auto-generate
-
-```
-tiger service update-password [service-id] [flags]
 ```
 
 ### Options

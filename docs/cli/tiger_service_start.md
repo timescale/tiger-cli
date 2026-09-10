@@ -8,7 +8,13 @@ Start a stopped database service.
 
 This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
 
-Examples:
+```
+tiger service start [service-id] [flags]
+```
+
+### Examples
+
+```
   # Start a service (waits for completion by default)
   tiger service start svc-12345
 
@@ -17,9 +23,6 @@ Examples:
 
   # Start service with custom wait timeout
   tiger service start svc-12345 --wait-timeout 10m
-
-```
-tiger service start [service-id] [flags]
 ```
 
 ### Options

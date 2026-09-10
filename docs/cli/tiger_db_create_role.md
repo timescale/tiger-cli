@@ -23,7 +23,27 @@ using the tsdb_admin.read_only_role extension setting. This is designed to provi
 safe database access for AI agents and automated tools that need to read production
 data without risk of modification.
 
-Examples:
+Technical Details:
+This command executes PostgreSQL statements in a transaction to create and configure the role.
+
+CREATE ROLE Options Used:
+  - LOGIN: Always enabled to allow the role to connect
+  - PASSWORD: Always set (from flag, env var, or auto-generated)
+  - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
+
+PostgreSQL Configuration Parameters That May Be Set:
+  - tsdb_admin.read_only_role: Set to 'true' when --read-only flag is used
+    (enforces permanent read-only mode for the role)
+  - statement_timeout: Set when --statement-timeout flag is provided
+    (kills queries that exceed the specified duration, in milliseconds)
+
+```
+tiger db create role [service-id] [flags]
+```
+
+### Examples
+
+```
   # Create a role with global database access (uses default service, auto-generates password)
   tiger db create role --name ai_analyst --from tsdbadmin
 
@@ -47,23 +67,6 @@ Examples:
 
   # Create a role with password from environment variable
   TIGER_NEW_PASSWORD=my-secure-password tiger db create role --name ai_analyst
-
-Technical Details:
-This command executes PostgreSQL statements in a transaction to create and configure the role.
-
-CREATE ROLE Options Used:
-  - LOGIN: Always enabled to allow the role to connect
-  - PASSWORD: Always set (from flag, env var, or auto-generated)
-  - IN ROLE: Added when --from flag is provided to inherit grants from existing roles
-
-PostgreSQL Configuration Parameters That May Be Set:
-  - tsdb_admin.read_only_role: Set to 'true' when --read-only flag is used
-    (enforces permanent read-only mode for the role)
-  - statement_timeout: Set when --statement-timeout flag is provided
-    (kills queries that exceed the specified duration, in milliseconds)
-
-```
-tiger db create role [service-id] [flags]
 ```
 
 ### Options

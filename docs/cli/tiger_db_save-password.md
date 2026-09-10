@@ -15,7 +15,13 @@ from your configuration. The password can be provided via:
 The password will be saved according to your --password-storage setting
 (keyring, pgpass, or none).
 
-Examples:
+```
+tiger db save-password [service-id] [flags]
+```
+
+### Examples
+
+```
   # Save password with explicit value (highest precedence)
   tiger db save-password svc-12345 --password=your-password
 
@@ -31,9 +37,6 @@ Examples:
 
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass
-
-```
-tiger db save-password [service-id] [flags]
 ```
 
 ### Options

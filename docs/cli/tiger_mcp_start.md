@@ -9,7 +9,13 @@ Start the Tiger Model Context Protocol (MCP) server for AI assistant integration
 The MCP server provides programmatic access to Tiger Cloud platform resources
 through Claude and other AI assistants. By default, it uses stdio transport.
 
-Examples:
+```
+tiger mcp start [flags]
+```
+
+### Examples
+
+```
   # Start with stdio transport (default)
   tiger mcp start
 
@@ -18,9 +24,6 @@ Examples:
 
   # Start with HTTP transport
   tiger mcp start http
-
-```
-tiger mcp start [flags]
 ```
 
 ### Options

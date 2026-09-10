@@ -38,6 +38,9 @@ jobs:
           git add --intent-to-add . # so newly generated files (e.g. docs for a new command) show up in the diff
           git diff --exit-code || { echo "::error::generated files are out of date; run 'go generate ./...' and commit the result (never edit generated files by hand)"; exit 1; }
 
+      - name: Format
+        run: go tool gofumpt -d . || { echo "::error::files have not been formatted with gofumpt; run 'go tool gofumpt -l -w .' and commit the result"; exit 1; }
+
       - name: Build
         run: go build ./...
 

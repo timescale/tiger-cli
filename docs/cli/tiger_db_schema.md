@@ -18,7 +18,13 @@ By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
 large and may embed implementation details.
 
-Examples:
+```
+tiger db schema [service-id] [flags]
+```
+
+### Examples
+
+```
   # Show the schema of the default service
   tiger db schema
 
@@ -33,9 +39,6 @@ Examples:
 
   # Include catalog, TimescaleDB internals, and extension-owned objects
   tiger db schema svc-12345 --internal
-
-```
-tiger db schema [service-id] [flags]
 ```
 
 ### Options

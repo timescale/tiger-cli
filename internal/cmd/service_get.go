@@ -21,10 +21,8 @@ func buildServiceGetCmd(app *common.App) *cobra.Command {
 
 The service ID can be provided as an argument or will use the default service
 from your configuration. This command displays comprehensive information about
-the service including configuration, status, endpoints, and resource usage.
-
-Examples:
-  # Get default service details
+the service including configuration, status, endpoints, and resource usage.`,
+		Example: `  # Get default service details
   tiger service get
 
   # Get specific service details
@@ -73,7 +71,7 @@ Examples:
 
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion("env"))
+	registerFlagCompletion(cmd, "output", outputCompletion("env"))
 
 	return cmd
 }

@@ -29,10 +29,8 @@ Backups run automatically on a schedule; there is no command to create or delete
 one. To restore data, create a recovery fork with tiger service fork.
 
 The service ID can be provided as an argument or will use the default service
-from your configuration.
-
-Examples:
-  # List backups for the default service
+from your configuration.`,
+		Example: `  # List backups for the default service
   tiger service backup
 
   # List backups for a specific service
@@ -78,7 +76,7 @@ Examples:
 	}
 
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
-	cmd.RegisterFlagCompletionFunc("output", outputCompletion())
+	registerFlagCompletion(cmd, "output", outputCompletion())
 
 	return cmd
 }

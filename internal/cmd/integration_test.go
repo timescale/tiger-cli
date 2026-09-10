@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/zalando/go-keyring"
 	"os"
 	"regexp"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/zalando/go-keyring"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -183,7 +183,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
 		)
-
 		if err != nil {
 			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
 		}
@@ -227,7 +226,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--no-set-default", // Don't modify user's default service
 			"--output", "json", // Use JSON for easier parsing
 		)
-
 		if err != nil {
 			t.Fatalf("Service creation failed: %v\nOutput: %s", err, output)
 		}
@@ -254,7 +252,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "list",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Service list failed: %v\nOutput: %s", err, output)
 		}
@@ -323,7 +320,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "logs", serviceID,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Service logs failed: %v\nOutput: %s", err, output)
 		}
@@ -355,7 +351,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as original_password_test;",
 		)
-
 		if err != nil {
 			t.Fatalf("Database psql command with original password failed: %v\nOutput: %s", err, output)
 		}
@@ -383,7 +378,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--new-password", newPassword,
 			"--password-storage", "keychain", // Save to keychain for psql test
 		)
-
 		if err != nil {
 			t.Fatalf("Password update failed: %v\nOutput: %s", err, output)
 		}
@@ -404,7 +398,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		output, err := executeIntegrationCommand(
 			t.Context(), "db", "connection-string", serviceID,
 		)
-
 		if err != nil {
 			t.Fatalf("Connection string failed: %v\nOutput: %s", err, output)
 		}
@@ -432,7 +425,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"db", "psql", serviceID,
 			"--", "-c", "SELECT 1 as updated_password_test;",
 		)
-
 		if err != nil {
 			t.Fatalf("Database psql command with updated password failed: %v\nOutput: %s", err, output)
 		}
@@ -642,7 +634,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--name", roleName,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create role failed: %v\nOutput: %s", err, output)
 		}
@@ -679,7 +670,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--password", password,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create role with password failed: %v\nOutput: %s", err, output)
 		}
@@ -716,7 +706,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--read-only", // Required when inheriting from tsdbadmin
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create role with --from failed: %v\nOutput: %s", err, output)
 		}
@@ -765,7 +754,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--read-only",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create read-only role failed: %v\nOutput: %s", err, output)
 		}
@@ -801,7 +789,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--statement-timeout", "30s",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create role with statement timeout failed: %v\nOutput: %s", err, output)
 		}
@@ -840,7 +827,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--password", basePassword,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create base role: %v\nOutput: %s", err, output)
 		}
@@ -898,7 +884,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--read-only",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create read-only role with inheritance: %v\nOutput: %s", err, output)
 		}
@@ -992,7 +977,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--read-only",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Create role with all options failed: %v\nOutput: %s", err, output)
 		}
@@ -1041,7 +1025,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 				"db", "psql", serviceID,
 				"--", "-c", fmt.Sprintf("SELECT rolname FROM pg_roles WHERE rolname = '%s';", roleName),
 			)
-
 			if err != nil {
 				t.Errorf("Failed to verify role %s exists: %v\nOutput: %s", roleName, err, output)
 				continue
@@ -1272,7 +1255,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "describe", serviceID,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to describe service before resize: %v\nOutput: %s", err, output)
 		}
@@ -1313,7 +1295,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--memory", targetMemoryGB,
 			"--wait-timeout", "10m", // Longer timeout for resize operations
 		)
-
 		if err != nil {
 			t.Fatalf("Service resize failed: %v\nOutput: %s", err, output)
 		}
@@ -1339,7 +1320,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"service", "describe", serviceID,
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to describe service after resize: %v\nOutput: %s", err, output)
 		}
@@ -1409,7 +1389,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--confirm",
 			"--wait-timeout", "10m",
 		)
-
 		if err != nil {
 			t.Fatalf("Service deletion failed: %v\nOutput: %s", err, output)
 		}
@@ -1558,7 +1537,6 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 		"--public-key", publicKey,
 		"--secret-key", secretKey,
 	)
-
 	if err != nil {
 		t.Fatalf("Login failed: %v\nOutput: %s", err, output)
 	}
@@ -1691,7 +1669,6 @@ func TestDatabaseCommandsIntegration(t *testing.T) {
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
 		)
-
 		if err != nil {
 			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
 		}
@@ -1947,7 +1924,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--public-key", publicKey,
 			"--secret-key", secretKey,
 		)
-
 		if err != nil {
 			t.Fatalf("Login failed: %v\nOutput: %s", err, output)
 		}
@@ -1972,7 +1948,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--no-set-default",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Source service creation failed: %v\nOutput: %s", err, output)
 		}
@@ -1999,7 +1974,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", sourceServiceID,
 			"--", "-c", fmt.Sprintf("CREATE TABLE %s (id INT PRIMARY KEY, data TEXT, created_at TIMESTAMP DEFAULT NOW());", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to create test table: %v\nOutput: %s", err, output)
 		}
@@ -2012,7 +1986,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", sourceServiceID,
 			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'test-row-1'), (2, 'test-row-2'), (3, 'test-row-3');", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to insert test data: %v\nOutput: %s", err, output)
 		}
@@ -2032,7 +2005,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", sourceServiceID,
 			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to query test data: %v\nOutput: %s", err, output)
 		}
@@ -2066,7 +2038,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--no-set-default",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
 		}
@@ -2087,7 +2058,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--confirm",
 			"--wait-timeout", "10m",
 		)
-
 		if err != nil {
 			t.Fatalf("Early fork service deletion failed: %v\nOutput: %s", err, output)
 		}
@@ -2110,7 +2080,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--no-set-default",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Service fork failed: %v\nOutput: %s", err, output)
 		}
@@ -2136,7 +2105,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", forkedServiceID,
 			"--", "-c", fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to query forked service data: %v\nOutput: %s", err, output)
 		}
@@ -2169,7 +2137,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", forkedServiceID,
 			"--", "-c", fmt.Sprintf("INSERT INTO %s (id, data) VALUES (4, 'fork-only-row');", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to insert data in fork: %v\nOutput: %s", err, output)
 		}
@@ -2181,7 +2148,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", forkedServiceID,
 			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to count rows in fork: %v\nOutput: %s", err, output)
 		}
@@ -2197,7 +2163,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", sourceServiceID,
 			"--", "-c", fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to count rows in source: %v\nOutput: %s", err, output)
 		}
@@ -2212,7 +2177,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", sourceServiceID,
 			"--", "-c", fmt.Sprintf("SELECT * FROM %s WHERE data = 'fork-only-row';", tableName),
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to query source for fork-only row: %v\nOutput: %s", err, output)
 		}
@@ -2238,7 +2202,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--confirm",
 			"--wait-timeout", "10m",
 		)
-
 		if err != nil {
 			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
 		}
@@ -2266,7 +2229,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--no-set-default",
 			"--output", "json",
 		)
-
 		if err != nil {
 			t.Fatalf("Service fork with --last-snapshot failed: %v\nOutput: %s", err, output)
 		}
@@ -2292,7 +2254,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"db", "psql", forkedServiceID,
 			"--", "-c", "SELECT 1 as test;",
 		)
-
 		if err != nil {
 			t.Fatalf("Failed to query --last-snapshot forked service: %v\nOutput: %s", err, output)
 		}
@@ -2317,7 +2278,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--confirm",
 			"--wait-timeout", "10m",
 		)
-
 		if err != nil {
 			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
 		}
@@ -2340,7 +2300,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			"--confirm",
 			"--wait-timeout", "10m",
 		)
-
 		if err != nil {
 			t.Fatalf("Source service deletion failed: %v\nOutput: %s", err, output)
 		}
@@ -2357,7 +2316,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Context(),
 			"auth", "logout",
 		)
-
 		if err != nil {
 			t.Fatalf("Logout failed: %v\nOutput: %s", err, output)
 		}

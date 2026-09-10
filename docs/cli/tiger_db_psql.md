@@ -32,7 +32,13 @@ terminal (e.g. in scripts) or when the service has no read replicas.
 You can also pass a read replica set ID to connect straight to that replica,
 skipping the prompt. Read replicas share the primary's credentials.
 
-Examples:
+```
+tiger db psql [service-id] [flags]
+```
+
+### Examples
+
+```
   # Connect to default service
   tiger db psql
 
@@ -57,9 +63,6 @@ Examples:
   # Pass additional flags to psql (use -- to separate)
   tiger db psql svc-12345 -- --single-transaction --quiet
   tiger db psql svc-12345 -- -c "SELECT version();" --no-psqlrc
-
-```
-tiger db psql [service-id] [flags]
 ```
 
 ### Options

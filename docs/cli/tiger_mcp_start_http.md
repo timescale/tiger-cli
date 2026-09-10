@@ -8,7 +8,13 @@ Start the MCP server using HTTP transport.
 
 The server will automatically find an available port if the specified port is busy.
 
-Examples:
+```
+tiger mcp start http [flags]
+```
+
+### Examples
+
+```
   # Start HTTP server on default port 8080
   tiger mcp start http
 
@@ -20,9 +26,6 @@ Examples:
 
   # Start server and bind to specific interface
   tiger mcp start http --host 192.168.1.100 --port 9000
-
-```
-tiger mcp start http [flags]
 ```
 
 ### Options

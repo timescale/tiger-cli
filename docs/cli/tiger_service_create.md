@@ -13,7 +13,19 @@ The default type of service created depends on your plan:
 By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
-Examples:
+Allowed CPU/Memory Configurations:
+  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
+  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
+
+```
+tiger service create [flags]
+```
+
+### Examples
+
+```
   # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 
@@ -46,15 +58,6 @@ Examples:
 
   # Create service with custom wait timeout
   tiger service create --name patient-db --wait-timeout 1h
-
-Allowed CPU/Memory Configurations:
-  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
-
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
-
-```
-tiger service create [flags]
 ```
 
 ### Options

@@ -6,7 +6,13 @@ Get detailed information about a specific MCP capability
 
 Get detailed information about a specific MCP tool, prompt, resource, or resource template.
 
-Examples:
+```
+tiger mcp get <name> [flags]
+```
+
+### Examples
+
+```
   # Get details about a tool
   tiger mcp get service_create
 
@@ -18,9 +24,6 @@ Examples:
 
   # Get details as YAML
   tiger mcp get service_create -o yaml
-
-```
-tiger mcp get <name> [flags]
 ```
 
 ### Options

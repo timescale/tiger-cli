@@ -8,7 +8,13 @@ List all MCP tools, prompts, and resources exposed via the Tiger MCP server.
 
 The output can be formatted as a table, JSON, or YAML.
 
-Examples:
+```
+tiger mcp list [flags]
+```
+
+### Examples
+
+```
   # List all capabilities in table format (default)
   tiger mcp list
 
@@ -17,9 +23,6 @@ Examples:
 
   # List as YAML
   tiger mcp list -o yaml
-
-```
-tiger mcp list [flags]
 ```
 
 ### Options

@@ -10,7 +10,13 @@ The service ID can be provided as an argument or will use the default service
 from your configuration. This command displays comprehensive information about
 the service including configuration, status, endpoints, and resource usage.
 
-Examples:
+```
+tiger service get [service-id] [flags]
+```
+
+### Examples
+
+```
   # Get default service details
   tiger service get
 
@@ -22,9 +28,6 @@ Examples:
 
   # Get service details in YAML format
   tiger service get svc-12345 --output yaml
-
-```
-tiger service get [service-id] [flags]
 ```
 
 ### Options

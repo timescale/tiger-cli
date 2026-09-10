@@ -28,7 +28,13 @@ Use --read-only to open the session in Tiger Cloud's immutable read-only mode
 read-only, and read_only=prod makes sessions against services tagged PROD
 read-only while leaving DEV services writable.
 
-Examples:
+```
+tiger db query [service-id] [flags]
+```
+
+### Examples
+
+```
   # Select data from a table
   tiger db query svc-12345 -c "SELECT * FROM users LIMIT 5"
 
@@ -53,9 +59,6 @@ Examples:
 
   # Query a read replica
   tiger db query rep1234567 -c "SELECT count(*) FROM events"
-
-```
-tiger db query [service-id] [flags]
 ```
 
 ### Options

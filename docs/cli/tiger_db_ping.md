@@ -18,7 +18,13 @@ Return Codes:
   2: No response to connection attempt (server unreachable)
   3: No attempt made (e.g., invalid parameters)
 
-Examples:
+```
+tiger db ping [service-id] [flags]
+```
+
+### Examples
+
+```
   # Test connection to default service
   tiger db ping
 
@@ -33,9 +39,6 @@ Examples:
 
   # Test connection with no timeout (wait indefinitely)
   tiger db ping svc-12345 --timeout 0
-
-```
-tiger db ping [service-id] [flags]
 ```
 
 ### Options
