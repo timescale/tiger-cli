@@ -154,6 +154,9 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Database operation tools
 	s.registerDatabaseTools(mode)
 
+	// Not service-mutating, so registered in every read-only mode.
+	mcp.AddTool(s.mcpServer, newFeedbackTool(), s.handleFeedback)
+
 	// TODO: Register more tool groups
 
 	// Register remote docs MCP server proxy

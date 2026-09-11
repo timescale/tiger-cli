@@ -134,6 +134,7 @@ Tiger CLI provides the following commands:
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
+- `tiger feedback` - Submit feedback, a bug report, or a support request to the Tiger Data team (pass the message as an argument or on stdin)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
 
@@ -210,6 +211,9 @@ The MCP server exposes the following tools to AI assistants:
 **Database Operations:**
 - `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
 - `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
+
+**Feedback:**
+- `feedback` - Submit feedback, a bug report, or a support request to the Tiger Data team
 
 The MCP server automatically uses your CLI authentication and configuration, so no additional setup is required beyond `tiger auth login`.
 

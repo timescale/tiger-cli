@@ -61,8 +61,8 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
 
-	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST)."
-	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "COUNT", "P50", "P90", "P99", "LAST"}
+	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST). MIN_TOTAL and MAX_TOTAL add every series' samples together first and take the extremum of that total, for a metric with per-series labels where the combined total is the meaningful quantity (e.g. peak of total connections across all databases); MIN and MAX give the single most extreme individual series instead."
+	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "MIN_TOTAL", "MAX_TOTAL", "COUNT", "P50", "P90", "P99", "LAST"}
 	schema.Properties["fn"].Examples = []any{"RATE"}
 
 	return schema
@@ -138,7 +138,7 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		body.BucketSeconds = &bs
 	}
 	if input.Fn != "" {
-		fn := api.MetricsSeriesRequestFn(strings.ToUpper(input.Fn))
+		fn := api.MetricsAggFn(strings.ToUpper(input.Fn))
 		body.Fn = &fn
 	}
 	if len(filters) > 0 {

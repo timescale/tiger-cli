@@ -19,6 +19,17 @@ import (
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
+// annotationRedactArgs marks a command whose positional arguments may carry
+// sensitive free text. wrapCommands replaces their values with
+// redactedArgValue when tracking; flags are still tracked, subject to the
+// analytics ignore list.
+const annotationRedactArgs = "tiger.redactArgs"
+
+// redactedArgValue replaces an argument's text in an analytics event, keeping
+// the argument count — for `tiger feedback`, whether the message came from an
+// argument or from stdin.
+const redactedArgValue = "[REDACTED]"
+
 func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 	// Match command names and aliases case-insensitively (e.g. `tiger SERVICE
 	// LIST` works the same as `tiger service list`). Cobra only exposes this as
@@ -102,6 +113,7 @@ tiger auth login
 	cmd.AddCommand(buildServiceCmd(app))
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
+	cmd.AddCommand(buildFeedbackCmd(app))
 
 	wrapCommands(cmd, app)
 
@@ -152,9 +164,16 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 			defer func() {
 				cfg, client, projectID := app.TryGetAll()
 				a := analytics.New(cfg, client, projectID)
+				trackedArgs := args
+				if c.Annotations[annotationRedactArgs] != "" {
+					trackedArgs = make([]string, len(args))
+					for i := range trackedArgs {
+						trackedArgs[i] = redactedArgValue
+					}
+				}
 				a.Track(
 					fmt.Sprintf("Run %s", c.CommandPath()),
-					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
+					analytics.Property("args", trackedArgs),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags()),
 					analytics.Error(runErr),

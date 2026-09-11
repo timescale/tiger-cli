@@ -34,13 +34,18 @@ tags:
     description: Manage read replica sets and their associated actions.
   - name: Backups
     description: View the backups taken for a service.
+  - name: Exporters
+    description: Send service logs and metrics to an external monitoring system.
   - name: Analytics
     description: Track analytics events.
+  - name: Feedback
+    description: Send feedback, bug reports, and support requests to Tiger Data.
 
 paths:
   /auth/logout:
     post:
       operationId: logout
+      x-tigerdata-owner: bizx
       tags:
         - Auth
       summary: Log out and revoke refresh token
@@ -72,6 +77,7 @@ paths:
   /auth/info:
     get:
       operationId: getAuthInfo
+      x-tigerdata-owner: bizx
       tags:
         - Auth
       summary: Get Authentication Info
@@ -92,6 +98,7 @@ paths:
   /analytics/identify:
     post:
       operationId: identifyUser
+      x-tigerdata-owner: unknown
       tags:
         - Analytics
       summary: Identify a user
@@ -119,6 +126,7 @@ paths:
   /analytics/track:
     post:
       operationId: trackEvent
+      x-tigerdata-owner: unknown
       tags:
         - Analytics
       summary: Track an analytics event
@@ -148,9 +156,60 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /feedback:
+    post:
+      operationId: submitFeedback
+      x-tigerdata-owner: prodexp
+      tags:
+        - Feedback
+      summary: Submit feedback
+      description: |
+        Sends feedback, a bug report, or a support request to Tiger Data.
+
+        The submitter's email address is resolved from the caller's
+        credentials, and the client version and operating system from the
+        `User-Agent` header, so neither is supplied in the body.
+
+        Returns 204 No Content on success. This endpoint opens no support
+        case and returns no ticket to track: use it for unsolicited feedback,
+        and raise anything needing a tracked response through support.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  description: The feedback, bug report, or support request to send.
+                  minLength: 1
+                  maxLength: 3000
+                  pattern: "\\S"
+                  example: "I can't connect to my service after resuming it."
+                source:
+                  type: string
+                  description: >-
+                    The client surface the feedback came from: `CLI` for a
+                    command run by a person, `MCP` for a call made by an AI
+                    assistant. Omit it from other clients; the `User-Agent`
+                    header still identifies them.
+                  enum:
+                    - CLI
+                    - MCP
+                  example: "CLI"
+      responses:
+        '204':
+          description: Feedback submitted.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects:
     get:
       operationId: getProjects
+      x-tigerdata-owner: bizx
       tags:
         - Projects
       summary: List projects accessible to the authenticated caller
@@ -173,6 +232,7 @@ paths:
   /projects/{project_id}/vpcs:
     get:
       operationId: getVPCs
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       parameters:
@@ -192,6 +252,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     post:
       operationId: createVPC
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       parameters:
@@ -217,6 +278,7 @@ paths:
   /projects/{project_id}/vpcs/{vpc_id}:
     get:
       operationId: getVPC
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       parameters:
@@ -235,6 +297,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     delete:
       operationId: deleteVPC
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: Delete a VPC
@@ -251,6 +314,7 @@ paths:
   /projects/{project_id}/vpcs/{vpc_id}/rename:
     post:
       operationId: renameVPC
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: Rename a VPC
@@ -273,6 +337,7 @@ paths:
   /projects/{project_id}/vpcs/{vpc_id}/peerings:
     get:
       operationId: getVPCPeerings
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: List VPC Peerings
@@ -293,6 +358,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     post:
       operationId: createVPCPeering
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: Create a VPC Peering
@@ -319,6 +385,7 @@ paths:
   /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id}:
     get:
       operationId: getVPCPeering
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: Get a VPC Peering
@@ -338,6 +405,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     delete:
       operationId: deleteVPCPeering
+      x-tigerdata-owner: platform
       tags:
         - VPCs
       summary: Delete a VPC Peering
@@ -355,6 +423,7 @@ paths:
   /projects/{project_id}/services:
     get:
       operationId: getServices
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: List All Services
@@ -374,6 +443,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     post:
       operationId: createService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Create a Service
@@ -399,6 +469,7 @@ paths:
   /projects/{project_id}/services/{service_id}:
     get:
       operationId: getService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Get a Service
@@ -417,6 +488,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     delete:
       operationId: deleteService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Delete a Service
@@ -433,6 +505,7 @@ paths:
   /projects/{project_id}/services/{service_id}/start:
     post:
       operationId: startService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Start a Service
@@ -453,6 +526,7 @@ paths:
   /projects/{project_id}/services/{service_id}/stop:
     post:
       operationId: stopService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Stop a Service
@@ -473,6 +547,7 @@ paths:
   /projects/{project_id}/services/{service_id}/rename:
     post:
       operationId: renameService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Rename a Service
@@ -499,6 +574,7 @@ paths:
   /projects/{project_id}/services/{service_id}/attachToVPC:
     post:
       operationId: attachServiceToVPC
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Attach Service to VPC
@@ -521,6 +597,7 @@ paths:
   /projects/{project_id}/services/{service_id}/detachFromVPC:
     post:
       operationId: detachServiceFromVPC
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Detach Service from VPC
@@ -543,6 +620,7 @@ paths:
   /projects/{project_id}/services/{service_id}/resize:
     post:
       operationId: resizeService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Resize a Service
@@ -569,6 +647,7 @@ paths:
   /projects/{project_id}/services/{service_id}/enablePooler:
     post:
       operationId: enablePooler
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Enable Connection Pooler for a Service
@@ -585,6 +664,7 @@ paths:
   /projects/{project_id}/services/{service_id}/disablePooler:
     post:
       operationId: disablePooler
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Disable Connection Pooler for a Service
@@ -598,9 +678,38 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/enableDataTiering:
+    post:
+      operationId: enableDataTiering
+      x-tigerdata-owner: platform
+      tags:
+        - Services
+      summary: Enable Data Tiering for a Service
+      description: |
+        Enables tiered storage on the service. Tiering policies move older,
+        rarely-accessed data from the high-performance storage tier to a
+        low-cost object storage tier. Tiered data stays queryable but becomes
+        read-only.
+
+        There is no way to disable tiering through this API. Contact Tiger
+        Data support if you need to turn it off.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: Data tiering enabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/forkService:
     post:
       operationId: forkService
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Fork a Service
@@ -627,6 +736,7 @@ paths:
   /projects/{project_id}/services/{service_id}/updatePassword:
     post:
       operationId: updatePassword
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Update Service Password
@@ -649,6 +759,7 @@ paths:
   /projects/{project_id}/services/{service_id}/setEnvironment:
     post:
       operationId: setEnvironment
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Set Environment for a Service
@@ -671,6 +782,7 @@ paths:
   /projects/{project_id}/services/{service_id}/logs:
     get:
       operationId: getServiceLogs
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Get service logs
@@ -755,6 +867,7 @@ paths:
   /projects/{project_id}/services/{service_id}/backups:
     get:
       operationId: getBackups
+      x-tigerdata-owner: platform
       x-tigerdata-preview: true
       tags:
         - Backups
@@ -781,9 +894,146 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/backup-regions:
+    get:
+      operationId: getBackupRegions
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: List All Backup Regions
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves the additional regions this service's backups are copied to
+        (cross-region backups). The region the service runs in is not listed.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: A list of backup regions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupRegion'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    post:
+      operationId: createBackupRegion
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Add a Backup Region
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Starts copying this service's backups to another region. The region is
+        added immediately; existing backups are copied to it in the background.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupRegionCreate'
+      responses:
+        '201':
+          description: The region was added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRegion'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/backup-regions/{region_code}:
+    delete:
+      operationId: deleteBackupRegion
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Remove a Backup Region
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Stops copying this service's backups to a region. Copies already stored
+        there are deleted in the background and cannot be recovered.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/BackupRegionCode'
+      responses:
+        '204':
+          description: The region no longer receives copies of this service's backups.
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/services/{service_id}/backup-retention:
+    get:
+      operationId: getBackupRetention
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Get the Backup Retention Policy
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves how long this service keeps its backups.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: The service's backup retention policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRetentionByTime'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+    put:
+      operationId: setBackupRetention
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Backups
+      summary: Set the Backup Retention Policy
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Sets how long this service keeps its backups. Shortening retention
+        deletes the backups that no longer fit.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupRetentionByTime'
+      responses:
+        '200':
+          description: The updated backup retention policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRetentionByTime'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/metrics/available-series:
     get:
       operationId: getServiceMetricsAvailableSeries
+      x-tigerdata-owner: prodexp
       x-tigerdata-preview: true
       tags:
         - Services
@@ -810,6 +1060,7 @@ paths:
   /projects/{project_id}/services/{service_id}/metrics/series:
     post:
       operationId: getServiceMetricsSeries
+      x-tigerdata-owner: prodexp
       x-tigerdata-preview: true
       tags:
         - Services
@@ -845,9 +1096,45 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/{service_id}/metrics/details/{metric_name}:
+    get:
+      operationId: getServiceMetricDetails
+      x-tigerdata-owner: prodexp
+      x-tigerdata-preview: true
+      tags:
+        - Services
+      summary: Get details about a metric
+      description: |
+        **Preview — this endpoint is experimental and may change without notice.**
+
+        Returns descriptive metadata for a named metric: what it measures,
+        its type, default aggregation, and any labels specific to it
+        (beyond the region/role/ordinal labels every metric carries). Use
+        getServiceMetricsAvailableSeries to discover valid metric names.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ServiceId'
+        - name: metric_name
+          in: path
+          required: true
+          description: Metric series name.
+          schema:
+            type: string
+            example: "pg_locks_count"
+      responses:
+        '200':
+          description: Details for the requested metric.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDetails'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}/setHA:
     post:
       operationId: setHAReplica
+      x-tigerdata-owner: platform
       tags:
         - Services
       summary: Change HA configuration for a Service
@@ -874,6 +1161,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets:
     get:
       operationId: getReplicaSets
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Get Read Replica Sets
@@ -894,6 +1182,7 @@ paths:
           $ref: '#/components/responses/ClientError'
     post:
       operationId: createReplicaSet
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Create a Read Replica Set
@@ -920,6 +1209,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}:
     delete:
       operationId: deleteReplicaSet
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Delete a Read Replica Set
@@ -937,6 +1227,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/resize:
     post:
       operationId: resizeReplicaSet
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Resize a Read Replica Set
@@ -960,6 +1251,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/enablePooler:
     post:
       operationId: enableReplicaPooler
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Enable Connection Pooler for a Read Replica
@@ -977,6 +1269,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/disablePooler:
     post:
       operationId: disableReplicaPooler
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Disable Connection Pooler for a Read Replica
@@ -994,6 +1287,7 @@ paths:
   /projects/{project_id}/services/{service_id}/replicaSets/{replica_set_id}/setEnvironment:
     post:
       operationId: setReplicaEnvironment
+      x-tigerdata-owner: platform
       tags:
         - Read Replica Sets
       summary: Set Environment for a Read Replica
@@ -1011,6 +1305,57 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/SuccessMessage'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/exporters:
+    get:
+      operationId: getExporters
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Exporters
+      summary: List All Exporters
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves every exporter in a project, across every region.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: A list of exporters.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Exporter'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
+  /projects/{project_id}/exporters/{exporter_id}:
+    get:
+      operationId: getExporter
+      x-tigerdata-owner: platform
+      x-tigerdata-preview: true
+      tags:
+        - Exporters
+      summary: Get an Exporter
+      description: |
+        **Preview - this endpoint is experimental and may change without notice.**
+
+        Retrieves a single exporter.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ExporterId'
+      responses:
+        '200':
+          description: Exporter details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exporter'
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -1041,6 +1386,14 @@ components:
         type: string
         minLength: 3
         example: "alb8jicdpr"
+    BackupRegionCode:
+      name: region_code
+      in: path
+      required: true
+      description: The region backups are copied to.
+      schema:
+        type: string
+        example: "eu-central-1"
     VPCId:
       name: vpc_id
       in: path
@@ -1059,6 +1412,15 @@ components:
         type: string
         pattern: "^[0-9]+$"
         example: "1234567890"
+    ExporterId:
+      name: exporter_id
+      in: path
+      required: true
+      description: The unique identifier of the exporter.
+      schema:
+        type: string
+        format: uuid
+        example: "3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31"
 
   schemas:
     AuthInfo:
@@ -1344,6 +1706,14 @@ components:
       properties:
         endpoint:
           $ref: '#/components/schemas/Endpoint'
+    DataTiering:
+      type: object
+      description: Data tiering configuration for a service.
+      properties:
+        enabled:
+          type: boolean
+          description: Whether tiered storage is enabled for this service.
+          example: false
     Service:
       type: object
       description: A database service and its current configuration.
@@ -1419,6 +1789,8 @@ components:
           $ref: '#/components/schemas/HAReplica'
         connection_pooler:
           $ref: '#/components/schemas/ConnectionPooler'
+        data_tiering:
+          $ref: '#/components/schemas/DataTiering'
         read_replica_sets:
           type: array
           description: The read replica sets attached to the service.
@@ -1946,6 +2318,105 @@ components:
         - FULL
         - INCREMENTAL
         - UNKNOWN
+    MetricsAggFn:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        Aggregation function applied to raw/pre-aggregated samples when
+        collapsing them into one value per output bucket.
+
+        - `RATE`: counter-reset-aware per-second rate of change.
+        - `INCREASE`: counter-reset-aware total increase over the bucket.
+        - `SUM`: sum of samples in the bucket.
+        - `AVG`: mean of samples in the bucket.
+        - `MIN`: minimum sample in the bucket.
+        - `MAX`: maximum sample in the bucket.
+        - `MIN_TOTAL` / `MAX_TOTAL`: minimum/maximum of the bucket's samples
+          added together across every series first — for a metric with
+          labels (e.g. one series per database) where the combined total,
+          not any single series' own extremum, is the meaningful quantity
+          (e.g. peak of total connections across all databases). `MIN`/`MAX`
+          give the single most extreme individual series instead, which is
+          the right answer when the metric is itself an extremum or a
+          timestamp (e.g. longest-running transaction).
+        - `COUNT`: number of samples in the bucket.
+        - `P50` / `P90` / `P99`: approximate percentiles.
+        - `LAST`: the most recent sample in the bucket.
+      enum:
+        - RATE
+        - INCREASE
+        - SUM
+        - AVG
+        - MIN
+        - MAX
+        - MIN_TOTAL
+        - MAX_TOTAL
+        - COUNT
+        - P50
+        - P90
+        - P99
+        - LAST
+    MetricType:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        The shape of a metric's underlying data.
+
+        - `GAUGE`: a value that can go up or down (e.g. a current connection count).
+        - `COUNTER`: a value that only increases until it resets (e.g. total queries run).
+        - `HISTOGRAM`: a distribution of observed values grouped into ranges.
+        - `SUMMARY`: a distribution of observed values summarized by quantile.
+      enum:
+        - GAUGE
+        - COUNTER
+        - HISTOGRAM
+        - SUMMARY
+    BackupRegion:
+      x-tigerdata-preview: true
+      type: object
+      description: A region that receives copies of a service's backups.
+      required:
+        - region_code
+      properties:
+        region_code:
+          type: string
+          description: The region backups are copied to.
+          example: "eu-central-1"
+        created:
+          type: string
+          format: date-time
+          description: When the region was added.
+          example: "2026-01-15T09:30:00Z"
+    BackupRetentionByTime:
+      x-tigerdata-preview: true
+      type: object
+      description: Keep the backups taken within a number of days, and discard older ones.
+      required:
+        - type
+        - retention_days
+      properties:
+        type:
+          type: string
+          description: Always `TIME`.
+          enum:
+            - TIME
+        retention_days:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          description: How many days of backups to keep. The current plan-based limit is 180 days.
+          example: 21
+    BackupRegionCreate:
+      x-tigerdata-preview: true
+      type: object
+      description: The region to start copying a service's backups to.
+      required:
+        - region_code
+      properties:
+        region_code:
+          type: string
+          description: The region to copy backups to. It cannot be the region the service runs in.
+          example: "eu-central-1"
     Project:
       type: object
       description: A project that organizes your Tiger Cloud resources, such as services and VPCs.
@@ -2014,19 +2485,8 @@ components:
             for a finer bucket than the tier can produce are rejected.
           example: 3600
         fn:
-          type: string
-          enum:
-            - RATE
-            - INCREASE
-            - SUM
-            - AVG
-            - MIN
-            - MAX
-            - COUNT
-            - P50
-            - P90
-            - P99
-            - LAST
+          allOf:
+            - $ref: '#/components/schemas/MetricsAggFn'
           description: |
             Aggregation function applied to raw/pre-aggregated samples when
             collapsing them into one value per output bucket. Optional: when
@@ -2050,18 +2510,6 @@ components:
               - `timescale_cloud_database_num_connections`
               - `timescale_cloud_database_job_duration_usecs`
               - `timescale_cloud_database_job_success`
-
-            Values:
-              - `RATE`: counter-reset-aware per-second rate of change.
-              - `INCREASE`: counter-reset-aware total increase over the bucket.
-              - `SUM`: sum of samples in the bucket.
-              - `AVG`: mean of samples in the bucket.
-              - `MIN`: minimum sample in the bucket.
-              - `MAX`: maximum sample in the bucket.
-              - `COUNT`: number of samples in the bucket.
-              - `P50` / `P90` / `P99`: percentile approximations (only valid
-                for metrics stored as sketches).
-              - `LAST`: the most recent sample in the bucket (default).
           example: "RATE"
         filters:
           type: array
@@ -2137,6 +2585,419 @@ components:
             no collected data. Gap buckets are still emitted (one entry per
             bucket in the window), so this is null rather than omitted.
           example: 247.5
+    ExporterType:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        Where an exporter sends data and what kind of data it sends. The
+        configuration it needs depends on the pair.
+
+        `PROMETHEUS_METRICS` is pull rather than push: Tiger Cloud serves an
+        endpoint your Prometheus scrapes, and sends nothing anywhere.
+      enum:
+        - CLOUDWATCH_LOGS
+        - CLOUDWATCH_METRICS
+        - DATADOG_METRICS
+        - PROMETHEUS_METRICS
+        - AZURE_MONITOR_METRICS
+    Exporter:
+      x-tigerdata-preview: true
+      description: |
+        An exporter that sends a service's logs or metrics to an external
+        monitoring system. `type` determines the shape of `config`.
+      oneOf:
+        - $ref: '#/components/schemas/CloudWatchLogsExporter'
+        - $ref: '#/components/schemas/CloudWatchMetricsExporter'
+        - $ref: '#/components/schemas/DatadogMetricsExporter'
+        - $ref: '#/components/schemas/PrometheusMetricsExporter'
+        - $ref: '#/components/schemas/AzureMonitorMetricsExporter'
+      discriminator:
+        propertyName: type
+        mapping:
+          CLOUDWATCH_LOGS: '#/components/schemas/CloudWatchLogsExporter'
+          CLOUDWATCH_METRICS: '#/components/schemas/CloudWatchMetricsExporter'
+          DATADOG_METRICS: '#/components/schemas/DatadogMetricsExporter'
+          PROMETHEUS_METRICS: '#/components/schemas/PrometheusMetricsExporter'
+          AZURE_MONITOR_METRICS: '#/components/schemas/AzureMonitorMetricsExporter'
+    ExporterBase:
+      x-tigerdata-preview: true
+      type: object
+      description: The fields every exporter carries, whatever it sends where.
+      required:
+        - exporter_id
+        - project_id
+        - name
+        - type
+        - region_code
+        - created
+      properties:
+        exporter_id:
+          type: string
+          format: uuid
+          description: The unique identifier for the exporter.
+          example: "3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31"
+        project_id:
+          type: string
+          description: The project the exporter belongs to.
+          example: "rp1pz7uyae"
+        name:
+          type: string
+          description: A human-readable name for the exporter. Not used to identify it.
+          example: "prod-metrics-to-datadog"
+        type:
+          $ref: '#/components/schemas/ExporterType'
+        region_code:
+          type: string
+          description: |
+            The cloud region the exporter runs in. Only services in this region
+            can be attached to it, and it cannot be changed afterwards.
+          example: "us-east-1"
+        created:
+          type: string
+          format: date-time
+          description: When the exporter was created.
+          example: "2026-01-15T10:30:00Z"
+    CloudWatchLogsExporter:
+      x-tigerdata-preview: true
+      description: An exporter that sends service logs to Amazon CloudWatch.
+      allOf:
+        - $ref: '#/components/schemas/ExporterBase'
+        - type: object
+          required:
+            - config
+          properties:
+            type:
+              type: string
+              description: Always `CLOUDWATCH_LOGS`.
+              enum:
+                - CLOUDWATCH_LOGS
+            config:
+              $ref: '#/components/schemas/CloudWatchLogsConfig'
+    CloudWatchMetricsExporter:
+      x-tigerdata-preview: true
+      description: An exporter that sends service metrics to Amazon CloudWatch.
+      allOf:
+        - $ref: '#/components/schemas/ExporterBase'
+        - type: object
+          required:
+            - config
+          properties:
+            type:
+              type: string
+              description: Always `CLOUDWATCH_METRICS`.
+              enum:
+                - CLOUDWATCH_METRICS
+            config:
+              $ref: '#/components/schemas/CloudWatchMetricsConfig'
+    DatadogMetricsExporter:
+      x-tigerdata-preview: true
+      description: An exporter that sends service metrics to Datadog.
+      allOf:
+        - $ref: '#/components/schemas/ExporterBase'
+        - type: object
+          required:
+            - config
+          properties:
+            type:
+              type: string
+              description: Always `DATADOG_METRICS`.
+              enum:
+                - DATADOG_METRICS
+            config:
+              $ref: '#/components/schemas/DatadogMetricsConfig'
+    PrometheusMetricsExporter:
+      x-tigerdata-preview: true
+      description: |
+        An exporter that serves a service's metrics on an endpoint for your
+        Prometheus to scrape.
+      allOf:
+        - $ref: '#/components/schemas/ExporterBase'
+        - type: object
+          required:
+            - config
+          properties:
+            type:
+              type: string
+              description: Always `PROMETHEUS_METRICS`.
+              enum:
+                - PROMETHEUS_METRICS
+            config:
+              $ref: '#/components/schemas/PrometheusMetricsConfig'
+    AzureMonitorMetricsExporter:
+      x-tigerdata-preview: true
+      description: An exporter that sends service metrics to Azure Monitor.
+      allOf:
+        - $ref: '#/components/schemas/ExporterBase'
+        - type: object
+          required:
+            - config
+          properties:
+            type:
+              type: string
+              description: Always `AZURE_MONITOR_METRICS`.
+              enum:
+                - AZURE_MONITOR_METRICS
+            config:
+              $ref: '#/components/schemas/AzureMonitorMetricsConfig'
+    MetricExporterConfigBase:
+      x-tigerdata-preview: true
+      type: object
+      description: The settings every metric exporter has.
+      properties:
+        enable_pg_metrics:
+          type: boolean
+          description: |
+            Also send PostgreSQL database metrics, such as per-table and
+            per-index statistics, alongside the service's operational metrics.
+            This increases the volume of metrics sent, which may cost more at
+            the destination.
+          default: false
+          example: true
+    CloudWatchLogsConfig:
+      x-tigerdata-preview: true
+      type: object
+      description: Where a CloudWatch logs exporter writes, and how it authenticates.
+      required:
+        - log_group_name
+        - log_stream_name
+        - aws_region
+        - credentials
+      properties:
+        log_group_name:
+          type: string
+          description: |
+            The CloudWatch log group to write to. It must already exist in your
+            AWS account.
+          example: "/tigerdata/prod"
+        log_stream_name:
+          type: string
+          description: The log stream within the log group to write to.
+          example: "orders-db"
+        aws_region:
+          type: string
+          description: |
+            The AWS region the log group is in. Independent of the exporter's own
+            `region_code`.
+          example: "us-east-1"
+        credentials:
+          $ref: '#/components/schemas/AWSCredentials'
+    CloudWatchMetricsConfig:
+      x-tigerdata-preview: true
+      description: |
+        Where a CloudWatch metrics exporter publishes, and how it authenticates.
+
+        Metrics are published in AWS Embedded Metric Format, which delivers them
+        as log events that CloudWatch extracts metrics from. The log group is how
+        the data arrives; the namespace is where the extracted metrics land.
+      allOf:
+        - $ref: '#/components/schemas/MetricExporterConfigBase'
+        - type: object
+          required:
+            - namespace
+            - log_group_name
+            - log_stream_name
+            - aws_region
+            - credentials
+          properties:
+            namespace:
+              type: string
+              description: The CloudWatch metric namespace to publish under.
+              example: "TigerData/Prod"
+            log_group_name:
+              type: string
+              description: |
+                The CloudWatch log group the Embedded Metric Format events are
+                written to. It must already exist in your AWS account.
+              example: "/tigerdata/prod"
+            log_stream_name:
+              type: string
+              description: The log stream within the log group to write to.
+              example: "orders-db"
+            aws_region:
+              type: string
+              description: |
+                The AWS region to publish metrics to. Independent of the
+                exporter's own `region_code`.
+              example: "us-east-1"
+            credentials:
+              $ref: '#/components/schemas/AWSCredentials'
+    DatadogMetricsConfig:
+      x-tigerdata-preview: true
+      description: Which Datadog account a service's metrics are sent to.
+      allOf:
+        - $ref: '#/components/schemas/MetricExporterConfigBase'
+        - type: object
+          required:
+            - api_key
+          properties:
+            api_key:
+              type: string
+              format: password
+              writeOnly: true
+              description: A Datadog API key with permission to submit metrics.
+              example: "0123456789abcdef0123456789abcdef"
+            site:
+              type: string
+              description: |
+                The Datadog site to send to. It must match the site your API key
+                belongs to.
+              default: "datadoghq.com"
+              example: "datadoghq.eu"
+    PrometheusMetricsConfig:
+      x-tigerdata-preview: true
+      description: |
+        The basic authentication credentials that guard the endpoint Prometheus
+        scrapes.
+      allOf:
+        - $ref: '#/components/schemas/MetricExporterConfigBase'
+        - type: object
+          required:
+            - username
+            - password
+          properties:
+            username:
+              type: string
+              description: The username Prometheus authenticates with.
+              example: "tiger-metrics"
+            password:
+              type: string
+              format: password
+              writeOnly: true
+              description: The password Prometheus authenticates with.
+              example: "a-very-secure-password"
+    AzureMonitorMetricsConfig:
+      x-tigerdata-preview: true
+      description: Which Azure Monitor workspace a service's metrics are sent to.
+      allOf:
+        - $ref: '#/components/schemas/MetricExporterConfigBase'
+        - type: object
+          required:
+            - connection_string
+          properties:
+            connection_string:
+              type: string
+              format: password
+              writeOnly: true
+              description: |
+                The Azure Monitor connection string for the workspace to send
+                metrics to.
+              example: "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://eastus-1.in.applicationinsights.azure.com/"
+    AWSCredentials:
+      x-tigerdata-preview: true
+      description: How Tiger Cloud authenticates to AWS.
+      oneOf:
+        - $ref: '#/components/schemas/AWSIAMRoleCredentials'
+        - $ref: '#/components/schemas/AWSAccessKeyCredentials'
+      discriminator:
+        propertyName: type
+        mapping:
+          IAM_ROLE: '#/components/schemas/AWSIAMRoleCredentials'
+          ACCESS_KEY: '#/components/schemas/AWSAccessKeyCredentials'
+    AWSIAMRoleCredentials:
+      x-tigerdata-preview: true
+      type: object
+      description: An IAM role in your account that Tiger Cloud assumes.
+      required:
+        - type
+        - aws_role_arn
+      properties:
+        type:
+          type: string
+          description: Always `IAM_ROLE`.
+          enum:
+            - IAM_ROLE
+        aws_role_arn:
+          type: string
+          pattern: '^(?:\d{12}|(arn:(aws|aws-us-gov|aws-cn):iam::\d{12}:(role|root|user)\/[0-9A-Za-z\+\.@_,-]{1,64}))$'
+          description: |
+            The IAM role to assume, either as a full ARN or as the bare 12-digit
+            AWS account ID.
+          example: "arn:aws:iam::123456789012:role/tiger-cloud-cloudwatch"
+    AWSAccessKeyCredentials:
+      x-tigerdata-preview: true
+      type: object
+      description: An access key pair belonging to an IAM user in your account.
+      required:
+        - type
+        - aws_access_key
+        - aws_secret_key
+      properties:
+        type:
+          type: string
+          description: Always `ACCESS_KEY`.
+          enum:
+            - ACCESS_KEY
+        aws_access_key:
+          type: string
+          description: The AWS access key ID.
+          example: "AKIAIOSFODNN7EXAMPLE"
+        aws_secret_key:
+          type: string
+          format: password
+          writeOnly: true
+          description: The AWS secret access key.
+          example: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+    MetricDetails:
+      x-tigerdata-preview: true
+      type: object
+      description: |
+        Descriptive metadata for a metric series — what it is, not its
+        data. Some series don't have full metadata yet: type and
+        default_agg may be null and description/labels may be empty, but
+        every field below is always present in the response.
+      required:
+        - name
+        - description
+        - type
+        - default_agg
+        - labels
+      properties:
+        name:
+          type: string
+          description: Metric series name.
+          example: "pg_locks_count"
+        description:
+          type: string
+          description: What this metric measures, or empty if undocumented.
+          example: "Number of locks currently held, grouped by relation and lock mode."
+        type:
+          allOf:
+            - $ref: '#/components/schemas/MetricType'
+          nullable: true
+          description: The shape of this metric's data, or null if undocumented.
+          example: "GAUGE"
+        default_agg:
+          allOf:
+            - $ref: '#/components/schemas/MetricsAggFn'
+          nullable: true
+          description: The aggregation function used by default when fn is omitted from a series query, or null if undocumented.
+          example: "AVG"
+        labels:
+          type: array
+          description: |
+            Labels specific to this metric (e.g. datname on
+            pg_stat_database_*) — not the region/role/ordinal labels every
+            metric carries regardless of which one it is.
+          items:
+            $ref: '#/components/schemas/MetricLabelDetails'
+
+    MetricLabelDetails:
+      x-tigerdata-preview: true
+      type: object
+      description: One label specific to a metric.
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          description: The label's key.
+          example: "datname"
+        description:
+          type: string
+          description: What this label identifies, or empty if undocumented.
+          example: "The database this row's values belong to."
 
   responses:
     AnalyticsResponse:
