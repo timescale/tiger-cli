@@ -34,12 +34,14 @@ func (ServiceStartInput) Schema() *jsonschema.Schema {
 
 // ServiceStartOutput represents output for service_start
 type ServiceStartOutput struct {
-	Status  string `json:"status" jsonschema:"Current service status after start operation"`
+	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
 func (ServiceStartOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceStartOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceStartOutput](nil))
+	schema.Properties["status"].Description = "Current service status after start operation"
+	return schema
 }
 
 func newServiceStartTool() *mcp.Tool {

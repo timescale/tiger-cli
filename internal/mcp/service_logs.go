@@ -47,11 +47,13 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 
 // ServiceLogsOutput represents output for service_logs
 type ServiceLogsOutput struct {
-	Logs []string `json:"logs" jsonschema:"Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."`
+	Logs []string `json:"logs"`
 }
 
 func (ServiceLogsOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceLogsOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceLogsOutput](nil))
+	schema.Properties["logs"].Description = "Log lines ordered from oldest to newest. Each line is prefixed with an RFC3339 timestamp followed by the log message."
+	return schema
 }
 
 func newServiceLogsTool() *mcp.Tool {

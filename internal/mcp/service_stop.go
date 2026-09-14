@@ -34,12 +34,14 @@ func (ServiceStopInput) Schema() *jsonschema.Schema {
 
 // ServiceStopOutput represents output for service_stop
 type ServiceStopOutput struct {
-	Status  string `json:"status" jsonschema:"Current service status after stop operation"`
+	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
 func (ServiceStopOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceStopOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceStopOutput](nil))
+	schema.Properties["status"].Description = "Current service status after stop operation"
+	return schema
 }
 
 func newServiceStopTool() *mcp.Tool {

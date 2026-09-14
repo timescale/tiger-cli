@@ -34,21 +34,30 @@ func (ServiceListOutput) Schema() *jsonschema.Schema {
 
 // ServiceInfo represents simplified service information for MCP output
 type ServiceInfo struct {
-	ServiceID   string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
+	ServiceID   string        `json:"id"`
 	Name        string        `json:"name"`
-	Status      string        `json:"status" jsonschema:"Service status"`
+	Status      string        `json:"status"`
 	Type        string        `json:"type"`
 	Region      string        `json:"region"`
 	Created     string        `json:"created,omitempty"`
-	Environment string        `json:"environment" jsonschema:"Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."`
+	Environment string        `json:"environment"`
 	Resources   *ResourceInfo `json:"resources,omitempty"`
 }
 
 func (ServiceInfo) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceInfo](nil))
+
+	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
+
+	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
+
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+
+	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
+
 	setResourceInfoSchemaProperties(schema.Properties["resources"])
+
 	return schema
 }
 
