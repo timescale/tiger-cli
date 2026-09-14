@@ -271,7 +271,7 @@ func TestUpgradeCmd(t *testing.T) {
 			wantStdout: downloadHeader("Upgrading", "dev", successServer.URL) +
 				"Verifying checksum\n" +
 				fmt.Sprintf("Installing new binary to %s\n", successBin) +
-				"tiger upgraded successfully to v1.2.3\n",
+				"Upgraded tiger to v1.2.3\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				got, err := os.ReadFile(successBin)
 				if err != nil {
@@ -305,7 +305,7 @@ func TestUpgradeCmd(t *testing.T) {
 			wantStdout: downloadHeader("Downgrading", "2.0.0", successServer.URL) +
 				"Verifying checksum\n" +
 				fmt.Sprintf("Installing new binary to %s\n", downgradeBin) +
-				"tiger downgraded successfully to v1.2.3\n",
+				"Downgraded tiger to v1.2.3\n",
 		},
 		{
 			// Error from a network failure is non-deterministic (depends on
@@ -375,7 +375,7 @@ func TestUpgradeLiveCDNIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upgrade failed: %v\n%s", err, out)
 	}
-	if want := "tiger upgraded successfully to " + latestTag; !strings.Contains(string(out), want) {
+	if want := "Upgraded tiger to " + latestTag; !strings.Contains(string(out), want) {
 		t.Errorf("upgrade output missing %q:\n%s", want, out)
 	}
 

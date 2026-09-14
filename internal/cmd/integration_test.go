@@ -383,7 +383,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify success message
-		if !strings.Contains(output, "updated successfully") {
+		if !strings.Contains(output, "Password updated") {
 			t.Errorf("Expected success message in output: %s", output)
 		}
 	})
@@ -1090,7 +1090,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		} else {
 			// Verify stop success message
 			if !strings.Contains(output, "Stop request accepted") &&
-				!strings.Contains(output, "stopped successfully") {
+				!strings.Contains(output, "Service stopped") {
 				t.Errorf("Expected stop success message, got: %s", output)
 			}
 			t.Logf("Service stop completed successfully")
@@ -1175,7 +1175,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		} else {
 			// Verify start success message
 			if !strings.Contains(output, "Start request accepted") &&
-				!strings.Contains(output, "ready and running") {
+				!strings.Contains(output, "Service is ready") {
 				t.Errorf("Expected start success message, got: %s", output)
 			}
 			t.Logf("Service start completed successfully")
@@ -1301,7 +1301,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 
 		// Verify resize success message
 		if !strings.Contains(output, "Resize completed successfully") &&
-			!strings.Contains(output, "resized successfully") {
+			!strings.Contains(output, "Service resized") {
 			t.Logf("Note: Expected resize success message, got: %s", output)
 		}
 
@@ -1394,7 +1394,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		}
 
 		// Verify deletion success message
-		if !strings.Contains(output, "deleted successfully") && !strings.Contains(output, "Deletion completed") && !strings.Contains(output, "successfully deleted") {
+		if !strings.Contains(output, "Service deleted") {
 			t.Errorf("Expected deletion success message in output: %s", output)
 		}
 

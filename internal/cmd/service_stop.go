@@ -99,7 +99,7 @@ This operation stops a service that is currently active/running. The service wil
 				return err
 			}
 
-			cmd.PrintErrf("Service has been successfully stopped!\n")
+			cmd.PrintErrf("Service stopped.\n")
 			return nil
 		},
 	}

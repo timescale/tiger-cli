@@ -351,9 +351,9 @@ func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, 
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, result)
 	default: // table format
-		cmd.Printf("Role '%s' created successfully\n", roleName)
+		cmd.Printf("Role '%s' created\n", roleName)
 		if readOnly {
-			cmd.Printf("Read-only enforcement: enabled (permanent, role-based)\n")
+			cmd.Printf("Read-only: enabled\n")
 		}
 		if statementTimeout > 0 {
 			cmd.Printf("Statement timeout: %s\n", statementTimeout)

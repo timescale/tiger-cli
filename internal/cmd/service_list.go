@@ -47,8 +47,8 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			services := *resp.JSON200
 
 			if len(services) == 0 {
-				cmd.PrintErrln("No services found! Your project is looking a bit empty.")
-				cmd.PrintErrln("Ready to get started? Create your first service with: tiger service create")
+				cmd.PrintErrln("No services found.")
+				cmd.PrintErrln("Create one with: tiger service create.")
 				return nil
 			}
 

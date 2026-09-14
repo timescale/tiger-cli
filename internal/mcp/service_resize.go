@@ -131,7 +131,7 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			message = "Service resized successfully!"
+			message = "Service resized."
 		}
 	}
 

@@ -72,7 +72,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "confirmation mismatch",
 			args:       []string{"service", "delete", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withStdin("svc-other\n")},
-			wantStderr: confirmPrompt + "Delete operation cancelled.\n",
+			wantStderr: confirmPrompt + "Cancelled.\n",
 		},
 		{
 			name:  "confirmation match",
@@ -125,7 +125,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			},
 			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"Service 'svc-12345' has been successfully deleted.\n",
+				"Service deleted.\n",
 		},
 		{
 			name:     "wait timeout",

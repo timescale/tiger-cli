@@ -11,8 +11,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-const noServicesStderr = "No services found! Your project is looking a bit empty.\n" +
-	"Ready to get started? Create your first service with: tiger service create\n"
+const noServicesStderr = "No services found.\n" +
+	"Create one with: tiger service create.\n"
 
 func TestServiceListCmd(t *testing.T) {
 	services := []api.Service{

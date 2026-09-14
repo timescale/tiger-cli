@@ -120,8 +120,8 @@ func TestServiceStartCmd(t *testing.T) {
 			args:  []string{"service", "start", "svc-12345"},
 			setup: setupStart(api.DeployStatusREADY),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
-				"Waiting for service to start (wait timeout: 10m0s)...\n" +
-				"Service has been successfully started!\n",
+				"Waiting for service to start (timeout: 10m0s)...\n" +
+				"Service started.\n",
 		},
 		{
 			name:     "wait polls until ready",
@@ -137,9 +137,9 @@ func TestServiceStartCmd(t *testing.T) {
 					}, nil)
 			},
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
-				"Waiting for service to start (wait timeout: 10m0s)...\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"⢎  Service status: RESUMING\n" +
-				"Service has been successfully started!\n",
+				"Service started.\n",
 		},
 		{
 			name:    "service fails during wait",
@@ -147,7 +147,7 @@ func TestServiceStartCmd(t *testing.T) {
 			setup:   setupStart(api.DeployStatus("FAILED")),
 			wantErr: "service failed with status: FAILED",
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
-				"Waiting for service to start (wait timeout: 10m0s)...\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"Error: service failed with status: FAILED\n",
 		},
 		{
@@ -168,7 +168,7 @@ func TestServiceStartCmd(t *testing.T) {
 			},
 			wantErr: "wait timeout reached after 10m0s - service may still be starting",
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
-				"Waiting for service to start (wait timeout: 10m0s)...\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"⢎  Service status: RESUMING\n" +
 				"Error: wait timeout reached after 10m0s - service may still be starting\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},

@@ -239,7 +239,7 @@ func setDefaultService(cmd *cobra.Command, cfg *config.Config, serviceID string)
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	cmd.PrintErrf("Set service '%s' as default service.\n", serviceID)
+	cmd.PrintErrf("Default service set to %s.\n", serviceID)
 	return nil
 }
 
@@ -249,10 +249,10 @@ func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, s
 		return
 	} else if noSetDefault {
 		// If the service wasn't set as the default, include the serviceID in the command
-		cmd.PrintErrf("Run 'tiger db psql %s' to connect to your new service\n", serviceID)
+		cmd.PrintErrf("Connect with: tiger db psql %s\n", serviceID)
 	} else {
 		// If the service was set as the default, no need to include the serviceID in the command
-		cmd.PrintErrf("Run 'tiger db psql' to connect to your new service\n")
+		cmd.PrintErrf("Connect with: tiger db psql\n")
 	}
 }
 

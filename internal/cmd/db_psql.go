@@ -437,7 +437,7 @@ func connectWithPasswordMenu(
 			details.Password = password
 			if err = testSaveAndLaunchPsqlWithPassword(ctx, cmd, cfg, details, psqlPath, psqlFlags, service); err != nil {
 				if isPostgresAuthenticationError(err) {
-					cmd.PrintErrf("Password incorrect. Please try again.\n\n")
+					cmd.PrintErrf("Password incorrect.\n\n")
 					continue
 				}
 				return fmt.Errorf("connection failed: %w", err)
@@ -454,7 +454,7 @@ func connectWithPasswordMenu(
 				cmd.PrintErrf("Error resetting password: %v\n\n", err)
 				continue
 			}
-			cmd.PrintErrf("Master password for '%s' user updated successfully\n", details.Role)
+			cmd.PrintErrf("Password updated for %s\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
 			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)

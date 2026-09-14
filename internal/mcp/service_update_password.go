@@ -123,7 +123,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 
 	output := ServiceUpdatePasswordOutput{
-		Message:         "Master password for 'tsdbadmin' user updated successfully",
+		Message:         "Password updated for tsdbadmin",
 		PasswordStorage: passwordStorage,
 	}
 

@@ -108,7 +108,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Resize request accepted for service '%s'!\n", serviceID)
+			cmd.PrintErrf("Resize request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if noWait {
@@ -137,7 +137,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			cmd.PrintErrf("Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("Service resized to %s.\n", cpuMemoryCfg)
 			return nil
 		},
 	}

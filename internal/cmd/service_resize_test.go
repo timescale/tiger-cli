@@ -50,7 +50,7 @@ func TestServiceResizeCmd(t *testing.T) {
 					}, nil)
 			},
 			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Use 'tiger service get' to check service status.
 `,
 		},
@@ -116,9 +116,9 @@ Use 'tiger service get' to check service status.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Waiting for resize to complete (timeout: 10m0s)...
-Service 'svc-12345' has been successfully resized to 2 CPU/8 GB!
+Service resized to 2 CPU/8 GB.
 `,
 		},
 		{
@@ -132,7 +132,7 @@ Service 'svc-12345' has been successfully resized to 2 CPU/8 GB!
 					}, nil)
 			},
 			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Use 'tiger service get' to check service status.
 `,
 		},
@@ -148,7 +148,7 @@ Use 'tiger service get' to check service status.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Use 'tiger service get' to check service status.
 `,
 		},
@@ -163,7 +163,7 @@ Use 'tiger service get' to check service status.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'svc-12345' to 4 CPU/16 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Use 'tiger service get' to check service status.
 `,
 		},
@@ -193,7 +193,7 @@ Use 'tiger service get' to check service status.
 			// SilenceErrors is set after the wait fails, so Cobra doesn't
 			// print the usual "Error:" line.
 			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
-Resize request accepted for service 'svc-12345'!
+Resize request accepted for service 'svc-12345'.
 Waiting for resize to complete (timeout: 10m0s)...
 ⢎  Service status: CONFIGURING
 Error: wait timeout reached after 10m0s - service may still be resizing

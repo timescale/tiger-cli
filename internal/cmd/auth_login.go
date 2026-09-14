@@ -28,7 +28,7 @@ import (
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
 Next steps:
-• Install MCP server for your favorite AI coding tool: tiger mcp install
+• Install the MCP server for your AI coding tool: tiger mcp install
 • List existing services: tiger service list
 • Create a new service: tiger service create
 `
@@ -214,7 +214,7 @@ func finishLogin(cmd *cobra.Command, cfg *config.Config, prevProjectID, projectI
 	if prevProjectID != projectID {
 		clearStaleDefaultService(cmd, cfg)
 	}
-	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
+	cmd.Printf("Logged in to project %s\n", projectID)
 
 	readOnlySet := offerProdProtection(cmd, cfg)
 	cmd.Print(nextSteps(readOnlySet))

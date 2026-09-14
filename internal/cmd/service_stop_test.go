@@ -121,7 +121,7 @@ func TestServiceStopCmd(t *testing.T) {
 			setup: setupStop(api.DeployStatusPAUSED),
 			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
 				"Waiting for service to stop (timeout: 10m0s)...\n" +
-				"Service has been successfully stopped!\n",
+				"Service stopped.\n",
 		},
 		{
 			name:     "wait polls until paused",
@@ -139,7 +139,7 @@ func TestServiceStopCmd(t *testing.T) {
 			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
 				"Waiting for service to stop (timeout: 10m0s)...\n" +
 				"⢎  Service status: PAUSING\n" +
-				"Service has been successfully stopped!\n",
+				"Service stopped.\n",
 		},
 		{
 			name:     "wait timeout",

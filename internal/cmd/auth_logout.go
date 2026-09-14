@@ -26,7 +26,7 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
-			cmd.Println("Successfully logged out and removed stored credentials")
+			cmd.Println("Logged out and removed stored credentials")
 			return nil
 		},
 	}

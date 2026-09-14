@@ -45,7 +45,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 		{
 			name:       "not logged in still succeeds",
 			args:       []string{"auth", "logout"},
-			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStdout: "Logged out and removed stored credentials\n",
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
 		{
@@ -57,7 +57,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 					ProjectID: "test-project-123",
 				}),
 			},
-			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStdout: "Logged out and removed stored credentials\n",
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
 		{
@@ -70,7 +70,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 					ProjectID: "test-project-123",
 				}),
 			},
-			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStdout: "Logged out and removed stored credentials\n",
 			checks: []checkFunc{checkNoStoredCredentials, func(t *testing.T, result cmdResult) {
 				if want := `{"refresh_token":"test-refresh-token"}`; logoutBody != want {
 					t.Errorf("server-side logout body = %q, want %q", logoutBody, want)
@@ -90,7 +90,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 					ProjectID: "test-project-123",
 				}),
 			},
-			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStdout: "Logged out and removed stored credentials\n",
 			wantStderr: matchPrefix("warning: server-side logout failed: "),
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
@@ -125,7 +125,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 				withEnv("NO_TELEMETRY", ""),
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
-			wantStdout: "Successfully logged out and removed stored credentials\n",
+			wantStdout: "Logged out and removed stored credentials\n",
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
 	})

@@ -109,7 +109,7 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			message = "Service stopped successfully!"
+			message = "Service stopped."
 		}
 	}
 

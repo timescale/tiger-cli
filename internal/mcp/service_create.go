@@ -200,7 +200,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			message = "Service created successfully and is ready!"
+			message = "Service is ready."
 		}
 	}
 

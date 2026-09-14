@@ -95,9 +95,8 @@ func TestServiceCreateCmd(t *testing.T) {
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 			checks: []checkFunc{checkDefaultService("svc-12345")},
@@ -150,11 +149,10 @@ Service is being created. Use 'tiger service list' to check status.
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
-Waiting for service to be ready (wait timeout: 30m0s)...
-Service is ready and running!
+Default service set to svc-12345.
+Waiting for service to be ready (timeout: 30m0s)...
+Service is ready.
 `,
 			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
@@ -173,13 +171,12 @@ Service is ready and running!
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Password saved to system keyring for automatic authentication
-Set service 'svc-12345' as default service.
-Waiting for service to be ready (wait timeout: 30m0s)...
-Service is ready and running!
-Run 'tiger db psql' to connect to your new service
+Password saved to system keyring
+Default service set to svc-12345.
+Waiting for service to be ready (timeout: 30m0s)...
+Service is ready.
+Connect with: tiger db psql
 `,
 			checks: []checkFunc{checkStoredPassword("svc-12345", "init-pass-123")},
 		},
@@ -198,12 +195,11 @@ Run 'tiger db psql' to connect to your new service
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Password saved to system keyring for automatic authentication
-Waiting for service to be ready (wait timeout: 30m0s)...
-Service is ready and running!
-Run 'tiger db psql svc-12345' to connect to your new service
+Password saved to system keyring
+Waiting for service to be ready (timeout: 30m0s)...
+Service is ready.
+Connect with: tiger db psql svc-12345
 `,
 			checks: []checkFunc{checkDefaultService("")},
 		},
@@ -219,9 +215,8 @@ Run 'tiger db psql svc-12345' to connect to your new service
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 			checks: []checkFunc{checkDefaultService("svc-12345")},
@@ -248,12 +243,11 @@ Service is being created. Use 'tiger service list' to check status.
 			},
 			wantStdout: sampleServiceCreateTable,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
-Waiting for service to be ready (wait timeout: 30m0s)...
+Default service set to svc-12345.
+Waiting for service to be ready (timeout: 30m0s)...
 ⢎  Service status: QUEUED
-Service is ready and running!
+Service is ready.
 `,
 		},
 		{
@@ -283,10 +277,9 @@ Service is ready and running!
 			// SilenceErrors is set after the wait fails, so Cobra doesn't
 			// print the usual "Error:" line.
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
-Waiting for service to be ready (wait timeout: 30m0s)...
+Default service set to svc-12345.
+Waiting for service to be ready (timeout: 30m0s)...
 ⢎  Service status: QUEUED
 Error: wait timeout reached after 30m0s - service may still be provisioning
 `,
@@ -304,9 +297,8 @@ Error: wait timeout reached after 30m0s - service may still be provisioning
 			},
 			wantStdout: sampleServiceCreateJSON,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 		},
@@ -322,9 +314,8 @@ Service is being created. Use 'tiger service list' to check status.
 			},
 			wantStdout: sampleServiceCreateYAML,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 		},
@@ -344,9 +335,8 @@ PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 		},
@@ -370,10 +360,9 @@ PGUSER=tsdbadmin
 PGPASSWORD=init-pass-123
 `,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Password saved to system keyring for automatic authentication
-Set service 'svc-12345' as default service.
+Password saved to system keyring
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 		},
@@ -405,7 +394,6 @@ PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
 Service is being created. Use 'tiger service list' to check status.
 `,
@@ -430,7 +418,6 @@ PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
 Service is being created. Use 'tiger service list' to check status.
 `,
@@ -448,9 +435,8 @@ Service is being created. Use 'tiger service list' to check status.
 			},
 			wantStdout: sampleServiceCreateJSON,
 			wantStderr: `Creating service 'test-service'...
-Service creation request accepted!
 Service ID: svc-12345
-Set service 'svc-12345' as default service.
+Default service set to svc-12345.
 Service is being created. Use 'tiger service list' to check status.
 `,
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
@@ -467,7 +453,7 @@ Service is being created. Use 'tiger service list' to check status.
 		},
 		{
 			// The generated name is random, so the request is matched on its
-			// "db-" prefix and stderr on the auto-generated-name notice.
+			// "db-" prefix and stderr on the same prefix in the status line.
 			name: "auto-generated name",
 			args: []string{"service", "create", "--no-wait", "--no-set-default", "-o", "env"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
@@ -485,8 +471,8 @@ PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `,
 			wantStderr: matchFunc(func(t *testing.T, got string) {
-				if !strings.Contains(got, "(auto-generated name)...") {
-					t.Errorf("expected stderr to mention the auto-generated name, got: %s", got)
+				if !strings.Contains(got, "Creating service 'db-") {
+					t.Errorf("expected stderr to show the generated db- name, got: %s", got)
 				}
 			}),
 		},

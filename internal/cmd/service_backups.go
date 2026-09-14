@@ -67,7 +67,7 @@ from your configuration.`,
 			backups := *resp.JSON200
 
 			if len(backups) == 0 {
-				cmd.PrintErrln("No backups found for this service yet.")
+				cmd.PrintErrln("No backups found.")
 				return nil
 			}
 

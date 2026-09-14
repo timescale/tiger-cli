@@ -109,7 +109,7 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			message = "Service started successfully and is ready!"
+			message = "Service started."
 		}
 	}
 

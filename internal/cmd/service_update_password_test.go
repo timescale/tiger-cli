@@ -53,9 +53,9 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		return password
 	}
 
-	savedStderr := "Password saved to system keyring for automatic authentication\n" +
-		"To view your new password, run: \n\t tiger service get svc-12345 --with-password\n" +
-		"Master password for 'tsdbadmin' user updated successfully\n"
+	savedStderr := "Password saved to system keyring\n" +
+		"View it with: tiger service get svc-12345 --with-password\n" +
+		"Password updated for tsdbadmin\n"
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -215,7 +215,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupGet(m)
 				setupUpdateAny(m)
 			},
-			wantStderr: "Successfully generated a new password.\n" + savedStderr,
+			wantStderr: savedStderr,
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); len(got) != 32 {
 					t.Errorf("stored password length = %d, want 32", len(got))
@@ -242,7 +242,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupUpdateAny(m)
 			},
 			wantStderr: "Enter new password (leave empty to generate): \n" +
-				"Successfully generated a new password.\n" + savedStderr,
+				savedStderr,
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); len(got) != 32 {
 					t.Errorf("stored password length = %d, want 32", len(got))
@@ -256,7 +256,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 				setupGet(m)
 				setupUpdate("newpass123")(m)
 			},
-			wantStderr: "Master password for 'tsdbadmin' user updated successfully\n",
+			wantStderr: "Password updated for tsdbadmin\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if got := storedPassword(t); got != "" {
 					t.Errorf("stored password = %q, want none stored", got)

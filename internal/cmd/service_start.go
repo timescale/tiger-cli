@@ -79,7 +79,7 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			}
 
 			// Wait for service to become ready
-			cmd.PrintErrf("Waiting for service to start (wait timeout: %v)...\n", waitTimeout)
+			cmd.PrintErrf("Waiting for service to start (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -99,7 +99,7 @@ This operation starts a service that is currently in an inactive/stopped state. 
 				return err
 			}
 
-			cmd.PrintErrf("Service has been successfully started!\n")
+			cmd.PrintErrf("Service started.\n")
 			return nil
 		},
 	}
