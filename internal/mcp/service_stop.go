@@ -10,6 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -97,15 +98,13 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service stop request accepted. The service may still be stopping."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: input.ServiceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "PAUSED",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be stopping",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusPAUSED,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be stopping",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

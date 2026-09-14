@@ -142,15 +142,6 @@ func TestServiceStartCmd(t *testing.T) {
 				"✅ Service has been successfully started!\n",
 		},
 		{
-			name:    "service fails during wait",
-			args:    []string{"service", "start", "svc-12345"},
-			setup:   setupStart(api.DeployStatus("FAILED")),
-			wantErr: "service failed with status: FAILED",
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to start (wait timeout: 10m0s)...\n" +
-				"❌ Error: service failed with status: FAILED\n",
-		},
-		{
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"service", "start", "svc-12345"},

@@ -54,14 +54,13 @@ func TestServiceDeleteCmd(t *testing.T) {
 		},
 		{
 			name: "read-only prod allows DEV service",
-			args: []string{"service", "delete", "svc-12345", "--confirm", "--no-wait"},
+			args: []string{"service", "delete", "svc-12345", "--confirm"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				setupDelete(m)
 			},
-			wantStderr: "\U0001f5d1\ufe0f  Delete request accepted for service 'svc-12345'.\n" +
-				"\U0001f4a1 Use 'tiger service list' to check deletion status.\n",
+			wantStderr: "\U0001f5d1\ufe0f  Service 'svc-12345' has been deleted.\n",
 		},
 		{
 			name:    "non-TTY without confirm",
@@ -76,19 +75,17 @@ func TestServiceDeleteCmd(t *testing.T) {
 		},
 		{
 			name:  "confirmation match",
-			args:  []string{"service", "delete", "svc-12345", "--no-wait"},
+			args:  []string{"service", "delete", "svc-12345"},
 			opts:  []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
 			setup: setupDelete,
 			wantStderr: confirmPrompt +
-				"🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+				"🗑️  Service 'svc-12345' has been deleted.\n",
 		},
 		{
-			name:  "confirm flag skips prompt",
-			args:  []string{"service", "delete", "svc-12345", "--confirm", "--no-wait"},
-			setup: setupDelete,
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+			name:       "confirm flag skips prompt",
+			args:       []string{"service", "delete", "svc-12345", "--confirm"},
+			setup:      setupDelete,
+			wantStderr: "🗑️  Service 'svc-12345' has been deleted.\n",
 		},
 		{
 			name: "network error",
@@ -113,49 +110,10 @@ func TestServiceDeleteCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
-			name:     "wait until deleted",
-			synctest: true,
-			args:     []string{"service", "delete", "svc-12345", "--confirm"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				setupDelete(m)
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-					}, nil)
-			},
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"✅ Service 'svc-12345' has been successfully deleted.\n",
-		},
-		{
-			name:     "wait timeout",
-			synctest: true,
-			args:     []string{"service", "delete", "svc-12345", "--confirm"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				setupDelete(m)
-				// The service is never deleted (a 200 keeps the wait
-				// polling), so the wait runs to the (virtual) deadline. The
-				// non-TTY spinner dedupes repeated messages, so those polls
-				// add no stderr lines.
-				svc := sampleService()
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &svc,
-					}, nil).AnyTimes()
-			},
-			wantErr: "wait timeout reached after 30m0s - service may still be deleting",
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"❌ Error: wait timeout reached after 30m0s - service may still be deleting\n",
-			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
-		},
-		{
-			name:  "rm alias",
-			args:  []string{"service", "rm", "svc-12345", "--confirm", "--no-wait"},
-			setup: setupDelete,
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+			name:       "rm alias",
+			args:       []string{"service", "rm", "svc-12345", "--confirm"},
+			setup:      setupDelete,
+			wantStderr: "🗑️  Service 'svc-12345' has been deleted.\n",
 		},
 	})
 }
