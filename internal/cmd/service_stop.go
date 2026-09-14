@@ -70,16 +70,16 @@ This operation stops a service that is currently active/running. The service wil
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("⏹️  Stop request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Stop request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
+				cmd.PrintErrln("Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become paused
-			cmd.PrintErrf("⏳ Waiting for service to stop (timeout: %v)...\n", waitTimeout)
+			cmd.PrintErrf("Waiting for service to stop (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -94,12 +94,12 @@ This operation stops a service that is currently active/running. The service wil
 				TimeoutMsg: "service may still be stopping",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
-				cmd.PrintErrf("❌ Error: %s\n", err)
+				cmd.PrintErrf("Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			cmd.PrintErrf("✅ Service has been successfully stopped!\n")
+			cmd.PrintErrf("Service has been successfully stopped!\n")
 			return nil
 		},
 	}

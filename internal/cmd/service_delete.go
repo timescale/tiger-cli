@@ -72,7 +72,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
 				if confirmation != serviceID {
-					cmd.PrintErrln("❌ Delete operation cancelled.")
+					cmd.PrintErrln("Delete operation cancelled.")
 					return nil
 				}
 			}
@@ -92,11 +92,11 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.PrintErrf("🗑️  Delete request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Delete request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("💡 Use 'tiger service list' to check deletion status.")
+				cmd.PrintErrln("Use 'tiger service list' to check deletion status.")
 				return nil
 			}
 
@@ -114,12 +114,12 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				TimeoutMsg: "service may still be deleting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
-				cmd.PrintErrf("❌ Error: %s\n", err)
+				cmd.PrintErrf("Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			cmd.PrintErrf("✅ Service '%s' has been successfully deleted.\n", serviceID)
+			cmd.PrintErrf("Service '%s' has been successfully deleted.\n", serviceID)
 			return nil
 		},
 	}

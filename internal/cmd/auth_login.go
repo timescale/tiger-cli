@@ -27,7 +27,7 @@ import (
 
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
-🎉 Next steps:
+Next steps:
 • Install MCP server for your favorite AI coding tool: tiger mcp install
 • List existing services: tiger service list
 • Create a new service: tiger service create
@@ -258,7 +258,7 @@ func offerProdProtection(cmd *cobra.Command, cfg *config.Config) bool {
 	}
 
 	if _, err := cfg.Set("read_only", string(mode)); err != nil {
-		cmd.PrintErrf("⚠️  Warning: could not set read_only: %v\n", err)
+		cmd.PrintErrf("Warning: could not set read_only: %v\n", err)
 		return false
 	}
 	if msg := readOnlyConfirmation(mode); msg != "" {

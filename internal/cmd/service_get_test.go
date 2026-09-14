@@ -281,7 +281,7 @@ status: READY
 │ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
 └─────────────┴──────────────────────────────────────────────────────────────────┘
 `,
-			wantStderr: "⚠️  Warning: Failed to get connection details: service endpoint not available\n",
+			wantStderr: "Warning: Failed to get connection details: service endpoint not available\n",
 		},
 		{
 			name:       "describe alias",

@@ -454,7 +454,7 @@ func connectWithPasswordMenu(
 				cmd.PrintErrf("Error resetting password: %v\n\n", err)
 				continue
 			}
-			cmd.PrintErrf("✅ Master password for '%s' user updated successfully\n", details.Role)
+			cmd.PrintErrf("Master password for '%s' user updated successfully\n", details.Role)
 			// Launch psql (password is now in storage)
 			details.Password = password
 			return launchPsql(cfg, details, psqlPath, psqlFlags, service, cmd)

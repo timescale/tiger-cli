@@ -126,7 +126,7 @@ so update the password on the primary instead.`,
 				}
 			}
 
-			cmd.PrintErrf("✅ Master password for 'tsdbadmin' user updated successfully\n")
+			cmd.PrintErrf("Master password for 'tsdbadmin' user updated successfully\n")
 			return nil
 		},
 	}

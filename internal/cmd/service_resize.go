@@ -84,7 +84,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Display resize information
-			cmd.PrintErrf("📐 Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
 
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
@@ -108,16 +108,16 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("✅ Resize request accepted for service '%s'!\n", serviceID)
+			cmd.PrintErrf("Resize request accepted for service '%s'!\n", serviceID)
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
+				cmd.PrintErrln("Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for resize to complete
-			cmd.PrintErrf("⏳ Waiting for resize to complete (timeout: %v)...\n", waitTimeout)
+			cmd.PrintErrf("Waiting for resize to complete (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:    client,
 				ProjectID: projectID,
@@ -132,12 +132,12 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				TimeoutMsg: "service may still be resizing",
 			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
-				cmd.PrintErrf("❌ Error: %s\n", err)
+				cmd.PrintErrf("Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			cmd.PrintErrf("🎉 Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("Service '%s' has been successfully resized to %s!\n", serviceID, cpuMemoryCfg)
 			return nil
 		},
 	}

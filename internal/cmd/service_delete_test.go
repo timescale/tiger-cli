@@ -60,8 +60,8 @@ func TestServiceDeleteCmd(t *testing.T) {
 				expectTaggedService("DEV")(m)
 				setupDelete(m)
 			},
-			wantStderr: "\U0001f5d1\ufe0f  Delete request accepted for service 'svc-12345'.\n" +
-				"\U0001f4a1 Use 'tiger service list' to check deletion status.\n",
+			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service list' to check deletion status.\n",
 		},
 		{
 			name:    "non-TTY without confirm",
@@ -72,7 +72,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "confirmation mismatch",
 			args:       []string{"service", "delete", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withStdin("svc-other\n")},
-			wantStderr: confirmPrompt + "❌ Delete operation cancelled.\n",
+			wantStderr: confirmPrompt + "Delete operation cancelled.\n",
 		},
 		{
 			name:  "confirmation match",
@@ -80,15 +80,15 @@ func TestServiceDeleteCmd(t *testing.T) {
 			opts:  []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
 			setup: setupDelete,
 			wantStderr: confirmPrompt +
-				"🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+				"Delete request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service list' to check deletion status.\n",
 		},
 		{
 			name:  "confirm flag skips prompt",
 			args:  []string{"service", "delete", "svc-12345", "--confirm", "--no-wait"},
 			setup: setupDelete,
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service list' to check deletion status.\n",
 		},
 		{
 			name: "network error",
@@ -123,9 +123,9 @@ func TestServiceDeleteCmd(t *testing.T) {
 						HTTPResponse: httpResponse(http.StatusNotFound),
 					}, nil)
 			},
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"✅ Service 'svc-12345' has been successfully deleted.\n",
+				"Service 'svc-12345' has been successfully deleted.\n",
 		},
 		{
 			name:     "wait timeout",
@@ -145,17 +145,17 @@ func TestServiceDeleteCmd(t *testing.T) {
 					}, nil).AnyTimes()
 			},
 			wantErr: "wait timeout reached after 30m0s - service may still be deleting",
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
 				"⢎  Waiting for service 'svc-12345' to be deleted\n" +
-				"❌ Error: wait timeout reached after 30m0s - service may still be deleting\n",
+				"Error: wait timeout reached after 30m0s - service may still be deleting\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
 			name:  "rm alias",
 			args:  []string{"service", "rm", "svc-12345", "--confirm", "--no-wait"},
 			setup: setupDelete,
-			wantStderr: "🗑️  Delete request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service list' to check deletion status.\n",
+			wantStderr: "Delete request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service list' to check deletion status.\n",
 		},
 	})
 }
