@@ -152,13 +152,14 @@ Configure the MCP server for your AI assistant:
 tiger mcp install
 
 # Or specify your client directly
-tiger mcp install claude-code    # Claude Code
-tiger mcp install codex          # Codex
-tiger mcp install copilot        # GitHub Copilot CLI
-tiger mcp install cursor         # Cursor IDE
-tiger mcp install gemini         # Gemini CLI
-tiger mcp install vscode         # VS Code
-tiger mcp install windsurf       # Windsurf
+tiger mcp install claude-code      # Claude Code
+tiger mcp install codex            # Codex
+tiger mcp install copilot          # GitHub Copilot CLI
+tiger mcp install cursor           # Cursor IDE
+tiger mcp install devin-desktop    # Devin Desktop
+tiger mcp install gemini           # Gemini CLI
+tiger mcp install vscode           # VS Code
+tiger mcp install windsurf         # Windsurf
 ```
 
 After installation, restart your AI assistant to activate the Tiger MCP server.

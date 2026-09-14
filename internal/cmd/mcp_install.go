@@ -100,6 +100,7 @@ const (
 	ClaudeCode  MCPClient = "claude-code"
 	Cursor      MCPClient = "cursor" // Both the IDE and the CLI
 	Windsurf    MCPClient = "windsurf"
+	Devin       MCPClient = "devin"
 	Codex       MCPClient = "codex"
 	Gemini      MCPClient = "gemini"
 	VSCode      MCPClient = "vscode"
@@ -181,6 +182,16 @@ var supportedClients = []clientConfig{
 		EditorNames:          []string{"windsurf"},
 		MCPServersPathPrefix: "/mcpServers",
 		ConfigPaths: []string{
+			"~/.codeium/windsurf/mcp_config.json",
+		},
+	},
+	{
+		ClientType:           Devin,
+		Name:                 "Devin Desktop",
+		EditorNames:          []string{"devin-desktop", "devin"},
+		MCPServersPathPrefix: "/mcpServers",
+		ConfigPaths: []string{
+			"~/.devin/mcp_config.json",
 			"~/.codeium/windsurf/mcp_config.json",
 		},
 	},
