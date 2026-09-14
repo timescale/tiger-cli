@@ -55,7 +55,7 @@ This operation starts a service that is currently in a stopped/paused state. The
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Starting a service cannot really break anything
 			IdempotentHint:  true,       // Starting an already-started service is safe (but returns an error)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Start Database Service",
 		},
 	}

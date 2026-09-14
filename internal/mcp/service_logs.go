@@ -36,10 +36,10 @@ func (ServiceLogsInput) Schema() *jsonschema.Schema {
 	schema.Properties["tail"].Minimum = new(1.0)
 	schema.Properties["tail"].Examples = []any{50, 100, 1000}
 
-	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format, e.g., '2024-01-15T09:00:00Z'). If not provided, only the tail parameter limits how far back logs are fetched."
+	schema.Properties["since"].Description = "Fetch logs after this timestamp (RFC3339 format). If not provided, only the tail parameter limits how far back logs are fetched."
 	schema.Properties["since"].Examples = []any{"2024-01-15T09:00:00Z", "2025-01-16T08:00:00Z"}
 
-	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format, e.g., '2024-01-15T10:00:00Z'). If not provided, fetches logs up to the current time."
+	schema.Properties["until"].Description = "Fetch logs before this timestamp (RFC3339 format). If not provided, fetches logs up to the current time."
 	schema.Properties["until"].Examples = []any{"2024-01-15T10:00:00Z", "2025-01-16T08:30:00Z"}
 
 	return schema
@@ -67,7 +67,7 @@ Supports filtering by time (via since/until parameters) and node (for services w
 		OutputSchema: ServiceLogsOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: new(true),
+			OpenWorldHint: new(false),
 			Title:         "Get Service Logs",
 		},
 	}

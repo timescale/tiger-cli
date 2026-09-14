@@ -55,7 +55,7 @@ This operation stops a service that is currently running. The service will trans
 			ReadOnlyHint:    false,
 			DestructiveHint: new(true), // Stopping a service breaks existing connections and could cause app downtime
 			IdempotentHint:  true,      // Stopping an already-stopped service is safe (but returns an error)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Stop Database Service",
 		},
 	}

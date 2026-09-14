@@ -27,14 +27,16 @@ type ServiceListOutput struct {
 }
 
 func (ServiceListOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceListOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceListOutput](nil))
+	schema.Properties["services"].Items = ServiceInfo{}.Schema()
+	return schema
 }
 
 // ServiceInfo represents simplified service information for MCP output
 type ServiceInfo struct {
 	ServiceID   string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name        string        `json:"name"`
-	Status      string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Status      string        `json:"status" jsonschema:"Service status"`
 	Type        string        `json:"type"`
 	Region      string        `json:"region"`
 	Created     string        `json:"created,omitempty"`
@@ -44,7 +46,9 @@ type ServiceInfo struct {
 
 func (ServiceInfo) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceInfo](nil))
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 	return schema
 }
 
@@ -58,7 +62,7 @@ func newServiceListTool() *mcp.Tool {
 		OutputSchema: ServiceListOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: new(true),
+			OpenWorldHint: new(false),
 			Title:         "List Database Services",
 		},
 	}

@@ -55,7 +55,11 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["role"].Description = "Convenience filter for the 'role' label. Omit to include all roles. Equivalent to passing {key:\"role\", value:\"primary\"|\"replica\"} via filters."
 	schema.Properties["role"].Enum = []any{"PRIMARY", "REPLICA"}
 
-	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
+	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric."
+	schema.Properties["filters"].Examples = []any{
+		[]MetricLabelFilterInput{{Key: "ordinal", Value: "0"}},
+		[]MetricLabelFilterInput{{Key: "job_id", Value: "1000"}},
+	}
 
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)

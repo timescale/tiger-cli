@@ -49,15 +49,22 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
-	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation (e.g., '0.5 cores', '1 core')"`
-	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation (e.g., '2 GB', '4 GB')"`
+	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation"`
+	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation"`
+}
+
+// setResourceInfoSchemaProperties enhances the schema of a ResourceInfo
+// property nested inside a service output schema.
+func setResourceInfoSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["cpu"].Examples = []any{"0.5 cores", "1 core", "4 cores"}
+	schema.Properties["memory"].Examples = []any{"2 GB", "4 GB", "16 GB"}
 }
 
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
 	ServiceID        string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
 	Name             string        `json:"name"`
-	Status           string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Status           string        `json:"status" jsonschema:"Service status"`
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
@@ -72,7 +79,9 @@ type ServiceDetail struct {
 
 func (ServiceDetail) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
 	return schema
 }
 

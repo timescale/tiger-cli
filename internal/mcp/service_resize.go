@@ -63,7 +63,7 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Not destructive, just modifies resources
 			IdempotentHint:  true,       // Can resize to same size multiple times
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Resize Database Service",
 		},
 	}
