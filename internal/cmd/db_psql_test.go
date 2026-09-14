@@ -115,7 +115,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			wantErr: "psql client not found. Please install PostgreSQL client tools",
+			wantErr: "psql not found. Install the PostgreSQL client tools",
 		},
 		{
 			// No GetReplicaSets expectation: a non-TTY stdin/stderr must skip

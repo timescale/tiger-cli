@@ -600,7 +600,7 @@ func prevOAuthCredentials(projectID string) config.Credentials {
 // followed by suffix (an already-quoted pattern, e.g. an Error line).
 func matchOAuthStderr(serverURL, suffix string) matcher {
 	return matchRegexp(fmt.Sprintf(
-		`Auth URL is: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s`,
+		`Auth URL: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s`,
 		regexp.QuoteMeta(serverURL), config.TigerCLIClientID, suffix))
 }
 
@@ -1026,7 +1026,7 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 			opts:       []runOption{withConfig(oauthURLs(success.URL))},
 			wantStdout: loggedIn,
 			wantStderr: matchOAuthStderr(success.URL, regexp.QuoteMeta(
-				"Failed to open browser: browser disabled in tests\n"+
+				"Warning: failed to open browser: browser disabled in tests\n"+
 					"Falling back to device authorization...\n"+deviceInstructions)),
 			checks: []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},

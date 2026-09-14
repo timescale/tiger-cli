@@ -484,19 +484,19 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	}
 	defer func() {
 		if err := server.server.Shutdown(ctx); err != nil {
-			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
+			l.cmd.PrintErrf("Warning: failed to close local server: %s\n", err)
 		}
 	}()
 
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
-	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
+	l.cmd.PrintErrf("Auth URL: %s\n", authURL)
 	l.cmd.PrintErrln("Opening browser for authentication...")
 
 	browserErr := openBrowserAsync(authURL)
 
 	select {
 	case err := <-browserErr:
-		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
+		l.cmd.PrintErrf("Warning: failed to open browser: %s\n", err)
 		return nil, errBrowserOpenFailed
 	case result := <-server.resultChan:
 		return result.token, result.err

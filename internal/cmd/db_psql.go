@@ -106,7 +106,7 @@ skipping the prompt. Read replicas share the primary's credentials.`,
 			// Check if psql is available
 			psqlPath, err := exec.LookPath("psql")
 			if err != nil {
-				return fmt.Errorf("psql client not found. Please install PostgreSQL client tools")
+				return fmt.Errorf("psql not found. Install the PostgreSQL client tools")
 			}
 
 			opts := common.ConnectionDetailsOptions{

@@ -91,7 +91,7 @@ func TestAuthLogoutCmd(t *testing.T) {
 				}),
 			},
 			wantStdout: "Logged out and removed stored credentials\n",
-			wantStderr: matchPrefix("warning: server-side logout failed: "),
+			wantStderr: matchPrefix("Warning: server-side logout failed: "),
 			checks:     []checkFunc{checkNoStoredCredentials},
 		},
 		{

@@ -58,6 +58,6 @@ func revokeOAuthSession(cmd *cobra.Command, app *common.App, cfg *config.Config)
 		body.RefreshToken = &rt
 	}
 	if _, err := client.LogoutWithResponse(cmd.Context(), body); err != nil {
-		cmd.PrintErrf("warning: server-side logout failed: %v\n", err)
+		cmd.PrintErrf("Warning: server-side logout failed: %v\n", err)
 	}
 }
