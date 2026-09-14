@@ -144,6 +144,8 @@ Helper functions inside `internal/cmd` take the `*cobra.Command` and print throu
 
 Status output is plain, concise, and factual: say what happened and stop. No emojis, decorative symbols, or exclamation points, and no "successfully" — the absence of an error already says the operation worked ("Service started.", not "✅ Service has been successfully started!"). Skip filler and encouragement ("your new service", "Ready to get started?"), and drop any line that doesn't tell the user something they can act on. Parallel commands use parallel wording, so create and fork both end with "Service is ready." and every wait line uses the same "(timeout: ...)" form. `tiger service create` is the model. The same applies to the messages MCP tools return.
 
+Warnings and errors follow the same standard. A non-fatal failure prints to stderr as `Warning: <lowercase description>` (`Warning: failed to open browser: ...`), never as a bare "Failed to ..." line or a lowercase `warning:`. Errors state the fix without pleading (`run 'tiger auth login'`, not `please run ...`); when an error has two sentences, the second starts with a capital letter as normal prose (`psql not found. Install the PostgreSQL client tools`).
+
 ### Reading Stdin
 
 Read user input through the helpers in `internal/util/read.go` — `util.ReadLine` (one trimmed line), `util.ReadPassword` (no echo, saves and restores terminal state), and `util.ReadAll` (everything, for piped input) — never by driving `bufio`/`term` directly. All three select on `ctx.Done()`, so Ctrl-C unblocks a waiting prompt instead of hanging.
