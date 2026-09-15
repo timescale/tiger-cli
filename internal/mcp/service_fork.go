@@ -18,14 +18,15 @@ import (
 
 // ServiceForkInput represents input for service_fork
 type ServiceForkInput struct {
-	ServiceID    string           `json:"service_id"`
-	Name         string           `json:"name,omitempty"`
-	ForkStrategy api.ForkStrategy `json:"fork_strategy"`
-	TargetTime   *time.Time       `json:"target_time,omitempty"`
-	CPUMemory    string           `json:"cpu_memory,omitempty"`
-	Wait         bool             `json:"wait,omitempty"`
-	SetDefault   bool             `json:"set_default,omitempty"`
-	WithPassword bool             `json:"with_password,omitempty"`
+	ServiceID    string             `json:"service_id"`
+	Name         string             `json:"name,omitempty"`
+	ForkStrategy api.ForkStrategy   `json:"fork_strategy"`
+	TargetTime   *time.Time         `json:"target_time,omitempty"`
+	CPUMemory    string             `json:"cpu_memory,omitempty"`
+	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	Wait         bool               `json:"wait,omitempty"`
+	SetDefault   bool               `json:"set_default,omitempty"`
+	WithPassword bool               `json:"with_password,omitempty"`
 }
 
 func (ServiceForkInput) Schema() *jsonschema.Schema {
@@ -44,6 +45,10 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
+
+	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused."
+	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
+	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -105,8 +110,11 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	// Deliberately DEV-only: the fork is always tagged DEV.
-	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
+	// Gate on the fork's own tag: under prod mode, forking a PROD source into a
+	// DEV fork is allowed — it reads production without changing it. The SDK
+	// applies the schema's DEV default, so input.Environment is always set by
+	// the time the handler runs.
+	if err := common.CheckReadOnly(cfg, input.Environment); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -139,14 +147,16 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		slog.String("fork_strategy", string(input.ForkStrategy)),
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
+		slog.String("environment", string(input.Environment)),
 	)
 
 	// Prepare service fork request
 	forkReq := api.ForkServiceCreate{
-		ForkStrategy: input.ForkStrategy,
-		TargetTime:   input.TargetTime,
-		CPUMillis:    cpuMillis,
-		MemoryGbs:    memoryGBs,
+		ForkStrategy:   input.ForkStrategy,
+		TargetTime:     input.TargetTime,
+		CPUMillis:      cpuMillis,
+		MemoryGbs:      memoryGBs,
+		EnvironmentTag: &input.Environment,
 	}
 
 	// Only set name if provided
