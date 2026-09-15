@@ -53,7 +53,6 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["environment"].Description = "Environment tag for the new service. Use 'PROD' only for production workloads — under read-only mode for production services, creating a PROD service is refused."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
-	schema.Properties["environment"].Examples = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -109,15 +108,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	// Default to DEV when unspecified, matching `tiger service create`.
-	environmentTag := input.Environment
-	if environmentTag == "" {
-		environmentTag = api.EnvironmentTagDEV
-	}
-
 	// Gate on the requested tag: under prod mode, creating DEV is allowed and
-	// creating PROD is not.
-	if err := common.CheckReadOnly(cfg, environmentTag); err != nil {
+	// creating PROD is not. The SDK applies the schema's DEV default, so
+	// input.Environment is always set by the time the handler runs.
+	if err := common.CheckReadOnly(cfg, input.Environment); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
@@ -143,7 +137,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
 		slog.Int("replicas", input.Replicas),
-		slog.String("environment", string(environmentTag)),
+		slog.String("environment", string(input.Environment)),
 	)
 
 	// Prepare service creation request
@@ -154,7 +148,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		ReplicaCount:   &input.Replicas,
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
-		EnvironmentTag: &environmentTag,
+		EnvironmentTag: &input.Environment,
 	}
 
 	// Make API call to create service

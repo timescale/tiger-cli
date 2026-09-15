@@ -50,7 +50,6 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
-	schema.Properties["environment"].Examples = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -112,15 +111,11 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	// Default to DEV when unspecified, matching `tiger service fork`.
-	environmentTag := input.Environment
-	if environmentTag == "" {
-		environmentTag = api.EnvironmentTagDEV
-	}
-
 	// Gate on the fork's own tag: under prod mode, forking a PROD source into a
-	// DEV fork is allowed — it reads production without changing it.
-	if err := common.CheckReadOnly(cfg, environmentTag); err != nil {
+	// DEV fork is allowed — it reads production without changing it. The SDK
+	// applies the schema's DEV default, so input.Environment is always set by
+	// the time the handler runs.
+	if err := common.CheckReadOnly(cfg, input.Environment); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -153,7 +148,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		slog.String("fork_strategy", string(input.ForkStrategy)),
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
-		slog.String("environment", string(environmentTag)),
+		slog.String("environment", string(input.Environment)),
 	)
 
 	// Prepare service fork request
@@ -162,7 +157,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		TargetTime:     input.TargetTime,
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
-		EnvironmentTag: &environmentTag,
+		EnvironmentTag: &input.Environment,
 	}
 
 	// Only set name if provided
