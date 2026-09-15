@@ -155,7 +155,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
 		},
 		{
 			name:    "invalid existing config",
@@ -335,6 +335,16 @@ func TestMCPInstallCmd(t *testing.T) {
 			}},
 		},
 		{
+			name:       "installs devin (json-config client like cursor)",
+			args:       []string{"mcp", "install", "devin", "--no-backup", "--config-path", path("devin")},
+			wantStdout: installSuccessOutput("devin", path("devin")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				assertJSONFile(t, path("devin"), map[string]any{
+					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
+				})
+			}},
+		},
+		{
 			name:       "client name is case-insensitive",
 			args:       []string{"mcp", "install", "CURSOR", "--no-backup", "--config-path", path("upper")},
 			wantStdout: installSuccessOutput("CURSOR", path("upper")),
@@ -394,6 +404,8 @@ func TestFindClientConfig(t *testing.T) {
 		{"CURSOR", Cursor, "Cursor"},
 		{"windsurf", Windsurf, "Windsurf"},
 		{"WindSurf", Windsurf, "Windsurf"},
+		{"devin", Devin, "Devin"},
+		{"DEVIN", Devin, "Devin"},
 		{"codex", Codex, "Codex"},
 		{"CODEX", Codex, "Codex"},
 	}
