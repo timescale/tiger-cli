@@ -38,13 +38,16 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 
 // ServiceResizeOutput represents output for service_resize
 type ServiceResizeOutput struct {
-	Status    string        `json:"status" jsonschema:"Current service status after resize operation"`
+	Status    string        `json:"status"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
 	Message   string        `json:"message"`
 }
 
 func (ServiceResizeOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceResizeOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceResizeOutput](nil))
+	schema.Properties["status"].Description = "Current service status after resize operation"
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	return schema
 }
 
 func newServiceResizeTool() *mcp.Tool {
@@ -63,7 +66,7 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Not destructive, just modifies resources
 			IdempotentHint:  true,       // Can resize to same size multiple times
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Resize Database Service",
 		},
 	}

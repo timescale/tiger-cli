@@ -49,30 +49,57 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
-	CPU    string `json:"cpu,omitempty" jsonschema:"CPU allocation (e.g., '0.5 cores', '1 core')"`
-	Memory string `json:"memory,omitempty" jsonschema:"Memory allocation (e.g., '2 GB', '4 GB')"`
+	CPU    string `json:"cpu,omitempty"`
+	Memory string `json:"memory,omitempty"`
+}
+
+// setResourceInfoSchemaProperties enhances the schema of a ResourceInfo
+// property nested inside a service output schema.
+func setResourceInfoSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["cpu"].Description = "CPU allocation"
+	schema.Properties["cpu"].Examples = []any{"0.5 cores", "1 core", "4 cores"}
+
+	schema.Properties["memory"].Description = "Memory allocation"
+	schema.Properties["memory"].Examples = []any{"2 GB", "4 GB", "16 GB"}
 }
 
 // ServiceDetail represents detailed service information
 type ServiceDetail struct {
-	ServiceID        string        `json:"id" jsonschema:"Service identifier (10-character alphanumeric string)"`
+	ServiceID        string        `json:"id"`
 	Name             string        `json:"name"`
-	Status           string        `json:"status" jsonschema:"Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)"`
+	Status           string        `json:"status"`
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
-	Environment      string        `json:"environment" jsonschema:"Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."`
+	Environment      string        `json:"environment"`
 	Resources        *ResourceInfo `json:"resources,omitempty"`
-	Replicas         int           `json:"replicas" jsonschema:"Number of HA replicas (0=single node/no HA, 1+=HA enabled)"`
-	DirectEndpoint   string        `json:"direct_endpoint,omitempty" jsonschema:"Direct database connection endpoint"`
-	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty" jsonschema:"Connection pooler endpoint"`
-	Password         string        `json:"password,omitempty" jsonschema:"Password for tsdbadmin user (only included if with_password=true)"`
-	ConnectionString string        `json:"connection_string" jsonschema:"PostgreSQL connection string (password embedded only if with_password=true)"`
+	Replicas         int           `json:"replicas"`
+	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
+	PoolerEndpoint   string        `json:"pooler_endpoint,omitempty"`
+	Password         string        `json:"password,omitempty"`
+	ConnectionString string        `json:"connection_string"`
 }
 
 func (ServiceDetail) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
+
+	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
+
+	schema.Properties["status"].Description = "Service status"
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
+
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
+
+	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
+
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
+
+	schema.Properties["replicas"].Description = "Number of HA replicas (0=single node/no HA, 1+=HA enabled)"
+	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint"
+	schema.Properties["pooler_endpoint"].Description = "Connection pooler endpoint"
+	schema.Properties["password"].Description = "Password for tsdbadmin user (only included if with_password=true)"
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string (password embedded only if with_password=true)"
+
 	return schema
 }
 
