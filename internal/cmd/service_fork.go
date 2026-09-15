@@ -204,17 +204,15 @@ You can override any of these defaults with the corresponding flags.`,
 				// Wait for service to be ready
 				cmd.PrintErrf("⏳ Waiting for fork to complete (timeout: %v)...\n", waitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-					Client:    client,
-					ProjectID: projectID,
-					ServiceID: forkedServiceID,
-					Handler: &common.StatusWaitHandler{
-						TargetStatus: "READY",
-						Service:      &forkedService,
-					},
-					Input:      cmd.InOrStdin(),
-					Output:     cmd.ErrOrStderr(),
-					Timeout:    waitTimeout,
-					TimeoutMsg: "service may still be provisioning",
+					Client:       client,
+					ProjectID:    projectID,
+					ServiceID:    forkedServiceID,
+					Service:      &forkedService,
+					TargetStatus: api.DeployStatusREADY,
+					Input:        cmd.InOrStdin(),
+					Output:       cmd.ErrOrStderr(),
+					Timeout:      waitTimeout,
+					TimeoutMsg:   "service may still be provisioning",
 				}); waitErr != nil {
 					cmd.PrintErrf("❌ Error: %s\n", waitErr)
 				} else {

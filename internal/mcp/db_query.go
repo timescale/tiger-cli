@@ -131,7 +131,7 @@ WARNING: Can execute any SQL statement including INSERT, UPDATE, DELETE, and DDL
 			ReadOnlyHint:    false,
 			DestructiveHint: new(true), // Can execute destructive SQL
 			IdempotentHint:  false,     // Queries may have side effects
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Execute SQL Query",
 		},
 	}

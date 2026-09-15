@@ -10,29 +10,20 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 )
 
-type WaitHandler interface {
-	// Message returns the current status message that should be displayed next
-	// to the spinner while waiting for a service to reach some state.
-	Message() string
-
-	// InitialCheck returns true if we don't need to begin the waiting/polling
-	// process, and false if we should.  It also returns an error, which is
-	// either immediately returned from WaitForService or temporarily shown
-	// next to the spinner depending on the first return value.
-	InitialCheck() (bool, error)
-
-	// Check returns true if we're done waiting/polling, and false if we should
-	// continue. It also returns an error, which is either immediately returned
-	// from WaitForService or temporarily shown next to the spinner depending
-	// on the first return value.
-	Check(resp *api.GetServiceResponse) (bool, error)
-}
-
 type WaitForServiceArgs struct {
 	Client    api.ClientWithResponsesInterface
 	ProjectID string
 	ServiceID string
-	Handler   WaitHandler
+
+	// Service is the service as last returned by the API. Its status decides
+	// whether polling is needed at all, and it is updated in place as polling
+	// proceeds so the caller can output the final state afterwards.
+	Service *api.Service
+
+	// TargetStatus ends the wait once the service reports it. Every other
+	// status, including UNSTABLE, keeps polling: transitional states pass and
+	// unstable services often recover on their own.
+	TargetStatus api.DeployStatus
 
 	// Input lets the spinner pick up a Ctrl+C and cancel the wait. See
 	// [SpinnerArgs.Input] for why the spinner needs stdin at all.
@@ -42,24 +33,25 @@ type WaitForServiceArgs struct {
 	TimeoutMsg string
 }
 
+// WaitForService polls a service until it reports TargetStatus, showing its
+// current status next to a spinner in the meantime.
 func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
+	if args.Service.Status == args.TargetStatus {
+		return nil
+	}
+
 	// The spinner cancels this context on Ctrl+C, which the loop below reports
 	// as a canceled wait.
 	ctx, cancel := context.WithTimeout(ctx, args.Timeout)
 	defer cancel()
 
-	if done, err := args.Handler.InitialCheck(); done {
-		return err
-	}
-
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	// Start the spinner
 	spinner := NewSpinner(SpinnerArgs{
 		Input:   args.Input,
 		Output:  args.Output,
-		Message: args.Handler.Message(),
+		Message: statusMessage(args.Service),
 		Cancel:  cancel,
 	})
 	defer spinner.Stop()
@@ -82,91 +74,29 @@ func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 				continue
 			}
 
-			if done, err := args.Handler.Check(resp); done {
-				return err
-			} else if err != nil {
-				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
-				continue
+			switch resp.StatusCode() {
+			case 200:
+				if resp.JSON200 == nil {
+					return errors.New("no response body returned from API")
+				}
+				args.Service.Status = resp.JSON200.Status
+				if args.Service.Status == args.TargetStatus {
+					return nil
+				}
+				spinner.Update(statusMessage(args.Service))
+			case 404:
+				// Can happen if user deletes service while it's still provisioning
+				return errors.New("service not found")
+			case 500:
+				// Assume 500s are temporary server-side issues, and that it's safe to keep polling
+				spinner.Update("Error checking service status: internal server error")
+			default:
+				return fmt.Errorf("received unexpected %s while checking service status", resp.Status())
 			}
-
-			spinner.Update(args.Handler.Message())
 		}
 	}
 }
 
-type StatusWaitHandler struct {
-	TargetStatus string
-	Service      *api.Service
-}
-
-func (h *StatusWaitHandler) Message() string {
-	return fmt.Sprintf("Service status: %s", h.Service.Status)
-}
-
-func (h *StatusWaitHandler) InitialCheck() (bool, error) {
-	// Check initial service status
-	return h.checkServiceStatus(h.Service)
-}
-
-func (h *StatusWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
-	switch resp.StatusCode() {
-	case 200:
-		if resp.JSON200 == nil {
-			return true, errors.New("no response body returned from API")
-		}
-
-		// Update the passed-in service's status, so it's correct when output after waiting.
-		h.Service.Status = resp.JSON200.Status
-
-		// Check returned service status
-		return h.checkServiceStatus(resp.JSON200)
-	case 404:
-		// Can happen if user deletes service while it's still provisioning
-		return true, errors.New("service not found")
-	case 500:
-		// Assume 500s are temporary server-side issues, and that it's safe to keep polling
-		return false, errors.New("internal server error")
-	default:
-		// Fail on unexpected status codes
-		return true, fmt.Errorf("received unexpected %s while checking service status", resp.Status())
-	}
-}
-
-func (h *StatusWaitHandler) checkServiceStatus(service *api.Service) (bool, error) {
-	status := string(service.Status)
-	switch status {
-	case h.TargetStatus:
-		return true, nil
-	case "FAILED", "ERROR":
-		return true, fmt.Errorf("service failed with status: %s", status)
-	default:
-		return false, nil
-	}
-}
-
-type DeletionWaitHandler struct {
-	ServiceID string
-}
-
-func (h *DeletionWaitHandler) Message() string {
-	return fmt.Sprintf("Waiting for service '%s' to be deleted", h.ServiceID)
-}
-
-func (h *DeletionWaitHandler) InitialCheck() (bool, error) {
-	return false, nil
-}
-
-func (h *DeletionWaitHandler) Check(resp *api.GetServiceResponse) (bool, error) {
-	switch resp.StatusCode() {
-	case 200:
-		return false, nil
-	case 404:
-		return true, nil
-	case 500:
-		// Assume 500s are temporary server-side issues, and that it's safe to keep polling
-		return false, errors.New("internal server error")
-	default:
-		// Fail on unexpected status codes
-		return true, fmt.Errorf("received unexpected %s while checking service status", resp.Status())
-	}
+func statusMessage(service *api.Service) string {
+	return fmt.Sprintf("Service status: %s", service.Status)
 }

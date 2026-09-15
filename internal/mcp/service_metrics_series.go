@@ -55,7 +55,11 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["role"].Description = "Convenience filter for the 'role' label. Omit to include all roles. Equivalent to passing {key:\"role\", value:\"primary\"|\"replica\"} via filters."
 	schema.Properties["role"].Enum = []any{"PRIMARY", "REPLICA"}
 
-	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric (e.g. 'role', 'ordinal', 'job_id')."
+	schema.Properties["filters"].Description = "Arbitrary label filters applied to the series query. Recognized label names depend on the metric."
+	schema.Properties["filters"].Examples = []any{
+		[]MetricLabelFilterInput{{Key: "ordinal", Value: "0"}},
+		[]MetricLabelFilterInput{{Key: "job_id", Value: "1000"}},
+	}
 
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)
@@ -63,7 +67,6 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST)."
 	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "COUNT", "P50", "P90", "P99", "LAST"}
-	schema.Properties["fn"].Examples = []any{"RATE"}
 
 	return schema
 }

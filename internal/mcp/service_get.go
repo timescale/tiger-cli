@@ -33,7 +33,9 @@ type ServiceGetOutput struct {
 }
 
 func (ServiceGetOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceGetOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceGetOutput](nil))
+	schema.Properties["service"] = ServiceDetail{}.Schema()
+	return schema
 }
 
 func newServiceGetTool() *mcp.Tool {
@@ -46,7 +48,7 @@ func newServiceGetTool() *mcp.Tool {
 		OutputSchema: ServiceGetOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
-			OpenWorldHint: new(true),
+			OpenWorldHint: new(false),
 			Title:         "Get Service Details",
 		},
 	}
