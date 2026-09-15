@@ -187,8 +187,8 @@ var supportedClients = []clientConfig{
 	},
 	{
 		ClientType:           Devin,
-		Name:                 "Devin Desktop",
-		EditorNames:          []string{"devin-desktop", "devin"},
+		Name:                 "Devin",
+		EditorNames:          []string{"devin"},
 		MCPServersPathPrefix: "/mcpServers",
 		ConfigPaths: []string{
 			"~/.devin/mcp_config.json",
