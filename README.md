@@ -137,7 +137,7 @@ Tiger CLI provides the following commands:
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
 
-Use `tiger <command> --help` for detailed information about each command.
+Use `tiger <command> --help` for detailed information about each command, or browse the generated [CLI reference](docs/cli/tiger.md).
 
 ## MCP Server
 

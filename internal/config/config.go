@@ -22,6 +22,7 @@ const (
 	DefaultAPIURL          = "https://console.cloud.tigerdata.com/public/api/v1"
 	DefaultAnalytics       = true
 	DefaultColor           = true
+	DefaultConfigDir       = "~/.config/tiger"
 	DefaultConsoleURL      = "https://console.cloud.tigerdata.com"
 	DefaultDocsMCP         = true
 	DefaultDocsMCPURL      = "https://mcp.tigerdata.com/docs?disabled_skills=ghost-database"
@@ -372,12 +373,7 @@ func GetConfigFile(dir string) string {
 }
 
 func GetDefaultConfigDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "./.config/tiger"
-	}
-
-	return filepath.Join(homeDir, ".config", "tiger")
+	return util.ExpandPath(DefaultConfigDir)
 }
 
 // getEffectiveConfigDir resolves the config directory from the --config-dir
