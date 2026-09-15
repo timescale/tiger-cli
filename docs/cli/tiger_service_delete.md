@@ -23,21 +23,13 @@ tiger service delete [service-id] [flags]
 
   # Delete service without confirmation prompt
   tiger service delete svc-12345 --confirm
-
-  # Delete service without waiting for completion
-  tiger service delete svc-12345 --no-wait
-
-  # Delete service with custom wait timeout
-  tiger service delete svc-12345 --wait-timeout 15m
 ```
 
 ### Options
 
 ```
-      --confirm                 Skip confirmation prompt (AI agents must confirm with user first)
-  -h, --help                    help for delete
-      --no-wait                 Don't wait for deletion to complete, return immediately
-      --wait-timeout duration   Wait timeout duration (e.g., 30m, 1h30m, 90s) (default 30m0s)
+      --confirm   Skip confirmation prompt (AI agents must confirm with user first)
+  -h, --help      help for delete
 ```
 
 ### Options inherited from parent commands
