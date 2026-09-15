@@ -95,7 +95,7 @@ WARNING: Creates billable resources.`,
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,      // Creating with same name creates multiple services (name is not unique)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Create Database Service",
 		},
 	}

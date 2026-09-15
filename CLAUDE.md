@@ -185,11 +185,36 @@ Only the MCP server logs. `newLogger(w)` (`internal/cmd/logger_helper.go`) point
 
 The server exposes two kinds of tools: native Tiger tools for service management and database operations (one file per tool), and documentation tools proxied from a remote docs MCP server (`proxy.go`).
 
-**Server state.** `NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger. The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
+### Server State
 
-**One file per tool**, named to match the tool (`service_create` → `service_create.go`), laid out in this order: the `<Tool>Input`/`<Tool>Output` structs and their `Schema()` methods, then `new<Tool>Tool()` returning the `*mcp.Tool`, then the `handle<Tool>` handler method on `*Server`, then helpers used only by that tool. Registration lives in `server.go` (`registerServiceTools`, `registerDatabaseTools`), so adding a tool means one new file plus one `addTool` line. Shared schema helpers and API-to-output conversion live in `utils.go`.
+`NewServer(ctx, app, logger)` takes the already-loaded `*common.App` and keeps it on the `Server` along with the logger. The experimental gate and the docs-proxy settings are read once here at startup (a client must restart the server to pick up changes to those), as are read-only mode's startup decisions — which write tools get registered, and the warning in the server instructions. The analytics middleware, though, reloads the App on every request, so handlers see current config and credentials — including the live `read_only` value in the per-call gates (see [Read-Only Mode](#read-only-mode)). Handlers therefore never load anything themselves — they read `s.app.GetAll()`/`GetClient()`/`GetConfig()` and log via `s.logger`.
 
-**Tool schemas.** Generate the base schema from the input struct with `util.Must(jsonschema.For[Input](nil))`, then enhance it in the `Schema()` method: add a description and `Examples` to every field, and use the JSON Schema properties (`Default`, `Minimum`/`Maximum`, `Enum`, `Pattern`, `MaxLength`, …) both to document values for AI assistants and to reject invalid arguments before they reach the handler. Accessing a property that doesn't exist in the generated schema panics at startup, which keeps the schema and the struct in sync. Fields without `omitempty`/`omitzero` are **required**; an optional field with a struct (non-pointer) type must use `omitzero`, because `omitempty` has no effect on struct values and the field would silently stay required.
+### One File Per Tool
+
+Every tool gets its own file in `internal/mcp/`, named to match the tool (`service_create` → `service_create.go`), laid out in this order:
+
+1. The `<Tool>Input`/`<Tool>Output` structs and their `Schema()` methods.
+2. `new<Tool>Tool()`, returning the `*mcp.Tool`.
+3. The `handle<Tool>` handler method on `*Server`.
+4. Helpers used only by that tool.
+
+Registration lives in `server.go` (`registerServiceTools`, `registerDatabaseTools`), so adding a tool means one new file plus one `addTool` line. Shared schema helpers and API-to-output conversion live in `utils.go`.
+
+### Tool Schemas
+
+Generate the base schema from the struct with `util.Must(jsonschema.For[Input](nil))`, then enhance it in the type's `Schema()` method:
+
+- Set a `Description` on every field there, never through `jsonschema` struct tags, so all schema detail for input and output types alike lives in one place.
+- Use the JSON Schema properties (`Default`, `Minimum`/`Maximum`, `Enum`, `Pattern`, `MaxLength`, …) both to document values for AI assistants and to reject invalid arguments before they reach the handler.
+- Illustrative values never go inline in a description string. A field whose values form a fixed, exhaustive set gets an `Enum` and nothing more; every other field gets `Examples`, and a preferred value is signalled with `Default`.
+- The MCP SDK applies schema defaults to the raw arguments before unmarshaling them into the input struct, so a handler reads a defaulted field directly and never re-applies the default itself.
+- `jsonschema.For` doesn't call the `Schema()` methods of nested types, so a nested output type's `Schema()` (or, for a property that must stay nullable, its `set*SchemaProperties` helper) is wired in explicitly by the enclosing type's `Schema()` — `ServiceListOutput` is the model.
+- Accessing a property that doesn't exist in the generated schema panics at startup, which keeps the schema and the struct in sync.
+- Fields without `omitempty`/`omitzero` are **required**. An optional field with a struct (non-pointer) type must use `omitzero`, because `omitempty` has no effect on struct values and the field would silently stay required.
+
+### Annotations
+
+Every tool sets `Annotations`: read-only tools set `ReadOnlyHint`, write tools set `DestructiveHint` and `IdempotentHint`, and all of them set `OpenWorldHint` to false — the tools act only on the Tiger Cloud API and the user's own services, a closed domain rather than an open world of arbitrary external entities.
 
 ## Read-Only Mode
 
