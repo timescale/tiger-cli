@@ -84,7 +84,8 @@ func buildServerInstructions(cfg *config.Config) string {
 		// the refusals — otherwise one looks like a bug.
 		return intro + capabilities + " " +
 			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_query connects to them read-only, so writes and DDL are rejected by the server. " +
-			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it."
+			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it. " +
+			"service_create and service_fork also refuse an environment of PROD, since the mode will not create a service it would then refuse to stop or delete: leave environment at its DEV default."
 	default:
 		return intro + capabilities
 	}

@@ -18,14 +18,15 @@ import (
 
 // ServiceForkInput represents input for service_fork
 type ServiceForkInput struct {
-	ServiceID    string           `json:"service_id"`
-	Name         string           `json:"name,omitempty"`
-	ForkStrategy api.ForkStrategy `json:"fork_strategy"`
-	TargetTime   *time.Time       `json:"target_time,omitempty"`
-	CPUMemory    string           `json:"cpu_memory,omitempty"`
-	Wait         bool             `json:"wait,omitempty"`
-	SetDefault   bool             `json:"set_default,omitempty"`
-	WithPassword bool             `json:"with_password,omitempty"`
+	ServiceID    string             `json:"service_id"`
+	Name         string             `json:"name,omitempty"`
+	ForkStrategy api.ForkStrategy   `json:"fork_strategy"`
+	TargetTime   *time.Time         `json:"target_time,omitempty"`
+	CPUMemory    string             `json:"cpu_memory,omitempty"`
+	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	Wait         bool               `json:"wait,omitempty"`
+	SetDefault   bool               `json:"set_default,omitempty"`
+	WithPassword bool               `json:"with_password,omitempty"`
 }
 
 func (ServiceForkInput) Schema() *jsonschema.Schema {
@@ -38,13 +39,16 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["fork_strategy"].Description = "Fork strategy: 'NOW' creates fork at current state, 'LAST_SNAPSHOT' uses last existing snapshot (faster), 'PITR' allows point-in-time recovery to specific timestamp (requires target_time parameter)"
 	schema.Properties["fork_strategy"].Enum = []any{api.ForkStrategyNOW, api.ForkStrategyLASTSNAPSHOT, api.ForkStrategyPITR}
-	schema.Properties["fork_strategy"].Examples = []any{api.ForkStrategyNOW, api.ForkStrategyLASTSNAPSHOT}
 
-	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format, e.g., '2025-01-15T10:30:00Z'). Only used when fork_strategy is 'PITR'."
+	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format). Only used when fork_strategy is 'PITR'."
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
 	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
+
+	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused."
+	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
+	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -93,7 +97,7 @@ WARNING: Creates billable resources.`,
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,      // Forking same service multiple times creates multiple forks
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Fork Database Service",
 		},
 	}
@@ -106,8 +110,11 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		return nil, ServiceForkOutput{}, err
 	}
 
-	// Deliberately DEV-only: the fork is always tagged DEV.
-	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
+	// Gate on the fork's own tag: under prod mode, forking a PROD source into a
+	// DEV fork is allowed — it reads production without changing it. The SDK
+	// applies the schema's DEV default, so input.Environment is always set by
+	// the time the handler runs.
+	if err := common.CheckReadOnly(cfg, input.Environment); err != nil {
 		return nil, ServiceForkOutput{}, err
 	}
 
@@ -140,14 +147,16 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		slog.String("fork_strategy", string(input.ForkStrategy)),
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
+		slog.String("environment", string(input.Environment)),
 	)
 
 	// Prepare service fork request
 	forkReq := api.ForkServiceCreate{
-		ForkStrategy: input.ForkStrategy,
-		TargetTime:   input.TargetTime,
-		CPUMillis:    cpuMillis,
-		MemoryGbs:    memoryGBs,
+		ForkStrategy:   input.ForkStrategy,
+		TargetTime:     input.TargetTime,
+		CPUMillis:      cpuMillis,
+		MemoryGbs:      memoryGBs,
+		EnvironmentTag: &input.Environment,
 	}
 
 	// Only set name if provided
@@ -200,15 +209,13 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service fork request accepted. The forked service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: serviceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be provisioning",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    serviceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be provisioning",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

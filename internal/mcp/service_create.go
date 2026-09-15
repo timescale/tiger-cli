@@ -17,14 +17,15 @@ import (
 
 // ServiceCreateInput represents input for service_create
 type ServiceCreateInput struct {
-	Name         string   `json:"name,omitempty"`
-	Addons       []string `json:"addons,omitempty"`
-	Region       *string  `json:"region,omitempty"`
-	CPUMemory    string   `json:"cpu_memory,omitempty"`
-	Replicas     int      `json:"replicas,omitempty"`
-	Wait         bool     `json:"wait,omitempty"`
-	SetDefault   bool     `json:"set_default,omitempty"`
-	WithPassword bool     `json:"with_password,omitempty"`
+	Name         string             `json:"name,omitempty"`
+	Addons       []string           `json:"addons,omitempty"`
+	Region       *string            `json:"region,omitempty"`
+	CPUMemory    string             `json:"cpu_memory,omitempty"`
+	Replicas     int                `json:"replicas,omitempty"`
+	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	Wait         bool               `json:"wait,omitempty"`
+	SetDefault   bool               `json:"set_default,omitempty"`
+	WithPassword bool               `json:"with_password,omitempty"`
 }
 
 func (ServiceCreateInput) Schema() *jsonschema.Schema {
@@ -48,6 +49,10 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["replicas"].Maximum = new(5.0)
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
+
+	schema.Properties["environment"].Description = "Environment tag for the new service. Use 'PROD' only for production workloads — under read-only mode for production services, creating a PROD service is refused."
+	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
+	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -90,7 +95,7 @@ WARNING: Creates billable resources.`,
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
 			IdempotentHint:  false,      // Creating with same name creates multiple services (name is not unique)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Create Database Service",
 		},
 	}
@@ -103,9 +108,10 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceCreateOutput{}, err
 	}
 
-	// Deliberately DEV-only: this tool takes no environment_tag, so the API always
-	// tags what it creates DEV.
-	if err := common.CheckReadOnly(cfg, api.EnvironmentTagDEV); err != nil {
+	// Gate on the requested tag: under prod mode, creating DEV is allowed and
+	// creating PROD is not. The SDK applies the schema's DEV default, so
+	// input.Environment is always set by the time the handler runs.
+	if err := common.CheckReadOnly(cfg, input.Environment); err != nil {
 		return nil, ServiceCreateOutput{}, err
 	}
 
@@ -131,16 +137,18 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("cpu", cpuMillis),
 		slog.Any("memory", memoryGBs),
 		slog.Int("replicas", input.Replicas),
+		slog.String("environment", string(input.Environment)),
 	)
 
 	// Prepare service creation request
 	serviceCreateReq := api.ServiceCreate{
-		Name:         input.Name,
-		Addons:       util.ConvertStringSlicePtr[api.ServiceCreateAddons](input.Addons),
-		RegionCode:   input.Region,
-		ReplicaCount: &input.Replicas,
-		CPUMillis:    cpuMillis,
-		MemoryGbs:    memoryGBs,
+		Name:           input.Name,
+		Addons:         util.ConvertStringSlicePtr[api.ServiceCreateAddons](input.Addons),
+		RegionCode:     input.Region,
+		ReplicaCount:   &input.Replicas,
+		CPUMillis:      cpuMillis,
+		MemoryGbs:      memoryGBs,
+		EnvironmentTag: &input.Environment,
 	}
 
 	// Make API call to create service
@@ -188,15 +196,13 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	message := "Service creation request accepted. The service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: serviceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be provisioning",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    serviceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be provisioning",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

@@ -10,6 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -34,12 +35,14 @@ func (ServiceStartInput) Schema() *jsonschema.Schema {
 
 // ServiceStartOutput represents output for service_start
 type ServiceStartOutput struct {
-	Status  string `json:"status" jsonschema:"Current service status after start operation"`
+	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
 func (ServiceStartOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceStartOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceStartOutput](nil))
+	schema.Properties["status"].Description = "Current service status after start operation"
+	return schema
 }
 
 func newServiceStartTool() *mcp.Tool {
@@ -55,7 +58,7 @@ This operation starts a service that is currently in a stopped/paused state. The
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Starting a service cannot really break anything
 			IdempotentHint:  true,       // Starting an already-started service is safe (but returns an error)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Start Database Service",
 		},
 	}
@@ -97,15 +100,13 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	message := "Service start request accepted. The service may still be starting."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: input.ServiceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be starting",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be starting",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
