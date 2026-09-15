@@ -79,7 +79,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withReadPassword("prompted-secret"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your secret key: \nValidating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:prompted-secret", "test-project-id")},
 		},
@@ -91,7 +91,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withStdin("prompted-public\n"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "You can find your API credentials at: https://console.cloud.tigerdata.com/dashboard/settings\n\nEnter your public key: Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("prompted-public:test-secret-key", "test-project-id")},
 		},
@@ -117,7 +117,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "stores credentials from flags",
 			args:       []string{"auth", "login", "--public-key", "test-public-key", "--secret-key", "test-secret-key"},
 			opts:       []runOption{withConfig(patURLs)},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
@@ -146,7 +146,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				"--project-id", "test-project-id",
 			},
 			opts:       []runOption{withConfig(patURLs)},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("test-public-key:test-secret-key", "test-project-id")},
 		},
@@ -158,7 +158,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withEnv("TIGER_PUBLIC_KEY", "env-public-key"),
 				withEnv("TIGER_SECRET_KEY", "env-secret-key"),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkStoredAPIKey("env-public-key:env-secret-key", "test-project-id")},
 		},
@@ -166,7 +166,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth single project",
 			args:       []string{"auth", "login"},
 			opts:       oauthOpts(singleProject.URL),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-123\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
@@ -176,7 +176,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "browser that outlives the handoff doesn't stall the login",
 			args:       []string{"auth", "login"},
 			opts:       []runOption{withConfig(oauthURLs(singleProject.URL)), withOpenBrowser(browserThatStaysOpen(t))},
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-123\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},
@@ -195,7 +195,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth multiple projects with interactive selection",
 			args:       []string{"auth", "login"},
 			opts:       oauthOpts(multiProject.URL, withIsTerminal(true), withSelectProject(2)),
-			wantStdout: "Successfully logged in (project: project-789)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-789\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(multiProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-789")},
 		},
@@ -213,7 +213,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			name:       "oauth project-id flag skips selection",
 			args:       []string{"auth", "login", "--project-id", "project-456"},
 			opts:       oauthOpts(multiProject.URL),
-			wantStdout: "Successfully logged in (project: project-456)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-456\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(multiProject.URL, ""),
 			checks:     []checkFunc{checkStoredOAuthCredentials("project-456")},
 		},
@@ -249,9 +249,9 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"}),
 				withStoredCredentials(prevOAuthCredentials("project-old"))),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-123\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
-				"Cleared default service (config key service_id): it belonged to the previous project\n")),
+				"Cleared default service; it belonged to the previous project.\n")),
 			checks: []checkFunc{checkDefaultService("")},
 		},
 		{
@@ -261,9 +261,9 @@ func TestAuthLoginCmd(t *testing.T) {
 			args: []string{"auth", "login"},
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"})),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-123\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, regexp.QuoteMeta(
-				"Cleared default service (config key service_id): it belonged to the previous project\n")),
+				"Cleared default service; it belonged to the previous project.\n")),
 			checks: []checkFunc{checkDefaultService("")},
 		},
 		{
@@ -272,7 +272,7 @@ func TestAuthLoginCmd(t *testing.T) {
 			opts: oauthOpts(singleProject.URL,
 				withConfig(map[string]any{"service_id": "svc-before"}),
 				withStoredCredentials(prevOAuthCredentials("project-123"))),
-			wantStdout: "Successfully logged in (project: project-123)\n" + nextSteps(true),
+			wantStdout: "Logged in to project project-123\n" + nextSteps(true),
 			wantStderr: matchOAuthStderr(singleProject.URL, ""),
 			checks:     []checkFunc{checkDefaultService("svc-before")},
 		},
@@ -290,7 +290,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyProd, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\nServices tagged PROD are now protected from writes.\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "prod"})},
 		},
@@ -302,7 +302,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyAll, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\nAll services are now protected from writes.\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "all"})},
 		},
@@ -316,7 +316,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyOff, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "off"})},
 		},
@@ -330,7 +330,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode("", false),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(false),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(false),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
 		},
@@ -341,7 +341,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withConfig(map[string]any{"api_url": authInfoServer.URL}),
 				withSelectReadOnlyMode(config.ReadOnlyProd, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(false),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(false),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
 		},
@@ -353,7 +353,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyProd, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "off"})},
 		},
@@ -365,7 +365,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyOff, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "prod"})},
 		},
@@ -377,7 +377,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyProd, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL, "read_only": "all"})},
 		},
@@ -392,7 +392,7 @@ func TestAuthLoginCmd(t *testing.T) {
 				withIsTerminal(true),
 				withSelectReadOnlyMode(config.ReadOnlyProd, true),
 			},
-			wantStdout: "Successfully logged in (project: test-project-id)\n" + nextSteps(true),
+			wantStdout: "Logged in to project test-project-id\n" + nextSteps(true),
 			wantStderr: "Validating API key...\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": authInfoServer.URL})},
 		},
@@ -600,7 +600,7 @@ func prevOAuthCredentials(projectID string) config.Credentials {
 // followed by suffix (an already-quoted pattern, e.g. an Error line).
 func matchOAuthStderr(serverURL, suffix string) matcher {
 	return matchRegexp(fmt.Sprintf(
-		`Auth URL is: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s`,
+		`Auth URL: %s/oauth/authorize\?client_id=%s&code_challenge=[A-Za-z0-9_-]+&code_challenge_method=S256&redirect_uri=http%%3A%%2F%%2Flocalhost%%3A\d+%%2Fcallback&response_type=code&state=[A-Za-z0-9_-]+\nOpening browser for authentication\.\.\.\n%s`,
 		regexp.QuoteMeta(serverURL), config.TigerCLIClientID, suffix))
 }
 
@@ -883,7 +883,7 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 	noCode := httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(noCode.Close)
 
-	loggedIn := "Successfully logged in (project: project-123)\n" + nextSteps(true)
+	loggedIn := "Logged in to project project-123\n" + nextSteps(true)
 
 	// Every failure below reaches the user through loginWithOAuth's wrapper.
 	const authFailed = "failed to authenticate via OAuth: "
@@ -1026,7 +1026,7 @@ func TestAuthLoginDeviceFlow(t *testing.T) {
 			opts:       []runOption{withConfig(oauthURLs(success.URL))},
 			wantStdout: loggedIn,
 			wantStderr: matchOAuthStderr(success.URL, regexp.QuoteMeta(
-				"Failed to open browser: browser disabled in tests\n"+
+				"Warning: failed to open browser: browser disabled in tests\n"+
 					"Falling back to device authorization...\n"+deviceInstructions)),
 			checks: []checkFunc{checkStoredOAuthCredentials("project-123")},
 		},

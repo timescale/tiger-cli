@@ -242,7 +242,7 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output io.Write
 		color.NoColor = false
 	}
 	fmt.Fprintf(output, "\n\n%s %s → %s\nTo upgrade: %s\n",
-		color.YellowString("A new release of tiger-cli is available:"),
+		color.YellowString("A new version of Tiger CLI is available:"),
 		color.CyanString(result.CurrentVersion),
 		color.CyanString(result.LatestVersion),
 		result.UpdateCommand,

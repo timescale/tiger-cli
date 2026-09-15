@@ -49,9 +49,9 @@ func TestServiceResizeCmd(t *testing.T) {
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
-✅ Resize request accepted for service 'svc-12345'!
-💡 Use 'tiger service get' to check service status.
+			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
+Resize request accepted for service 'svc-12345'.
+Use 'tiger service get' to check service status.
 `,
 		},
 		{
@@ -77,7 +77,7 @@ func TestServiceResizeCmd(t *testing.T) {
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr:    "failed to resize service: connection refused",
-			wantStderr: "📐 Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: failed to resize service: connection refused\n",
+			wantStderr: "Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: failed to resize service: connection refused\n",
 		},
 		{
 			name: "API error",
@@ -90,7 +90,7 @@ func TestServiceResizeCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr:    "service not found",
-			wantStderr: "📐 Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: service not found\n",
+			wantStderr: "Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: service not found\n",
 			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -103,7 +103,7 @@ func TestServiceResizeCmd(t *testing.T) {
 					}, nil)
 			},
 			wantErr:    "empty response from API",
-			wantStderr: "📐 Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: empty response from API\n",
+			wantStderr: "Resizing service 'svc-12345' to 2 CPU/8 GB...\nError: empty response from API\n",
 		},
 		{
 			name: "success with wait, service immediately ready",
@@ -115,10 +115,10 @@ func TestServiceResizeCmd(t *testing.T) {
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
-✅ Resize request accepted for service 'svc-12345'!
-⏳ Waiting for resize to complete (timeout: 10m0s)...
-🎉 Service 'svc-12345' has been successfully resized to 2 CPU/8 GB!
+			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
+Resize request accepted for service 'svc-12345'.
+Waiting for resize to complete (timeout: 10m0s)...
+Service resized to 2 CPU/8 GB.
 `,
 		},
 		{
@@ -131,9 +131,9 @@ func TestServiceResizeCmd(t *testing.T) {
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
-✅ Resize request accepted for service 'svc-12345'!
-💡 Use 'tiger service get' to check service status.
+			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
+Resize request accepted for service 'svc-12345'.
+Use 'tiger service get' to check service status.
 `,
 		},
 		{
@@ -147,9 +147,9 @@ func TestServiceResizeCmd(t *testing.T) {
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
-✅ Resize request accepted for service 'svc-12345'!
-💡 Use 'tiger service get' to check service status.
+			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
+Resize request accepted for service 'svc-12345'.
+Use 'tiger service get' to check service status.
 `,
 		},
 		{
@@ -162,9 +162,9 @@ func TestServiceResizeCmd(t *testing.T) {
 						JSON202:      &svc,
 					}, nil)
 			},
-			wantStderr: `📐 Resizing service 'svc-12345' to 4 CPU/16 GB...
-✅ Resize request accepted for service 'svc-12345'!
-💡 Use 'tiger service get' to check service status.
+			wantStderr: `Resizing service 'svc-12345' to 4 CPU/16 GB...
+Resize request accepted for service 'svc-12345'.
+Use 'tiger service get' to check service status.
 `,
 		},
 		{
@@ -192,11 +192,11 @@ func TestServiceResizeCmd(t *testing.T) {
 			wantErr: "wait timeout reached after 10m0s - service may still be resizing",
 			// SilenceErrors is set after the wait fails, so Cobra doesn't
 			// print the usual "Error:" line.
-			wantStderr: `📐 Resizing service 'svc-12345' to 2 CPU/8 GB...
-✅ Resize request accepted for service 'svc-12345'!
-⏳ Waiting for resize to complete (timeout: 10m0s)...
+			wantStderr: `Resizing service 'svc-12345' to 2 CPU/8 GB...
+Resize request accepted for service 'svc-12345'.
+Waiting for resize to complete (timeout: 10m0s)...
 ⢎  Service status: CONFIGURING
-❌ Error: wait timeout reached after 10m0s - service may still be resizing
+Error: wait timeout reached after 10m0s - service may still be resizing
 `,
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},

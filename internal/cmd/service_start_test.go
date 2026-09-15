@@ -54,8 +54,8 @@ func TestServiceStartCmd(t *testing.T) {
 				expectTaggedService("DEV")(m)
 				setupStart(api.DeployStatusRESUMING)(m)
 			},
-			wantStderr: "\u25b6\ufe0f  Start request accepted for service 'svc-12345'.\n" +
-				"\U0001f4a1 Use 'tiger service get' to check service status.\n",
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:    "missing service id",
@@ -112,16 +112,16 @@ func TestServiceStartCmd(t *testing.T) {
 			name:  "no-wait",
 			args:  []string{"service", "start", "svc-12345", "--no-wait"},
 			setup: setupStart(api.DeployStatusRESUMING),
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service get' to check service status.\n",
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:  "wait returns immediately when already ready",
 			args:  []string{"service", "start", "svc-12345"},
 			setup: setupStart(api.DeployStatusREADY),
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to start (wait timeout: 10m0s)...\n" +
-				"✅ Service has been successfully started!\n",
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
+				"Service started.\n",
 		},
 		{
 			name:     "wait polls until ready",
@@ -136,10 +136,10 @@ func TestServiceStartCmd(t *testing.T) {
 						JSON200:      &ready,
 					}, nil)
 			},
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to start (wait timeout: 10m0s)...\n" +
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"⢎  Service status: RESUMING\n" +
-				"✅ Service has been successfully started!\n",
+				"Service started.\n",
 		},
 		{
 			name:     "wait timeout",
@@ -158,10 +158,10 @@ func TestServiceStartCmd(t *testing.T) {
 					}, nil).AnyTimes()
 			},
 			wantErr: "wait timeout reached after 10m0s - service may still be starting",
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"⏳ Waiting for service to start (wait timeout: 10m0s)...\n" +
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"⢎  Service status: RESUMING\n" +
-				"❌ Error: wait timeout reached after 10m0s - service may still be starting\n",
+				"Error: wait timeout reached after 10m0s - service may still be starting\n",
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
@@ -169,15 +169,15 @@ func TestServiceStartCmd(t *testing.T) {
 			args:  []string{"service", "start", "--no-wait"},
 			opts:  []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup: setupStart(api.DeployStatusRESUMING),
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service get' to check service status.\n",
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:  "resume alias",
 			args:  []string{"service", "resume", "svc-12345", "--no-wait"},
 			setup: setupStart(api.DeployStatusRESUMING),
-			wantStderr: "▶️  Start request accepted for service 'svc-12345'.\n" +
-				"💡 Use 'tiger service get' to check service status.\n",
+			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
+				"Use 'tiger service get' to check service status.\n",
 		},
 	})
 }

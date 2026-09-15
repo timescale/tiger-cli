@@ -60,7 +60,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 				expectTaggedService("DEV")(m)
 				setupDelete(m)
 			},
-			wantStderr: "\U0001f5d1\ufe0f  Service 'svc-12345' has been deleted.\n",
+			wantStderr: "Service 'svc-12345' deleted.\n",
 		},
 		{
 			name:    "non-TTY without confirm",
@@ -71,7 +71,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "confirmation mismatch",
 			args:       []string{"service", "delete", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withStdin("svc-other\n")},
-			wantStderr: confirmPrompt + "❌ Delete operation cancelled.\n",
+			wantStderr: confirmPrompt + "Cancelled.\n",
 		},
 		{
 			name:  "confirmation match",
@@ -79,13 +79,13 @@ func TestServiceDeleteCmd(t *testing.T) {
 			opts:  []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
 			setup: setupDelete,
 			wantStderr: confirmPrompt +
-				"🗑️  Service 'svc-12345' has been deleted.\n",
+				"Service 'svc-12345' deleted.\n",
 		},
 		{
 			name:       "confirm flag skips prompt",
 			args:       []string{"service", "delete", "svc-12345", "--confirm"},
 			setup:      setupDelete,
-			wantStderr: "🗑️  Service 'svc-12345' has been deleted.\n",
+			wantStderr: "Service 'svc-12345' deleted.\n",
 		},
 		{
 			name: "network error",
@@ -113,7 +113,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "rm alias",
 			args:       []string{"service", "rm", "svc-12345", "--confirm"},
 			setup:      setupDelete,
-			wantStderr: "🗑️  Service 'svc-12345' has been deleted.\n",
+			wantStderr: "Service 'svc-12345' deleted.\n",
 		},
 	})
 }

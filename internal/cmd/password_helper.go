@@ -39,7 +39,7 @@ func updateAndSaveServicePassword(
 		cmd.PrintErrf("Warning: could not save password: %v\n", err)
 	} else if result.Success {
 		cmd.PrintErrf("%s\n", result.Message)
-		cmd.PrintErrf("To view your new password, run: \n\t tiger service get %s --with-password\n", service.ServiceID)
+		cmd.PrintErrf("View it with: tiger service get %s --with-password\n", service.ServiceID)
 	}
 
 	return nil
@@ -53,7 +53,6 @@ func resetServicePassword(ctx context.Context, cmd *cobra.Command, cfg *config.C
 		if newPassword, err = util.GenerateSecurePassword(32); err != nil {
 			return "", fmt.Errorf("failed to generate new password: %w", err)
 		}
-		cmd.PrintErrf("Successfully generated a new password.\n")
 	}
 
 	// Update and save password

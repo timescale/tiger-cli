@@ -140,7 +140,7 @@ version: %s
 			},
 			wantStdout: "0.1.0\n",
 			wantErr:    "",
-			wantStderr: matchPrefix("\n\nA new release of tiger-cli is available: 0.1.0 → 99.99.99\nTo upgrade: "),
+			wantStderr: matchPrefix("\n\nA new version of Tiger CLI is available: 0.1.0 → 99.99.99\nTo upgrade: "),
 			checks:     []checkFunc{checkExitCode(common.ExitUpdateAvailable)},
 		},
 	})

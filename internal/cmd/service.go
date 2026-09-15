@@ -195,7 +195,7 @@ func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api
 
 	if connectionDetails, err := common.GetConnectionDetails(cfg, service, opts); err != nil {
 		if cmd != nil {
-			cmd.PrintErrf("⚠️  Warning: Failed to get connection details: %v\n", err)
+			cmd.PrintErrf("Warning: Failed to get connection details: %v\n", err)
 		}
 	} else {
 		outputSvc.ConnectionDetails = *connectionDetails
@@ -221,14 +221,14 @@ func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, service api.Se
 		return false
 	}
 
-	// Output the message with appropriate emoji
+	// Only a real storage failure is a warning; the "none" method is informational.
 	if result.Success {
-		cmd.PrintErrf("🔐 %s\n", result.Message)
+		cmd.PrintErrf("%s\n", result.Message)
 		return true
 	} else if result.Method == "none" {
-		cmd.PrintErrf("💡 %s\n", result.Message)
+		cmd.PrintErrf("%s\n", result.Message)
 	} else {
-		cmd.PrintErrf("⚠️  %s\n", result.Message)
+		cmd.PrintErrf("Warning: %s\n", result.Message)
 	}
 	return false
 }
@@ -239,7 +239,7 @@ func setDefaultService(cmd *cobra.Command, cfg *config.Config, serviceID string)
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	cmd.PrintErrf("🎯 Set service '%s' as default service.\n", serviceID)
+	cmd.PrintErrf("Default service set to %s.\n", serviceID)
 	return nil
 }
 
@@ -249,10 +249,10 @@ func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, s
 		return
 	} else if noSetDefault {
 		// If the service wasn't set as the default, include the serviceID in the command
-		cmd.PrintErrf("🔌 Run 'tiger db psql %s' to connect to your new service\n", serviceID)
+		cmd.PrintErrf("Connect with: tiger db psql %s\n", serviceID)
 	} else {
 		// If the service was set as the default, no need to include the serviceID in the command
-		cmd.PrintErrf("🔌 Run 'tiger db psql' to connect to your new service\n")
+		cmd.PrintErrf("Connect with: tiger db psql\n")
 	}
 }
 

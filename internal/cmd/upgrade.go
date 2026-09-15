@@ -158,9 +158,9 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 	archiveURL := fmt.Sprintf("%s/releases/%s/%s", releasesURL, targetTag, archiveFilename)
 	checksumURL := archiveURL + ".sha256"
 
-	verb, pastVerb := "Upgrading", "upgraded"
+	verb, pastVerb := "Upgrading", "Upgraded"
 	if isDowngrade(currentVersion, targetTag) {
-		verb, pastVerb = "Downgrading", "downgraded"
+		verb, pastVerb = "Downgrading", "Downgraded"
 	}
 	cmd.Printf("%s tiger %s → %s\n", verb, currentVersion, targetTag)
 	cmd.Printf("Downloading %s\n", archiveURL)
@@ -187,7 +187,7 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 		return err
 	}
 
-	cmd.Printf("tiger %s successfully to %s\n", pastVerb, targetTag)
+	cmd.Printf("%s tiger to %s\n", pastVerb, targetTag)
 	return nil
 }
 

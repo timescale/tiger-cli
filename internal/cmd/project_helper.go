@@ -37,5 +37,5 @@ func clearStaleDefaultService(cmd *cobra.Command, cfg *config.Config) {
 		cmd.PrintErrln("Warning: the default service from --service-id/TIGER_SERVICE_ID belongs to the previous project and is still in effect")
 		return
 	}
-	cmd.PrintErrln("Cleared default service (config key service_id): it belonged to the previous project")
+	cmd.PrintErrln("Cleared default service; it belonged to the previous project.")
 }
