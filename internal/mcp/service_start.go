@@ -10,6 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -99,15 +100,13 @@ func (s *Server) handleServiceStart(ctx context.Context, req *mcp.CallToolReques
 	message := "Service start request accepted. The service may still be starting."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: input.ServiceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be starting",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be starting",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

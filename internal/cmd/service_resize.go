@@ -119,17 +119,15 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// Wait for resize to complete
 			cmd.PrintErrf("⏳ Waiting for resize to complete (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    client,
-				ProjectID: projectID,
-				ServiceID: serviceID,
-				Handler: &common.StatusWaitHandler{
-					TargetStatus: "READY",
-					Service:      &service,
-				},
-				Input:      cmd.InOrStdin(),
-				Output:     cmd.ErrOrStderr(),
-				Timeout:    waitTimeout,
-				TimeoutMsg: "service may still be resizing",
+				Client:       client,
+				ProjectID:    projectID,
+				ServiceID:    serviceID,
+				Service:      &service,
+				TargetStatus: api.DeployStatusREADY,
+				Input:        cmd.InOrStdin(),
+				Output:       cmd.ErrOrStderr(),
+				Timeout:      waitTimeout,
+				TimeoutMsg:   "service may still be resizing",
 			}); err != nil {
 				// Return error for sake of exit code, but silence since we already output it
 				cmd.PrintErrf("❌ Error: %s\n", err)

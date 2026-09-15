@@ -209,15 +209,13 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service fork request accepted. The forked service may still be provisioning."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: serviceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be provisioning",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    serviceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be provisioning",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
