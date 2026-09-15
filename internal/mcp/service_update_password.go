@@ -53,7 +53,7 @@ func newServiceUpdatePasswordTool() *mcp.Tool {
 			ReadOnlyHint:    false,
 			DestructiveHint: new(true), // Modifies authentication credentials
 			IdempotentHint:  true,      // Same password can be set multiple times
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Update Service Password",
 		},
 	}

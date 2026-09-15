@@ -10,6 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/util"
 )
@@ -34,12 +35,14 @@ func (ServiceStopInput) Schema() *jsonschema.Schema {
 
 // ServiceStopOutput represents output for service_stop
 type ServiceStopOutput struct {
-	Status  string `json:"status" jsonschema:"Current service status after stop operation"`
+	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
 func (ServiceStopOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceStopOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceStopOutput](nil))
+	schema.Properties["status"].Description = "Current service status after stop operation"
+	return schema
 }
 
 func newServiceStopTool() *mcp.Tool {
@@ -55,7 +58,7 @@ This operation stops a service that is currently running. The service will trans
 			ReadOnlyHint:    false,
 			DestructiveHint: new(true), // Stopping a service breaks existing connections and could cause app downtime
 			IdempotentHint:  true,      // Stopping an already-stopped service is safe (but returns an error)
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Stop Database Service",
 		},
 	}
@@ -97,15 +100,13 @@ func (s *Server) handleServiceStop(ctx context.Context, req *mcp.CallToolRequest
 	message := "Service stop request accepted. The service may still be stopping."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: input.ServiceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "PAUSED",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be stopping",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusPAUSED,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be stopping",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

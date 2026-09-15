@@ -117,7 +117,7 @@ func sweepStaleIntegrationServices(t *testing.T, threshold time.Duration) {
 			s.ServiceID, s.Name, s.Created.Format(time.RFC3339))
 		if _, err := executeIntegrationCommand(ctx,
 			"service", "delete", s.ServiceID,
-			"--confirm", "--no-wait"); err != nil {
+			"--confirm"); err != nil {
 			t.Logf("Sweep: failed to delete %s: %v", s.ServiceID, err)
 			continue
 		}
@@ -166,7 +166,6 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 				t.Context(),
 				"service", "delete", serviceID,
 				"--confirm",
-				"--wait-timeout", "5m",
 			)
 			if err != nil {
 				t.Logf("Warning: Failed to cleanup service %s: %v", serviceID, err)
@@ -1387,14 +1386,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Context(),
 			"service", "delete", serviceID,
 			"--confirm",
-			"--wait-timeout", "10m",
 		)
 		if err != nil {
 			t.Fatalf("Service deletion failed: %v\nOutput: %s", err, output)
 		}
 
 		// Verify deletion success message
-		if !strings.Contains(output, "Service deleted") {
+		if !strings.Contains(output, " deleted.") {
 			t.Errorf("Expected deletion success message in output: %s", output)
 		}
 
@@ -1490,7 +1488,7 @@ func extractServiceIDFromCreateOutput(t *testing.T, output string) string {
 	for line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.Contains(line, "Service ID") || strings.Contains(line, "service_id") {
-			// Extract ID from lines like "📋 Service ID: p7yqpiw7a8" or "service_id: svc-12345"
+			// Extract ID from lines like "Service ID: p7yqpiw7a8" or "service_id: svc-12345"
 			parts := strings.Split(line, ":")
 			if len(parts) >= 2 {
 				id := strings.TrimSpace(parts[1])
@@ -1751,7 +1749,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 		},
 		{
 			name: "service delete",
-			args: []string{"service", "delete", "non-existent-service", "--confirm", "--no-wait"},
+			args: []string{"service", "delete", "non-existent-service", "--confirm"},
 		},
 		{
 			name: "service start",
@@ -1891,7 +1889,6 @@ func TestServiceForkIntegration(t *testing.T) {
 				t.Context(),
 				"service", "delete", sourceServiceID,
 				"--confirm",
-				"--wait-timeout", "5m",
 			)
 			if err != nil {
 				t.Logf("Warning: Failed to cleanup source service %s: %v", sourceServiceID, err)
@@ -1907,7 +1904,6 @@ func TestServiceForkIntegration(t *testing.T) {
 				t.Context(),
 				"service", "delete", forkedServiceID,
 				"--confirm",
-				"--wait-timeout", "5m",
 			)
 			if err != nil {
 				t.Logf("Warning: Failed to cleanup forked service %s: %v", forkedServiceID, err)
@@ -2056,7 +2052,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Context(),
 			"service", "delete", extractedServiceID,
 			"--confirm",
-			"--wait-timeout", "10m",
 		)
 		if err != nil {
 			t.Fatalf("Early fork service deletion failed: %v\nOutput: %s", err, output)
@@ -2200,7 +2195,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Context(),
 			"service", "delete", forkedServiceID,
 			"--confirm",
-			"--wait-timeout", "10m",
 		)
 		if err != nil {
 			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
@@ -2276,7 +2270,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Context(),
 			"service", "delete", forkedServiceID,
 			"--confirm",
-			"--wait-timeout", "10m",
 		)
 		if err != nil {
 			t.Fatalf("Forked service deletion failed: %v\nOutput: %s", err, output)
@@ -2298,7 +2291,6 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Context(),
 			"service", "delete", sourceServiceID,
 			"--confirm",
-			"--wait-timeout", "10m",
 		)
 		if err != nil {
 			t.Fatalf("Source service deletion failed: %v\nOutput: %s", err, output)

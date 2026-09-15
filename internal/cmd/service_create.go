@@ -178,17 +178,15 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				// Wait for service to be ready
 				cmd.PrintErrf("Waiting for service to be ready (timeout: %v)...\n", waitTimeout)
 				if waitErr = common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-					Client:    client,
-					ProjectID: projectID,
-					ServiceID: serviceID,
-					Handler: &common.StatusWaitHandler{
-						TargetStatus: "READY",
-						Service:      &service,
-					},
-					Input:      cmd.InOrStdin(),
-					Output:     cmd.ErrOrStderr(),
-					Timeout:    waitTimeout,
-					TimeoutMsg: "service may still be provisioning",
+					Client:       client,
+					ProjectID:    projectID,
+					ServiceID:    serviceID,
+					Service:      &service,
+					TargetStatus: api.DeployStatusREADY,
+					Input:        cmd.InOrStdin(),
+					Output:       cmd.ErrOrStderr(),
+					Timeout:      waitTimeout,
+					TimeoutMsg:   "service may still be provisioning",
 				}); waitErr != nil {
 					cmd.PrintErrf("Error: %s\n", waitErr)
 				} else {

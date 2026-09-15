@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -14,8 +13,6 @@ import (
 
 // buildServiceDeleteCmd creates the delete subcommand
 func buildServiceDeleteCmd(app *common.App) *cobra.Command {
-	var noWait bool
-	var waitTimeout time.Duration
 	var confirm bool
 
 	cmd := &cobra.Command{
@@ -32,13 +29,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
   tiger service delete svc-12345
 
   # Delete service without confirmation prompt
-  tiger service delete svc-12345 --confirm
-
-  # Delete service without waiting for completion
-  tiger service delete svc-12345 --no-wait
-
-  # Delete service with custom wait timeout
-  tiger service delete svc-12345 --wait-timeout 15m`,
+  tiger service delete svc-12345 --confirm`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
@@ -92,40 +83,11 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.PrintErrf("Delete request accepted for service '%s'.\n", serviceID)
-
-			// If not waiting, return early
-			if noWait {
-				cmd.PrintErrln("Use 'tiger service list' to check deletion status.")
-				return nil
-			}
-
-			// Wait for deletion to complete
-			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    client,
-				ProjectID: projectID,
-				ServiceID: serviceID,
-				Handler: &common.DeletionWaitHandler{
-					ServiceID: serviceID,
-				},
-				Input:      cmd.InOrStdin(),
-				Output:     cmd.ErrOrStderr(),
-				Timeout:    waitTimeout,
-				TimeoutMsg: "service may still be deleting",
-			}); err != nil {
-				// Return error for sake of exit code, but log ourselves for sake of icon
-				cmd.PrintErrf("Error: %s\n", err)
-				cmd.SilenceErrors = true
-				return err
-			}
-
-			cmd.PrintErrln("Service deleted.")
+			cmd.PrintErrf("Service '%s' deleted.\n", serviceID)
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for deletion to complete, return immediately")
-	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt (AI agents must confirm with user first)")
 
 	return cmd

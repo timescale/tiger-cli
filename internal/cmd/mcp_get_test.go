@@ -7,7 +7,7 @@ import (
 func TestMCPGetCmd(t *testing.T) {
 	// service_get exercises the full text layout: annotation tags, description,
 	// a Parameters section, and a nested Output schema.
-	serviceGetText := `Get Service Details [read-only] [open-world]
+	serviceGetText := `Get Service Details [read-only]
 
 Tool name: service_get
 
@@ -31,16 +31,16 @@ Output:
     • region (required): string
     • replicas (required): integer - Number of HA replicas (0=single node/no HA, 1+=HA enabled)
     • resources: object, null
-      • cpu: string - CPU allocation (e.g., '0.5 cores', '1 core')
-      • memory: string - Memory allocation (e.g., '2 GB', '4 GB')
-    • status (required): string - Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+      • cpu: string - CPU allocation
+      • memory: string - Memory allocation
+    • status (required): string - Service status
     • type (required): string
 
 `
 
 	// service_list takes no parameters, so its text output has no Parameters
 	// section.
-	serviceListText := `List Database Services [read-only] [open-world]
+	serviceListText := `List Database Services [read-only]
 
 Tool name: service_list
 
@@ -55,9 +55,9 @@ Output:
     • name (required): string
     • region (required): string
     • resources: object, null
-      • cpu: string - CPU allocation (e.g., '0.5 cores', '1 core')
-      • memory: string - Memory allocation (e.g., '2 GB', '4 GB')
-    • status (required): string - Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+      • cpu: string - CPU allocation
+      • memory: string - Memory allocation
+    • status (required): string - Service status
     • type (required): string
 
 `
@@ -65,7 +65,7 @@ Output:
 	serviceListJSON := `{
   "annotations": {
     "idempotentHint": false,
-    "openWorldHint": true,
+    "openWorldHint": false,
     "readOnlyHint": true,
     "title": "List Database Services"
   },
@@ -103,11 +103,21 @@ Output:
               "additionalProperties": false,
               "properties": {
                 "cpu": {
-                  "description": "CPU allocation (e.g., '0.5 cores', '1 core')",
+                  "description": "CPU allocation",
+                  "examples": [
+                    "0.5 cores",
+                    "1 core",
+                    "4 cores"
+                  ],
                   "type": "string"
                 },
                 "memory": {
-                  "description": "Memory allocation (e.g., '2 GB', '4 GB')",
+                  "description": "Memory allocation",
+                  "examples": [
+                    "2 GB",
+                    "4 GB",
+                    "16 GB"
+                  ],
                   "type": "string"
                 }
               },
@@ -117,10 +127,21 @@ Output:
               ]
             },
             "status": {
-              "description": "Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)",
+              "description": "Service status",
+              "examples": [
+                "READY",
+                "PAUSED",
+                "CONFIGURING",
+                "UPGRADING"
+              ],
               "type": "string"
             },
             "type": {
+              "enum": [
+                "TIMESCALEDB",
+                "POSTGRES",
+                "VECTOR"
+              ],
               "type": "string"
             }
           },
@@ -151,7 +172,7 @@ Output:
 
 	serviceListYAML := `annotations:
   idempotentHint: false
-  openWorldHint: true
+  openWorldHint: false
   readOnlyHint: true
   title: List Database Services
 description: List all database services in your Tiger Cloud project. Returns services with status, type, region, and resource allocation.
@@ -182,18 +203,35 @@ outputSchema:
             additionalProperties: false
             properties:
               cpu:
-                description: CPU allocation (e.g., '0.5 cores', '1 core')
+                description: CPU allocation
+                examples:
+                  - 0.5 cores
+                  - 1 core
+                  - 4 cores
                 type: string
               memory:
-                description: Memory allocation (e.g., '2 GB', '4 GB')
+                description: Memory allocation
+                examples:
+                  - 2 GB
+                  - 4 GB
+                  - 16 GB
                 type: string
             type:
               - "null"
               - object
           status:
-            description: Service status (e.g., READY, PAUSED, CONFIGURING, UPGRADING)
+            description: Service status
+            examples:
+              - READY
+              - PAUSED
+              - CONFIGURING
+              - UPGRADING
             type: string
           type:
+            enum:
+              - TIMESCALEDB
+              - POSTGRES
+              - VECTOR
             type: string
         required:
           - id

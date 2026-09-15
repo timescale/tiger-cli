@@ -38,13 +38,16 @@ func (ServiceResizeInput) Schema() *jsonschema.Schema {
 
 // ServiceResizeOutput represents output for service_resize
 type ServiceResizeOutput struct {
-	Status    string        `json:"status" jsonschema:"Current service status after resize operation"`
+	Status    string        `json:"status"`
 	Resources *ResourceInfo `json:"resources,omitempty"`
 	Message   string        `json:"message"`
 }
 
 func (ServiceResizeOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceResizeOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceResizeOutput](nil))
+	schema.Properties["status"].Description = "Current service status after resize operation"
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	return schema
 }
 
 func newServiceResizeTool() *mcp.Tool {
@@ -63,7 +66,7 @@ WARNING: Creates billable resource changes. Increasing resources will increase c
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Not destructive, just modifies resources
 			IdempotentHint:  true,       // Can resize to same size multiple times
-			OpenWorldHint:   new(true),
+			OpenWorldHint:   new(false),
 			Title:           "Resize Database Service",
 		},
 	}
@@ -119,15 +122,13 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 	message := "Resize request accepted. The service may still be resizing."
 	if input.Wait {
 		if err := common.WaitForService(ctx, common.WaitForServiceArgs{
-			Client:    client,
-			ProjectID: projectID,
-			ServiceID: input.ServiceID,
-			Handler: &common.StatusWaitHandler{
-				TargetStatus: "READY",
-				Service:      &service,
-			},
-			Timeout:    waitTimeout,
-			TimeoutMsg: "service may still be resizing",
+			Client:       client,
+			ProjectID:    projectID,
+			ServiceID:    input.ServiceID,
+			Service:      &service,
+			TargetStatus: api.DeployStatusREADY,
+			Timeout:      waitTimeout,
+			TimeoutMsg:   "service may still be resizing",
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {

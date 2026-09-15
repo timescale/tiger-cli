@@ -81,17 +81,15 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			// Wait for service to become ready
 			cmd.PrintErrf("Waiting for service to start (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    client,
-				ProjectID: projectID,
-				ServiceID: serviceID,
-				Handler: &common.StatusWaitHandler{
-					TargetStatus: "READY",
-					Service:      &service,
-				},
-				Input:      cmd.InOrStdin(),
-				Output:     cmd.ErrOrStderr(),
-				Timeout:    waitTimeout,
-				TimeoutMsg: "service may still be starting",
+				Client:       client,
+				ProjectID:    projectID,
+				ServiceID:    serviceID,
+				Service:      &service,
+				TargetStatus: api.DeployStatusREADY,
+				Input:        cmd.InOrStdin(),
+				Output:       cmd.ErrOrStderr(),
+				Timeout:      waitTimeout,
+				TimeoutMsg:   "service may still be starting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				cmd.PrintErrf("Error: %s\n", err)

@@ -81,17 +81,15 @@ This operation stops a service that is currently active/running. The service wil
 			// Wait for service to become paused
 			cmd.PrintErrf("Waiting for service to stop (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
-				Client:    client,
-				ProjectID: projectID,
-				ServiceID: serviceID,
-				Handler: &common.StatusWaitHandler{
-					TargetStatus: "PAUSED",
-					Service:      &service,
-				},
-				Input:      cmd.InOrStdin(),
-				Output:     cmd.ErrOrStderr(),
-				Timeout:    waitTimeout,
-				TimeoutMsg: "service may still be stopping",
+				Client:       client,
+				ProjectID:    projectID,
+				ServiceID:    serviceID,
+				Service:      &service,
+				TargetStatus: api.DeployStatusPAUSED,
+				Input:        cmd.InOrStdin(),
+				Output:       cmd.ErrOrStderr(),
+				Timeout:      waitTimeout,
+				TimeoutMsg:   "service may still be stopping",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
 				cmd.PrintErrf("Error: %s\n", err)
