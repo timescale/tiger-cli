@@ -32,6 +32,7 @@ const (
 	toolServiceStart            = "service_start"
 	toolServiceStop             = "service_stop"
 	toolServiceResize           = "service_resize"
+	toolServiceRename           = "service_rename"
 	toolServiceUpdatePassword   = "service_update_password"
 	toolServiceDelete           = "service_delete"
 	toolServiceLogs             = "service_logs"
@@ -62,6 +63,7 @@ var readOnlyGatedTools = []string{
 	toolServiceStart,
 	toolServiceStop,
 	toolServiceResize,
+	toolServiceRename,
 	toolServiceUpdatePassword,
 	toolServiceDelete,
 }
@@ -184,6 +186,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
 	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
 	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 

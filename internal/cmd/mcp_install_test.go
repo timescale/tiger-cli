@@ -26,33 +26,21 @@ func stubTigerExecutablePath(t *testing.T, path string) {
 // installSuccessOutput is the exact stdout `tiger mcp install` prints after a
 // successful file-based installation.
 func installSuccessOutput(clientName, configPath string) string {
-	return fmt.Sprintf(`✅ Successfully installed Tiger MCP server configuration for %s
-📁 Configuration file: %s
+	return fmt.Sprintf(`Installed Tiger MCP server configuration for %s
+Configuration file: %s
 
-💡 Next steps:
+Next steps:
    1. Restart %s to load the new configuration
    2. The Tiger MCP server will be available as 'tiger'
 
-🤖 Try asking your AI assistant:
-
-   📊 List and manage your Tiger Cloud services:
+Try asking your AI assistant:
    • "List my Tiger Cloud services"
-   • "Show me details for service xyz-123"
    • "Create a new database service called my-app-db"
-   • "Update the password for my database service"
-   • "What Tiger Cloud services do I have access to?"
-
-   📚 Ask questions from the PostgreSQL and Tiger Cloud documentation:
-   • "Show me Tiger Cloud documentation about hypertables?"
+   • "Show me Tiger Cloud documentation about hypertables"
    • "What are the best practices for PostgreSQL indexing?"
-   • "What is the command for renaming a table?"
    • "Help me optimize my PostgreSQL queries"
-
-   📋 Make use of our optimized AI guides for common workflows:
    • "Help me create a new database schema for my application"
-   • "Help me set up hypertables for the device_readings table"
    • "Help me figure out which tables should be hypertables"
-   • "What's the best way to structure time-series data?"
 `, clientName, configPath, clientName)
 }
 
@@ -117,13 +105,15 @@ func TestMCPInstallCmd(t *testing.T) {
 		return p
 	}
 
-	// Stub `claude` on PATH so the CLI-based install path runs end-to-end
-	// without the real client; the script records its argv for the check.
+	// Stub `claude` and `devin` on PATH so the CLI-based install paths run end-to-end
+	// without the real clients; the script records its argv for the check.
 	stubBin := t.TempDir()
 	argvFile := filepath.Join(stubBin, "argv")
 	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
-	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0o755); err != nil {
-		t.Fatalf("failed to write claude stub: %v", err)
+	for _, stub := range []string{"claude", "devin"} {
+		if err := os.WriteFile(filepath.Join(stubBin, stub), []byte(stubScript), 0o755); err != nil {
+			t.Fatalf("failed to write %s stub: %v", stub, err)
+		}
 	}
 	cliHome := t.TempDir()
 
@@ -144,7 +134,7 @@ func TestMCPInstallCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "too many arguments",
-			args:    []string{"mcp", "install", "cursor", "windsurf"},
+			args:    []string{"mcp", "install", "cursor", "devin"},
 			wantErr: "accepts at most 1 arg(s), received 2",
 		},
 		{
@@ -155,7 +145,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
 		},
 		{
 			name:    "invalid existing config",
@@ -335,6 +325,22 @@ func TestMCPInstallCmd(t *testing.T) {
 			}},
 		},
 		{
+			name: "installs devin (cli)",
+			args: []string{"mcp", "install", "devin"},
+			opts: []runOption{
+				withEnv("PATH", stubBin),
+				withEnv("HOME", cliHome),
+			},
+			wantStdout: installSuccessOutput("devin", filepath.Join(cliHome, ".config", "devin", "mcp_config.json")),
+			checks: []checkFunc{func(t *testing.T, result cmdResult) {
+				argv, err := os.ReadFile(argvFile)
+				if err != nil {
+					t.Fatalf("devin stub was not invoked: %v", err)
+				}
+				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\n--\ntiger\nmcp\nstart\n")
+			}},
+		},
+		{
 			name:       "client name is case-insensitive",
 			args:       []string{"mcp", "install", "CURSOR", "--no-backup", "--config-path", path("upper")},
 			wantStdout: installSuccessOutput("CURSOR", path("upper")),
@@ -392,8 +398,8 @@ func TestFindClientConfig(t *testing.T) {
 		{"CLAUDE-CODE", ClaudeCode, "Claude Code"},
 		{"cursor", Cursor, "Cursor"},
 		{"CURSOR", Cursor, "Cursor"},
-		{"windsurf", Windsurf, "Windsurf"},
-		{"WindSurf", Windsurf, "Windsurf"},
+		{"devin", Devin, "Devin"},
+		{"DEVIN", Devin, "Devin"},
 		{"codex", Codex, "Codex"},
 		{"CODEX", Codex, "Codex"},
 	}
@@ -553,6 +559,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 		want := map[MCPClient][]string{
 			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
+			Devin:      {"devin", "mcp", "add", "-s", "user", "tiger", "--", "/path/to/tiger", "mcp", "start"},
 			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
 			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},

@@ -140,6 +140,12 @@ Helper functions inside `internal/cmd` take the `*cobra.Command` and print throu
 - Serialize with `util.SerializeToJSON` and `util.SerializeToYAML`. **Don't add `yaml:` struct tags to output types** — `SerializeToYAML` encodes to JSON first and converts, so only `json:` tags matter and the two formats stay consistent (including for generated types that only carry `json:` tags).
 - Colored output uses `fatih/color`; the lifecycle sets `color.NoColor` from `cfg.Color`, so commands need no per-command wiring.
 
+### Tone
+
+Status output is plain, concise, and factual: say what happened and stop. No emojis, decorative symbols, or exclamation points, and no "successfully" — the absence of an error already says the operation worked ("Service started.", not "✅ Service has been successfully started!"). Skip filler and encouragement ("your new service", "Ready to get started?"), and drop any line that doesn't tell the user something they can act on. Parallel commands use parallel wording, so create and fork both end with "Service is ready." and every wait line uses the same "(timeout: ...)" form. `tiger service create` is the model. The same applies to the messages MCP tools return.
+
+Warnings and errors follow the same standard. A non-fatal failure prints to stderr as `Warning: <lowercase description>` (`Warning: failed to open browser: ...`), never as a bare "Failed to ..." line or a lowercase `warning:`. Errors state the fix without pleading (`run 'tiger auth login'`, not `please run ...`); when an error has two sentences, the second starts with a capital letter as normal prose (`psql not found. Install the PostgreSQL client tools`).
+
 ### Reading Stdin
 
 Read user input through the helpers in `internal/util/read.go` — `util.ReadLine` (one trimmed line), `util.ReadPassword` (no echo, saves and restores terminal state), and `util.ReadAll` (everything, for piped input) — never by driving `bufio`/`term` directly. All three select on `ctx.Done()`, so Ctrl-C unblocks a waiting prompt instead of hanging.
@@ -228,7 +234,7 @@ A destructive tool that needs a human in the loop asks through MCP elicitation, 
 
 ## Read-Only Mode
 
-`cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off` (`prod` protects only services tagged `PROD`). `config.Load` normalizes every value through `parseReadOnlyMode`, which also accepts the legacy boolean spellings, so nothing downstream sees an unnormalized value. Every write/destructive surface on both planes gates through one of the two checks in `internal/common/read_only.go` — on the CLI side that's the `RunE` of `service create`, `fork`, `start`, `stop`, `resize`, `update-password`, `delete`, and `db create role`; on the MCP side, the handlers of the write tools listed in `readOnlyGatedTools`:
+`cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off` (`prod` protects only services tagged `PROD`). `config.Load` normalizes every value through `parseReadOnlyMode`, which also accepts the legacy boolean spellings, so nothing downstream sees an unnormalized value. Every write/destructive surface on both planes gates through one of the two checks in `internal/common/read_only.go` — on the CLI side that's the `RunE` of `service create`, `fork`, `start`, `stop`, `rename`, `resize`, `update-password`, `delete`, and `db create role`; on the MCP side, the handlers of the write tools listed in `readOnlyGatedTools`:
 
 - `common.CheckReadOnly(cfg, tag)` — for a caller that has the target's environment tag: from a fetched service via `common.ServiceEnvironmentTag(service)`, or from the tag about to be requested (`--environment` on `service create`/`fork`, and the `environment` parameter of the matching MCP tools, both defaulting to `DEV`).
 - `common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, serviceID)` — the same verdict from an ID, fetching the service to read its tag. The fetch happens only under `prod` (`all` refuses and `off` allows without one), and a failed fetch is a refusal.

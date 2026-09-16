@@ -219,7 +219,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 		}); err != nil {
 			message = fmt.Sprintf("Error: %s", err.Error())
 		} else {
-			message = "Service forked successfully and is ready!"
+			message = "Forked service is ready."
 		}
 	}
 

@@ -21,7 +21,7 @@ func SupportedClients() []ClientInfo {
 // Install installs an MCP server configuration for the specified client.
 //
 // Required options:
-//   - ClientName: The name of the client to configure (e.g., "claude-code", "cursor", "windsurf")
+//   - ClientName: The name of the client to configure (e.g., "claude-code", "cursor", "devin")
 //   - ServerName: The name to register the MCP server as (e.g., "my-mcp-server")
 //   - Command: Path to the MCP server binary (e.g., "/usr/local/bin/my-server")
 //   - Args: Arguments to pass to the MCP server binary (e.g., []string{"serve", "--port", "8080"})
