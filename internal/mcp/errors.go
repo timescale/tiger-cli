@@ -15,6 +15,7 @@ var readOnlyGatedTools = []string{
 	toolServiceStart,
 	toolServiceStop,
 	toolServiceResize,
+	toolServiceRename,
 	toolServiceUpdatePassword,
 }
 
