@@ -160,7 +160,6 @@ tiger mcp install cursor           # Cursor IDE
 tiger mcp install devin            # Devin
 tiger mcp install gemini           # Gemini CLI
 tiger mcp install vscode           # VS Code
-tiger mcp install windsurf         # Windsurf
 ```
 
 After installation, restart your AI assistant to activate the Tiger MCP server.

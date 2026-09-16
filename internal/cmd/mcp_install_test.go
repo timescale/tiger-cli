@@ -146,7 +146,7 @@ func TestMCPInstallCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "too many arguments",
-			args:    []string{"mcp", "install", "cursor", "windsurf"},
+			args:    []string{"mcp", "install", "cursor", "devin"},
 			wantErr: "accepts at most 1 arg(s), received 2",
 		},
 		{
@@ -157,7 +157,7 @@ func TestMCPInstallCmd(t *testing.T) {
 		{
 			name:    "unsupported client",
 			args:    []string{"mcp", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, windsurf, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
 		},
 		{
 			name:    "invalid existing config",
@@ -410,8 +410,6 @@ func TestFindClientConfig(t *testing.T) {
 		{"CLAUDE-CODE", ClaudeCode, "Claude Code"},
 		{"cursor", Cursor, "Cursor"},
 		{"CURSOR", Cursor, "Cursor"},
-		{"windsurf", Windsurf, "Windsurf"},
-		{"WindSurf", Windsurf, "Windsurf"},
 		{"devin", Devin, "Devin"},
 		{"DEVIN", Devin, "Devin"},
 		{"codex", Codex, "Codex"},
