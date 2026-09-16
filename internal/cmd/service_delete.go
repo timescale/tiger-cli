@@ -63,7 +63,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
 				if confirmation != serviceID {
-					cmd.PrintErrln("Cancelled.")
+					cmd.PrintErrln("Delete operation cancelled.")
 					return nil
 				}
 			}

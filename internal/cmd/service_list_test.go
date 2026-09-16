@@ -12,7 +12,7 @@ import (
 )
 
 const noServicesStderr = "No services found.\n" +
-	"Create one with: tiger service create.\n"
+	"Create your first service with: tiger service create\n"
 
 func TestServiceListCmd(t *testing.T) {
 	services := []api.Service{

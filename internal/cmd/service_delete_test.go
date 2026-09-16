@@ -71,7 +71,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "confirmation mismatch",
 			args:       []string{"service", "delete", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withStdin("svc-other\n")},
-			wantStderr: confirmPrompt + "Cancelled.\n",
+			wantStderr: confirmPrompt + "Delete operation cancelled.\n",
 		},
 		{
 			name:  "confirmation match",
