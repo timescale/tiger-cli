@@ -143,7 +143,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			args:       []string{"service", "backup", "svc-12345"},
 			opts:       []runOption{experimental},
 			setup:      setupList([]api.Backup{}),
-			wantStderr: "No backups found for this service yet.\n",
+			wantStderr: "No backups found.\n",
 		},
 		{
 			// The label is omitted from the table: it repeats STARTED and TYPE,

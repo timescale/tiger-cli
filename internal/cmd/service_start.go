@@ -70,16 +70,16 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("▶️  Start request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Start request accepted for service '%s'.\n", serviceID)
 
 			// If not waiting, return early
 			if noWait {
-				cmd.PrintErrln("💡 Use 'tiger service get' to check service status.")
+				cmd.PrintErrln("Use 'tiger service get' to check service status.")
 				return nil
 			}
 
 			// Wait for service to become ready
-			cmd.PrintErrf("⏳ Waiting for service to start (wait timeout: %v)...\n", waitTimeout)
+			cmd.PrintErrf("Waiting for service to start (timeout: %v)...\n", waitTimeout)
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:       client,
 				ProjectID:    projectID,
@@ -92,12 +92,12 @@ This operation starts a service that is currently in an inactive/stopped state. 
 				TimeoutMsg:   "service may still be starting",
 			}); err != nil {
 				// Return error for sake of exit code, but log ourselves for sake of icon
-				cmd.PrintErrf("❌ Error: %s\n", err)
+				cmd.PrintErrf("Error: %s\n", err)
 				cmd.SilenceErrors = true
 				return err
 			}
 
-			cmd.PrintErrf("✅ Service has been successfully started!\n")
+			cmd.PrintErrf("Service started.\n")
 			return nil
 		},
 	}

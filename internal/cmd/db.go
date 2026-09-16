@@ -61,6 +61,6 @@ func isPostgresAuthenticationError(err error) bool {
 // any. It is a no-op for a primary target or when there's nothing to warn.
 func warnReplicaPooler(cmd *cobra.Command, target *common.ConnectionTarget, pooled bool) {
 	if warning := common.ReplicaPoolerWarning(target, pooled); warning != "" {
-		cmd.PrintErrf("⚠️  Warning: %s\n", warning)
+		cmd.PrintErrf("Warning: %s\n", warning)
 	}
 }

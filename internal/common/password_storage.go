@@ -98,7 +98,7 @@ func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordSt
 	return PasswordStorageResult{
 		Success: true,
 		Method:  "keyring",
-		Message: "Password saved to system keyring for automatic authentication",
+		Message: "Password saved to system keyring",
 	}
 }
 
@@ -297,7 +297,7 @@ func (p *PgpassStorage) GetStorageResult(err error, password string) PasswordSto
 	return PasswordStorageResult{
 		Success: true,
 		Method:  "pgpass",
-		Message: "Password saved to ~/.pgpass for automatic authentication",
+		Message: "Password saved to ~/.pgpass",
 	}
 }
 

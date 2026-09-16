@@ -51,7 +51,7 @@ func NewAPIClient(ctx context.Context, cfg *config.Config) (*api.ClientWithRespo
 	if !fromEnv {
 		stored, err := GetStoredCredentials(cfg)
 		if err != nil {
-			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", err))
+			return nil, "", ExitWithCode(ExitAuthenticationError, fmt.Errorf("authentication required: %w. Run 'tiger auth login'", err))
 		}
 
 		client, err := api.NewTigerClientForCredentials(cfg, stored)

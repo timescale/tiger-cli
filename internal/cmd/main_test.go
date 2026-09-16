@@ -479,13 +479,13 @@ func withNotLoggedIn() runOption {
 
 // notLoggedInMsg is the message of the error withNotLoggedIn makes the client
 // factory return; test cases expect it as their wantErr.
-const notLoggedInMsg = "authentication required: not logged in. Please run 'tiger auth login'"
+const notLoggedInMsg = "authentication required: not logged in. Run 'tiger auth login'"
 
 // notLoggedInError mirrors the error common.NewAPIClient returns when no
 // credentials are stored.
 func notLoggedInError() error {
 	return common.ExitWithCode(common.ExitAuthenticationError,
-		fmt.Errorf("authentication required: %w. Please run 'tiger auth login'", config.ErrNotLoggedIn))
+		fmt.Errorf("authentication required: %w. Run 'tiger auth login'", config.ErrNotLoggedIn))
 }
 
 // checkFunc is an extra assertion a cmdTest runs after the standard ones.

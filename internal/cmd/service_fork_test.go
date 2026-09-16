@@ -35,9 +35,8 @@ PGUSER=tsdbadmin
 	// in the strategy description of the first line.
 	noWaitStderr := func(firstLine string) string {
 		return firstLine + `
-✅ Fork request accepted!
-📋 New Service ID: svc-67890
-⏳ Service is being forked. Use 'tiger service list' to check status.
+Service ID: svc-67890
+Service is being forked. Use 'tiger service list' to check status.
 `
 	}
 
@@ -95,7 +94,7 @@ PGUSER=tsdbadmin
 					}, nil)
 			},
 			wantStdout: forkedEnv,
-			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state..."),
+			wantStderr: noWaitStderr("Forking service 'svc-12345' at current state..."),
 		},
 		{
 			name:    "missing service id",
@@ -115,7 +114,7 @@ PGUSER=tsdbadmin
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr:    "failed to fork Service: connection refused",
-			wantStderr: "🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state...\nError: failed to fork Service: connection refused\n",
+			wantStderr: "Forking service 'svc-12345' at current state...\nError: failed to fork Service: connection refused\n",
 		},
 		{
 			name: "API error",
@@ -128,7 +127,7 @@ PGUSER=tsdbadmin
 					}, nil)
 			},
 			wantErr:    "service not found",
-			wantStderr: "🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state...\nError: service not found\n",
+			wantStderr: "Forking service 'svc-12345' at current state...\nError: service not found\n",
 			checks:     []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
@@ -141,7 +140,7 @@ PGUSER=tsdbadmin
 					}, nil)
 			},
 			wantErr:    "empty response from API",
-			wantStderr: "🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state...\nError: empty response from API\n",
+			wantStderr: "Forking service 'svc-12345' at current state...\nError: empty response from API\n",
 		},
 		{
 			name: "fork now success with wait",
@@ -159,14 +158,13 @@ PGUSER=tsdbadmin
 					}, nil)
 			},
 			wantStdout: sampleForkedServiceTable,
-			wantStderr: `🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state...
-✅ Fork request accepted!
-📋 New Service ID: svc-67890
-🔐 Password saved to system keyring for automatic authentication
-🎯 Set service 'svc-67890' as default service.
-⏳ Waiting for fork to complete (timeout: 30m0s)...
-🎉 Service fork completed successfully!
-🔌 Run 'tiger db psql' to connect to your new service
+			wantStderr: `Forking service 'svc-12345' at current state...
+Service ID: svc-67890
+Password saved to system keyring
+Default service set to svc-67890.
+Waiting for fork to be ready (timeout: 30m0s)...
+Service is ready.
+Connect with: tiger db psql
 `,
 			checks: []checkFunc{
 				checkDefaultService("svc-67890"),
@@ -185,7 +183,7 @@ PGUSER=tsdbadmin
 					}, nil)
 			},
 			wantStdout: forkedEnv,
-			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at current state..."),
+			wantStderr: noWaitStderr("Forking service 'svc-12345' at current state..."),
 			checks:     []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
@@ -201,7 +199,7 @@ PGUSER=tsdbadmin
 				}, nil)
 			},
 			wantStdout: forkedEnv,
-			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at last snapshot..."),
+			wantStderr: noWaitStderr("Forking service 'svc-12345' at last snapshot..."),
 		},
 		{
 			name: "to-timestamp strategy",
@@ -217,7 +215,7 @@ PGUSER=tsdbadmin
 				}, nil)
 			},
 			wantStdout: forkedEnv,
-			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create '(auto-generated)' at point-in-time: 2025-01-15T10:30:00Z..."),
+			wantStderr: noWaitStderr("Forking service 'svc-12345' at point-in-time: 2025-01-15T10:30:00Z..."),
 		},
 		{
 			name: "custom name environment and resources",
@@ -239,7 +237,7 @@ PGUSER=tsdbadmin
 				}, nil)
 			},
 			wantStdout: forkedEnv,
-			wantStderr: noWaitStderr("🍴 Forking service 'svc-12345' to create 'my-fork' at current state..."),
+			wantStderr: noWaitStderr("Forking service 'svc-12345' to 'my-fork' at current state..."),
 		},
 	})
 }

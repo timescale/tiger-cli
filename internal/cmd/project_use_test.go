@@ -156,7 +156,7 @@ func TestProjectUseCmd(t *testing.T) {
 			},
 			setup:      bothProjects,
 			wantStdout: "Switched to project project-new\n",
-			wantStderr: "Cleared default service (config key service_id): it belonged to the previous project\n",
+			wantStderr: "Cleared default service; it belonged to the previous project.\n",
 			checks: []checkFunc{
 				checkStoredProject("project-new"),
 				checkDefaultService(""),
