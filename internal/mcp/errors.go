@@ -7,17 +7,6 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// readOnlyGatedTools are the service-mutating tools addTool skips under
-// read_only=all.
-var readOnlyGatedTools = []string{
-	toolServiceCreate,
-	toolServiceFork,
-	toolServiceStart,
-	toolServiceStop,
-	toolServiceResize,
-	toolServiceUpdatePassword,
-}
-
 // handleDatabaseError turns the readiness sentinels into guidance naming the
 // tool that resolves them. Every other error passes through unchanged.
 func handleDatabaseError(err error) error {

@@ -204,6 +204,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_start` - Start a stopped database service
 - `service_stop` - Stop a running database service
 - `service_resize` - Resize a database service by changing CPU and memory allocation
+- `service_delete` - Permanently delete a database service; deleting a service tagged PROD first asks the user to confirm through the MCP client (elicitation), and is refused if the client cannot prompt
 - `service_update_password` - Update the master password for a service
 - `service_logs` - View logs for a database service
 
