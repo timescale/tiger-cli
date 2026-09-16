@@ -349,7 +349,7 @@ func TestMCPInstallCmd(t *testing.T) {
 				if err != nil {
 					t.Fatalf("devin stub was not invoked: %v", err)
 				}
-				assertOutput(t, string(argv), "mcp\nadd\ntiger\n--\ntiger\nmcp\nstart\n")
+				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\n--\ntiger\nmcp\nstart\n")
 			}},
 		},
 		{
@@ -571,7 +571,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 		want := map[MCPClient][]string{
 			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
-			Devin:      {"devin", "mcp", "add", "tiger", "--", "/path/to/tiger", "mcp", "start"},
+			Devin:      {"devin", "mcp", "add", "-s", "user", "tiger", "--", "/path/to/tiger", "mcp", "start"},
 			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
 			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},
