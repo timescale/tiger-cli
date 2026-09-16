@@ -204,6 +204,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_fork` - Fork an existing database service to create an independent copy
 - `service_start` - Start a stopped database service
 - `service_stop` - Stop a running database service
+- `service_rename` - Rename a database service
 - `service_resize` - Resize a database service by changing CPU and memory allocation
 - `service_update_password` - Update the master password for a service
 - `service_logs` - View logs for a database service
