@@ -65,6 +65,7 @@ INFO Skipping write tool in read-only mode tool=service_update_password
 INFO Skipping write tool in read-only mode tool=service_start
 INFO Skipping write tool in read-only mode tool=service_stop
 INFO Skipping write tool in read-only mode tool=service_resize
+INFO Skipping write tool in read-only mode tool=service_rename
 ` + stdioLog),
 		},
 	})

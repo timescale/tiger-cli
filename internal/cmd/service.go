@@ -35,6 +35,7 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildServiceStopCmd(app))
 	cmd.AddCommand(buildServiceUpdatePasswordCmd(app))
 	cmd.AddCommand(buildServiceForkCmd(app))
+	cmd.AddCommand(buildServiceRenameCmd(app))
 	cmd.AddCommand(buildServiceResizeCmd(app))
 	cmd.AddCommand(buildServiceLogsCmd(app))
 

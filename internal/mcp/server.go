@@ -32,6 +32,7 @@ const (
 	toolServiceStart            = "service_start"
 	toolServiceStop             = "service_stop"
 	toolServiceResize           = "service_resize"
+	toolServiceRename           = "service_rename"
 	toolServiceUpdatePassword   = "service_update_password"
 	toolServiceLogs             = "service_logs"
 	toolServiceMetricsAvailable = "service_metrics_available"
@@ -171,6 +172,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
 	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 
 	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They

@@ -112,6 +112,7 @@ Tiger CLI provides the following commands:
   - `fork` - Fork an existing service
   - `start` - Start a stopped service (alias: `resume`)
   - `stop` - Stop a running service (alias: `pause`)
+  - `rename` - Rename a service
   - `resize` - Resize service CPU and memory allocation
   - `delete` - Delete a service (alias: `rm`)
   - `update-password` - Update service master password
@@ -203,6 +204,7 @@ The MCP server exposes the following tools to AI assistants:
 - `service_fork` - Fork an existing database service to create an independent copy
 - `service_start` - Start a stopped database service
 - `service_stop` - Stop a running database service
+- `service_rename` - Rename a database service
 - `service_resize` - Resize a database service by changing CPU and memory allocation
 - `service_update_password` - Update the master password for a service
 - `service_logs` - View logs for a database service
@@ -259,10 +261,10 @@ All configuration options can be set via `tiger config set <key> <value>`:
 - `password_storage` - Password storage method: `keyring`, `pgpass`, or `none` (default: `keyring`)
 - `read_only` - Which services this CLI may change: `all`, `prod`, or `off` (default: `off`, which protects nothing). An interactive `tiger auth login` offers a menu of the three modes, and records your choice either way, so it only asks until you answer once. `true` and `on` are accepted as aliases for `all`, and `false` for `off`, so existing config files and `TIGER_READ_ONLY=true` behave as before.
 
-  Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db psql`, `tiger db query`, `tiger db uri`, the `db_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
+  Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`rename`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db psql`, `tiger db query`, `tiger db uri`, the `db_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
 
   - `all` protects every service, and the MCP write tools aren't registered at all, so they don't appear in `tools/list` and can't be called.
-  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. Reading a service's tag costs one extra API call for `tiger service start`/`stop`/`resize`/`delete`, and the operation is refused if that lookup fails. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
+  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. Reading a service's tag costs one extra API call for `tiger service start`/`stop`/`rename`/`resize`/`delete`, and the operation is refused if that lookup fails. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
 
 - `service_id` - Default service ID. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
