@@ -117,13 +117,15 @@ func TestMCPInstallCmd(t *testing.T) {
 		return p
 	}
 
-	// Stub `claude` on PATH so the CLI-based install path runs end-to-end
-	// without the real client; the script records its argv for the check.
+	// Stub `claude` and `devin` on PATH so the CLI-based install paths run end-to-end
+	// without the real clients; the script records its argv for the check.
 	stubBin := t.TempDir()
 	argvFile := filepath.Join(stubBin, "argv")
 	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
-	if err := os.WriteFile(filepath.Join(stubBin, "claude"), []byte(stubScript), 0o755); err != nil {
-		t.Fatalf("failed to write claude stub: %v", err)
+	for _, stub := range []string{"claude", "devin"} {
+		if err := os.WriteFile(filepath.Join(stubBin, stub), []byte(stubScript), 0o755); err != nil {
+			t.Fatalf("failed to write %s stub: %v", stub, err)
+		}
 	}
 	cliHome := t.TempDir()
 
@@ -335,13 +337,19 @@ func TestMCPInstallCmd(t *testing.T) {
 			}},
 		},
 		{
-			name:       "installs devin (json-config client like cursor)",
-			args:       []string{"mcp", "install", "devin", "--no-backup", "--config-path", path("devin")},
-			wantStdout: installSuccessOutput("devin", path("devin")),
+			name: "installs devin (cli)",
+			args: []string{"mcp", "install", "devin"},
+			opts: []runOption{
+				withEnv("PATH", stubBin),
+				withEnv("HOME", cliHome),
+			},
+			wantStdout: installSuccessOutput("devin", filepath.Join(cliHome, ".config", "devin", "mcp_config.json")),
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, path("devin"), map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
+				argv, err := os.ReadFile(argvFile)
+				if err != nil {
+					t.Fatalf("devin stub was not invoked: %v", err)
+				}
+				assertOutput(t, string(argv), "mcp\nadd\ntiger\n--\ntiger\nmcp\nstart\n")
 			}},
 		},
 		{
@@ -565,6 +573,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 		want := map[MCPClient][]string{
 			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
+			Devin:      {"devin", "mcp", "add", "tiger", "--", "/path/to/tiger", "mcp", "start"},
 			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
 			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
 			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},

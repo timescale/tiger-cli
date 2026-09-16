@@ -186,13 +186,16 @@ var supportedClients = []clientConfig{
 		},
 	},
 	{
-		ClientType:           Devin,
-		Name:                 "Devin",
-		EditorNames:          []string{"devin"},
-		MCPServersPathPrefix: "/mcpServers",
+		ClientType:  Devin,
+		Name:        "Devin",
+		EditorNames: []string{"devin"},
 		ConfigPaths: []string{
-			"~/.devin/mcp_config.json",
-			"~/.codeium/windsurf/mcp_config.json",
+			"~/.config/devin/mcp_config.json",
+			".devin/mcp_config.json",
+			".devin/mcp_config.local.json",
+		},
+		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+			return append([]string{"devin", "mcp", "add", serverName, "--", command}, args...), nil
 		},
 	},
 	{
