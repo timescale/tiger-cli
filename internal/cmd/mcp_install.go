@@ -181,11 +181,9 @@ var supportedClients = []clientConfig{
 		EditorNames: []string{"devin"},
 		ConfigPaths: []string{
 			"~/.config/devin/mcp_config.json",
-			".devin/mcp_config.json",
-			".devin/mcp_config.local.json",
 		},
 		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"devin", "mcp", "add", serverName, "--", command}, args...), nil
+			return append([]string{"devin", "mcp", "add", "-s", "user", serverName, "--", command}, args...), nil
 		},
 	},
 	{
