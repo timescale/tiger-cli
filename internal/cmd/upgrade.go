@@ -113,22 +113,22 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 	switch result.InstallMethod {
 	case version.InstallMethodHomebrew, version.InstallMethodDeb, version.InstallMethodRPM:
 		if !force {
-			return fmt.Errorf("tiger appears to have been installed via %s; upgrade it with:\n    %s",
+			return fmt.Errorf("cannot upgrade: Tiger CLI appears to have been installed via %s; upgrade it with:\n    %s",
 				result.InstallMethod, result.UpdateCommand)
 		}
-		cmd.PrintErrf("Warning: tiger appears to have been installed via %s; overwriting from release archive because --force was set\n", result.InstallMethod)
+		cmd.PrintErrf("Warning: Tiger CLI appears to have been installed via %s; overwriting from release archive because --force was set\n", result.InstallMethod)
 	}
 
 	// Dev builds are typically local, unreleased builds; replacing one with a
 	// release archive is almost always surprising, so require --force.
 	if (currentVersion == "dev" || currentVersion == "unknown" || result.InstallMethod == version.InstallMethodDevelopment) && !force {
-		return fmt.Errorf("tiger is a local dev build, not a released version; re-run with --force to replace it with version %s", targetTag)
+		return fmt.Errorf("cannot upgrade: Tiger CLI is a local dev build, not a released version; re-run with --force to replace it with version %s", targetTag)
 	}
 
 	if !force {
 		if cur, curErr := semver.NewVersion(currentVersion); curErr == nil {
 			if tgt, tgtErr := semver.NewVersion(targetTag); tgtErr == nil && cur.Equal(tgt) {
-				cmd.Printf("tiger is already at version %s\n", currentVersion)
+				cmd.Printf("Tiger CLI is already at version %s\n", currentVersion)
 				return nil
 			}
 		}
@@ -158,11 +158,11 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 	archiveURL := fmt.Sprintf("%s/releases/%s/%s", releasesURL, targetTag, archiveFilename)
 	checksumURL := archiveURL + ".sha256"
 
-	verb, pastVerb := "Upgrading", "upgraded"
+	verb, pastVerb := "Upgrading", "Upgraded"
 	if isDowngrade(currentVersion, targetTag) {
-		verb, pastVerb = "Downgrading", "downgraded"
+		verb, pastVerb = "Downgrading", "Downgraded"
 	}
-	cmd.Printf("%s tiger %s → %s\n", verb, currentVersion, targetTag)
+	cmd.Printf("%s Tiger CLI %s → %s\n", verb, currentVersion, targetTag)
 	cmd.Printf("Downloading %s\n", archiveURL)
 	if err := downloadFile(ctx, archiveURL, archivePath); err != nil {
 		return fmt.Errorf("failed to download release archive: %w", err)
@@ -187,7 +187,7 @@ func runUpgrade(cmd *cobra.Command, app *common.App, requestedVersion string, fo
 		return err
 	}
 
-	cmd.Printf("tiger %s successfully to %s\n", pastVerb, targetTag)
+	cmd.Printf("%s Tiger CLI to %s\n", pastVerb, targetTag)
 	return nil
 }
 

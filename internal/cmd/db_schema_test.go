@@ -110,7 +110,7 @@ func TestDbSchemaCmd(t *testing.T) {
 				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantErr:    notReadyMsg("rep-67890"),
-			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
+			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
 		},
 	})
 }

@@ -26,7 +26,7 @@ func buildLogoutCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to remove credentials: %w", err)
 			}
 
-			cmd.Println("Successfully logged out and removed stored credentials")
+			cmd.Println("Logged out and removed stored credentials")
 			return nil
 		},
 	}
@@ -58,6 +58,6 @@ func revokeOAuthSession(cmd *cobra.Command, app *common.App, cfg *config.Config)
 		body.RefreshToken = &rt
 	}
 	if _, err := client.LogoutWithResponse(cmd.Context(), body); err != nil {
-		cmd.PrintErrf("warning: server-side logout failed: %v\n", err)
+		cmd.PrintErrf("Warning: server-side logout failed: %v\n", err)
 	}
 }

@@ -185,7 +185,7 @@ func TestUpgradeCmd(t *testing.T) {
 	// Stdout the command prints before each download-flow failure or success:
 	// the version banner and the download line.
 	downloadHeader := func(verb, currentVersion, serverURL string) string {
-		return fmt.Sprintf("%s tiger %s → v1.2.3\nDownloading %s/releases/v1.2.3/%s\n",
+		return fmt.Sprintf("%s Tiger CLI %s → v1.2.3\nDownloading %s/releases/v1.2.3/%s\n",
 			verb, currentVersion, serverURL, archiveName)
 	}
 
@@ -215,7 +215,7 @@ func TestUpgradeCmd(t *testing.T) {
 			name:    "refuses dev build without --force",
 			args:    []string{"upgrade"},
 			opts:    []runOption{withConfig(map[string]any{"releases_url": latestServer.URL})},
-			wantErr: "tiger is a local dev build, not a released version; re-run with --force to replace it with version v99.99.99",
+			wantErr: "cannot upgrade: Tiger CLI is a local dev build, not a released version; re-run with --force to replace it with version v99.99.99",
 		},
 		{
 			name: "fails when release archive is missing",
@@ -271,7 +271,7 @@ func TestUpgradeCmd(t *testing.T) {
 			wantStdout: downloadHeader("Upgrading", "dev", successServer.URL) +
 				"Verifying checksum\n" +
 				fmt.Sprintf("Installing new binary to %s\n", successBin) +
-				"tiger upgraded successfully to v1.2.3\n",
+				"Upgraded Tiger CLI to v1.2.3\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				got, err := os.ReadFile(successBin)
 				if err != nil {
@@ -305,7 +305,7 @@ func TestUpgradeCmd(t *testing.T) {
 			wantStdout: downloadHeader("Downgrading", "2.0.0", successServer.URL) +
 				"Verifying checksum\n" +
 				fmt.Sprintf("Installing new binary to %s\n", downgradeBin) +
-				"tiger downgraded successfully to v1.2.3\n",
+				"Downgraded Tiger CLI to v1.2.3\n",
 		},
 		{
 			// Error from a network failure is non-deterministic (depends on
@@ -375,7 +375,7 @@ func TestUpgradeLiveCDNIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upgrade failed: %v\n%s", err, out)
 	}
-	if want := "tiger upgraded successfully to " + latestTag; !strings.Contains(string(out), want) {
+	if want := "Upgraded Tiger CLI to " + latestTag; !strings.Contains(string(out), want) {
 		t.Errorf("upgrade output missing %q:\n%s", want, out)
 	}
 

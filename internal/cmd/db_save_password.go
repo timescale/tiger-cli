@@ -107,7 +107,7 @@ The password will be saved according to your --password-storage setting
 				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
 					service.ServiceID)
 			}
-			cmd.PrintErrf("Password saved successfully for service %s (role: %s)\n",
+			cmd.PrintErrf("Password saved for service %s (role %s)\n",
 				service.ServiceID, role)
 			return nil
 		},
