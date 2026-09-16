@@ -12,7 +12,7 @@ configuration files for the specified client.
 Supported Clients:
   claude-code              Configure for Claude Code
   cursor                   Configure for Cursor
-  windsurf                 Configure for Windsurf
+  devin                    Configure for Devin
   codex                    Configure for Codex
   gemini                   Configure for Gemini CLI
   vscode                   Configure for VS Code

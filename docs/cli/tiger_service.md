@@ -32,6 +32,7 @@ Manage database services within Tiger Cloud platform.
 * [tiger service get](tiger_service_get.md)	 - Show detailed information about a service
 * [tiger service list](tiger_service_list.md)	 - List all services
 * [tiger service logs](tiger_service_logs.md)	 - View logs for a service
+* [tiger service rename](tiger_service_rename.md)	 - Rename a database service
 * [tiger service resize](tiger_service_resize.md)	 - Resize a database service
 * [tiger service start](tiger_service_start.md)	 - Start a stopped database service
 * [tiger service stop](tiger_service_stop.md)	 - Stop a running database service
