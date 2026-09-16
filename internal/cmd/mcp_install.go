@@ -99,7 +99,7 @@ type MCPClient string
 const (
 	ClaudeCode  MCPClient = "claude-code"
 	Cursor      MCPClient = "cursor" // Both the IDE and the CLI
-	Windsurf    MCPClient = "windsurf"
+	Devin       MCPClient = "devin"
 	Codex       MCPClient = "codex"
 	Gemini      MCPClient = "gemini"
 	VSCode      MCPClient = "vscode"
@@ -135,7 +135,7 @@ type clientConfig struct {
 	ClientType           MCPClient // Our internal client type
 	Name                 string
 	EditorNames          []string // Supported client names for this client
-	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor/Windsurf)
+	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor)
 	ConfigPaths          []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
 	// buildInstallCommand builds the CLI install command for CLI-based clients
 	// Parameters: serverName (name to register), command (binary path), args (arguments to binary)
@@ -176,12 +176,14 @@ var supportedClients = []clientConfig{
 		},
 	},
 	{
-		ClientType:           Windsurf,
-		Name:                 "Windsurf",
-		EditorNames:          []string{"windsurf"},
-		MCPServersPathPrefix: "/mcpServers",
+		ClientType:  Devin,
+		Name:        "Devin",
+		EditorNames: []string{"devin"},
 		ConfigPaths: []string{
-			"~/.codeium/windsurf/mcp_config.json",
+			"~/.config/devin/mcp_config.json",
+		},
+		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+			return append([]string{"devin", "mcp", "add", "-s", "user", serverName, "--", command}, args...), nil
 		},
 	},
 	{
