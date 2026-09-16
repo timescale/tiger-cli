@@ -85,10 +85,10 @@ func TestServiceRenameCmd(t *testing.T) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
-						JSON4XX:      &api.Error{Message: new("name already in use")},
+						JSON4XX:      &api.Error{Message: new("invalid request")},
 					}, nil)
 			},
-			wantErr: "name already in use",
+			wantErr: "invalid request",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
