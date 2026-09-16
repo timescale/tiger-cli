@@ -26,33 +26,21 @@ func stubTigerExecutablePath(t *testing.T, path string) {
 // installSuccessOutput is the exact stdout `tiger mcp install` prints after a
 // successful file-based installation.
 func installSuccessOutput(clientName, configPath string) string {
-	return fmt.Sprintf(`✅ Successfully installed Tiger MCP server configuration for %s
-📁 Configuration file: %s
+	return fmt.Sprintf(`Installed Tiger MCP server configuration for %s
+Configuration file: %s
 
-💡 Next steps:
+Next steps:
    1. Restart %s to load the new configuration
    2. The Tiger MCP server will be available as 'tiger'
 
-🤖 Try asking your AI assistant:
-
-   📊 List and manage your Tiger Cloud services:
+Try asking your AI assistant:
    • "List my Tiger Cloud services"
-   • "Show me details for service xyz-123"
    • "Create a new database service called my-app-db"
-   • "Update the password for my database service"
-   • "What Tiger Cloud services do I have access to?"
-
-   📚 Ask questions from the PostgreSQL and Tiger Cloud documentation:
-   • "Show me Tiger Cloud documentation about hypertables?"
+   • "Show me Tiger Cloud documentation about hypertables"
    • "What are the best practices for PostgreSQL indexing?"
-   • "What is the command for renaming a table?"
    • "Help me optimize my PostgreSQL queries"
-
-   📋 Make use of our optimized AI guides for common workflows:
    • "Help me create a new database schema for my application"
-   • "Help me set up hypertables for the device_readings table"
    • "Help me figure out which tables should be hypertables"
-   • "What's the best way to structure time-series data?"
 `, clientName, configPath, clientName)
 }
 

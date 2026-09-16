@@ -27,8 +27,8 @@ import (
 
 // nextStepsMessage is the message shown after successful login
 const nextStepsMessage = `
-🎉 Next steps:
-• Install MCP server for your favorite AI coding tool: tiger mcp install
+Next steps:
+• Install the MCP server for your AI coding tool: tiger mcp install
 • List existing services: tiger service list
 • Create a new service: tiger service create
 `
@@ -214,7 +214,7 @@ func finishLogin(cmd *cobra.Command, cfg *config.Config, prevProjectID, projectI
 	if prevProjectID != projectID {
 		clearStaleDefaultService(cmd, cfg)
 	}
-	cmd.Printf("Successfully logged in (project: %s)\n", projectID)
+	cmd.Printf("Logged in to project %s\n", projectID)
 
 	readOnlySet := offerProdProtection(cmd, cfg)
 	cmd.Print(nextSteps(readOnlySet))
@@ -258,7 +258,7 @@ func offerProdProtection(cmd *cobra.Command, cfg *config.Config) bool {
 	}
 
 	if _, err := cfg.Set("read_only", string(mode)); err != nil {
-		cmd.PrintErrf("⚠️  Warning: could not set read_only: %v\n", err)
+		cmd.PrintErrf("Warning: could not set read_only: %v\n", err)
 		return false
 	}
 	if msg := readOnlyConfirmation(mode); msg != "" {
@@ -484,19 +484,19 @@ func (l *oauthLogin) getTokenViaBrowser(ctx context.Context) (*oauth2.Token, err
 	}
 	defer func() {
 		if err := server.server.Shutdown(ctx); err != nil {
-			l.cmd.PrintErrf("Failed to close local server: %s\n", err)
+			l.cmd.PrintErrf("Warning: failed to close local server: %s\n", err)
 		}
 	}()
 
 	authURL := server.oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(codeVerifier))
-	l.cmd.PrintErrf("Auth URL is: %s\n", authURL)
+	l.cmd.PrintErrf("Auth URL: %s\n", authURL)
 	l.cmd.PrintErrln("Opening browser for authentication...")
 
 	browserErr := openBrowserAsync(authURL)
 
 	select {
 	case err := <-browserErr:
-		l.cmd.PrintErrf("Failed to open browser: %s\n", err)
+		l.cmd.PrintErrf("Warning: failed to open browser: %s\n", err)
 		return nil, errBrowserOpenFailed
 	case result := <-server.resultChan:
 		return result.token, result.err

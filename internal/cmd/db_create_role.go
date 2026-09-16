@@ -149,9 +149,9 @@ PostgreSQL Configuration Parameters That May Be Set:
 			// Save password to storage with the new role name
 			result, err := common.SavePasswordWithResult(cfg, *service, rolePassword, name)
 			if err != nil {
-				cmd.PrintErrf("⚠️  Warning: %s\n", result.Message)
+				cmd.PrintErrf("Warning: %s\n", result.Message)
 			} else if !result.Success {
-				cmd.PrintErrf("⚠️  Warning: %s\n", result.Message)
+				cmd.PrintErrf("Warning: %s\n", result.Message)
 			}
 
 			// Output result in requested format
@@ -351,15 +351,15 @@ func outputCreateRoleResult(cmd *cobra.Command, roleName string, readOnly bool, 
 	case "yaml":
 		return util.SerializeToYAML(outputWriter, result)
 	default: // table format
-		cmd.Printf("✓ Role '%s' created successfully\n", roleName)
+		cmd.Printf("Role '%s' created\n", roleName)
 		if readOnly {
-			cmd.Printf("  Read-only enforcement: enabled (permanent, role-based)\n")
+			cmd.Printf("Read-only: enabled\n")
 		}
 		if statementTimeout > 0 {
-			cmd.Printf("  Statement timeout: %s\n", statementTimeout)
+			cmd.Printf("Statement timeout: %s\n", statementTimeout)
 		}
 		if len(fromRoles) > 0 {
-			cmd.Printf("  Inherits from: %s\n", strings.Join(fromRoles, ", "))
+			cmd.Printf("Inherits from: %s\n", strings.Join(fromRoles, ", "))
 		}
 		return nil
 	}

@@ -200,7 +200,7 @@ func TestDbURICmd(t *testing.T) {
 			args:       []string{"db", "uri", "rep-67890", "--pooled"},
 			setup:      setupGetReplica,
 			wantStdout: replicaURI,
-			wantStderr: "⚠️  Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
+			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
 		},
 		{
 			name: "replica parent fetch error",
