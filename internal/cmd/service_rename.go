@@ -64,7 +64,7 @@ rename and the name to give it.`,
 			}
 			service := *resp.JSON200
 
-			cmd.Printf("✅ Renamed service '%s' to '%s'.\n", serviceID, service.Name)
+			cmd.Printf("Renamed service '%s' to '%s'.\n", serviceID, service.Name)
 
 			return nil
 		},

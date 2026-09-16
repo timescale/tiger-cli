@@ -21,7 +21,7 @@ func TestServiceRenameCmd(t *testing.T) {
 			}, nil)
 	}
 
-	const renamedMsg = "✅ Renamed service 'svc-12345' to 'analytics-prod'.\n"
+	const renamedMsg = "Renamed service 'svc-12345' to 'analytics-prod'.\n"
 
 	runCmdTests(t, []cmdTest{
 		{
