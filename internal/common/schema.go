@@ -1,10 +1,5 @@
 package common
 
-// This file is ported from the ghost CLI (internal/common/schema.go). The
-// FetchServiceSchema entry point and the SchemaIdent/FetchServiceSchemaArgs
-// types are tiger-specific; the introspection engine is kept in sync with that
-// source.
-
 import (
 	"context"
 	"fmt"
