@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"slices"
 	"time"
@@ -228,6 +229,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 				}
 
 				a.Track(fmt.Sprintf("Call %s tool", r.Params.Name),
+					clientInfo(req),
 					analytics.Map(args),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(toolErr),
@@ -236,6 +238,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 		case *mcp.ReadResourceRequest:
 			defer func() {
 				a.Track("Read proxied resource",
+					clientInfo(req),
 					analytics.Property("resource_uri", r.Params.URI),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(runErr),
@@ -244,6 +247,7 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 		case *mcp.GetPromptRequest:
 			defer func() {
 				a.Track(fmt.Sprintf("Get %s prompt", r.Params.Name),
+					clientInfo(req),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.Error(runErr),
 				)
@@ -252,6 +256,37 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 
 		// Execute the actual handler
 		return next(ctx, method, req)
+	}
+}
+
+// clientInfo returns an analytics option describing the MCP client from its
+// initialize request: who it is, which protocol version it speaks, and which
+// capabilities it advertises. Only the keys of the open-ended experimental and
+// extensions maps are recorded, never their client-supplied values.
+func clientInfo(req mcp.Request) analytics.Option {
+	return func(properties map[string]any) {
+		ss, ok := req.GetSession().(*mcp.ServerSession)
+		if !ok {
+			return
+		}
+		params := ss.InitializeParams()
+		if params == nil {
+			return
+		}
+		properties["client_protocol_version"] = params.ProtocolVersion
+		if info := params.ClientInfo; info != nil {
+			properties["client_name"] = info.Name
+			properties["client_version"] = info.Version
+		}
+		if caps := params.Capabilities; caps != nil {
+			properties["client_elicitation"] = caps.Elicitation != nil
+			if len(caps.Experimental) > 0 {
+				properties["client_experimental"] = slices.Sorted(maps.Keys(caps.Experimental))
+			}
+			if len(caps.Extensions) > 0 {
+				properties["client_extensions"] = slices.Sorted(maps.Keys(caps.Extensions))
+			}
+		}
 	}
 }
 
