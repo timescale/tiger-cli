@@ -3,16 +3,23 @@ package cmd
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"testing"
-
-	"go.uber.org/mock/gomock"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
+
+// withGenerateServiceName pins the otherwise random auto-generated service
+// name, so the request that carries it can be asserted exactly.
+func withGenerateServiceName(name string) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.GenerateServiceName
+		common.GenerateServiceName = func() string { return name }
+		t.Cleanup(func() { common.GenerateServiceName = original })
+	})
+}
 
 func TestServiceCreateCmd(t *testing.T) {
 	// The default request sent when only --name is provided.
@@ -452,29 +459,27 @@ Service is being created. Use 'tiger service list' to check status.
 			}},
 		},
 		{
-			// The generated name is random, so the request is matched on its
-			// "db-" prefix and stderr on the same prefix in the status line.
 			name: "auto-generated name",
 			args: []string{"service", "create", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{withGenerateServiceName("db-42424")},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, gomock.Cond(func(x any) bool {
-					req, ok := x.(api.CreateServiceJSONRequestBody)
-					return ok && strings.HasPrefix(req.Name, "db-")
-				})).Return(&api.CreateServiceResponse{
-					HTTPResponse: httpResponse(http.StatusAccepted),
-					JSON202:      &svc,
-				}, nil)
+				req := baseReq
+				req.Name = "db-42424"
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
 			},
 			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
 `,
-			wantStderr: matchFunc(func(t *testing.T, got string) {
-				if !strings.Contains(got, "Creating service 'db-") {
-					t.Errorf("expected stderr to show the generated db- name, got: %s", got)
-				}
-			}),
+			wantStderr: `Creating service 'db-42424'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
 		},
 	})
 }

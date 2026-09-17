@@ -13,21 +13,14 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-// logsParams matches a *api.GetServiceLogsParams satisfying check.
-func logsParams(check func(p *api.GetServiceLogsParams) bool) gomock.Matcher {
-	return gomock.Cond(func(x any) bool {
-		p, ok := x.(*api.GetServiceLogsParams)
-		return ok && p != nil && check(p)
-	})
-}
+// logsNow is when FetchServiceLogs fixes an absent --until bound: cases that
+// omit the flag run under synctest, whose clock always starts at this instant,
+// so the params the command sends can be spelled out exactly.
+var logsNow = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
-// defaultLogsParams matches the params of a `tiger service logs` call with no
-// flags: no node, since, or cursor, and an until bound fixed to the current
-// time by FetchServiceLogs.
-func defaultLogsParams() gomock.Matcher {
-	return logsParams(func(p *api.GetServiceLogsParams) bool {
-		return p.Node == nil && p.Since == nil && p.Cursor == nil && p.Until != nil
-	})
+// defaultLogsParams are the params of a `tiger service logs` call with no flags.
+func defaultLogsParams() *api.GetServiceLogsParams {
+	return &api.GetServiceLogsParams{Until: &logsNow}
 }
 
 func logsResponse(logs *api.ServiceLogs) *api.GetServiceLogsResponse {
@@ -77,8 +70,9 @@ func TestServiceLogsCmd(t *testing.T) {
 			wantErr: "invalid argument \"bogus\" for \"--since\" flag: invalid time format `bogus` must be one of: `2006-01-02T15:04:05Z07:00`",
 		},
 		{
-			name: "network error",
-			args: []string{"service", "logs", "svc-12345"},
+			name:     "network error",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(nil, errors.New("connection refused"))
@@ -86,8 +80,9 @@ func TestServiceLogsCmd(t *testing.T) {
 			wantErr: "failed to fetch logs: connection refused",
 		},
 		{
-			name: "API error",
-			args: []string{"service", "logs", "svc-12345"},
+			name:     "API error",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(&api.GetServiceLogsResponse{
@@ -99,8 +94,9 @@ func TestServiceLogsCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
-			name: "nil response body",
-			args: []string{"service", "logs", "svc-12345"},
+			name:     "nil response body",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(logsResponse(nil), nil)
@@ -108,30 +104,34 @@ func TestServiceLogsCmd(t *testing.T) {
 			wantErr: "unexpected empty response",
 		},
 		{
-			name:  "empty logs",
-			args:  []string{"service", "logs", "svc-12345"},
-			setup: setupLogs(api.ServiceLogs{}),
+			name:     "empty logs",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
+			setup:    setupLogs(api.ServiceLogs{}),
 		},
 		{
-			name:  "text output",
-			args:  []string{"service", "logs", "svc-12345"},
-			setup: setupLogs(api.ServiceLogs{Entries: &entries}),
+			name:     "text output",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
+			setup:    setupLogs(api.ServiceLogs{Entries: &entries}),
 			wantStdout: "LOG: database system is ready to accept connections\n" +
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
 			// Timestamps are rendered in the local timezone, pinned to UTC in
 			// TestMain so the expected output stays literal.
-			name:  "text output with timestamps",
-			args:  []string{"service", "logs", "svc-12345"},
-			setup: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:     "text output with timestamps",
+			args:     []string{"service", "logs", "svc-12345"},
+			synctest: true,
+			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: "2025-01-15 10:30:00 UTC LOG: checkpoint starting\n" +
 				"2025-01-15 10:31:00 UTC LOG: checkpoint complete\n",
 		},
 		{
-			name:  "json output",
-			args:  []string{"service", "logs", "svc-12345", "-o", "json"},
-			setup: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:     "json output",
+			args:     []string{"service", "logs", "svc-12345", "-o", "json"},
+			synctest: true,
+			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: `[
   {
     "message": "LOG: checkpoint starting",
@@ -147,9 +147,10 @@ func TestServiceLogsCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"service", "logs", "svc-12345", "-o", "yaml"},
-			setup: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:     "yaml output",
+			args:     []string{"service", "logs", "svc-12345", "-o", "yaml"},
+			synctest: true,
+			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: `- message: 'LOG: checkpoint starting'
   severity: LOG
   timestamp: "2025-01-15T10:30:00Z"
@@ -161,8 +162,9 @@ func TestServiceLogsCmd(t *testing.T) {
 		{
 			// Two pages: the first returns a cursor, the second must be
 			// requested with it. Entries beyond --tail are trimmed.
-			name: "pagination with tail",
-			args: []string{"service", "logs", "svc-12345", "--tail", "3"},
+			name:     "pagination with tail",
+			args:     []string{"service", "logs", "svc-12345", "--tail", "3"},
+			synctest: true,
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
@@ -175,9 +177,10 @@ func TestServiceLogsCmd(t *testing.T) {
 				gomock.InOrder(
 					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 						Return(logsResponse(&api.ServiceLogs{Entries: &page1, LastCursor: new("cursor-1")}), nil),
-					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", logsParams(func(p *api.GetServiceLogsParams) bool {
-						return p.Cursor != nil && *p.Cursor == "cursor-1"
-					})).
+					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+						Until:  &logsNow,
+						Cursor: new("cursor-1"),
+					}).
 						Return(logsResponse(&api.ServiceLogs{Entries: &page2, LastCursor: new("cursor-2")}), nil),
 				)
 			},
@@ -189,11 +192,10 @@ func TestServiceLogsCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
-				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", logsParams(func(p *api.GetServiceLogsParams) bool {
-					return p.Since != nil && p.Since.Equal(since) &&
-						p.Until != nil && p.Until.Equal(until) &&
-						p.Cursor == nil && p.Node == nil
-				})).
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+					Since: &since,
+					Until: &until,
+				}).
 					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
 			},
 			wantStdout: "LOG: database system is ready to accept connections\n" +
@@ -202,29 +204,33 @@ func TestServiceLogsCmd(t *testing.T) {
 		{
 			// --node 0 is valid and must be sent explicitly (the parameter is
 			// only omitted when the flag isn't set).
-			name: "node param",
-			args: []string{"service", "logs", "svc-12345", "--node", "0"},
+			name:     "node param",
+			args:     []string{"service", "logs", "svc-12345", "--node", "0"},
+			synctest: true,
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", logsParams(func(p *api.GetServiceLogsParams) bool {
-					return p.Node != nil && *p.Node == 0
-				})).
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
+					Node:  new(0),
+					Until: &logsNow,
+				}).
 					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
 			},
 			wantStdout: "LOG: database system is ready to accept connections\n" +
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
-			name: "default service id from config",
-			args: []string{"service", "logs"},
-			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			name:     "default service id from config",
+			args:     []string{"service", "logs"},
+			opts:     []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			synctest: true,
 			setup: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG"},
 			}}),
 			wantStdout: "LOG: ready\n",
 		},
 		{
-			name: "log alias",
-			args: []string{"service", "log", "svc-12345"},
+			name:     "log alias",
+			args:     []string{"service", "log", "svc-12345"},
+			synctest: true,
 			setup: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG"},
 			}}),

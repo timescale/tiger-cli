@@ -10,8 +10,10 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// Matches front-end logic for generating a random service name
-func GenerateServiceName() string {
+// GenerateServiceName matches the front-end logic for generating a random
+// service name. It is a var so tests can pin the name and assert the request
+// that carries it exactly.
+var GenerateServiceName = func() string {
 	return fmt.Sprintf("db-%d", 10000+rand.Intn(90000))
 }
 

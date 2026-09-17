@@ -67,8 +67,8 @@ func TestDBQuery(t *testing.T) {
 	)
 
 	// ExecuteQuery is stubbed for the success cases below, so they reach the
-	// handler's own output without a live database. stubQuery records the args
-	// the handler built, which is how a case asserts what it passed down.
+	// handler's own output without a live database. stubQuery asserts the args
+	// the handler built, which is how a case proves what it passed down.
 	result := &common.QueryResult{
 		ResultSets: []common.ResultSet{{
 			CommandTag:   "SELECT 1",
@@ -85,22 +85,17 @@ func TestDBQuery(t *testing.T) {
 		"rows_affected": float64(1),
 	}}
 
-	stubQuery := func(got *common.ExecuteQueryArgs, res *common.QueryResult) func(*testing.T) {
+	stubQuery := func(want common.ExecuteQueryArgs, res *common.QueryResult) func(*testing.T) {
 		return func(t *testing.T) {
 			original := common.ExecuteQuery
-			common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, args common.ExecuteQueryArgs) (*common.QueryResult, error) {
-				*got = args
+			common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.ExecuteQueryArgs) (*common.QueryResult, error) {
+				t.Helper()
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
+				}
 				return res, nil
 			}
 			t.Cleanup(func() { common.ExecuteQuery = original })
-		}
-	}
-	checkQueryArgs := func(got *common.ExecuteQueryArgs, want common.ExecuteQueryArgs) toolCheckFunc {
-		return func(t *testing.T, _ string) {
-			t.Helper()
-			if diff := cmp.Diff(want, *got); diff != "" {
-				t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
-			}
 		}
 	}
 	// baseArgs is what the handler builds from a bare query, with the schema
@@ -111,8 +106,6 @@ func TestDBQuery(t *testing.T) {
 		MaxRows:  config.DefaultMCPMaxRows,
 		MaxBytes: mcpMaxResponseBytes,
 	}
-
-	var defaultQuery, paramQuery, fileQuery, readOnlyQuery, maxRowsQuery, zeroRowsQuery, truncatedQuery, replicaQuery common.ExecuteQueryArgs
 
 	runToolTests(t, []toolTest{
 		{
@@ -266,9 +259,8 @@ func TestDBQuery(t *testing.T) {
 			tool:       toolDBQuery,
 			args:       args,
 			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(&defaultQuery, result)},
+			setup:      []func(*testing.T){stubQuery(baseArgs, result)},
 			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks:     []toolCheckFunc{checkQueryArgs(&defaultQuery, baseArgs)},
 		},
 		{
 			name: "passes parameters, role and pooling down to the query",
@@ -289,64 +281,60 @@ func TestDBQuery(t *testing.T) {
 					},
 				}
 			})),
-			setup:      []func(*testing.T){stubQuery(&paramQuery, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks: []toolCheckFunc{checkQueryArgs(&paramQuery, common.ExecuteQueryArgs{
+			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
 				Query:      "SELECT $1::int",
 				Parameters: []string{"1"},
 				Role:       "readonly",
 				Pooled:     true,
 				MaxRows:    config.DefaultMCPMaxRows,
 				MaxBytes:   mcpMaxResponseBytes,
-			})},
+			}, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
 		},
 		{
 			// The file's contents become the query text.
-			name:       "runs the query read from a file",
-			tool:       toolDBQuery,
-			args:       map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(&fileQuery, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks: []toolCheckFunc{checkQueryArgs(&fileQuery, common.ExecuteQueryArgs{
+			name:      "runs the query read from a file",
+			tool:      toolDBQuery,
+			args:      map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			setupMock: expectStatus(api.DeployStatusREADY),
+			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT * FROM users;\n",
 				Role:     "tsdbadmin",
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
-			})},
+			}, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
 		},
 		{
 			// db_query isn't a read-only gated tool: the mode opens the session
 			// read-only rather than refusing the call.
-			name:       "read-only all runs the query in a read-only session",
-			tool:       toolDBQuery,
-			args:       args,
-			config:     map[string]any{"read_only": "all"},
-			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(&readOnlyQuery, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks: []toolCheckFunc{checkQueryArgs(&readOnlyQuery, common.ExecuteQueryArgs{
+			name:      "read-only all runs the query in a read-only session",
+			tool:      toolDBQuery,
+			args:      args,
+			config:    map[string]any{"read_only": "all"},
+			setupMock: expectStatus(api.DeployStatusREADY),
+			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "tsdbadmin",
 				ReadOnly: true,
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
-			})},
+			}, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
 		},
 		{
-			name:       "mcp_max_rows caps the rows per result set",
-			tool:       toolDBQuery,
-			args:       args,
-			config:     map[string]any{"mcp_max_rows": 250},
-			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(&maxRowsQuery, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks: []toolCheckFunc{checkQueryArgs(&maxRowsQuery, common.ExecuteQueryArgs{
+			name:      "mcp_max_rows caps the rows per result set",
+			tool:      toolDBQuery,
+			args:      args,
+			config:    map[string]any{"mcp_max_rows": 250},
+			setupMock: expectStatus(api.DeployStatusREADY),
+			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "tsdbadmin",
 				MaxRows:  250,
 				MaxBytes: mcpMaxResponseBytes,
-			})},
+			}, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
 		},
 		{
 			// A config-file or TIGER_MCP_MAX_ROWS value bypasses `tiger config
@@ -357,9 +345,8 @@ func TestDBQuery(t *testing.T) {
 			args:       args,
 			config:     map[string]any{"mcp_max_rows": 0},
 			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(&zeroRowsQuery, result)},
+			setup:      []func(*testing.T){stubQuery(baseArgs, result)},
 			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
-			checks:     []toolCheckFunc{checkQueryArgs(&zeroRowsQuery, baseArgs)},
 		},
 		{
 			// A truncated result carries the notice naming the configured cap.
@@ -367,7 +354,7 @@ func TestDBQuery(t *testing.T) {
 			tool:      toolDBQuery,
 			args:      args,
 			setupMock: expectStatus(api.DeployStatusREADY),
-			setup: []func(*testing.T){stubQuery(&truncatedQuery, &common.QueryResult{
+			setup: []func(*testing.T){stubQuery(baseArgs, &common.QueryResult{
 				ResultSets: []common.ResultSet{{
 					CommandTag:   "SELECT 100",
 					Columns:      []common.Column{{Name: "id", Type: "int4"}},
@@ -392,7 +379,6 @@ func TestDBQuery(t *testing.T) {
 					"plus an overall response size cap). More rows exist. Do the work in the database instead of re-running this query: " +
 					"aggregate (GROUP BY, COUNT, SUM, AVG), filter (WHERE), or paginate (LIMIT/OFFSET).",
 			},
-			checks: []toolCheckFunc{checkQueryArgs(&truncatedQuery, baseArgs)},
 		},
 		{
 			// The replica has no pooler, so the warning rides along with a
@@ -406,19 +392,18 @@ func TestDBQuery(t *testing.T) {
 				expectGet("u8me885b93", ready)(m)
 				expectGet("e6ue9697jf", sampleService())(m)
 			},
-			setup: []func(*testing.T){stubQuery(&replicaQuery, result)},
-			wantOutput: map[string]any{
-				"result_sets":    wantResultSets,
-				"execution_time": "12ms",
-				"warning":        `read replica "replica-service" has no connection pooler; connecting directly instead`,
-			},
-			checks: []toolCheckFunc{checkQueryArgs(&replicaQuery, common.ExecuteQueryArgs{
+			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "tsdbadmin",
 				Pooled:   true,
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
-			})},
+			}, result)},
+			wantOutput: map[string]any{
+				"result_sets":    wantResultSets,
+				"execution_time": "12ms",
+				"warning":        `read replica "replica-service" has no connection pooler; connecting directly instead`,
+			},
 		},
 	})
 }

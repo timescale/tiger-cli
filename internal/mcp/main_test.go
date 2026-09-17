@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -40,6 +41,11 @@ func TestMain(m *testing.M) {
 			os.Unsetenv(key)
 		}
 	}
+
+	// Pin the local timezone to UTC so times the tools stamp with time.Now can
+	// be asserted with plain literals. Done here, while the process is still
+	// single-goroutine, since mutating time.Local later would race.
+	time.Local = time.UTC
 
 	os.Exit(m.Run())
 }

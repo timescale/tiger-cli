@@ -15,17 +15,11 @@ import (
 func TestServiceLogs(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
-	// FetchServiceLogs pins an absent upper bound to time.Now(), so the default
-	// params can only be matched on the fields the tool controls.
-	matchParams := func(check func(*api.GetServiceLogsParams) bool) gomock.Matcher {
-		return gomock.Cond(func(x any) bool {
-			p, ok := x.(*api.GetServiceLogsParams)
-			return ok && p != nil && check(p)
-		})
-	}
-	defaultParams := matchParams(func(p *api.GetServiceLogsParams) bool {
-		return p.Node == nil && p.Since == nil && p.Cursor == nil && p.Until != nil
-	})
+	// FetchServiceLogs pins an absent upper bound to time.Now(). Cases that
+	// omit until run under synctest, whose clock always starts at this instant,
+	// so the params it sends can be spelled out exactly.
+	now := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	defaultParams := &api.GetServiceLogsParams{Until: &now}
 
 	logsResponse := func(logs *api.ServiceLogs) *api.GetServiceLogsResponse {
 		return &api.GetServiceLogsResponse{
@@ -79,9 +73,10 @@ func TestServiceLogs(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/tail: minimum: 0/1 is less than 1.000000`,
 		},
 		{
-			name: "fetch request fails",
-			tool: toolServiceLogs,
-			args: args,
+			name:     "fetch request fails",
+			tool:     toolServiceLogs,
+			args:     args,
+			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(nil, errors.New("connection refused"))
@@ -89,9 +84,10 @@ func TestServiceLogs(t *testing.T) {
 			wantErr: "failed to fetch logs: connection refused",
 		},
 		{
-			name: "fetch API error",
-			tool: toolServiceLogs,
-			args: args,
+			name:     "fetch API error",
+			tool:     toolServiceLogs,
+			args:     args,
+			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(&api.GetServiceLogsResponse{
@@ -102,9 +98,10 @@ func TestServiceLogs(t *testing.T) {
 			wantErr: "service not found",
 		},
 		{
-			name: "nil response body",
-			tool: toolServiceLogs,
-			args: args,
+			name:     "nil response body",
+			tool:     toolServiceLogs,
+			args:     args,
+			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(logsResponse(nil), nil)
@@ -115,6 +112,7 @@ func TestServiceLogs(t *testing.T) {
 			name:       "no log entries",
 			tool:       toolServiceLogs,
 			args:       args,
+			synctest:   true,
 			setupMock:  expectLogs(api.ServiceLogs{}),
 			wantOutput: map[string]any{"logs": []any{}},
 		},
@@ -122,14 +120,16 @@ func TestServiceLogs(t *testing.T) {
 			name:       "returns entries oldest first",
 			tool:       toolServiceLogs,
 			args:       args,
+			synctest:   true,
 			setupMock:  expectLogs(api.ServiceLogs{Entries: &entries}),
 			wantOutput: entriesOutput,
 		},
 		{
 			// An entry the API sent without a timestamp renders bare.
-			name: "entry with a zero timestamp has no prefix",
-			tool: toolServiceLogs,
-			args: args,
+			name:     "entry with a zero timestamp has no prefix",
+			tool:     toolServiceLogs,
+			args:     args,
+			synctest: true,
 			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: checkpoint complete", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.UTC)},
 				{Message: "LOG: no timestamp", Severity: "LOG"},
@@ -141,9 +141,10 @@ func TestServiceLogs(t *testing.T) {
 		},
 		{
 			// A non-UTC timestamp is converted before formatting.
-			name: "non-UTC timestamp is rendered in UTC",
-			tool: toolServiceLogs,
-			args: args,
+			name:     "non-UTC timestamp is rendered in UTC",
+			tool:     toolServiceLogs,
+			args:     args,
+			synctest: true,
 			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.FixedZone("UTC+2", 2*60*60))},
 			}}),
@@ -152,9 +153,10 @@ func TestServiceLogs(t *testing.T) {
 		{
 			// Two pages: the first returns a cursor, the second must be
 			// requested with it. Entries beyond tail are trimmed.
-			name: "pagination trimmed to tail",
-			tool: toolServiceLogs,
-			args: map[string]any{"service_id": "e6ue9697jf", "tail": 3},
+			name:     "pagination trimmed to tail",
+			tool:     toolServiceLogs,
+			args:     map[string]any{"service_id": "e6ue9697jf", "tail": 3},
+			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
@@ -167,9 +169,10 @@ func TestServiceLogs(t *testing.T) {
 				gomock.InOrder(
 					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 						Return(logsResponse(&api.ServiceLogs{Entries: &page1, LastCursor: new("cursor-1")}), nil),
-					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", matchParams(func(p *api.GetServiceLogsParams) bool {
-						return p.Cursor != nil && *p.Cursor == "cursor-1"
-					})).
+					m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
+						Until:  &now,
+						Cursor: new("cursor-1"),
+					}).
 						Return(logsResponse(&api.ServiceLogs{Entries: &page2, LastCursor: new("cursor-2")}), nil),
 				)
 			},
@@ -212,13 +215,15 @@ func TestServiceLogs(t *testing.T) {
 			wantOutput: entriesOutput,
 		},
 		{
-			name: "node 2 reaches the request",
-			tool: toolServiceLogs,
-			args: map[string]any{"service_id": "e6ue9697jf", "node": 2},
+			name:     "node 2 reaches the request",
+			tool:     toolServiceLogs,
+			args:     map[string]any{"service_id": "e6ue9697jf", "node": 2},
+			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", matchParams(func(p *api.GetServiceLogsParams) bool {
-					return p.Node != nil && *p.Node == 2
-				})).
+				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
+					Node:  new(2),
+					Until: &now,
+				}).
 					Return(logsResponse(&api.ServiceLogs{Entries: &entries}), nil)
 			},
 			wantOutput: entriesOutput,

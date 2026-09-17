@@ -7,11 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"go.uber.org/mock/gomock"
-
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestServiceCreate(t *testing.T) {
@@ -43,6 +41,15 @@ func TestServiceCreate(t *testing.T) {
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &svc,
 				}, nil)
+		}
+	}
+
+	// stubGeneratedName pins the otherwise random auto-generated service name.
+	stubGeneratedName := func(name string) func(*testing.T) {
+		return func(t *testing.T) {
+			original := common.GenerateServiceName
+			common.GenerateServiceName = func() string { return name }
+			t.Cleanup(func() { common.GenerateServiceName = original })
 		}
 	}
 
@@ -190,22 +197,14 @@ func TestServiceCreate(t *testing.T) {
 			wantOutput: output(acceptedMsg),
 		},
 		{
-			// The generated name is random, so the request is matched on every
-			// other field; the mocked response is the usual sample service.
-			name: "auto-generates a name when none is given",
-			tool: toolServiceCreate,
-			args: map[string]any{},
+			name:  "auto-generates a name when none is given",
+			tool:  toolServiceCreate,
+			args:  map[string]any{},
+			setup: []func(*testing.T){stubGeneratedName("db-42424")},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				generatedName := gomock.Cond(func(req api.ServiceCreate) bool {
-					want := baseReq
-					want.Name = req.Name
-					return req.Name != "" && req.Name != "test-service" && cmp.Equal(want, req)
-				})
-				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, generatedName).
-					Return(&api.CreateServiceResponse{
-						HTTPResponse: httpResponse(http.StatusAccepted),
-						JSON202:      &newService,
-					}, nil)
+				req := baseReq
+				req.Name = "db-42424"
+				expectCreate(req)(m)
 			},
 			wantOutput: output(acceptedMsg),
 		},
