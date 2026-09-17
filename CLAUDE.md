@@ -243,7 +243,7 @@ Gotchas when adding a gated surface: a replica set is judged on its *own* tag, n
 Usage tracking is automatic via middleware, so new commands and tools normally need no tracking code:
 
 - CLI commands are tracked by `wrapCommands` with event names like `"Run tiger service create"`, capturing elapsed time, user-provided flags, and success/failure.
-- MCP tool calls are tracked by `analyticsMiddleware` in `internal/mcp/server.go` with event names like `"Call service_create tool"`, along with resource reads and prompt requests.
+- MCP tool calls are tracked by `analyticsMiddleware` in `internal/mcp/server.go` with event names like `"Call service_create tool"`, along with resource reads and prompt requests. Every MCP event also carries details of the client from the session's `initialize` handshake — name, version, protocol version, and advertised capabilities (`clientInfo` in `server.go`).
 
 **Sensitive data must never reach analytics.** The `ignore` list in `internal/analytics/analytics.go` filters flag and tool-parameter names (write flag names with underscores: `public-key` → `public_key`). When adding a command or tool that handles passwords, keys, SQL queries, connection strings, or similar, add the field names there. Positional arguments are tracked through `analytics.Args`, which redacts the sensitive ones per command path — add a case there when adding a command whose positional argument may carry sensitive text (`tiger feedback` is the model), and prefer a flag over a positional argument where the choice is open.
 
@@ -273,6 +273,10 @@ Command tests live in `internal/cmd`, one test file per command file, all table-
 ## Documentation
 
 After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation.
+
+### Public Repository
+
+This is a public repository that anyone can read. Nothing in it — code, comments, tests, documentation, commit messages, or PR descriptions — should link to or reference private or internal resources: internal repos, Slack channels or threads, internal documents, ticket trackers, or any other information that isn't already public. Describe the motivation for a change in the change itself rather than pointing at an internal discussion of it.
 
 ### Maintaining This File
 
