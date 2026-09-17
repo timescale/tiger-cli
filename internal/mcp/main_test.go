@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -24,8 +25,10 @@ import (
 const testProjectID = "test-project-id"
 
 func TestMain(m *testing.M) {
-	// Backstop: replace the system keyring with an in-memory mock so no test can
-	// read, write, or delete real credentials or passwords.
+	// Backstop: replace the system keyring with an in-memory mock so that even a
+	// test that forgets to reset can never read, write, or delete real
+	// credentials or passwords. Per-test isolation comes from the fresh
+	// keyring.MockInit() in runToolTest.
 	keyring.MockInit()
 
 	// Scrub inherited TIGER_* env vars: config.Load reads them through viper's
@@ -79,6 +82,25 @@ type toolTest struct {
 	// wantOutput is the exact structured content; nil asserts none.
 	wantErr    string
 	wantOutput map[string]any
+	// wantCallErr is the exact text of a transport error, which is how the SDK
+	// reports a tool the server never registered — a handler's own error comes
+	// back as a result, not as one of these. Set it and the result assertions
+	// are skipped, since there is no result.
+	wantCallErr string
+
+	// checks are optional extra assertions, run in order after the standard ones.
+	checks []toolCheckFunc
+
+	// experimental turns on the App's experimental gate before the server is
+	// built, so the preview-stage tools are registered for this case.
+	experimental bool
+
+	// synctest runs the case inside a [synctest] bubble, where time is
+	// virtual: a poll interval or wait timeout elapses the instant every
+	// goroutine is blocked on it. Set it for cases that wait on a timer (the
+	// `wait` polling loop in common.WaitForService), so they assert against
+	// realistic durations and finish instantly instead of sleeping.
+	synctest bool
 }
 
 // runToolTests runs each case as a subtest.
@@ -86,6 +108,10 @@ func runToolTests(t *testing.T, tests []toolTest) {
 	t.Helper()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.synctest {
+				synctest.Test(t, func(t *testing.T) { runToolTest(t, tt) })
+				return
+			}
 			runToolTest(t, tt)
 		})
 	}
@@ -96,6 +122,10 @@ func runToolTest(t *testing.T, tt toolTest) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
+
+	// Give the case a fresh, empty in-memory keyring so a password a tool saves
+	// never leaks into a later case that asserts none is stored.
+	keyring.MockInit()
 
 	configDir := t.TempDir()
 	values := map[string]any{"analytics": false, "docs_mcp": false}
@@ -108,7 +138,7 @@ func runToolTest(t *testing.T, tt toolTest) {
 		tt.setupMock(mockClient)
 	}
 
-	app := &common.App{}
+	app := &common.App{Experimental: tt.experimental}
 	app.SetClientFactory(func(context.Context, *config.Config) (api.ClientWithResponsesInterface, string, error) {
 		if tt.clientErr != nil {
 			return nil, "", tt.clientErr
@@ -165,6 +195,15 @@ func runToolTest(t *testing.T, tt toolTest) {
 		Name:      tt.tool,
 		Arguments: tt.args,
 	})
+	if tt.wantCallErr != "" {
+		if err == nil {
+			t.Fatalf("call %s: expected error %q, got none", tt.tool, tt.wantCallErr)
+		}
+		if got := err.Error(); got != tt.wantCallErr {
+			t.Errorf("call error = %q, want %q", got, tt.wantCallErr)
+		}
+		return
+	}
 	if err != nil {
 		t.Fatalf("call %s: %v", tt.tool, err)
 	}
@@ -182,6 +221,41 @@ func runToolTest(t *testing.T, tt toolTest) {
 	if diff := cmp.Diff(wantStructured, res.StructuredContent); diff != "" {
 		t.Errorf("structured content mismatch (-want +got):\n%s", diff)
 	}
+
+	for _, check := range tt.checks {
+		check(t, configDir)
+	}
+}
+
+// toolCheckFunc is an extra assertion a case can make after the standard ones,
+// against state the tool left behind in its config directory.
+type toolCheckFunc func(t *testing.T, configDir string)
+
+// checkDefaultService returns a check asserting the service_id the tool wrote
+// to the config file, with "" asserting it wrote none.
+func checkDefaultService(want string) toolCheckFunc {
+	return func(t *testing.T, configDir string) {
+		t.Helper()
+		got, _ := readConfigFile(t, configDir)["service_id"].(string)
+		if got != want {
+			t.Errorf("default service_id = %q, want %q", got, want)
+		}
+	}
+}
+
+// readConfigFile reads the config file back as raw keys, so a check sees what
+// the tool actually wrote rather than the resolved config's defaults.
+func readConfigFile(t *testing.T, configDir string) map[string]any {
+	t.Helper()
+	contents, err := os.ReadFile(config.GetConfigFile(configDir))
+	if err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(contents, &values); err != nil {
+		t.Fatalf("failed to parse config file: %v", err)
+	}
+	return values
 }
 
 // resultError returns the text of an IsError result, or "" for a success.
