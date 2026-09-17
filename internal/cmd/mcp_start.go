@@ -57,7 +57,7 @@ func startStdioServer(cmd *cobra.Command, app *common.App) error {
 
 	// Start the stdio transport
 	if err := server.StartStdio(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		return fmt.Errorf("failed to start MCP server: %w", err)
+		return fmt.Errorf("MCP server exited with error: %w", err)
 	}
 
 	// Close the MCP server when finished
