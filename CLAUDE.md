@@ -274,6 +274,10 @@ Command tests live in `internal/cmd`, one test file per command file, all table-
 
 After changing commands, MCP tools, config options, or flags, check and update **README.md** (user-facing documentation), **CLAUDE.md** (this file), and **docs/development.md** (development guide) to keep them in sync with the implementation.
 
+### Public Repository
+
+This is a public repository that anyone can read. Nothing in it — code, comments, tests, documentation, commit messages, or PR descriptions — should link to or reference private or internal resources: internal repos, Slack channels or threads, internal documents, ticket trackers, or any other information that isn't already public. Describe the motivation for a change in the change itself rather than pointing at an internal discussion of it.
+
 ### Maintaining This File
 
 This file is pulled into every agent session, so unnecessary detail bloats context and distracts more than it helps. When a change introduces or alters a pattern, update this file — but hold additions to its style:
