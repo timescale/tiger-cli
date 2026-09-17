@@ -253,7 +253,7 @@ Gotchas when adding a gated surface: a replica set is judged on its *own* tag, n
 Usage tracking is automatic via middleware, so new commands and tools normally need no tracking code:
 
 - CLI commands are tracked by `wrapCommands` with event names like `"Run tiger service create"`, capturing elapsed time, user-provided flags, and success/failure.
-- MCP tool calls are tracked by `analyticsMiddleware` in `internal/mcp/server.go` with event names like `"Call service_create tool"`, along with resource reads and prompt requests.
+- MCP tool calls are tracked by `analyticsMiddleware` in `internal/mcp/server.go` with event names like `"Call service_create tool"`, along with resource reads and prompt requests. Every MCP event also carries details of the client from the session's `initialize` handshake — name, version, protocol version, and advertised capabilities (`clientInfo` in `server.go`).
 
 **Sensitive data must never reach analytics.** The `ignore` list in `internal/analytics/analytics.go` filters flag and tool-parameter names (write flag names with underscores: `public-key` → `public_key`). When adding a command or tool that handles passwords, keys, SQL queries, connection strings, or similar, add the field names there. All positional arguments are tracked automatically, so accept sensitive values via flags instead — or add filtering logic in `wrapCommands` if a positional argument is unavoidable.
 
