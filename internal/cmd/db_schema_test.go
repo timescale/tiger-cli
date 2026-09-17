@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -10,7 +11,27 @@ import (
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 )
+
+// withFetchServiceSchema stubs common.FetchServiceSchema — otherwise the point
+// where the command would open a real database connection — asserting the
+// arguments the command passed down and returning schema and err in their
+// place. Expectation and return value are configured together, the way an API
+// client mock's are, so nothing about a case leaks into the next one.
+func withFetchServiceSchema(want common.FetchServiceSchemaArgs, schema *common.DatabaseSchema, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.FetchServiceSchema
+		common.FetchServiceSchema = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.FetchServiceSchemaArgs) (*common.DatabaseSchema, error) {
+			t.Helper()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("FetchServiceSchema args mismatch (-want +got):\n%s", diff)
+			}
+			return schema, err
+		}
+		t.Cleanup(func() { common.FetchServiceSchema = original })
+	})
+}
 
 func TestDbSchemaCmd(t *testing.T) {
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
@@ -22,8 +43,7 @@ func TestDbSchemaCmd(t *testing.T) {
 	}
 
 	// The fetch is stubbed for the success cases below, so they reach the
-	// command's own output and flag handling without a live database. Each
-	// records into its own args value, since cases run as separate subtests.
+	// command's own output and flag handling without a live database.
 	schema := &common.DatabaseSchema{
 		ID:   "svc-12345",
 		Name: "tsdb",
@@ -36,30 +56,6 @@ func TestDbSchemaCmd(t *testing.T) {
 		}},
 	}
 	const schemaText = "DATABASE: tsdb (svc-12345)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
-
-	// checkFetchArgs asserts what the command passed down to the fetch.
-	checkFetchArgs := func(got *fetchSchemaArgs, wantServiceID, wantRole string, wantPooled bool, wantOpts common.SchemaOptions) checkFunc {
-		return func(t *testing.T, _ cmdResult) {
-			t.Helper()
-			if got.target == nil {
-				t.Fatal("fetch was never called")
-			}
-			if id := got.target.ConnectionService.ServiceID; id != wantServiceID {
-				t.Errorf("fetch service = %q, want %q", id, wantServiceID)
-			}
-			if got.role != wantRole {
-				t.Errorf("fetch role = %q, want %q", got.role, wantRole)
-			}
-			if got.pooled != wantPooled {
-				t.Errorf("fetch pooled = %v, want %v", got.pooled, wantPooled)
-			}
-			if diff := cmp.Diff(wantOpts, got.opts); diff != "" {
-				t.Errorf("fetch options mismatch (-want +got):\n%s", diff)
-			}
-		}
-	}
-
-	var defaultArgs, flagArgs, replicaArgs, errArgs fetchSchemaArgs
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -158,11 +154,8 @@ func TestDbSchemaCmd(t *testing.T) {
 			name:       "prints the schema with the flag defaults",
 			args:       []string{"db", "schema", "svc-12345"},
 			setup:      setupGetWithStatus(api.DeployStatusREADY),
-			opts:       []runOption{withFetchServiceSchema(&defaultArgs, schema, nil)},
+			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
 			wantStdout: schemaText,
-			checks: []checkFunc{
-				checkFetchArgs(&defaultArgs, "svc-12345", "tsdbadmin", false, common.SchemaOptions{}),
-			},
 		},
 		{
 			name: "passes every flag down to the fetch",
@@ -170,40 +163,35 @@ func TestDbSchemaCmd(t *testing.T) {
 				"db", "schema", "svc-12345",
 				"--schema", "public", "--internal", "--definitions", "--comments", "--role", "reader",
 			},
-			setup:      setupGetWithStatus(api.DeployStatusREADY),
-			opts:       []runOption{withFetchServiceSchema(&flagArgs, schema, nil)},
+			setup: setupGetWithStatus(api.DeployStatusREADY),
+			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{
+				Role:               "reader",
+				Schema:             "public",
+				IncludeInternal:    true,
+				IncludeDefinitions: true,
+				IncludeComments:    true,
+			}, schema, nil)},
 			wantStdout: schemaText,
-			checks: []checkFunc{
-				checkFetchArgs(&flagArgs, "svc-12345", "reader", false, common.SchemaOptions{
-					Schema:             "public",
-					IncludeInternal:    true,
-					IncludeDefinitions: true,
-					IncludeComments:    true,
-				}),
-			},
 		},
 		{
-			// The replica is the connection target; --pooled warns and falls
-			// back, and this time the fetch succeeds behind the warning.
+			// The warning names the replica, proving it is the connection
+			// target; --pooled falls back and this time the fetch succeeds.
 			name: "prints the schema of a read replica",
 			args: []string{"db", "schema", "rep-67890", "--pooled"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			opts:       []runOption{withFetchServiceSchema(&replicaArgs, schema, nil)},
+			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
 			wantStdout: schemaText,
 			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
-			checks: []checkFunc{
-				checkFetchArgs(&replicaArgs, "rep-67890", "tsdbadmin", true, common.SchemaOptions{}),
-			},
 		},
 		{
 			// A fetch failure goes through handleDatabaseError like any other.
 			name:    "fetch fails",
 			args:    []string{"db", "schema", "svc-12345"},
 			setup:   setupGetWithStatus(api.DeployStatusREADY),
-			opts:    []runOption{withFetchServiceSchema(&errArgs, nil, errors.New("failed to connect to database: no route to host"))},
+			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
 			wantErr: "failed to connect to database: no route to host",
 		},
 	})
