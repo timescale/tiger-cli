@@ -16,7 +16,10 @@ import (
 //
 // The connection is forced read-only: introspection only issues SELECTs, so
 // this is always safe and guards against accidental writes.
-func FetchServiceSchema(ctx context.Context, cfg *config.Config, target *ConnectionTarget, role string, pooled bool, opts SchemaOptions) (*DatabaseSchema, error) {
+//
+// It is a var so tests can stub the connection out and reach the callers'
+// success paths, which are otherwise only reachable against a live database.
+var FetchServiceSchema = func(ctx context.Context, cfg *config.Config, target *ConnectionTarget, role string, pooled bool, opts SchemaOptions) (*DatabaseSchema, error) {
 	if err := CheckServiceReady(target.ConnectionService); err != nil {
 		return nil, err
 	}

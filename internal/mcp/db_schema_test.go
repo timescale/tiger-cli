@@ -1,12 +1,17 @@
 package mcp
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/config"
 )
 
 func TestDBSchema(t *testing.T) {
@@ -45,6 +50,55 @@ func TestDBSchema(t *testing.T) {
 		// rather than opening a connection.
 		noEndpointErr = "failed to build connection string: service endpoint not available"
 	)
+
+	// The fetch is stubbed for the success cases below, so they reach the
+	// handler's own output without a live database. stubFetch records what the
+	// handler passed down, which is how a case asserts the tool's parameters
+	// reached the fetch.
+	schema := &common.DatabaseSchema{
+		ID:   "e6ue9697jf",
+		Name: "tsdb",
+		Schemas: []common.NamespacedSchema{{
+			Name: "public",
+			Tables: []common.TableSchema{{
+				Name:    "metrics",
+				Columns: []common.TableColumnSchema{{Name: "time", Type: "timestamptz", NotNull: true}},
+			}},
+		}},
+	}
+	const schemaText = "DATABASE: tsdb (e6ue9697jf)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
+
+	type fetchArgs struct {
+		serviceID string
+		role      string
+		pooled    bool
+		opts      common.SchemaOptions
+	}
+	stubFetch := func(got *fetchArgs) func(*testing.T) {
+		return func(t *testing.T) {
+			original := common.FetchServiceSchema
+			common.FetchServiceSchema = func(_ context.Context, _ *config.Config, target *common.ConnectionTarget, role string, pooled bool, opts common.SchemaOptions) (*common.DatabaseSchema, error) {
+				*got = fetchArgs{
+					serviceID: target.ConnectionService.ServiceID,
+					role:      role,
+					pooled:    pooled,
+					opts:      opts,
+				}
+				return schema, nil
+			}
+			t.Cleanup(func() { common.FetchServiceSchema = original })
+		}
+	}
+	checkFetchArgs := func(got *fetchArgs, want fetchArgs) toolCheckFunc {
+		return func(t *testing.T, _ string) {
+			t.Helper()
+			if diff := cmp.Diff(want, *got, cmp.AllowUnexported(fetchArgs{})); diff != "" {
+				t.Errorf("fetch args mismatch (-want +got):\n%s", diff)
+			}
+		}
+	}
+
+	var defaultFetch, optionFetch, replicaFetch fetchArgs
 
 	runToolTests(t, []toolTest{
 		{
@@ -162,9 +216,19 @@ func TestDBSchema(t *testing.T) {
 			wantErr: "connection pooler not available for this service",
 		},
 		{
-			// The introspection options only shape the SQL issued after
-			// connecting; all that's observable here is that they're accepted.
-			name: "introspection options accepted",
+			name:       "returns the schema with the parameter defaults",
+			tool:       "db_schema",
+			args:       args,
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubFetch(&defaultFetch)},
+			wantOutput: map[string]any{"schema": schemaText},
+			checks: []toolCheckFunc{checkFetchArgs(&defaultFetch, fetchArgs{
+				serviceID: "e6ue9697jf",
+				role:      "tsdbadmin",
+			})},
+		},
+		{
+			name: "passes every introspection option down to the fetch",
 			tool: "db_schema",
 			args: map[string]any{
 				"service_id":  "e6ue9697jf",
@@ -173,10 +237,43 @@ func TestDBSchema(t *testing.T) {
 				"definitions": true,
 				"comments":    true,
 				"role":        "readonly",
-				"pooled":      false,
 			},
-			setupMock: expectStatus(api.DeployStatusPAUSED),
-			wantErr:   pausedErr,
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubFetch(&optionFetch)},
+			wantOutput: map[string]any{"schema": schemaText},
+			checks: []toolCheckFunc{checkFetchArgs(&optionFetch, fetchArgs{
+				serviceID: "e6ue9697jf",
+				role:      "readonly",
+				opts: common.SchemaOptions{
+					Schema:             "public",
+					IncludeInternal:    true,
+					IncludeDefinitions: true,
+					IncludeComments:    true,
+				},
+			})},
+		},
+		{
+			// The replica has no pooler, so the warning rides along with a
+			// successful result — the one path it is ever visible on.
+			name: "read replica without a pooler warns alongside the schema",
+			tool: "db_schema",
+			args: map[string]any{"service_id": "u8me885b93", "pooled": true},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				ready := replica
+				ready.Status = api.DeployStatusREADY
+				expectGet("u8me885b93", ready)(m)
+				expectGet("e6ue9697jf", sampleService())(m)
+			},
+			setup: []func(*testing.T){stubFetch(&replicaFetch)},
+			wantOutput: map[string]any{
+				"schema":  schemaText,
+				"warning": `read replica "replica-service" has no connection pooler; connecting directly instead`,
+			},
+			checks: []toolCheckFunc{checkFetchArgs(&replicaFetch, fetchArgs{
+				serviceID: "u8me885b93",
+				role:      "tsdbadmin",
+				pooled:    true,
+			})},
 		},
 	})
 }

@@ -430,6 +430,29 @@ func withReadPassword(password string) runOption {
 	})
 }
 
+// withFetchServiceSchema stubs common.FetchServiceSchema, so a case can reach
+// the success path of `tiger db schema` without a live database. The stub
+// records the arguments it was called with, which is how a case asserts that
+// the command's flags reached the fetch.
+func withFetchServiceSchema(got *fetchSchemaArgs, schema *common.DatabaseSchema, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.FetchServiceSchema
+		common.FetchServiceSchema = func(_ context.Context, _ *config.Config, target *common.ConnectionTarget, role string, pooled bool, opts common.SchemaOptions) (*common.DatabaseSchema, error) {
+			*got = fetchSchemaArgs{target: target, role: role, pooled: pooled, opts: opts}
+			return schema, err
+		}
+		t.Cleanup(func() { common.FetchServiceSchema = original })
+	})
+}
+
+// fetchSchemaArgs is what the withFetchServiceSchema stub was called with.
+type fetchSchemaArgs struct {
+	target *common.ConnectionTarget
+	role   string
+	pooled bool
+	opts   common.SchemaOptions
+}
+
 // withOpenBrowser overrides openBrowser for the duration of the test. By
 // default, runCommand stubs openBrowser to return an error (installed before
 // the setup hooks run, so this override lands on top of it). Use this to

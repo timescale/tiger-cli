@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 	"github.com/timescale/tiger-cli/internal/common"
@@ -18,6 +20,46 @@ func TestDbSchemaCmd(t *testing.T) {
 			}))
 		}
 	}
+
+	// The fetch is stubbed for the success cases below, so they reach the
+	// command's own output and flag handling without a live database. Each
+	// records into its own args value, since cases run as separate subtests.
+	schema := &common.DatabaseSchema{
+		ID:   "svc-12345",
+		Name: "tsdb",
+		Schemas: []common.NamespacedSchema{{
+			Name: "public",
+			Tables: []common.TableSchema{{
+				Name:    "metrics",
+				Columns: []common.TableColumnSchema{{Name: "time", Type: "timestamptz", NotNull: true}},
+			}},
+		}},
+	}
+	const schemaText = "DATABASE: tsdb (svc-12345)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
+
+	// checkFetchArgs asserts what the command passed down to the fetch.
+	checkFetchArgs := func(got *fetchSchemaArgs, wantServiceID, wantRole string, wantPooled bool, wantOpts common.SchemaOptions) checkFunc {
+		return func(t *testing.T, _ cmdResult) {
+			t.Helper()
+			if got.target == nil {
+				t.Fatal("fetch was never called")
+			}
+			if id := got.target.ConnectionService.ServiceID; id != wantServiceID {
+				t.Errorf("fetch service = %q, want %q", id, wantServiceID)
+			}
+			if got.role != wantRole {
+				t.Errorf("fetch role = %q, want %q", got.role, wantRole)
+			}
+			if got.pooled != wantPooled {
+				t.Errorf("fetch pooled = %v, want %v", got.pooled, wantPooled)
+			}
+			if diff := cmp.Diff(wantOpts, got.opts); diff != "" {
+				t.Errorf("fetch options mismatch (-want +got):\n%s", diff)
+			}
+		}
+	}
+
+	var defaultArgs, flagArgs, replicaArgs, errArgs fetchSchemaArgs
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -111,6 +153,58 @@ func TestDbSchemaCmd(t *testing.T) {
 			},
 			wantErr:    notReadyMsg("rep-67890"),
 			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\nError: " + notReadyMsg("rep-67890") + "\n",
+		},
+		{
+			name:       "prints the schema with the flag defaults",
+			args:       []string{"db", "schema", "svc-12345"},
+			setup:      setupGetWithStatus(api.DeployStatusREADY),
+			opts:       []runOption{withFetchServiceSchema(&defaultArgs, schema, nil)},
+			wantStdout: schemaText,
+			checks: []checkFunc{
+				checkFetchArgs(&defaultArgs, "svc-12345", "tsdbadmin", false, common.SchemaOptions{}),
+			},
+		},
+		{
+			name: "passes every flag down to the fetch",
+			args: []string{
+				"db", "schema", "svc-12345",
+				"--schema", "public", "--internal", "--definitions", "--comments", "--role", "reader",
+			},
+			setup:      setupGetWithStatus(api.DeployStatusREADY),
+			opts:       []runOption{withFetchServiceSchema(&flagArgs, schema, nil)},
+			wantStdout: schemaText,
+			checks: []checkFunc{
+				checkFetchArgs(&flagArgs, "svc-12345", "reader", false, common.SchemaOptions{
+					Schema:             "public",
+					IncludeInternal:    true,
+					IncludeDefinitions: true,
+					IncludeComments:    true,
+				}),
+			},
+		},
+		{
+			// The replica is the connection target; --pooled warns and falls
+			// back, and this time the fetch succeeds behind the warning.
+			name: "prints the schema of a read replica",
+			args: []string{"db", "schema", "rep-67890", "--pooled"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "rep-67890", sampleReplica())
+				expectGetService(m, "svc-12345", sampleService())
+			},
+			opts:       []runOption{withFetchServiceSchema(&replicaArgs, schema, nil)},
+			wantStdout: schemaText,
+			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
+			checks: []checkFunc{
+				checkFetchArgs(&replicaArgs, "rep-67890", "tsdbadmin", true, common.SchemaOptions{}),
+			},
+		},
+		{
+			// A fetch failure goes through handleDatabaseError like any other.
+			name:    "fetch fails",
+			args:    []string{"db", "schema", "svc-12345"},
+			setup:   setupGetWithStatus(api.DeployStatusREADY),
+			opts:    []runOption{withFetchServiceSchema(&errArgs, nil, errors.New("failed to connect to database: no route to host"))},
+			wantErr: "failed to connect to database: no route to host",
 		},
 	})
 }

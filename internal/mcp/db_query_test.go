@@ -1,15 +1,19 @@
 package mcp
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
@@ -61,6 +65,54 @@ func TestDBQuery(t *testing.T) {
 		// rather than opening a connection.
 		noEndpointErr = "failed to build connection string: service endpoint not available"
 	)
+
+	// ExecuteQuery is stubbed for the success cases below, so they reach the
+	// handler's own output without a live database. stubQuery records the args
+	// the handler built, which is how a case asserts what it passed down.
+	result := &common.QueryResult{
+		ResultSets: []common.ResultSet{{
+			CommandTag:   "SELECT 1",
+			Columns:      []common.Column{{Name: "id", Type: "int4"}},
+			Rows:         [][]*string{{new("1")}},
+			RowsAffected: 1,
+		}},
+		ExecutionTime: 12 * time.Millisecond,
+	}
+	wantResultSets := []any{map[string]any{
+		"command_tag":   "SELECT 1",
+		"columns":       []any{map[string]any{"name": "id", "type": "int4"}},
+		"rows":          []any{[]any{"1"}},
+		"rows_affected": float64(1),
+	}}
+
+	stubQuery := func(got *common.ExecuteQueryArgs, res *common.QueryResult) func(*testing.T) {
+		return func(t *testing.T) {
+			original := common.ExecuteQuery
+			common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, args common.ExecuteQueryArgs) (*common.QueryResult, error) {
+				*got = args
+				return res, nil
+			}
+			t.Cleanup(func() { common.ExecuteQuery = original })
+		}
+	}
+	checkQueryArgs := func(got *common.ExecuteQueryArgs, want common.ExecuteQueryArgs) toolCheckFunc {
+		return func(t *testing.T, _ string) {
+			t.Helper()
+			if diff := cmp.Diff(want, *got); diff != "" {
+				t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
+			}
+		}
+	}
+	// baseArgs is what the handler builds from a bare query, with the schema
+	// defaults the SDK applies and the MCP-only response caps.
+	baseArgs := common.ExecuteQueryArgs{
+		Query:    "SELECT 1",
+		Role:     "tsdbadmin",
+		MaxRows:  config.DefaultMCPMaxRows,
+		MaxBytes: mcpMaxResponseBytes,
+	}
+
+	var defaultQuery, paramQuery, fileQuery, readOnlyQuery, maxRowsQuery, zeroRowsQuery, truncatedQuery, replicaQuery common.ExecuteQueryArgs
 
 	runToolTests(t, []toolTest{
 		{
@@ -210,20 +262,16 @@ func TestDBQuery(t *testing.T) {
 			wantErr: "connection pooler not available for this service",
 		},
 		{
-			// db_query isn't a read-only gated tool: the mode makes the session
-			// read-only rather than refusing the call, so the query proceeds.
-			name:      "read-only all still runs the query",
-			tool:      toolDBQuery,
-			args:      args,
-			config:    map[string]any{"read_only": "all"},
-			setupMock: expectStatus(api.DeployStatusREADY),
-			wantErr:   noEndpointErr,
+			name:       "returns the result sets",
+			tool:       toolDBQuery,
+			args:       args,
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubQuery(&defaultQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks:     []toolCheckFunc{checkQueryArgs(&defaultQuery, baseArgs)},
 		},
 		{
-			// The remaining parameters only shape the connection and the
-			// statement issued after it; all that's observable here is that
-			// they're accepted.
-			name: "remaining parameters accepted",
+			name: "passes parameters, role and pooling down to the query",
 			tool: toolDBQuery,
 			args: map[string]any{
 				"service_id":      "e6ue9697jf",
@@ -231,149 +279,146 @@ func TestDBQuery(t *testing.T) {
 				"parameters":      []any{"1"},
 				"timeout_seconds": 60,
 				"role":            "readonly",
-				"pooled":          false,
+				"pooled":          true,
 			},
-			setupMock: expectStatus(api.DeployStatusPAUSED),
-			wantErr:   pausedErr,
+			setupMock: expectGet("e6ue9697jf", sampleService(func(s *api.Service) {
+				s.ConnectionPooler = &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{
+						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+						Port: new(6432),
+					},
+				}
+			})),
+			setup:      []func(*testing.T){stubQuery(&paramQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks: []toolCheckFunc{checkQueryArgs(&paramQuery, common.ExecuteQueryArgs{
+				Query:      "SELECT $1::int",
+				Parameters: []string{"1"},
+				Role:       "readonly",
+				Pooled:     true,
+				MaxRows:    config.DefaultMCPMaxRows,
+				MaxBytes:   mcpMaxResponseBytes,
+			})},
 		},
-	})
-}
-
-// Helper-level: the row cap only takes effect once a query runs, so a tool
-// call can't reach it without a live database.
-func TestResolveMaxRows(t *testing.T) {
-	tests := []struct {
-		name       string
-		configured int
-		want       int
-	}{
 		{
-			name:       "configured value is used",
-			configured: 250,
-			want:       250,
+			// The file's contents become the query text.
+			name:       "runs the query read from a file",
+			tool:       toolDBQuery,
+			args:       map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubQuery(&fileQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks: []toolCheckFunc{checkQueryArgs(&fileQuery, common.ExecuteQueryArgs{
+				Query:    "SELECT * FROM users;\n",
+				Role:     "tsdbadmin",
+				MaxRows:  config.DefaultMCPMaxRows,
+				MaxBytes: mcpMaxResponseBytes,
+			})},
+		},
+		{
+			// db_query isn't a read-only gated tool: the mode opens the session
+			// read-only rather than refusing the call.
+			name:       "read-only all runs the query in a read-only session",
+			tool:       toolDBQuery,
+			args:       args,
+			config:     map[string]any{"read_only": "all"},
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubQuery(&readOnlyQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks: []toolCheckFunc{checkQueryArgs(&readOnlyQuery, common.ExecuteQueryArgs{
+				Query:    "SELECT 1",
+				Role:     "tsdbadmin",
+				ReadOnly: true,
+				MaxRows:  config.DefaultMCPMaxRows,
+				MaxBytes: mcpMaxResponseBytes,
+			})},
+		},
+		{
+			name:       "mcp_max_rows caps the rows per result set",
+			tool:       toolDBQuery,
+			args:       args,
+			config:     map[string]any{"mcp_max_rows": 250},
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubQuery(&maxRowsQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks: []toolCheckFunc{checkQueryArgs(&maxRowsQuery, common.ExecuteQueryArgs{
+				Query:    "SELECT 1",
+				Role:     "tsdbadmin",
+				MaxRows:  250,
+				MaxBytes: mcpMaxResponseBytes,
+			})},
 		},
 		{
 			// A config-file or TIGER_MCP_MAX_ROWS value bypasses `tiger config
-			// set` validation, so a zero (or negative) configured value can
-			// reach here and must be sanitized to the default.
-			name:       "zero configured (env/file bypass) falls back to default",
-			configured: 0,
-			want:       config.DefaultMCPMaxRows,
+			// set` validation, so a non-positive one can reach the handler and
+			// must fall back to the default rather than meaning "no cap".
+			name:       "non-positive mcp_max_rows falls back to the default",
+			tool:       toolDBQuery,
+			args:       args,
+			config:     map[string]any{"mcp_max_rows": 0},
+			setupMock:  expectStatus(api.DeployStatusREADY),
+			setup:      []func(*testing.T){stubQuery(&zeroRowsQuery, result)},
+			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			checks:     []toolCheckFunc{checkQueryArgs(&zeroRowsQuery, baseArgs)},
 		},
 		{
-			name:       "negative configured falls back to default",
-			configured: -1,
-			want:       config.DefaultMCPMaxRows,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveMaxRows(tt.configured); got != tt.want {
-				t.Errorf("resolveMaxRows(%d) = %d, want %d", tt.configured, got, tt.want)
-			}
-		})
-	}
-}
-
-// Helper-level: the notice is only emitted on a truncated result set, which
-// needs a live database to produce.
-func TestTruncationNotice(t *testing.T) {
-	notice := truncationNotice(100)
-	// The notice must mention the actual cap and steer the model toward doing
-	// the work in SQL rather than re-running the query.
-	for _, want := range []string{"100", "LIMIT", "aggregate"} {
-		if !strings.Contains(notice, want) {
-			t.Errorf("truncationNotice() = %q, missing %q", notice, want)
-		}
-	}
-}
-
-func TestDBQueryOutputSchemaHasTruncationFields(t *testing.T) {
-	schema := DBQueryOutput{}.Schema()
-	for _, name := range []string{"truncated", "notice"} {
-		prop, ok := schema.Properties[name]
-		if !ok {
-			t.Fatalf("expected %q property in output schema", name)
-		}
-		if prop.Description == "" {
-			t.Errorf("expected %q to have a description", name)
-		}
-	}
-	resultSet := schema.Properties["result_sets"].Items
-	if _, ok := resultSet.Properties["truncated"]; !ok {
-		t.Error("expected truncated property on result set schema")
-	}
-}
-
-func TestResolveQueryInput(t *testing.T) {
-	dir := t.TempDir()
-	sqlPath := filepath.Join(dir, "schema.sql")
-	if err := os.WriteFile(sqlPath, []byte("SELECT 1;\n"), 0o600); err != nil {
-		t.Fatalf("failed to write SQL file: %v", err)
-	}
-	emptyPath := filepath.Join(dir, "empty.sql")
-	if err := os.WriteFile(emptyPath, nil, 0o600); err != nil {
-		t.Fatalf("failed to write empty SQL file: %v", err)
-	}
-
-	tests := []struct {
-		name    string
-		query   string
-		file    string
-		want    string
-		wantErr string
-	}{
-		{
-			name:  "inline query",
-			query: "SELECT 1",
-			want:  "SELECT 1",
+			// A truncated result carries the notice naming the configured cap.
+			name:      "truncated results carry an actionable notice",
+			tool:      toolDBQuery,
+			args:      args,
+			setupMock: expectStatus(api.DeployStatusREADY),
+			setup: []func(*testing.T){stubQuery(&truncatedQuery, &common.QueryResult{
+				ResultSets: []common.ResultSet{{
+					CommandTag:   "SELECT 100",
+					Columns:      []common.Column{{Name: "id", Type: "int4"}},
+					Rows:         [][]*string{{new("1")}},
+					RowsAffected: 5000,
+					Truncated:    true,
+				}},
+				ExecutionTime: 12 * time.Millisecond,
+				Truncated:     true,
+			})},
+			wantOutput: map[string]any{
+				"result_sets": []any{map[string]any{
+					"command_tag":   "SELECT 100",
+					"columns":       []any{map[string]any{"name": "id", "type": "int4"}},
+					"rows":          []any{[]any{"1"}},
+					"rows_affected": float64(5000),
+					"truncated":     true,
+				}},
+				"execution_time": "12ms",
+				"truncated":      true,
+				"notice": "Results were truncated to limit the amount of data returned (the configured mcp_max_rows=100 per result set, " +
+					"plus an overall response size cap). More rows exist. Do the work in the database instead of re-running this query: " +
+					"aggregate (GROUP BY, COUNT, SUM, AVG), filter (WHERE), or paginate (LIMIT/OFFSET).",
+			},
+			checks: []toolCheckFunc{checkQueryArgs(&truncatedQuery, baseArgs)},
 		},
 		{
-			name: "query read from file",
-			file: sqlPath,
-			want: "SELECT 1;\n",
+			// The replica has no pooler, so the warning rides along with a
+			// successful result — the one path it is ever visible on.
+			name: "read replica without a pooler warns alongside the results",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1", "pooled": true},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				ready := replica
+				ready.Status = api.DeployStatusREADY
+				expectGet("u8me885b93", ready)(m)
+				expectGet("e6ue9697jf", sampleService())(m)
+			},
+			setup: []func(*testing.T){stubQuery(&replicaQuery, result)},
+			wantOutput: map[string]any{
+				"result_sets":    wantResultSets,
+				"execution_time": "12ms",
+				"warning":        `read replica "replica-service" has no connection pooler; connecting directly instead`,
+			},
+			checks: []toolCheckFunc{checkQueryArgs(&replicaQuery, common.ExecuteQueryArgs{
+				Query:    "SELECT 1",
+				Role:     "tsdbadmin",
+				Pooled:   true,
+				MaxRows:  config.DefaultMCPMaxRows,
+				MaxBytes: mcpMaxResponseBytes,
+			})},
 		},
-		{
-			name:    "neither provided",
-			wantErr: "exactly one of 'query' or 'file' must be provided",
-		},
-		{
-			name:    "both provided",
-			query:   "SELECT 1",
-			file:    sqlPath,
-			wantErr: "exactly one of 'query' or 'file' must be provided",
-		},
-		{
-			name:    "missing file",
-			file:    filepath.Join(dir, "nope.sql"),
-			wantErr: "failed to read SQL file",
-		},
-		{
-			name:    "empty file",
-			file:    emptyPath,
-			wantErr: "is empty",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveQueryInput(tt.query, tt.file)
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
-				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Errorf("error = %q, want it to contain %q", err, tt.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("query = %q, want %q", got, tt.want)
-			}
-		})
-	}
+	})
 }

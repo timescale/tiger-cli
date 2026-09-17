@@ -91,6 +91,11 @@ type toolTest struct {
 	// checks are optional extra assertions, run in order after the standard ones.
 	checks []toolCheckFunc
 
+	// setup are t-scoped hooks run before the server is built. Use them to stub
+	// a package-level var, so the t.Cleanup restoring it belongs to the case
+	// that installed it rather than to the enclosing test function.
+	setup []func(t *testing.T)
+
 	// experimental turns on the App's experimental gate before the server is
 	// built, so the preview-stage tools are registered for this case.
 	experimental bool
@@ -126,6 +131,10 @@ func runToolTest(t *testing.T, tt toolTest) {
 	// Give the case a fresh, empty in-memory keyring so a password a tool saves
 	// never leaks into a later case that asserts none is stored.
 	keyring.MockInit()
+
+	for _, setup := range tt.setup {
+		setup(t)
+	}
 
 	configDir := t.TempDir()
 	values := map[string]any{"analytics": false, "docs_mcp": false}
