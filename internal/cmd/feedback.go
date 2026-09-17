@@ -78,7 +78,7 @@ that needs a tracked response, contact support directly.`,
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.Println("Feedback submitted! Thank you.")
+			cmd.Println("Feedback submitted!")
 			return nil
 		},
 	}
