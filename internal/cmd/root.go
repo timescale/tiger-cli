@@ -47,14 +47,13 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 		Use:   "tiger",
 		Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
 		Long: `Tiger CLI is a command-line interface for managing Tiger Cloud platform resources.
-Built as a single Go binary, it provides comprehensive tools for managing database services,
-VPCs, replicas, and related infrastructure components.
+It provides comprehensive tools for managing the lifecycle of database services,
+as well as for connecting to and querying them. It also includes Tiger MCP, a
+Model Context Protocol server that exposes the same operations to AI assistants.
 
 To get started, run:
 
-tiger auth login
-
-`,
+  tiger auth login`,
 	}
 
 	// Every command runs with this context — cobra copies it onto the command it
