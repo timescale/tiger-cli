@@ -774,7 +774,7 @@ func TestGetEffectiveConfigDir(t *testing.T) {
 	}{
 		{
 			name:     "default behavior",
-			expected: GetDefaultConfigDir(),
+			expected: util.ExpandPath(DefaultConfigDir),
 		},
 		{
 			name:     "no flag set",
