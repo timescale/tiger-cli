@@ -102,6 +102,7 @@ tiger auth login
 	cmd.AddCommand(buildServiceCmd(app))
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
+	cmd.AddCommand(buildFeedbackCmd(app))
 
 	wrapCommands(cmd, app)
 
@@ -154,7 +155,7 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 				a := analytics.New(cfg, client, projectID)
 				a.Track(
 					fmt.Sprintf("Run %s", c.CommandPath()),
-					analytics.Property("args", args), // NOTE: Safe right now, but might need allow-list in the future if some args end up containing sensitive info
+					analytics.Args(c.CommandPath(), args),
 					analytics.Property("elapsed_seconds", time.Since(start).Seconds()),
 					analytics.FlagSet(c.Flags()),
 					analytics.Error(runErr),

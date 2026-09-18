@@ -12,6 +12,7 @@ func TestMCPListCmd(t *testing.T) {
 	defaultTools := []string{
 		"db_query",
 		"db_schema",
+		"feedback",
 		"service_create",
 		"service_delete",
 		"service_fork",
@@ -30,6 +31,7 @@ func TestMCPListCmd(t *testing.T) {
 ├──────┼─────────────────────────┤
 │ tool │ db_query                │
 │ tool │ db_schema               │
+│ tool │ feedback                │
 │ tool │ service_create          │
 │ tool │ service_delete          │
 │ tool │ service_fork            │
@@ -50,6 +52,7 @@ func TestMCPListCmd(t *testing.T) {
 ├──────┼──────────────┤
 │ tool │ db_query     │
 │ tool │ db_schema    │
+│ tool │ feedback     │
 │ tool │ service_get  │
 │ tool │ service_list │
 │ tool │ service_logs │
@@ -62,6 +65,7 @@ func TestMCPListCmd(t *testing.T) {
 ├──────┼───────────────────────────┤
 │ tool │ db_query                  │
 │ tool │ db_schema                 │
+│ tool │ feedback                  │
 │ tool │ service_backups           │
 │ tool │ service_create            │
 │ tool │ service_delete            │
