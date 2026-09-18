@@ -157,6 +157,10 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Database operation tools
 	s.registerDatabaseTools(mode)
 
+	// Submitting feedback mutates no service, so the tool is absent from
+	// readOnlyGatedTools and stays registered in every read-only mode.
+	addTool(s, mode, newFeedbackTool(), s.handleFeedback)
+
 	// TODO: Register more tool groups
 
 	// Register remote docs MCP server proxy

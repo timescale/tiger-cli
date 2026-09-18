@@ -25,6 +25,7 @@ var ignore = []string{
 	"project_id",
 	"password",
 	"new_password",
+	"message",
 	"query",
 	"command",
 	"file",
@@ -74,6 +75,28 @@ func Map(m map[string]any) Option {
 			}
 			properties[key] = value
 		}
+	}
+}
+
+// redactedArgValue replaces a sensitive positional argument's text, keeping the
+// argument count — for `tiger feedback`, whether the message came from an
+// argument or from stdin.
+const redactedArgValue = "[REDACTED]"
+
+// Args creates an Option that adds a command's positional arguments to the
+// event properties, redacting the sensitive ones for the commands that take
+// them (e.g. the message in `tiger feedback`). Add a case here when adding a
+// command whose positional argument may carry sensitive text.
+func Args(commandPath string, args []string) Option {
+	return func(properties map[string]any) {
+		filtered := slices.Clone(args)
+
+		// Redact the feedback message from `tiger feedback [message]`.
+		if commandPath == "tiger feedback" && len(filtered) > 0 {
+			filtered[0] = redactedArgValue
+		}
+
+		properties["args"] = filtered
 	}
 }
 

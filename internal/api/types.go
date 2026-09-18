@@ -4,10 +4,58 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
 	"time"
 
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for AWSAccessKeyCredentialsType.
+const (
+	AWSAccessKeyCredentialsTypeACCESSKEY AWSAccessKeyCredentialsType = "ACCESS_KEY"
+)
+
+// Valid indicates whether the value is a known member of the AWSAccessKeyCredentialsType enum.
+func (e AWSAccessKeyCredentialsType) Valid() bool {
+	switch e {
+	case AWSAccessKeyCredentialsTypeACCESSKEY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AWSAccessKeyCredentialsUpdateType.
+const (
+	AWSAccessKeyCredentialsUpdateTypeACCESSKEY AWSAccessKeyCredentialsUpdateType = "ACCESS_KEY"
+)
+
+// Valid indicates whether the value is a known member of the AWSAccessKeyCredentialsUpdateType enum.
+func (e AWSAccessKeyCredentialsUpdateType) Valid() bool {
+	switch e {
+	case AWSAccessKeyCredentialsUpdateTypeACCESSKEY:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AWSIAMRoleCredentialsType.
+const (
+	AWSIAMRoleCredentialsTypeIAMROLE AWSIAMRoleCredentialsType = "IAM_ROLE"
+)
+
+// Valid indicates whether the value is a known member of the AWSIAMRoleCredentialsType enum.
+func (e AWSIAMRoleCredentialsType) Valid() bool {
+	switch e {
+	case AWSIAMRoleCredentialsTypeIAMROLE:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for AuthInfoType.
 const (
@@ -21,6 +69,51 @@ func (e AuthInfoType) Valid() bool {
 	case AuthInfoTypeAPIKey:
 		return true
 	case AuthInfoTypeOauth:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AzureMonitorMetricsExporterType.
+const (
+	AzureMonitorMetricsExporterTypeAZUREMONITORMETRICS AzureMonitorMetricsExporterType = "AZURE_MONITOR_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the AzureMonitorMetricsExporterType enum.
+func (e AzureMonitorMetricsExporterType) Valid() bool {
+	switch e {
+	case AzureMonitorMetricsExporterTypeAZUREMONITORMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AzureMonitorMetricsExporterCreateType.
+const (
+	AzureMonitorMetricsExporterCreateTypeAZUREMONITORMETRICS AzureMonitorMetricsExporterCreateType = "AZURE_MONITOR_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the AzureMonitorMetricsExporterCreateType enum.
+func (e AzureMonitorMetricsExporterCreateType) Valid() bool {
+	switch e {
+	case AzureMonitorMetricsExporterCreateTypeAZUREMONITORMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AzureMonitorMetricsExporterUpdateType.
+const (
+	AzureMonitorMetricsExporterUpdateTypeAZUREMONITORMETRICS AzureMonitorMetricsExporterUpdateType = "AZURE_MONITOR_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the AzureMonitorMetricsExporterUpdateType enum.
+func (e AzureMonitorMetricsExporterUpdateType) Valid() bool {
+	switch e {
+	case AzureMonitorMetricsExporterUpdateTypeAZUREMONITORMETRICS:
 		return true
 	default:
 		return false
@@ -57,6 +150,21 @@ func (e BackupCopyStatus) Valid() bool {
 	}
 }
 
+// Defines values for BackupRetentionByTimeType.
+const (
+	BackupRetentionByTimeTypeTIME BackupRetentionByTimeType = "TIME"
+)
+
+// Valid indicates whether the value is a known member of the BackupRetentionByTimeType enum.
+func (e BackupRetentionByTimeType) Valid() bool {
+	switch e {
+	case BackupRetentionByTimeTypeTIME:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for BackupType.
 const (
 	BackupTypeFULL        BackupType = "FULL"
@@ -72,6 +180,141 @@ func (e BackupType) Valid() bool {
 	case BackupTypeINCREMENTAL:
 		return true
 	case BackupTypeUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchLogsExporterType.
+const (
+	CloudWatchLogsExporterTypeCLOUDWATCHLOGS CloudWatchLogsExporterType = "CLOUDWATCH_LOGS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchLogsExporterType enum.
+func (e CloudWatchLogsExporterType) Valid() bool {
+	switch e {
+	case CloudWatchLogsExporterTypeCLOUDWATCHLOGS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchLogsExporterCreateType.
+const (
+	CloudWatchLogsExporterCreateTypeCLOUDWATCHLOGS CloudWatchLogsExporterCreateType = "CLOUDWATCH_LOGS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchLogsExporterCreateType enum.
+func (e CloudWatchLogsExporterCreateType) Valid() bool {
+	switch e {
+	case CloudWatchLogsExporterCreateTypeCLOUDWATCHLOGS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchLogsExporterUpdateType.
+const (
+	CloudWatchLogsExporterUpdateTypeCLOUDWATCHLOGS CloudWatchLogsExporterUpdateType = "CLOUDWATCH_LOGS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchLogsExporterUpdateType enum.
+func (e CloudWatchLogsExporterUpdateType) Valid() bool {
+	switch e {
+	case CloudWatchLogsExporterUpdateTypeCLOUDWATCHLOGS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchMetricsExporterType.
+const (
+	CloudWatchMetricsExporterTypeCLOUDWATCHMETRICS CloudWatchMetricsExporterType = "CLOUDWATCH_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchMetricsExporterType enum.
+func (e CloudWatchMetricsExporterType) Valid() bool {
+	switch e {
+	case CloudWatchMetricsExporterTypeCLOUDWATCHMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchMetricsExporterCreateType.
+const (
+	CloudWatchMetricsExporterCreateTypeCLOUDWATCHMETRICS CloudWatchMetricsExporterCreateType = "CLOUDWATCH_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchMetricsExporterCreateType enum.
+func (e CloudWatchMetricsExporterCreateType) Valid() bool {
+	switch e {
+	case CloudWatchMetricsExporterCreateTypeCLOUDWATCHMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CloudWatchMetricsExporterUpdateType.
+const (
+	CloudWatchMetricsExporterUpdateTypeCLOUDWATCHMETRICS CloudWatchMetricsExporterUpdateType = "CLOUDWATCH_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the CloudWatchMetricsExporterUpdateType enum.
+func (e CloudWatchMetricsExporterUpdateType) Valid() bool {
+	switch e {
+	case CloudWatchMetricsExporterUpdateTypeCLOUDWATCHMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatadogMetricsExporterType.
+const (
+	DatadogMetricsExporterTypeDATADOGMETRICS DatadogMetricsExporterType = "DATADOG_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the DatadogMetricsExporterType enum.
+func (e DatadogMetricsExporterType) Valid() bool {
+	switch e {
+	case DatadogMetricsExporterTypeDATADOGMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatadogMetricsExporterCreateType.
+const (
+	DatadogMetricsExporterCreateTypeDATADOGMETRICS DatadogMetricsExporterCreateType = "DATADOG_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the DatadogMetricsExporterCreateType enum.
+func (e DatadogMetricsExporterCreateType) Valid() bool {
+	switch e {
+	case DatadogMetricsExporterCreateTypeDATADOGMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DatadogMetricsExporterUpdateType.
+const (
+	DatadogMetricsExporterUpdateTypeDATADOGMETRICS DatadogMetricsExporterUpdateType = "DATADOG_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the DatadogMetricsExporterUpdateType enum.
+func (e DatadogMetricsExporterUpdateType) Valid() bool {
+	switch e {
+	case DatadogMetricsExporterUpdateTypeDATADOGMETRICS:
 		return true
 	default:
 		return false
@@ -141,6 +384,33 @@ func (e EnvironmentTag) Valid() bool {
 	}
 }
 
+// Defines values for ExporterType.
+const (
+	ExporterTypeAZUREMONITORMETRICS ExporterType = "AZURE_MONITOR_METRICS"
+	ExporterTypeCLOUDWATCHLOGS      ExporterType = "CLOUDWATCH_LOGS"
+	ExporterTypeCLOUDWATCHMETRICS   ExporterType = "CLOUDWATCH_METRICS"
+	ExporterTypeDATADOGMETRICS      ExporterType = "DATADOG_METRICS"
+	ExporterTypePROMETHEUSMETRICS   ExporterType = "PROMETHEUS_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the ExporterType enum.
+func (e ExporterType) Valid() bool {
+	switch e {
+	case ExporterTypeAZUREMONITORMETRICS:
+		return true
+	case ExporterTypeCLOUDWATCHLOGS:
+		return true
+	case ExporterTypeCLOUDWATCHMETRICS:
+		return true
+	case ExporterTypeDATADOGMETRICS:
+		return true
+	case ExporterTypePROMETHEUSMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ForkStrategy.
 const (
 	ForkStrategyLASTSNAPSHOT ForkStrategy = "LAST_SNAPSHOT"
@@ -162,45 +432,138 @@ func (e ForkStrategy) Valid() bool {
 	}
 }
 
-// Defines values for MetricsSeriesRequestFn.
+// Defines values for MetricMatchType.
 const (
-	MetricsSeriesRequestFnAVG      MetricsSeriesRequestFn = "AVG"
-	MetricsSeriesRequestFnCOUNT    MetricsSeriesRequestFn = "COUNT"
-	MetricsSeriesRequestFnINCREASE MetricsSeriesRequestFn = "INCREASE"
-	MetricsSeriesRequestFnLAST     MetricsSeriesRequestFn = "LAST"
-	MetricsSeriesRequestFnMAX      MetricsSeriesRequestFn = "MAX"
-	MetricsSeriesRequestFnMIN      MetricsSeriesRequestFn = "MIN"
-	MetricsSeriesRequestFnP50      MetricsSeriesRequestFn = "P50"
-	MetricsSeriesRequestFnP90      MetricsSeriesRequestFn = "P90"
-	MetricsSeriesRequestFnP99      MetricsSeriesRequestFn = "P99"
-	MetricsSeriesRequestFnRATE     MetricsSeriesRequestFn = "RATE"
-	MetricsSeriesRequestFnSUM      MetricsSeriesRequestFn = "SUM"
+	MetricMatchTypeEQUAL    MetricMatchType = "EQUAL"
+	MetricMatchTypeNOTEQUAL MetricMatchType = "NOT_EQUAL"
 )
 
-// Valid indicates whether the value is a known member of the MetricsSeriesRequestFn enum.
-func (e MetricsSeriesRequestFn) Valid() bool {
+// Valid indicates whether the value is a known member of the MetricMatchType enum.
+func (e MetricMatchType) Valid() bool {
 	switch e {
-	case MetricsSeriesRequestFnAVG:
+	case MetricMatchTypeEQUAL:
 		return true
-	case MetricsSeriesRequestFnCOUNT:
+	case MetricMatchTypeNOTEQUAL:
 		return true
-	case MetricsSeriesRequestFnINCREASE:
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricType.
+const (
+	MetricTypeCOUNTER   MetricType = "COUNTER"
+	MetricTypeGAUGE     MetricType = "GAUGE"
+	MetricTypeHISTOGRAM MetricType = "HISTOGRAM"
+	MetricTypeSUMMARY   MetricType = "SUMMARY"
+)
+
+// Valid indicates whether the value is a known member of the MetricType enum.
+func (e MetricType) Valid() bool {
+	switch e {
+	case MetricTypeCOUNTER:
 		return true
-	case MetricsSeriesRequestFnLAST:
+	case MetricTypeGAUGE:
 		return true
-	case MetricsSeriesRequestFnMAX:
+	case MetricTypeHISTOGRAM:
 		return true
-	case MetricsSeriesRequestFnMIN:
+	case MetricTypeSUMMARY:
 		return true
-	case MetricsSeriesRequestFnP50:
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricsAggFn.
+const (
+	MetricsAggFnAVG      MetricsAggFn = "AVG"
+	MetricsAggFnCOUNT    MetricsAggFn = "COUNT"
+	MetricsAggFnINCREASE MetricsAggFn = "INCREASE"
+	MetricsAggFnLAST     MetricsAggFn = "LAST"
+	MetricsAggFnMAX      MetricsAggFn = "MAX"
+	MetricsAggFnMAXTOTAL MetricsAggFn = "MAX_TOTAL"
+	MetricsAggFnMIN      MetricsAggFn = "MIN"
+	MetricsAggFnMINTOTAL MetricsAggFn = "MIN_TOTAL"
+	MetricsAggFnP50      MetricsAggFn = "P50"
+	MetricsAggFnP90      MetricsAggFn = "P90"
+	MetricsAggFnP99      MetricsAggFn = "P99"
+	MetricsAggFnRATE     MetricsAggFn = "RATE"
+	MetricsAggFnSUM      MetricsAggFn = "SUM"
+)
+
+// Valid indicates whether the value is a known member of the MetricsAggFn enum.
+func (e MetricsAggFn) Valid() bool {
+	switch e {
+	case MetricsAggFnAVG:
 		return true
-	case MetricsSeriesRequestFnP90:
+	case MetricsAggFnCOUNT:
 		return true
-	case MetricsSeriesRequestFnP99:
+	case MetricsAggFnINCREASE:
 		return true
-	case MetricsSeriesRequestFnRATE:
+	case MetricsAggFnLAST:
 		return true
-	case MetricsSeriesRequestFnSUM:
+	case MetricsAggFnMAX:
+		return true
+	case MetricsAggFnMAXTOTAL:
+		return true
+	case MetricsAggFnMIN:
+		return true
+	case MetricsAggFnMINTOTAL:
+		return true
+	case MetricsAggFnP50:
+		return true
+	case MetricsAggFnP90:
+		return true
+	case MetricsAggFnP99:
+		return true
+	case MetricsAggFnRATE:
+		return true
+	case MetricsAggFnSUM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PrometheusMetricsExporterType.
+const (
+	PrometheusMetricsExporterTypePROMETHEUSMETRICS PrometheusMetricsExporterType = "PROMETHEUS_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the PrometheusMetricsExporterType enum.
+func (e PrometheusMetricsExporterType) Valid() bool {
+	switch e {
+	case PrometheusMetricsExporterTypePROMETHEUSMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PrometheusMetricsExporterCreateType.
+const (
+	PrometheusMetricsExporterCreateTypePROMETHEUSMETRICS PrometheusMetricsExporterCreateType = "PROMETHEUS_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the PrometheusMetricsExporterCreateType enum.
+func (e PrometheusMetricsExporterCreateType) Valid() bool {
+	switch e {
+	case PrometheusMetricsExporterCreateTypePROMETHEUSMETRICS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PrometheusMetricsExporterUpdateType.
+const (
+	PrometheusMetricsExporterUpdateTypePROMETHEUSMETRICS PrometheusMetricsExporterUpdateType = "PROMETHEUS_METRICS"
+)
+
+// Valid indicates whether the value is a known member of the PrometheusMetricsExporterUpdateType enum.
+func (e PrometheusMetricsExporterUpdateType) Valid() bool {
+	switch e {
+	case PrometheusMetricsExporterUpdateTypePROMETHEUSMETRICS:
 		return true
 	default:
 		return false
@@ -289,6 +652,144 @@ func (e SetEnvironmentInputEnvironment) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Defines values for SubmitFeedbackJSONBodySource.
+const (
+	SubmitFeedbackJSONBodySourceCLI SubmitFeedbackJSONBodySource = "CLI"
+	SubmitFeedbackJSONBodySourceMCP SubmitFeedbackJSONBodySource = "MCP"
+)
+
+// Valid indicates whether the value is a known member of the SubmitFeedbackJSONBodySource enum.
+func (e SubmitFeedbackJSONBodySource) Valid() bool {
+	switch e {
+	case SubmitFeedbackJSONBodySourceCLI:
+		return true
+	case SubmitFeedbackJSONBodySourceMCP:
+		return true
+	default:
+		return false
+	}
+}
+
+// AWSAccessKeyCredentials An access key pair belonging to an IAM user in your account.
+type AWSAccessKeyCredentials struct {
+	// AwsAccessKey The AWS access key ID.
+	//
+	// Example: AKIAIOSFODNN7EXAMPLE
+	AwsAccessKey string `json:"aws_access_key"`
+
+	// AwsSecretKey The AWS secret access key.
+	//
+	// Example: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+	AwsSecretKey *string `json:"aws_secret_key,omitempty"`
+
+	// Type Always `ACCESS_KEY`.
+	Type AWSAccessKeyCredentialsType `json:"type"`
+}
+
+// AWSAccessKeyCredentialsType Always `ACCESS_KEY`.
+type AWSAccessKeyCredentialsType string
+
+// AWSAccessKeyCredentialsUpdate A replacement AWS access key pair. The two parts move together: send
+// both to rotate the key, or omit both to keep the stored one.
+type AWSAccessKeyCredentialsUpdate struct {
+	// AwsAccessKey A replacement AWS access key ID.
+	//
+	// Example: AKIAIOSFODNN7EXAMPLE
+	AwsAccessKey *string `json:"aws_access_key,omitempty"`
+
+	// AwsSecretKey The AWS secret access key that pairs with the access key ID.
+	//
+	// Example: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+	AwsSecretKey *string `json:"aws_secret_key,omitempty"`
+
+	// Type Always `ACCESS_KEY`.
+	Type AWSAccessKeyCredentialsUpdateType `json:"type"`
+}
+
+// AWSAccessKeyCredentialsUpdateType Always `ACCESS_KEY`.
+type AWSAccessKeyCredentialsUpdateType string
+
+// AWSCredentials How Tiger Cloud authenticates to AWS.
+type AWSCredentials struct {
+	union json.RawMessage
+}
+
+// AWSCredentialsUpdate Replacement AWS credentials. Switching between the two kinds is
+// allowed: sending `IAM_ROLE` discards any stored access key pair, and
+// sending `ACCESS_KEY` discards any stored role.
+type AWSCredentialsUpdate struct {
+	union json.RawMessage
+}
+
+// AWSIAMRoleCredentials An IAM role in your account that Tiger Cloud assumes.
+type AWSIAMRoleCredentials struct {
+	// AwsRoleArn The IAM role to assume, either as a full ARN or as the bare 12-digit
+	// AWS account ID.
+	//
+	//
+	// Example: arn:aws:iam::123456789012:role/tiger-cloud-cloudwatch
+	AwsRoleArn string `json:"aws_role_arn"`
+
+	// Type Always `IAM_ROLE`.
+	Type AWSIAMRoleCredentialsType `json:"type"`
+}
+
+// AWSIAMRoleCredentialsType Always `IAM_ROLE`.
+type AWSIAMRoleCredentialsType string
+
+// AllowList An IP allow list, restricting which IP ranges can reach a service.
+type AllowList struct {
+	// AllowListID The unique identifier of the IP allow list.
+	//
+	// Example: 1234567890
+	AllowListID string `json:"allow_list_id"`
+
+	// CidrBlocks The IP ranges this IP allow list permits. Each block must be a
+	// public range no smaller than a /17.
+	CidrBlocks []string `json:"cidr_blocks"`
+
+	// CreatedAt When the IP allow list was created.
+	//
+	// Example: 2025-01-15T09:30:00Z
+	CreatedAt time.Time `json:"created_at"`
+
+	// Description A human-readable label for the IP allow list.
+	//
+	// Example: Office network
+	Description string `json:"description"`
+
+	// ProjectID The project the IP allow list belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+}
+
+// AllowListCreate Parameters for creating an IP allow list.
+type AllowListCreate struct {
+	// CidrBlocks The IP ranges to permit. Each block must be a public range no
+	// smaller than a /17; the count is capped by your plan.
+	CidrBlocks []string `json:"cidr_blocks"`
+
+	// Description A human-readable label for the IP allow list.
+	//
+	// Example: Office network
+	Description string `json:"description"`
+}
+
+// AllowListUpdate Parameters for updating an IP allow list. Send `description` and/or
+// `cidr_blocks` to change them; omit either one to leave it unchanged.
+// At least one is required.
+type AllowListUpdate struct {
+	// CidrBlocks The IP ranges to permit, replacing the current set. Each block
+	// must be a public range no smaller than a /17.
+	CidrBlocks *[]string `json:"cidr_blocks,omitempty"`
+
+	// Description A human-readable label for the IP allow list.
+	//
+	// Example: Office network
+	Description *string `json:"description,omitempty"`
 }
 
 // AuthInfo Information about the authentication credentials being used. Exactly one
@@ -402,6 +903,124 @@ type AuthInfoUser struct {
 	Name string `json:"name"`
 }
 
+// AzureMonitorMetricsConfig Which Azure Monitor workspace a service's metrics are sent to.
+type AzureMonitorMetricsConfig struct {
+	// ConnectionString The Azure Monitor connection string for the workspace to send
+	// metrics to.
+	//
+	//
+	// Example: InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://eastus-1.in.applicationinsights.azure.com/
+	ConnectionString *string `json:"connection_string,omitempty"`
+
+	// IncludePgMetrics Include PostgreSQL database metrics, such as per-table and
+	// per-index statistics, alongside the service's operational metrics.
+	// This increases the volume of metrics sent, which may cost more at
+	// the destination.
+	//
+	//
+	// Example: true
+	IncludePgMetrics *bool `json:"include_pg_metrics,omitempty"`
+}
+
+// AzureMonitorMetricsConfigUpdate A replacement configuration for an Azure Monitor metrics exporter.
+// Omitting `connection_string` keeps the stored one.
+type AzureMonitorMetricsConfigUpdate struct {
+	// ConnectionString A replacement Azure Monitor connection string.
+	//
+	// Example: InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://eastus-1.in.applicationinsights.azure.com/
+	ConnectionString *string `json:"connection_string,omitempty"`
+
+	// IncludePgMetrics Whether to include PostgreSQL database metrics, such as
+	// per-table and per-index statistics, alongside the service's
+	// operational metrics. Send the value you want the exporter to
+	// have, not only the value you are changing.
+	//
+	//
+	// Example: true
+	IncludePgMetrics bool `json:"include_pg_metrics"`
+}
+
+// AzureMonitorMetricsExporter An exporter that sends service metrics to Azure Monitor.
+type AzureMonitorMetricsExporter struct {
+	// Config Which Azure Monitor workspace a service's metrics are sent to.
+	Config AzureMonitorMetricsConfig `json:"config"`
+
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `AZURE_MONITOR_METRICS`.
+	Type AzureMonitorMetricsExporterType `json:"type"`
+}
+
+// AzureMonitorMetricsExporterType Always `AZURE_MONITOR_METRICS`.
+type AzureMonitorMetricsExporterType string
+
+// AzureMonitorMetricsExporterCreate Parameters for creating an Azure Monitor metrics exporter.
+type AzureMonitorMetricsExporterCreate struct {
+	// Config Which Azure Monitor workspace a service's metrics are sent to.
+	Config AzureMonitorMetricsConfig `json:"config"`
+
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `AZURE_MONITOR_METRICS`.
+	Type AzureMonitorMetricsExporterCreateType `json:"type"`
+}
+
+// AzureMonitorMetricsExporterCreateType Always `AZURE_MONITOR_METRICS`.
+type AzureMonitorMetricsExporterCreateType string
+
+// AzureMonitorMetricsExporterUpdate Parameters for updating an Azure Monitor metrics exporter.
+type AzureMonitorMetricsExporterUpdate struct {
+	// Config A replacement configuration for an Azure Monitor metrics exporter.
+	// Omitting `connection_string` keeps the stored one.
+	Config *AzureMonitorMetricsConfigUpdate `json:"config,omitempty"`
+
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Always `AZURE_MONITOR_METRICS`.
+	Type AzureMonitorMetricsExporterUpdateType `json:"type"`
+}
+
+// AzureMonitorMetricsExporterUpdateType Always `AZURE_MONITOR_METRICS`.
+type AzureMonitorMetricsExporterUpdateType string
+
 // Backup A single backup of a service, taken automatically by Tiger Cloud.
 type Backup struct {
 	// DurationSeconds How long the backup took, in seconds. Absent while the backup is still running.
@@ -447,6 +1066,27 @@ type Backup struct {
 // - `UNKNOWN`: an unrecognized state.
 type BackupCopyStatus string
 
+// BackupRegion A region that receives copies of a service's backups.
+type BackupRegion struct {
+	// Created When the region was added.
+	//
+	// Example: 2026-01-15T09:30:00Z
+	Created *time.Time `json:"created,omitempty"`
+
+	// RegionCode The region backups are copied to.
+	//
+	// Example: eu-central-1
+	RegionCode string `json:"region_code"`
+}
+
+// BackupRegionCreate The region to start copying a service's backups to.
+type BackupRegionCreate struct {
+	// RegionCode The region to copy backups to. It cannot be the region the service runs in.
+	//
+	// Example: eu-central-1
+	RegionCode string `json:"region_code"`
+}
+
 // BackupRegionState A region storing a copy of a backup.
 type BackupRegionState struct {
 	// RegionCode The region storing the copy.
@@ -458,6 +1098,20 @@ type BackupRegionState struct {
 	Status *BackupCopyStatus `json:"status,omitempty"`
 }
 
+// BackupRetentionByTime Keep the backups taken within a number of days, and discard older ones.
+type BackupRetentionByTime struct {
+	// RetentionDays How many days of backups to keep. The current plan-based limit is 180 days.
+	//
+	// Example: 21
+	RetentionDays int `json:"retention_days"`
+
+	// Type Always `TIME`.
+	Type BackupRetentionByTimeType `json:"type"`
+}
+
+// BackupRetentionByTimeType Always `TIME`.
+type BackupRetentionByTimeType string
+
 // BackupType The type of a backup.
 //
 // - `FULL`: a complete copy of the service's data.
@@ -465,11 +1119,449 @@ type BackupRegionState struct {
 // - `UNKNOWN`: a type this version of the API does not name.
 type BackupType string
 
+// CloudWatchLogsConfig Where a CloudWatch logs exporter writes, and how it authenticates.
+type CloudWatchLogsConfig struct {
+	// AwsRegion The AWS region the log group is in. Independent of the exporter's own
+	// `region_code`.
+	//
+	//
+	// Example: us-east-1
+	AwsRegion string `json:"aws_region"`
+
+	// Credentials How Tiger Cloud authenticates to AWS.
+	Credentials AWSCredentials `json:"credentials"`
+
+	// LogGroupName The CloudWatch log group to write to. It must already exist in your
+	// AWS account.
+	//
+	//
+	// Example: /tigerdata/prod
+	LogGroupName string `json:"log_group_name"`
+
+	// LogStreamName The log stream within the log group to write to.
+	//
+	// Example: orders-db
+	LogStreamName string `json:"log_stream_name"`
+}
+
+// CloudWatchLogsConfigUpdate A replacement configuration for a CloudWatch logs exporter. Omitting
+// a credential keeps the stored one.
+type CloudWatchLogsConfigUpdate struct {
+	// AwsRegion The AWS region the log group is in.
+	//
+	// Example: us-east-1
+	AwsRegion string `json:"aws_region"`
+
+	// Credentials Replacement AWS credentials. Switching between the two kinds is
+	// allowed: sending `IAM_ROLE` discards any stored access key pair, and
+	// sending `ACCESS_KEY` discards any stored role.
+	Credentials AWSCredentialsUpdate `json:"credentials"`
+
+	// LogGroupName The CloudWatch log group to write to.
+	//
+	// Example: /tigerdata/prod
+	LogGroupName string `json:"log_group_name"`
+
+	// LogStreamName The log stream within the log group to write to.
+	//
+	// Example: orders-db
+	LogStreamName string `json:"log_stream_name"`
+}
+
+// CloudWatchLogsExporter An exporter that sends service logs to Amazon CloudWatch.
+type CloudWatchLogsExporter struct {
+	// Config Where a CloudWatch logs exporter writes, and how it authenticates.
+	Config CloudWatchLogsConfig `json:"config"`
+
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `CLOUDWATCH_LOGS`.
+	Type CloudWatchLogsExporterType `json:"type"`
+}
+
+// CloudWatchLogsExporterType Always `CLOUDWATCH_LOGS`.
+type CloudWatchLogsExporterType string
+
+// CloudWatchLogsExporterCreate Parameters for creating a CloudWatch logs exporter.
+type CloudWatchLogsExporterCreate struct {
+	// Config Where a CloudWatch logs exporter writes, and how it authenticates.
+	Config CloudWatchLogsConfig `json:"config"`
+
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `CLOUDWATCH_LOGS`.
+	Type CloudWatchLogsExporterCreateType `json:"type"`
+}
+
+// CloudWatchLogsExporterCreateType Always `CLOUDWATCH_LOGS`.
+type CloudWatchLogsExporterCreateType string
+
+// CloudWatchLogsExporterUpdate Parameters for updating a CloudWatch logs exporter.
+type CloudWatchLogsExporterUpdate struct {
+	// Config A replacement configuration for a CloudWatch logs exporter. Omitting
+	// a credential keeps the stored one.
+	Config *CloudWatchLogsConfigUpdate `json:"config,omitempty"`
+
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Always `CLOUDWATCH_LOGS`.
+	Type CloudWatchLogsExporterUpdateType `json:"type"`
+}
+
+// CloudWatchLogsExporterUpdateType Always `CLOUDWATCH_LOGS`.
+type CloudWatchLogsExporterUpdateType string
+
+// CloudWatchMetricsConfig Where a CloudWatch metrics exporter publishes, and how it authenticates.
+//
+// Metrics are published in AWS Embedded Metric Format, which delivers them
+// as log events that CloudWatch extracts metrics from. The log group is how
+// the data arrives; the namespace is where the extracted metrics land.
+type CloudWatchMetricsConfig struct {
+	// AwsRegion The AWS region to publish metrics to. Independent of the
+	// exporter's own `region_code`.
+	//
+	//
+	// Example: us-east-1
+	AwsRegion string `json:"aws_region"`
+
+	// Credentials How Tiger Cloud authenticates to AWS.
+	Credentials AWSCredentials `json:"credentials"`
+
+	// IncludePgMetrics Include PostgreSQL database metrics, such as per-table and
+	// per-index statistics, alongside the service's operational metrics.
+	// This increases the volume of metrics sent, which may cost more at
+	// the destination.
+	//
+	//
+	// Example: true
+	IncludePgMetrics *bool `json:"include_pg_metrics,omitempty"`
+
+	// LogGroupName The CloudWatch log group the Embedded Metric Format events are
+	// written to. It must already exist in your AWS account.
+	//
+	//
+	// Example: /tigerdata/prod
+	LogGroupName string `json:"log_group_name"`
+
+	// LogStreamName The log stream within the log group to write to.
+	//
+	// Example: orders-db
+	LogStreamName string `json:"log_stream_name"`
+
+	// Namespace The CloudWatch metric namespace to publish under.
+	//
+	// Example: TigerData/Prod
+	Namespace string `json:"namespace"`
+}
+
+// CloudWatchMetricsConfigUpdate A replacement configuration for a CloudWatch metrics exporter.
+// Omitting a credential keeps the stored one.
+type CloudWatchMetricsConfigUpdate struct {
+	// AwsRegion The AWS region to publish metrics to.
+	//
+	// Example: us-east-1
+	AwsRegion string `json:"aws_region"`
+
+	// Credentials Replacement AWS credentials. Switching between the two kinds is
+	// allowed: sending `IAM_ROLE` discards any stored access key pair, and
+	// sending `ACCESS_KEY` discards any stored role.
+	Credentials AWSCredentialsUpdate `json:"credentials"`
+
+	// IncludePgMetrics Whether to include PostgreSQL database metrics, such as
+	// per-table and per-index statistics, alongside the service's
+	// operational metrics. Send the value you want the exporter to
+	// have, not only the value you are changing.
+	//
+	//
+	// Example: true
+	IncludePgMetrics bool `json:"include_pg_metrics"`
+
+	// LogGroupName The CloudWatch log group used alongside the metric namespace.
+	//
+	// Example: /tigerdata/prod
+	LogGroupName string `json:"log_group_name"`
+
+	// LogStreamName The log stream within the log group.
+	//
+	// Example: orders-db
+	LogStreamName string `json:"log_stream_name"`
+
+	// Namespace The CloudWatch metric namespace to publish under.
+	//
+	// Example: TigerData/Prod
+	Namespace string `json:"namespace"`
+}
+
+// CloudWatchMetricsExporter An exporter that sends service metrics to Amazon CloudWatch.
+type CloudWatchMetricsExporter struct {
+	// Config Where a CloudWatch metrics exporter publishes, and how it authenticates.
+	//
+	// Metrics are published in AWS Embedded Metric Format, which delivers them
+	// as log events that CloudWatch extracts metrics from. The log group is how
+	// the data arrives; the namespace is where the extracted metrics land.
+	Config CloudWatchMetricsConfig `json:"config"`
+
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `CLOUDWATCH_METRICS`.
+	Type CloudWatchMetricsExporterType `json:"type"`
+}
+
+// CloudWatchMetricsExporterType Always `CLOUDWATCH_METRICS`.
+type CloudWatchMetricsExporterType string
+
+// CloudWatchMetricsExporterCreate Parameters for creating a CloudWatch metrics exporter.
+type CloudWatchMetricsExporterCreate struct {
+	// Config Where a CloudWatch metrics exporter publishes, and how it authenticates.
+	//
+	// Metrics are published in AWS Embedded Metric Format, which delivers them
+	// as log events that CloudWatch extracts metrics from. The log group is how
+	// the data arrives; the namespace is where the extracted metrics land.
+	Config CloudWatchMetricsConfig `json:"config"`
+
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `CLOUDWATCH_METRICS`.
+	Type CloudWatchMetricsExporterCreateType `json:"type"`
+}
+
+// CloudWatchMetricsExporterCreateType Always `CLOUDWATCH_METRICS`.
+type CloudWatchMetricsExporterCreateType string
+
+// CloudWatchMetricsExporterUpdate Parameters for updating a CloudWatch metrics exporter.
+type CloudWatchMetricsExporterUpdate struct {
+	// Config A replacement configuration for a CloudWatch metrics exporter.
+	// Omitting a credential keeps the stored one.
+	Config *CloudWatchMetricsConfigUpdate `json:"config,omitempty"`
+
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Always `CLOUDWATCH_METRICS`.
+	Type CloudWatchMetricsExporterUpdateType `json:"type"`
+}
+
+// CloudWatchMetricsExporterUpdateType Always `CLOUDWATCH_METRICS`.
+type CloudWatchMetricsExporterUpdateType string
+
 // ConnectionPooler Connection pooler configuration for a service.
 type ConnectionPooler struct {
 	// Endpoint A network endpoint for connecting to a service.
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
 }
+
+// DataTiering Data tiering configuration for a service.
+type DataTiering struct {
+	// Enabled Whether tiered storage is enabled for this service.
+	//
+	// Example: false
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// DatadogMetricsConfig Which Datadog account a service's metrics are sent to.
+type DatadogMetricsConfig struct {
+	// APIKey A Datadog API key with permission to submit metrics.
+	//
+	// Example: 0123456789abcdef0123456789abcdef
+	APIKey *string `json:"api_key,omitempty"`
+
+	// IncludePgMetrics Include PostgreSQL database metrics, such as per-table and
+	// per-index statistics, alongside the service's operational metrics.
+	// This increases the volume of metrics sent, which may cost more at
+	// the destination.
+	//
+	//
+	// Example: true
+	IncludePgMetrics *bool `json:"include_pg_metrics,omitempty"`
+
+	// Site The Datadog site to send to. It must match the site your API key
+	// belongs to.
+	//
+	//
+	// Example: datadoghq.eu
+	Site *string `json:"site,omitempty"`
+}
+
+// DatadogMetricsConfigUpdate A replacement configuration for a Datadog metrics exporter. Omitting
+// `api_key` keeps the stored one.
+type DatadogMetricsConfigUpdate struct {
+	// APIKey A replacement Datadog API key.
+	//
+	// Example: 0123456789abcdef0123456789abcdef
+	APIKey *string `json:"api_key,omitempty"`
+
+	// IncludePgMetrics Whether to include PostgreSQL database metrics, such as
+	// per-table and per-index statistics, alongside the service's
+	// operational metrics. Send the value you want the exporter to
+	// have, not only the value you are changing.
+	//
+	//
+	// Example: true
+	IncludePgMetrics bool `json:"include_pg_metrics"`
+
+	// Site The Datadog site to send to. It must match the site your API
+	// key belongs to.
+	//
+	//
+	// Example: datadoghq.eu
+	Site string `json:"site"`
+}
+
+// DatadogMetricsExporter An exporter that sends service metrics to Datadog.
+type DatadogMetricsExporter struct {
+	// Config Which Datadog account a service's metrics are sent to.
+	Config DatadogMetricsConfig `json:"config"`
+
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `DATADOG_METRICS`.
+	Type DatadogMetricsExporterType `json:"type"`
+}
+
+// DatadogMetricsExporterType Always `DATADOG_METRICS`.
+type DatadogMetricsExporterType string
+
+// DatadogMetricsExporterCreate Parameters for creating a Datadog metrics exporter.
+type DatadogMetricsExporterCreate struct {
+	// Config Which Datadog account a service's metrics are sent to.
+	Config DatadogMetricsConfig `json:"config"`
+
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `DATADOG_METRICS`.
+	Type DatadogMetricsExporterCreateType `json:"type"`
+}
+
+// DatadogMetricsExporterCreateType Always `DATADOG_METRICS`.
+type DatadogMetricsExporterCreateType string
+
+// DatadogMetricsExporterUpdate Parameters for updating a Datadog metrics exporter.
+type DatadogMetricsExporterUpdate struct {
+	// Config A replacement configuration for a Datadog metrics exporter. Omitting
+	// `api_key` keeps the stored one.
+	Config *DatadogMetricsConfigUpdate `json:"config,omitempty"`
+
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Always `DATADOG_METRICS`.
+	Type DatadogMetricsExporterUpdateType `json:"type"`
+}
+
+// DatadogMetricsExporterUpdateType Always `DATADOG_METRICS`.
+type DatadogMetricsExporterUpdateType string
 
 // DeployStatus The current deployment status of the service:
 // - QUEUED: the create request has been submitted and is queued
@@ -515,6 +1607,110 @@ type Error struct {
 	//
 	// Example: The requested service could not be found.
 	Message *string `json:"message,omitempty"`
+}
+
+// Exporter An exporter that sends a service's logs or metrics to an external
+// monitoring system. `type` determines the shape of `config`.
+type Exporter struct {
+	union json.RawMessage
+}
+
+// ExporterBase The fields every exporter carries, whatever it sends where.
+type ExporterBase struct {
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Where an exporter sends data and what kind of data it sends. Which
+	// fields `config` needs depends on the destination and data kind you
+	// pick here.
+	//
+	// `PROMETHEUS_METRICS` is pull rather than push: Tiger Cloud serves an
+	// endpoint your Prometheus scrapes, and sends nothing anywhere.
+	Type ExporterType `json:"type"`
+}
+
+// ExporterCreate Parameters for creating an exporter. `type` selects the destination
+// and the kind of data sent.
+type ExporterCreate struct {
+	union json.RawMessage
+}
+
+// ExporterCreateBase The creation parameters common to every exporter type.
+type ExporterCreateBase struct {
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Where an exporter sends data and what kind of data it sends. Which
+	// fields `config` needs depends on the destination and data kind you
+	// pick here.
+	//
+	// `PROMETHEUS_METRICS` is pull rather than push: Tiger Cloud serves an
+	// endpoint your Prometheus scrapes, and sends nothing anywhere.
+	Type ExporterType `json:"type"`
+}
+
+// ExporterType Where an exporter sends data and what kind of data it sends. Which
+// fields `config` needs depends on the destination and data kind you
+// pick here.
+//
+// `PROMETHEUS_METRICS` is pull rather than push: Tiger Cloud serves an
+// endpoint your Prometheus scrapes, and sends nothing anywhere.
+type ExporterType string
+
+// ExporterUpdate Parameters for updating an exporter. `type` is required and must
+// match the exporter's current type. Send `config` to replace the whole
+// configuration; omit it to leave the configuration unchanged.
+type ExporterUpdate struct {
+	union json.RawMessage
+}
+
+// ExporterUpdateBase The update parameters common to every exporter type.
+type ExporterUpdateBase struct {
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Where an exporter sends data and what kind of data it sends. Which
+	// fields `config` needs depends on the destination and data kind you
+	// pick here.
+	//
+	// `PROMETHEUS_METRICS` is pull rather than push: Tiger Cloud serves an
+	// endpoint your Prometheus scrapes, and sends nothing anywhere.
+	Type ExporterType `json:"type"`
 }
 
 // ForkServiceCreate Create a fork of an existing service. Service type, region code, and storage are always inherited from the parent service.
@@ -603,6 +1799,74 @@ type MetricDataPoint struct {
 	Value *float64 `json:"value"`
 }
 
+// MetricDetails Descriptive metadata for a metric series — what it is, not its
+// data. Some series don't have full metadata yet: type and
+// default_agg may be null and description/labels may be empty, but
+// every field below is always present in the response.
+type MetricDetails struct {
+	// DefaultAgg The aggregation function used by default when fn is omitted from a series query, or null if undocumented.
+	//
+	// Example: AVG
+	DefaultAgg *MetricsAggFn `json:"default_agg"`
+
+	// Description What this metric measures, or empty if undocumented.
+	//
+	// Example: Number of locks currently held, grouped by relation and lock mode.
+	Description string `json:"description"`
+
+	// Labels Labels specific to this metric (e.g. datname on
+	// pg_stat_database_*) — not the region/role/ordinal labels every
+	// metric carries regardless of which one it is.
+	Labels []MetricLabelDetails `json:"labels"`
+
+	// Name Metric series name.
+	//
+	// Example: pg_locks_count
+	Name string `json:"name"`
+
+	// Type The shape of this metric's data, or null if undocumented.
+	//
+	// Example: GAUGE
+	Type *MetricType `json:"type"`
+}
+
+// MetricExporterConfigBase The settings every metric exporter has.
+type MetricExporterConfigBase struct {
+	// IncludePgMetrics Include PostgreSQL database metrics, such as per-table and
+	// per-index statistics, alongside the service's operational metrics.
+	// This increases the volume of metrics sent, which may cost more at
+	// the destination.
+	//
+	//
+	// Example: true
+	IncludePgMetrics *bool `json:"include_pg_metrics,omitempty"`
+}
+
+// MetricExporterConfigUpdateBase The settings shared by every metric exporter, as sent on an update.
+type MetricExporterConfigUpdateBase struct {
+	// IncludePgMetrics Whether to include PostgreSQL database metrics, such as
+	// per-table and per-index statistics, alongside the service's
+	// operational metrics. Send the value you want the exporter to
+	// have, not only the value you are changing.
+	//
+	//
+	// Example: true
+	IncludePgMetrics bool `json:"include_pg_metrics"`
+}
+
+// MetricLabelDetails One label specific to a metric.
+type MetricLabelDetails struct {
+	// Description What this label identifies, or empty if undocumented.
+	//
+	// Example: The database this row's values belong to.
+	Description string `json:"description"`
+
+	// Name The label's key.
+	//
+	// Example: datname
+	Name string `json:"name"`
+}
+
 // MetricLabelFilter A single key/value label match applied to a metric series query.
 type MetricLabelFilter struct {
 	// Key Label key to match against, e.g. `role` or `job_id`.
@@ -610,11 +1874,20 @@ type MetricLabelFilter struct {
 	// Example: role
 	Key string `json:"key"`
 
+	// MatchType How to compare the label's value. Optional; defaults to `EQUAL`.
+	MatchType *MetricMatchType `json:"match_type,omitempty"`
+
 	// Value Label value to match. Case sensitivity follows the underlying metric's storage convention.
 	//
 	// Example: primary
 	Value string `json:"value"`
 }
+
+// MetricMatchType - `EQUAL`: the series must have the label equal to `value`.
+//   - `NOT_EQUAL`: the series must not have the label equal to `value`. A
+//     series missing the label entirely also matches. To exclude multiple
+//     values of the same label, pass multiple filters with that key.
+type MetricMatchType string
 
 // MetricSeries One labeled time series — the label set plus its per-bucket data points.
 type MetricSeries struct {
@@ -625,6 +1898,36 @@ type MetricSeries struct {
 	// metric (e.g. `role`, `ordinal`).
 	Labels map[string]string `json:"labels"`
 }
+
+// MetricType The shape of a metric's underlying data.
+//
+// - `GAUGE`: a value that can go up or down (e.g. a current connection count).
+// - `COUNTER`: a value that only increases until it resets (e.g. total queries run).
+// - `HISTOGRAM`: a distribution of observed values grouped into ranges.
+// - `SUMMARY`: a distribution of observed values summarized by quantile.
+type MetricType string
+
+// MetricsAggFn Aggregation function applied to raw/pre-aggregated samples when
+// collapsing them into one value per output bucket.
+//
+//   - `RATE`: counter-reset-aware per-second rate of change.
+//   - `INCREASE`: counter-reset-aware total increase over the bucket.
+//   - `SUM`: sum of samples in the bucket.
+//   - `AVG`: mean of samples in the bucket.
+//   - `MIN`: minimum sample in the bucket.
+//   - `MAX`: maximum sample in the bucket.
+//   - `MIN_TOTAL` / `MAX_TOTAL`: minimum/maximum of the bucket's samples
+//     added together across every series first — for a metric with
+//     labels (e.g. one series per database) where the combined total,
+//     not any single series' own extremum, is the meaningful quantity
+//     (e.g. peak of total connections across all databases). `MIN`/`MAX`
+//     give the single most extreme individual series instead, which is
+//     the right answer when the metric is itself an extremum or a
+//     timestamp (e.g. longest-running transaction).
+//   - `COUNT`: number of samples in the bucket.
+//   - `P50` / `P90` / `P99`: approximate percentiles.
+//   - `LAST`: the most recent sample in the bucket.
+type MetricsAggFn string
 
 // MetricsSeriesRequest Parameters for a single getServiceMetricsSeries query. Sent as a JSON
 // body so callers can pass an unbounded filter set without query-string
@@ -672,21 +1975,9 @@ type MetricsSeriesRequest struct {
 	//   - `timescale_cloud_database_job_duration_usecs`
 	//   - `timescale_cloud_database_job_success`
 	//
-	// Values:
-	//   - `RATE`: counter-reset-aware per-second rate of change.
-	//   - `INCREASE`: counter-reset-aware total increase over the bucket.
-	//   - `SUM`: sum of samples in the bucket.
-	//   - `AVG`: mean of samples in the bucket.
-	//   - `MIN`: minimum sample in the bucket.
-	//   - `MAX`: maximum sample in the bucket.
-	//   - `COUNT`: number of samples in the bucket.
-	//   - `P50` / `P90` / `P99`: percentile approximations (only valid
-	//     for metrics stored as sketches).
-	//   - `LAST`: the most recent sample in the bucket (default).
-	//
 	//
 	// Example: RATE
-	Fn *MetricsSeriesRequestFn `json:"fn,omitempty"`
+	Fn *MetricsAggFn `json:"fn,omitempty"`
 
 	// From Start of the time window (RFC3339; nanosecond precision accepted).
 	//
@@ -703,44 +1994,6 @@ type MetricsSeriesRequest struct {
 	// Example: 2026-06-25T11:00:00Z
 	To time.Time `json:"to"`
 }
-
-// MetricsSeriesRequestFn Aggregation function applied to raw/pre-aggregated samples when
-// collapsing them into one value per output bucket. Optional: when
-// omitted the server picks the default for the metric (currently
-// `LAST`).
-//
-// Not accepted on the following metrics — requests are rejected
-// with `INVALID_REQUEST`:
-//   - `timescale_cloud_system_cpu_total_millicores`
-//   - `timescale_cloud_system_cpu_usage_millicores`
-//   - `timescale_cloud_system_disk_io_read_bytes`
-//   - `timescale_cloud_system_disk_io_read_ops`
-//   - `timescale_cloud_system_disk_io_total_bytes`
-//   - `timescale_cloud_system_disk_io_total_ops`
-//   - `timescale_cloud_system_disk_io_write_bytes`
-//   - `timescale_cloud_system_disk_io_write_ops`
-//   - `timescale_cloud_system_disk_usage_bytes`
-//   - `timescale_cloud_system_memory_total_bytes`
-//   - `timescale_cloud_system_memory_usage_bytes`
-//   - `timescale_cloud_database_qps`
-//   - `timescale_cloud_database_num_connections`
-//   - `timescale_cloud_database_job_duration_usecs`
-//   - `timescale_cloud_database_job_success`
-//
-// Values:
-//   - `RATE`: counter-reset-aware per-second rate of change.
-//   - `INCREASE`: counter-reset-aware total increase over the bucket.
-//   - `SUM`: sum of samples in the bucket.
-//   - `AVG`: mean of samples in the bucket.
-//   - `MIN`: minimum sample in the bucket.
-//   - `MAX`: maximum sample in the bucket.
-//   - `COUNT`: number of samples in the bucket.
-//   - `P50` / `P90` / `P99`: percentile approximations (only valid
-//     for metrics stored as sketches).
-//   - `LAST`: the most recent sample in the bucket (default).
-//
-// Example: RATE
-type MetricsSeriesRequestFn string
 
 // Peering A VPC peering connection to an external cloud account.
 type Peering struct {
@@ -810,6 +2063,150 @@ type Project struct {
 	// Example: My Production Project
 	Name string `json:"name"`
 }
+
+// PrometheusMetricsConfig The endpoint Prometheus scrapes, and the basic authentication
+// credentials that guard it.
+//
+// A project can hold one `PROMETHEUS_METRICS` exporter per region;
+// creating a second in the same region fails with a 409.
+type PrometheusMetricsConfig struct {
+	// Endpoint The URL Prometheus scrapes to collect these metrics.
+	//
+	// Example: https://<project_id>.<region>.exporter.tsdb.cloud.timescale.com/metrics
+	Endpoint *string `json:"endpoint,omitempty"`
+
+	// IncludePgMetrics Include PostgreSQL database metrics, such as per-table and
+	// per-index statistics, alongside the service's operational metrics.
+	// This increases the volume of metrics sent, which may cost more at
+	// the destination.
+	//
+	//
+	// Example: true
+	IncludePgMetrics *bool `json:"include_pg_metrics,omitempty"`
+
+	// Password The password Prometheus authenticates with.
+	//
+	// Example: a-very-secure-password
+	Password *string `json:"password,omitempty"`
+
+	// Username The username Prometheus authenticates with.
+	//
+	// Example: tiger-metrics
+	Username string `json:"username"`
+}
+
+// PrometheusMetricsConfigUpdate A replacement configuration for a Prometheus metrics exporter.
+// Omitting `password` keeps the stored one.
+type PrometheusMetricsConfigUpdate struct {
+	// IncludePgMetrics Whether to include PostgreSQL database metrics, such as
+	// per-table and per-index statistics, alongside the service's
+	// operational metrics. Send the value you want the exporter to
+	// have, not only the value you are changing.
+	//
+	//
+	// Example: true
+	IncludePgMetrics bool `json:"include_pg_metrics"`
+
+	// Password A replacement password.
+	//
+	// Example: a-very-secure-password
+	Password *string `json:"password,omitempty"`
+
+	// Username The username Prometheus authenticates with.
+	//
+	// Example: tiger-metrics
+	Username string `json:"username"`
+}
+
+// PrometheusMetricsExporter An exporter that serves a service's metrics on an endpoint for your
+// Prometheus to scrape.
+type PrometheusMetricsExporter struct {
+	// Config The endpoint Prometheus scrapes, and the basic authentication
+	// credentials that guard it.
+	//
+	// A project can hold one `PROMETHEUS_METRICS` exporter per region;
+	// creating a second in the same region fails with a 409.
+	Config PrometheusMetricsConfig `json:"config"`
+
+	// Created When the exporter was created.
+	//
+	// Example: 2026-01-15T10:30:00Z
+	Created time.Time `json:"created"`
+
+	// ExporterID The unique identifier for the exporter.
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+
+	// Name A human-readable name for the exporter. Not used to identify it.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// ProjectID The project the exporter belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// RegionCode The cloud region the exporter runs in. Only services in this region
+	// can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `PROMETHEUS_METRICS`.
+	Type PrometheusMetricsExporterType `json:"type"`
+}
+
+// PrometheusMetricsExporterType Always `PROMETHEUS_METRICS`.
+type PrometheusMetricsExporterType string
+
+// PrometheusMetricsExporterCreate Parameters for creating a Prometheus metrics exporter.
+type PrometheusMetricsExporterCreate struct {
+	// Config The endpoint Prometheus scrapes, and the basic authentication
+	// credentials that guard it.
+	//
+	// A project can hold one `PROMETHEUS_METRICS` exporter per region;
+	// creating a second in the same region fails with a 409.
+	Config PrometheusMetricsConfig `json:"config"`
+
+	// Name A human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name string `json:"name"`
+
+	// RegionCode The cloud region to create the exporter in. Only services in this
+	// region can be attached to it, and it cannot be changed afterwards.
+	//
+	//
+	// Example: us-east-1
+	RegionCode string `json:"region_code"`
+
+	// Type Always `PROMETHEUS_METRICS`.
+	Type PrometheusMetricsExporterCreateType `json:"type"`
+}
+
+// PrometheusMetricsExporterCreateType Always `PROMETHEUS_METRICS`.
+type PrometheusMetricsExporterCreateType string
+
+// PrometheusMetricsExporterUpdate Parameters for updating a Prometheus metrics exporter.
+type PrometheusMetricsExporterUpdate struct {
+	// Config A replacement configuration for a Prometheus metrics exporter.
+	// Omitting `password` keeps the stored one.
+	Config *PrometheusMetricsConfigUpdate `json:"config,omitempty"`
+
+	// Name A new human-readable name for the exporter.
+	//
+	// Example: prod-metrics-to-datadog
+	Name *string `json:"name,omitempty"`
+
+	// Type Always `PROMETHEUS_METRICS`.
+	Type PrometheusMetricsExporterUpdateType `json:"type"`
+}
+
+// PrometheusMetricsExporterUpdateType Always `PROMETHEUS_METRICS`.
+type PrometheusMetricsExporterUpdateType string
 
 // ReadReplicaSet A set of read replicas for a service.
 type ReadReplicaSet struct {
@@ -952,6 +2349,9 @@ type Service struct {
 	// Example: 2025-01-15T09:30:00Z
 	Created time.Time `json:"created"`
 
+	// DataTiering Data tiering configuration for a service.
+	DataTiering *DataTiering `json:"data_tiering,omitempty"`
+
 	// Endpoint A network endpoint for connecting to a service.
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
 
@@ -966,8 +2366,27 @@ type Service struct {
 	// Example: a-very-secure-initial-password
 	InitialPassword *string `json:"initial_password,omitempty"`
 
+	// LogExporterID The exporter this service sends its logs to. Absent when the
+	// service is not attached to a log exporter. Change it with the
+	// attach and detach operations.
+	//
+	// A newly attached log exporter only starts carrying logs once the
+	// service has restarted.
+	//
+	//
+	// Example: 9b2e4d61-7a30-4c58-8f0d-6e1a3c9b4d27
+	LogExporterID *openapi_types.UUID `json:"log_exporter_id,omitempty"`
+
 	// Metadata Additional metadata for the service.
 	Metadata *ServiceMetadata `json:"metadata,omitempty"`
+
+	// MetricExporterID The exporter this service sends its metrics to. Absent when the
+	// service is not attached to a metric exporter. Change it with the
+	// attach and detach operations.
+	//
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	MetricExporterID *openapi_types.UUID `json:"metric_exporter_id,omitempty"`
 
 	// Metrics Resource usage metrics for the service.
 	Metrics *ServiceMetrics `json:"metrics,omitempty"`
@@ -1012,6 +2431,14 @@ type Service struct {
 	VpcEndpoint *VPCEndpoint `json:"vpc_endpoint,omitempty"`
 }
 
+// ServiceAllowListInput Identifies which IP allow list to attach to or detach from a service.
+type ServiceAllowListInput struct {
+	// AllowListID The unique identifier of the IP allow list.
+	//
+	// Example: 1234567890
+	AllowListID string `json:"allow_list_id"`
+}
+
 // ServiceCreate Parameters for creating a service.
 type ServiceCreate struct {
 	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
@@ -1050,6 +2477,17 @@ type ServiceCreate struct {
 
 // ServiceCreateAddons defines model for ServiceCreate.Addons.
 type ServiceCreateAddons string
+
+// ServiceExporterInput Parameters for attaching a service to an exporter, or detaching it
+// from one.
+type ServiceExporterInput struct {
+	// ExporterID The exporter to attach the service to, or detach it from. It must
+	// be in the same region as the service.
+	//
+	//
+	// Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+	ExporterID openapi_types.UUID `json:"exporter_id"`
+}
 
 // ServiceLogEntry A single structured log entry from a service.
 type ServiceLogEntry struct {
@@ -1248,6 +2686,15 @@ type VPCRename struct {
 	Name string `json:"name"`
 }
 
+// AllowListID Example: 1234567890
+type AllowListID = string
+
+// BackupRegionCode Example: eu-central-1
+type BackupRegionCode = string
+
+// ExporterID Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
+type ExporterID = openapi_types.UUID
+
 // PeeringID Example: 1234567890
 type PeeringID = string
 
@@ -1307,6 +2754,22 @@ type LogoutJSONBody struct {
 	RefreshToken *string `json:"refresh_token,omitempty"`
 }
 
+// SubmitFeedbackJSONBody defines parameters for SubmitFeedback.
+type SubmitFeedbackJSONBody struct {
+	// Message The feedback, bug report, or support request to send.
+	//
+	// Example: I can't connect to my service after resuming it.
+	Message string `json:"message"`
+
+	// Source The client surface the feedback came from: `CLI` for a command run by a person, `MCP` for a call made by an AI assistant. Omit it from other clients; the `User-Agent` header still identifies them.
+	//
+	// Example: CLI
+	Source *SubmitFeedbackJSONBodySource `json:"source,omitempty"`
+}
+
+// SubmitFeedbackJSONBodySource defines parameters for SubmitFeedback.
+type SubmitFeedbackJSONBodySource string
+
 // GetServiceLogsParams defines parameters for GetServiceLogs.
 type GetServiceLogsParams struct {
 	// Node Specific service node to fetch logs from (for multi-node services).
@@ -1340,11 +2803,44 @@ type TrackEventJSONRequestBody TrackEventJSONBody
 // LogoutJSONRequestBody defines body for Logout for application/json ContentType.
 type LogoutJSONRequestBody LogoutJSONBody
 
+// SubmitFeedbackJSONRequestBody defines body for SubmitFeedback for application/json ContentType.
+type SubmitFeedbackJSONRequestBody SubmitFeedbackJSONBody
+
+// CreateAllowListJSONRequestBody defines body for CreateAllowList for application/json ContentType.
+type CreateAllowListJSONRequestBody = AllowListCreate
+
+// UpdateAllowListJSONRequestBody defines body for UpdateAllowList for application/json ContentType.
+type UpdateAllowListJSONRequestBody = AllowListUpdate
+
+// CreateExporterJSONRequestBody defines body for CreateExporter for application/json ContentType.
+type CreateExporterJSONRequestBody = ExporterCreate
+
+// UpdateExporterJSONRequestBody defines body for UpdateExporter for application/json ContentType.
+type UpdateExporterJSONRequestBody = ExporterUpdate
+
 // CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
 type CreateServiceJSONRequestBody = ServiceCreate
 
+// AttachServiceToAllowListJSONRequestBody defines body for AttachServiceToAllowList for application/json ContentType.
+type AttachServiceToAllowListJSONRequestBody = ServiceAllowListInput
+
+// AttachServiceToExporterJSONRequestBody defines body for AttachServiceToExporter for application/json ContentType.
+type AttachServiceToExporterJSONRequestBody = ServiceExporterInput
+
 // AttachServiceToVPCJSONRequestBody defines body for AttachServiceToVPC for application/json ContentType.
 type AttachServiceToVPCJSONRequestBody = ServiceVPCInput
+
+// CreateBackupRegionJSONRequestBody defines body for CreateBackupRegion for application/json ContentType.
+type CreateBackupRegionJSONRequestBody = BackupRegionCreate
+
+// SetBackupRetentionJSONRequestBody defines body for SetBackupRetention for application/json ContentType.
+type SetBackupRetentionJSONRequestBody = BackupRetentionByTime
+
+// DetachServiceFromAllowListJSONRequestBody defines body for DetachServiceFromAllowList for application/json ContentType.
+type DetachServiceFromAllowListJSONRequestBody = ServiceAllowListInput
+
+// DetachServiceFromExporterJSONRequestBody defines body for DetachServiceFromExporter for application/json ContentType.
+type DetachServiceFromExporterJSONRequestBody = ServiceExporterInput
 
 // DetachServiceFromVPCJSONRequestBody defines body for DetachServiceFromVPC for application/json ContentType.
 type DetachServiceFromVPCJSONRequestBody = ServiceVPCInput
@@ -1387,3 +2883,832 @@ type CreateVPCPeeringJSONRequestBody = PeeringCreate
 
 // RenameVPCJSONRequestBody defines body for RenameVPC for application/json ContentType.
 type RenameVPCJSONRequestBody = VPCRename
+
+// AsAWSIAMRoleCredentials returns the union data inside the AWSCredentials as a AWSIAMRoleCredentials
+func (t AWSCredentials) AsAWSIAMRoleCredentials() (AWSIAMRoleCredentials, error) {
+	var body AWSIAMRoleCredentials
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAWSIAMRoleCredentials overwrites any union data inside the AWSCredentials as the provided AWSIAMRoleCredentials
+func (t *AWSCredentials) FromAWSIAMRoleCredentials(v AWSIAMRoleCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"IAM_ROLE"}`))
+	t.union = b
+	return err
+}
+
+// MergeAWSIAMRoleCredentials performs a merge with any union data inside the AWSCredentials, using the provided AWSIAMRoleCredentials
+func (t *AWSCredentials) MergeAWSIAMRoleCredentials(v AWSIAMRoleCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"IAM_ROLE"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAWSAccessKeyCredentials returns the union data inside the AWSCredentials as a AWSAccessKeyCredentials
+func (t AWSCredentials) AsAWSAccessKeyCredentials() (AWSAccessKeyCredentials, error) {
+	var body AWSAccessKeyCredentials
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAWSAccessKeyCredentials overwrites any union data inside the AWSCredentials as the provided AWSAccessKeyCredentials
+func (t *AWSCredentials) FromAWSAccessKeyCredentials(v AWSAccessKeyCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"ACCESS_KEY"}`))
+	t.union = b
+	return err
+}
+
+// MergeAWSAccessKeyCredentials performs a merge with any union data inside the AWSCredentials, using the provided AWSAccessKeyCredentials
+func (t *AWSCredentials) MergeAWSAccessKeyCredentials(v AWSAccessKeyCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"ACCESS_KEY"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AWSCredentials) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AWSCredentials) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "ACCESS_KEY":
+		return t.AsAWSAccessKeyCredentials()
+	case "IAM_ROLE":
+		return t.AsAWSIAMRoleCredentials()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AWSCredentials) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AWSCredentials) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsAWSIAMRoleCredentials returns the union data inside the AWSCredentialsUpdate as a AWSIAMRoleCredentials
+func (t AWSCredentialsUpdate) AsAWSIAMRoleCredentials() (AWSIAMRoleCredentials, error) {
+	var body AWSIAMRoleCredentials
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAWSIAMRoleCredentials overwrites any union data inside the AWSCredentialsUpdate as the provided AWSIAMRoleCredentials
+func (t *AWSCredentialsUpdate) FromAWSIAMRoleCredentials(v AWSIAMRoleCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"IAM_ROLE"}`))
+	t.union = b
+	return err
+}
+
+// MergeAWSIAMRoleCredentials performs a merge with any union data inside the AWSCredentialsUpdate, using the provided AWSIAMRoleCredentials
+func (t *AWSCredentialsUpdate) MergeAWSIAMRoleCredentials(v AWSIAMRoleCredentials) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"IAM_ROLE"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAWSAccessKeyCredentialsUpdate returns the union data inside the AWSCredentialsUpdate as a AWSAccessKeyCredentialsUpdate
+func (t AWSCredentialsUpdate) AsAWSAccessKeyCredentialsUpdate() (AWSAccessKeyCredentialsUpdate, error) {
+	var body AWSAccessKeyCredentialsUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAWSAccessKeyCredentialsUpdate overwrites any union data inside the AWSCredentialsUpdate as the provided AWSAccessKeyCredentialsUpdate
+func (t *AWSCredentialsUpdate) FromAWSAccessKeyCredentialsUpdate(v AWSAccessKeyCredentialsUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"ACCESS_KEY"}`))
+	t.union = b
+	return err
+}
+
+// MergeAWSAccessKeyCredentialsUpdate performs a merge with any union data inside the AWSCredentialsUpdate, using the provided AWSAccessKeyCredentialsUpdate
+func (t *AWSCredentialsUpdate) MergeAWSAccessKeyCredentialsUpdate(v AWSAccessKeyCredentialsUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"ACCESS_KEY"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AWSCredentialsUpdate) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AWSCredentialsUpdate) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "ACCESS_KEY":
+		return t.AsAWSAccessKeyCredentialsUpdate()
+	case "IAM_ROLE":
+		return t.AsAWSIAMRoleCredentials()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AWSCredentialsUpdate) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AWSCredentialsUpdate) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCloudWatchLogsExporter returns the union data inside the Exporter as a CloudWatchLogsExporter
+func (t Exporter) AsCloudWatchLogsExporter() (CloudWatchLogsExporter, error) {
+	var body CloudWatchLogsExporter
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchLogsExporter overwrites any union data inside the Exporter as the provided CloudWatchLogsExporter
+func (t *Exporter) FromCloudWatchLogsExporter(v CloudWatchLogsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchLogsExporter performs a merge with any union data inside the Exporter, using the provided CloudWatchLogsExporter
+func (t *Exporter) MergeCloudWatchLogsExporter(v CloudWatchLogsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCloudWatchMetricsExporter returns the union data inside the Exporter as a CloudWatchMetricsExporter
+func (t Exporter) AsCloudWatchMetricsExporter() (CloudWatchMetricsExporter, error) {
+	var body CloudWatchMetricsExporter
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchMetricsExporter overwrites any union data inside the Exporter as the provided CloudWatchMetricsExporter
+func (t *Exporter) FromCloudWatchMetricsExporter(v CloudWatchMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchMetricsExporter performs a merge with any union data inside the Exporter, using the provided CloudWatchMetricsExporter
+func (t *Exporter) MergeCloudWatchMetricsExporter(v CloudWatchMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDatadogMetricsExporter returns the union data inside the Exporter as a DatadogMetricsExporter
+func (t Exporter) AsDatadogMetricsExporter() (DatadogMetricsExporter, error) {
+	var body DatadogMetricsExporter
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDatadogMetricsExporter overwrites any union data inside the Exporter as the provided DatadogMetricsExporter
+func (t *Exporter) FromDatadogMetricsExporter(v DatadogMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeDatadogMetricsExporter performs a merge with any union data inside the Exporter, using the provided DatadogMetricsExporter
+func (t *Exporter) MergeDatadogMetricsExporter(v DatadogMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPrometheusMetricsExporter returns the union data inside the Exporter as a PrometheusMetricsExporter
+func (t Exporter) AsPrometheusMetricsExporter() (PrometheusMetricsExporter, error) {
+	var body PrometheusMetricsExporter
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPrometheusMetricsExporter overwrites any union data inside the Exporter as the provided PrometheusMetricsExporter
+func (t *Exporter) FromPrometheusMetricsExporter(v PrometheusMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergePrometheusMetricsExporter performs a merge with any union data inside the Exporter, using the provided PrometheusMetricsExporter
+func (t *Exporter) MergePrometheusMetricsExporter(v PrometheusMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAzureMonitorMetricsExporter returns the union data inside the Exporter as a AzureMonitorMetricsExporter
+func (t Exporter) AsAzureMonitorMetricsExporter() (AzureMonitorMetricsExporter, error) {
+	var body AzureMonitorMetricsExporter
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAzureMonitorMetricsExporter overwrites any union data inside the Exporter as the provided AzureMonitorMetricsExporter
+func (t *Exporter) FromAzureMonitorMetricsExporter(v AzureMonitorMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeAzureMonitorMetricsExporter performs a merge with any union data inside the Exporter, using the provided AzureMonitorMetricsExporter
+func (t *Exporter) MergeAzureMonitorMetricsExporter(v AzureMonitorMetricsExporter) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Exporter) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t Exporter) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "AZURE_MONITOR_METRICS":
+		return t.AsAzureMonitorMetricsExporter()
+	case "CLOUDWATCH_LOGS":
+		return t.AsCloudWatchLogsExporter()
+	case "CLOUDWATCH_METRICS":
+		return t.AsCloudWatchMetricsExporter()
+	case "DATADOG_METRICS":
+		return t.AsDatadogMetricsExporter()
+	case "PROMETHEUS_METRICS":
+		return t.AsPrometheusMetricsExporter()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t Exporter) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Exporter) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCloudWatchLogsExporterCreate returns the union data inside the ExporterCreate as a CloudWatchLogsExporterCreate
+func (t ExporterCreate) AsCloudWatchLogsExporterCreate() (CloudWatchLogsExporterCreate, error) {
+	var body CloudWatchLogsExporterCreate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchLogsExporterCreate overwrites any union data inside the ExporterCreate as the provided CloudWatchLogsExporterCreate
+func (t *ExporterCreate) FromCloudWatchLogsExporterCreate(v CloudWatchLogsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchLogsExporterCreate performs a merge with any union data inside the ExporterCreate, using the provided CloudWatchLogsExporterCreate
+func (t *ExporterCreate) MergeCloudWatchLogsExporterCreate(v CloudWatchLogsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCloudWatchMetricsExporterCreate returns the union data inside the ExporterCreate as a CloudWatchMetricsExporterCreate
+func (t ExporterCreate) AsCloudWatchMetricsExporterCreate() (CloudWatchMetricsExporterCreate, error) {
+	var body CloudWatchMetricsExporterCreate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchMetricsExporterCreate overwrites any union data inside the ExporterCreate as the provided CloudWatchMetricsExporterCreate
+func (t *ExporterCreate) FromCloudWatchMetricsExporterCreate(v CloudWatchMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchMetricsExporterCreate performs a merge with any union data inside the ExporterCreate, using the provided CloudWatchMetricsExporterCreate
+func (t *ExporterCreate) MergeCloudWatchMetricsExporterCreate(v CloudWatchMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDatadogMetricsExporterCreate returns the union data inside the ExporterCreate as a DatadogMetricsExporterCreate
+func (t ExporterCreate) AsDatadogMetricsExporterCreate() (DatadogMetricsExporterCreate, error) {
+	var body DatadogMetricsExporterCreate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDatadogMetricsExporterCreate overwrites any union data inside the ExporterCreate as the provided DatadogMetricsExporterCreate
+func (t *ExporterCreate) FromDatadogMetricsExporterCreate(v DatadogMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeDatadogMetricsExporterCreate performs a merge with any union data inside the ExporterCreate, using the provided DatadogMetricsExporterCreate
+func (t *ExporterCreate) MergeDatadogMetricsExporterCreate(v DatadogMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPrometheusMetricsExporterCreate returns the union data inside the ExporterCreate as a PrometheusMetricsExporterCreate
+func (t ExporterCreate) AsPrometheusMetricsExporterCreate() (PrometheusMetricsExporterCreate, error) {
+	var body PrometheusMetricsExporterCreate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPrometheusMetricsExporterCreate overwrites any union data inside the ExporterCreate as the provided PrometheusMetricsExporterCreate
+func (t *ExporterCreate) FromPrometheusMetricsExporterCreate(v PrometheusMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergePrometheusMetricsExporterCreate performs a merge with any union data inside the ExporterCreate, using the provided PrometheusMetricsExporterCreate
+func (t *ExporterCreate) MergePrometheusMetricsExporterCreate(v PrometheusMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAzureMonitorMetricsExporterCreate returns the union data inside the ExporterCreate as a AzureMonitorMetricsExporterCreate
+func (t ExporterCreate) AsAzureMonitorMetricsExporterCreate() (AzureMonitorMetricsExporterCreate, error) {
+	var body AzureMonitorMetricsExporterCreate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAzureMonitorMetricsExporterCreate overwrites any union data inside the ExporterCreate as the provided AzureMonitorMetricsExporterCreate
+func (t *ExporterCreate) FromAzureMonitorMetricsExporterCreate(v AzureMonitorMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeAzureMonitorMetricsExporterCreate performs a merge with any union data inside the ExporterCreate, using the provided AzureMonitorMetricsExporterCreate
+func (t *ExporterCreate) MergeAzureMonitorMetricsExporterCreate(v AzureMonitorMetricsExporterCreate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ExporterCreate) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t ExporterCreate) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "AZURE_MONITOR_METRICS":
+		return t.AsAzureMonitorMetricsExporterCreate()
+	case "CLOUDWATCH_LOGS":
+		return t.AsCloudWatchLogsExporterCreate()
+	case "CLOUDWATCH_METRICS":
+		return t.AsCloudWatchMetricsExporterCreate()
+	case "DATADOG_METRICS":
+		return t.AsDatadogMetricsExporterCreate()
+	case "PROMETHEUS_METRICS":
+		return t.AsPrometheusMetricsExporterCreate()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t ExporterCreate) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ExporterCreate) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsCloudWatchLogsExporterUpdate returns the union data inside the ExporterUpdate as a CloudWatchLogsExporterUpdate
+func (t ExporterUpdate) AsCloudWatchLogsExporterUpdate() (CloudWatchLogsExporterUpdate, error) {
+	var body CloudWatchLogsExporterUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchLogsExporterUpdate overwrites any union data inside the ExporterUpdate as the provided CloudWatchLogsExporterUpdate
+func (t *ExporterUpdate) FromCloudWatchLogsExporterUpdate(v CloudWatchLogsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchLogsExporterUpdate performs a merge with any union data inside the ExporterUpdate, using the provided CloudWatchLogsExporterUpdate
+func (t *ExporterUpdate) MergeCloudWatchLogsExporterUpdate(v CloudWatchLogsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_LOGS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCloudWatchMetricsExporterUpdate returns the union data inside the ExporterUpdate as a CloudWatchMetricsExporterUpdate
+func (t ExporterUpdate) AsCloudWatchMetricsExporterUpdate() (CloudWatchMetricsExporterUpdate, error) {
+	var body CloudWatchMetricsExporterUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCloudWatchMetricsExporterUpdate overwrites any union data inside the ExporterUpdate as the provided CloudWatchMetricsExporterUpdate
+func (t *ExporterUpdate) FromCloudWatchMetricsExporterUpdate(v CloudWatchMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeCloudWatchMetricsExporterUpdate performs a merge with any union data inside the ExporterUpdate, using the provided CloudWatchMetricsExporterUpdate
+func (t *ExporterUpdate) MergeCloudWatchMetricsExporterUpdate(v CloudWatchMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"CLOUDWATCH_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDatadogMetricsExporterUpdate returns the union data inside the ExporterUpdate as a DatadogMetricsExporterUpdate
+func (t ExporterUpdate) AsDatadogMetricsExporterUpdate() (DatadogMetricsExporterUpdate, error) {
+	var body DatadogMetricsExporterUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDatadogMetricsExporterUpdate overwrites any union data inside the ExporterUpdate as the provided DatadogMetricsExporterUpdate
+func (t *ExporterUpdate) FromDatadogMetricsExporterUpdate(v DatadogMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeDatadogMetricsExporterUpdate performs a merge with any union data inside the ExporterUpdate, using the provided DatadogMetricsExporterUpdate
+func (t *ExporterUpdate) MergeDatadogMetricsExporterUpdate(v DatadogMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"DATADOG_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPrometheusMetricsExporterUpdate returns the union data inside the ExporterUpdate as a PrometheusMetricsExporterUpdate
+func (t ExporterUpdate) AsPrometheusMetricsExporterUpdate() (PrometheusMetricsExporterUpdate, error) {
+	var body PrometheusMetricsExporterUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPrometheusMetricsExporterUpdate overwrites any union data inside the ExporterUpdate as the provided PrometheusMetricsExporterUpdate
+func (t *ExporterUpdate) FromPrometheusMetricsExporterUpdate(v PrometheusMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergePrometheusMetricsExporterUpdate performs a merge with any union data inside the ExporterUpdate, using the provided PrometheusMetricsExporterUpdate
+func (t *ExporterUpdate) MergePrometheusMetricsExporterUpdate(v PrometheusMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"PROMETHEUS_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAzureMonitorMetricsExporterUpdate returns the union data inside the ExporterUpdate as a AzureMonitorMetricsExporterUpdate
+func (t ExporterUpdate) AsAzureMonitorMetricsExporterUpdate() (AzureMonitorMetricsExporterUpdate, error) {
+	var body AzureMonitorMetricsExporterUpdate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAzureMonitorMetricsExporterUpdate overwrites any union data inside the ExporterUpdate as the provided AzureMonitorMetricsExporterUpdate
+func (t *ExporterUpdate) FromAzureMonitorMetricsExporterUpdate(v AzureMonitorMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	t.union = b
+	return err
+}
+
+// MergeAzureMonitorMetricsExporterUpdate performs a merge with any union data inside the ExporterUpdate, using the provided AzureMonitorMetricsExporterUpdate
+func (t *ExporterUpdate) MergeAzureMonitorMetricsExporterUpdate(v AzureMonitorMetricsExporterUpdate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"type":"AZURE_MONITOR_METRICS"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ExporterUpdate) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"type"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t ExporterUpdate) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "AZURE_MONITOR_METRICS":
+		return t.AsAzureMonitorMetricsExporterUpdate()
+	case "CLOUDWATCH_LOGS":
+		return t.AsCloudWatchLogsExporterUpdate()
+	case "CLOUDWATCH_METRICS":
+		return t.AsCloudWatchMetricsExporterUpdate()
+	case "DATADOG_METRICS":
+		return t.AsDatadogMetricsExporterUpdate()
+	case "PROMETHEUS_METRICS":
+		return t.AsPrometheusMetricsExporterUpdate()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t ExporterUpdate) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ExporterUpdate) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
