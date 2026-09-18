@@ -30,6 +30,7 @@ To get started, run:
 * [tiger auth](tiger_auth.md)	 - Manage authentication and credentials
 * [tiger config](tiger_config.md)	 - Manage CLI configuration
 * [tiger db](tiger_db.md)	 - Database operations and management
+* [tiger feedback](tiger_feedback.md)	 - Submit feedback or a bug report
 * [tiger mcp](tiger_mcp.md)	 - Tiger Model Context Protocol (MCP) server
 * [tiger project](tiger_project.md)	 - Manage Tiger Cloud projects
 * [tiger service](tiger_service.md)	 - Manage database services
