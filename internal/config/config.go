@@ -372,10 +372,6 @@ func GetConfigFile(dir string) string {
 	return filepath.Join(dir, ConfigFileName)
 }
 
-func GetDefaultConfigDir() string {
-	return util.ExpandPath(DefaultConfigDir)
-}
-
 // getEffectiveConfigDir resolves the config directory from the --config-dir
 // flag, then TIGER_CONFIG_DIR, then the default location.
 func getEffectiveConfigDir(flags *pflag.FlagSet) string {
@@ -389,7 +385,7 @@ func getEffectiveConfigDir(flags *pflag.FlagSet) string {
 		return util.ExpandPath(dir)
 	}
 
-	return GetDefaultConfigDir()
+	return util.ExpandPath(DefaultConfigDir)
 }
 
 func ensureConfigDir(configDir string) (string, error) {
