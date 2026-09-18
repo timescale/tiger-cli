@@ -129,7 +129,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:         toolServiceMetricsSeries,
 			args:         args(map[string]any{"fn": "MEDIAN"}),
 			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/fn: enum: MEDIAN does not equal any of: [RATE INCREASE SUM AVG MIN MAX COUNT P50 P90 P99 LAST]`,
+			wantErr:      `validating "arguments": validating root: validating /properties/fn: enum: MEDIAN does not equal any of: [RATE INCREASE SUM AVG MIN MAX MIN_TOTAL MAX_TOTAL COUNT P50 P90 P99 LAST]`,
 		},
 		{
 			name:         "bucket below the minimum",
@@ -244,7 +244,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			experimental: true,
 			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.BucketSeconds = new(3600)
-				b.Fn = new(api.MetricsSeriesRequestFnAVG)
+				b.Fn = new(api.MetricsAggFnAVG)
 			}), &[]api.MetricSeries{}),
 			wantOutput: noSeries,
 		},
