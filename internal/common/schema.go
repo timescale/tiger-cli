@@ -1,9 +1,5 @@
 package common
 
-// This file is ported from the ghost CLI (internal/common/schema.go). The
-// FetchSchemaFromConn entry point and the SchemaIdent/SchemaOptions types are
-// tiger-specific; the introspection engine is kept in sync with that source.
-
 import (
 	"context"
 	"fmt"
@@ -12,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/timescale/tiger-cli/internal/config"
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
@@ -237,8 +234,11 @@ type SchemaIdent struct {
 	Name string
 }
 
-// SchemaOptions controls what FetchSchemaFromConn collects.
-type SchemaOptions struct {
+// FetchServiceSchemaArgs configures a call to FetchServiceSchema.
+type FetchServiceSchemaArgs struct {
+	Role   string
+	Pooled bool
+
 	// Schema, if non-empty, limits the fetch to a single namespace.
 	Schema string
 	// IncludeInternal disables the exclusion filters, adding catalog (pg_*)
@@ -1107,22 +1107,67 @@ ORDER BY n.nspname, c.relname`,
 	)
 }
 
-// FetchSchemaFromConn introspects the schema of the database reachable over
-// conn, scoped by opts (see SchemaOptions). ident only supplies the ID/Name
+// FetchServiceSchema opens a read-only connection to the target (a primary
+// service or one of its read replicas) and introspects its schema. It is the
+// shared entry point for the `tiger db schema` CLI command and the db_schema
+// MCP tool.
+//
+// The connection is forced read-only: introspection only issues SELECTs, so
+// this is always safe and guards against accidental writes.
+//
+// It is a var so tests can stub the connection out and reach the callers'
+// success paths, which are otherwise only reachable against a live database.
+var FetchServiceSchema = func(ctx context.Context, cfg *config.Config, target *ConnectionTarget, args FetchServiceSchemaArgs) (*DatabaseSchema, error) {
+	if err := CheckServiceReady(target.ConnectionService); err != nil {
+		return nil, err
+	}
+
+	details, err := target.Details(cfg, ConnectionDetailsOptions{
+		Pooled:       args.Pooled,
+		Role:         args.Role,
+		WithPassword: true,
+		ReadOnly:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	connConfig, err := pgx.ParseConfig(details.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+	// Introspection runs parameterless statements, so the simple protocol fits.
+	connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer conn.Close(context.Background())
+
+	ident := SchemaIdent{
+		ID:   target.ConnectionService.ServiceID,
+		Name: target.ConnectionService.Name,
+	}
+	return fetchSchemaFromConn(ctx, conn, ident, args)
+}
+
+// fetchSchemaFromConn introspects the schema of the database reachable over
+// conn, scoped by the filter fields of args. ident only supplies the ID/Name
 // shown in the result; it does not affect what is queried. The caller owns
 // conn and is responsible for any readiness check before connecting.
-func FetchSchemaFromConn(ctx context.Context, conn *pgx.Conn, ident SchemaIdent, opts SchemaOptions) (*DatabaseSchema, error) {
-	if opts.Schema != "" {
-		if err := checkSchemaExists(ctx, conn, opts.Schema, opts.IncludeInternal); err != nil {
+func fetchSchemaFromConn(ctx context.Context, conn *pgx.Conn, ident SchemaIdent, args FetchServiceSchemaArgs) (*DatabaseSchema, error) {
+	if args.Schema != "" {
+		if err := checkSchemaExists(ctx, conn, args.Schema, args.IncludeInternal); err != nil {
 			return nil, err
 		}
 	}
 
 	filter := schemaFilter{
-		includeInternal:    opts.IncludeInternal,
-		includeDefinitions: opts.IncludeDefinitions,
-		includeComments:    opts.IncludeComments,
-		schema:             opts.Schema,
+		includeInternal:    args.IncludeInternal,
+		includeDefinitions: args.IncludeDefinitions,
+		includeComments:    args.IncludeComments,
+		schema:             args.Schema,
 	}
 
 	// Build the schema in stages: first collect every object keyed by

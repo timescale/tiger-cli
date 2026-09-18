@@ -114,7 +114,7 @@ func TestProjectUseCmd(t *testing.T) {
 			name: "network error listing projects",
 			args: []string{"project", "use", "project-new"},
 			opts: []runOption{oauthLogin},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -124,7 +124,7 @@ func TestProjectUseCmd(t *testing.T) {
 			name: "API error listing projects",
 			args: []string{"project", "use", "project-new"},
 			opts: []runOption{oauthLogin},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(&api.GetProjectsResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -135,11 +135,11 @@ func TestProjectUseCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitGeneralError)},
 		},
 		{
-			name:    "no access to requested project",
-			args:    []string{"project", "use", "project-unknown"},
-			opts:    []runOption{oauthLogin},
-			setup:   setupProjects([]api.Project{{ID: testProjectID, Name: "Old Project"}}),
-			wantErr: "no access to the requested project",
+			name:      "no access to requested project",
+			args:      []string{"project", "use", "project-unknown"},
+			opts:      []runOption{oauthLogin},
+			setupMock: setupProjects([]api.Project{{ID: testProjectID, Name: "Old Project"}}),
+			wantErr:   "no access to the requested project",
 			wantStderr: "Project project-unknown is not among your accessible projects\n" +
 				"Error: no access to the requested project\n",
 			checks: []checkFunc{
@@ -154,7 +154,7 @@ func TestProjectUseCmd(t *testing.T) {
 				oauthLogin,
 				withConfig(map[string]any{"service_id": "svc-123"}),
 			},
-			setup:      bothProjects,
+			setupMock:  bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			wantStderr: "Cleared default service; it belonged to the previous project.\n",
 			checks: []checkFunc{
@@ -166,7 +166,7 @@ func TestProjectUseCmd(t *testing.T) {
 			name:       "switch without default service",
 			args:       []string{"project", "use", "project-new"},
 			opts:       []runOption{oauthLogin},
-			setup:      bothProjects,
+			setupMock:  bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			checks:     []checkFunc{checkStoredProject("project-new")},
 		},
@@ -179,7 +179,7 @@ func TestProjectUseCmd(t *testing.T) {
 				oauthLogin,
 				withEnv("TIGER_SERVICE_ID", "svc-env"),
 			},
-			setup:      bothProjects,
+			setupMock:  bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			wantStderr: "Warning: the default service from --service-id/TIGER_SERVICE_ID belongs to the previous project and is still in effect\n",
 			checks:     []checkFunc{checkStoredProject("project-new")},
@@ -188,7 +188,7 @@ func TestProjectUseCmd(t *testing.T) {
 			name:       "switch alias",
 			args:       []string{"project", "switch", "project-new"},
 			opts:       []runOption{oauthLogin},
-			setup:      bothProjects,
+			setupMock:  bothProjects,
 			wantStdout: "Switched to project project-new\n",
 			checks:     []checkFunc{checkStoredProject("project-new")},
 		},

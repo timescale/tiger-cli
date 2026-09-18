@@ -61,7 +61,7 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"service", "get", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -70,7 +70,7 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name: "not found",
 			args: []string{"service", "get", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -83,7 +83,7 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"service", "get", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -92,9 +92,9 @@ func TestServiceGetCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name:  "table output",
-			args:  []string{"service", "get", "svc-12345"},
-			setup: setupGet(fullService),
+			name:      "table output",
+			args:      []string{"service", "get", "svc-12345"},
+			setupMock: setupGet(fullService),
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                            VALUE                                            │
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -116,9 +116,9 @@ func TestServiceGetCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "free tier table output",
-			args:  []string{"service", "get", "svc-12345"},
-			setup: setupGet(freeTierService),
+			name:      "free tier table output",
+			args:      []string{"service", "get", "svc-12345"},
+			setupMock: setupGet(freeTierService),
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                            VALUE                                            │
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -137,10 +137,10 @@ func TestServiceGetCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "default service id from config",
-			args:  []string{"service", "get"},
-			setup: setupGet(freeTierService),
-			opts:  []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			name:      "default service id from config",
+			args:      []string{"service", "get"},
+			setupMock: setupGet(freeTierService),
+			opts:      []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                            VALUE                                            │
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -161,9 +161,9 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			// The API's initial_password must never appear in output without
 			// --with-password.
-			name:  "json output omits password",
-			args:  []string{"service", "get", "svc-12345", "-o", "json"},
-			setup: setupGet(withInitialPassword),
+			name:      "json output omits password",
+			args:      []string{"service", "get", "svc-12345", "-o", "json"},
+			setupMock: setupGet(withInitialPassword),
 			wantStdout: `{
   "created": "2025-01-15T10:30:00Z",
   "endpoint": {
@@ -195,9 +195,9 @@ func TestServiceGetCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"service", "get", "svc-12345", "-o", "yaml"},
-			setup: setupGet(sampleService()),
+			name:      "yaml output",
+			args:      []string{"service", "get", "svc-12345", "-o", "yaml"},
+			setupMock: setupGet(sampleService()),
 			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
 console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
 created: "2025-01-15T10:30:00Z"
@@ -224,19 +224,19 @@ status: READY
 		{
 			name:       "env output",
 			args:       []string{"service", "get", "svc-12345", "-o", "env"},
-			setup:      setupGet(sampleService()),
+			setupMock:  setupGet(sampleService()),
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "env output with password",
 			args:       []string{"service", "get", "svc-12345", "-o", "env", "--with-password"},
-			setup:      setupGet(withInitialPassword),
+			setupMock:  setupGet(withInitialPassword),
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\nPGPASSWORD=super-secret-pw\n",
 		},
 		{
-			name:  "table output with password",
-			args:  []string{"service", "get", "svc-12345", "--with-password"},
-			setup: setupGet(withInitialPassword),
+			name:      "table output with password",
+			args:      []string{"service", "get", "svc-12345", "--with-password"},
+			setupMock: setupGet(withInitialPassword),
 			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │     PROPERTY      │                                                    VALUE                                                    │
 ├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -256,15 +256,15 @@ status: READY
 `,
 		},
 		{
-			name:    "with password unavailable",
-			args:    []string{"service", "get", "svc-12345", "--with-password"},
-			setup:   setupGet(sampleService()),
-			wantErr: "password requested but not available for service svc-12345",
+			name:      "with password unavailable",
+			args:      []string{"service", "get", "svc-12345", "--with-password"},
+			setupMock: setupGet(sampleService()),
+			wantErr:   "password requested but not available for service svc-12345",
 		},
 		{
 			name: "no endpoint warning",
 			args: []string{"service", "get", "svc-12345"},
-			setup: setupGet(sampleService(func(s *api.Service) {
+			setupMock: setupGet(sampleService(func(s *api.Service) {
 				s.Endpoint = nil
 			})),
 			wantStdout: `┌─────────────┬──────────────────────────────────────────────────────────────────┐
@@ -286,13 +286,13 @@ status: READY
 		{
 			name:       "describe alias",
 			args:       []string{"service", "describe", "svc-12345", "-o", "env"},
-			setup:      setupGet(sampleService()),
+			setupMock:  setupGet(sampleService()),
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "show alias",
 			args:       []string{"service", "show", "svc-12345", "-o", "env"},
-			setup:      setupGet(sampleService()),
+			setupMock:  setupGet(sampleService()),
 			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 	})

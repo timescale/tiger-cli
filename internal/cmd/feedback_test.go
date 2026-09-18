@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -29,50 +28,34 @@ func TestFeedbackCmd(t *testing.T) {
 
 	const secretMessage = "cannot connect with postgres://tsdbadmin:hunter2@svc.tsdb.cloud/tsdb"
 
-	// Cases run sequentially, so one var captures whichever event was sent.
-	var trackedEvent api.TrackEventJSONRequestBody
-	expectTrack := func(m *mocks.MockClientWithResponsesInterface) {
-		// The body can't be matched exactly — it carries elapsed_seconds and the
-		// temp config dir — so match it loosely and let checkTrackedArgs assert
-		// the properties that matter.
-		m.EXPECT().TrackEventWithResponse(validCtx, gomock.Any()).
-			DoAndReturn(func(_ context.Context, body api.TrackEventJSONRequestBody, _ ...api.RequestEditorFn) (*api.TrackEventResponse, error) {
-				trackedEvent = body
-				return &api.TrackEventResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil
-			})
-	}
-
-	expectSubmitAndTrack := func(message string) func(m *mocks.MockClientWithResponsesInterface) {
-		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectSubmit(message, submitted, nil)(m)
-			expectTrack(m)
-		}
-	}
-
-	// checkTrackedArgs asserts the tracked args, that the user's flags survived,
-	// and that message appears nowhere.
-	checkTrackedArgs := func(wantArgs []string, message string) checkFunc {
-		return func(t *testing.T, _ cmdResult) {
-			t.Helper()
-			if trackedEvent.Properties == nil {
-				t.Fatal("tracked event carried no properties")
+	// trackedEvent matches the analytics event a feedback invocation sends,
+	// asserting the tracked args, that the user's flags survived, and that
+	// message appears nowhere. The body can't be matched exactly — it carries
+	// elapsed_seconds and the temp config dir — hence a matcher on the
+	// properties that matter, checked at the moment the event is sent.
+	trackedEvent := func(wantArgs []string, message string) gomock.Matcher {
+		return gomock.Cond(func(body api.TrackEventJSONRequestBody) bool {
+			if body.Properties == nil {
+				return false
 			}
-			props := *trackedEvent.Properties
-			if diff := cmp.Diff(wantArgs, props["args"]); diff != "" {
-				t.Errorf("tracked args property mismatch (-want +got):\n%s", diff)
+			props := *body.Properties
+			if !cmp.Equal(wantArgs, props["args"]) {
+				return false
 			}
 			// Only argument values are replaced; --analytics is a flag each case sets.
 			if _, ok := props["analytics"]; !ok {
-				t.Errorf("tracked event carries no flags, want the flags the user set: %#v", props)
+				return false
 			}
 			// The message must not appear under any key, not just "args".
 			encoded, err := json.Marshal(props)
-			if err != nil {
-				t.Fatalf("failed to encode tracked properties: %v", err)
-			}
-			if strings.Contains(string(encoded), message) {
-				t.Errorf("tracked event contains the feedback message: %s", encoded)
-			}
+			return err == nil && !strings.Contains(string(encoded), message)
+		})
+	}
+	expectSubmitAndTrack := func(message string, wantArgs []string) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectSubmit(message, submitted, nil)(m)
+			m.EXPECT().TrackEventWithResponse(validCtx, trackedEvent(wantArgs, message)).
+				Return(&api.TrackEventResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 		}
 	}
 
@@ -106,15 +89,15 @@ func TestFeedbackCmd(t *testing.T) {
 			wantErr: "feedback message cannot be empty",
 		},
 		{
-			name:    "network error",
-			args:    []string{"feedback", "it broke"},
-			setup:   expectSubmit("it broke", nil, errors.New("connection refused")),
-			wantErr: "failed to submit feedback: connection refused",
+			name:      "network error",
+			args:      []string{"feedback", "it broke"},
+			setupMock: expectSubmit("it broke", nil, errors.New("connection refused")),
+			wantErr:   "failed to submit feedback: connection refused",
 		},
 		{
 			name: "API error",
 			args: []string{"feedback", "it broke"},
-			setup: expectSubmit("it broke", &api.SubmitFeedbackResponse{
+			setupMock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusBadRequest),
 				JSON4XX:      &api.Error{Message: new("message must not be blank")},
 			}, nil),
@@ -125,7 +108,7 @@ func TestFeedbackCmd(t *testing.T) {
 			// A 5XX carries no typed body, so the error is the generic one.
 			name: "server error",
 			args: []string{"feedback", "it broke"},
-			setup: expectSubmit("it broke", &api.SubmitFeedbackResponse{
+			setupMock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusInternalServerError),
 			}, nil),
 			wantErr: "unknown error",
@@ -134,7 +117,7 @@ func TestFeedbackCmd(t *testing.T) {
 		{
 			name:       "message from argument",
 			args:       []string{"feedback", "Great tool!"},
-			setup:      expectSubmit("Great tool!", submitted, nil),
+			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 		},
 		{
@@ -142,7 +125,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:       "message from stdin",
 			args:       []string{"feedback"},
 			opts:       []runOption{withStdin("Great tool!\n")},
-			setup:      expectSubmit("Great tool!", submitted, nil),
+			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 		},
 		{
@@ -150,7 +133,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:       "prompts on a terminal",
 			args:       []string{"feedback"},
 			opts:       []runOption{withIsTerminal(true), withStdin("Great tool!")},
-			setup:      expectSubmit("Great tool!", submitted, nil),
+			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 			wantStderr: "Enter your feedback (press Ctrl+D when done):\n",
 		},
@@ -164,9 +147,8 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("NO_TELEMETRY", ""),
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
-			setup:      expectSubmitAndTrack(secretMessage),
+			setupMock:  expectSubmitAndTrack(secretMessage, []string{"[REDACTED]"}),
 			wantStdout: wantSubmitted,
-			checks:     []checkFunc{checkTrackedArgs([]string{"[REDACTED]"}, secretMessage)},
 		},
 		{
 			// A piped message leaves no argument at all, so the redaction has to
@@ -179,9 +161,8 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("NO_TELEMETRY", ""),
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
-			setup:      expectSubmitAndTrack(secretMessage),
+			setupMock:  expectSubmitAndTrack(secretMessage, []string{}),
 			wantStdout: wantSubmitted,
-			checks:     []checkFunc{checkTrackedArgs([]string{}, secretMessage)},
 		},
 	})
 }

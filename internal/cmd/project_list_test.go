@@ -43,7 +43,7 @@ func TestProjectListCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"project", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -52,7 +52,7 @@ func TestProjectListCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"project", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(&api.GetProjectsResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -65,7 +65,7 @@ func TestProjectListCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"project", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetProjectsWithResponse(validCtx).
 					Return(&api.GetProjectsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -76,9 +76,9 @@ func TestProjectListCmd(t *testing.T) {
 		},
 		{
 			// Only the active project is marked current.
-			name:  "table output",
-			args:  []string{"project", "list"},
-			setup: bothProjects,
+			name:      "table output",
+			args:      []string{"project", "list"},
+			setupMock: bothProjects,
 			wantStdout: `┌──────────────────┬─────────────────┬─────────┐
 │    PROJECT ID    │      NAME       │ CURRENT │
 ├──────────────────┼─────────────────┼─────────┤
@@ -88,18 +88,18 @@ func TestProjectListCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "empty list",
-			args:  []string{"project", "list"},
-			setup: setupList([]api.Project{}),
+			name:      "empty list",
+			args:      []string{"project", "list"},
+			setupMock: setupList([]api.Project{}),
 			wantStdout: `┌────────────┬──────┬─────────┐
 │ PROJECT ID │ NAME │ CURRENT │
 └────────────┴──────┴─────────┘
 `,
 		},
 		{
-			name:  "json output",
-			args:  []string{"project", "list", "-o", "json"},
-			setup: bothProjects,
+			name:      "json output",
+			args:      []string{"project", "list", "-o", "json"},
+			setupMock: bothProjects,
 			wantStdout: `[
   {
     "id": "project-other",
@@ -115,9 +115,9 @@ func TestProjectListCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"project", "list", "-o", "yaml"},
-			setup: bothProjects,
+			name:      "yaml output",
+			args:      []string{"project", "list", "-o", "yaml"},
+			setupMock: bothProjects,
 			wantStdout: `- current: false
   id: project-other
   name: Other Project
@@ -134,16 +134,16 @@ func TestProjectListCmd(t *testing.T) {
 		{
 			// --output rejects env at parse time, but TIGER_OUTPUT isn't
 			// validated on load.
-			name:    "env output from env var",
-			args:    []string{"project", "list"},
-			opts:    []runOption{withEnv("TIGER_OUTPUT", "env")},
-			setup:   bothProjects,
-			wantErr: "environment variable output is not supported for multiple projects",
+			name:      "env output from env var",
+			args:      []string{"project", "list"},
+			opts:      []runOption{withEnv("TIGER_OUTPUT", "env")},
+			setupMock: bothProjects,
+			wantErr:   "environment variable output is not supported for multiple projects",
 		},
 		{
-			name:  "ls alias",
-			args:  []string{"project", "ls"},
-			setup: bothProjects,
+			name:      "ls alias",
+			args:      []string{"project", "ls"},
+			setupMock: bothProjects,
 			wantStdout: `┌──────────────────┬─────────────────┬─────────┐
 │    PROJECT ID    │      NAME       │ CURRENT │
 ├──────────────────┼─────────────────┼─────────┤

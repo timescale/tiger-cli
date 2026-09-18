@@ -80,17 +80,17 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			// prod judges the fetched service by its environment tag; no
 			// update expectation is registered, so an attempted mutation
 			// fails as an unexpected call.
-			name:    "read-only prod refuses PROD service",
-			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup:   expectTaggedService("PROD"),
-			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:      "read-only prod refuses PROD service",
+			args:      []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
+			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setupMock: expectTaggedService("PROD"),
+			wantErr:   `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				setupUpdate("newpass123")(m)
 			},
@@ -111,7 +111,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "network error on get",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -120,7 +120,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "API error on get",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -133,7 +133,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "nil response body on get",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -144,7 +144,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "read replica rejected",
 			args: []string{"service", "update-password", "rep1234567", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				replica := sampleService(func(s *api.Service) {
 					s.ServiceID = "rep1234567"
 					s.ForkedFrom = &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")}
@@ -158,15 +158,15 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: `"rep1234567" is a read replica; update the password on its primary service "svcprimary" instead`,
 		},
 		{
-			name:    "non-interactive without password",
-			args:    []string{"service", "update-password", "svc-12345"},
-			setup:   setupGet,
-			wantErr: "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
+			name:      "non-interactive without password",
+			args:      []string{"service", "update-password", "svc-12345"},
+			setupMock: setupGet,
+			wantErr:   "TTY not detected - use --new-password flag, --auto-generate flag, or TIGER_NEW_PASSWORD environment variable",
 		},
 		{
 			name: "network error on update",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: "newpass123"}).
 					Return(nil, errors.New("connection refused"))
@@ -176,7 +176,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "API error on update",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "svc-12345", api.UpdatePasswordInput{Password: "newpass123"}).
 					Return(&api.UpdatePasswordResponse{
@@ -190,7 +190,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "new-password flag",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdate("newpass123")(m)
 			},
@@ -201,7 +201,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name: "env var password",
 			args: []string{"service", "update-password", "svc-12345"},
 			opts: []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pass-456")},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdate("env-pass-456")(m)
 			},
@@ -211,7 +211,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "auto-generate",
 			args: []string{"service", "update-password", "svc-12345", "--auto-generate"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdateAny(m)
 			},
@@ -226,7 +226,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name: "interactive prompt",
 			args: []string{"service", "update-password", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withReadPassword("prompted-pass")},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdate("prompted-pass")(m)
 			},
@@ -237,7 +237,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name: "interactive prompt empty generates",
 			args: []string{"service", "update-password", "svc-12345"},
 			opts: []runOption{withIsTerminal(true), withReadPassword("")},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdateAny(m)
 			},
@@ -252,7 +252,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name: "password storage none",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123", "--password-storage", "none"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdate("newpass123")(m)
 			},
@@ -267,7 +267,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name: "default service id from config",
 			args: []string{"service", "update-password", "--new-password", "newpass123"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupGet(m)
 				setupUpdate("newpass123")(m)
 			},

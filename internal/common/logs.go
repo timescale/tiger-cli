@@ -34,9 +34,10 @@ func FetchServiceLogs(ctx context.Context, args FetchServiceLogsArgs) ([]api.Ser
 
 	// Fix the upper time bound so that all paginated requests share the same
 	// window — without this, a clock tick between requests could cause the
-	// second page to return logs already included on the first page.
+	// second page to return logs already included on the first page. UTC is
+	// the canonical form for the query parameter it becomes.
 	if params.Until == nil {
-		now := time.Now()
+		now := time.Now().UTC()
 		params.Until = &now
 	}
 
