@@ -23,8 +23,8 @@ const (
 	serverTitle = "Tiger MCP"
 )
 
-// MCP tool names. Centralized so the read-only gate (see errors.go) and the
-// tool registrations share a single source of truth.
+// MCP tool names. Centralized so readOnlyGatedTools and the tool registrations
+// share a single source of truth.
 const (
 	toolServiceList             = "service_list"
 	toolServiceGet              = "service_get"
@@ -35,6 +35,7 @@ const (
 	toolServiceResize           = "service_resize"
 	toolServiceRename           = "service_rename"
 	toolServiceUpdatePassword   = "service_update_password"
+	toolServiceDelete           = "service_delete"
 	toolServiceLogs             = "service_logs"
 	toolServiceMetricsAvailable = "service_metrics_available"
 	toolServiceMetricsSeries    = "service_metrics_series"
@@ -55,6 +56,19 @@ type Server struct {
 	app *common.App
 }
 
+// readOnlyGatedTools are the service-mutating tools addTool skips under
+// read_only=all.
+var readOnlyGatedTools = []string{
+	toolServiceCreate,
+	toolServiceFork,
+	toolServiceStart,
+	toolServiceStop,
+	toolServiceResize,
+	toolServiceRename,
+	toolServiceUpdatePassword,
+	toolServiceDelete,
+}
+
 // addTool registers an MCP tool, skipping readOnlyGatedTools under read_only=all.
 // Under prod they stay registered — they still work on DEV services — and refuse
 // per call in the handler, once the target is known.
@@ -71,7 +85,7 @@ func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mc
 func buildServerInstructions(cfg *config.Config) string {
 	const (
 		intro        = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
-		capabilities = "Use it to provision and fork services, start/stop/resize instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+		capabilities = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
 	)
 
 	switch cfg.ReadOnly {
@@ -79,7 +93,7 @@ func buildServerInstructions(cfg *config.Config) string {
 		// The write tools aren't registered, so announce the mode instead of
 		// advertising them.
 		return intro +
-			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, or modify services. " +
+			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, delete, or modify services. " +
 			"db_query connects read-only, so writes and DDL are rejected by the server."
 	case config.ReadOnlyProd:
 		// The write tools are registered, so keep advertising them but explain
@@ -178,6 +192,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
 	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
+	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 
 	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They
@@ -225,8 +240,17 @@ func (s *Server) analyticsMiddleware(next mcp.MethodHandler) mcp.MethodHandler {
 			}
 
 			defer func() {
+				callToolResult, _ := result.(*mcp.CallToolResult)
+
+				// A result that only asks the client for input (e.g. an
+				// elicitation) isn't the outcome of the call: the tool runs
+				// again with the answer, and that run is the one tracked.
+				if callToolResult != nil && callToolResult.InputRequests != nil {
+					return
+				}
+
 				toolErr := runErr
-				if callToolResult, ok := result.(*mcp.CallToolResult); ok && callToolResult != nil && callToolResult.IsError && len(callToolResult.Content) > 0 {
+				if callToolResult != nil && callToolResult.IsError && len(callToolResult.Content) > 0 {
 					if textContent, ok := callToolResult.Content[0].(*mcp.TextContent); ok && textContent != nil {
 						toolErr = errors.New(textContent.Text)
 					}

@@ -50,7 +50,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["replicas"].Default = util.Must(json.Marshal(0))
 	schema.Properties["replicas"].Examples = []any{0, 1, 2}
 
-	schema.Properties["environment"].Description = "Environment tag for the new service. Use 'PROD' only for production workloads — under read-only mode for production services, creating a PROD service is refused."
+	schema.Properties["environment"].Description = "Environment tag for the new service. Use 'PROD' only for production workloads — under read-only mode for production services, creating a PROD service is refused, and deleting a PROD service always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 

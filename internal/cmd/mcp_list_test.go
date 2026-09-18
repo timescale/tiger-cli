@@ -14,6 +14,7 @@ func TestMCPListCmd(t *testing.T) {
 		"db_schema",
 		"feedback",
 		"service_create",
+		"service_delete",
 		"service_fork",
 		"service_get",
 		"service_list",
@@ -32,6 +33,7 @@ func TestMCPListCmd(t *testing.T) {
 │ tool │ db_schema               │
 │ tool │ feedback                │
 │ tool │ service_create          │
+│ tool │ service_delete          │
 │ tool │ service_fork            │
 │ tool │ service_get             │
 │ tool │ service_list            │
@@ -66,6 +68,7 @@ func TestMCPListCmd(t *testing.T) {
 │ tool │ feedback                  │
 │ tool │ service_backups           │
 │ tool │ service_create            │
+│ tool │ service_delete            │
 │ tool │ service_fork              │
 │ tool │ service_get               │
 │ tool │ service_list              │

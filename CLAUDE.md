@@ -231,6 +231,16 @@ Generate the base schema from the struct with `util.Must(jsonschema.For[Input](n
 
 Every tool sets `Annotations`: read-only tools set `ReadOnlyHint`, write tools set `DestructiveHint` and `IdempotentHint`, and all of them set `OpenWorldHint` to false — the tools act only on the Tiger Cloud API and the user's own services, a closed domain rather than an open world of arbitrary external entities.
 
+### User Confirmation
+
+A destructive tool that needs a human in the loop asks through MCP elicitation, rather than relying on the client's tool approval or the model's own judgment. Typically that means confirming an action against a service tagged `PROD`, while `DEV` services proceed without a prompt. `service_delete` is the model:
+
+- The handler never calls the SDK's `Elicit` directly. It returns the prompt as an input request on the tool result, and the SDK runs the handler again with the user's answer attached to the request — so everything before the prompt runs twice and must be cheap and repeatable.
+- Check the client's capabilities before prompting. A client that can't elicit gets an error naming the CLI command to run instead; the action never proceeds silently.
+- The shape of the prompt is up to the tool. `service_delete` has the user type the service ID back, as the CLI does, but a plain accept/decline or a different field may suit another tool.
+- Only an explicit confirmation proceeds. A decline, a dismissal, or a wrong answer returns a non-error result saying the user cancelled, so the model doesn't treat it as a failure to retry.
+- The tool description should say that the tool prompts the user itself, so agents don't ask for confirmation first and the user isn't asked twice.
+
 ## Read-Only Mode
 
 `cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off` (`prod` protects only services tagged `PROD`). `config.Load` normalizes every value through `parseReadOnlyMode`, which also accepts the legacy boolean spellings, so nothing downstream sees an unnormalized value. Every write/destructive surface on both planes gates through one of the two checks in `internal/common/read_only.go` — on the CLI side that's the `RunE` of `service create`, `fork`, `start`, `stop`, `rename`, `resize`, `update-password`, `delete`, and `db create role`; on the MCP side, the handlers of the write tools listed in `readOnlyGatedTools`:
@@ -266,6 +276,8 @@ Usage tracking is automatic via middleware, so new commands and tools normally n
 
 Never accept a state where tests are failing.
 
+### CLI Commands
+
 Command tests live in `internal/cmd`, one test file per command file, all table-driven on the shared harness in `main_test.go`:
 
 - `runCommand(t, args, setupMock, opts...)` builds the real root command via `buildRootCmd`, injects the generated mock API client (`mocks.MockClientWithResponsesInterface`) through `app.SetClientFactory`, runs against an isolated `t.TempDir()` config directory (always passing `--analytics=false --version-check=false`), and returns captured, ANSI-stripped stdout/stderr plus the `Execute` error. The result also carries `cfg` — the config that invocation actually resolved — so precedence can be asserted on what the command saw; it's nil when nothing loaded, which is what `checkNotLoaded` asserts for help and completion.
@@ -278,6 +290,15 @@ Command tests live in `internal/cmd`, one test file per command file, all table-
 - Order test cases by the command's execution flow: auth errors, argument/flag validation, the read-only gate, network/API errors, nil response body, success paths (table, json, yaml), then remaining flags and edge cases — so the table reads like a walkthrough of the function.
 - Slice tests by command, never by feature. A behavior that spans commands (the read-only gate, say) is tested as cases in each affected command's table, not as one cross-command test looping over commands — each command's table must stay the single place where its full behavior is read and extended.
 - Test commands as a whole through `runCommand`; don't unit-test individual helpers unless their behavior is genuinely unreachable through a command (a Bubble Tea model that needs a real TTY, SQL builders that only execute over a live connection). Such a test keeps a comment saying why it's helper-level, and the command tests stub the helper through a seam — a package-level `var` replaced by a `withSetup`-based option (`withSelectProject` in `auth_login_test.go` is the model). Commands that reach a real database (pgx) or spawn external binaries test their error paths only — the success paths are covered by `integration_test.go`.
+
+### MCP Tools
+
+MCP tool tests live in `internal/mcp`, one test file per tool file, table-driven on the shared harness in `main_test.go`:
+
+- Test cases use the `toolTest` struct and run through `runToolTests` — one inline table per test function, as with `cmdTest`. Each case builds a real server with `NewServer` over the generated mock API client and an isolated config directory (analytics off, docs proxy disabled), connects an in-memory MCP client, and calls the tool through the SDK's actual request path, so schema validation, middleware, and elicitation round trips are all exercised. `wantErr` holds the exact text of the error result and `wantOutput` the exact structured content; left unset, they assert success and no structured content respectively.
+- A case that expects the tool to prompt sets `wantPrompt` (the `ElicitParams` as the client receives them) and `answer` (the user's `ElicitResult`); setting `answer` is also what gives the client elicitation support, so a case without one proves the tool copes with a client that can't prompt. `clientCaps` overrides the advertised capabilities for the remaining cases.
+- `config` seeds the config file the server starts with, which also decides which tools are registered; `configAfterStart` rewrites it once the server is running, for behavior driven by a config change the per-request reload picks up.
+- Mock expectations follow the same rules as the command tests (`validCtx`, exact request structs, `httpResponse`, `sampleService`); a tool that runs twice per call expects its lookups with an explicit `Times`.
 
 ## Documentation
 
