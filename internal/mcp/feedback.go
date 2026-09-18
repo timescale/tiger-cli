@@ -29,7 +29,7 @@ type FeedbackInput struct {
 func (FeedbackInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[FeedbackInput](nil))
 
-	schema.Properties["message"].Description = fmt.Sprintf("The feedback, bug report, or support request to send. Describe what the user was trying to do and what happened. At most %d characters.", maxFeedbackMessageLength)
+	schema.Properties["message"].Description = fmt.Sprintf("The feedback or bug report to send. Describe what the user was trying to do and what happened. At most %d characters.", maxFeedbackMessageLength)
 	schema.Properties["message"].MinLength = new(1)
 	schema.Properties["message"].Examples = []any{"Creating a service fails with INVALID_REQUEST when the region is us-west-2."}
 
@@ -39,12 +39,15 @@ func (FeedbackInput) Schema() *jsonschema.Schema {
 // FeedbackOutput represents output for feedback
 type FeedbackOutput struct {
 	Success bool `json:"success"`
+	// SupportURL is project-specific, so it can't live in the tool description.
+	SupportURL string `json:"support_url"`
 }
 
 func (FeedbackOutput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[FeedbackOutput](nil))
 
 	schema.Properties["success"].Description = "Whether the feedback was submitted."
+	schema.Properties["support_url"].Description = "The Tiger Cloud console page where the user opens a tracked support ticket."
 
 	return schema
 }
@@ -53,9 +56,9 @@ func newFeedbackTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  "feedback",
 		Title: "Submit Feedback",
-		Description: `Submit feedback, a bug report, or a support request to the Tiger Data team.
+		Description: `Submit feedback or a bug report to the Tiger Data team.
 
-The message reaches a person, so confirm the wording with the user before sending. This opens no support case and returns no ticket to track.`,
+The message reaches a person, so confirm the wording with the user before sending. This opens no support case and returns no ticket to track; for anything that needs a tracked response, point the user at the support URL returned in the output.`,
 		InputSchema:  FeedbackInput{}.Schema(),
 		OutputSchema: FeedbackOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
@@ -70,7 +73,7 @@ The message reaches a person, so confirm the wording with the user before sendin
 
 // handleFeedback handles the feedback MCP tool
 func (s *Server) handleFeedback(ctx context.Context, req *mcp.CallToolRequest, input FeedbackInput) (*mcp.CallToolResult, FeedbackOutput, error) {
-	client, _, err := s.app.GetClient()
+	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
 		return nil, FeedbackOutput{}, err
 	}
@@ -92,7 +95,10 @@ func (s *Server) handleFeedback(ctx context.Context, req *mcp.CallToolRequest, i
 		return nil, FeedbackOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	return nil, FeedbackOutput{Success: true}, nil
+	return nil, FeedbackOutput{
+		Success:    true,
+		SupportURL: fmt.Sprintf("%s/projects/%s/support/main", cfg.ConsoleURL, projectID),
+	}, nil
 }
 
 // validateFeedbackMessage trims the message like the CLI does, so both surfaces

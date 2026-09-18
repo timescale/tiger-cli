@@ -18,15 +18,16 @@ import (
 func buildFeedbackCmd(app *common.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "feedback [message]",
-		Short: "Submit feedback, a bug report, or a support request",
-		Long: `Submit feedback, a bug report, or a support request to the Tiger Data team.
+		Short: "Submit feedback or a bug report",
+		Long: `Submit feedback or a bug report to the Tiger Data team.
 
 The message is sent with the email address of your account, so the team can
 follow up, and with the CLI version and operating system. Pass the message as
 an argument, or omit it to read from stdin.
 
 This does not open a support case and returns no ticket to track. For anything
-that needs a tracked response, contact support directly.`,
+that needs a tracked response, open a support ticket in the Tiger Cloud
+console; the command prints the link for your project.`,
 		Example: `  # Submit feedback as an argument
   tiger feedback "I can't connect to my service after resuming it"
 
@@ -40,7 +41,7 @@ that needs a tracked response, contact support directly.`,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, _, err := app.GetClient()
+			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
@@ -78,7 +79,8 @@ that needs a tracked response, contact support directly.`,
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.Println("Feedback submitted!")
+			cmd.Println("Feedback submitted.")
+			cmd.Printf("For a tracked response, open a support ticket: %s/projects/%s/support/main\n", cfg.ConsoleURL, projectID)
 			return nil
 		},
 	}

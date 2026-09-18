@@ -76,6 +76,10 @@ func TestFeedbackCmd(t *testing.T) {
 		}
 	}
 
+	// The support link is built from the console URL and the caller's project.
+	const wantSubmitted = "Feedback submitted.\n" +
+		"For a tracked response, open a support ticket: https://console.cloud.tigerdata.com/projects/" + testProjectID + "/support/main\n"
+
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
@@ -131,7 +135,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:       "message from argument",
 			args:       []string{"feedback", "Great tool!"},
 			setup:      expectSubmit("Great tool!", submitted, nil),
-			wantStdout: "Feedback submitted!\n",
+			wantStdout: wantSubmitted,
 		},
 		{
 			// The trailing newline echo appends is trimmed before sending.
@@ -139,7 +143,7 @@ func TestFeedbackCmd(t *testing.T) {
 			args:       []string{"feedback"},
 			opts:       []runOption{withStdin("Great tool!\n")},
 			setup:      expectSubmit("Great tool!", submitted, nil),
-			wantStdout: "Feedback submitted!\n",
+			wantStdout: wantSubmitted,
 		},
 		{
 			// The hint goes to stderr, so a redirected stdout stays clean.
@@ -147,7 +151,7 @@ func TestFeedbackCmd(t *testing.T) {
 			args:       []string{"feedback"},
 			opts:       []runOption{withIsTerminal(true), withStdin("Great tool!")},
 			setup:      expectSubmit("Great tool!", submitted, nil),
-			wantStdout: "Feedback submitted!\n",
+			wantStdout: wantSubmitted,
 			wantStderr: "Enter your feedback (press Ctrl+D when done):\n",
 		},
 		{
@@ -161,7 +165,7 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
 			setup:      expectSubmitAndTrack(secretMessage),
-			wantStdout: "Feedback submitted!\n",
+			wantStdout: wantSubmitted,
 			checks:     []checkFunc{checkTrackedArgs([]string{"[REDACTED]"}, secretMessage)},
 		},
 		{
@@ -176,7 +180,7 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
 			setup:      expectSubmitAndTrack(secretMessage),
-			wantStdout: "Feedback submitted!\n",
+			wantStdout: wantSubmitted,
 			checks:     []checkFunc{checkTrackedArgs([]string{}, secretMessage)},
 		},
 	})
