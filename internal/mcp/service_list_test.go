@@ -98,10 +98,10 @@ func TestServiceList(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceList,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceList,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name: "API error",

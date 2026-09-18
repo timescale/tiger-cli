@@ -13,6 +13,7 @@ import (
 
 func TestServiceFork(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW"}
+	waitArgs := map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "wait": true}
 
 	// The request the SDK's schema defaults produce for a call that sets
 	// nothing but service_id and fork_strategy.
@@ -32,6 +33,8 @@ func TestServiceFork(t *testing.T) {
 			}
 		}}, overrides...)...)
 	}
+	provisioning := func(s *api.Service) { s.Status = api.DeployStatusCONFIGURING }
+	withInitialPassword := func(s *api.Service) { s.InitialPassword = new("fork-pass-123") }
 
 	expectFork := func(req api.ForkServiceCreate, overrides ...func(*api.Service)) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -62,16 +65,27 @@ func TestServiceFork(t *testing.T) {
 		return d
 	}
 
-	const acceptedMsg = "Service fork request accepted. The forked service may still be provisioning."
+	const (
+		acceptedMsg = "Service fork request accepted. The forked service may still be provisioning."
+		readyMsg    = "Forked service is ready."
+	)
 	accepted := map[string]any{"service": baseDetail, "message": acceptedMsg}
+	ready := map[string]any{"service": baseDetail, "message": readyMsg}
+	// The keyring is the default storage and is in-memory for tests, so the
+	// save succeeds unless a case replaces it.
+	storedPassword := map[string]any{
+		"success": true,
+		"method":  "keyring",
+		"message": "Password saved to system keyring",
+	}
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceFork,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceFork,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "fork strategy is required",
@@ -97,11 +111,11 @@ func TestServiceFork(t *testing.T) {
 		{
 			// The tool isn't registered under read_only=all at startup; this is
 			// the handler's own check catching a config change made since.
-			name:             "read-only all refuses without an API call",
-			tool:             toolServiceFork,
-			args:             args,
-			configAfterStart: map[string]any{"read_only": "all"},
-			wantErr:          "this operation is not allowed in read-only mode",
+			name:    "read-only all refuses without an API call",
+			tool:    toolServiceFork,
+			args:    args,
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
+			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			// prod gates on the tag the fork is about to request, not the
@@ -109,14 +123,14 @@ func TestServiceFork(t *testing.T) {
 			name:    "read-only prod refuses a PROD fork",
 			tool:    toolServiceFork,
 			args:    map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "environment": "PROD"},
-			config:  map[string]any{"read_only": "prod"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name:       "read-only prod allows the DEV default",
 			tool:       toolServiceFork,
 			args:       args,
-			config:     map[string]any{"read_only": "prod"},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock:  expectFork(baseReq),
 			wantOutput: accepted,
 		},
@@ -224,69 +238,118 @@ func TestServiceFork(t *testing.T) {
 			},
 		},
 		{
-			name:      "stores the initial password",
+			name:      "stores the initial password without returning it",
 			tool:      toolServiceFork,
 			args:      args,
-			setupMock: expectFork(baseReq, func(s *api.Service) { s.InitialPassword = new("fork-pass-123") }),
+			setupMock: expectFork(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
-				"service": baseDetail,
-				"message": acceptedMsg,
-				"password_storage": map[string]any{
-					"success": true,
-					"method":  "keyring",
-					"message": "Password saved to system keyring",
-				},
+				"service":          baseDetail,
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
 			},
 		},
 		{
 			name:      "with_password returns the password and embeds it in the connection string",
 			tool:      toolServiceFork,
 			args:      map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "with_password": true},
-			setupMock: expectFork(baseReq, func(s *api.Service) { s.InitialPassword = new("fork-pass-123") }),
+			setupMock: expectFork(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"password":          "fork-pass-123",
 					"connection_string": "postgresql://tsdbadmin:fork-pass-123@u8me885b93.test-project-id.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
 				}),
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
+			},
+		},
+		{
+			// A storage failure isn't fatal: the fork exists either way, so the
+			// tool reports the failure rather than erroring.
+			name:      "reports a password storage failure",
+			tool:      toolServiceFork,
+			args:      args,
+			opts:      []runOption{withKeyringError(errors.New("keyring is locked"))},
+			setupMock: expectFork(baseReq, withInitialPassword),
+			wantOutput: map[string]any{
+				"service": baseDetail,
 				"message": acceptedMsg,
 				"password_storage": map[string]any{
-					"success": true,
+					"success": false,
 					"method":  "keyring",
-					"message": "Password saved to system keyring",
+					"message": "Failed to save password to keyring: keyring is locked",
 				},
 			},
 		},
 		{
-			name:     "waits for the fork to be ready",
-			tool:     toolServiceFork,
-			args:     map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "wait": true},
+			// set_default defaults to true, so the plain fork above already
+			// stored one; this pins that it is the forked service, not the
+			// source.
+			name:       "sets the forked service as the default",
+			tool:       toolServiceFork,
+			args:       args,
+			setupMock:  expectFork(baseReq),
+			wantOutput: accepted,
+			checks:     []checkFunc{checkDefaultService("u8me885b93")},
+		},
+		{
+			name:       "set_default false leaves the default service unset",
+			tool:       toolServiceFork,
+			args:       map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "set_default": false},
+			setupMock:  expectFork(baseReq),
+			wantOutput: accepted,
+			checks:     []checkFunc{checkDefaultService("")},
+		},
+		{
+			// Already at the target status, so the wait returns without polling.
+			name:       "wait returns immediately when the fork is already ready",
+			tool:       toolServiceFork,
+			args:       waitArgs,
+			setupMock:  expectFork(baseReq),
+			wantOutput: ready,
+		},
+		{
+			name:     "wait polls until the fork is ready",
 			synctest: true,
+			tool:     toolServiceFork,
+			args:     waitArgs,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectFork(baseReq, func(s *api.Service) { s.Status = api.DeployStatusCONFIGURING })(m)
-				ready := forkedService()
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "u8me885b93").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &ready,
-					}, nil)
+				expectFork(baseReq, provisioning)(m)
+				expectGetService(m, "u8me885b93", forkedService())
 			},
-			wantOutput: map[string]any{"service": baseDetail, "message": "Forked service is ready."},
+			wantOutput: ready,
 		},
 		{
 			// A failed wait is reported in the message rather than as a tool
 			// error: the fork itself was accepted.
-			name:     "wait failure is reported in the message",
-			tool:     toolServiceFork,
-			args:     map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "wait": true},
+			name:     "wait reports a failed poll in the message",
 			synctest: true,
+			tool:     toolServiceFork,
+			args:     waitArgs,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectFork(baseReq, func(s *api.Service) { s.Status = api.DeployStatusCONFIGURING })(m)
+				expectFork(baseReq, provisioning)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "u8me885b93").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
 			},
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{"status": "CONFIGURING"}),
 				"message": "Error: service not found",
+			},
+		},
+		{
+			// The full 10-minute timeout elapses instantly in the bubble.
+			// AnyTimes because the loop polls once a second for the whole of
+			// it: the count is timer-driven, not something the case asserts.
+			name:     "wait reports a timeout in the message",
+			synctest: true,
+			tool:     toolServiceFork,
+			args:     waitArgs,
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectFork(baseReq, provisioning)(m)
+				expectGetService(m, "u8me885b93", forkedService(provisioning)).AnyTimes()
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"status": "CONFIGURING"}),
+				"message": "Error: wait timeout reached after 10m0s - service may still be provisioning",
 			},
 		},
 	})

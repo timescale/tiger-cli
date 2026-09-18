@@ -46,17 +46,17 @@ func TestServiceDeleteCmd(t *testing.T) {
 			// prod judges the service by its environment tag, so the gate
 			// fetches it. Only the tag lookup is registered: an attempted
 			// mutation fails as an unexpected call.
-			name:    "read-only prod refuses PROD service",
-			args:    []string{"service", "delete", "svc-12345"},
-			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup:   expectTaggedService("PROD"),
-			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:      "read-only prod refuses PROD service",
+			args:      []string{"service", "delete", "svc-12345"},
+			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setupMock: expectTaggedService("PROD"),
+			wantErr:   `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			args: []string{"service", "delete", "svc-12345", "--confirm"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				setupDelete(m)
 			},
@@ -74,23 +74,23 @@ func TestServiceDeleteCmd(t *testing.T) {
 			wantStderr: confirmPrompt + "Delete operation cancelled.\n",
 		},
 		{
-			name:  "confirmation match",
-			args:  []string{"service", "delete", "svc-12345"},
-			opts:  []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
-			setup: setupDelete,
+			name:      "confirmation match",
+			args:      []string{"service", "delete", "svc-12345"},
+			opts:      []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
+			setupMock: setupDelete,
 			wantStderr: confirmPrompt +
 				"Service 'svc-12345' deleted.\n",
 		},
 		{
 			name:       "confirm flag skips prompt",
 			args:       []string{"service", "delete", "svc-12345", "--confirm"},
-			setup:      setupDelete,
+			setupMock:  setupDelete,
 			wantStderr: "Service 'svc-12345' deleted.\n",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "delete", "svc-12345", "--confirm"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -99,7 +99,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"service", "delete", "svc-12345", "--confirm"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.DeleteServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -112,7 +112,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 		{
 			name:       "rm alias",
 			args:       []string{"service", "rm", "svc-12345", "--confirm"},
-			setup:      setupDelete,
+			setupMock:  setupDelete,
 			wantStderr: "Service 'svc-12345' deleted.\n",
 		},
 	})

@@ -48,11 +48,11 @@ func TestServiceLogs(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceLogs,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceLogs,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "service ID failing the schema pattern",
@@ -73,10 +73,10 @@ func TestServiceLogs(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/tail: minimum: 0/1 is less than 1.000000`,
 		},
 		{
-			name:     "fetch request fails",
+			name:     "network error",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(nil, errors.New("connection refused"))
@@ -84,10 +84,10 @@ func TestServiceLogs(t *testing.T) {
 			wantErr: "failed to fetch logs: connection refused",
 		},
 		{
-			name:     "fetch API error",
+			name:     "API error",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(&api.GetServiceLogsResponse{
@@ -99,9 +99,9 @@ func TestServiceLogs(t *testing.T) {
 		},
 		{
 			name:     "nil response body",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(logsResponse(nil), nil)
@@ -110,26 +110,26 @@ func TestServiceLogs(t *testing.T) {
 		},
 		{
 			name:       "no log entries",
+			synctest:   true,
 			tool:       toolServiceLogs,
 			args:       args,
-			synctest:   true,
 			setupMock:  expectLogs(api.ServiceLogs{}),
 			wantOutput: map[string]any{"logs": []any{}},
 		},
 		{
 			name:       "returns entries oldest first",
+			synctest:   true,
 			tool:       toolServiceLogs,
 			args:       args,
-			synctest:   true,
 			setupMock:  expectLogs(api.ServiceLogs{Entries: &entries}),
 			wantOutput: entriesOutput,
 		},
 		{
 			// An entry the API sent without a timestamp renders bare.
 			name:     "entry with a zero timestamp has no prefix",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			synctest: true,
 			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: checkpoint complete", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.UTC)},
 				{Message: "LOG: no timestamp", Severity: "LOG"},
@@ -142,9 +142,9 @@ func TestServiceLogs(t *testing.T) {
 		{
 			// A non-UTC timestamp is converted before formatting.
 			name:     "non-UTC timestamp is rendered in UTC",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			synctest: true,
 			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.FixedZone("UTC+2", 2*60*60))},
 			}}),
@@ -154,9 +154,9 @@ func TestServiceLogs(t *testing.T) {
 			// Two pages: the first returns a cursor, the second must be
 			// requested with it. Entries beyond tail are trimmed.
 			name:     "pagination trimmed to tail",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     map[string]any{"service_id": "e6ue9697jf", "tail": 3},
-			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
@@ -179,8 +179,8 @@ func TestServiceLogs(t *testing.T) {
 			wantOutput: map[string]any{"logs": []any{"entry 3", "entry 4", "entry 5"}},
 		},
 		{
-			// An explicit until leaves nothing nondeterministic, so the params
-			// are matched exactly.
+			// An explicit until leaves nothing time-dependent, so no bubble is
+			// needed to match the params exactly.
 			name: "since and until reach the request",
 			tool: toolServiceLogs,
 			args: map[string]any{
@@ -216,9 +216,9 @@ func TestServiceLogs(t *testing.T) {
 		},
 		{
 			name:     "node 2 reaches the request",
+			synctest: true,
 			tool:     toolServiceLogs,
 			args:     map[string]any{"service_id": "e6ue9697jf", "node": 2},
-			synctest: true,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
 					Node:  new(2),

@@ -17,8 +17,33 @@ import (
 	"github.com/timescale/tiger-cli/internal/config"
 )
 
+// withExecuteQuery stubs common.ExecuteQuery — otherwise the point where the
+// tool would open a real database connection — asserting the arguments the
+// handler passed down and returning result and err in their place. Expectation
+// and return value are configured together, the way an API client mock's are,
+// so nothing about a case leaks into the next one.
+func withExecuteQuery(want common.ExecuteQueryArgs, result *common.QueryResult, err error) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.ExecuteQuery
+		common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.ExecuteQueryArgs) (*common.QueryResult, error) {
+			t.Helper()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
+			}
+			return result, err
+		}
+		t.Cleanup(func() { common.ExecuteQuery = original })
+	})
+}
+
 func TestDBQuery(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1"}
+
+	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) { s.Status = status }))
+		}
+	}
 
 	sqlDir := t.TempDir()
 	sqlFile := filepath.Join(sqlDir, "query.sql")
@@ -31,44 +56,10 @@ func TestDBQuery(t *testing.T) {
 	}
 	missingFile := filepath.Join(sqlDir, "nope.sql")
 
-	// A read replica connects to its own endpoint but borrows the parent
-	// primary's credentials, so resolving one fetches both services.
-	replica := sampleService(func(s *api.Service) {
-		s.ServiceID = "u8me885b93"
-		s.Name = "replica-service"
-		s.Status = api.DeployStatusPAUSED
-		s.ForkedFrom = &api.ForkSpec{
-			IsStandby: new(true),
-			ProjectID: new(testProjectID),
-			ServiceID: new("e6ue9697jf"),
-		}
-	})
+	const bothOrNeitherMsg = "exactly one of 'query' or 'file' must be provided"
 
-	expectGet := func(id string, svc api.Service) func(*mocks.MockClientWithResponsesInterface) {
-		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, id).
-				Return(&api.GetServiceResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &svc,
-				}, nil)
-		}
-	}
-	expectStatus := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
-		return expectGet("e6ue9697jf", sampleService(func(s *api.Service) { s.Status = status }))
-	}
-
-	const (
-		bothOrNeitherErr = "exactly one of 'query' or 'file' must be provided"
-		pausedErr        = "service is paused — start it with the service_start tool"
-		notReadyErr      = "service is not ready — check its status with service_get and try again"
-		// sampleService carries no endpoint, so a READY service fails here
-		// rather than opening a connection.
-		noEndpointErr = "failed to build connection string: service endpoint not available"
-	)
-
-	// ExecuteQuery is stubbed for the success cases below, so they reach the
-	// handler's own output without a live database. stubQuery asserts the args
-	// the handler built, which is how a case proves what it passed down.
+	// The query is stubbed for the success cases below, so they reach the
+	// handler's own output without a live database.
 	result := &common.QueryResult{
 		ResultSets: []common.ResultSet{{
 			CommandTag:   "SELECT 1",
@@ -84,20 +75,8 @@ func TestDBQuery(t *testing.T) {
 		"rows":          []any{[]any{"1"}},
 		"rows_affected": float64(1),
 	}}
+	wantResult := map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"}
 
-	stubQuery := func(want common.ExecuteQueryArgs, res *common.QueryResult) func(*testing.T) {
-		return func(t *testing.T) {
-			original := common.ExecuteQuery
-			common.ExecuteQuery = func(_ context.Context, _ *config.Config, _ *common.ConnectionTarget, got common.ExecuteQueryArgs) (*common.QueryResult, error) {
-				t.Helper()
-				if diff := cmp.Diff(want, got); diff != "" {
-					t.Errorf("ExecuteQuery args mismatch (-want +got):\n%s", diff)
-				}
-				return res, nil
-			}
-			t.Cleanup(func() { common.ExecuteQuery = original })
-		}
-	}
 	// baseArgs is what the handler builds from a bare query, with the schema
 	// defaults the SDK applies and the MCP-only response caps.
 	baseArgs := common.ExecuteQueryArgs{
@@ -109,11 +88,11 @@ func TestDBQuery(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolDBQuery,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolDBQuery,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			// The service_id pattern is enforced by the SDK's schema validation,
@@ -133,13 +112,13 @@ func TestDBQuery(t *testing.T) {
 			name:    "neither query nor file",
 			tool:    toolDBQuery,
 			args:    map[string]any{"service_id": "e6ue9697jf"},
-			wantErr: bothOrNeitherErr,
+			wantErr: bothOrNeitherMsg,
 		},
 		{
 			name:    "both query and file",
 			tool:    toolDBQuery,
 			args:    map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1", "file": sqlFile},
-			wantErr: bothOrNeitherErr,
+			wantErr: bothOrNeitherMsg,
 		},
 		{
 			name:    "missing SQL file",
@@ -159,8 +138,8 @@ func TestDBQuery(t *testing.T) {
 			name:      "SQL file read then stops before connecting",
 			tool:      toolDBQuery,
 			args:      map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			setupMock: expectStatus(api.DeployStatusREADY),
-			wantErr:   noEndpointErr,
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
+			wantErr:   noEndpointMsg,
 		},
 		{
 			name: "service lookup network error",
@@ -202,17 +181,17 @@ func TestDBQuery(t *testing.T) {
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1"},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGet("u8me885b93", replica)(m)
-				expectGet("e6ue9697jf", sampleService())(m)
+				expectGetService(m, "u8me885b93", sampleReplica())
+				expectGetService(m, "e6ue9697jf", sampleService())
 			},
-			wantErr: pausedErr,
+			wantErr: pausedMsg,
 		},
 		{
 			name: "read replica parent lookup fails",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1"},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGet("u8me885b93", replica)(m)
+				expectGetService(m, "u8me885b93", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -225,42 +204,53 @@ func TestDBQuery(t *testing.T) {
 			name:      "service paused",
 			tool:      toolDBQuery,
 			args:      args,
-			setupMock: expectStatus(api.DeployStatusPAUSED),
-			wantErr:   pausedErr,
+			setupMock: setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr:   pausedMsg,
 		},
 		{
 			name:      "service pausing",
 			tool:      toolDBQuery,
 			args:      args,
-			setupMock: expectStatus(api.DeployStatusPAUSING),
-			wantErr:   pausedErr,
+			setupMock: setupGetWithStatus(api.DeployStatusPAUSING),
+			wantErr:   pausedMsg,
 		},
 		{
 			name:      "service not ready",
 			tool:      toolDBQuery,
 			args:      args,
-			setupMock: expectStatus(api.DeployStatusQUEUED),
-			wantErr:   notReadyErr,
+			setupMock: setupGetWithStatus(api.DeployStatusQUEUED),
+			wantErr:   notReadyMsg,
 		},
 		{
 			name: "pooled without a pooler",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1", "pooled": true},
-			setupMock: expectGet("e6ue9697jf", sampleService(func(s *api.Service) {
-				s.Endpoint = &api.Endpoint{
-					Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
-					Port: new(5432),
-				}
-			})),
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+					s.Endpoint = &api.Endpoint{
+						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+						Port: new(5432),
+					}
+				}))
+			},
 			wantErr: "connection pooler not available for this service",
+		},
+		{
+			// A query failure passes through handleDatabaseError unchanged.
+			name:      "query fails",
+			tool:      toolDBQuery,
+			args:      args,
+			opts:      []runOption{withExecuteQuery(baseArgs, nil, errors.New("failed to connect to database: no route to host"))},
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
+			wantErr:   "failed to connect to database: no route to host",
 		},
 		{
 			name:       "returns the result sets",
 			tool:       toolDBQuery,
 			args:       args,
-			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(baseArgs, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			opts:       []runOption{withExecuteQuery(baseArgs, result, nil)},
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
 		},
 		{
 			name: "passes parameters, role and pooling down to the query",
@@ -273,88 +263,95 @@ func TestDBQuery(t *testing.T) {
 				"role":            "readonly",
 				"pooled":          true,
 			},
-			setupMock: expectGet("e6ue9697jf", sampleService(func(s *api.Service) {
-				s.ConnectionPooler = &api.ConnectionPooler{
-					Endpoint: &api.Endpoint{
-						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
-						Port: new(6432),
-					},
-				}
-			})),
-			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query:      "SELECT $1::int",
 				Parameters: []string{"1"},
 				Role:       "readonly",
 				Pooled:     true,
 				MaxRows:    config.DefaultMCPMaxRows,
 				MaxBytes:   mcpMaxResponseBytes,
-			}, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			}, result, nil)},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+					s.ConnectionPooler = &api.ConnectionPooler{
+						Endpoint: &api.Endpoint{
+							Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
+							Port: new(6432),
+						},
+					}
+				}))
+			},
+			wantOutput: wantResult,
 		},
 		{
 			// The file's contents become the query text.
-			name:      "runs the query read from a file",
-			tool:      toolDBQuery,
-			args:      map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			setupMock: expectStatus(api.DeployStatusREADY),
-			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
+			name: "runs the query read from a file",
+			tool: toolDBQuery,
+			args: map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT * FROM users;\n",
 				Role:     "tsdbadmin",
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
-			}, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			}, result, nil)},
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
 		},
 		{
 			// db_query isn't a read-only gated tool: the mode opens the session
 			// read-only rather than refusing the call.
-			name:      "read-only all runs the query in a read-only session",
-			tool:      toolDBQuery,
-			args:      args,
-			config:    map[string]any{"read_only": "all"},
-			setupMock: expectStatus(api.DeployStatusREADY),
-			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
-				Query:    "SELECT 1",
-				Role:     "tsdbadmin",
-				ReadOnly: true,
-				MaxRows:  config.DefaultMCPMaxRows,
-				MaxBytes: mcpMaxResponseBytes,
-			}, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			name: "read-only all runs the query in a read-only session",
+			tool: toolDBQuery,
+			args: args,
+			opts: []runOption{
+				withConfig(map[string]any{"read_only": "all"}),
+				withExecuteQuery(common.ExecuteQueryArgs{
+					Query:    "SELECT 1",
+					Role:     "tsdbadmin",
+					ReadOnly: true,
+					MaxRows:  config.DefaultMCPMaxRows,
+					MaxBytes: mcpMaxResponseBytes,
+				}, result, nil),
+			},
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
 		},
 		{
-			name:      "mcp_max_rows caps the rows per result set",
-			tool:      toolDBQuery,
-			args:      args,
-			config:    map[string]any{"mcp_max_rows": 250},
-			setupMock: expectStatus(api.DeployStatusREADY),
-			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
-				Query:    "SELECT 1",
-				Role:     "tsdbadmin",
-				MaxRows:  250,
-				MaxBytes: mcpMaxResponseBytes,
-			}, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			name: "mcp_max_rows caps the rows per result set",
+			tool: toolDBQuery,
+			args: args,
+			opts: []runOption{
+				withConfig(map[string]any{"mcp_max_rows": 250}),
+				withExecuteQuery(common.ExecuteQueryArgs{
+					Query:    "SELECT 1",
+					Role:     "tsdbadmin",
+					MaxRows:  250,
+					MaxBytes: mcpMaxResponseBytes,
+				}, result, nil),
+			},
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
 		},
 		{
 			// A config-file or TIGER_MCP_MAX_ROWS value bypasses `tiger config
 			// set` validation, so a non-positive one can reach the handler and
 			// must fall back to the default rather than meaning "no cap".
-			name:       "non-positive mcp_max_rows falls back to the default",
-			tool:       toolDBQuery,
-			args:       args,
-			config:     map[string]any{"mcp_max_rows": 0},
-			setupMock:  expectStatus(api.DeployStatusREADY),
-			setup:      []func(*testing.T){stubQuery(baseArgs, result)},
-			wantOutput: map[string]any{"result_sets": wantResultSets, "execution_time": "12ms"},
+			name: "non-positive mcp_max_rows falls back to the default",
+			tool: toolDBQuery,
+			args: args,
+			opts: []runOption{
+				withConfig(map[string]any{"mcp_max_rows": 0}),
+				withExecuteQuery(baseArgs, result, nil),
+			},
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			wantOutput: wantResult,
 		},
 		{
 			// A truncated result carries the notice naming the configured cap.
-			name:      "truncated results carry an actionable notice",
-			tool:      toolDBQuery,
-			args:      args,
-			setupMock: expectStatus(api.DeployStatusREADY),
-			setup: []func(*testing.T){stubQuery(baseArgs, &common.QueryResult{
+			name: "truncated results carry an actionable notice",
+			tool: toolDBQuery,
+			args: args,
+			opts: []runOption{withExecuteQuery(baseArgs, &common.QueryResult{
 				ResultSets: []common.ResultSet{{
 					CommandTag:   "SELECT 100",
 					Columns:      []common.Column{{Name: "id", Type: "int4"}},
@@ -364,7 +361,8 @@ func TestDBQuery(t *testing.T) {
 				}},
 				ExecutionTime: 12 * time.Millisecond,
 				Truncated:     true,
-			})},
+			}, nil)},
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: map[string]any{
 				"result_sets": []any{map[string]any{
 					"command_tag":   "SELECT 100",
@@ -386,19 +384,17 @@ func TestDBQuery(t *testing.T) {
 			name: "read replica without a pooler warns alongside the results",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1", "pooled": true},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				ready := replica
-				ready.Status = api.DeployStatusREADY
-				expectGet("u8me885b93", ready)(m)
-				expectGet("e6ue9697jf", sampleService())(m)
-			},
-			setup: []func(*testing.T){stubQuery(common.ExecuteQueryArgs{
+			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "tsdbadmin",
 				Pooled:   true,
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
-			}, result)},
+			}, result, nil)},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "u8me885b93", sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY }))
+				expectGetService(m, "e6ue9697jf", sampleService())
+			},
 			wantOutput: map[string]any{
 				"result_sets":    wantResultSets,
 				"execution_time": "12ms",

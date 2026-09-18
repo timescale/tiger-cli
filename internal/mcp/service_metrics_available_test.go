@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -11,6 +12,10 @@ import (
 func TestServiceMetricsAvailable(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
+	// The tool is experimental-gated (see the first case), so every other
+	// case registers it explicitly.
+	experimental := withExperimental()
+
 	expectSeries := func(series *[]string) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
@@ -20,6 +25,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 				}, nil)
 		}
 	}
+	noSeries := map[string]any{"series": []any{}}
 
 	runToolTests(t, []toolTest{
 		{
@@ -32,32 +38,42 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "service_metrics_available"`,
 		},
 		{
-			name:         "not logged in",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
-			clientErr:    errNotLoggedIn,
-			wantErr:      errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceMetricsAvailable,
+			args:    args,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
-			name:         "service ID failing the schema pattern",
-			tool:         toolServiceMetricsAvailable,
-			args:         map[string]any{"service_id": "NOPE"},
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
+			name:    "service ID failing the schema pattern",
+			tool:    toolServiceMetricsAvailable,
+			args:    map[string]any{"service_id": "NOPE"},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
-			name:         "missing service ID",
-			tool:         toolServiceMetricsAvailable,
-			args:         map[string]any{},
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: required: missing properties: ["service_id"]`,
+			name:    "missing service ID",
+			tool:    toolServiceMetricsAvailable,
+			args:    map[string]any{},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: required: missing properties: ["service_id"]`,
 		},
 		{
-			name:         "API error",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
+			name: "network error",
+			tool: toolServiceMetricsAvailable,
+			args: args,
+			opts: []runOption{experimental},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to list metric series: connection refused",
+		},
+		{
+			name: "API error",
+			tool: toolServiceMetricsAvailable,
+			args: args,
+			opts: []runOption{experimental},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceMetricsAvailableSeriesResponse{
@@ -68,10 +84,10 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			wantErr: "service not found",
 		},
 		{
-			name:         "API error without a message body",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
+			name: "API error without a message body",
+			tool: toolServiceMetricsAvailable,
+			args: args,
+			opts: []runOption{experimental},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceMetricsAvailableSeriesResponse{
@@ -82,26 +98,36 @@ func TestServiceMetricsAvailable(t *testing.T) {
 		},
 		{
 			// A 200 with no parsed body is reported as no series, not an error.
-			name:         "nil response body",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
-			setupMock:    expectSeries(nil),
-			wantOutput:   map[string]any{"series": []any{}},
+			name:       "nil response body",
+			tool:       toolServiceMetricsAvailable,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(nil),
+			wantOutput: noSeries,
 		},
 		{
-			name:         "no series available",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
-			setupMock:    expectSeries(&[]string{}),
-			wantOutput:   map[string]any{"series": []any{}},
+			// A JSON `null` array is normalized to an empty one, so the output
+			// stays a valid array.
+			name:       "null series array",
+			tool:       toolServiceMetricsAvailable,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(new([]string)),
+			wantOutput: noSeries,
 		},
 		{
-			name:         "series listed",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
+			name:       "no series available",
+			tool:       toolServiceMetricsAvailable,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(&[]string{}),
+			wantOutput: noSeries,
+		},
+		{
+			name: "series listed",
+			tool: toolServiceMetricsAvailable,
+			args: args,
+			opts: []runOption{experimental},
 			setupMock: expectSeries(&[]string{
 				"timescale_cloud_system_cpu_usage_millicores",
 				"timescale_cloud_system_memory_usage_bytes",
@@ -110,17 +136,6 @@ func TestServiceMetricsAvailable(t *testing.T) {
 				"timescale_cloud_system_cpu_usage_millicores",
 				"timescale_cloud_system_memory_usage_bytes",
 			}},
-		},
-		{
-			// A JSON `null` array parses to a non-nil pointer holding a nil
-			// slice, which the handler passes straight through as a null
-			// `series` rather than the empty array it emits for a nil body.
-			name:         "null series array",
-			tool:         toolServiceMetricsAvailable,
-			args:         args,
-			experimental: true,
-			setupMock:    expectSeries(new([]string)),
-			wantOutput:   map[string]any{"series": nil},
 		},
 	})
 }

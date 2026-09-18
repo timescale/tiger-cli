@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -11,6 +12,10 @@ import (
 
 func TestServiceBackups(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
+
+	// The tool is experimental-gated (see the first case), so every other
+	// case registers it explicitly.
+	experimental := withExperimental()
 
 	expectBackups := func(backups *[]api.Backup) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
@@ -64,6 +69,7 @@ func TestServiceBackups(t *testing.T) {
 			"regions":    []any{map[string]any{"region_code": "us-east-1"}},
 		},
 	}}
+	noBackups := map[string]any{"backups": []any{}}
 
 	runToolTests(t, []toolTest{
 		{
@@ -76,32 +82,42 @@ func TestServiceBackups(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "service_backups"`,
 		},
 		{
-			name:         "not logged in",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
-			clientErr:    errNotLoggedIn,
-			wantErr:      errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceBackups,
+			args:    args,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
-			name:         "service ID failing the schema pattern",
-			tool:         toolServiceBackups,
-			args:         map[string]any{"service_id": "NOPE"},
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
+			name:    "service ID failing the schema pattern",
+			tool:    toolServiceBackups,
+			args:    map[string]any{"service_id": "NOPE"},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
-			name:         "missing service ID",
-			tool:         toolServiceBackups,
-			args:         map[string]any{},
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: required: missing properties: ["service_id"]`,
+			name:    "missing service ID",
+			tool:    toolServiceBackups,
+			args:    map[string]any{},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: required: missing properties: ["service_id"]`,
 		},
 		{
-			name:         "API error",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
+			name: "network error",
+			tool: toolServiceBackups,
+			args: args,
+			opts: []runOption{experimental},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to list backups: connection refused",
+		},
+		{
+			name: "API error",
+			tool: toolServiceBackups,
+			args: args,
+			opts: []runOption{experimental},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetBackupsResponse{
@@ -112,10 +128,10 @@ func TestServiceBackups(t *testing.T) {
 			wantErr: "service not found",
 		},
 		{
-			name:         "API error without a message body",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
+			name: "API error without a message body",
+			tool: toolServiceBackups,
+			args: args,
+			opts: []runOption{experimental},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetBackupsResponse{
@@ -126,39 +142,38 @@ func TestServiceBackups(t *testing.T) {
 		},
 		{
 			// A 200 with no parsed body is reported as no backups, not an error.
-			name:         "nil response body",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
-			setupMock:    expectBackups(nil),
-			wantOutput:   map[string]any{"backups": []any{}},
+			name:       "nil response body",
+			tool:       toolServiceBackups,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectBackups(nil),
+			wantOutput: noBackups,
 		},
 		{
-			name:         "no backups taken yet",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
-			setupMock:    expectBackups(&[]api.Backup{}),
-			wantOutput:   map[string]any{"backups": []any{}},
+			// A JSON `null` array is normalized to an empty one, so the output
+			// stays a valid array.
+			name:       "null backups array",
+			tool:       toolServiceBackups,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectBackups(new([]api.Backup)),
+			wantOutput: noBackups,
 		},
 		{
-			name:         "backups listed",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
-			setupMock:    expectBackups(&backups),
-			wantOutput:   wantBackups,
+			name:       "no backups taken yet",
+			tool:       toolServiceBackups,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectBackups(&[]api.Backup{}),
+			wantOutput: noBackups,
 		},
 		{
-			// A JSON `null` array parses to a non-nil pointer holding a nil
-			// slice, which the handler passes straight through as a null
-			// `backups` rather than the empty array it emits for a nil body.
-			name:         "null backups array",
-			tool:         toolServiceBackups,
-			args:         args,
-			experimental: true,
-			setupMock:    expectBackups(new([]api.Backup)),
-			wantOutput:   map[string]any{"backups": nil},
+			name:       "backups listed",
+			tool:       toolServiceBackups,
+			args:       args,
+			opts:       []runOption{experimental},
+			setupMock:  expectBackups(&backups),
+			wantOutput: wantBackups,
 		},
 	})
 }

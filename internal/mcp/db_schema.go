@@ -71,7 +71,7 @@ func (DBSchemaOutput) Schema() *jsonschema.Schema {
 
 func newDBSchemaTool() *mcp.Tool {
 	return &mcp.Tool{
-		Name:  "db_schema",
+		Name:  toolDBSchema,
 		Title: "Show Database Schema",
 		Description: `Display the schema of a service database.
 

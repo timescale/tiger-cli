@@ -41,6 +41,8 @@ const (
 	toolServiceMetricsSeries    = "service_metrics_series"
 	toolServiceBackups          = "service_backups"
 	toolDBQuery                 = "db_query"
+	toolDBSchema                = "db_schema"
+	toolFeedback                = "feedback"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality

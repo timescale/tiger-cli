@@ -73,7 +73,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "network error",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -83,7 +83,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "API error",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(&api.GetServiceLogsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -97,41 +97,41 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "nil response body",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(logsResponse(nil), nil)
 			},
 			wantErr: "unexpected empty response",
 		},
 		{
-			name:     "empty logs",
-			args:     []string{"service", "logs", "svc-12345"},
-			synctest: true,
-			setup:    setupLogs(api.ServiceLogs{}),
+			name:      "empty logs",
+			args:      []string{"service", "logs", "svc-12345"},
+			synctest:  true,
+			setupMock: setupLogs(api.ServiceLogs{}),
 		},
 		{
-			name:     "text output",
-			args:     []string{"service", "logs", "svc-12345"},
-			synctest: true,
-			setup:    setupLogs(api.ServiceLogs{Entries: &entries}),
+			name:      "text output",
+			args:      []string{"service", "logs", "svc-12345"},
+			synctest:  true,
+			setupMock: setupLogs(api.ServiceLogs{Entries: &entries}),
 			wantStdout: "LOG: database system is ready to accept connections\n" +
 				"ERROR: relation \"missing\" does not exist\n",
 		},
 		{
 			// Timestamps are rendered in the local timezone, pinned to UTC in
 			// TestMain so the expected output stays literal.
-			name:     "text output with timestamps",
-			args:     []string{"service", "logs", "svc-12345"},
-			synctest: true,
-			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:      "text output with timestamps",
+			args:      []string{"service", "logs", "svc-12345"},
+			synctest:  true,
+			setupMock: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: "2025-01-15 10:30:00 UTC LOG: checkpoint starting\n" +
 				"2025-01-15 10:31:00 UTC LOG: checkpoint complete\n",
 		},
 		{
-			name:     "json output",
-			args:     []string{"service", "logs", "svc-12345", "-o", "json"},
-			synctest: true,
-			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:      "json output",
+			args:      []string{"service", "logs", "svc-12345", "-o", "json"},
+			synctest:  true,
+			setupMock: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: `[
   {
     "message": "LOG: checkpoint starting",
@@ -147,10 +147,10 @@ func TestServiceLogsCmd(t *testing.T) {
 `,
 		},
 		{
-			name:     "yaml output",
-			args:     []string{"service", "logs", "svc-12345", "-o", "yaml"},
-			synctest: true,
-			setup:    setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
+			name:      "yaml output",
+			args:      []string{"service", "logs", "svc-12345", "-o", "yaml"},
+			synctest:  true,
+			setupMock: setupLogs(api.ServiceLogs{Entries: &timestampedEntries}),
 			wantStdout: `- message: 'LOG: checkpoint starting'
   severity: LOG
   timestamp: "2025-01-15T10:30:00Z"
@@ -165,7 +165,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "pagination with tail",
 			args:     []string{"service", "logs", "svc-12345", "--tail", "3"},
 			synctest: true,
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
 					{Message: "entry 4", Severity: "LOG"},
@@ -189,7 +189,7 @@ func TestServiceLogsCmd(t *testing.T) {
 		{
 			name: "since and until params",
 			args: []string{"service", "logs", "svc-12345", "--since", "2024-01-15T09:00:00Z", "--until", "2024-01-15T10:00:00Z"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
@@ -207,7 +207,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "node param",
 			args:     []string{"service", "logs", "svc-12345", "--node", "0"},
 			synctest: true,
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
 					Node:  new(0),
 					Until: &logsNow,
@@ -222,7 +222,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			args:     []string{"service", "logs"},
 			opts:     []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			synctest: true,
-			setup: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
+			setupMock: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG"},
 			}}),
 			wantStdout: "LOG: ready\n",
@@ -231,7 +231,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name:     "log alias",
 			args:     []string{"service", "log", "svc-12345"},
 			synctest: true,
-			setup: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
+			setupMock: setupLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG"},
 			}}),
 			wantStdout: "LOG: ready\n",

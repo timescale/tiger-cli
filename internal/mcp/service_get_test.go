@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -46,13 +47,9 @@ func TestServiceGet(t *testing.T) {
 		s.Endpoint = endpoint
 	})
 
-	expectGet := func(service api.Service) func(m *mocks.MockClientWithResponsesInterface) {
+	setupGet := func(svc api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-				Return(&api.GetServiceResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &service,
-				}, nil)
+			expectGetService(m, "e6ue9697jf", svc)
 		}
 	}
 
@@ -90,11 +87,11 @@ func TestServiceGet(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceGet,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceGet,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			// The service_id pattern is enforced by the SDK's schema validation,
@@ -103,6 +100,16 @@ func TestServiceGet(t *testing.T) {
 			tool:    toolServiceGet,
 			args:    map[string]any{"service_id": "not-an-id"},
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "not-an-id" does not match regular expression "^[a-z0-9]{10}$"`,
+		},
+		{
+			name: "network error",
+			tool: toolServiceGet,
+			args: args,
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to get service details: connection refused",
 		},
 		{
 			name: "API error",
@@ -131,21 +138,21 @@ func TestServiceGet(t *testing.T) {
 			name:       "gets service without password",
 			tool:       toolServiceGet,
 			args:       args,
-			setupMock:  expectGet(fullService),
+			setupMock:  setupGet(fullService),
 			wantOutput: full,
 		},
 		{
 			name:       "gets service with password",
 			tool:       toolServiceGet,
 			args:       argsWithPassword,
-			setupMock:  expectGet(passwordService),
+			setupMock:  setupGet(passwordService),
 			wantOutput: withPassword,
 		},
 		{
 			name:      "password requested but unavailable",
 			tool:      toolServiceGet,
 			args:      argsWithPassword,
-			setupMock: expectGet(noPasswordService),
+			setupMock: setupGet(noPasswordService),
 			wantErr:   "requested password but password not available",
 		},
 	})

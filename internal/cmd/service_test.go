@@ -23,19 +23,19 @@ func TestServiceCommandAliases(t *testing.T) {
 		{
 			name:       "service",
 			args:       []string{"service", "list"},
-			setup:      emptyList,
+			setupMock:  emptyList,
 			wantStderr: noServicesStderr,
 		},
 		{
 			name:       "services alias",
 			args:       []string{"services", "list"},
-			setup:      emptyList,
+			setupMock:  emptyList,
 			wantStderr: noServicesStderr,
 		},
 		{
 			name:       "svc alias",
 			args:       []string{"svc", "list"},
-			setup:      emptyList,
+			setupMock:  emptyList,
 			wantStderr: noServicesStderr,
 		},
 	})

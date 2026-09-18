@@ -74,7 +74,7 @@ const testProjectID = "test-project-123"
 type cmdTest struct {
 	name       string
 	args       []string
-	setup      func(m *mocks.MockClientWithResponsesInterface)
+	setupMock  func(m *mocks.MockClientWithResponsesInterface)
 	opts       []runOption
 	wantStdout any
 	wantStderr any
@@ -86,6 +86,11 @@ type cmdTest struct {
 	// goroutine is blocked on it. Set it for cases that wait on a timer (the
 	// `--wait` polling loop in common.WaitForService), so they assert against
 	// realistic durations and finish instantly instead of sleeping.
+	//
+	// The bubble's clock also always starts at the same instant, 2000-01-01
+	// UTC, so a case whose request depends on time.Now (`service logs` sends
+	// it as the default upper bound) sets synctest too and spells that time
+	// out as a plain literal.
 	//
 	// It is opt-in rather than the default because a bubble only advances its
 	// clock while every goroutine in it is durably blocked, and real network
@@ -128,7 +133,7 @@ func runCmdTests(t *testing.T, tests []cmdTest) {
 // runCmdTests so a case can opt into running inside a synctest bubble.
 func runCmdTest(t *testing.T, tt cmdTest) {
 	t.Helper()
-	result := runCommand(t, tt.args, tt.setup, tt.opts...)
+	result := runCommand(t, tt.args, tt.setupMock, tt.opts...)
 
 	if tt.wantErr != nil {
 		if result.err == nil {

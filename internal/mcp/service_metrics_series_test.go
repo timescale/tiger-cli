@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"maps"
 	"net/http"
 	"testing"
@@ -22,6 +23,10 @@ func TestServiceMetricsSeries(t *testing.T) {
 		maps.Copy(out, extra)
 		return out
 	}
+
+	// The tool is experimental-gated (see the first case), so every other
+	// case registers it explicitly.
+	experimental := withExperimental()
 
 	from := time.Date(2026, 5, 13, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 13, 1, 0, 0, 0, time.UTC)
@@ -96,121 +101,131 @@ func TestServiceMetricsSeries(t *testing.T) {
 			wantCallErr: `calling "tools/call": unknown tool "service_metrics_series"`,
 		},
 		{
-			name:         "not logged in",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			clientErr:    errNotLoggedIn,
-			wantErr:      errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceMetricsSeries,
+			args:    baseArgs,
+			opts:    []runOption{experimental, withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
-			name:         "no arguments",
-			tool:         toolServiceMetricsSeries,
-			args:         map[string]any{},
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: required: missing properties: ["service_id" "metric_name" "from" "to"]`,
+			name:    "no arguments",
+			tool:    toolServiceMetricsSeries,
+			args:    map[string]any{},
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: required: missing properties: ["service_id" "metric_name" "from" "to"]`,
 		},
 		{
-			name:         "service ID failing the schema pattern",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"service_id": "NOPE"}),
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
+			name:    "service ID failing the schema pattern",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"service_id": "NOPE"}),
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
-			name:         "role outside the enum",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"role": "primary"}),
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/role: enum: primary does not equal any of: [PRIMARY REPLICA]`,
+			name:    "role outside the enum",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"role": "primary"}),
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/role: enum: primary does not equal any of: [PRIMARY REPLICA]`,
 		},
 		{
-			name:         "aggregation function outside the enum",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"fn": "MEDIAN"}),
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/fn: enum: MEDIAN does not equal any of: [RATE INCREASE SUM AVG MIN MAX MIN_TOTAL MAX_TOTAL COUNT P50 P90 P99 LAST]`,
+			name:    "aggregation function outside the enum",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"fn": "MEDIAN"}),
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/fn: enum: MEDIAN does not equal any of: [RATE INCREASE SUM AVG MIN MAX MIN_TOTAL MAX_TOTAL COUNT P50 P90 P99 LAST]`,
 		},
 		{
-			name:         "bucket below the minimum",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"bucket_seconds": 30}),
-			experimental: true,
-			wantErr:      `validating "arguments": validating root: validating /properties/bucket_seconds: minimum: 30/1 is less than 60.000000`,
+			name:    "bucket below the minimum",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"bucket_seconds": 30}),
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/bucket_seconds: minimum: 30/1 is less than 60.000000`,
 		},
 		{
 			// The time window is plain strings in the schema, so the handler is
 			// what rejects a non-RFC3339 value.
-			name:         "from is not RFC3339",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"from": "yesterday"}),
-			experimental: true,
-			wantErr:      `from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`,
+			name:    "from is not RFC3339",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"from": "yesterday"}),
+			opts:    []runOption{experimental},
+			wantErr: `from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`,
 		},
 		{
-			name:         "to is not RFC3339",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"to": "2026-05-13"}),
-			experimental: true,
-			wantErr:      `to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): parsing time "2026-05-13" as "2006-01-02T15:04:05Z07:00": cannot parse "" as "T"`,
+			name:    "to is not RFC3339",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"to": "2026-05-13"}),
+			opts:    []runOption{experimental},
+			wantErr: `to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): parsing time "2026-05-13" as "2006-01-02T15:04:05Z07:00": cannot parse "" as "T"`,
 		},
 		{
-			name:         "API error",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectError(http.StatusBadRequest, &api.ClientError{Message: new("unknown metric name")}),
-			wantErr:      "unknown metric name",
+			name: "network error",
+			tool: toolServiceMetricsSeries,
+			args: baseArgs,
+			opts: []runOption{experimental},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf", baseBody).
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch metric series: connection refused",
 		},
 		{
-			name:         "API error without a message body",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectError(http.StatusInternalServerError, nil),
-			wantErr:      "unknown error",
+			name:      "API error",
+			tool:      toolServiceMetricsSeries,
+			args:      baseArgs,
+			opts:      []runOption{experimental},
+			setupMock: expectError(http.StatusBadRequest, &api.ClientError{Message: new("unknown metric name")}),
+			wantErr:   "unknown metric name",
+		},
+		{
+			name:      "API error without a message body",
+			tool:      toolServiceMetricsSeries,
+			args:      baseArgs,
+			opts:      []runOption{experimental},
+			setupMock: expectError(http.StatusInternalServerError, nil),
+			wantErr:   "unknown error",
 		},
 		{
 			// A 200 with no parsed body is reported as no series, not an error.
-			name:         "nil response body",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectSeries(baseBody, nil),
-			wantOutput:   noSeries,
+			name:       "nil response body",
+			tool:       toolServiceMetricsSeries,
+			args:       baseArgs,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(baseBody, nil),
+			wantOutput: noSeries,
 		},
 		{
 			// A JSON `null` array is normalized to an empty one, so the output
 			// stays a valid array.
-			name:         "null series array",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectSeries(baseBody, new([]api.MetricSeries)),
-			wantOutput:   noSeries,
+			name:       "null series array",
+			tool:       toolServiceMetricsSeries,
+			args:       baseArgs,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(baseBody, new([]api.MetricSeries)),
+			wantOutput: noSeries,
 		},
 		{
-			name:         "no data in the window",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectSeries(baseBody, &[]api.MetricSeries{}),
-			wantOutput:   noSeries,
+			name:       "no data in the window",
+			tool:       toolServiceMetricsSeries,
+			args:       baseArgs,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(baseBody, &[]api.MetricSeries{}),
+			wantOutput: noSeries,
 		},
 		{
-			name:         "series returned",
-			tool:         toolServiceMetricsSeries,
-			args:         baseArgs,
-			experimental: true,
-			setupMock:    expectSeries(baseBody, &series),
-			wantOutput:   wantSeries,
+			name:       "series returned",
+			tool:       toolServiceMetricsSeries,
+			args:       baseArgs,
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(baseBody, &series),
+			wantOutput: wantSeries,
 		},
 		{
 			// The convenience role is sent as a lowercased label filter.
-			name:         "role filter",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"role": "REPLICA"}),
-			experimental: true,
+			name: "role filter",
+			tool: toolServiceMetricsSeries,
+			args: args(map[string]any{"role": "REPLICA"}),
+			opts: []runOption{experimental},
 			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.Filters = &[]api.MetricLabelFilter{{Key: "role", Value: "replica"}}
 			}), &[]api.MetricSeries{}),
@@ -228,7 +243,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 					map[string]any{"key": "job_id", "value": ""},
 				},
 			}),
-			experimental: true,
+			opts: []runOption{experimental},
 			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.Filters = &[]api.MetricLabelFilter{
 					{Key: "role", Value: "primary"},
@@ -238,10 +253,10 @@ func TestServiceMetricsSeries(t *testing.T) {
 			wantOutput: noSeries,
 		},
 		{
-			name:         "bucket size and aggregation function",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"bucket_seconds": 3600, "fn": "AVG"}),
-			experimental: true,
+			name: "bucket size and aggregation function",
+			tool: toolServiceMetricsSeries,
+			args: args(map[string]any{"bucket_seconds": 3600, "fn": "AVG"}),
+			opts: []runOption{experimental},
 			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.BucketSeconds = new(3600)
 				b.Fn = new(api.MetricsAggFnAVG)
@@ -250,12 +265,12 @@ func TestServiceMetricsSeries(t *testing.T) {
 		},
 		{
 			// An empty filter list leaves the request body's filters unset.
-			name:         "empty filter list",
-			tool:         toolServiceMetricsSeries,
-			args:         args(map[string]any{"filters": []any{}}),
-			experimental: true,
-			setupMock:    expectSeries(baseBody, &[]api.MetricSeries{}),
-			wantOutput:   noSeries,
+			name:       "empty filter list",
+			tool:       toolServiceMetricsSeries,
+			args:       args(map[string]any{"filters": []any{}}),
+			opts:       []runOption{experimental},
+			setupMock:  expectSeries(baseBody, &[]api.MetricSeries{}),
+			wantOutput: noSeries,
 		},
 	})
 }

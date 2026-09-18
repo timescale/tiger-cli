@@ -36,11 +36,11 @@ func TestServiceRename(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceRename,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceRename,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "service ID failing the schema pattern",
@@ -57,11 +57,11 @@ func TestServiceRename(t *testing.T) {
 		{
 			// The tool isn't registered under read_only=all at startup; this is
 			// the handler's own check catching a config change made since.
-			name:             "read-only all refuses without an API call",
-			tool:             toolServiceRename,
-			args:             args,
-			configAfterStart: map[string]any{"read_only": "all"},
-			wantErr:          "this operation is not allowed in read-only mode",
+			name:    "read-only all refuses without an API call",
+			tool:    toolServiceRename,
+			args:    args,
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
+			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			// Only the tag lookup is registered: an attempted rename fails as an
@@ -69,7 +69,7 @@ func TestServiceRename(t *testing.T) {
 			name:      "read-only prod refuses PROD service",
 			tool:      toolServiceRename,
 			args:      args,
-			config:    map[string]any{"read_only": "prod"},
+			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock: expectTaggedService("PROD", 1),
 			wantErr:   `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
@@ -77,7 +77,7 @@ func TestServiceRename(t *testing.T) {
 			name:       "read-only prod allows DEV service",
 			tool:       toolServiceRename,
 			args:       args,
-			config:     map[string]any{"read_only": "prod"},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock:  expectTaggedServiceAndRename("DEV"),
 			wantOutput: output,
 		},

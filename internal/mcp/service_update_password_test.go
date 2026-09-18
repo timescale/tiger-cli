@@ -13,19 +13,16 @@ func TestServiceUpdatePassword(t *testing.T) {
 	const password = "MySecurePassword123!"
 	args := map[string]any{"service_id": "e6ue9697jf", "password": password}
 
-	expectGetService := func(svc api.Service) func(*mocks.MockClientWithResponsesInterface) {
-		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-				Return(&api.GetServiceResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &svc,
-				}, nil)
-		}
-	}
 	expectUpdate := func(status int) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", api.UpdatePasswordInput{Password: password}).
 				Return(&api.UpdatePasswordResponse{HTTPResponse: httpResponse(status)}, nil)
+		}
+	}
+	expectGetServiceAndUpdate := func(svc api.Service, status int) func(*mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectGetService(m, "e6ue9697jf", svc)
+			expectUpdate(status)(m)
 		}
 	}
 	expectTaggedServiceAndUpdate := func(tag string, status int) func(*mocks.MockClientWithResponsesInterface) {
@@ -48,11 +45,11 @@ func TestServiceUpdatePassword(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceUpdatePassword,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceUpdatePassword,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "service ID failing the schema pattern",
@@ -70,14 +67,14 @@ func TestServiceUpdatePassword(t *testing.T) {
 			// The tool isn't registered under read_only=all at startup; this is
 			// the handler's own up-front check catching a config change made
 			// since, before any fetch.
-			name:             "read-only all refuses without an API call",
-			tool:             toolServiceUpdatePassword,
-			args:             args,
-			configAfterStart: map[string]any{"read_only": "all"},
-			wantErr:          "this operation is not allowed in read-only mode",
+			name:    "read-only all refuses without an API call",
+			tool:    toolServiceUpdatePassword,
+			args:    args,
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
+			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
-			name: "service lookup request fails",
+			name: "service lookup network error",
 			tool: toolServiceUpdatePassword,
 			args: args,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -115,7 +112,7 @@ func TestServiceUpdatePassword(t *testing.T) {
 			name:      "read-only prod refuses PROD service",
 			tool:      toolServiceUpdatePassword,
 			args:      args,
-			config:    map[string]any{"read_only": "prod"},
+			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock: expectTaggedService("PROD", 1),
 			wantErr:   `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
@@ -123,7 +120,7 @@ func TestServiceUpdatePassword(t *testing.T) {
 			name:       "read-only prod allows DEV service",
 			tool:       toolServiceUpdatePassword,
 			args:       args,
-			config:     map[string]any{"read_only": "prod"},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock:  expectTaggedServiceAndUpdate("DEV", http.StatusOK),
 			wantOutput: updated,
 		},
@@ -131,9 +128,11 @@ func TestServiceUpdatePassword(t *testing.T) {
 			name: "read replica names its primary",
 			tool: toolServiceUpdatePassword,
 			args: args,
-			setupMock: expectGetService(sampleService(func(s *api.Service) {
-				s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93"), IsStandby: new(true)}
-			})),
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+					s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93"), IsStandby: new(true)}
+				}))
+			},
 			wantErr: `"e6ue9697jf" is a read replica; update the password on its primary service "u8me885b93" instead`,
 		},
 		{
@@ -141,20 +140,17 @@ func TestServiceUpdatePassword(t *testing.T) {
 			name: "non-standby fork is updated",
 			tool: toolServiceUpdatePassword,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService(func(s *api.Service) {
-					s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93")}
-				}))(m)
-				expectUpdate(http.StatusOK)(m)
-			},
+			setupMock: expectGetServiceAndUpdate(sampleService(func(s *api.Service) {
+				s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93")}
+			}), http.StatusOK),
 			wantOutput: updated,
 		},
 		{
-			name: "update request fails",
+			name: "update network error",
 			tool: toolServiceUpdatePassword,
 			args: args,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService())(m)
+				expectGetService(m, "e6ue9697jf", sampleService())
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", api.UpdatePasswordInput{Password: password}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -165,7 +161,7 @@ func TestServiceUpdatePassword(t *testing.T) {
 			tool: toolServiceUpdatePassword,
 			args: args,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService())(m)
+				expectGetService(m, "e6ue9697jf", sampleService())
 				m.EXPECT().UpdatePasswordWithResponse(validCtx, testProjectID, "e6ue9697jf", api.UpdatePasswordInput{Password: password}).
 					Return(&api.UpdatePasswordResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -175,36 +171,28 @@ func TestServiceUpdatePassword(t *testing.T) {
 			wantErr: "password is too weak",
 		},
 		{
-			name: "updates password on a 200",
-			tool: toolServiceUpdatePassword,
-			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService())(m)
-				expectUpdate(http.StatusOK)(m)
-			},
+			name:       "updates password on a 200",
+			tool:       toolServiceUpdatePassword,
+			args:       args,
+			setupMock:  expectGetServiceAndUpdate(sampleService(), http.StatusOK),
 			wantOutput: updated,
 		},
 		{
-			name: "updates password on a 204",
-			tool: toolServiceUpdatePassword,
-			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService())(m)
-				expectUpdate(http.StatusNoContent)(m)
-			},
+			name:       "updates password on a 204",
+			tool:       toolServiceUpdatePassword,
+			args:       args,
+			setupMock:  expectGetServiceAndUpdate(sampleService(), http.StatusNoContent),
 			wantOutput: updated,
 		},
 		{
 			// A storage failure isn't fatal: the password is changed either
-			// way, so the tool reports the failure rather than erroring.
-			name:   "reports a password storage failure",
-			tool:   toolServiceUpdatePassword,
-			args:   args,
-			config: map[string]any{"password_storage": "pgpass"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(sampleService())(m)
-				expectUpdate(http.StatusOK)(m)
-			},
+			// way, so the tool reports the failure rather than erroring. The
+			// pgpass save fails on sampleService's missing endpoint.
+			name:      "reports a password storage failure",
+			tool:      toolServiceUpdatePassword,
+			args:      args,
+			opts:      []runOption{withConfig(map[string]any{"password_storage": "pgpass"})},
+			setupMock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
 			wantOutput: map[string]any{
 				"message": "Password updated for tsdbadmin",
 				"password_storage": map[string]any{

@@ -12,8 +12,19 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
+// withGenerateServiceName pins the otherwise random auto-generated service
+// name, so the request that carries it can be asserted exactly.
+func withGenerateServiceName(name string) runOption {
+	return withSetup(func(t *testing.T) {
+		original := common.GenerateServiceName
+		common.GenerateServiceName = func() string { return name }
+		t.Cleanup(func() { common.GenerateServiceName = original })
+	})
+}
+
 func TestServiceCreate(t *testing.T) {
 	args := map[string]any{"name": "test-service"}
+	waitArgs := map[string]any{"name": "test-service", "wait": true}
 
 	// The request built from a name alone: the SDK applies the schema's
 	// replicas and environment defaults before the handler runs.
@@ -23,19 +34,18 @@ func TestServiceCreate(t *testing.T) {
 		EnvironmentTag: new(api.EnvironmentTagDEV),
 	}
 
-	newService := sampleService(func(s *api.Service) {
-		s.Created = time.Date(2025, 1, 15, 9, 30, 0, 0, time.UTC)
-		s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.abc.tsdb.cloud.timescale.com"), Port: new(5432)}
-	})
+	newService := func(overrides ...func(*api.Service)) api.Service {
+		return sampleService(append([]func(*api.Service){func(s *api.Service) {
+			s.Created = time.Date(2025, 1, 15, 9, 30, 0, 0, time.UTC)
+			s.Endpoint = &api.Endpoint{Host: new("e6ue9697jf.abc.tsdb.cloud.timescale.com"), Port: new(5432)}
+		}}, overrides...)...)
+	}
 	provisioning := func(s *api.Service) { s.Status = api.DeployStatusCONFIGURING }
-	withPassword := func(s *api.Service) { s.InitialPassword = new("init-pass-123") }
+	withInitialPassword := func(s *api.Service) { s.InitialPassword = new("init-pass-123") }
 
 	expectCreate := func(req api.ServiceCreate, overrides ...func(*api.Service)) func(*mocks.MockClientWithResponsesInterface) {
-		svc := newService
-		for _, override := range overrides {
-			override(&svc)
-		}
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			svc := newService(overrides...)
 			m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
 				Return(&api.CreateServiceResponse{
 					HTTPResponse: httpResponse(http.StatusAccepted),
@@ -44,33 +54,7 @@ func TestServiceCreate(t *testing.T) {
 		}
 	}
 
-	// stubGeneratedName pins the otherwise random auto-generated service name.
-	stubGeneratedName := func(name string) func(*testing.T) {
-		return func(t *testing.T) {
-			original := common.GenerateServiceName
-			common.GenerateServiceName = func() string { return name }
-			t.Cleanup(func() { common.GenerateServiceName = original })
-		}
-	}
-
-	// expectPoll registers the wait loop's single status check, reporting the
-	// service ready.
-	expectPoll := func(m *mocks.MockClientWithResponsesInterface) {
-		ready := newService
-		m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-			Return(&api.GetServiceResponse{
-				HTTPResponse: httpResponse(http.StatusOK),
-				JSON200:      &ready,
-			}, nil)
-	}
-
-	const (
-		acceptedMsg = "Service creation request accepted. The service may still be provisioning."
-		readyMsg    = "Service is ready."
-		connString  = "postgresql://tsdbadmin@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require"
-	)
-
-	detail := map[string]any{
+	baseDetail := map[string]any{
 		"id":                "e6ue9697jf",
 		"name":              "test-service",
 		"status":            "READY",
@@ -80,32 +64,35 @@ func TestServiceCreate(t *testing.T) {
 		"environment":       "DEV",
 		"direct_endpoint":   "e6ue9697jf.abc.tsdb.cloud.timescale.com:5432",
 		"replicas":          float64(0),
-		"connection_string": connString,
+		"connection_string": "postgresql://tsdbadmin@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
 	}
-	output := func(message string, mutate ...func(service, out map[string]any)) map[string]any {
-		service := maps.Clone(detail)
-		out := map[string]any{"service": service, "message": message}
-		for _, m := range mutate {
-			m(service, out)
-		}
-		return out
+	detail := func(overrides map[string]any) map[string]any {
+		d := maps.Clone(baseDetail)
+		maps.Copy(d, overrides)
+		return d
 	}
-	stillProvisioning := func(service, _ map[string]any) { service["status"] = "CONFIGURING" }
-	storedPassword := func(_, out map[string]any) {
-		out["password_storage"] = map[string]any{
-			"success": true,
-			"method":  "keyring",
-			"message": "Password saved to system keyring",
-		}
+
+	const (
+		acceptedMsg = "Service creation request accepted. The service may still be provisioning."
+		readyMsg    = "Service is ready."
+	)
+	accepted := map[string]any{"service": baseDetail, "message": acceptedMsg}
+	ready := map[string]any{"service": baseDetail, "message": readyMsg}
+	// The keyring is the default storage and is in-memory for tests, so the
+	// save succeeds unless a case replaces it.
+	storedPassword := map[string]any{
+		"success": true,
+		"method":  "keyring",
+		"message": "Password saved to system keyring",
 	}
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      toolServiceCreate,
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolServiceCreate,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "unknown environment rejected by the schema",
@@ -131,11 +118,11 @@ func TestServiceCreate(t *testing.T) {
 		{
 			// The tool isn't registered under read_only=all at startup; this is
 			// the handler's own check catching a config change made since.
-			name:             "read-only all refuses without an API call",
-			tool:             toolServiceCreate,
-			args:             args,
-			configAfterStart: map[string]any{"read_only": "all"},
-			wantErr:          "this operation is not allowed in read-only mode",
+			name:    "read-only all refuses without an API call",
+			tool:    toolServiceCreate,
+			args:    args,
+			opts:    []runOption{withConfigAfterStart(map[string]any{"read_only": "all"})},
+			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			// prod gates on the tag being requested rather than on any existing
@@ -143,16 +130,16 @@ func TestServiceCreate(t *testing.T) {
 			name:    "read-only prod refuses a requested PROD environment",
 			tool:    toolServiceCreate,
 			args:    map[string]any{"name": "test-service", "environment": "PROD"},
-			config:  map[string]any{"read_only": "prod"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name:       "read-only prod allows the DEV default",
 			tool:       toolServiceCreate,
 			args:       args,
-			config:     map[string]any{"read_only": "prod"},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setupMock:  expectCreate(baseReq),
-			wantOutput: output(acceptedMsg),
+			wantOutput: accepted,
 		},
 		{
 			name: "network error",
@@ -194,19 +181,22 @@ func TestServiceCreate(t *testing.T) {
 			tool:       toolServiceCreate,
 			args:       args,
 			setupMock:  expectCreate(baseReq),
-			wantOutput: output(acceptedMsg),
+			wantOutput: accepted,
 		},
 		{
-			name:  "auto-generates a name when none is given",
-			tool:  toolServiceCreate,
-			args:  map[string]any{},
-			setup: []func(*testing.T){stubGeneratedName("db-42424")},
+			name: "auto-generates a name when none is given",
+			tool: toolServiceCreate,
+			args: map[string]any{},
+			opts: []runOption{withGenerateServiceName("db-42424")},
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Name = "db-42424"
-				expectCreate(req)(m)
+				expectCreate(req, func(s *api.Service) { s.Name = "db-42424" })(m)
 			},
-			wantOutput: output(acceptedMsg),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"name": "db-42424"}),
+				"message": acceptedMsg,
+			},
 		},
 		{
 			name: "passes region, addons, replicas and cpu_memory through",
@@ -231,46 +221,57 @@ func TestServiceCreate(t *testing.T) {
 				s.HaReplicas = &api.HAReplica{ReplicaCount: new(2)}
 				s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(8)}}}
 			}),
-			wantOutput: output(acceptedMsg, func(service, _ map[string]any) {
-				service["region"] = "us-west-2"
-				service["replicas"] = float64(2)
-				service["resources"] = map[string]any{"cpu": "2 cores", "memory": "8 GB"}
-			}),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"region":    "us-west-2",
+					"replicas":  float64(2),
+					"resources": map[string]any{"cpu": "2 cores", "memory": "8 GB"},
+				}),
+				"message": acceptedMsg,
+			},
 		},
 		{
-			name:       "stores the initial password without returning it",
-			tool:       toolServiceCreate,
-			args:       args,
-			setupMock:  expectCreate(baseReq, withPassword),
-			wantOutput: output(acceptedMsg, storedPassword),
+			name:      "stores the initial password without returning it",
+			tool:      toolServiceCreate,
+			args:      args,
+			setupMock: expectCreate(baseReq, withInitialPassword),
+			wantOutput: map[string]any{
+				"service":          baseDetail,
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
+			},
 		},
 		{
 			name:      "with_password returns the password and embeds it in the connection string",
 			tool:      toolServiceCreate,
 			args:      map[string]any{"name": "test-service", "with_password": true},
-			setupMock: expectCreate(baseReq, withPassword),
-			wantOutput: output(acceptedMsg, storedPassword, func(service, _ map[string]any) {
-				service["password"] = "init-pass-123"
-				service["connection_string"] = "postgresql://tsdbadmin:init-pass-123@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require"
-			}),
-		},
-		{
-			name:       "wait returns immediately when the service is already ready",
-			tool:       toolServiceCreate,
-			args:       map[string]any{"name": "test-service", "wait": true},
-			setupMock:  expectCreate(baseReq),
-			wantOutput: output(readyMsg),
-		},
-		{
-			name:     "wait polls until the service is ready",
-			tool:     toolServiceCreate,
-			args:     map[string]any{"name": "test-service", "wait": true},
-			synctest: true,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectCreate(baseReq, provisioning)(m)
-				expectPoll(m)
+			setupMock: expectCreate(baseReq, withInitialPassword),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"password":          "init-pass-123",
+					"connection_string": "postgresql://tsdbadmin:init-pass-123@e6ue9697jf.abc.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				}),
+				"message":          acceptedMsg,
+				"password_storage": storedPassword,
 			},
-			wantOutput: output(readyMsg),
+		},
+		{
+			// A storage failure isn't fatal: the service exists either way, so
+			// the tool reports the failure rather than erroring.
+			name:      "reports a password storage failure",
+			tool:      toolServiceCreate,
+			args:      args,
+			opts:      []runOption{withKeyringError(errors.New("keyring is locked"))},
+			setupMock: expectCreate(baseReq, withInitialPassword),
+			wantOutput: map[string]any{
+				"service": baseDetail,
+				"message": acceptedMsg,
+				"password_storage": map[string]any{
+					"success": false,
+					"method":  "keyring",
+					"message": "Failed to save password to keyring: keyring is locked",
+				},
+			},
 		},
 		{
 			// set_default defaults to true, so the plain create above already
@@ -279,50 +280,69 @@ func TestServiceCreate(t *testing.T) {
 			tool:       toolServiceCreate,
 			args:       args,
 			setupMock:  expectCreate(baseReq),
-			wantOutput: output(acceptedMsg),
-			checks:     []toolCheckFunc{checkDefaultService("e6ue9697jf")},
+			wantOutput: accepted,
+			checks:     []checkFunc{checkDefaultService("e6ue9697jf")},
 		},
 		{
 			name:       "set_default false leaves the default service unset",
 			tool:       toolServiceCreate,
 			args:       map[string]any{"name": "test-service", "set_default": false},
 			setupMock:  expectCreate(baseReq),
-			wantOutput: output(acceptedMsg),
-			checks:     []toolCheckFunc{checkDefaultService("")},
+			wantOutput: accepted,
+			checks:     []checkFunc{checkDefaultService("")},
+		},
+		{
+			// Already at the target status, so the wait returns without polling.
+			name:       "wait returns immediately when the service is already ready",
+			tool:       toolServiceCreate,
+			args:       waitArgs,
+			setupMock:  expectCreate(baseReq),
+			wantOutput: ready,
+		},
+		{
+			name:     "wait polls until the service is ready",
+			synctest: true,
+			tool:     toolServiceCreate,
+			args:     waitArgs,
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectCreate(baseReq, provisioning)(m)
+				expectGetService(m, "e6ue9697jf", newService())
+			},
+			wantOutput: ready,
 		},
 		{
 			// A failed wait is reported in the message rather than as an error:
 			// the service was created either way.
-			name:     "wait reports a polling failure in the message",
-			tool:     toolServiceCreate,
-			args:     map[string]any{"name": "test-service", "wait": true},
+			name:     "wait reports a failed poll in the message",
 			synctest: true,
+			tool:     toolServiceCreate,
+			args:     waitArgs,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, provisioning)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
 			},
-			wantOutput: output("Error: service not found", stillProvisioning),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"status": "CONFIGURING"}),
+				"message": "Error: service not found",
+			},
 		},
 		{
-			name:     "wait times out while the service is still provisioning",
-			tool:     toolServiceCreate,
-			args:     map[string]any{"name": "test-service", "wait": true},
+			// The full 10-minute timeout elapses instantly in the bubble.
+			// AnyTimes because the loop polls once a second for the whole of
+			// it: the count is timer-driven, not something the case asserts.
+			name:     "wait reports a timeout in the message",
 			synctest: true,
+			tool:     toolServiceCreate,
+			args:     waitArgs,
 			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, provisioning)(m)
-				pending := newService
-				provisioning(&pending)
-				// AnyTimes because the loop polls once a second for the full
-				// timeout: the count is timer-driven, not something asserted here.
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &pending,
-					}, nil).
-					AnyTimes()
+				expectGetService(m, "e6ue9697jf", newService(provisioning)).AnyTimes()
 			},
-			wantOutput: output("Error: wait timeout reached after 10m0s - service may still be provisioning", stillProvisioning),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"status": "CONFIGURING"}),
+				"message": "Error: wait timeout reached after 10m0s - service may still be provisioning",
+			},
 		},
 	})
 }

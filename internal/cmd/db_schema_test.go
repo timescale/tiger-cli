@@ -72,16 +72,16 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			// Paused readiness stops the command before any connection attempt,
 			// proving the config default reached the service lookup.
-			name:    "default service id from config",
-			args:    []string{"db", "schema"},
-			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr: pausedMsg("svc-12345"),
+			name:      "default service id from config",
+			args:      []string{"db", "schema"},
+			opts:      []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			setupMock: setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr:   pausedMsg("svc-12345"),
 		},
 		{
 			name: "network error",
 			args: []string{"db", "schema", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -90,7 +90,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"db", "schema", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -103,7 +103,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"db", "schema", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -113,35 +113,35 @@ func TestDbSchemaCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name:    "service paused",
-			args:    []string{"db", "schema", "svc-12345"},
-			setup:   setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr: pausedMsg("svc-12345"),
+			name:      "service paused",
+			args:      []string{"db", "schema", "svc-12345"},
+			setupMock: setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr:   pausedMsg("svc-12345"),
 		},
 		{
-			name:    "service pausing",
-			args:    []string{"db", "schema", "svc-12345"},
-			setup:   setupGetWithStatus(api.DeployStatusPAUSING),
-			wantErr: pausedMsg("svc-12345"),
+			name:      "service pausing",
+			args:      []string{"db", "schema", "svc-12345"},
+			setupMock: setupGetWithStatus(api.DeployStatusPAUSING),
+			wantErr:   pausedMsg("svc-12345"),
 		},
 		{
-			name:    "service not ready",
-			args:    []string{"db", "schema", "svc-12345"},
-			setup:   setupGetWithStatus(api.DeployStatusQUEUED),
-			wantErr: notReadyMsg("svc-12345"),
+			name:      "service not ready",
+			args:      []string{"db", "schema", "svc-12345"},
+			setupMock: setupGetWithStatus(api.DeployStatusQUEUED),
+			wantErr:   notReadyMsg("svc-12345"),
 		},
 		{
-			name:    "pooled without pooler",
-			args:    []string{"db", "schema", "svc-12345", "--pooled"},
-			setup:   setupGetWithStatus(api.DeployStatusREADY),
-			wantErr: "connection pooler not available for this service",
+			name:      "pooled without pooler",
+			args:      []string{"db", "schema", "svc-12345", "--pooled"},
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
+			wantErr:   "connection pooler not available for this service",
 		},
 		{
 			// The replica has no pooler, so --pooled warns and falls back; the
 			// not-ready status then stops the command before any connection.
 			name: "replica pooled without pooler warns before readiness check",
 			args: []string{"db", "schema", "rep-67890", "--pooled"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
 				}))
@@ -153,7 +153,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name:       "prints the schema with the flag defaults",
 			args:       []string{"db", "schema", "svc-12345"},
-			setup:      setupGetWithStatus(api.DeployStatusREADY),
+			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
 			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
 			wantStdout: schemaText,
 		},
@@ -163,7 +163,7 @@ func TestDbSchemaCmd(t *testing.T) {
 				"db", "schema", "svc-12345",
 				"--schema", "public", "--internal", "--definitions", "--comments", "--role", "reader",
 			},
-			setup: setupGetWithStatus(api.DeployStatusREADY),
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
 			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{
 				Role:               "reader",
 				Schema:             "public",
@@ -178,7 +178,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			// target; --pooled falls back and this time the fetch succeeds.
 			name: "prints the schema of a read replica",
 			args: []string{"db", "schema", "rep-67890", "--pooled"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				expectGetService(m, "svc-12345", sampleService())
 			},
@@ -188,11 +188,11 @@ func TestDbSchemaCmd(t *testing.T) {
 		},
 		{
 			// A fetch failure goes through handleDatabaseError like any other.
-			name:    "fetch fails",
-			args:    []string{"db", "schema", "svc-12345"},
-			setup:   setupGetWithStatus(api.DeployStatusREADY),
-			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
-			wantErr: "failed to connect to database: no route to host",
+			name:      "fetch fails",
+			args:      []string{"db", "schema", "svc-12345"},
+			setupMock: setupGetWithStatus(api.DeployStatusREADY),
+			opts:      []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
+			wantErr:   "failed to connect to database: no route to host",
 		},
 	})
 }

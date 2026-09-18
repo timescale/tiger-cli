@@ -34,15 +34,15 @@ func TestFeedback(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:      "not logged in",
-			tool:      "feedback",
-			args:      args,
-			clientErr: errNotLoggedIn,
-			wantErr:   errNotLoggedIn.Error(),
+			name:    "not logged in",
+			tool:    toolFeedback,
+			args:    args,
+			opts:    []runOption{withNotLoggedIn()},
+			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "missing message",
-			tool:    "feedback",
+			tool:    toolFeedback,
 			args:    map[string]any{},
 			wantErr: `validating "arguments": validating root: required: missing properties: ["message"]`,
 		},
@@ -50,7 +50,7 @@ func TestFeedback(t *testing.T) {
 			// The schema's MinLength rejects the empty string before the handler
 			// runs, so the error is the validator's.
 			name:    "empty message",
-			tool:    "feedback",
+			tool:    toolFeedback,
 			args:    map[string]any{"message": ""},
 			wantErr: `validating "arguments": validating root: validating /properties/message: minLength: "" contains 0 Unicode code points, fewer than 1`,
 		},
@@ -58,7 +58,7 @@ func TestFeedback(t *testing.T) {
 			// Whitespace passes MinLength but trims to nothing, and is caught
 			// before the round trip.
 			name:    "blank message",
-			tool:    "feedback",
+			tool:    toolFeedback,
 			args:    map[string]any{"message": "  \n\t"},
 			wantErr: "feedback message cannot be empty",
 		},
@@ -66,20 +66,20 @@ func TestFeedback(t *testing.T) {
 			// The limit is enforced by the handler, not the schema, so the error
 			// reports the length without echoing the message.
 			name:    "message too long",
-			tool:    "feedback",
+			tool:    toolFeedback,
 			args:    map[string]any{"message": strings.Repeat("a", maxFeedbackMessageLength+1)},
 			wantErr: "feedback message is too long: 3001 characters, limit is 3000",
 		},
 		{
 			name:      "network error",
-			tool:      "feedback",
+			tool:      toolFeedback,
 			args:      args,
 			setupMock: expectSubmit("Great tool!", nil, errors.New("connection refused")),
 			wantErr:   "failed to submit feedback: connection refused",
 		},
 		{
 			name: "API error",
-			tool: "feedback",
+			tool: toolFeedback,
 			args: args,
 			setupMock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -90,7 +90,7 @@ func TestFeedback(t *testing.T) {
 		{
 			// A 5XX carries no typed body, so the error is the generic one.
 			name: "server error",
-			tool: "feedback",
+			tool: toolFeedback,
 			args: args,
 			setupMock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -99,7 +99,7 @@ func TestFeedback(t *testing.T) {
 		},
 		{
 			name:       "submits feedback",
-			tool:       "feedback",
+			tool:       toolFeedback,
 			args:       args,
 			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
@@ -107,14 +107,14 @@ func TestFeedback(t *testing.T) {
 		{
 			// Trimmed like the CLI, so both surfaces send the same text.
 			name:       "trims surrounding whitespace",
-			tool:       "feedback",
+			tool:       toolFeedback,
 			args:       map[string]any{"message": "  Great tool!\n"},
 			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
 		},
 		{
 			name:       "message at the limit",
-			tool:       "feedback",
+			tool:       toolFeedback,
 			args:       map[string]any{"message": atLimit},
 			setupMock:  expectSubmit(atLimit, submitted, nil),
 			wantOutput: sent,
@@ -123,9 +123,9 @@ func TestFeedback(t *testing.T) {
 			// Feedback mutates no service, so the tool isn't read-only gated: it
 			// stays registered and works under read_only=all.
 			name:       "read-only all still submits",
-			tool:       "feedback",
+			tool:       toolFeedback,
 			args:       args,
-			config:     map[string]any{"read_only": "all"},
+			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			setupMock:  expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
 		},

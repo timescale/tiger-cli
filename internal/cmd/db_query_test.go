@@ -92,18 +92,18 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			// An explicit empty --command is an empty query, not a signal to
 			// fall back to stdin.
-			name:    "empty command flag",
-			args:    []string{"db", "query", "svc-12345", "-c", ""},
-			setup:   setupGetService,
-			opts:    []runOption{withStdin("SELECT 'from stdin'")},
-			wantErr: "query cannot be empty",
+			name:      "empty command flag",
+			args:      []string{"db", "query", "svc-12345", "-c", ""},
+			setupMock: setupGetService,
+			opts:      []runOption{withStdin("SELECT 'from stdin'")},
+			wantErr:   "query cannot be empty",
 		},
 		{
-			name:    "empty stdin",
-			args:    []string{"db", "query", "svc-12345"},
-			setup:   setupGetService,
-			opts:    []runOption{withStdin("")},
-			wantErr: "query cannot be empty",
+			name:      "empty stdin",
+			args:      []string{"db", "query", "svc-12345"},
+			setupMock: setupGetService,
+			opts:      []runOption{withStdin("")},
+			wantErr:   "query cannot be empty",
 		},
 		{
 			name:    "negative timeout",
@@ -116,10 +116,10 @@ func TestDbQueryCmd(t *testing.T) {
 			wantErr: "if any flags in the group [command file] are set none of the others can be; [command file] were all set",
 		},
 		{
-			name:    "missing file",
-			args:    []string{"db", "query", "svc-12345", "-f", filepath.Join(sqlDir, "nope.sql")},
-			setup:   setupGetService,
-			wantErr: "failed to read SQL file: open " + filepath.Join(sqlDir, "nope.sql") + ": no such file or directory",
+			name:      "missing file",
+			args:      []string{"db", "query", "svc-12345", "-f", filepath.Join(sqlDir, "nope.sql")},
+			setupMock: setupGetService,
+			wantErr:   "failed to read SQL file: open " + filepath.Join(sqlDir, "nope.sql") + ": no such file or directory",
 		},
 		{
 			// No mock and no stdin: the service ID is required before anything
@@ -136,9 +136,9 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			// read_only=all opens the session read-only without the flag. The
 			// gate is on the session, not the command: the query still runs.
-			name:  "read_only all",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "read_only all",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "all"}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -150,9 +150,9 @@ func TestDbQueryCmd(t *testing.T) {
 		},
 		{
 			// Legacy boolean value, still accepted as an alias for "all".
-			name:  "read_only true",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "read_only true",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": true}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -163,9 +163,9 @@ func TestDbQueryCmd(t *testing.T) {
 			},
 		},
 		{
-			name:  "read_only prod, PROD service",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: expectTaggedService("PROD"),
+			name:      "read_only prod, PROD service",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: expectTaggedService("PROD"),
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "prod"}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -177,9 +177,9 @@ func TestDbQueryCmd(t *testing.T) {
 		},
 		{
 			// prod mode leaves DEV services writable.
-			name:  "read_only prod, DEV service",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: expectTaggedService("DEV"),
+			name:      "read_only prod, DEV service",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: expectTaggedService("DEV"),
 			opts: []runOption{
 				withConfig(map[string]any{"read_only": "prod"}),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -191,7 +191,7 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -200,7 +200,7 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -211,9 +211,9 @@ func TestDbQueryCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
-			name:  "service paused",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "service paused",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT 1",
 				Role:  "tsdbadmin",
@@ -224,9 +224,9 @@ func TestDbQueryCmd(t *testing.T) {
 			// A bare pgx auth failure says nothing about which password is
 			// wrong or how to fix it, so the command appends the recovery
 			// commands.
-			name:  "authentication failure explains how to fix it",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "authentication failure explains how to fix it",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT 1",
 				Role:  "tsdbadmin",
@@ -239,9 +239,9 @@ func TestDbQueryCmd(t *testing.T) {
 				"The stored password is missing or invalid. Save the current one with 'tiger db save-password svc-12345', or reset it with 'tiger service update-password svc-12345'",
 		},
 		{
-			name:  "query error",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELCT 1"},
-			setup: setupGetService,
+			name:      "query error",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELCT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELCT 1",
 				Role:  "tsdbadmin",
@@ -249,9 +249,9 @@ func TestDbQueryCmd(t *testing.T) {
 			wantErr: `ERROR: syntax error at or near "SELCT" (SQLSTATE 42601)`,
 		},
 		{
-			name:  "select results as a table",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users"},
-			setup: setupGetService,
+			name:      "select results as a table",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id, name FROM users",
 				Role:  "tsdbadmin",
@@ -263,9 +263,9 @@ func TestDbQueryCmd(t *testing.T) {
 				"(2 rows)\n\n",
 		},
 		{
-			name:  "single row is reported in the singular",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users LIMIT 1"},
-			setup: setupGetService,
+			name:      "single row is reported in the singular",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users LIMIT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id, name FROM users LIMIT 1",
 				Role:  "tsdbadmin",
@@ -283,9 +283,9 @@ func TestDbQueryCmd(t *testing.T) {
 				"(1 row)\n\n",
 		},
 		{
-			name:  "empty select still renders its columns",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id FROM users WHERE false"},
-			setup: setupGetService,
+			name:      "empty select still renders its columns",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id FROM users WHERE false"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id FROM users WHERE false",
 				Role:  "tsdbadmin",
@@ -302,9 +302,9 @@ func TestDbQueryCmd(t *testing.T) {
 		{
 			// A statement that returns no columns has nothing to tabulate, so
 			// its command tag stands in for the result.
-			name:  "multi-statement mixes command tags and tables",
-			args:  []string{"db", "query", "svc-12345", "-c", "CREATE TABLE t (id int); INSERT INTO t VALUES (1); SELECT id FROM t"},
-			setup: setupGetService,
+			name:      "multi-statement mixes command tags and tables",
+			args:      []string{"db", "query", "svc-12345", "-c", "CREATE TABLE t (id int); INSERT INTO t VALUES (1); SELECT id FROM t"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "CREATE TABLE t (id int); INSERT INTO t VALUES (1); SELECT id FROM t",
 				Role:  "tsdbadmin",
@@ -328,9 +328,9 @@ func TestDbQueryCmd(t *testing.T) {
 				"(1 row)\n\n",
 		},
 		{
-			name:  "json output",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users", "-o", "json"},
-			setup: setupGetService,
+			name:      "json output",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users", "-o", "json"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id, name FROM users",
 				Role:  "tsdbadmin",
@@ -370,9 +370,9 @@ func TestDbQueryCmd(t *testing.T) {
 			// omitzero keeps the two empty cases distinct: a SELECT that matched
 			// nothing still reports "rows": [], where a statement returning no
 			// rows at all omits the field.
-			name:  "json output distinguishes an empty select from no rows at all",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id FROM users WHERE false; SET application_name = 'x'", "-o", "json"},
-			setup: setupGetService,
+			name:      "json output distinguishes an empty select from no rows at all",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id FROM users WHERE false; SET application_name = 'x'", "-o", "json"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id FROM users WHERE false; SET application_name = 'x'",
 				Role:  "tsdbadmin",
@@ -409,9 +409,9 @@ func TestDbQueryCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users", "-o", "yaml"},
-			setup: setupGetService,
+			name:      "yaml output",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT id, name FROM users", "-o", "yaml"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT id, name FROM users",
 				Role:  "tsdbadmin",
@@ -435,9 +435,9 @@ result_sets:
 `,
 		},
 		{
-			name:  "defaults",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "defaults",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT 1",
 				Role:  "tsdbadmin",
@@ -446,9 +446,9 @@ result_sets:
 		{
 			// util.ReadAll trims the trailing newline; the statements themselves
 			// reach the database untouched.
-			name:  "query read from stdin",
-			args:  []string{"db", "query", "svc-12345"},
-			setup: setupGetService,
+			name:      "query read from stdin",
+			args:      []string{"db", "query", "svc-12345"},
+			setupMock: setupGetService,
 			opts: []runOption{
 				withStdin("SELECT 1;\nSELECT 2;\n"),
 				withExecuteQuery(common.ExecuteQueryArgs{
@@ -460,18 +460,18 @@ result_sets:
 		{
 			// File contents are passed through as read, newline and all, and the
 			// command is reachable by its `sql` alias.
-			name:  "query read from a file, via the sql alias",
-			args:  []string{"db", "sql", "svc-12345", "-f", sqlFile},
-			setup: setupGetService,
+			name:      "query read from a file, via the sql alias",
+			args:      []string{"db", "sql", "svc-12345", "-f", sqlFile},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "SELECT * FROM users;\n",
 				Role:  "tsdbadmin",
 			}, &common.QueryResult{}, nil)},
 		},
 		{
-			name:  "role, pooled and read-only flags",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--role", "readonly", "--pooled", "--read-only"},
-			setup: setupGetService,
+			name:      "role, pooled and read-only flags",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1", "--role", "readonly", "--pooled", "--read-only"},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query:    "SELECT 1",
 				Role:     "readonly",
@@ -482,9 +482,9 @@ result_sets:
 		{
 			// Whitespace-only SQL is passed through for the database to report
 			// on, rather than being second-guessed here.
-			name:  "whitespace-only query reaches the database",
-			args:  []string{"db", "query", "svc-12345", "-c", "   "},
-			setup: setupGetService,
+			name:      "whitespace-only query reaches the database",
+			args:      []string{"db", "query", "svc-12345", "-c", "   "},
+			setupMock: setupGetService,
 			opts: []runOption{withExecuteQuery(common.ExecuteQueryArgs{
 				Query: "   ",
 				Role:  "tsdbadmin",
@@ -493,9 +493,9 @@ result_sets:
 		{
 			// Row caps protect an agent's context, so they're MCP-only: the CLI
 			// asks for everything the query produced.
-			name:  "no row or byte caps",
-			args:  []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
-			setup: setupGetService,
+			name:      "no row or byte caps",
+			args:      []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
+			setupMock: setupGetService,
 			opts: []runOption{
 				withConfig(map[string]any{"mcp_max_rows": 10}),
 				withExecuteQuery(common.ExecuteQueryArgs{
