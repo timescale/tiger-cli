@@ -19,7 +19,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/version"
 )
 
-// BuildRootCmd exposes the root command for tools like doc generators.
+// BuildRootCmd exposes the root command for the docs generator.
 func BuildRootCmd(ctx context.Context) (*cobra.Command, error) {
 	cmd, _, err := buildRootCmd(ctx)
 	return cmd, err
