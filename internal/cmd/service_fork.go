@@ -39,7 +39,7 @@ You must specify exactly one timing option for the fork strategy:
 - --to-timestamp: Fork at a specific point in time (point-in-time recovery)
 
 By default:
-- Name will be auto-generated as '{source-service-name}-fork'
+- Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
@@ -230,7 +230,7 @@ You can override any of these defaults with the corresponding flags.`,
 	}
 
 	// Add flags
-	cmd.Flags().StringVar(&name, "name", "", "Name for the forked service (defaults to '{source-name}-fork')")
+	cmd.Flags().StringVar(&name, "name", "", "Name for the forked service (auto-generated if not provided)")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for fork operation to complete")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")

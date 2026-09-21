@@ -1735,7 +1735,7 @@ type ForkServiceCreate struct {
 	// Example: 4
 	MemoryGbs *string `json:"memory_gbs,omitempty"`
 
-	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+	// Name A human-readable name for the forked service. If not provided, defaults to "standard-fork-<parent name>" (or "recovery-fork-<parent name>" for PITR forks), with "-1", "-2", ... appended if that name is already in use in the project.
 	//
 	// Example: my-production-db-fork
 	Name *string `json:"name,omitempty"`

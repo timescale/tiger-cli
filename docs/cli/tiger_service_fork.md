@@ -12,7 +12,7 @@ You must specify exactly one timing option for the fork strategy:
 - --to-timestamp: Fork at a specific point in time (point-in-time recovery)
 
 By default:
-- Name will be auto-generated as '{source-service-name}-fork'
+- Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
@@ -58,7 +58,7 @@ tiger service fork [service-id] [flags]
   -h, --help                    help for fork
       --last-snapshot           Fork at the last existing snapshot (faster)
       --memory string           Memory allocation in gigabytes (inherits from source if not specified)
-      --name string             Name for the forked service (defaults to '{source-name}-fork')
+      --name string             Name for the forked service (auto-generated if not provided)
       --no-set-default          Don't set this service as the default service
       --no-wait                 Don't wait for fork operation to complete
       --now                     Fork at the current database state (creates new snapshot or uses WAL replay)
