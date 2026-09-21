@@ -265,6 +265,33 @@ Output:
 
 `
 
+	metricsDetailsText := `Get Metric Details [read-only]
+
+Tool name: service_metrics_details
+
+Description:
+Get descriptive metadata for a metric: what it measures, its type, default
+aggregation function, and available labels.
+
+Use service_metrics_available to discover metric names, this tool to inspect
+one, then service_metrics_series to fetch its data.
+
+Parameters:
+  • metric_name (required): string - Name of the metric to describe. Use service_metrics_available to discover valid names.
+  • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
+
+Output:
+  • details (required): object
+    • default_agg (required): string, null
+    • description (required): string
+    • labels (required): []object, null
+      • description (required): string
+      • name (required): string
+    • name (required): string
+    • type (required): string, null
+
+`
+
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing argument",
@@ -332,6 +359,19 @@ Output:
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),
 			wantStdout: metricsAvailableText,
+		},
+		{
+			name:    "service_metrics_details hidden by default",
+			args:    []string{"mcp", "get", "service_metrics_details"},
+			opts:    noDocsProxy(nil),
+			wantErr: `capability "service_metrics_details" not found`,
+		},
+		{
+			name: "service_metrics_details visible with gate on",
+			args: []string{"mcp", "get", "service_metrics_details"},
+			opts: append(noDocsProxy(nil),
+				withEnv("TIGER_EXPERIMENTAL", "true")),
+			wantStdout: metricsDetailsText,
 		},
 	})
 }
