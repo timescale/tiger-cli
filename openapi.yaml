@@ -2426,7 +2426,7 @@ components:
           type: string
           minLength: 1
           maxLength: 128
-          description: A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+          description: A human-readable name for the forked service. If not provided, defaults to "standard-fork-<parent name>" (or "recovery-fork-<parent name>" for PITR forks), with "-1", "-2", ... appended if that name is already in use in the project.
           example: "my-production-db-fork"
         cpu_millis:
           type: string

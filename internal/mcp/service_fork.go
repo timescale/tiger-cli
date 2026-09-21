@@ -86,7 +86,7 @@ You must specify a fork strategy:
 - 'PITR': Fork at a specific point in time (requires target_time parameter)
 
 By default:
-- Name will be auto-generated as '{source-service-name}-fork'
+- Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as the default service
 
