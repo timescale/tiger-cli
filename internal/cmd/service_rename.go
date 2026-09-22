@@ -15,7 +15,7 @@ import (
 // buildServiceRenameCmd creates the rename subcommand
 func buildServiceRenameCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rename <service> <new-name>",
+		Use:   "rename <name-or-id> <new-name>",
 		Short: "Rename a database service",
 		Long: `Rename a database service.
 

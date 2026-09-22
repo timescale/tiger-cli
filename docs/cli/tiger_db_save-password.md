@@ -16,7 +16,7 @@ The password will be saved according to your --password-storage setting
 (keyring, pgpass, or none).
 
 ```
-tiger db save-password [service] [flags]
+tiger db save-password [name-or-id] [flags]
 ```
 
 ### Examples

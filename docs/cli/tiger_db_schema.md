@@ -19,7 +19,7 @@ definitions and object comments are omitted unless requested, since they can be
 large and may embed implementation details.
 
 ```
-tiger db schema [service] [flags]
+tiger db schema [name-or-id] [flags]
 ```
 
 ### Examples

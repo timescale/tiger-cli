@@ -20,7 +20,7 @@ func buildDbPingCmd(app *common.App) *cobra.Command {
 	var role string
 
 	cmd := &cobra.Command{
-		Use:     "ping [service]",
+		Use:     "ping [name-or-id]",
 		Aliases: []string{"test", "test-connection"},
 		Short:   "Test database connectivity",
 		Long: `Test database connectivity to a service.

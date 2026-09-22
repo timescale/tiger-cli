@@ -22,7 +22,7 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 	var password string
 
 	cmd := &cobra.Command{
-		Use:     "role [service]",
+		Use:     "role [name-or-id]",
 		Aliases: []string{"user"},
 		Short:   "Create a new database role",
 		Long: `Create a new database role with optional read-only enforcement.

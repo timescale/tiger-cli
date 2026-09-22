@@ -14,7 +14,7 @@ import (
 // buildServiceMetricsAvailableSeriesCmd lists the metric series available for a service
 func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "available-series [service]",
+		Use:   "available-series [name-or-id]",
 		Short: "List available metric series",
 		Long: `List the names of all metric series available for a service.
 

@@ -12,7 +12,7 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration.
 
 ```
-tiger service start [service] [flags]
+tiger service start [name-or-id] [flags]
 ```
 
 ### Examples

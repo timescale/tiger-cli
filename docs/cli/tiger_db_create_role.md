@@ -38,7 +38,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)
 
 ```
-tiger db create role [service] [flags]
+tiger db create role [name-or-id] [flags]
 ```
 
 ### Examples

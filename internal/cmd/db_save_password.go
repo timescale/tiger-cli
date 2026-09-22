@@ -15,7 +15,7 @@ func buildDbSavePasswordCmd(app *common.App) *cobra.Command {
 	var password string
 
 	cmd := &cobra.Command{
-		Use:   "save-password [service]",
+		Use:   "save-password [name-or-id]",
 		Short: "Save password for a database service",
 		Long: `Save a password for a database service to configured password storage.
 

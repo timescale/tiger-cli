@@ -16,7 +16,7 @@ service ID to confirm deletion — the ID, not the name — unless you use the
 Note for AI agents: Always confirm with the user before performing this destructive operation.
 
 ```
-tiger service delete [service] [flags]
+tiger service delete [name-or-id] [flags]
 ```
 
 ### Examples

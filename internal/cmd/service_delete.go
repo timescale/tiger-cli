@@ -17,7 +17,7 @@ func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 	var confirm bool
 
 	cmd := &cobra.Command{
-		Use:     "delete [service]",
+		Use:     "delete [name-or-id]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a database service",
 		Long: `Delete a database service permanently.

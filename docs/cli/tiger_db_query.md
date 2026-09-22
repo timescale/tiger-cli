@@ -29,7 +29,7 @@ read-only, and read_only=prod makes sessions against services tagged PROD
 read-only while leaving DEV services writable.
 
 ```
-tiger db query [service] [flags]
+tiger db query [name-or-id] [flags]
 ```
 
 ### Examples

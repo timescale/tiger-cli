@@ -17,7 +17,7 @@ func buildServiceStartCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "start [service]",
+		Use:     "start [name-or-id]",
 		Aliases: []string{"resume"},
 		Short:   "Start a stopped database service",
 		Long: `Start a stopped database service.

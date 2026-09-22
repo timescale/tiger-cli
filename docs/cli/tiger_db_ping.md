@@ -19,7 +19,7 @@ Return Codes:
   3: No attempt made (e.g., invalid parameters)
 
 ```
-tiger db ping [service] [flags]
+tiger db ping [name-or-id] [flags]
 ```
 
 ### Examples

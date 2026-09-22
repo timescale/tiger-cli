@@ -16,7 +16,7 @@ func buildServiceUpdatePasswordCmd(app *common.App) *cobra.Command {
 	var autoGenerate bool
 
 	cmd := &cobra.Command{
-		Use:   "update-password [service]",
+		Use:   "update-password [name-or-id]",
 		Short: "Update the master password for a service",
 		Long: `Update the master password for a specific database service.
 

@@ -14,7 +14,7 @@ A read replica ID is rejected — read replicas share the primary's credentials,
 so update the password on the primary instead.
 
 ```
-tiger service update-password [service] [flags]
+tiger service update-password [name-or-id] [flags]
 ```
 
 ### Examples

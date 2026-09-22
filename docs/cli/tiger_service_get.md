@@ -11,7 +11,7 @@ service from your configuration. This command displays comprehensive information
 the service including configuration, status, endpoints, and resource usage.
 
 ```
-tiger service get [service] [flags]
+tiger service get [name-or-id] [flags]
 ```
 
 ### Examples

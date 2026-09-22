@@ -26,7 +26,7 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var fn string
 
 	cmd := &cobra.Command{
-		Use:   "series [service]",
+		Use:   "series [name-or-id]",
 		Short: "Get metric series data",
 		Long: `Get time-series data for a specific metric.
 

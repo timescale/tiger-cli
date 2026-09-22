@@ -19,7 +19,7 @@ func buildServiceLogsCmd(app *common.App) *cobra.Command {
 	var node int
 
 	cmd := &cobra.Command{
-		Use:     "logs [service]",
+		Use:     "logs [name-or-id]",
 		Aliases: []string{"log"},
 		Short:   "View logs for a service",
 		Long: `View logs for a database service.

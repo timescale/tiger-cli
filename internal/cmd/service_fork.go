@@ -29,7 +29,7 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var environment string
 
 	cmd := &cobra.Command{
-		Use:   "fork [service]",
+		Use:   "fork [name-or-id]",
 		Short: "Fork an existing database service",
 		Long: `Fork an existing database service to create a new independent copy.
 

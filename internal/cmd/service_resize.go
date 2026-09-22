@@ -19,7 +19,7 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "resize [service]",
+		Use:   "resize [name-or-id]",
 		Short: "Resize a database service",
 		Long: `Resize a database service by changing its CPU and memory allocation.
 

@@ -24,7 +24,7 @@ func buildDbQueryCmd(app *common.App) *cobra.Command {
 	var timeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "query [service]",
+		Use:     "query [name-or-id]",
 		Aliases: []string{"sql"},
 		Short:   "Execute a SQL query on a database",
 		Long: `Execute a SQL query against a database service and display the results.

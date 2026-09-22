@@ -15,7 +15,7 @@ rename and the name to give it. The service to rename can be given by ID or by
 its current name.
 
 ```
-tiger service rename <service> <new-name> [flags]
+tiger service rename <name-or-id> <new-name> [flags]
 ```
 
 ### Examples

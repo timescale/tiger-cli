@@ -13,7 +13,7 @@ The service can be given by ID or name as an argument, or will use the default
 service from your configuration.
 
 ```
-tiger service logs [service] [flags]
+tiger service logs [name-or-id] [flags]
 ```
 
 ### Examples

@@ -27,7 +27,7 @@ func buildDbPsqlCmd(app *common.App) *cobra.Command {
 	var noReplicaPrompt bool
 
 	cmd := &cobra.Command{
-		Use:     "psql [service]",
+		Use:     "psql [name-or-id]",
 		Aliases: []string{"connect"},
 		Short:   "Connect to a database with psql",
 		Long: `Connect to a database service using psql client.

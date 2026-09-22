@@ -11,7 +11,7 @@ func buildServiceGetCmd(app *common.App) *cobra.Command {
 	var withPassword bool
 
 	cmd := &cobra.Command{
-		Use:     "get [service]",
+		Use:     "get [name-or-id]",
 		Aliases: []string{"describe", "show"},
 		Short:   "Show detailed information about a service",
 		Long: `Show detailed information about a specific database service.

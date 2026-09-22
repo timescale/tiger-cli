@@ -22,7 +22,7 @@ The source service can be given by ID or name as an argument, or will use the
 default service from your configuration.
 
 ```
-tiger service fork [service] [flags]
+tiger service fork [name-or-id] [flags]
 ```
 
 ### Examples

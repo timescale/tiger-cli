@@ -15,7 +15,7 @@ func buildDbSchemaCmd(app *common.App) *cobra.Command {
 	var pooled bool
 
 	cmd := &cobra.Command{
-		Use:   "schema [service]",
+		Use:   "schema [name-or-id]",
 		Short: "Display database schema information",
 		Long: `Display the schema of a database service: tables (regular, partitioned, and
 foreign), views, materialized views, enum types, functions, procedures,

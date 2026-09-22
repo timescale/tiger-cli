@@ -21,7 +21,7 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
 
 ```
-tiger service resize [service] [flags]
+tiger service resize [name-or-id] [flags]
 ```
 
 ### Examples

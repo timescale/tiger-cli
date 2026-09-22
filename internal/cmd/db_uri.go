@@ -15,7 +15,7 @@ func buildDbURICmd(app *common.App) *cobra.Command {
 	var readOnly bool
 
 	cmd := &cobra.Command{
-		Use:     "uri [service]",
+		Use:     "uri [name-or-id]",
 		Aliases: []string{"connection-string"},
 		Short:   "Get connection URI for a service",
 		Long: `Get a PostgreSQL connection URI for connecting to a database service.

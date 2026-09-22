@@ -21,7 +21,7 @@ import (
 // TIGER_EXPERIMENTAL in buildServiceCmd.
 func buildServiceBackupsCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup [service]",
+		Use:   "backup [name-or-id]",
 		Short: "List backups for a service",
 		Long: `List the full and incremental backups taken for a database service.
 

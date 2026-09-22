@@ -23,7 +23,7 @@ read_only=prod makes those for services tagged PROD read-only while leaving DEV
 services writable.
 
 ```
-tiger db uri [service] [flags]
+tiger db uri [name-or-id] [flags]
 ```
 
 ### Examples

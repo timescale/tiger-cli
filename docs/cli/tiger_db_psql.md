@@ -33,7 +33,7 @@ You can also pass a read replica set ID to connect straight to that replica,
 skipping the prompt. Read replicas share the primary's credentials.
 
 ```
-tiger db psql [service] [flags]
+tiger db psql [name-or-id] [flags]
 ```
 
 ### Examples
