@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,8 +19,9 @@ import (
 
 // MetricLabelFilterInput mirrors api.MetricLabelFilter for the tool schema.
 type MetricLabelFilterInput struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	MatchType string `json:"match_type,omitempty"`
 }
 
 // ServiceMetricsSeriesInput represents input for service_metrics_series
@@ -59,7 +61,11 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["filters"].Examples = []any{
 		[]MetricLabelFilterInput{{Key: "ordinal", Value: "0"}},
 		[]MetricLabelFilterInput{{Key: "job_id", Value: "1000"}},
+		[]MetricLabelFilterInput{{Key: "role", Value: "replica", MatchType: "NOT_EQUAL"}},
 	}
+	schema.Properties["filters"].Items.Properties["match_type"].Description = "How to compare the label's value. EQUAL: the series must have the label equal to value. NOT_EQUAL: the series must not have the label equal to value; NOT_EQUAL also matches a series missing the label entirely. To exclude multiple values of the same label, pass multiple filters with that key. Defaults to EQUAL."
+	schema.Properties["filters"].Items.Properties["match_type"].Enum = []any{"EQUAL", "NOT_EQUAL"}
+	schema.Properties["filters"].Items.Properties["match_type"].Default = util.Must(json.Marshal("EQUAL"))
 
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)
@@ -179,7 +185,12 @@ func buildMetricFilters(role string, filters []MetricLabelFilterInput) []api.Met
 		if f.Key == "" || f.Value == "" {
 			continue
 		}
-		out = append(out, api.MetricLabelFilter{Key: f.Key, Value: f.Value})
+		filter := api.MetricLabelFilter{Key: f.Key, Value: f.Value}
+		if f.MatchType != "" {
+			matchType := api.MetricMatchType(strings.ToUpper(f.MatchType))
+			filter.MatchType = &matchType
+		}
+		out = append(out, filter)
 	}
 	return out
 }

@@ -49,7 +49,12 @@ full list of raw data points.`,
   # Filter by an arbitrary label
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
-    --filter ordinal=0`,
+    --filter ordinal=0
+
+  # Exclude a label value
+  tiger service metrics series --metric some_metric_name \
+    --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
+    --filter role!=replica`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -115,7 +120,7 @@ full list of raw data points.`,
 	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339)")
 	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339)")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
-	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value (repeatable)")
+	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value or name!=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
@@ -139,9 +144,17 @@ func parseMetricFilters(role string, filters []string) ([]api.MetricLabelFilter,
 		out = append(out, api.MetricLabelFilter{Key: "role", Value: strings.ToLower(role)})
 	}
 	for _, f := range filters {
+		if k, v, ok := strings.Cut(f, "!="); ok {
+			if k == "" || v == "" {
+				return nil, fmt.Errorf("--filter must be name=value or name!=value, got %q", f)
+			}
+			matchType := api.MetricMatchTypeNOTEQUAL
+			out = append(out, api.MetricLabelFilter{Key: k, Value: v, MatchType: &matchType})
+			continue
+		}
 		k, v, ok := strings.Cut(f, "=")
 		if !ok || k == "" || v == "" {
-			return nil, fmt.Errorf("--filter must be name=value, got %q", f)
+			return nil, fmt.Errorf("--filter must be name=value or name!=value, got %q", f)
 		}
 		out = append(out, api.MetricLabelFilter{Key: k, Value: v})
 	}
