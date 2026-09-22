@@ -105,8 +105,8 @@ func checkDefaultIsID(service api.Service, ref serviceRef) error {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
-		"%s is set to %q, which is the name of service %s. A default service must be an ID, because a name breaks as soon as the service is renamed.\nRun 'tiger config set service_id %s' to resolve it once and store the ID",
-		ref.source, ref.ref, service.ServiceID, ref.ref))
+		"%s is set to %q, the name of service %s. A name here breaks as soon as the service is renamed.\nUse %s, pass the name as an argument, or run 'tiger config set service_id %s' to store its ID",
+		ref.source, ref.ref, service.ServiceID, service.ServiceID, ref.ref))
 }
 
 // resolveServiceForWrite is resolveService for a command that changes the

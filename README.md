@@ -318,7 +318,7 @@ These flags are available on all commands and take precedence over both environm
 - `--color` - Enable/disable colored output
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
-- `--service-id <id>` - Default service ID (a name is refused; pass one as an argument instead)
+- `--service-id <id>` - Service ID (a name is refused; pass one as an argument instead)
 - `--version-check` - Enable/disable checking for updates on startup
 - `-h, --help` - Show help information
 

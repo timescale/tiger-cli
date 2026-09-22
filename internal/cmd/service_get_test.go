@@ -200,9 +200,9 @@ func TestServiceGetCmd(t *testing.T) {
 				expectResolveRef(m, "test-service", sampleService())
 			},
 			opts: []runOption{withEnv("TIGER_SERVICE_ID", "test-service")},
-			wantErr: `TIGER_SERVICE_ID is set to "test-service", which is the name of service svc-12345. ` +
-				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
-				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			wantErr: `TIGER_SERVICE_ID is set to "test-service", the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Use svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -211,9 +211,9 @@ func TestServiceGetCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "test-service", sampleService())
 			},
-			wantErr: `--service-id is set to "test-service", which is the name of service svc-12345. ` +
-				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
-				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			wantErr: `--service-id is set to "test-service", the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Use svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -225,9 +225,9 @@ func TestServiceGetCmd(t *testing.T) {
 				expectResolveRef(m, "test-service", sampleService())
 			},
 			opts: []runOption{withConfig(map[string]any{"service_id": "test-service"})},
-			wantErr: `the service_id config value is set to "test-service", which is the name of service svc-12345. ` +
-				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
-				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			wantErr: `the service_id config value is set to "test-service", the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Use svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{

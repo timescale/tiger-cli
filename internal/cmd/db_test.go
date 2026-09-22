@@ -43,9 +43,6 @@ func notReadyMsg(serviceID string) string {
 	return fmt.Sprintf("service is not ready — check its status with 'tiger service get %s' and try again", serviceID)
 }
 
-// expectGetService registers a plain fetch of id, returning svc. A db command
-// resolves its target rather than fetching it (see expectResolveRef), so this
-// covers the fetches that follow: the parent lookup behind a read replica.
 func expectGetService(m *mocks.MockClientWithResponsesInterface, id string, svc api.Service) {
 	m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, id).
 		Return(&api.GetServiceResponse{

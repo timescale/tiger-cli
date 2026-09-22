@@ -24,7 +24,7 @@ tiger service list [flags]
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         default service ID
+      --service-id string         service ID
       --version-check             check for updates on startup (default true)
 ```
 

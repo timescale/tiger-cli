@@ -85,7 +85,7 @@ To get started, run:
 	cmd.PersistentFlags().Bool("color", true, "enable colored output")
 	cmd.PersistentFlags().String("config-dir", config.DefaultConfigDir, "config directory")
 	cmd.PersistentFlags().String("password-storage", config.DefaultPasswordStorage, "password storage method (keyring, pgpass, none)")
-	cmd.PersistentFlags().String("service-id", "", "default service ID")
+	cmd.PersistentFlags().String("service-id", "", "service ID")
 	cmd.PersistentFlags().Bool("version-check", true, "check for updates on startup")
 	registerFlagCompletion(cmd, "password-storage", passwordStorageCompletion)
 	registerFlagCompletion(cmd, "config-dir", dirCompletion)
