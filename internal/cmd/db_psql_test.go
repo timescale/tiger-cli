@@ -42,17 +42,17 @@ func TestDbPsqlCmd(t *testing.T) {
 		{
 			name:    "service ID required",
 			args:    []string{"db", "psql"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "connect alias",
 			args:    []string{"db", "connect"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "args after -- are not the service ID",
 			args:    []string{"db", "psql", "--", "--single-transaction"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "default service ID from config with psql flags after --",

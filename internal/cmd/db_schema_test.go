@@ -29,7 +29,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "schema"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			// Paused readiness stops the command before any connection attempt,

@@ -32,9 +32,9 @@ its current name.`,
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			serviceRef, newName := args[0], strings.TrimSpace(args[1])
+			serviceArg, newName := args[0], strings.TrimSpace(args[1])
 
-			if serviceRef == "" {
+			if serviceArg == "" {
 				return errors.New("service cannot be empty")
 			}
 
@@ -47,7 +47,7 @@ its current name.`,
 				return err
 			}
 
-			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, argServiceRef(serviceArg))
 			if err != nil {
 				return err
 			}

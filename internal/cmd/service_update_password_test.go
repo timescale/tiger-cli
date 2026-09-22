@@ -96,7 +96,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "env password and auto-generate conflict",

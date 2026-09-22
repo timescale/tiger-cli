@@ -30,7 +30,7 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				service, err := resolveService(cmd.Context(), client, projectID, value)
+				service, err := resolveService(cmd.Context(), client, projectID, argServiceRef(value))
 				if err != nil {
 					return err
 				}

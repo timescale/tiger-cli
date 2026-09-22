@@ -37,7 +37,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "create", "role", "--name", "ai_analyst"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			// The blanket case is refused before the ref is resolved, so no

@@ -43,7 +43,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 			if len(args) < 1 || args[0] == "" {
 				return errors.New("service is required")
 			}
-			serviceRef := args[0]
+			serviceArg := args[0]
 
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
@@ -52,7 +52,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
 			// Gated here, ahead of the confirmation prompt, so read-only mode
 			// refuses without first asking the user to type the service ID.
-			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, argServiceRef(serviceArg))
 			if err != nil {
 				return err
 			}

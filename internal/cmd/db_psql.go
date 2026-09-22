@@ -93,7 +93,7 @@ skipping the prompt. Read replicas share the primary's credentials.`,
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			serviceRef, err := getServiceRef(cfg, serviceArgs)
+			serviceRef, err := getServiceRef(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}

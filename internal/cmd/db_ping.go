@@ -59,7 +59,7 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}

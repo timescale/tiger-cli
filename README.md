@@ -151,7 +151,9 @@ tiger service stop my-api-db
 tiger config set service_id my-api-db
 ```
 
-The same goes for the `--service-id` flag, the `TIGER_SERVICE_ID` environment variable, and the `service_id` config key. A read replica set is named the same way, by its own ID or its own name.
+A read replica set is named the same way, by its own ID or its own name.
+
+A *default* service is always an ID. `tiger config set service_id` takes a name, resolves it once and stores the ID, so the default survives a rename. `--service-id` and `TIGER_SERVICE_ID` take an ID only: they are set once and reused, so a name there would keep working right up until someone renamed the service. Given one, the CLI says which ID to use instead.
 
 Names are matched exactly and case-sensitively, and deleted services never match. A name is unique among a project's active services, and a service can't be named after another service's ID, so a reference identifies at most one service. One that matches more than one is refused rather than resolved — run `tiger service list` to find the ID you want.
 
@@ -305,7 +307,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_READ_ONLY` - Which services this CLI may change: `all`, `prod`, or `off` (same aliases as `read_only`)
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
-- `TIGER_SERVICE_ID` - Default service, by ID or name
+- `TIGER_SERVICE_ID` - Default service ID (a name is refused; see [Naming a Service](#naming-a-service))
 - `TIGER_VERSION_CHECK` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available; `false` to disable
 
 ### Global Flags
@@ -316,7 +318,7 @@ These flags are available on all commands and take precedence over both environm
 - `--color` - Enable/disable colored output
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
-- `--service-id <id-or-name>` - Specify the service by ID or name
+- `--service-id <id>` - Default service ID (a name is refused; pass one as an argument instead)
 - `--version-check` - Enable/disable checking for updates on startup
 - `-h, --help` - Show help information
 

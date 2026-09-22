@@ -44,7 +44,7 @@ service from your configuration.`,
 			}
 
 			// Determine the service ref
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}

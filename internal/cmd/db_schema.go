@@ -53,7 +53,7 @@ large and may embed implementation details.`,
 				return err
 			}
 
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}

@@ -126,7 +126,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// blocks on reading a query.
 			name:    "missing service id",
 			args:    []string{"db", "query"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "too many args",

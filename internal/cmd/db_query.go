@@ -90,7 +90,7 @@ read-only while leaving DEV services writable.`,
 			// Resolve the service before reading the query: with no --command
 			// or --file, reading comes last so a missing service fails
 			// immediately instead of after waiting on stdin.
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}

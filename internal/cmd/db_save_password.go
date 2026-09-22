@@ -51,7 +51,7 @@ The password will be saved according to your --password-storage setting
 				return err
 			}
 
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}

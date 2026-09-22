@@ -47,7 +47,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name:    "service ID required",
 			args:    []string{"db", "save-password", "--password=pw"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "network error fetching service",

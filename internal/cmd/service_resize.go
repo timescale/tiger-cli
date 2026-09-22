@@ -63,7 +63,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Determine the service ref
-			serviceRef, err := getServiceRef(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}

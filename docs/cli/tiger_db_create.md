@@ -19,7 +19,7 @@ Create database resources such as roles, databases, and extensions.
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         service ID or name
+      --service-id string         default service ID
       --version-check             check for updates on startup (default true)
 ```
 

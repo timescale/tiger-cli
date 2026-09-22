@@ -56,7 +56,7 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "get"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "network error",
@@ -188,6 +188,47 @@ func TestServiceGetCmd(t *testing.T) {
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
+		},
+		{
+			// A default must be an ID. The refusal comes after the lookup, so
+			// it can name the ID to store instead of just saying "not found".
+			// Tested here for all three layers; every command that reads the
+			// default shares this path through getServiceRef.
+			name: "name in TIGER_SERVICE_ID is refused",
+			args: []string{"service", "get"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withEnv("TIGER_SERVICE_ID", "test-service")},
+			wantErr: `TIGER_SERVICE_ID is set to "test-service", which is the name of service svc-12345. ` +
+				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
+				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			name: "name in --service-id is refused",
+			args: []string{"service", "get", "--service-id", "test-service"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			wantErr: `--service-id is set to "test-service", which is the name of service svc-12345. ` +
+				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
+				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			// A hand-edited config file is the one way a name gets stored,
+			// since 'tiger config set service_id' resolves before writing.
+			name: "name in the config file is refused",
+			args: []string{"service", "get"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withConfig(map[string]any{"service_id": "test-service"})},
+			wantErr: `the service_id config value is set to "test-service", which is the name of service svc-12345. ` +
+				"A default service must be an ID, because a name breaks as soon as the service is renamed.\n" +
+				"Run 'tiger config set service_id test-service' to resolve it once and store the ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			// The API's initial_password must never appear in output without
