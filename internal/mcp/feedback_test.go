@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestFeedback(t *testing.T) {
+func TestFeedbackTool(t *testing.T) {
 	args := map[string]any{"message": "Great tool!"}
 
 	expectSubmit := func(message string, resp *api.SubmitFeedbackResponse, err error) func(*mocks.MockClientWithResponsesInterface) {

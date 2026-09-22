@@ -11,7 +11,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceFork(t *testing.T) {
+func TestServiceForkTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW"}
 	waitArgs := map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "wait": true}
 

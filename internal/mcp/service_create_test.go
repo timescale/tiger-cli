@@ -22,7 +22,7 @@ func withGenerateServiceName(name string) runOption {
 	})
 }
 
-func TestServiceCreate(t *testing.T) {
+func TestServiceCreateTool(t *testing.T) {
 	args := map[string]any{"name": "test-service"}
 	waitArgs := map[string]any{"name": "test-service", "wait": true}
 

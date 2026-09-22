@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceRename(t *testing.T) {
+func TestServiceRenameTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "name": "renamed-service"}
 
 	renamed := sampleService(func(s *api.Service) { s.Name = "renamed-service" })

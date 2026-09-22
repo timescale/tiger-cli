@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceGet(t *testing.T) {
+func TestServiceGetTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 	argsWithPassword := map[string]any{"service_id": "e6ue9697jf", "with_password": true}
 

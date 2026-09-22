@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceList(t *testing.T) {
+func TestServiceListTool(t *testing.T) {
 	created := time.Date(2025, 1, 15, 9, 30, 0, 0, time.UTC)
 
 	expectServices := func(services []api.Service) func(m *mocks.MockClientWithResponsesInterface) {

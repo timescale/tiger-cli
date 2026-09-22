@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceMetricsAvailable(t *testing.T) {
+func TestServiceMetricsAvailableTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	// The tool is experimental-gated (see the first case), so every other

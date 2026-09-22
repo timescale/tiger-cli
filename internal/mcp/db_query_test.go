@@ -36,7 +36,7 @@ func withExecuteQuery(want common.ExecuteQueryArgs, result *common.QueryResult, 
 	})
 }
 
-func TestDBQuery(t *testing.T) {
+func TestDBQueryTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1"}
 
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {

@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceBackups(t *testing.T) {
+func TestServiceBackupsTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	// The tool is experimental-gated (see the first case), so every other

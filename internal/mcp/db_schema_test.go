@@ -33,7 +33,7 @@ func withFetchServiceSchema(want common.FetchServiceSchemaArgs, schema *common.D
 	})
 }
 
-func TestDBSchema(t *testing.T) {
+func TestDBSchemaTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {

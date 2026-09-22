@@ -10,7 +10,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceDelete(t *testing.T) {
+func TestServiceDeleteTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	expectDelete := func(m *mocks.MockClientWithResponsesInterface) {

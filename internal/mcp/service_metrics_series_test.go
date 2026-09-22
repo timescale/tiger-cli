@@ -11,7 +11,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceMetricsSeries(t *testing.T) {
+func TestServiceMetricsSeriesTool(t *testing.T) {
 	baseArgs := map[string]any{
 		"service_id":  "e6ue9697jf",
 		"metric_name": "timescale_cloud_system_cpu_usage_millicores",

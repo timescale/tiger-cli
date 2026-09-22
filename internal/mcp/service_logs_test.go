@@ -12,7 +12,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceLogs(t *testing.T) {
+func TestServiceLogsTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 
 	// FetchServiceLogs pins an absent upper bound to time.Now(). Cases that

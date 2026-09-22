@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceUpdatePassword(t *testing.T) {
+func TestServiceUpdatePasswordTool(t *testing.T) {
 	const password = "MySecurePassword123!"
 	args := map[string]any{"service_id": "e6ue9697jf", "password": password}
 

@@ -9,7 +9,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
-func TestServiceStart(t *testing.T) {
+func TestServiceStartTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf"}
 	waitArgs := map[string]any{"service_id": "e6ue9697jf", "wait": true}
 
