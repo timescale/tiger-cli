@@ -93,8 +93,8 @@ func TestServiceDeleteCmd(t *testing.T) {
 		{
 			// The prompt takes the ID and nothing else: typing back the name
 			// that was used to reach the service does not authorize the
-			// delete, which is what keeps a shadowed or ambiguous name from
-			// doing damage here.
+			// delete, since a name can move to a different service through a
+			// rename.
 			name: "name typed back at the prompt does not confirm",
 			args: []string{"service", "delete", "test-service"},
 			opts: []runOption{withIsTerminal(true), withStdin("test-service\n")},

@@ -153,11 +153,11 @@ tiger config set service_id my-api-db
 
 The same goes for the `--service-id` flag, the `TIGER_SERVICE_ID` environment variable, and the `service_id` config key. A read replica set is named the same way, by its own ID or its own name.
 
-Names are matched exactly and case-sensitively, and deleted services never match. Because a name has no precedence over an ID, a reference that matches more than one service is refused rather than resolved — run `tiger service list` to find the ID you want. Names are not unique within a project, so this can happen whenever two services share one.
+Names are matched exactly and case-sensitively, and deleted services never match. A name is unique among a project's active services, and a service can't be named after another service's ID, so a reference identifies at most one service. One that matches more than one is refused rather than resolved — run `tiger service list` to find the ID you want.
 
 `tiger config set service_id` resolves what you give it and stores the ID, so a later rename can't strand the default. Destructive commands accept a name too, but their confirmation prompt still requires the service's ID.
 
-The MCP tools take IDs only: an agent has `service_list` to look one up, and shouldn't be guessing at a name that might be ambiguous when the tool on the other end is destructive.
+The MCP tools take IDs only: an agent has `service_list` to look one up, and a name it guessed or remembered may since have moved to a different service through a rename, or through a delete and recreate — not a risk worth taking when the tool on the other end is destructive.
 
 ## MCP Server
 

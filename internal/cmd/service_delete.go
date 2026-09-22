@@ -63,9 +63,9 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
-				// Show both forms, but take only the ID: typing a name to
-				// authorize a delete is where a shadowed or ambiguous name
-				// would do the most damage.
+				// Show both forms, but take only the ID: a name can move to a
+				// different service through a rename, so it is the wrong
+				// thing to authorize a delete with.
 				cmd.PrintErrf("Are you sure you want to delete service '%s' (%s)? This operation cannot be undone.\n", service.Name, serviceID)
 				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
 				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())

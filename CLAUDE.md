@@ -139,7 +139,7 @@ A command that identifies a service takes a **ref**: its ID, a read replica set 
 - Resolving returns the whole service, so a command that needed one fetches nothing after it — `service get` and the `db` commands (via `common.NewConnectionTarget`) are the model. The commands that only pass an ID to another endpoint use `resolveServiceID`.
 - A command that changes the service it resolves calls `resolveServiceForWrite`, which refuses the blanket read-only case before the network call and gates on the tag the resolution returns, so neither half can be skipped or ordered wrong at a call site. Validate flags before calling it, so a bad flag costs no call either. Commands that only read a service use `resolveService`; `service fork` does too, since it gates on the environment it's about to request rather than on its source's.
 - The positional is `[name-or-id]` (`<name-or-id>` where it's required), so the usage line itself shows both accepted forms; the `Long` text reads "The service can be given by ID or name as an argument". Prose says **service**, never service ID.
-- Completion keeps offering IDs with the name as the description: a name can be shadowed or ambiguous, and tab completion already solves not remembering the ID.
+- Completion offers IDs with the name as the description, so what it inserts is the stable identifier even though a name would resolve too.
 - `config set service_id` resolves at write time and stores the ID, so a rename can't strand the default. It's the one config key whose write needs auth and a network call.
 - Destructive commands accept a name, but their confirmation prompt shows both forms and takes only the ID.
 - MCP tools stay IDs-only — an intentional divergence, documented at `setServiceIDSchemaProperties`.
