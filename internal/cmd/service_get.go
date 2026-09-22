@@ -17,8 +17,9 @@ func buildServiceGetCmd(app *common.App) *cobra.Command {
 		Long: `Show detailed information about a specific database service.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. This command displays comprehensive information about
-the service including configuration, status, endpoints, and resource usage.`,
+service from your configuration. This command displays comprehensive
+information about the service including configuration, status, endpoints, and
+resource usage.`,
 		Example: `  # Get default service details
   tiger service get
 

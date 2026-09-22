@@ -21,8 +21,9 @@ func buildDbURICmd(app *common.App) *cobra.Command {
 		Long: `Get a PostgreSQL connection URI for connecting to a database service.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. The connection string includes all necessary parameters
-for establishing a database connection to the TimescaleDB/PostgreSQL service.
+service from your configuration. The connection string includes all necessary
+parameters for establishing a database connection to the
+TimescaleDB/PostgreSQL service.
 
 You can also pass a read replica set ID to get a connection string for that replica.
 

@@ -21,8 +21,8 @@ func buildServiceUpdatePasswordCmd(app *common.App) *cobra.Command {
 		Long: `Update the master password for a specific database service.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. This command updates the master password for the
-'tsdbadmin' user used to authenticate to the database service.
+service from your configuration. This command updates the master password for
+the 'tsdbadmin' user used to authenticate to the database service.
 
 A read replica ID is rejected — read replicas share the primary's credentials,
 so update the password on the primary instead.`,

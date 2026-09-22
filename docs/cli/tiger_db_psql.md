@@ -7,8 +7,8 @@ Connect to a database with psql
 Connect to a database service using psql client.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. This command will launch an interactive psql session
-with the appropriate connection parameters.
+service from your configuration. This command will launch an interactive psql
+session with the appropriate connection parameters.
 
 Authentication is handled automatically using:
 1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)

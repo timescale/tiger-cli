@@ -7,8 +7,8 @@ Resize a database service
 Resize a database service by changing its CPU and memory allocation.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. This command changes the compute and memory resources
-allocated to your database service.
+service from your configuration. This command changes the compute and memory
+resources allocated to your database service.
 
 The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will

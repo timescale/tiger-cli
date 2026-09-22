@@ -23,9 +23,9 @@ indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
 The service can be given by ID or name as an argument, or will use the default
-service from your configuration. You can also pass a read replica set ID to introspect
-that replica. Only objects the connecting role can access are returned. The
-connection is opened in Tiger Cloud's immutable read-only mode.
+service from your configuration. You can also pass a read replica set ID to
+introspect that replica. Only objects the connecting role can access are
+returned. The connection is opened in Tiger Cloud's immutable read-only mode.
 
 By default only user-facing schemas and objects are shown. View and routine
 definitions and object comments are omitted unless requested, since they can be
