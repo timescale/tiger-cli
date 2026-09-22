@@ -40,7 +40,21 @@ type ServiceMetricsDetailsOutput struct {
 }
 
 func (ServiceMetricsDetailsOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceMetricsDetailsOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceMetricsDetailsOutput](nil))
+
+	// These fields are always present in the response (hence "required" above),
+	// but their content is only present once the metric is documented — every
+	// undocumented metric still returns the key, just with a null/empty value.
+	details := schema.Properties["details"]
+	details.Properties["name"].Description = "Metric series name."
+	details.Properties["type"].Description = "The shape of this metric's data, or null if undocumented."
+	details.Properties["default_agg"].Description = "The aggregation function used by default when fn is omitted from a series query, or null if undocumented."
+	details.Properties["description"].Description = "What this metric measures, or empty if undocumented."
+	details.Properties["labels"].Description = "Labels specific to this metric (e.g. datname on pg_stat_database_*) — not the region/role/ordinal labels every metric carries regardless of which one it is."
+	details.Properties["labels"].Items.Properties["name"].Description = "The label's key."
+	details.Properties["labels"].Items.Properties["description"].Description = "What this label identifies, or empty if undocumented."
+
+	return schema
 }
 
 func newServiceMetricsDetailsTool() *mcp.Tool {
