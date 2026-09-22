@@ -9,8 +9,8 @@ foreign), views, materialized views, enum types, functions, procedures,
 indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. You can also pass a read replica set ID to introspect
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. You can also pass a read replica set ID to introspect
 that replica. Only objects the connecting role can access are returned. The
 connection is opened in Tiger Cloud's immutable read-only mode.
 
@@ -19,7 +19,7 @@ definitions and object comments are omitted unless requested, since they can be
 large and may embed implementation details.
 
 ```
-tiger db schema [service-id] [flags]
+tiger db schema [service] [flags]
 ```
 
 ### Examples
@@ -60,7 +60,7 @@ tiger db schema [service-id] [flags]
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         service ID
+      --service-id string         service ID or name
       --version-check             check for updates on startup (default true)
 ```
 

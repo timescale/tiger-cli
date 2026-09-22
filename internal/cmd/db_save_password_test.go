@@ -14,7 +14,7 @@ import (
 
 func TestDbSavePasswordCmd(t *testing.T) {
 	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "svc-12345", sampleService())
+		expectResolveRef(m, "svc-12345", sampleService())
 	}
 
 	// checkKeyringPassword asserts the mock keyring holds want for role.
@@ -47,26 +47,21 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name:    "service ID required",
 			args:    []string{"db", "save-password", "--password=pw"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
 		},
 		{
 			name: "network error fetching service",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service "svc-12345": connection refused`,
 		},
 		{
 			name: "API error fetching service",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
@@ -75,11 +70,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      nil,
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -203,8 +194,8 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name: "replica ID saves against parent primary",
 			args: []string{"db", "save-password", "rep-67890", "--password=replica-pw"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica())
-				setupGetService(m)
+				expectResolveRef(m, "rep-67890", sampleReplica())
+				expectGetService(m, "svc-12345", sampleService())
 			},
 			wantStderr: "Read replicas share the primary's credentials; saving against primary svc-12345.\nPassword saved for service svc-12345 (role tsdbadmin)\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {

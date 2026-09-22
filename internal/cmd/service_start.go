@@ -17,12 +17,15 @@ func buildServiceStartCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "start [service-id]",
+		Use:     "start [service]",
 		Aliases: []string{"resume"},
 		Short:   "Start a stopped database service",
 		Long: `Start a stopped database service.
 
-This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.`,
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Start a service (waits for completion by default)
   tiger service start svc-12345
 
@@ -40,15 +43,17 @@ This operation starts a service that is currently in an inactive/stopped state. 
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cfg, args)
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
+			serviceID := resolved.ServiceID
 
 			// Make the start request
 			resp, err := client.StartServiceWithResponse(

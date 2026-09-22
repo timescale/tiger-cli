@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -16,13 +17,17 @@ func buildServiceDeleteCmd(app *common.App) *cobra.Command {
 	var confirm bool
 
 	cmd := &cobra.Command{
-		Use:     "delete [service-id]",
+		Use:     "delete [service]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a database service",
 		Long: `Delete a database service permanently.
 
-This operation is irreversible. By default, you will be prompted to type the service ID
-to confirm deletion, unless you use the --confirm flag.
+The service can be given by ID or name, but must be given explicitly: there is
+no fallback to the default service.
+
+This operation is irreversible. By default, you will be prompted to type the
+service ID to confirm deletion — the ID, not the name — unless you use the
+--confirm flag.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.`,
 		Example: `  # Delete a service (with confirmation prompt)
@@ -34,29 +39,34 @@ Note for AI agents: Always confirm with the user before performing this destruct
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require explicit service ID for safety
-			if len(args) < 1 {
-				return fmt.Errorf("service ID is required")
+			// Require an explicit service for safety: no default fallback.
+			if len(args) < 1 || args[0] == "" {
+				return errors.New("service is required")
 			}
-			serviceID := args[0]
+			serviceRef := args[0]
 
-			// Check read-only mode before the confirmation prompt, so it refuses
-			// without asking the user to type the service ID.
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			// Gated here, ahead of the confirmation prompt, so read-only mode
+			// refuses without first asking the user to type the service ID.
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
+			serviceID := service.ServiceID
 
 			// Prompt for confirmation unless --confirm is used
 			if !confirm {
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
-				cmd.PrintErrf("Are you sure you want to delete service '%s'? This operation cannot be undone.\n", serviceID)
+				// Show both forms, but take only the ID: typing a name to
+				// authorize a delete is where a shadowed or ambiguous name
+				// would do the most damage.
+				cmd.PrintErrf("Are you sure you want to delete service '%s' (%s)? This operation cannot be undone.\n", service.Name, serviceID)
 				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
 				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {

@@ -13,13 +13,9 @@ import (
 )
 
 func TestServiceUpdatePasswordCmd(t *testing.T) {
+	// Resolving returns the whole service, so the command fetches nothing after it.
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
-		svc := sampleService()
-		m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-			Return(&api.GetServiceResponse{
-				HTTPResponse: httpResponse(http.StatusOK),
-				JSON200:      &svc,
-			}, nil)
+		expectResolveRef(m, "svc-12345", sampleService())
 	}
 
 	setupUpdate := func(password string) func(m *mocks.MockClientWithResponsesInterface) {
@@ -84,7 +80,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			args:    []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup:   expectTaggedService("PROD"),
-			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
@@ -100,7 +96,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
 		},
 		{
 			name:    "env password and auto-generate conflict",
@@ -109,35 +105,27 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: "cannot use --auto-generate and --new-password together",
 		},
 		{
-			name: "network error on get",
+			name: "network error on resolve",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to get service details: connection refused",
+			wantErr: `failed to resolve service "svc-12345": connection refused`,
 		},
 		{
-			name: "API error on get",
+			name: "API error on resolve",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
-			name: "nil response body on get",
+			name: "nil response body on resolve",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -145,15 +133,10 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			name: "read replica rejected",
 			args: []string{"service", "update-password", "rep1234567", "--new-password", "newpass123"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				replica := sampleService(func(s *api.Service) {
+				expectResolveRef(m, "rep1234567", sampleService(func(s *api.Service) {
 					s.ServiceID = "rep1234567"
 					s.ForkedFrom = &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")}
-				})
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "rep1234567").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      &replica,
-					}, nil)
+				}))
 			},
 			wantErr: `"rep1234567" is a read replica; update the password on its primary service "svcprimary" instead`,
 		},

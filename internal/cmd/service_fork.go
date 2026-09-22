@@ -29,7 +29,7 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var environment string
 
 	cmd := &cobra.Command{
-		Use:   "fork [service-id]",
+		Use:   "fork [service]",
 		Short: "Fork an existing database service",
 		Long: `Fork an existing database service to create a new independent copy.
 
@@ -43,7 +43,10 @@ By default:
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.`,
+You can override any of these defaults with the corresponding flags.
+
+The source service can be given by ID or name as an argument, or will use the
+default service from your configuration.`,
 		Example: `  # Fork a service at the current state
   tiger service fork svc-12345 --now
 
@@ -109,14 +112,19 @@ You can override any of these defaults with the corresponding flags.`,
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cfg, args)
 			if err != nil {
 				return err
 			}
 
 			// Use provided custom values, validate against allowed combinations
 			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
+			if err != nil {
+				return err
+			}
+
+			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

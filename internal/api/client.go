@@ -431,6 +431,32 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project_id}/services (the `CreateService` operationId).
 	CreateService(ctx context.Context, projectID ProjectID, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ResolveServiceRefWithBody Resolve a Service Reference
+	//
+	// Resolves a reference to a single service. The reference matches a
+	// service whose ID equals it, or whose name equals it — exactly and
+	// case-sensitively, with no precedence between the two. Read replica
+	// sets match on either, like any other service. A reference matching
+	// more than one service is refused rather than resolved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+	ResolveServiceRefWithBody(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResolveServiceRef Resolve a Service Reference
+	//
+	// Resolves a reference to a single service. The reference matches a
+	// service whose ID equals it, or whose name equals it — exactly and
+	// case-sensitively, with no precedence between the two. Read replica
+	// sets match on either, like any other service. A reference matching
+	// more than one service is refused rather than resolved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+	ResolveServiceRef(ctx context.Context, projectID ProjectID, body ResolveServiceRefJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteService Delete a Service
 	//
 	// Deletes a specific service. This is an asynchronous operation.
@@ -1682,6 +1708,52 @@ func (c *Client) CreateServiceWithBody(ctx context.Context, projectID ProjectID,
 // Corresponds with POST /projects/{project_id}/services (the `CreateService` operationId).
 func (c *Client) CreateService(ctx context.Context, projectID ProjectID, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateServiceRequest(c.Server, projectID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResolveServiceRefWithBody Resolve a Service Reference
+//
+// Resolves a reference to a single service. The reference matches a
+// service whose ID equals it, or whose name equals it — exactly and
+// case-sensitively, with no precedence between the two. Read replica
+// sets match on either, like any other service. A reference matching
+// more than one service is refused rather than resolved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+func (c *Client) ResolveServiceRefWithBody(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResolveServiceRefRequestWithBody(c.Server, projectID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResolveServiceRef Resolve a Service Reference
+//
+// Resolves a reference to a single service. The reference matches a
+// service whose ID equals it, or whose name equals it — exactly and
+// case-sensitively, with no precedence between the two. Read replica
+// sets match on either, like any other service. A reference matching
+// more than one service is refused rather than resolved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+func (c *Client) ResolveServiceRef(ctx context.Context, projectID ProjectID, body ResolveServiceRefJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResolveServiceRefRequest(c.Server, projectID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3711,6 +3783,53 @@ func NewCreateServiceRequestWithBody(server string, projectID ProjectID, content
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/services", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResolveServiceRefRequest calls the generic ResolveServiceRef builder with application/json body
+func NewResolveServiceRefRequest(server string, projectID ProjectID, body ResolveServiceRefJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewResolveServiceRefRequestWithBody(server, projectID, "application/json", bodyReader)
+}
+
+// NewResolveServiceRefRequestWithBody constructs an http.Request for the ResolveServiceRef method, with any body, and a specified content type
+func NewResolveServiceRefRequestWithBody(server string, projectID ProjectID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/services/resolve", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6387,6 +6506,32 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project_id}/services (the `CreateService` operationId).
 	CreateServiceWithResponse(ctx context.Context, projectID ProjectID, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
+	// ResolveServiceRefWithBodyWithResponse Resolve a Service Reference
+	//
+	// Resolves a reference to a single service. The reference matches a
+	// service whose ID equals it, or whose name equals it — exactly and
+	// case-sensitively, with no precedence between the two. Read replica
+	// sets match on either, like any other service. A reference matching
+	// more than one service is refused rather than resolved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+	ResolveServiceRefWithBodyWithResponse(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResolveServiceRefResponse, error)
+
+	// ResolveServiceRefWithResponse Resolve a Service Reference
+	//
+	// Resolves a reference to a single service. The reference matches a
+	// service whose ID equals it, or whose name equals it — exactly and
+	// case-sensitively, with no precedence between the two. Read replica
+	// sets match on either, like any other service. A reference matching
+	// more than one service is refused rather than resolved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+	ResolveServiceRefWithResponse(ctx context.Context, projectID ProjectID, body ResolveServiceRefJSONRequestBody, reqEditors ...RequestEditorFn) (*ResolveServiceRefResponse, error)
+
 	// DeleteServiceWithResponse Delete a Service
 	//
 	// Deletes a specific service. This is an asynchronous operation.
@@ -7915,6 +8060,54 @@ func (r CreateServiceResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResolveServiceRefResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Service
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResolveServiceRefResponse) GetJSON200() *Service {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ResolveServiceRefResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ResolveServiceRefResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResolveServiceRefResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResolveServiceRefResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResolveServiceRefResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10560,6 +10753,44 @@ func (c *ClientWithResponses) CreateServiceWithResponse(ctx context.Context, pro
 	return ParseCreateServiceResponse(rsp)
 }
 
+// ResolveServiceRefWithBodyWithResponse Resolve a Service Reference
+//
+// Resolves a reference to a single service. The reference matches a
+// service whose ID equals it, or whose name equals it — exactly and
+// case-sensitively, with no precedence between the two. Read replica
+// sets match on either, like any other service. A reference matching
+// more than one service is refused rather than resolved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+func (c *ClientWithResponses) ResolveServiceRefWithBodyWithResponse(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResolveServiceRefResponse, error) {
+	rsp, err := c.ResolveServiceRefWithBody(ctx, projectID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResolveServiceRefResponse(rsp)
+}
+
+// ResolveServiceRefWithResponse Resolve a Service Reference
+//
+// Resolves a reference to a single service. The reference matches a
+// service whose ID equals it, or whose name equals it — exactly and
+// case-sensitively, with no precedence between the two. Read replica
+// sets match on either, like any other service. A reference matching
+// more than one service is refused rather than resolved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/services/resolve (the `ResolveServiceRef` operationId).
+func (c *ClientWithResponses) ResolveServiceRefWithResponse(ctx context.Context, projectID ProjectID, body ResolveServiceRefJSONRequestBody, reqEditors ...RequestEditorFn) (*ResolveServiceRefResponse, error) {
+	rsp, err := c.ResolveServiceRef(ctx, projectID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResolveServiceRefResponse(rsp)
+}
+
 // DeleteServiceWithResponse Delete a Service
 //
 // Deletes a specific service. This is an asynchronous operation.
@@ -12218,6 +12449,39 @@ func ParseCreateServiceResponse(rsp *http.Response) (*CreateServiceResponse, err
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResolveServiceRefResponse parses an HTTP response from a ResolveServiceRefWithResponse call
+func ParseResolveServiceRefResponse(rsp *http.Response) (*ResolveServiceRefResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResolveServiceRefResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Service
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError

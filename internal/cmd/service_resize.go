@@ -19,12 +19,12 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "resize [service-id]",
+		Use:   "resize [service]",
 		Short: "Resize a database service",
 		Long: `Resize a database service by changing its CPU and memory allocation.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command changes the compute and memory resources
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command changes the compute and memory resources
 allocated to your database service.
 
 The service may be temporarily unavailable during the resize operation. Note
@@ -62,8 +62,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cfg, args)
 			if err != nil {
 				return err
 			}
@@ -79,9 +79,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("must specify at least one of --cpu or --memory")
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
+			serviceID := resolved.ServiceID
 
 			// Display resize information
 			cmd.PrintErrf("Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)

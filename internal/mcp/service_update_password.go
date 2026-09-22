@@ -95,8 +95,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 	service := *serviceResp.JSON200
 
-	// The prod half of the gate, riding on the fetch above.
-	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
+	if err := common.CheckReadOnlyService(cfg, service); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 

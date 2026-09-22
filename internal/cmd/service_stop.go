@@ -17,12 +17,15 @@ func buildServiceStopCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "stop [service-id]",
+		Use:     "stop [service]",
 		Aliases: []string{"pause"},
 		Short:   "Stop a running database service",
 		Long: `Stop a running database service.
 
-This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.`,
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Stop a service (waits for completion by default)
   tiger service stop svc-12345
 
@@ -40,15 +43,17 @@ This operation stops a service that is currently active/running. The service wil
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cfg, args)
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
+			serviceID := resolved.ServiceID
 
 			// Make the stop request
 			resp, err := client.StopServiceWithResponse(

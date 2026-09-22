@@ -6,8 +6,8 @@ Connect to a database with psql
 
 Connect to a database service using psql client.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command will launch an interactive psql session
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command will launch an interactive psql session
 with the appropriate connection parameters.
 
 Authentication is handled automatically using:
@@ -33,7 +33,7 @@ You can also pass a read replica set ID to connect straight to that replica,
 skipping the prompt. Read replicas share the primary's credentials.
 
 ```
-tiger db psql [service-id] [flags]
+tiger db psql [service] [flags]
 ```
 
 ### Examples
@@ -82,7 +82,7 @@ tiger db psql [service-id] [flags]
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         service ID
+      --service-id string         service ID or name
       --version-check             check for updates on startup (default true)
 ```
 

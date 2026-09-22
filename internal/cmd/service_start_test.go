@@ -11,8 +11,10 @@ import (
 )
 
 func TestServiceStartCmd(t *testing.T) {
-	setupStart := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+	// overrides apply to the resolved service, whose tag the prod gate reads.
+	setupStart := func(status api.DeployStatus, overrides ...func(*api.Service)) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRef(m, "svc-12345", sampleService(overrides...))
 			svc := sampleService(func(s *api.Service) { s.Status = status })
 			m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.StartServiceResponse{
@@ -47,25 +49,23 @@ func TestServiceStartCmd(t *testing.T) {
 			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
-			name: "read-only prod allows DEV service",
-			args: []string{"service", "start", "svc-12345", "--no-wait"},
-			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectTaggedService("DEV")(m)
-				setupStart(api.DeployStatusRESUMING)(m)
-			},
+			name:  "read-only prod allows DEV service",
+			args:  []string{"service", "start", "svc-12345", "--no-wait"},
+			opts:  []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: setupStart(api.DeployStatusRESUMING, envTag("DEV")),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"service", "start"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -75,6 +75,7 @@ func TestServiceStartCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -88,6 +89,7 @@ func TestServiceStartCmd(t *testing.T) {
 			name: "service not found",
 			args: []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -101,6 +103,7 @@ func TestServiceStartCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "start", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),

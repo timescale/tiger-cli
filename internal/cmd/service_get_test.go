@@ -38,8 +38,8 @@ func TestServiceGetCmd(t *testing.T) {
 
 	setupGet := func(service api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-				Return(&api.GetServiceResponse{
+			m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "svc-12345"}).
+				Return(&api.ResolveServiceRefResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
 					JSON200:      &service,
 				}, nil)
@@ -56,23 +56,23 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "get"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id-or-name>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "get", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
+				m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "svc-12345"}).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to get service details: connection refused",
+			wantErr: `failed to resolve service "svc-12345": connection refused`,
 		},
 		{
 			name: "not found",
 			args: []string{"service", "get", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
+				m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "svc-12345"}).
+					Return(&api.ResolveServiceRefResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
 						JSON4XX:      &api.ClientError{Message: new("service not found")},
 					}, nil)
@@ -81,11 +81,27 @@ func TestServiceGetCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
+			// A ref matching more than one service is refused by the API; the
+			// CLI surfaces that message and points at the command that lists
+			// the candidates, which the message itself doesn't name.
+			name: "ambiguous ref refused",
+			args: []string{"service", "get", "my-api-db"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "my-api-db"}).
+					Return(&api.ResolveServiceRefResponse{
+						HTTPResponse: httpResponse(http.StatusBadRequest),
+						JSON4XX:      &api.ClientError{Message: new("ambiguous service name matches multiple services")},
+					}, nil)
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name: "nil response body",
 			args: []string{"service", "get", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
+				m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "svc-12345"}).
+					Return(&api.ResolveServiceRefResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 					}, nil)
 			},
@@ -114,6 +130,21 @@ func TestServiceGetCmd(t *testing.T) {
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
+		},
+		{
+			// The ref reaches the API as typed: no client-side classification
+			// stands between a name and the service it names.
+			name: "name resolves to the service",
+			args: []string{"service", "get", "test-service", "-o", "env"},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				svc := sampleService()
+				m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: "test-service"}).
+					Return(&api.ResolveServiceRefResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &svc,
+					}, nil)
+			},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:  "free tier table output",

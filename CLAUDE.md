@@ -132,6 +132,18 @@ Further conventions:
 - **Long-running operations** wait for completion by default, with `--no-wait` to return immediately and `--wait-timeout` (a duration) to bound the wait; a timeout exits with code 2 (`common.ExitTimeout`). Use `common.WaitForService`, which shows a spinner on a TTY and plain progress lines otherwise, writing progress to stderr.
 - **Help text** should document the default behavior and explain how to override it, with examples of common usage in the command's `Example` field rather than in `Long`.
 
+### Service Refs
+
+A command that identifies a service takes a **ref**: its ID, a read replica set ID, or its name. The CLI classifies nothing — `getServiceRef` picks the ref out of `args[0]` or `cfg.ServiceID`, and `resolveService`/`resolveServiceID` (`service_ref_helper.go`) hand it to the API's resolve operation, which matches ID and name together and refuses a ref matching more than one service. Never compare a ref against a shape or try to tell an ID from a name.
+
+- Resolving returns the whole service, so a command that needed one fetches nothing after it — `service get` and the `db` commands (via `common.NewConnectionTarget`) are the model. The commands that only pass an ID to another endpoint use `resolveServiceID`.
+- A command that changes the service it resolves calls `resolveServiceForWrite`, which refuses the blanket read-only case before the network call and gates on the tag the resolution returns, so neither half can be skipped or ordered wrong at a call site. Validate flags before calling it, so a bad flag costs no call either. Commands that only read a service use `resolveService`; `service fork` does too, since it gates on the environment it's about to request rather than on its source's.
+- Help text says **service**, not service ID: the positional is `[service]` (`<service>` where it's required), and the `Long` text reads "The service can be given by ID or name as an argument".
+- Completion keeps offering IDs with the name as the description: a name can be shadowed or ambiguous, and tab completion already solves not remembering the ID.
+- `config set service_id` resolves at write time and stores the ID, so a rename can't strand the default. It's the one config key whose write needs auth and a network call.
+- Destructive commands accept a name, but their confirmation prompt shows both forms and takes only the ID.
+- MCP tools stay IDs-only — an intentional divergence, documented at `setServiceIDSchemaProperties`.
+
 ## Output
 
 ### Streams
@@ -243,12 +255,13 @@ A destructive tool that needs a human in the loop asks through MCP elicitation, 
 
 ## Read-Only Mode
 
-`cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off` (`prod` protects only services tagged `PROD`). `config.Load` normalizes every value through `parseReadOnlyMode`, which also accepts the legacy boolean spellings, so nothing downstream sees an unnormalized value. Every write/destructive surface on both planes gates through one of the two checks in `internal/common/read_only.go` — on the CLI side that's the `RunE` of `service create`, `fork`, `start`, `stop`, `rename`, `resize`, `update-password`, `delete`, and `db create role`; on the MCP side, the handlers of the write tools listed in `readOnlyGatedTools`:
+`cfg.ReadOnly` is a `config.ReadOnlyMode` — `all`, `prod`, or `off` (`prod` protects only services tagged `PROD`). `config.Load` normalizes every value through `parseReadOnlyMode`, which also accepts the legacy boolean spellings, so nothing downstream sees an unnormalized value. Every write/destructive surface on both planes gates through one of the three checks in `internal/common/read_only.go` — on the CLI side that's the `RunE` of `service create`, `fork`, `start`, `stop`, `rename`, `resize`, `update-password`, `delete`, and `db create role`; on the MCP side, the handlers of the write tools listed in `readOnlyGatedTools`:
 
-- `common.CheckReadOnly(cfg, tag)` — for a caller that has the target's environment tag: from a fetched service via `common.ServiceEnvironmentTag(service)`, or from the tag about to be requested (`--environment` on `service create`/`fork`, and the `environment` parameter of the matching MCP tools, both defaulting to `DEV`).
-- `common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, serviceID)` — the same verdict from an ID, fetching the service to read its tag. The fetch happens only under `prod` (`all` refuses and `off` allows without one), and a failed fetch is a refusal.
+- `common.CheckReadOnly(cfg, tag)` — for a caller that has only a tag and no service, which in practice means the tag about to be requested (`--environment` on `service create`/`fork`, and the `environment` parameter of the matching MCP tools, both defaulting to `DEV`).
+- `common.CheckReadOnlyService(cfg, service)` — for a caller holding the service: `resolveServiceForWrite` on the CLI side, and the MCP tools that fetch before gating. It reads the tag off the service and names it in the refusal, so the user knows which service was protected.
+- `common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, serviceID)` — the same verdict from an ID, fetching the service and handing it to `CheckReadOnlyService`. The fetch happens only under `prod` (`all` refuses and `off` allows without one), and a failed fetch is a refusal. Only the MCP write tools that don't already hold the service need it.
 
-Gotchas when adding a gated surface: a replica set is judged on its *own* tag, never its primary's; `prod` refuses *creating* a `PROD` service too (otherwise it would create services it then can't stop or delete), so `create`/`fork` gate on the tag they're about to request; the MCP server skips registering write tools only under `all` — under `prod` they stay registered and refuse per call, with a `prod` variant of the server instructions explaining that; and where the verdict is wanted as a boolean, write `CheckReadOnly(…) != nil` rather than a wrapper, so grepping one name finds every gate. `CheckReadOnly` requires a tag so it can't silently ignore `prod`; the one shortcut allowed is refusing the blanket case before a fetch the command was making anyway (`if cfg.ReadOnly.BlocksAll() { return common.ErrReadOnly }`), then still calling `CheckReadOnly` once the service arrives — `service update-password` does both.
+Gotchas when adding a gated surface: a replica set is judged on its *own* tag, never its primary's; `prod` refuses *creating* a `PROD` service too (otherwise it would create services it then can't stop or delete), so `create`/`fork` gate on the tag they're about to request; the MCP server skips registering write tools only under `all` — under `prod` they stay registered and refuse per call, with a `prod` variant of the server instructions explaining that; and where the verdict is wanted as a boolean, write `CheckReadOnly(…) != nil` rather than a wrapper, so grepping `CheckReadOnly` finds every gate. `CheckReadOnly` requires a tag so it can't silently ignore `prod`; the one shortcut allowed is refusing the blanket case before a fetch the command was making anyway (`if cfg.ReadOnly.BlocksAll() { return common.ErrReadOnly }`), then still gating once the service arrives — on the CLI side `resolveServiceForWrite` does both, so a command gets that order by calling it.
 
 ## CLI/MCP Synchronization
 

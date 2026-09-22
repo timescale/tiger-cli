@@ -6,12 +6,12 @@ Show detailed information about a service
 
 Show detailed information about a specific database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command displays comprehensive information about
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command displays comprehensive information about
 the service including configuration, status, endpoints, and resource usage.
 
 ```
-tiger service get [service-id] [flags]
+tiger service get [service] [flags]
 ```
 
 ### Examples
@@ -45,7 +45,7 @@ tiger service get [service-id] [flags]
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         service ID
+      --service-id string         service ID or name
       --version-check             check for updates on startup (default true)
 ```
 

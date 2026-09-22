@@ -15,15 +15,15 @@ func buildDbSchemaCmd(app *common.App) *cobra.Command {
 	var pooled bool
 
 	cmd := &cobra.Command{
-		Use:   "schema [service-id]",
+		Use:   "schema [service]",
 		Short: "Display database schema information",
 		Long: `Display the schema of a database service: tables (regular, partitioned, and
 foreign), views, materialized views, enum types, functions, procedures,
 indexes, triggers, and TimescaleDB hypertable and continuous aggregate
 metadata.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. You can also pass a read replica set ID to introspect
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. You can also pass a read replica set ID to introspect
 that replica. Only objects the connecting role can access are returned. The
 connection is opened in Tiger Cloud's immutable read-only mode.
 
@@ -53,12 +53,17 @@ large and may embed implementation details.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cfg, args)
 			if err != nil {
 				return err
 			}
 
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
 			if err != nil {
 				return err
 			}

@@ -26,14 +26,17 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var fn string
 
 	cmd := &cobra.Command{
-		Use:   "series [service-id]",
+		Use:   "series [service]",
 		Short: "Get metric series data",
 		Long: `Get time-series data for a specific metric.
 
 Use 'tiger service metrics available-series' to discover valid metric names.
 
 Each labeled series (e.g. one per replica) is returned independently with its
-full list of raw data points.`,
+full list of raw data points.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Fetch CPU usage for the last hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
@@ -50,8 +53,9 @@ full list of raw data points.`,
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --filter ordinal=0`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
@@ -72,7 +76,12 @@ full list of raw data points.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cfg, args)
+			if err != nil {
+				return err
+			}
+
+			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

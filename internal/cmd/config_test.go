@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
 // checkConfigFile returns a check func asserting that the persisted config
@@ -26,8 +28,9 @@ func TestConfigCmd(t *testing.T) {
 		{
 			name:       "cfg alias",
 			args:       []string{"cfg", "set", "service_id", "alias-service"},
-			wantStdout: "Set service_id = alias-service\n",
-			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "alias-service"})},
+			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "alias-service", sampleService()) },
+			wantStdout: "Set service_id = svc-12345 (test-service)\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
 		},
 	})
 }

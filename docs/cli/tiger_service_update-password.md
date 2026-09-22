@@ -6,15 +6,15 @@ Update the master password for a service
 
 Update the master password for a specific database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command updates the master password for the
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command updates the master password for the
 'tsdbadmin' user used to authenticate to the database service.
 
 A read replica ID is rejected — read replicas share the primary's credentials,
 so update the password on the primary instead.
 
 ```
-tiger service update-password [service-id] [flags]
+tiger service update-password [service] [flags]
 ```
 
 ### Examples
@@ -58,7 +58,7 @@ tiger service update-password [service-id] [flags]
       --color                     enable colored output (default true)
       --config-dir string         config directory (default "~/.config/tiger")
       --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
-      --service-id string         service ID
+      --service-id string         service ID or name
       --version-check             check for updates on startup (default true)
 ```
 

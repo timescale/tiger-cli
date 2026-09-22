@@ -20,11 +20,33 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 			cfg := app.GetConfig()
 
 			key, value := args[0], args[1]
+
+			// The default service is stored as an ID, so a name given here is
+			// resolved once at write time rather than on every command that
+			// reads it. A stored name would break on a rename, or as soon as a
+			// second service took the same name.
+			var resolvedName string
+			if key == "service_id" && value != "" {
+				_, client, projectID, err := app.GetAll()
+				if err != nil {
+					return err
+				}
+				service, err := resolveService(cmd.Context(), client, projectID, value)
+				if err != nil {
+					return err
+				}
+				value, resolvedName = service.ServiceID, service.Name
+			}
+
 			stored, err := cfg.Set(key, value)
 			if err != nil {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
 
+			if resolvedName != "" {
+				cmd.Printf("Set %s = %s (%s)\n", key, stored, resolvedName)
+				return nil
+			}
 			cmd.Printf("Set %s = %s\n", key, stored)
 			return nil
 		},

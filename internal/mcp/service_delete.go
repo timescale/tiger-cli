@@ -98,7 +98,7 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 	}
 
 	tag := common.ServiceEnvironmentTag(*service)
-	if err := common.CheckReadOnly(cfg, tag); err != nil {
+	if err := common.CheckReadOnlyService(cfg, *service); err != nil {
 		return nil, ServiceDeleteOutput{}, err
 	}
 

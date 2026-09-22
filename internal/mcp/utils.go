@@ -33,7 +33,13 @@ func validServiceTypes() []string {
 	}
 }
 
-// setServiceIDSchemaProperties sets common service_id schema properties
+// setServiceIDSchemaProperties sets common service_id schema properties.
+//
+// Intentional divergence from the CLI: every CLI command that takes a service
+// ID also takes a service name, but the tools stay IDs-only. Agents have
+// service_list, and a name can be ambiguous or shadowed — not something to
+// guess at when the tool on the other end is destructive. The API itself
+// accepts either; the pattern below is what declines them here.
 func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}
