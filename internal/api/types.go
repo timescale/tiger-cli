@@ -1814,9 +1814,11 @@ type MetricDetails struct {
 	// Example: Number of locks currently held, grouped by relation and lock mode.
 	Description string `json:"description"`
 
-	// Labels Labels specific to this metric (e.g. datname on
-	// pg_stat_database_*) — not the region/role/ordinal labels every
-	// metric carries regardless of which one it is.
+	// Labels All labels this metric can be filtered or grouped by: its own
+	// labels (e.g. datname on pg_stat_database_*) plus the
+	// region/role/ordinal labels most metrics also carry. A few
+	// datasources only attach a subset of those — e.g.
+	// pgbouncer-sourced metrics only get region, not role/ordinal.
 	Labels []MetricLabelDetails `json:"labels"`
 
 	// Name Metric series name.

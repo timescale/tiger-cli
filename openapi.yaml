@@ -1259,9 +1259,10 @@ paths:
         **Preview — this endpoint is experimental and may change without notice.**
 
         Returns descriptive metadata for a named metric: what it measures,
-        its type, default aggregation, and any labels specific to it
-        (beyond the region/role/ordinal labels every metric carries). Use
-        getServiceMetricsAvailableSeries to discover valid metric names.
+        its type, default aggregation, and every label it can be filtered or
+        grouped by — its own labels plus the region/role/ordinal labels most
+        metrics also carry. Use getServiceMetricsAvailableSeries to discover
+        valid metric names.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/ServiceId'
@@ -3838,9 +3839,11 @@ components:
         labels:
           type: array
           description: |
-            Labels specific to this metric (e.g. datname on
-            pg_stat_database_*) — not the region/role/ordinal labels every
-            metric carries regardless of which one it is.
+            All labels this metric can be filtered or grouped by: its own
+            labels (e.g. datname on pg_stat_database_*) plus the
+            region/role/ordinal labels most metrics also carry. A few
+            datasources only attach a subset of those — e.g.
+            pgbouncer-sourced metrics only get region, not role/ordinal.
           items:
             $ref: '#/components/schemas/MetricLabelDetails'
 
