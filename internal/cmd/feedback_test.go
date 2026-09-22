@@ -89,15 +89,15 @@ func TestFeedbackCmd(t *testing.T) {
 			wantErr: "feedback message cannot be empty",
 		},
 		{
-			name:      "network error",
-			args:      []string{"feedback", "it broke"},
-			setupMock: expectSubmit("it broke", nil, errors.New("connection refused")),
-			wantErr:   "failed to submit feedback: connection refused",
+			name:    "network error",
+			args:    []string{"feedback", "it broke"},
+			mock:    expectSubmit("it broke", nil, errors.New("connection refused")),
+			wantErr: "failed to submit feedback: connection refused",
 		},
 		{
 			name: "API error",
 			args: []string{"feedback", "it broke"},
-			setupMock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
+			mock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusBadRequest),
 				JSON4XX:      &api.Error{Message: new("message must not be blank")},
 			}, nil),
@@ -108,7 +108,7 @@ func TestFeedbackCmd(t *testing.T) {
 			// A 5XX carries no typed body, so the error is the generic one.
 			name: "server error",
 			args: []string{"feedback", "it broke"},
-			setupMock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
+			mock: expectSubmit("it broke", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusInternalServerError),
 			}, nil),
 			wantErr: "unknown error",
@@ -117,7 +117,7 @@ func TestFeedbackCmd(t *testing.T) {
 		{
 			name:       "message from argument",
 			args:       []string{"feedback", "Great tool!"},
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 		},
 		{
@@ -125,7 +125,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:       "message from stdin",
 			args:       []string{"feedback"},
 			opts:       []runOption{withStdin("Great tool!\n")},
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 		},
 		{
@@ -133,7 +133,7 @@ func TestFeedbackCmd(t *testing.T) {
 			name:       "prompts on a terminal",
 			args:       []string{"feedback"},
 			opts:       []runOption{withIsTerminal(true), withStdin("Great tool!")},
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantStdout: wantSubmitted,
 			wantStderr: "Enter your feedback (press Ctrl+D when done):\n",
 		},
@@ -147,7 +147,7 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("NO_TELEMETRY", ""),
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
-			setupMock:  expectSubmitAndTrack(secretMessage, []string{"[REDACTED]"}),
+			mock:       expectSubmitAndTrack(secretMessage, []string{"[REDACTED]"}),
 			wantStdout: wantSubmitted,
 		},
 		{
@@ -161,7 +161,7 @@ func TestFeedbackCmd(t *testing.T) {
 				withEnv("NO_TELEMETRY", ""),
 				withEnv("DISABLE_TELEMETRY", ""),
 			},
-			setupMock:  expectSubmitAndTrack(secretMessage, []string{}),
+			mock:       expectSubmitAndTrack(secretMessage, []string{}),
 			wantStdout: wantSubmitted,
 		},
 	})

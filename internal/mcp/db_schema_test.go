@@ -77,7 +77,7 @@ func TestDBSchema(t *testing.T) {
 			name: "service lookup network error",
 			tool: toolDBSchema,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -87,7 +87,7 @@ func TestDBSchema(t *testing.T) {
 			name: "service lookup API error",
 			tool: toolDBSchema,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -100,32 +100,32 @@ func TestDBSchema(t *testing.T) {
 			name: "nil response body",
 			tool: toolDBSchema,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
 			wantErr: "empty response from API",
 		},
 		{
-			name:      "service paused",
-			tool:      toolDBSchema,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr:   pausedMsg,
+			name:    "service paused",
+			tool:    toolDBSchema,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr: pausedMsg,
 		},
 		{
-			name:      "service pausing",
-			tool:      toolDBSchema,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusPAUSING),
-			wantErr:   pausedMsg,
+			name:    "service pausing",
+			tool:    toolDBSchema,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusPAUSING),
+			wantErr: pausedMsg,
 		},
 		{
-			name:      "service not ready",
-			tool:      toolDBSchema,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusQUEUED),
-			wantErr:   notReadyMsg,
+			name:    "service not ready",
+			tool:    toolDBSchema,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusQUEUED),
+			wantErr: notReadyMsg,
 		},
 		{
 			// Both services are fetched: the replica for its endpoint, the
@@ -133,7 +133,7 @@ func TestDBSchema(t *testing.T) {
 			name: "read replica resolves its parent",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica())
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
@@ -143,7 +143,7 @@ func TestDBSchema(t *testing.T) {
 			name: "read replica parent lookup fails",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
@@ -154,17 +154,17 @@ func TestDBSchema(t *testing.T) {
 			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
 		},
 		{
-			name:      "ready service without an endpoint",
-			tool:      toolDBSchema,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusREADY),
-			wantErr:   noEndpointMsg,
+			name:    "ready service without an endpoint",
+			tool:    toolDBSchema,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusREADY),
+			wantErr: noEndpointMsg,
 		},
 		{
 			name: "pooled without a pooler",
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "e6ue9697jf", "pooled": true},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{
 						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
@@ -176,19 +176,19 @@ func TestDBSchema(t *testing.T) {
 		},
 		{
 			// A fetch failure passes through handleDatabaseError unchanged.
-			name:      "fetch fails",
-			tool:      toolDBSchema,
-			args:      args,
-			opts:      []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
-			setupMock: setupGetWithStatus(api.DeployStatusREADY),
-			wantErr:   "failed to connect to database: no route to host",
+			name:    "fetch fails",
+			tool:    toolDBSchema,
+			args:    args,
+			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
+			mock:    setupGetWithStatus(api.DeployStatusREADY),
+			wantErr: "failed to connect to database: no route to host",
 		},
 		{
 			name:       "returns the schema with the parameter defaults",
 			tool:       toolDBSchema,
 			args:       args,
 			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: map[string]any{"schema": schemaText},
 		},
 		{
@@ -209,7 +209,7 @@ func TestDBSchema(t *testing.T) {
 				IncludeDefinitions: true,
 				IncludeComments:    true,
 			}, schema, nil)},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: map[string]any{"schema": schemaText},
 		},
 		{
@@ -220,7 +220,7 @@ func TestDBSchema(t *testing.T) {
 			tool: toolDBSchema,
 			args: map[string]any{"service_id": "u8me885b93", "pooled": true},
 			opts: []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY }))
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},

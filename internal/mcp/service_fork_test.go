@@ -131,7 +131,7 @@ func TestServiceFork(t *testing.T) {
 			tool:       toolServiceFork,
 			args:       args,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock:  expectFork(baseReq),
+			mock:       expectFork(baseReq),
 			wantOutput: accepted,
 		},
 		{
@@ -150,7 +150,7 @@ func TestServiceFork(t *testing.T) {
 			name: "network error",
 			tool: toolServiceFork,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -160,7 +160,7 @@ func TestServiceFork(t *testing.T) {
 			name: "API error",
 			tool: toolServiceFork,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -173,7 +173,7 @@ func TestServiceFork(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceFork,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", baseReq).
 					Return(&api.ForkServiceResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
@@ -183,14 +183,14 @@ func TestServiceFork(t *testing.T) {
 			name:       "forks at the current state",
 			tool:       toolServiceFork,
 			args:       args,
-			setupMock:  expectFork(baseReq),
+			mock:       expectFork(baseReq),
 			wantOutput: accepted,
 		},
 		{
 			name: "forks from the last snapshot",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "LAST_SNAPSHOT"},
-			setupMock: expectFork(api.ForkServiceCreate{
+			mock: expectFork(api.ForkServiceCreate{
 				ForkStrategy:   api.ForkStrategyLASTSNAPSHOT,
 				EnvironmentTag: new(api.EnvironmentTagDEV),
 			}),
@@ -200,7 +200,7 @@ func TestServiceFork(t *testing.T) {
 			name: "forks to a point in time",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "PITR", "target_time": "2025-01-15T10:30:00Z"},
-			setupMock: expectFork(api.ForkServiceCreate{
+			mock: expectFork(api.ForkServiceCreate{
 				ForkStrategy:   api.ForkStrategyPITR,
 				TargetTime:     new(time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)),
 				EnvironmentTag: new(api.EnvironmentTagDEV),
@@ -217,7 +217,7 @@ func TestServiceFork(t *testing.T) {
 				"cpu_memory":    "1 CPU/4 GB",
 				"environment":   "PROD",
 			},
-			setupMock: expectFork(api.ForkServiceCreate{
+			mock: expectFork(api.ForkServiceCreate{
 				ForkStrategy:   api.ForkStrategyNOW,
 				Name:           new("my-forked-db"),
 				CPUMillis:      new("1000"),
@@ -238,10 +238,10 @@ func TestServiceFork(t *testing.T) {
 			},
 		},
 		{
-			name:      "stores the initial password without returning it",
-			tool:      toolServiceFork,
-			args:      args,
-			setupMock: expectFork(baseReq, withInitialPassword),
+			name: "stores the initial password without returning it",
+			tool: toolServiceFork,
+			args: args,
+			mock: expectFork(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service":          baseDetail,
 				"message":          acceptedMsg,
@@ -249,10 +249,10 @@ func TestServiceFork(t *testing.T) {
 			},
 		},
 		{
-			name:      "with_password returns the password and embeds it in the connection string",
-			tool:      toolServiceFork,
-			args:      map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "with_password": true},
-			setupMock: expectFork(baseReq, withInitialPassword),
+			name: "with_password returns the password and embeds it in the connection string",
+			tool: toolServiceFork,
+			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "with_password": true},
+			mock: expectFork(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"password":          "fork-pass-123",
@@ -265,11 +265,11 @@ func TestServiceFork(t *testing.T) {
 		{
 			// A storage failure isn't fatal: the fork exists either way, so the
 			// tool reports the failure rather than erroring.
-			name:      "reports a password storage failure",
-			tool:      toolServiceFork,
-			args:      args,
-			opts:      []runOption{withKeyringError(errors.New("keyring is locked"))},
-			setupMock: expectFork(baseReq, withInitialPassword),
+			name: "reports a password storage failure",
+			tool: toolServiceFork,
+			args: args,
+			opts: []runOption{withKeyringError(errors.New("keyring is locked"))},
+			mock: expectFork(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service": baseDetail,
 				"message": acceptedMsg,
@@ -287,7 +287,7 @@ func TestServiceFork(t *testing.T) {
 			name:       "sets the forked service as the default",
 			tool:       toolServiceFork,
 			args:       args,
-			setupMock:  expectFork(baseReq),
+			mock:       expectFork(baseReq),
 			wantOutput: accepted,
 			checks:     []checkFunc{checkDefaultService("u8me885b93")},
 		},
@@ -295,7 +295,7 @@ func TestServiceFork(t *testing.T) {
 			name:       "set_default false leaves the default service unset",
 			tool:       toolServiceFork,
 			args:       map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "set_default": false},
-			setupMock:  expectFork(baseReq),
+			mock:       expectFork(baseReq),
 			wantOutput: accepted,
 			checks:     []checkFunc{checkDefaultService("")},
 		},
@@ -304,7 +304,7 @@ func TestServiceFork(t *testing.T) {
 			name:       "wait returns immediately when the fork is already ready",
 			tool:       toolServiceFork,
 			args:       waitArgs,
-			setupMock:  expectFork(baseReq),
+			mock:       expectFork(baseReq),
 			wantOutput: ready,
 		},
 		{
@@ -312,7 +312,7 @@ func TestServiceFork(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceFork,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectFork(baseReq, provisioning)(m)
 				expectGetService(m, "u8me885b93", forkedService())
 			},
@@ -325,7 +325,7 @@ func TestServiceFork(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceFork,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectFork(baseReq, provisioning)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "u8me885b93").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
@@ -343,7 +343,7 @@ func TestServiceFork(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceFork,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectFork(baseReq, provisioning)(m)
 				expectGetService(m, "u8me885b93", forkedService(provisioning)).AnyTimes()
 			},

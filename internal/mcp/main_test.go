@@ -61,12 +61,12 @@ const testProjectID = "test-project-id"
 // structured content. Left unset, wantErr asserts the call succeeded and
 // wantOutput asserts it returned no structured content.
 type toolTest struct {
-	name      string
-	tool      string
-	args      map[string]any
-	setupMock func(m *mocks.MockClientWithResponsesInterface)
-	opts      []runOption
-	checks    []checkFunc // optional extra assertions, run in order after the standard ones
+	name   string
+	tool   string
+	args   map[string]any
+	mock   func(m *mocks.MockClientWithResponsesInterface)
+	opts   []runOption
+	checks []checkFunc // optional extra assertions, run in order after the standard ones
 
 	wantErr    string
 	wantOutput map[string]any
@@ -113,7 +113,7 @@ func runToolTests(t *testing.T, tests []toolTest) {
 // runToolTests so a case can opt into running inside a synctest bubble.
 func runToolTest(t *testing.T, tt toolTest) {
 	t.Helper()
-	result := runTool(t, tt.tool, tt.args, tt.setupMock, tt.opts...)
+	result := runTool(t, tt.tool, tt.args, tt.mock, tt.opts...)
 
 	if tt.wantCallErr != "" {
 		if result.err == nil {

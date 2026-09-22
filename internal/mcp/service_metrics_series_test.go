@@ -163,27 +163,27 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool: toolServiceMetricsSeries,
 			args: baseArgs,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf", baseBody).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to fetch metric series: connection refused",
 		},
 		{
-			name:      "API error",
-			tool:      toolServiceMetricsSeries,
-			args:      baseArgs,
-			opts:      []runOption{experimental},
-			setupMock: expectError(http.StatusBadRequest, &api.ClientError{Message: new("unknown metric name")}),
-			wantErr:   "unknown metric name",
+			name:    "API error",
+			tool:    toolServiceMetricsSeries,
+			args:    baseArgs,
+			opts:    []runOption{experimental},
+			mock:    expectError(http.StatusBadRequest, &api.ClientError{Message: new("unknown metric name")}),
+			wantErr: "unknown metric name",
 		},
 		{
-			name:      "API error without a message body",
-			tool:      toolServiceMetricsSeries,
-			args:      baseArgs,
-			opts:      []runOption{experimental},
-			setupMock: expectError(http.StatusInternalServerError, nil),
-			wantErr:   "unknown error",
+			name:    "API error without a message body",
+			tool:    toolServiceMetricsSeries,
+			args:    baseArgs,
+			opts:    []runOption{experimental},
+			mock:    expectError(http.StatusInternalServerError, nil),
+			wantErr: "unknown error",
 		},
 		{
 			// A 200 with no parsed body is reported as no series, not an error.
@@ -191,7 +191,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:       toolServiceMetricsSeries,
 			args:       baseArgs,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(baseBody, nil),
+			mock:       expectSeries(baseBody, nil),
 			wantOutput: noSeries,
 		},
 		{
@@ -201,7 +201,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:       toolServiceMetricsSeries,
 			args:       baseArgs,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(baseBody, new([]api.MetricSeries)),
+			mock:       expectSeries(baseBody, new([]api.MetricSeries)),
 			wantOutput: noSeries,
 		},
 		{
@@ -209,7 +209,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:       toolServiceMetricsSeries,
 			args:       baseArgs,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(baseBody, &[]api.MetricSeries{}),
+			mock:       expectSeries(baseBody, &[]api.MetricSeries{}),
 			wantOutput: noSeries,
 		},
 		{
@@ -217,7 +217,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:       toolServiceMetricsSeries,
 			args:       baseArgs,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(baseBody, &series),
+			mock:       expectSeries(baseBody, &series),
 			wantOutput: wantSeries,
 		},
 		{
@@ -226,7 +226,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool: toolServiceMetricsSeries,
 			args: args(map[string]any{"role": "REPLICA"}),
 			opts: []runOption{experimental},
-			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.Filters = &[]api.MetricLabelFilter{{Key: "role", Value: "replica"}}
 			}), &[]api.MetricSeries{}),
 			wantOutput: noSeries,
@@ -244,7 +244,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 				},
 			}),
 			opts: []runOption{experimental},
-			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.Filters = &[]api.MetricLabelFilter{
 					{Key: "role", Value: "primary"},
 					{Key: "ordinal", Value: "0"},
@@ -257,7 +257,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool: toolServiceMetricsSeries,
 			args: args(map[string]any{"bucket_seconds": 3600, "fn": "AVG"}),
 			opts: []runOption{experimental},
-			setupMock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
 				b.BucketSeconds = new(3600)
 				b.Fn = new(api.MetricsAggFnAVG)
 			}), &[]api.MetricSeries{}),
@@ -269,7 +269,7 @@ func TestServiceMetricsSeries(t *testing.T) {
 			tool:       toolServiceMetricsSeries,
 			args:       args(map[string]any{"filters": []any{}}),
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(baseBody, &[]api.MetricSeries{}),
+			mock:       expectSeries(baseBody, &[]api.MetricSeries{}),
 			wantOutput: noSeries,
 		},
 	})

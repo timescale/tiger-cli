@@ -71,17 +71,17 @@ func TestFeedback(t *testing.T) {
 			wantErr: "feedback message is too long: 3001 characters, limit is 3000",
 		},
 		{
-			name:      "network error",
-			tool:      toolFeedback,
-			args:      args,
-			setupMock: expectSubmit("Great tool!", nil, errors.New("connection refused")),
-			wantErr:   "failed to submit feedback: connection refused",
+			name:    "network error",
+			tool:    toolFeedback,
+			args:    args,
+			mock:    expectSubmit("Great tool!", nil, errors.New("connection refused")),
+			wantErr: "failed to submit feedback: connection refused",
 		},
 		{
 			name: "API error",
 			tool: toolFeedback,
 			args: args,
-			setupMock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
+			mock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusBadRequest),
 				JSON4XX:      &api.Error{Message: new("message must not be blank")},
 			}, nil),
@@ -92,7 +92,7 @@ func TestFeedback(t *testing.T) {
 			name: "server error",
 			tool: toolFeedback,
 			args: args,
-			setupMock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
+			mock: expectSubmit("Great tool!", &api.SubmitFeedbackResponse{
 				HTTPResponse: httpResponse(http.StatusInternalServerError),
 			}, nil),
 			wantErr: "unknown error",
@@ -101,7 +101,7 @@ func TestFeedback(t *testing.T) {
 			name:       "submits feedback",
 			tool:       toolFeedback,
 			args:       args,
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
 		},
 		{
@@ -109,14 +109,14 @@ func TestFeedback(t *testing.T) {
 			name:       "trims surrounding whitespace",
 			tool:       toolFeedback,
 			args:       map[string]any{"message": "  Great tool!\n"},
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
 		},
 		{
 			name:       "message at the limit",
 			tool:       toolFeedback,
 			args:       map[string]any{"message": atLimit},
-			setupMock:  expectSubmit(atLimit, submitted, nil),
+			mock:       expectSubmit(atLimit, submitted, nil),
 			wantOutput: sent,
 		},
 		{
@@ -126,7 +126,7 @@ func TestFeedback(t *testing.T) {
 			tool:       toolFeedback,
 			args:       args,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
-			setupMock:  expectSubmit("Great tool!", submitted, nil),
+			mock:       expectSubmit("Great tool!", submitted, nil),
 			wantOutput: sent,
 		},
 	})

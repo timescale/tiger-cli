@@ -135,17 +135,17 @@ func TestDBQuery(t *testing.T) {
 		{
 			// The file is read before the service is looked up, so reaching the
 			// connection step proves its contents became the query.
-			name:      "SQL file read then stops before connecting",
-			tool:      toolDBQuery,
-			args:      map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
-			setupMock: setupGetWithStatus(api.DeployStatusREADY),
-			wantErr:   noEndpointMsg,
+			name:    "SQL file read then stops before connecting",
+			tool:    toolDBQuery,
+			args:    map[string]any{"service_id": "e6ue9697jf", "file": sqlFile},
+			mock:    setupGetWithStatus(api.DeployStatusREADY),
+			wantErr: noEndpointMsg,
 		},
 		{
 			name: "service lookup network error",
 			tool: toolDBQuery,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -155,7 +155,7 @@ func TestDBQuery(t *testing.T) {
 			name: "service lookup API error",
 			tool: toolDBQuery,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -168,7 +168,7 @@ func TestDBQuery(t *testing.T) {
 			name: "nil response body",
 			tool: toolDBQuery,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
@@ -180,7 +180,7 @@ func TestDBQuery(t *testing.T) {
 			name: "read replica resolves its parent",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica())
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},
@@ -190,7 +190,7 @@ func TestDBQuery(t *testing.T) {
 			name: "read replica parent lookup fails",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "u8me885b93", "query": "SELECT 1"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
@@ -201,31 +201,31 @@ func TestDBQuery(t *testing.T) {
 			wantErr: `failed to fetch parent service "e6ue9697jf" for read replica: service not found`,
 		},
 		{
-			name:      "service paused",
-			tool:      toolDBQuery,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusPAUSED),
-			wantErr:   pausedMsg,
+			name:    "service paused",
+			tool:    toolDBQuery,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusPAUSED),
+			wantErr: pausedMsg,
 		},
 		{
-			name:      "service pausing",
-			tool:      toolDBQuery,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusPAUSING),
-			wantErr:   pausedMsg,
+			name:    "service pausing",
+			tool:    toolDBQuery,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusPAUSING),
+			wantErr: pausedMsg,
 		},
 		{
-			name:      "service not ready",
-			tool:      toolDBQuery,
-			args:      args,
-			setupMock: setupGetWithStatus(api.DeployStatusQUEUED),
-			wantErr:   notReadyMsg,
+			name:    "service not ready",
+			tool:    toolDBQuery,
+			args:    args,
+			mock:    setupGetWithStatus(api.DeployStatusQUEUED),
+			wantErr: notReadyMsg,
 		},
 		{
 			name: "pooled without a pooler",
 			tool: toolDBQuery,
 			args: map[string]any{"service_id": "e6ue9697jf", "query": "SELECT 1", "pooled": true},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{
 						Host: new("e6ue9697jf.project.tsdb.cloud.timescale.com"),
@@ -237,19 +237,19 @@ func TestDBQuery(t *testing.T) {
 		},
 		{
 			// A query failure passes through handleDatabaseError unchanged.
-			name:      "query fails",
-			tool:      toolDBQuery,
-			args:      args,
-			opts:      []runOption{withExecuteQuery(baseArgs, nil, errors.New("failed to connect to database: no route to host"))},
-			setupMock: setupGetWithStatus(api.DeployStatusREADY),
-			wantErr:   "failed to connect to database: no route to host",
+			name:    "query fails",
+			tool:    toolDBQuery,
+			args:    args,
+			opts:    []runOption{withExecuteQuery(baseArgs, nil, errors.New("failed to connect to database: no route to host"))},
+			mock:    setupGetWithStatus(api.DeployStatusREADY),
+			wantErr: "failed to connect to database: no route to host",
 		},
 		{
 			name:       "returns the result sets",
 			tool:       toolDBQuery,
 			args:       args,
 			opts:       []runOption{withExecuteQuery(baseArgs, result, nil)},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
 		{
@@ -271,7 +271,7 @@ func TestDBQuery(t *testing.T) {
 				MaxRows:    config.DefaultMCPMaxRows,
 				MaxBytes:   mcpMaxResponseBytes,
 			}, result, nil)},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
 						Endpoint: &api.Endpoint{
@@ -294,7 +294,7 @@ func TestDBQuery(t *testing.T) {
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
 			}, result, nil)},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
 		{
@@ -313,7 +313,7 @@ func TestDBQuery(t *testing.T) {
 					MaxBytes: mcpMaxResponseBytes,
 				}, result, nil),
 			},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
 		{
@@ -329,7 +329,7 @@ func TestDBQuery(t *testing.T) {
 					MaxBytes: mcpMaxResponseBytes,
 				}, result, nil),
 			},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
 		{
@@ -343,7 +343,7 @@ func TestDBQuery(t *testing.T) {
 				withConfig(map[string]any{"mcp_max_rows": 0}),
 				withExecuteQuery(baseArgs, result, nil),
 			},
-			setupMock:  setupGetWithStatus(api.DeployStatusREADY),
+			mock:       setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: wantResult,
 		},
 		{
@@ -362,7 +362,7 @@ func TestDBQuery(t *testing.T) {
 				ExecutionTime: 12 * time.Millisecond,
 				Truncated:     true,
 			}, nil)},
-			setupMock: setupGetWithStatus(api.DeployStatusREADY),
+			mock: setupGetWithStatus(api.DeployStatusREADY),
 			wantOutput: map[string]any{
 				"result_sets": []any{map[string]any{
 					"command_tag":   "SELECT 100",
@@ -391,7 +391,7 @@ func TestDBQuery(t *testing.T) {
 				MaxRows:  config.DefaultMCPMaxRows,
 				MaxBytes: mcpMaxResponseBytes,
 			}, result, nil)},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "u8me885b93", sampleReplica(func(s *api.Service) { s.Status = api.DeployStatusREADY }))
 				expectGetService(m, "e6ue9697jf", sampleService())
 			},

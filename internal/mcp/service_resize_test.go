@@ -96,19 +96,19 @@ func TestServiceResize(t *testing.T) {
 		{
 			// Only the tag lookup is registered: an attempted resize fails as an
 			// unexpected call.
-			name:      "read-only prod refuses PROD service",
-			tool:      toolServiceResize,
-			args:      args,
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			tool:    toolServiceResize,
+			args:    args,
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			tool: toolServiceResize,
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV", 1)(m)
 				expectResize(api.DeployStatusCONFIGURING)(m)
 			},
@@ -118,7 +118,7 @@ func TestServiceResize(t *testing.T) {
 			name: "network error",
 			tool: toolServiceResize,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -128,7 +128,7 @@ func TestServiceResize(t *testing.T) {
 			name: "API error",
 			tool: toolServiceResize,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -141,7 +141,7 @@ func TestServiceResize(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceResize,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(&api.ResizeServiceResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
@@ -151,7 +151,7 @@ func TestServiceResize(t *testing.T) {
 			name:       "resizes without waiting by default",
 			tool:       toolServiceResize,
 			args:       args,
-			setupMock:  expectResize(api.DeployStatusCONFIGURING),
+			mock:       expectResize(api.DeployStatusCONFIGURING),
 			wantOutput: accepted,
 		},
 		{
@@ -159,7 +159,7 @@ func TestServiceResize(t *testing.T) {
 			name:       "wait returns immediately when the service is already ready",
 			tool:       toolServiceResize,
 			args:       waitArgs,
-			setupMock:  expectResize(api.DeployStatusREADY),
+			mock:       expectResize(api.DeployStatusREADY),
 			wantOutput: resized,
 		},
 		{
@@ -167,7 +167,7 @@ func TestServiceResize(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceResize,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResize(api.DeployStatusCONFIGURING)(m)
 				expectGetService(m, "e6ue9697jf", resizedService(api.DeployStatusREADY))
 			},
@@ -180,7 +180,7 @@ func TestServiceResize(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceResize,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResize(api.DeployStatusCONFIGURING)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
@@ -199,7 +199,7 @@ func TestServiceResize(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceResize,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResize(api.DeployStatusCONFIGURING)(m)
 				expectGetService(m, "e6ue9697jf", resizedService(api.DeployStatusCONFIGURING)).AnyTimes()
 			},

@@ -105,7 +105,7 @@ func TestServiceGet(t *testing.T) {
 			name: "network error",
 			tool: toolServiceGet,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -115,7 +115,7 @@ func TestServiceGet(t *testing.T) {
 			name: "API error",
 			tool: toolServiceGet,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -128,7 +128,7 @@ func TestServiceGet(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceGet,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
@@ -138,22 +138,22 @@ func TestServiceGet(t *testing.T) {
 			name:       "gets service without password",
 			tool:       toolServiceGet,
 			args:       args,
-			setupMock:  setupGet(fullService),
+			mock:       setupGet(fullService),
 			wantOutput: full,
 		},
 		{
 			name:       "gets service with password",
 			tool:       toolServiceGet,
 			args:       argsWithPassword,
-			setupMock:  setupGet(passwordService),
+			mock:       setupGet(passwordService),
 			wantOutput: withPassword,
 		},
 		{
-			name:      "password requested but unavailable",
-			tool:      toolServiceGet,
-			args:      argsWithPassword,
-			setupMock: setupGet(noPasswordService),
-			wantErr:   "requested password but password not available",
+			name:    "password requested but unavailable",
+			tool:    toolServiceGet,
+			args:    argsWithPassword,
+			mock:    setupGet(noPasswordService),
+			wantErr: "requested password but password not available",
 		},
 	})
 }

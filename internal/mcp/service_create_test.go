@@ -138,14 +138,14 @@ func TestServiceCreate(t *testing.T) {
 			tool:       toolServiceCreate,
 			args:       args,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock:  expectCreate(baseReq),
+			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
 		},
 		{
 			name: "network error",
 			tool: toolServiceCreate,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -155,7 +155,7 @@ func TestServiceCreate(t *testing.T) {
 			name: "API error",
 			tool: toolServiceCreate,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -168,7 +168,7 @@ func TestServiceCreate(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceCreate,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -180,7 +180,7 @@ func TestServiceCreate(t *testing.T) {
 			name:       "creates a service with the schema defaults",
 			tool:       toolServiceCreate,
 			args:       args,
-			setupMock:  expectCreate(baseReq),
+			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
 		},
 		{
@@ -188,7 +188,7 @@ func TestServiceCreate(t *testing.T) {
 			tool: toolServiceCreate,
 			args: map[string]any{},
 			opts: []runOption{withGenerateServiceName("db-42424")},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Name = "db-42424"
 				expectCreate(req, func(s *api.Service) { s.Name = "db-42424" })(m)
@@ -208,7 +208,7 @@ func TestServiceCreate(t *testing.T) {
 				"replicas":   2,
 				"cpu_memory": "2 CPU/8 GB",
 			},
-			setupMock: expectCreate(api.ServiceCreate{
+			mock: expectCreate(api.ServiceCreate{
 				Name:           "test-service",
 				Addons:         &[]api.ServiceCreateAddons{"time-series", "ai"},
 				RegionCode:     new("us-west-2"),
@@ -231,10 +231,10 @@ func TestServiceCreate(t *testing.T) {
 			},
 		},
 		{
-			name:      "stores the initial password without returning it",
-			tool:      toolServiceCreate,
-			args:      args,
-			setupMock: expectCreate(baseReq, withInitialPassword),
+			name: "stores the initial password without returning it",
+			tool: toolServiceCreate,
+			args: args,
+			mock: expectCreate(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service":          baseDetail,
 				"message":          acceptedMsg,
@@ -242,10 +242,10 @@ func TestServiceCreate(t *testing.T) {
 			},
 		},
 		{
-			name:      "with_password returns the password and embeds it in the connection string",
-			tool:      toolServiceCreate,
-			args:      map[string]any{"name": "test-service", "with_password": true},
-			setupMock: expectCreate(baseReq, withInitialPassword),
+			name: "with_password returns the password and embeds it in the connection string",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "with_password": true},
+			mock: expectCreate(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service": detail(map[string]any{
 					"password":          "init-pass-123",
@@ -258,11 +258,11 @@ func TestServiceCreate(t *testing.T) {
 		{
 			// A storage failure isn't fatal: the service exists either way, so
 			// the tool reports the failure rather than erroring.
-			name:      "reports a password storage failure",
-			tool:      toolServiceCreate,
-			args:      args,
-			opts:      []runOption{withKeyringError(errors.New("keyring is locked"))},
-			setupMock: expectCreate(baseReq, withInitialPassword),
+			name: "reports a password storage failure",
+			tool: toolServiceCreate,
+			args: args,
+			opts: []runOption{withKeyringError(errors.New("keyring is locked"))},
+			mock: expectCreate(baseReq, withInitialPassword),
 			wantOutput: map[string]any{
 				"service": baseDetail,
 				"message": acceptedMsg,
@@ -279,7 +279,7 @@ func TestServiceCreate(t *testing.T) {
 			name:       "sets the new service as the default",
 			tool:       toolServiceCreate,
 			args:       args,
-			setupMock:  expectCreate(baseReq),
+			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
 			checks:     []checkFunc{checkDefaultService("e6ue9697jf")},
 		},
@@ -287,7 +287,7 @@ func TestServiceCreate(t *testing.T) {
 			name:       "set_default false leaves the default service unset",
 			tool:       toolServiceCreate,
 			args:       map[string]any{"name": "test-service", "set_default": false},
-			setupMock:  expectCreate(baseReq),
+			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
 			checks:     []checkFunc{checkDefaultService("")},
 		},
@@ -296,7 +296,7 @@ func TestServiceCreate(t *testing.T) {
 			name:       "wait returns immediately when the service is already ready",
 			tool:       toolServiceCreate,
 			args:       waitArgs,
-			setupMock:  expectCreate(baseReq),
+			mock:       expectCreate(baseReq),
 			wantOutput: ready,
 		},
 		{
@@ -304,7 +304,7 @@ func TestServiceCreate(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceCreate,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, provisioning)(m)
 				expectGetService(m, "e6ue9697jf", newService())
 			},
@@ -317,7 +317,7 @@ func TestServiceCreate(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceCreate,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, provisioning)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
@@ -335,7 +335,7 @@ func TestServiceCreate(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceCreate,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectCreate(baseReq, provisioning)(m)
 				expectGetService(m, "e6ue9697jf", newService(provisioning)).AnyTimes()
 			},

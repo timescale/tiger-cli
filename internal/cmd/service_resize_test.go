@@ -31,17 +31,17 @@ func TestServiceResizeCmd(t *testing.T) {
 			// prod judges the service by its environment tag, so the gate
 			// fetches it. Only the tag lookup is registered: an attempted
 			// mutation fails as an unexpected call.
-			name:      "read-only prod refuses PROD service",
-			args:      []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD"),
-			wantErr:   `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD"),
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
@@ -72,7 +72,7 @@ Use 'tiger service get' to check service status.
 		{
 			name: "network error",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -82,7 +82,7 @@ Use 'tiger service get' to check service status.
 		{
 			name: "API error",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -96,7 +96,7 @@ Use 'tiger service get' to check service status.
 		{
 			name: "nil response body",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -108,7 +108,7 @@ Use 'tiger service get' to check service status.
 		{
 			name: "success with wait, service immediately ready",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -124,7 +124,7 @@ Service resized to 2 CPU/8 GB.
 		{
 			name: "no wait",
 			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8", "--no-wait"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -140,7 +140,7 @@ Use 'tiger service get' to check service status.
 			name: "service id from config, cpu only auto-configures memory",
 			args: []string{"service", "resize", "--cpu", "2000", "--no-wait"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -155,7 +155,7 @@ Use 'tiger service get' to check service status.
 		{
 			name: "memory only auto-configures cpu",
 			args: []string{"service", "resize", "svc-12345", "--memory", "16", "--no-wait"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "4000", MemoryGbs: "16"}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -171,7 +171,7 @@ Use 'tiger service get' to check service status.
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				configuring := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusCONFIGURING
 				})

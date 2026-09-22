@@ -62,19 +62,19 @@ func TestServiceStop(t *testing.T) {
 		{
 			// Only the tag lookup is registered: an attempted stop fails as an
 			// unexpected call.
-			name:      "read-only prod refuses PROD service",
-			tool:      toolServiceStop,
-			args:      args,
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			tool:    toolServiceStop,
+			args:    args,
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			tool: toolServiceStop,
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV", 1)(m)
 				expectStop(api.DeployStatusPAUSING)(m)
 			},
@@ -84,7 +84,7 @@ func TestServiceStop(t *testing.T) {
 			name: "network error",
 			tool: toolServiceStop,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -94,7 +94,7 @@ func TestServiceStop(t *testing.T) {
 			name: "API error",
 			tool: toolServiceStop,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -107,7 +107,7 @@ func TestServiceStop(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceStop,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.StopServiceResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
@@ -117,7 +117,7 @@ func TestServiceStop(t *testing.T) {
 			name:       "stops without waiting by default",
 			tool:       toolServiceStop,
 			args:       args,
-			setupMock:  expectStop(api.DeployStatusPAUSING),
+			mock:       expectStop(api.DeployStatusPAUSING),
 			wantOutput: accepted,
 		},
 		{
@@ -125,7 +125,7 @@ func TestServiceStop(t *testing.T) {
 			name:       "wait returns immediately when the service is already paused",
 			tool:       toolServiceStop,
 			args:       waitArgs,
-			setupMock:  expectStop(api.DeployStatusPAUSED),
+			mock:       expectStop(api.DeployStatusPAUSED),
 			wantOutput: stopped,
 		},
 		{
@@ -133,7 +133,7 @@ func TestServiceStop(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStop,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStop(api.DeployStatusPAUSING)(m)
 				expectGetService(m, "e6ue9697jf", withStatus(api.DeployStatusPAUSED))
 			},
@@ -146,7 +146,7 @@ func TestServiceStop(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStop,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStop(api.DeployStatusPAUSING)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
@@ -164,7 +164,7 @@ func TestServiceStop(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStop,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStop(api.DeployStatusPAUSING)(m)
 				expectGetService(m, "e6ue9697jf", withStatus(api.DeployStatusPAUSING)).AnyTimes()
 			},

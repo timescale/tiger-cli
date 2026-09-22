@@ -40,17 +40,17 @@ func TestServiceStartCmd(t *testing.T) {
 			// prod judges the service by its environment tag, so the gate
 			// fetches it. Only the tag lookup is registered: an attempted
 			// mutation fails as an unexpected call.
-			name:      "read-only prod refuses PROD service",
-			args:      []string{"service", "start", "svc-12345"},
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD"),
-			wantErr:   `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "start", "svc-12345"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD"),
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			args: []string{"service", "start", "svc-12345", "--no-wait"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				setupStart(api.DeployStatusRESUMING)(m)
 			},
@@ -65,7 +65,7 @@ func TestServiceStartCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -74,7 +74,7 @@ func TestServiceStartCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -87,7 +87,7 @@ func TestServiceStartCmd(t *testing.T) {
 		{
 			name: "service not found",
 			args: []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -100,7 +100,7 @@ func TestServiceStartCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -109,16 +109,16 @@ func TestServiceStartCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name:      "no-wait",
-			args:      []string{"service", "start", "svc-12345", "--no-wait"},
-			setupMock: setupStart(api.DeployStatusRESUMING),
+			name: "no-wait",
+			args: []string{"service", "start", "svc-12345", "--no-wait"},
+			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
-			name:      "wait returns immediately when already ready",
-			args:      []string{"service", "start", "svc-12345"},
-			setupMock: setupStart(api.DeployStatusREADY),
+			name: "wait returns immediately when already ready",
+			args: []string{"service", "start", "svc-12345"},
+			mock: setupStart(api.DeployStatusREADY),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
 				"Waiting for service to start (timeout: 10m0s)...\n" +
 				"Service started.\n",
@@ -127,7 +127,7 @@ func TestServiceStartCmd(t *testing.T) {
 			name:     "wait polls until ready",
 			synctest: true,
 			args:     []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStart(api.DeployStatusRESUMING)(m)
 				ready := sampleService()
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
@@ -145,7 +145,7 @@ func TestServiceStartCmd(t *testing.T) {
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"service", "start", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupStart(api.DeployStatusRESUMING)(m)
 				// The service never reaches the target state, so the wait
 				// polls until the (virtual) deadline. The non-TTY spinner
@@ -165,17 +165,17 @@ func TestServiceStartCmd(t *testing.T) {
 			checks: []checkFunc{checkExitCode(common.ExitTimeout)},
 		},
 		{
-			name:      "default service id from config",
-			args:      []string{"service", "start", "--no-wait"},
-			opts:      []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setupMock: setupStart(api.DeployStatusRESUMING),
+			name: "default service id from config",
+			args: []string{"service", "start", "--no-wait"},
+			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
+			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
-			name:      "resume alias",
-			args:      []string{"service", "resume", "svc-12345", "--no-wait"},
-			setupMock: setupStart(api.DeployStatusRESUMING),
+			name: "resume alias",
+			args: []string{"service", "resume", "svc-12345", "--no-wait"},
+			mock: setupStart(api.DeployStatusRESUMING),
 			wantStderr: "Start request accepted for service 'svc-12345'.\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},

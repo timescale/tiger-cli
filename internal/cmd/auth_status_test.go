@@ -78,7 +78,7 @@ func TestAuthStatusCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"auth", "status"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetAuthInfoWithResponse(validCtx).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -87,7 +87,7 @@ func TestAuthStatusCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"auth", "status"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetAuthInfoWithResponse(validCtx).
 					Return(&api.GetAuthInfoResponse{
 						HTTPResponse: httpResponse(http.StatusUnauthorized),
@@ -100,7 +100,7 @@ func TestAuthStatusCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"auth", "status"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetAuthInfoWithResponse(validCtx).
 					Return(&api.GetAuthInfoResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -112,13 +112,13 @@ func TestAuthStatusCmd(t *testing.T) {
 		{
 			name:       "table output for PAT credentials",
 			args:       []string{"auth", "status"},
-			setupMock:  setupAuthInfo(patInfo),
+			mock:       setupAuthInfo(patInfo),
 			wantStdout: patTable,
 		},
 		{
-			name:      "table output for OAuth session",
-			args:      []string{"auth", "status"},
-			setupMock: setupAuthInfo(oauthInfo),
+			name: "table output for OAuth session",
+			args: []string{"auth", "status"},
+			mock: setupAuthInfo(oauthInfo),
 			wantStdout: `┌─────────────┬──────────────────────────────┐
 │  PROPERTY   │            VALUE             │
 ├─────────────┼──────────────────────────────┤
@@ -131,7 +131,7 @@ func TestAuthStatusCmd(t *testing.T) {
 		{
 			name: "table output for OAuth session without name",
 			args: []string{"auth", "status"},
-			setupMock: setupAuthInfo(api.AuthInfo{
+			mock: setupAuthInfo(api.AuthInfo{
 				Type: api.AuthInfoTypeOauth,
 				Oauth: &api.AuthInfoOAuth{
 					User: api.AuthInfoUser{ID: "user-123", Email: "test@example.com"},
@@ -147,15 +147,15 @@ func TestAuthStatusCmd(t *testing.T) {
 `,
 		},
 		{
-			name:      "unsupported auth info type",
-			args:      []string{"auth", "status"},
-			setupMock: setupAuthInfo(api.AuthInfo{Type: "bogus"}),
-			wantErr:   `unsupported auth info type: "bogus"`,
+			name:    "unsupported auth info type",
+			args:    []string{"auth", "status"},
+			mock:    setupAuthInfo(api.AuthInfo{Type: "bogus"}),
+			wantErr: `unsupported auth info type: "bogus"`,
 		},
 		{
-			name:      "json output",
-			args:      []string{"auth", "status", "-o", "json"},
-			setupMock: setupAuthInfo(patInfo),
+			name: "json output",
+			args: []string{"auth", "status", "-o", "json"},
+			mock: setupAuthInfo(patInfo),
 			wantStdout: `{
   "api_key": {
     "created": "2025-01-15T10:30:00Z",
@@ -177,9 +177,9 @@ func TestAuthStatusCmd(t *testing.T) {
 `,
 		},
 		{
-			name:      "yaml output",
-			args:      []string{"auth", "status", "-o", "yaml"},
-			setupMock: setupAuthInfo(patInfo),
+			name: "yaml output",
+			args: []string{"auth", "status", "-o", "yaml"},
+			mock: setupAuthInfo(patInfo),
 			wantStdout: `api_key:
   created: "2025-01-15T10:30:00Z"
   issuing_user:
@@ -198,7 +198,7 @@ type: apiKey
 		{
 			name:       "whoami alias",
 			args:       []string{"auth", "whoami"},
-			setupMock:  setupAuthInfo(patInfo),
+			mock:       setupAuthInfo(patInfo),
 			wantStdout: patTable,
 		},
 	})

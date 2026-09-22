@@ -107,7 +107,7 @@ func TestServiceBackups(t *testing.T) {
 			tool: toolServiceBackups,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -118,7 +118,7 @@ func TestServiceBackups(t *testing.T) {
 			tool: toolServiceBackups,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -132,7 +132,7 @@ func TestServiceBackups(t *testing.T) {
 			tool: toolServiceBackups,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -146,7 +146,7 @@ func TestServiceBackups(t *testing.T) {
 			tool:       toolServiceBackups,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectBackups(nil),
+			mock:       expectBackups(nil),
 			wantOutput: noBackups,
 		},
 		{
@@ -156,7 +156,7 @@ func TestServiceBackups(t *testing.T) {
 			tool:       toolServiceBackups,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectBackups(new([]api.Backup)),
+			mock:       expectBackups(new([]api.Backup)),
 			wantOutput: noBackups,
 		},
 		{
@@ -164,7 +164,7 @@ func TestServiceBackups(t *testing.T) {
 			tool:       toolServiceBackups,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectBackups(&[]api.Backup{}),
+			mock:       expectBackups(&[]api.Backup{}),
 			wantOutput: noBackups,
 		},
 		{
@@ -172,7 +172,7 @@ func TestServiceBackups(t *testing.T) {
 			tool:       toolServiceBackups,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectBackups(&backups),
+			mock:       expectBackups(&backups),
 			wantOutput: wantBackups,
 		},
 	})

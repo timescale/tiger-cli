@@ -93,7 +93,7 @@ func TestServiceCreateCmd(t *testing.T) {
 			name: "read-only prod allows requested DEV",
 			args: []string{"service", "create", "--name", "test-service", "--environment", "DEV", "--no-wait"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -111,7 +111,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "network error",
 			args: []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -121,7 +121,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "API error",
 			args: []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -135,7 +135,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "nil response body",
 			args: []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -147,7 +147,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "success with wait, service immediately ready",
 			args: []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -166,7 +166,7 @@ Service is ready.
 		{
 			name: "initial password saved to keyring",
 			args: []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				pwSvc := sampleService(func(s *api.Service) {
 					s.InitialPassword = new("init-pass-123")
 				})
@@ -190,7 +190,7 @@ Connect with: tiger db psql
 		{
 			name: "no set default",
 			args: []string{"service", "create", "--name", "test-service", "--no-set-default"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				pwSvc := sampleService(func(s *api.Service) {
 					s.InitialPassword = new("init-pass-123")
 				})
@@ -213,7 +213,7 @@ Connect with: tiger db psql svc-12345
 		{
 			name: "no wait",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -232,7 +232,7 @@ Service is being created. Use 'tiger service list' to check status.
 			name:     "wait polls until ready",
 			synctest: true,
 			args:     []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				queued := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
 				})
@@ -261,7 +261,7 @@ Service is ready.
 			name:     "wait timeout",
 			synctest: true,
 			args:     []string{"service", "create", "--name", "test-service"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				queued := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
 				})
@@ -295,7 +295,7 @@ Error: wait timeout reached after 30m0s - service may still be provisioning
 		{
 			name: "json output",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait", "-o", "json"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -312,7 +312,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "yaml output",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait", "-o", "yaml"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -329,7 +329,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "env output",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait", "-o", "env"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -350,7 +350,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "with-password includes initial password in output",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait", "--with-password", "-o", "env"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				pwSvc := sampleService(func(s *api.Service) {
 					s.InitialPassword = new("init-pass-123")
 				})
@@ -381,7 +381,7 @@ Service is being created. Use 'tiger service list' to check status.
 				"--replicas", "2", "--cpu", "1000", "--memory", "4",
 				"--environment", "prod", "--no-wait", "--no-set-default", "-o", "env",
 			},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, api.ServiceCreate{
 					Name:           "test-service",
 					Addons:         &[]api.ServiceCreateAddons{"time-series", "ai"},
@@ -408,7 +408,7 @@ Service is being created. Use 'tiger service list' to check status.
 		{
 			name: "addons none sends empty list",
 			args: []string{"service", "create", "--name", "test-service", "--addons", "none", "--no-wait", "--no-set-default", "-o", "env"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, api.ServiceCreate{
 					Name:           "test-service",
 					Addons:         &[]api.ServiceCreateAddons{},
@@ -433,7 +433,7 @@ Service is being created. Use 'tiger service list' to check status.
 			name: "output flag does not persist to config file",
 			args: []string{"service", "create", "--name", "test-service", "--no-wait", "-o", "json"},
 			opts: []runOption{withConfig(map[string]any{"output": "yaml"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -462,7 +462,7 @@ Service is being created. Use 'tiger service list' to check status.
 			name: "auto-generated name",
 			args: []string{"service", "create", "--no-wait", "--no-set-default", "-o", "env"},
 			opts: []runOption{withGenerateServiceName("db-42424")},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Name = "db-42424"
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).

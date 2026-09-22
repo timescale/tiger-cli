@@ -80,7 +80,7 @@ func TestServiceDelete(t *testing.T) {
 			name: "service lookup fails",
 			tool: toolServiceDelete,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -92,19 +92,19 @@ func TestServiceDelete(t *testing.T) {
 		{
 			// Only the tag lookup is registered: an attempted deletion fails as
 			// an unexpected call.
-			name:      "read-only prod refuses PROD service",
-			tool:      toolServiceDelete,
-			args:      args,
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			tool:    toolServiceDelete,
+			args:    args,
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name:       "read-only prod allows DEV service",
 			tool:       toolServiceDelete,
 			args:       args,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock:  expectTaggedServiceAndDelete("DEV"),
+			mock:       expectTaggedServiceAndDelete("DEV"),
 			wantOutput: deleted,
 		},
 		{
@@ -112,7 +112,7 @@ func TestServiceDelete(t *testing.T) {
 			name:       "deletes DEV service without prompting",
 			tool:       toolServiceDelete,
 			args:       args,
-			setupMock:  expectTaggedServiceAndDelete("DEV"),
+			mock:       expectTaggedServiceAndDelete("DEV"),
 			wantOutput: deleted,
 		},
 		{
@@ -122,7 +122,7 @@ func TestServiceDelete(t *testing.T) {
 			tool: toolServiceDelete,
 			args: args,
 			opts: []runOption{confirm("e6ue9697jf")},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("PROD", 2)(m)
 				expectDelete(m)
 			},
@@ -134,7 +134,7 @@ func TestServiceDelete(t *testing.T) {
 			tool:       toolServiceDelete,
 			args:       args,
 			opts:       []runOption{confirm("u8me885b93")},
-			setupMock:  expectTaggedService("PROD", 2),
+			mock:       expectTaggedService("PROD", 2),
 			wantPrompt: prompt,
 			wantOutput: cancelled,
 		},
@@ -145,7 +145,7 @@ func TestServiceDelete(t *testing.T) {
 			tool:       toolServiceDelete,
 			args:       args,
 			opts:       []runOption{confirm("fail")},
-			setupMock:  expectTaggedService("PROD", 2),
+			mock:       expectTaggedService("PROD", 2),
 			wantPrompt: prompt,
 			wantOutput: cancelled,
 		},
@@ -154,7 +154,7 @@ func TestServiceDelete(t *testing.T) {
 			tool:       toolServiceDelete,
 			args:       args,
 			opts:       []runOption{withElicitation(&mcp.ElicitResult{Action: "decline"})},
-			setupMock:  expectTaggedService("PROD", 2),
+			mock:       expectTaggedService("PROD", 2),
 			wantPrompt: prompt,
 			wantOutput: cancelled,
 		},
@@ -163,16 +163,16 @@ func TestServiceDelete(t *testing.T) {
 			tool:       toolServiceDelete,
 			args:       args,
 			opts:       []runOption{withElicitation(&mcp.ElicitResult{Action: "cancel"})},
-			setupMock:  expectTaggedService("PROD", 2),
+			mock:       expectTaggedService("PROD", 2),
 			wantPrompt: prompt,
 			wantOutput: cancelled,
 		},
 		{
-			name:      "PROD deletion refused when the client lacks elicitation",
-			tool:      toolServiceDelete,
-			args:      args,
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   noElicitationMsg,
+			name:    "PROD deletion refused when the client lacks elicitation",
+			tool:    toolServiceDelete,
+			args:    args,
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: noElicitationMsg,
 		},
 		{
 			name: "PROD deletion refused when the client supports only url elicitation",
@@ -181,14 +181,14 @@ func TestServiceDelete(t *testing.T) {
 			opts: []runOption{withClientCapabilities(&mcp.ClientCapabilities{
 				Elicitation: &mcp.ElicitationCapabilities{URL: &mcp.URLElicitationCapabilities{}},
 			})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   noElicitationMsg,
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: noElicitationMsg,
 		},
 		{
 			name: "delete API error",
 			tool: toolServiceDelete,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV", 1)(m)
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.DeleteServiceResponse{

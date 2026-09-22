@@ -86,7 +86,7 @@ Service is being forked. Use 'tiger service list' to check status.
 			name: "read-only prod allows requested DEV",
 			args: []string{"service", "fork", "svc-12345", "--now", "--environment", "DEV", "--no-wait", "--no-set-default", "-o", "env"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -109,7 +109,7 @@ Service is being forked. Use 'tiger service list' to check status.
 		{
 			name: "network error",
 			args: []string{"service", "fork", "svc-12345", "--now"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -119,7 +119,7 @@ Service is being forked. Use 'tiger service list' to check status.
 		{
 			name: "API error",
 			args: []string{"service", "fork", "svc-12345", "--now"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -133,7 +133,7 @@ Service is being forked. Use 'tiger service list' to check status.
 		{
 			name: "nil response body",
 			args: []string{"service", "fork", "svc-12345", "--now"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -145,7 +145,7 @@ Service is being forked. Use 'tiger service list' to check status.
 		{
 			name: "fork now success with wait",
 			args: []string{"service", "fork", "svc-12345", "--now"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				pwForked := sampleService(func(s *api.Service) {
 					s.ServiceID = "svc-67890"
 					s.Name = "test-service-fork"
@@ -175,7 +175,7 @@ Connect with: tiger db psql
 			name: "source service id from config",
 			args: []string{"service", "fork", "--now", "--no-wait", "--no-set-default", "-o", "env"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -189,7 +189,7 @@ Connect with: tiger db psql
 		{
 			name: "last snapshot strategy",
 			args: []string{"service", "fork", "svc-12345", "--last-snapshot", "--no-wait", "--no-set-default", "-o", "env"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyLASTSNAPSHOT,
 					EnvironmentTag: new(api.EnvironmentTagDEV),
@@ -204,7 +204,7 @@ Connect with: tiger db psql
 		{
 			name: "to-timestamp strategy",
 			args: []string{"service", "fork", "svc-12345", "--to-timestamp", "2025-01-15T10:30:00Z", "--no-wait", "--no-set-default", "-o", "env"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyPITR,
 					TargetTime:     new(time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)),
@@ -224,7 +224,7 @@ Connect with: tiger db psql
 				"--cpu", "2000", "--memory", "8", "--environment", "prod",
 				"--no-wait", "--no-set-default", "-o", "env",
 			},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyNOW,
 					Name:           new("my-fork"),

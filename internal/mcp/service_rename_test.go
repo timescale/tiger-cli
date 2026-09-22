@@ -66,26 +66,26 @@ func TestServiceRename(t *testing.T) {
 		{
 			// Only the tag lookup is registered: an attempted rename fails as an
 			// unexpected call.
-			name:      "read-only prod refuses PROD service",
-			tool:      toolServiceRename,
-			args:      args,
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			tool:    toolServiceRename,
+			args:    args,
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name:       "read-only prod allows DEV service",
 			tool:       toolServiceRename,
 			args:       args,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock:  expectTaggedServiceAndRename("DEV"),
+			mock:       expectTaggedServiceAndRename("DEV"),
 			wantOutput: output,
 		},
 		{
 			name: "rename request fails",
 			tool: toolServiceRename,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ServiceRename{Name: "renamed-service"}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -95,7 +95,7 @@ func TestServiceRename(t *testing.T) {
 			name: "rename API error",
 			tool: toolServiceRename,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ServiceRename{Name: "renamed-service"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -108,7 +108,7 @@ func TestServiceRename(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceRename,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ServiceRename{Name: "renamed-service"}).
 					Return(&api.RenameServiceResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
@@ -120,7 +120,7 @@ func TestServiceRename(t *testing.T) {
 			name:       "renames service",
 			tool:       toolServiceRename,
 			args:       args,
-			setupMock:  expectRename,
+			mock:       expectRename,
 			wantOutput: output,
 		},
 		{
@@ -128,7 +128,7 @@ func TestServiceRename(t *testing.T) {
 			name: "reports the name the API stored",
 			tool: toolServiceRename,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				stored := sampleService(func(s *api.Service) { s.Name = "renamed-service-1" })
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ServiceRename{Name: "renamed-service"}).
 					Return(&api.RenameServiceResponse{

@@ -74,7 +74,7 @@ const testProjectID = "test-project-123"
 type cmdTest struct {
 	name       string
 	args       []string
-	setupMock  func(m *mocks.MockClientWithResponsesInterface)
+	mock       func(m *mocks.MockClientWithResponsesInterface)
 	opts       []runOption
 	wantStdout any
 	wantStderr any
@@ -133,7 +133,7 @@ func runCmdTests(t *testing.T, tests []cmdTest) {
 // runCmdTests so a case can opt into running inside a synctest bubble.
 func runCmdTest(t *testing.T, tt cmdTest) {
 	t.Helper()
-	result := runCommand(t, tt.args, tt.setupMock, tt.opts...)
+	result := runCommand(t, tt.args, tt.mock, tt.opts...)
 
 	if tt.wantErr != nil {
 		if result.err == nil {

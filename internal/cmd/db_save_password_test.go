@@ -52,7 +52,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name: "network error fetching service",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -61,7 +61,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name: "API error fetching service",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -74,7 +74,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"db", "save-password", "svc-12345", "--password=pw"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -84,29 +84,29 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name:      "empty password via flag",
-			args:      []string{"db", "save-password", "svc-12345", "--password="},
-			setupMock: setupGetService,
-			wantErr:   "password cannot be empty when provided via --password flag",
+			name:    "empty password via flag",
+			args:    []string{"db", "save-password", "svc-12345", "--password="},
+			mock:    setupGetService,
+			wantErr: "password cannot be empty when provided via --password flag",
 		},
 		{
-			name:      "no password without a TTY",
-			args:      []string{"db", "save-password", "svc-12345"},
-			setupMock: setupGetService,
-			wantErr:   "TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable",
+			name:    "no password without a TTY",
+			args:    []string{"db", "save-password", "svc-12345"},
+			mock:    setupGetService,
+			wantErr: "TTY not detected - password required. Use --password flag or TIGER_NEW_PASSWORD environment variable",
 		},
 		{
 			name:       "empty password at prompt",
 			args:       []string{"db", "save-password", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withReadPassword("")},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantErr:    "password cannot be empty",
 			wantStderr: "Enter password: \nError: password cannot be empty\n",
 		},
 		{
 			name:       "saves password from flag",
 			args:       []string{"db", "save-password", "svc-12345", "--password=flag-pw"},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
 		},
@@ -114,7 +114,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "default service ID from config",
 			args:       []string{"db", "save-password", "--password=default-pw"},
 			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "default-pw")},
 		},
@@ -122,7 +122,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "saves password from TIGER_NEW_PASSWORD",
 			args:       []string{"db", "save-password", "svc-12345"},
 			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "env-pw")},
 		},
@@ -130,7 +130,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "flag takes precedence over TIGER_NEW_PASSWORD",
 			args:       []string{"db", "save-password", "svc-12345", "--password=flag-pw"},
 			opts:       []runOption{withEnv("TIGER_NEW_PASSWORD", "env-pw")},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "flag-pw")},
 		},
@@ -138,14 +138,14 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "prompts for password on a TTY",
 			args:       []string{"db", "save-password", "svc-12345"},
 			opts:       []runOption{withIsTerminal(true), withReadPassword("prompt-pw")},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Enter password: \nPassword saved for service svc-12345 (role tsdbadmin)\n",
 			checks:     []checkFunc{checkKeyringPassword("tsdbadmin", "prompt-pw")},
 		},
 		{
 			name:       "custom role",
 			args:       []string{"db", "save-password", "svc-12345", "--password=readonly-pw", "--role", "readonly"},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role readonly)\n",
 			checks: []checkFunc{checkKeyringPassword("readonly", "readonly-pw"), func(t *testing.T, result cmdResult) {
 				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
@@ -157,7 +157,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "pgpass storage",
 			args:       []string{"db", "save-password", "svc-12345", "--password=pgpass-pw", "--password-storage", "pgpass"},
 			opts:       []runOption{withEnv("HOME", pgpassHome)},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				data, err := os.ReadFile(filepath.Join(pgpassHome, ".pgpass"))
@@ -171,7 +171,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 			name:       "pgpass save overwrites existing entry",
 			args:       []string{"db", "save-password", "svc-12345", "--password=first-pw", "--password-storage", "pgpass"},
 			opts:       []runOption{withEnv("HOME", overwriteHome)},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				second := runCommand(t,
@@ -191,7 +191,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name:       "none storage saves nothing",
 			args:       []string{"db", "save-password", "svc-12345", "--password=none-pw", "--password-storage", "none"},
-			setupMock:  setupGetService,
+			mock:       setupGetService,
 			wantStderr: "Password saved for service svc-12345 (role tsdbadmin)\n",
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
 				if pw, err := (&common.KeyringStorage{}).Get(sampleService(), "tsdbadmin"); err == nil {
@@ -202,7 +202,7 @@ func TestDbSavePasswordCmd(t *testing.T) {
 		{
 			name: "replica ID saves against parent primary",
 			args: []string{"db", "save-password", "rep-67890", "--password=replica-pw"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				setupGetService(m)
 			},

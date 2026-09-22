@@ -77,7 +77,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -88,7 +88,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(&api.GetServiceLogsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -102,7 +102,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", defaultParams).
 					Return(logsResponse(nil), nil)
 			},
@@ -113,7 +113,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest:   true,
 			tool:       toolServiceLogs,
 			args:       args,
-			setupMock:  expectLogs(api.ServiceLogs{}),
+			mock:       expectLogs(api.ServiceLogs{}),
 			wantOutput: map[string]any{"logs": []any{}},
 		},
 		{
@@ -121,7 +121,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest:   true,
 			tool:       toolServiceLogs,
 			args:       args,
-			setupMock:  expectLogs(api.ServiceLogs{Entries: &entries}),
+			mock:       expectLogs(api.ServiceLogs{Entries: &entries}),
 			wantOutput: entriesOutput,
 		},
 		{
@@ -130,7 +130,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
+			mock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: checkpoint complete", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.UTC)},
 				{Message: "LOG: no timestamp", Severity: "LOG"},
 			}}),
@@ -145,7 +145,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     args,
-			setupMock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
+			mock: expectLogs(api.ServiceLogs{Entries: &[]api.ServiceLogEntry{
 				{Message: "LOG: ready", Severity: "LOG", Timestamp: time.Date(2025, 1, 15, 10, 31, 0, 0, time.FixedZone("UTC+2", 2*60*60))},
 			}}),
 			wantOutput: map[string]any{"logs": []any{"2025-01-15 08:31:00 UTC LOG: ready"}},
@@ -157,7 +157,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     map[string]any{"service_id": "e6ue9697jf", "tail": 3},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
 					{Message: "entry 4", Severity: "LOG"},
@@ -188,7 +188,7 @@ func TestServiceLogs(t *testing.T) {
 				"since":      "2024-01-15T09:00:00Z",
 				"until":      "2024-01-15T10:00:00Z",
 			},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
@@ -204,7 +204,7 @@ func TestServiceLogs(t *testing.T) {
 			name: "node 0 reaches the request",
 			tool: toolServiceLogs,
 			args: map[string]any{"service_id": "e6ue9697jf", "node": 0, "until": "2024-01-15T10:00:00Z"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
 					Node:  new(0),
@@ -219,7 +219,7 @@ func TestServiceLogs(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceLogs,
 			args:     map[string]any{"service_id": "e6ue9697jf", "node": 2},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "e6ue9697jf", &api.GetServiceLogsParams{
 					Node:  new(2),
 					Until: &now,

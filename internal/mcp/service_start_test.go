@@ -62,19 +62,19 @@ func TestServiceStart(t *testing.T) {
 		{
 			// Only the tag lookup is registered: an attempted start fails as an
 			// unexpected call.
-			name:      "read-only prod refuses PROD service",
-			tool:      toolServiceStart,
-			args:      args,
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD", 1),
-			wantErr:   `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			tool:    toolServiceStart,
+			args:    args,
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD", 1),
+			wantErr: `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			tool: toolServiceStart,
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV", 1)(m)
 				expectStart(api.DeployStatusQUEUED)(m)
 			},
@@ -84,7 +84,7 @@ func TestServiceStart(t *testing.T) {
 			name: "network error",
 			tool: toolServiceStart,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -94,7 +94,7 @@ func TestServiceStart(t *testing.T) {
 			name: "API error",
 			tool: toolServiceStart,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.StartServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -107,7 +107,7 @@ func TestServiceStart(t *testing.T) {
 			name: "nil response body",
 			tool: toolServiceStart,
 			args: args,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().StartServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.StartServiceResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
@@ -117,7 +117,7 @@ func TestServiceStart(t *testing.T) {
 			name:       "starts without waiting by default",
 			tool:       toolServiceStart,
 			args:       args,
-			setupMock:  expectStart(api.DeployStatusQUEUED),
+			mock:       expectStart(api.DeployStatusQUEUED),
 			wantOutput: accepted,
 		},
 		{
@@ -125,7 +125,7 @@ func TestServiceStart(t *testing.T) {
 			name:       "wait returns immediately when the service is already ready",
 			tool:       toolServiceStart,
 			args:       waitArgs,
-			setupMock:  expectStart(api.DeployStatusREADY),
+			mock:       expectStart(api.DeployStatusREADY),
 			wantOutput: started,
 		},
 		{
@@ -133,7 +133,7 @@ func TestServiceStart(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStart,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStart(api.DeployStatusRESUMING)(m)
 				expectGetService(m, "e6ue9697jf", withStatus(api.DeployStatusREADY))
 			},
@@ -146,7 +146,7 @@ func TestServiceStart(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStart,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStart(api.DeployStatusRESUMING)(m)
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceResponse{HTTPResponse: httpResponse(http.StatusNotFound)}, nil)
@@ -164,7 +164,7 @@ func TestServiceStart(t *testing.T) {
 			synctest: true,
 			tool:     toolServiceStart,
 			args:     waitArgs,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectStart(api.DeployStatusRESUMING)(m)
 				expectGetService(m, "e6ue9697jf", withStatus(api.DeployStatusRESUMING)).AnyTimes()
 			},

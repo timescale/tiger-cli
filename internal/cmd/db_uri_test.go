@@ -49,7 +49,7 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"db", "uri", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -58,7 +58,7 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"db", "uri", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -71,7 +71,7 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"db", "uri", "svc-12345"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -83,106 +83,106 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name:       "positional service id",
 			args:       []string{"db", "uri", "svc-12345"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			wantStdout: directURI,
 		},
 		{
 			name:       "default service id from config",
 			args:       []string{"db", "uri"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantStdout: directURI,
 		},
 		{
 			name:       "connection-string alias",
 			args:       []string{"db", "connection-string", "svc-12345"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			wantStdout: directURI,
 		},
 		{
 			name:       "custom role",
 			args:       []string{"db", "uri", "svc-12345", "--role", "readonly"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			wantStdout: "postgresql://readonly@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name: "pooled with pooler available",
 			args: []string{"db", "uri", "svc-12345", "--pooled"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(withPooler))
 			},
 			wantStdout: "postgresql://tsdbadmin@pooler.svc-12345.project.tsdb.cloud.timescale.com:6432/tsdb?sslmode=require\n",
 		},
 		{
-			name:      "pooled without pooler",
-			args:      []string{"db", "uri", "svc-12345", "--pooled"},
-			setupMock: setupGet,
-			wantErr:   "connection pooler not available for this service",
+			name:    "pooled without pooler",
+			args:    []string{"db", "uri", "svc-12345", "--pooled"},
+			mock:    setupGet,
+			wantErr: "connection pooler not available for this service",
 		},
 		{
-			name:      "with-password without stored password",
-			args:      []string{"db", "uri", "svc-12345", "--with-password"},
-			setupMock: setupGet,
-			wantErr:   "password not available to include in connection string",
+			name:    "with-password without stored password",
+			args:    []string{"db", "uri", "svc-12345", "--with-password"},
+			mock:    setupGet,
+			wantErr: "password not available to include in connection string",
 		},
 		{
 			name:       "read-only flag",
 			args:       []string{"db", "uri", "svc-12345", "--read-only"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "read-only from config all",
 			args:       []string{"db", "uri", "svc-12345"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "read-only flag and config all",
 			args:       []string{"db", "uri", "svc-12345", "--read-only"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "config prod, PROD service",
 			args:       []string{"db", "uri", "svc-12345"},
-			setupMock:  expectTaggedService("PROD"),
+			mock:       expectTaggedService("PROD"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "config prod, DEV service",
 			args:       []string{"db", "uri", "svc-12345"},
-			setupMock:  expectTaggedService("DEV"),
+			mock:       expectTaggedService("DEV"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: directURI,
 		},
 		{
 			name:       "config prod, untagged service",
 			args:       []string{"db", "uri", "svc-12345"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: directURI,
 		},
 		{
 			name:       "flag on beats config prod",
 			args:       []string{"db", "uri", "svc-12345", "--read-only"},
-			setupMock:  expectTaggedService("DEV"),
+			mock:       expectTaggedService("DEV"),
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantStdout: readOnlyURI,
 		},
 		{
 			name:       "replica target uses replica endpoint",
 			args:       []string{"db", "uri", "rep-67890"},
-			setupMock:  setupGetReplica,
+			mock:       setupGetReplica,
 			wantStdout: replicaURI,
 		},
 		{
 			name: "replica pooled with pooler uses replica pooler",
 			args: []string{"db", "uri", "rep-67890", "--pooled"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
 						Endpoint: &api.Endpoint{
@@ -198,14 +198,14 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name:       "replica pooled without pooler falls back with warning",
 			args:       []string{"db", "uri", "rep-67890", "--pooled"},
-			setupMock:  setupGetReplica,
+			mock:       setupGetReplica,
 			wantStdout: replicaURI,
 			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
 		},
 		{
 			name: "replica parent fetch error",
 			args: []string{"db", "uri", "rep-67890"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
@@ -215,14 +215,14 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name:       "with-password includes stored password",
 			args:       []string{"db", "uri", "svc-12345", "--with-password"},
-			setupMock:  setupGet,
+			mock:       setupGet,
 			opts:       []runOption{withStoredPassword(sampleService(), "secret-pw")},
 			wantStdout: "postgresql://tsdbadmin:secret-pw@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},
 		{
 			name:       "replica uses primary credentials",
 			args:       []string{"db", "uri", "rep-67890", "--with-password"},
-			setupMock:  setupGetReplica,
+			mock:       setupGetReplica,
 			opts:       []runOption{withStoredPassword(sampleService(), "primary-pw")},
 			wantStdout: "postgresql://tsdbadmin:primary-pw@rep-67890.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require\n",
 		},

@@ -63,7 +63,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool: toolServiceMetricsAvailable,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -74,7 +74,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool: toolServiceMetricsAvailable,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceMetricsAvailableSeriesResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -88,7 +88,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool: toolServiceMetricsAvailable,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricsAvailableSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf").
 					Return(&api.GetServiceMetricsAvailableSeriesResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -102,7 +102,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool:       toolServiceMetricsAvailable,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(nil),
+			mock:       expectSeries(nil),
 			wantOutput: noSeries,
 		},
 		{
@@ -112,7 +112,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool:       toolServiceMetricsAvailable,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(new([]string)),
+			mock:       expectSeries(new([]string)),
 			wantOutput: noSeries,
 		},
 		{
@@ -120,7 +120,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool:       toolServiceMetricsAvailable,
 			args:       args,
 			opts:       []runOption{experimental},
-			setupMock:  expectSeries(&[]string{}),
+			mock:       expectSeries(&[]string{}),
 			wantOutput: noSeries,
 		},
 		{
@@ -128,7 +128,7 @@ func TestServiceMetricsAvailable(t *testing.T) {
 			tool: toolServiceMetricsAvailable,
 			args: args,
 			opts: []runOption{experimental},
-			setupMock: expectSeries(&[]string{
+			mock: expectSeries(&[]string{
 				"timescale_cloud_system_cpu_usage_millicores",
 				"timescale_cloud_system_memory_usage_bytes",
 			}),

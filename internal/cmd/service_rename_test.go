@@ -53,17 +53,17 @@ func TestServiceRenameCmd(t *testing.T) {
 			// prod judges the service by its environment tag, so the gate
 			// fetches it. Only the tag lookup is registered: an attempted
 			// rename fails as an unexpected call.
-			name:      "read-only prod refuses PROD service",
-			args:      []string{"service", "rename", "svc-12345", "analytics-prod"},
-			opts:      []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: expectTaggedService("PROD"),
-			wantErr:   `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			name:    "read-only prod refuses PROD service",
+			args:    []string{"service", "rename", "svc-12345", "analytics-prod"},
+			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			mock:    expectTaggedService("PROD"),
+			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("DEV")(m)
 				expectRename(m)
 			},
@@ -72,7 +72,7 @@ func TestServiceRenameCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -81,7 +81,7 @@ func TestServiceRenameCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -94,7 +94,7 @@ func TestServiceRenameCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -105,7 +105,7 @@ func TestServiceRenameCmd(t *testing.T) {
 		{
 			name:       "renames the service",
 			args:       []string{"service", "rename", "svc-12345", "analytics-prod"},
-			setupMock:  expectRename,
+			mock:       expectRename,
 			wantStdout: renamedMsg,
 		},
 		{
@@ -113,7 +113,7 @@ func TestServiceRenameCmd(t *testing.T) {
 			// request match is what proves the trimming happened.
 			name:       "trims the new name",
 			args:       []string{"service", "rename", "svc-12345", "  analytics-prod  "},
-			setupMock:  expectRename,
+			mock:       expectRename,
 			wantStdout: renamedMsg,
 		},
 	})

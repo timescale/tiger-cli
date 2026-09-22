@@ -106,7 +106,7 @@ func TestServiceList(t *testing.T) {
 		{
 			name: "API error",
 			tool: toolServiceList,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusForbidden),
@@ -119,7 +119,7 @@ func TestServiceList(t *testing.T) {
 			// A 200 with no body is an empty list, not an error.
 			name: "nil response body lists nothing",
 			tool: toolServiceList,
-			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(&api.GetServicesResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
@@ -128,13 +128,13 @@ func TestServiceList(t *testing.T) {
 		{
 			name:       "empty list",
 			tool:       toolServiceList,
-			setupMock:  expectServices([]api.Service{}),
+			mock:       expectServices([]api.Service{}),
 			wantOutput: map[string]any{"services": []any{}},
 		},
 		{
 			name:       "lists services",
 			tool:       toolServiceList,
-			setupMock:  expectServices(services),
+			mock:       expectServices(services),
 			wantOutput: listed,
 		},
 	})
