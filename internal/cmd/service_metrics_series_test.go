@@ -75,5 +75,31 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			opts:    []runOption{experimental},
 			wantErr: `--filter must be name=value or name!=value, got "role!="`,
 		},
+		{
+			name: "group-by builds a GroupBy request",
+			args: []string{
+				"service", "metrics", "series", "svc-12345",
+				"--metric", "some_metric",
+				"--from", "2026-05-13T00:00:00Z",
+				"--to", "2026-05-13T01:00:00Z",
+				"--group-by", "role",
+				"--group-by", "ordinal",
+			},
+			opts: []runOption{experimental},
+			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				empty := []api.MetricSeries{}
+				groupBy := []string{"role", "ordinal"}
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+					Name:    "some_metric",
+					From:    fromTime,
+					To:      toTime,
+					GroupBy: &groupBy,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantStdout: noDataMsg,
+		},
 	})
 }

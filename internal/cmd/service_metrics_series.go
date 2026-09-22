@@ -24,6 +24,7 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var filters []string
 	var bucketSeconds int
 	var fn string
+	var groupBy []string
 
 	cmd := &cobra.Command{
 		Use:   "series [service-id]",
@@ -54,7 +55,12 @@ full list of raw data points.`,
   # Exclude a label value
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
-    --filter role!=replica`,
+    --filter role!=replica
+
+  # Break the result into one series per role
+  tiger service metrics series --metric some_metric_name \
+    --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
+    --group-by role`,
 		Args:         cobra.MaximumNArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -98,6 +104,9 @@ full list of raw data points.`,
 			if len(labelFilters) > 0 {
 				body.Filters = &labelFilters
 			}
+			if len(groupBy) > 0 {
+				body.GroupBy = &groupBy
+			}
 
 			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, serviceID, body)
 			if err != nil {
@@ -123,6 +132,7 @@ full list of raw data points.`,
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value or name!=value (repeatable)")
 	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
+	cmd.Flags().StringSliceVar(&groupBy, "group-by", nil, "Label key to break the result into one series per distinct value (repeatable). Rejected on the same metrics that reject --fn; omit to collapse into a single series")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 	registerFlagCompletion(cmd, "role", metricsSeriesRoleCompletion)
