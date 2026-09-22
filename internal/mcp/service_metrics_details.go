@@ -50,7 +50,7 @@ func (ServiceMetricsDetailsOutput) Schema() *jsonschema.Schema {
 	details.Properties["type"].Description = "The shape of this metric's data, or null if undocumented."
 	details.Properties["default_agg"].Description = "The aggregation function used by default when fn is omitted from a series query, or null if undocumented."
 	details.Properties["description"].Description = "What this metric measures, or empty if undocumented."
-	details.Properties["labels"].Description = "Labels specific to this metric (e.g. datname on pg_stat_database_*) — not the region/role/ordinal labels every metric carries regardless of which one it is."
+	details.Properties["labels"].Description = "All labels this metric can be filtered or grouped by: its own labels (e.g. datname on pg_stat_database_*) plus the region/role/ordinal labels most metrics also carry. A few datasources only attach a subset of those — e.g. pgbouncer-sourced metrics only get region, not role/ordinal."
 	details.Properties["labels"].Items.Properties["name"].Description = "The label's key."
 	details.Properties["labels"].Items.Properties["description"].Description = "What this label identifies, or empty if undocumented."
 

@@ -284,7 +284,7 @@ Output:
   • details (required): object
     • default_agg (required): string, null - The aggregation function used by default when fn is omitted from a series query, or null if undocumented.
     • description (required): string - What this metric measures, or empty if undocumented.
-    • labels (required): []object, null - Labels specific to this metric (e.g. datname on pg_stat_database_*) — not the region/role/ordinal labels every metric carries regardless of which one it is.
+    • labels (required): []object, null - All labels this metric can be filtered or grouped by: its own labels (e.g. datname on pg_stat_database_*) plus the region/role/ordinal labels most metrics also carry. A few datasources only attach a subset of those — e.g. pgbouncer-sourced metrics only get region, not role/ordinal.
       • description (required): string - What this label identifies, or empty if undocumented.
       • name (required): string - The label's key.
     • name (required): string - Metric series name.
