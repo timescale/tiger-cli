@@ -6,17 +6,16 @@ Fork an existing database service
 
 Fork an existing database service to create a new independent copy.
 
-You must specify exactly one timing option for the fork strategy:
-- --now: Fork at the current database state (creates new snapshot or uses WAL replay)
-- --last-snapshot: Fork at the last existing snapshot (faster fork)
-- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
-
 By default:
+- The fork is taken at the current database state (creates new snapshot or uses WAL replay)
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.
+You can override any of these defaults with the corresponding flags. To fork
+from an earlier state instead of the current one, pass exactly one of:
+- --last-snapshot: Fork at the last existing snapshot (faster fork)
+- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
 
 ```
 tiger service fork [service-id] [flags]
@@ -26,7 +25,7 @@ tiger service fork [service-id] [flags]
 
 ```
   # Fork a service at the current state
-  tiger service fork svc-12345 --now
+  tiger service fork svc-12345
 
   # Fork a service at the last snapshot
   tiger service fork svc-12345 --last-snapshot
@@ -35,19 +34,19 @@ tiger service fork [service-id] [flags]
   tiger service fork svc-12345 --to-timestamp 2025-01-15T10:30:00Z
 
   # Fork with custom name
-  tiger service fork svc-12345 --now --name my-forked-db
+  tiger service fork svc-12345 --name my-forked-db
 
   # Fork with custom resources
-  tiger service fork svc-12345 --now --cpu 2000 --memory 8
+  tiger service fork svc-12345 --cpu 2000 --memory 8
 
   # Fork without setting as default service
-  tiger service fork svc-12345 --now --no-set-default
+  tiger service fork svc-12345 --no-set-default
 
   # Fork without waiting for completion
-  tiger service fork svc-12345 --now --no-wait
+  tiger service fork svc-12345 --no-wait
 
   # Fork with custom wait timeout
-  tiger service fork svc-12345 --now --wait-timeout 45m
+  tiger service fork svc-12345 --wait-timeout 45m
 ```
 
 ### Options
@@ -61,7 +60,6 @@ tiger service fork [service-id] [flags]
       --name string             Name for the forked service (auto-generated if not provided)
       --no-set-default          Don't set this service as the default service
       --no-wait                 Don't wait for fork operation to complete
-      --now                     Fork at the current database state (creates new snapshot or uses WAL replay)
   -o, --output string           Output format (json, yaml, env, table)
       --to-timestamp time       Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)
       --wait-timeout duration   Wait timeout duration (e.g., 30m, 1h30m, 90s) (default 30m0s)

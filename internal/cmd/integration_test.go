@@ -1850,7 +1850,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}
 }
 
-// TestServiceForkIntegration tests forking a service with --now strategy and validates data is correctly copied
+// TestServiceForkIntegration tests forking a service at the current state (the default) and validates data is correctly copied
 func TestServiceForkIntegration(t *testing.T) {
 	keyring.MockInit()
 	// Check for required environment variables
@@ -2065,12 +2065,11 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Skip("No source service ID available")
 		}
 
-		t.Logf("Forking service: %s with --now strategy", sourceServiceID)
+		t.Logf("Forking service: %s at current state (default strategy)", sourceServiceID)
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
 			"service", "fork", sourceServiceID,
-			"--now",
 			"--wait-timeout", "15m",
 			"--no-set-default",
 			"--output", "json",
@@ -2189,7 +2188,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Skip("No forked service ID available")
 		}
 
-		t.Logf("Deleting --now forked service: %s", forkedServiceID)
+		t.Logf("Deleting current-state forked service: %s", forkedServiceID)
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
@@ -2202,7 +2201,7 @@ func TestServiceForkIntegration(t *testing.T) {
 
 		// Clear forkedServiceID so cleanup doesn't try to delete again
 		forkedServiceID = ""
-		t.Logf("✅ --now forked service deleted successfully")
+		t.Logf("✅ Current-state forked service deleted successfully")
 	})
 
 	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
@@ -2213,7 +2212,7 @@ func TestServiceForkIntegration(t *testing.T) {
 		t.Logf("Waiting %v for snapshot to become available for --last-snapshot fork...", waitDuration)
 		time.Sleep(waitDuration)
 
-		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from --now fork exists)")
+		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from current-state fork exists)")
 
 		output, err := executeIntegrationCommand(
 			t.Context(),

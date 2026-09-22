@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -33,19 +34,18 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 		Short: "Fork an existing database service",
 		Long: `Fork an existing database service to create a new independent copy.
 
-You must specify exactly one timing option for the fork strategy:
-- --now: Fork at the current database state (creates new snapshot or uses WAL replay)
-- --last-snapshot: Fork at the last existing snapshot (faster fork)
-- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
-
 By default:
+- The fork is taken at the current database state (creates new snapshot or uses WAL replay)
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.`,
+You can override any of these defaults with the corresponding flags. To fork
+from an earlier state instead of the current one, pass exactly one of:
+- --last-snapshot: Fork at the last existing snapshot (faster fork)
+- --to-timestamp: Fork at a specific point in time (point-in-time recovery)`,
 		Example: `  # Fork a service at the current state
-  tiger service fork svc-12345 --now
+  tiger service fork svc-12345
 
   # Fork a service at the last snapshot
   tiger service fork svc-12345 --last-snapshot
@@ -54,41 +54,30 @@ You can override any of these defaults with the corresponding flags.`,
   tiger service fork svc-12345 --to-timestamp 2025-01-15T10:30:00Z
 
   # Fork with custom name
-  tiger service fork svc-12345 --now --name my-forked-db
+  tiger service fork svc-12345 --name my-forked-db
 
   # Fork with custom resources
-  tiger service fork svc-12345 --now --cpu 2000 --memory 8
+  tiger service fork svc-12345 --cpu 2000 --memory 8
 
   # Fork without setting as default service
-  tiger service fork svc-12345 --now --no-set-default
+  tiger service fork svc-12345 --no-set-default
 
   # Fork without waiting for completion
-  tiger service fork svc-12345 --now --no-wait
+  tiger service fork svc-12345 --no-wait
 
   # Fork with custom wait timeout
-  tiger service fork svc-12345 --now --wait-timeout 45m`,
+  tiger service fork svc-12345 --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate timing flags first - exactly one must be specified
-			timingFlagsSet := 0
-			if now {
-				timingFlagsSet++
-			}
-			if lastSnapshot {
-				timingFlagsSet++
-			}
+			// Validate timing flags first - at most one may be specified
 			toTimestampSet := cmd.Flags().Changed("to-timestamp")
-			if toTimestampSet {
-				timingFlagsSet++
+			if lastSnapshot && toTimestampSet {
+				return errors.New("can only specify one of --last-snapshot or --to-timestamp")
 			}
-
-			if timingFlagsSet == 0 {
-				return fmt.Errorf("must specify --now, --last-snapshot or --to-timestamp")
-			}
-			if timingFlagsSet > 1 {
-				return fmt.Errorf("can only specify one of --now, --last-snapshot or --to-timestamp")
+			if now && (lastSnapshot || toTimestampSet) {
+				return errors.New("--now is the default and cannot be combined with --last-snapshot or --to-timestamp")
 			}
 
 			// Validate and normalize environment tag (case-insensitive)
@@ -122,12 +111,10 @@ You can override any of these defaults with the corresponding flags.`,
 			}
 
 			// Determine fork strategy and target time
-			var forkStrategy api.ForkStrategy
+			forkStrategy := api.ForkStrategyNOW
 			var targetTime *time.Time
 
-			if now {
-				forkStrategy = api.ForkStrategyNOW
-			} else if lastSnapshot {
+			if lastSnapshot {
 				forkStrategy = api.ForkStrategyLASTSNAPSHOT
 			} else if toTimestampSet {
 				forkStrategy = api.ForkStrategyPITR
@@ -235,10 +222,12 @@ You can override any of these defaults with the corresponding flags.`,
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 
-	// Timing strategy flags
-	cmd.Flags().BoolVar(&now, "now", false, "Fork at the current database state (creates new snapshot or uses WAL replay)")
+	// Timing strategy flags. --now is the default and kept only for backwards
+	// compatibility, so it's hidden from help.
+	cmd.Flags().BoolVar(&now, "now", false, "Fork at the current database state (the default)")
 	cmd.Flags().BoolVar(&lastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
 	cmd.Flags().TimeVar(&toTimestamp, "to-timestamp", time.Time{}, []string{time.RFC3339}, "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
+	markFlagHidden(cmd, "now")
 
 	// Resource customization flags
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
