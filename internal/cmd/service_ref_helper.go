@@ -75,7 +75,7 @@ func resolveServiceForWrite(ctx context.Context, cfg *config.Config, client api.
 
 	// Resolving returns the whole service, so prod's half of the gate needs
 	// no second fetch.
-	if err := common.CheckReadOnlyService(cfg, *service); err != nil {
+	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*service)); err != nil {
 		return nil, err
 	}
 

@@ -35,7 +35,7 @@ func TestServiceResizeCmd(t *testing.T) {
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup:   expectTaggedService("PROD"),
-			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",

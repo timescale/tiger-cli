@@ -31,16 +31,6 @@ func CheckReadOnly(cfg *config.Config, tag api.EnvironmentTag) error {
 	return nil
 }
 
-// CheckReadOnlyService is CheckReadOnly for a caller that already holds the
-// service, naming it in the refusal so the user knows which one was protected.
-// Prefer it over CheckReadOnly wherever the service is in hand.
-func CheckReadOnlyService(cfg *config.Config, service api.Service) error {
-	if err := CheckReadOnly(cfg, ServiceEnvironmentTag(service)); err != nil {
-		return fmt.Errorf("service %s: %w", service.ServiceID, err)
-	}
-	return nil
-}
-
 // CheckReadOnlyByServiceID is CheckReadOnly for a caller that has only the
 // service's ID, fetching the service to read its tag. A failed fetch is a
 // refusal: we can't tell whether the service is PROD.
@@ -61,5 +51,5 @@ func CheckReadOnlyByServiceID(ctx context.Context, cfg *config.Config, client ap
 		return fmt.Errorf("cannot verify whether service %s is tagged PROD (read_only=%s): %w", serviceID, cfg.ReadOnly, err)
 	}
 
-	return CheckReadOnlyService(cfg, *service)
+	return CheckReadOnly(cfg, ServiceEnvironmentTag(*service))
 }

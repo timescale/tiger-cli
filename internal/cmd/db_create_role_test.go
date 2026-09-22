@@ -52,7 +52,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup:   expectTaggedService("PROD"),
-			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			// The missing endpoint stops the command right after the gate,
