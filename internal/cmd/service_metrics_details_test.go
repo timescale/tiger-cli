@@ -15,17 +15,25 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 	// so every case registers it explicitly.
 	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
-	avg := api.MetricsAggFnAVG
+	maxTotal := api.MetricsAggFnMAXTOTAL
 	gauge := api.MetricTypeGAUGE
 
+	// pg_stat_activity_count: its own labels (datname, state, usename,
+	// backend_type) carry no description yet, plus the region/role/ordinal
+	// labels every registry-backed metric gets, which do.
 	fullDetails := api.MetricDetails{
-		Name:        "pg_locks_count",
+		Name:        "pg_stat_activity_count",
 		Type:        &gauge,
-		DefaultAgg:  &avg,
-		Description: "Number of locks currently held, grouped by relation and lock mode.",
+		DefaultAgg:  &maxTotal,
+		Description: "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
 		Labels: []api.MetricLabelDetails{
-			{Name: "datname", Description: "The database this row's values belong to."},
-			{Name: "mode", Description: ""},
+			{Name: "datname", Description: ""},
+			{Name: "state", Description: ""},
+			{Name: "usename", Description: ""},
+			{Name: "backend_type", Description: ""},
+			{Name: "region", Description: "Region the service runs in."},
+			{Name: "role", Description: "Instance role: primary, replica, or standby_leader."},
+			{Name: "ordinal", Description: "Per-pod ordinal within the service."},
 		},
 	}
 
@@ -35,21 +43,26 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		Name: "some_new_metric",
 	}
 
-	const fullDetailsTable = `┌─────────────────────┬────────────────────────────────────────────────────────────────────┐
-│      PROPERTY       │                               VALUE                                │
-├─────────────────────┼────────────────────────────────────────────────────────────────────┤
-│ Name                │ pg_locks_count                                                     │
-│ Type                │ GAUGE                                                              │
-│ Default Aggregation │ AVG                                                                │
-│ Description         │ Number of locks currently held, grouped by relation and lock mode. │
-└─────────────────────┴────────────────────────────────────────────────────────────────────┘
+	const fullDetailsTable = `┌─────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────────┐
+│      PROPERTY       │                                             VALUE                                              │
+├─────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Name                │ pg_stat_activity_count                                                                         │
+│ Type                │ GAUGE                                                                                          │
+│ Default Aggregation │ MAX_TOTAL                                                                                      │
+│ Description         │ Number of connections in pg_stat_activity, grouped by state, connected role, and backend type. │
+└─────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────┬───────────────────────────────────────────┐
-│  LABEL  │                DESCRIPTION                │
-├─────────┼───────────────────────────────────────────┤
-│ datname │ The database this row's values belong to. │
-│ mode    │ undocumented                              │
-└─────────┴───────────────────────────────────────────┘
+┌──────────────┬─────────────────────────────────────────────────────┐
+│    LABEL     │                     DESCRIPTION                     │
+├──────────────┼─────────────────────────────────────────────────────┤
+│ datname      │ undocumented                                        │
+│ state        │ undocumented                                        │
+│ usename      │ undocumented                                        │
+│ backend_type │ undocumented                                        │
+│ region       │ Region the service runs in.                         │
+│ role         │ Instance role: primary, replica, or standby_leader. │
+│ ordinal      │ Per-pod ordinal within the service.                 │
+└──────────────┴─────────────────────────────────────────────────────┘
 `
 
 	const undocumentedTable = `┌─────────────────────┬─────────────────┐
@@ -75,7 +88,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
-			args:    []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count"},
+			args:    []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts:    []runOption{experimental, withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
@@ -88,26 +101,26 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		},
 		{
 			name:    "missing service id",
-			args:    []string{"service", "metrics", "details", "--metric", "pg_locks_count"},
+			args:    []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
 			opts:    []runOption{experimental},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
-			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count"},
+			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_locks_count").
+				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to get metric details: connection refused",
 		},
 		{
 			name: "API error",
-			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count"},
+			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_locks_count").
+				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
 						JSON4XX:      &api.ClientError{Message: new("service not found")},
@@ -118,10 +131,10 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		},
 		{
 			name: "nil response body",
-			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count"},
+			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_locks_count").
+				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 						JSON200:      nil,
@@ -131,16 +144,16 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		},
 		{
 			name:       "table output with labels",
-			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count"},
+			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts:       []runOption{experimental},
-			setup:      setupDetails("pg_locks_count", fullDetails),
+			setup:      setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
 		{
 			name:       "default service id from config",
-			args:       []string{"service", "metrics", "details", "--metric", "pg_locks_count"},
+			args:       []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
 			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup:      setupDetails("pg_locks_count", fullDetails),
+			setup:      setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
 		{
@@ -155,40 +168,70 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		},
 		{
 			name:  "json output",
-			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count", "-o", "json"},
+			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "json"},
 			opts:  []runOption{experimental},
-			setup: setupDetails("pg_locks_count", fullDetails),
+			setup: setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: `{
-  "default_agg": "AVG",
-  "description": "Number of locks currently held, grouped by relation and lock mode.",
+  "default_agg": "MAX_TOTAL",
+  "description": "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
   "labels": [
     {
-      "description": "The database this row's values belong to.",
+      "description": "",
       "name": "datname"
     },
     {
       "description": "",
-      "name": "mode"
+      "name": "state"
+    },
+    {
+      "description": "",
+      "name": "usename"
+    },
+    {
+      "description": "",
+      "name": "backend_type"
+    },
+    {
+      "description": "Region the service runs in.",
+      "name": "region"
+    },
+    {
+      "description": "Instance role: primary, replica, or standby_leader.",
+      "name": "role"
+    },
+    {
+      "description": "Per-pod ordinal within the service.",
+      "name": "ordinal"
     }
   ],
-  "name": "pg_locks_count",
+  "name": "pg_stat_activity_count",
   "type": "GAUGE"
 }
 `,
 		},
 		{
 			name:  "yaml output",
-			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_locks_count", "-o", "yaml"},
+			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "yaml"},
 			opts:  []runOption{experimental},
-			setup: setupDetails("pg_locks_count", fullDetails),
-			wantStdout: `default_agg: AVG
-description: Number of locks currently held, grouped by relation and lock mode.
+			setup: setupDetails("pg_stat_activity_count", fullDetails),
+			wantStdout: `default_agg: MAX_TOTAL
+description: Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.
 labels:
-  - description: The database this row's values belong to.
+  - description: ""
     name: datname
   - description: ""
-    name: mode
-name: pg_locks_count
+    name: state
+  - description: ""
+    name: usename
+  - description: ""
+    name: backend_type
+  - description: Region the service runs in.
+    name: region
+  - description: 'Instance role: primary, replica, or standby_leader.'
+    name: role
+  - description: Per-pod ordinal within the service.
+    name: ordinal
+name: pg_stat_activity_count
 type: GAUGE
 `,
 		},
