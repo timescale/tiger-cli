@@ -65,9 +65,7 @@ jobs:
         # Under -coverpkg, the percentages go test prints are of the whole
         # module, not the package. Writing covdata lets the Coverage step
         # report real per-package figures.
-        run: |
-          mkdir -p covdata
-          go test -race -timeout 15m -cover -coverpkg=./... ./... -args -test.gocoverdir="$PWD/covdata"
+        run: mkdir -p covdata && go test -race -timeout 15m -cover -coverpkg=./... ./... -args -test.gocoverdir="$PWD/covdata"
 
       - name: Coverage
         run: go tool covdata percent -i=covdata
