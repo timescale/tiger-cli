@@ -190,12 +190,18 @@ func buildMetricFilters(role string, filters []MetricLabelFilterInput) []api.Met
 		out = append(out, api.MetricLabelFilter{Key: "role", Value: strings.ToLower(role)})
 	}
 	for _, f := range filters {
+		// Key/Value are required and MatchType has a schema default, but both
+		// guarantees only hold for object properties: the SDK's schema-default
+		// application (and this codebase's usual "trust the schema" convention)
+		// doesn't recurse into array items like this one, so an omitted
+		// match_type still arrives here as "" rather than "EQUAL".
 		if f.Key == "" || f.Value == "" {
 			continue
 		}
 		filter := api.MetricLabelFilter{Key: f.Key, Value: f.Value}
 		if f.MatchType != "" {
-			matchType := api.MetricMatchType(strings.ToUpper(f.MatchType))
+			// Already exactly "EQUAL" or "NOT_EQUAL": validated against the enum.
+			matchType := api.MetricMatchType(f.MatchType)
 			filter.MatchType = &matchType
 		}
 		out = append(out, filter)
