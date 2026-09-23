@@ -7,7 +7,7 @@ Create a new database service
 Create a new database service in the current project.
 
 The default type of service created depends on your plan:
-- Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
+- Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 By default, the newly created service will be set as your default service for future
@@ -31,9 +31,6 @@ tiger service create [flags]
 
   # Create a free TimescaleDB service
   tiger service create --name free-db --cpu shared
-
-  # Create a TimescaleDB service with AI add-ons
-  tiger service create --name hybrid-db --addons time-series,ai
 
   # Create a plain Postgres service
   tiger service create --name postgres-db --addons none
@@ -63,7 +60,7 @@ tiger service create [flags]
 ### Options
 
 ```
-      --addons strings          Addons to enable (time-series, ai, or 'none' for PostgreSQL-only)
+      --addons strings          Addons to enable (time-series, or 'none' for PostgreSQL-only)
       --cpu string              CPU allocation in millicores or 'shared'
       --environment string      Environment tag (DEV or PROD) (default "DEV")
   -h, --help                    help for create

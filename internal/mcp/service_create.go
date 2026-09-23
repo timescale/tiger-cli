@@ -34,8 +34,8 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
 	schema.Properties["name"].Examples = []any{"my-production-db", "analytics-service", "user-store"}
 
-	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions. Use empty array for PostgreSQL-only."
-	schema.Properties["addons"].Items.Enum = []any{common.AddonTimeSeries, common.AddonAI}
+	schema.Properties["addons"].Description = "Array of addons to enable for the service. 'time-series' enables TimescaleDB. Use empty array for PostgreSQL-only."
+	schema.Properties["addons"].Items.Enum = []any{common.AddonTimeSeries}
 	schema.Properties["addons"].UniqueItems = true
 
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
@@ -85,7 +85,7 @@ func newServiceCreateTool() *mcp.Tool {
 		Description: `Create a new database service in Tiger Cloud with specified type, compute resources, region, and HA options.
 
 The default type of service created depends on the user's plan:
-- Free plan: Creates a service with shared CPU/memory and the 'time-series' and 'ai' add-ons
+- Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 WARNING: Creates billable resources.`,
