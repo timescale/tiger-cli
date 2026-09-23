@@ -74,6 +74,7 @@ func TestMCPListCmd(t *testing.T) {
 │ tool │ service_list              │
 │ tool │ service_logs              │
 │ tool │ service_metrics_available │
+│ tool │ service_metrics_details   │
 │ tool │ service_metrics_series    │
 │ tool │ service_rename            │
 │ tool │ service_resize            │

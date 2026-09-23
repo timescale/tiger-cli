@@ -757,9 +757,10 @@ type ClientInterface interface {
 	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns descriptive metadata for a named metric: what it measures,
-	// its type, default aggregation, and any labels specific to it
-	// (beyond the region/role/ordinal labels every metric carries). Use
-	// getServiceMetricsAvailableSeries to discover valid metric names.
+	// its type, default aggregation, and every label it can be filtered or
+	// grouped by — its own labels plus the region/role/ordinal labels most
+	// metrics also carry. Use getServiceMetricsAvailableSeries to discover
+	// valid metric names.
 	//
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
 	GetServiceMetricDetails(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2308,9 +2309,10 @@ func (c *Client) GetServiceMetricsAvailableSeries(ctx context.Context, projectID
 // **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns descriptive metadata for a named metric: what it measures,
-// its type, default aggregation, and any labels specific to it
-// (beyond the region/role/ordinal labels every metric carries). Use
-// getServiceMetricsAvailableSeries to discover valid metric names.
+// its type, default aggregation, and every label it can be filtered or
+// grouped by — its own labels plus the region/role/ordinal labels most
+// metrics also carry. Use getServiceMetricsAvailableSeries to discover
+// valid metric names.
 //
 // Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/details/{metric_name} (the `GetServiceMetricDetails` operationId).
 func (c *Client) GetServiceMetricDetails(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6735,9 +6737,10 @@ type ClientWithResponsesInterface interface {
 	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns descriptive metadata for a named metric: what it measures,
-	// its type, default aggregation, and any labels specific to it
-	// (beyond the region/role/ordinal labels every metric carries). Use
-	// getServiceMetricsAvailableSeries to discover valid metric names.
+	// its type, default aggregation, and every label it can be filtered or
+	// grouped by — its own labels plus the region/role/ordinal labels most
+	// metrics also carry. Use getServiceMetricsAvailableSeries to discover
+	// valid metric names.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -11082,9 +11085,10 @@ func (c *ClientWithResponses) GetServiceMetricsAvailableSeriesWithResponse(ctx c
 // **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns descriptive metadata for a named metric: what it measures,
-// its type, default aggregation, and any labels specific to it
-// (beyond the region/role/ordinal labels every metric carries). Use
-// getServiceMetricsAvailableSeries to discover valid metric names.
+// its type, default aggregation, and every label it can be filtered or
+// grouped by — its own labels plus the region/role/ordinal labels most
+// metrics also carry. Use getServiceMetricsAvailableSeries to discover
+// valid metric names.
 //
 // Returns a wrapper object for the known response body format(s).
 //

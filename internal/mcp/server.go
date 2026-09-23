@@ -38,9 +38,12 @@ const (
 	toolServiceDelete           = "service_delete"
 	toolServiceLogs             = "service_logs"
 	toolServiceMetricsAvailable = "service_metrics_available"
+	toolServiceMetricsDetails   = "service_metrics_details"
 	toolServiceMetricsSeries    = "service_metrics_series"
 	toolServiceBackups          = "service_backups"
 	toolDBQuery                 = "db_query"
+	toolDBSchema                = "db_schema"
+	toolFeedback                = "feedback"
 )
 
 // Server wraps the MCP server with Tiger-specific functionality
@@ -196,11 +199,10 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
 
 	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They
-	// are registered only when the experimental gate is on at server startup;
-	// the user must restart the MCP server after toggling the gate. Handler
-	// bodies re-check the gate defensively in case config changes mid-session.
+	// are registered only when the experimental gate is on at server startup.
 	if experimental {
 		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
+		addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
 		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
 	}

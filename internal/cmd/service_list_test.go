@@ -56,7 +56,7 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"service", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -65,7 +65,7 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"service", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
@@ -77,7 +77,7 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"service", "list"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -88,13 +88,13 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name:       "empty list",
 			args:       []string{"service", "list"},
-			setup:      setupList(nil),
+			mock:       setupList(nil),
 			wantStderr: noServicesStderr,
 		},
 		{
-			name:  "table output",
-			args:  []string{"service", "list"},
-			setup: setupList(services),
+			name: "table output",
+			args: []string{"service", "list"},
+			mock: setupList(services),
 			wantStdout: `┌────────────┬──────────────┬────────┬─────────────┬───────────┬──────────────────┐
 │ SERVICE ID │     NAME     │ STATUS │    TYPE     │  REGION   │     CREATED      │
 ├────────────┼──────────────┼────────┼─────────────┼───────────┼──────────────────┤
@@ -108,7 +108,7 @@ func TestServiceListCmd(t *testing.T) {
 			// the config file must not be rewritten.
 			name:       "json output via flag overriding config",
 			args:       []string{"service", "list", "-o", "json"},
-			setup:      setupList(services),
+			mock:       setupList(services),
 			opts:       []runOption{withConfig(map[string]any{"output": "table"})},
 			wantStdout: serviceListJSON,
 			checks: []checkFunc{func(t *testing.T, result cmdResult) {
@@ -119,9 +119,9 @@ func TestServiceListCmd(t *testing.T) {
 			}},
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"service", "list", "-o", "yaml"},
-			setup: setupList(services),
+			name: "yaml output",
+			args: []string{"service", "list", "-o", "yaml"},
+			mock: setupList(services),
 			wantStdout: `- connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
   console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
   created: "2025-01-15T10:30:00Z"
@@ -169,7 +169,7 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name:       "output format from config",
 			args:       []string{"service", "list"},
-			setup:      setupList(services),
+			mock:       setupList(services),
 			opts:       []runOption{withConfig(map[string]any{"output": "json"})},
 			wantStdout: serviceListJSON,
 		},
@@ -178,7 +178,7 @@ func TestServiceListCmd(t *testing.T) {
 			// reach the output switch via a hand-edited config file.
 			name:    "env output format from config",
 			args:    []string{"service", "list"},
-			setup:   setupList(services),
+			mock:    setupList(services),
 			opts:    []runOption{withConfig(map[string]any{"output": "env"})},
 			wantErr: "environment variable output is not supported for multiple services",
 		},
@@ -190,7 +190,7 @@ func TestServiceListCmd(t *testing.T) {
 		{
 			name:       "ls alias",
 			args:       []string{"service", "ls"},
-			setup:      setupList(nil),
+			mock:       setupList(nil),
 			wantStderr: noServicesStderr,
 		},
 	})
