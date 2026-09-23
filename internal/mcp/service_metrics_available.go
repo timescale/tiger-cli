@@ -71,7 +71,7 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 	}
 
 	// Default to a non-nil slice so a missing body or a JSON null marshals to
-	// `[]` rather than `null`, keeping the output a valid array.
+	// `[]` rather than `null`.
 	series := []string{}
 	if resp.JSON200 != nil && *resp.JSON200 != nil {
 		series = *resp.JSON200

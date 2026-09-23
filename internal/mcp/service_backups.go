@@ -73,7 +73,7 @@ func (s *Server) handleServiceBackups(ctx context.Context, req *mcp.CallToolRequ
 	}
 
 	// Default to a non-nil slice so a missing body or a JSON null marshals to
-	// `[]` rather than `null`, keeping the output a valid array.
+	// `[]` rather than `null`.
 	backups := []api.Backup{}
 	if resp.JSON200 != nil && *resp.JSON200 != nil {
 		backups = *resp.JSON200
