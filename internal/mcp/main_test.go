@@ -52,6 +52,11 @@ type toolTest struct {
 	tool string
 	args map[string]any
 
+	// experimental gates preview-stage tools at registration (see CLAUDE.md's
+	// "Experimental Feature Gating"). A tool behind the gate is never added to
+	// the server unless this is true.
+	experimental bool
+
 	// config seeds the config file the server loads at startup. Analytics is
 	// always off and the docs proxy disabled.
 	config map[string]any
@@ -108,7 +113,7 @@ func runToolTest(t *testing.T, tt toolTest) {
 		tt.setupMock(mockClient)
 	}
 
-	app := &common.App{}
+	app := &common.App{Experimental: tt.experimental}
 	app.SetClientFactory(func(context.Context, *config.Config) (api.ClientWithResponsesInterface, string, error) {
 		if tt.clientErr != nil {
 			return nil, "", tt.clientErr

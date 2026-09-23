@@ -265,6 +265,36 @@ Output:
 
 `
 
+	metricsDetailsText := `Get Metric Details [read-only]
+
+Tool name: service_metrics_details
+
+Description:
+Get descriptive metadata for a metric: what it measures, its type, default
+aggregation function, and available labels.
+
+Use service_metrics_available to discover metric names, this tool to inspect
+one, then service_metrics_series to fetch its data.
+
+These metrics have no richer metadata (returns just the name, with type,
+default aggregation, description, and labels all empty): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success.
+
+Parameters:
+  • metric_name (required): string - Name of the metric to describe. Use service_metrics_available to discover valid names.
+  • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
+
+Output:
+  • details (required): object
+    • default_agg (required): string, null - The aggregation function used by default when fn is omitted from a series query, or null if undocumented.
+    • description (required): string - What this metric measures, or empty if undocumented.
+    • labels (required): []object, null - All labels this metric can be filtered or grouped by: its own labels (e.g. datname on pg_stat_database_*) plus the region/role/ordinal labels most metrics also carry. A few datasources only attach a subset of those — e.g. pgbouncer-sourced metrics only get region, not role/ordinal.
+      • description (required): string - What this label identifies, or empty if undocumented.
+      • name (required): string - The label's key.
+    • name (required): string - Metric series name.
+    • type (required): string, null - The shape of this metric's data, or null if undocumented.
+
+`
+
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "missing argument",
@@ -332,6 +362,19 @@ Output:
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),
 			wantStdout: metricsAvailableText,
+		},
+		{
+			name:    "service_metrics_details hidden by default",
+			args:    []string{"mcp", "get", "service_metrics_details"},
+			opts:    noDocsProxy(nil),
+			wantErr: `capability "service_metrics_details" not found`,
+		},
+		{
+			name: "service_metrics_details visible with gate on",
+			args: []string{"mcp", "get", "service_metrics_details"},
+			opts: append(noDocsProxy(nil),
+				withEnv("TIGER_EXPERIMENTAL", "true")),
+			wantStdout: metricsDetailsText,
 		},
 	})
 }
