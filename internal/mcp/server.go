@@ -38,6 +38,7 @@ const (
 	toolServiceDelete           = "service_delete"
 	toolServiceLogs             = "service_logs"
 	toolServiceMetricsAvailable = "service_metrics_available"
+	toolServiceMetricsDetails   = "service_metrics_details"
 	toolServiceMetricsSeries    = "service_metrics_series"
 	toolServiceBackups          = "service_backups"
 	toolDBQuery                 = "db_query"
@@ -201,6 +202,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	// are registered only when the experimental gate is on at server startup.
 	if experimental {
 		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
+		addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
 		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 		addTool(s, mode, newServiceBackupsTool(), s.handleServiceBackups)
 	}

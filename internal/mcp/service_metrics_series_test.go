@@ -253,6 +253,55 @@ func TestServiceMetricsSeriesTool(t *testing.T) {
 			wantOutput: noSeries,
 		},
 		{
+			// Schema defaults apply to object properties, not array items, so
+			// a filter without match_type must leave MatchType nil rather than
+			// send an empty string.
+			name: "filter without match_type omits it from the request",
+			tool: toolServiceMetricsSeries,
+			args: args(map[string]any{"filters": []any{map[string]any{"key": "ordinal", "value": "0"}}}),
+			opts: []runOption{experimental},
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+				b.Filters = &[]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}
+			}), &[]api.MetricSeries{}),
+			wantOutput: noSeries,
+		},
+		{
+			name: "NOT_EQUAL match_type reaches the request",
+			tool: toolServiceMetricsSeries,
+			args: args(map[string]any{"filters": []any{map[string]any{"key": "role", "value": "replica", "match_type": "NOT_EQUAL"}}}),
+			opts: []runOption{experimental},
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+				b.Filters = &[]api.MetricLabelFilter{{Key: "role", Value: "replica", MatchType: new(api.MetricMatchTypeNOTEQUAL)}}
+			}), &[]api.MetricSeries{}),
+			wantOutput: noSeries,
+		},
+		{
+			name:    "match_type outside the enum",
+			tool:    toolServiceMetricsSeries,
+			args:    args(map[string]any{"filters": []any{map[string]any{"key": "role", "value": "replica", "match_type": "REGEX"}}}),
+			opts:    []runOption{experimental},
+			wantErr: `validating "arguments": validating root: validating /properties/filters: validating /properties/filters/items: validating /properties/filters/items/properties/match_type: enum: REGEX does not equal any of: [EQUAL NOT_EQUAL]`,
+		},
+		{
+			name: "group_by reaches the request",
+			tool: toolServiceMetricsSeries,
+			args: args(map[string]any{"group_by": []any{"role", "ordinal"}}),
+			opts: []runOption{experimental},
+			mock: expectSeries(body(func(b *api.MetricsSeriesRequest) {
+				b.GroupBy = &[]string{"role", "ordinal"}
+			}), &[]api.MetricSeries{}),
+			wantOutput: noSeries,
+		},
+		{
+			// An empty group_by list leaves the request body's grouping unset.
+			name:       "empty group_by list",
+			tool:       toolServiceMetricsSeries,
+			args:       args(map[string]any{"group_by": []any{}}),
+			opts:       []runOption{experimental},
+			mock:       expectSeries(baseBody, &[]api.MetricSeries{}),
+			wantOutput: noSeries,
+		},
+		{
 			name: "bucket size and aggregation function",
 			tool: toolServiceMetricsSeries,
 			args: args(map[string]any{"bucket_seconds": 3600, "fn": "AVG"}),
