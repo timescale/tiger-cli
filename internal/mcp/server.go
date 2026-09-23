@@ -83,11 +83,19 @@ func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mc
 
 // buildServerInstructions returns the `instructions` string the MCP SDK sends
 // to clients at initialize. Evaluated once at server start, like tool registration.
-func buildServerInstructions(cfg *config.Config) string {
+func buildServerInstructions(cfg *config.Config, experimental bool) string {
 	const (
 		intro        = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
 		capabilities = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+		// Metrics tools are registered regardless of read-only mode (they're all
+		// read-only themselves), so this is appended in every branch below.
+		metricsBlurb = " Metrics tools (service_metrics_available, service_metrics_details, service_metrics_series) cover hardware/resource usage, PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals — use them for monitoring, debugging, and performance investigation."
 	)
+
+	metrics := ""
+	if experimental {
+		metrics = metricsBlurb
+	}
 
 	switch cfg.ReadOnly {
 	case config.ReadOnlyAll:
@@ -95,16 +103,16 @@ func buildServerInstructions(cfg *config.Config) string {
 		// advertising them.
 		return intro +
 			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, delete, or modify services. " +
-			"db_query connects read-only, so writes and DDL are rejected by the server."
+			"db_query connects read-only, so writes and DDL are rejected by the server." + metrics
 	case config.ReadOnlyProd:
 		// The write tools are registered, so keep advertising them but explain
 		// the refusals — otherwise one looks like a bug.
 		return intro + capabilities + " " +
 			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_query connects to them read-only, so writes and DDL are rejected by the server. " +
 			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it. " +
-			"service_create and service_fork also refuse an environment of PROD, since the mode will not create a service it would then refuse to stop or delete: leave environment at its DEV default."
+			"service_create and service_fork also refuse an environment of PROD, since the mode will not create a service it would then refuse to stop or delete: leave environment at its DEV default." + metrics
 	default:
-		return intro + capabilities
+		return intro + capabilities + metrics
 	}
 }
 
@@ -121,7 +129,7 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 		Title:   serverTitle,
 		Version: config.Version,
 	}, &mcp.ServerOptions{
-		Instructions: buildServerInstructions(cfg),
+		Instructions: buildServerInstructions(cfg, app.Experimental),
 		Logger:       logger,
 	})
 

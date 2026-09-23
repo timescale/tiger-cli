@@ -96,7 +96,7 @@ func newServiceMetricsSeriesTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceMetricsSeries,
 		Title: "Get Metric Series Data",
-		Description: `Fetch time-series data for a named metric over a specified time window.
+		Description: `Fetch time-series data for a named metric over a specified time window, for monitoring, debugging, and performance investigation.
 
 Use service_metrics_available first to discover valid metric names.
 
@@ -105,7 +105,7 @@ return multiple labeled series (e.g. one per replica, one per worker ordinal).
 Each series contains its full list of raw data points. Use group_by to
 control which label keys define that grouping.
 
-Available metrics include: CPU usage/allocation, memory usage/total, disk usage, and disk I/O (read/write bytes and ops).`,
+Available metrics span hardware/resource usage (CPU, memory, disk, network), PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals (compression, chunks, background jobs).`,
 		InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
 		OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{

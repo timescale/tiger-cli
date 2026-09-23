@@ -37,7 +37,8 @@ func newServiceMetricsAvailableTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceMetricsAvailable,
 		Title: "List Available Metric Series",
-		Description: "List the names of all metric series available for a service. " +
+		Description: "List the names of all metric series available for a service, for monitoring, debugging, and performance investigation. " +
+			"Covers hardware/resource usage, PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals. " +
 			"Call this first to discover what metrics exist before fetching data with service_metrics_series.",
 		InputSchema:  ServiceMetricsAvailableInput{}.Schema(),
 		OutputSchema: ServiceMetricsAvailableOutput{}.Schema(),

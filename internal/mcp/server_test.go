@@ -98,9 +98,9 @@ func TestReadOnlyToolRegistration(t *testing.T) {
 func TestBuildServerInstructions(t *testing.T) {
 	const capabilitiesMarker = "Tiger MCP provides tools"
 
-	readWrite := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyOff})
-	readOnly := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyAll})
-	prodOnly := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyProd})
+	readWrite := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyOff}, false)
+	readOnly := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyAll}, false)
+	prodOnly := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyProd}, false)
 
 	// The capabilities blurb is always present, whatever the mode.
 	for _, got := range []string{readWrite, readOnly, prodOnly} {
@@ -129,5 +129,23 @@ func TestBuildServerInstructions(t *testing.T) {
 	}
 	if !strings.Contains(prodOnly, "PROD") {
 		t.Errorf("prod-mode instructions should explain that PROD services are refused: %q", prodOnly)
+	}
+
+	// Metrics tools are only mentioned when the experimental gate is on —
+	// otherwise they aren't registered, so mentioning them would mislead.
+	const metricsMarker = "service_metrics_series"
+	for _, got := range []string{readWrite, readOnly, prodOnly} {
+		if strings.Contains(got, metricsMarker) {
+			t.Errorf("instructions should not mention metrics tools when experimental is off: %q", got)
+		}
+	}
+
+	readWriteExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyOff}, true)
+	readOnlyExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyAll}, true)
+	prodOnlyExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyProd}, true)
+	for _, got := range []string{readWriteExperimental, readOnlyExperimental, prodOnlyExperimental} {
+		if !strings.Contains(got, metricsMarker) {
+			t.Errorf("instructions should mention metrics tools when experimental is on: %q", got)
+		}
 	}
 }
