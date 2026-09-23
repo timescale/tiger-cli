@@ -142,6 +142,14 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 
 	filters := buildMetricFilters(input.Role, input.Filters)
 
+	if token := req.Params.GetProgressToken(); token != nil {
+		req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			ProgressToken: token,
+			Message: fmt.Sprintf("Fetching metric %q for service %s, %s to %s (%s)...",
+				input.MetricName, input.ServiceID, input.From, input.To, describeSeriesParams(input, filters)),
+		})
+	}
+
 	body := api.MetricsSeriesRequest{
 		Name: input.MetricName,
 		From: fromTime,
@@ -179,6 +187,40 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	}
 
 	return nil, ServiceMetricsSeriesOutput{Series: series}, nil
+}
+
+// describeSeriesParams renders a service_metrics_series call's remaining
+// parameters as a short clause, for progress notifications.
+func describeSeriesParams(input ServiceMetricsSeriesInput, filters []api.MetricLabelFilter) string {
+	fn := "server default"
+	if input.Fn != "" {
+		fn = input.Fn
+	}
+
+	bucket := "server default"
+	if input.BucketSeconds > 0 {
+		bucket = fmt.Sprintf("%ds", input.BucketSeconds)
+	}
+
+	filterDesc := "none"
+	if len(filters) > 0 {
+		parts := make([]string, len(filters))
+		for i, f := range filters {
+			op := "="
+			if f.MatchType != nil && *f.MatchType == api.MetricMatchTypeNOTEQUAL {
+				op = "!="
+			}
+			parts[i] = f.Key + op + f.Value
+		}
+		filterDesc = strings.Join(parts, ", ")
+	}
+
+	groupBy := "none"
+	if len(input.GroupBy) > 0 {
+		groupBy = strings.Join(input.GroupBy, ", ")
+	}
+
+	return fmt.Sprintf("fn: %s, bucket: %s, filters: %s, group_by: %s", fn, bucket, filterDesc, groupBy)
 }
 
 // buildMetricFilters merges the convenience Role input with the arbitrary

@@ -61,6 +61,13 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 		slog.String("service_id", input.ServiceID),
 	)
 
+	if token := req.Params.GetProgressToken(); token != nil {
+		req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			ProgressToken: token,
+			Message:       fmt.Sprintf("Listing available metric series for service %s...", input.ServiceID),
+		})
+	}
+
 	resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(ctx, projectID, input.ServiceID)
 	if err != nil {
 		return nil, ServiceMetricsAvailableOutput{}, fmt.Errorf("failed to list metric series: %w", err)

@@ -101,5 +101,53 @@ func TestServiceMetricsSeries(t *testing.T) {
 			},
 			wantOutput: wantEmptySeries,
 		},
+		{
+			name:              "sends a progress notification describing the query before fetching",
+			tool:              toolServiceMetricsSeries,
+			experimental:      true,
+			withProgressToken: true,
+			args: map[string]any{
+				"service_id":     "e6ue9697jf",
+				"metric_name":    "some_metric",
+				"from":           "2026-05-13T00:00:00Z",
+				"to":             "2026-05-13T01:00:00Z",
+				"fn":             "AVG",
+				"bucket_seconds": 60,
+				"filters":        []map[string]any{{"key": "role", "value": "primary"}},
+				"group_by":       []string{"role"},
+			},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				empty := []api.MetricSeries{}
+				filters := []api.MetricLabelFilter{{Key: "role", Value: "primary"}}
+				groupBy := []string{"role"}
+				fn := api.MetricsAggFn("AVG")
+				bucket := 60
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf", api.MetricsSeriesRequest{
+					Name:          "some_metric",
+					From:          fromTime,
+					To:            toTime,
+					Fn:            &fn,
+					BucketSeconds: &bucket,
+					Filters:       &filters,
+					GroupBy:       &groupBy,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantOutput: wantEmptySeries,
+			wantProgress: []string{
+				`Fetching metric "some_metric" for service e6ue9697jf, 2026-05-13T00:00:00Z to 2026-05-13T01:00:00Z (fn: AVG, bucket: 60s, filters: role=primary, group_by: role)...`,
+			},
+		},
+		{
+			name:         "no progress notification without a client-supplied token",
+			tool:         toolServiceMetricsSeries,
+			experimental: true,
+			args:         args(map[string]any{"key": "ordinal", "value": "0"}),
+			setupMock:    expectSeries([]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}),
+			wantOutput:   wantEmptySeries,
+			wantProgress: nil,
+		},
 	})
 }

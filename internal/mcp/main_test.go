@@ -84,6 +84,13 @@ type toolTest struct {
 	// wantOutput is the exact structured content; nil asserts none.
 	wantErr    string
 	wantOutput map[string]any
+
+	// withProgressToken opts the call into sending a progress token, so the
+	// handler's NotifyProgress calls (if any) actually go out on the wire.
+	// wantProgress is the exact, ordered list of progress notification
+	// messages expected; nil asserts none were sent.
+	withProgressToken bool
+	wantProgress      []string
 }
 
 // runToolTests runs each case as a subtest.
@@ -157,6 +164,10 @@ func runToolTest(t *testing.T, tt toolTest) {
 			return tt.answer, nil
 		}
 	}
+	var gotProgress []string
+	clientOpts.ProgressNotificationHandler = func(_ context.Context, req *mcp.ProgressNotificationClientRequest) {
+		gotProgress = append(gotProgress, req.Params.Message)
+	}
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client"}, clientOpts)
 	clientSession, err := client.Connect(ctx, clientTransport, nil)
 	if err != nil {
@@ -164,18 +175,26 @@ func runToolTest(t *testing.T, tt toolTest) {
 	}
 	t.Cleanup(func() { _ = clientSession.Close() })
 
-	// A handler's returned error travels as an IsError result, not a transport
-	// error, so a non-nil err here means the call itself broke.
-	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+	params := &mcp.CallToolParams{
 		Name:      tt.tool,
 		Arguments: tt.args,
-	})
+	}
+	if tt.withProgressToken {
+		params.SetProgressToken("test-token")
+	}
+
+	// A handler's returned error travels as an IsError result, not a transport
+	// error, so a non-nil err here means the call itself broke.
+	res, err := clientSession.CallTool(ctx, params)
 	if err != nil {
 		t.Fatalf("call %s: %v", tt.tool, err)
 	}
 
 	if tt.wantPrompt != nil && !prompted {
 		t.Errorf("expected a prompt %q, got none", tt.wantPrompt.Message)
+	}
+	if diff := cmp.Diff(tt.wantProgress, gotProgress); diff != "" {
+		t.Errorf("progress messages mismatch (-want +got):\n%s", diff)
 	}
 	if got := resultError(res); got != tt.wantErr {
 		t.Errorf("error = %q, want %q", got, tt.wantErr)

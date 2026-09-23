@@ -92,6 +92,13 @@ func (s *Server) handleServiceMetricsDetails(ctx context.Context, req *mcp.CallT
 		slog.String("metric", input.MetricName),
 	)
 
+	if token := req.Params.GetProgressToken(); token != nil {
+		req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			ProgressToken: token,
+			Message:       fmt.Sprintf("Fetching details for metric %q on service %s...", input.MetricName, input.ServiceID),
+		})
+	}
+
 	resp, err := client.GetServiceMetricDetailsWithResponse(ctx, projectID, input.ServiceID, input.MetricName)
 	if err != nil {
 		return nil, ServiceMetricsDetailsOutput{}, fmt.Errorf("failed to get metric details: %w", err)
