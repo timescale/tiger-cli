@@ -218,7 +218,7 @@ func selectConnection(
 	}
 
 	if chosen.IsReplica {
-		cmd.PrintErrf("Connecting to read replica '%s'...\n", chosen.ConnectionService.Name)
+		cmd.PrintErrf("Connecting to read replica %s...\n", serviceLabel(chosen.ConnectionService))
 	}
 	return details, nil
 }

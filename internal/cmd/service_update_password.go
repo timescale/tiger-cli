@@ -84,7 +84,7 @@ so update the password on the primary instead.`,
 
 			// A read replica has no separate password to rotate.
 			if common.IsReadReplica(service) {
-				return fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
+				return fmt.Errorf("'%s' is a read replica; update the password on its primary service '%s' instead",
 					serviceID, util.DerefStr(service.ForkedFrom.ServiceID))
 			}
 

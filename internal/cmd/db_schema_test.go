@@ -29,7 +29,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "schema"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			// Paused readiness stops the command before any connection attempt,
@@ -46,7 +46,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service "svc-12345": connection refused`,
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "API error",

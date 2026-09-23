@@ -24,7 +24,6 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 			// The default service is stored as an ID, so a name given here is
 			// resolved once at write time rather than on every command that
 			// reads it.
-			var resolvedName string
 			if key == "service_id" && value != "" {
 				_, client, projectID, err := app.GetAll()
 				if err != nil {
@@ -34,7 +33,12 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				value, resolvedName = service.ServiceID, service.Name
+				// Echo only a name that actually resolved: handing an ID back
+				// to someone who typed that ID says nothing.
+				if service.ServiceID != value {
+					cmd.PrintErrf("Resolved '%s' to %s.\n", value, service.ServiceID)
+				}
+				value = service.ServiceID
 			}
 
 			stored, err := cfg.Set(key, value)
@@ -42,10 +46,6 @@ func buildConfigSetCmd(app *common.App) *cobra.Command {
 				return fmt.Errorf("failed to set config: %w", err)
 			}
 
-			if resolvedName != "" {
-				cmd.Printf("Set %s = %s (%s)\n", key, stored, resolvedName)
-				return nil
-			}
 			cmd.Printf("Set %s = %s\n", key, stored)
 			return nil
 		},

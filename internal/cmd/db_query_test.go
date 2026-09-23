@@ -126,7 +126,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// blocks on reading a query.
 			name:    "missing service id",
 			args:    []string{"db", "query"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "too many args",
@@ -194,7 +194,7 @@ func TestDbQueryCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service "svc-12345": connection refused`,
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "API error",

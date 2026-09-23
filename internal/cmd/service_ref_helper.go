@@ -16,7 +16,7 @@ import (
 
 // errServiceRequired is returned when neither an argument nor a configured
 // default identifies a service.
-var errServiceRequired = errors.New("service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'")
+var errServiceRequired = errors.New("service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'")
 
 // serviceRef is what the user gave to identify a service, and where it came
 // from. The two resolve differently: an argument may be an ID, a read replica
@@ -72,7 +72,7 @@ func defaultServiceSource(cmd *cobra.Command) string {
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
 	resp, err := client.ResolveServiceRefWithResponse(ctx, projectID, api.ServiceRefRequest{Ref: ref.ref})
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve service %q: %w", ref.ref, err)
+		return nil, fmt.Errorf("failed to resolve service '%s': %w", ref.ref, err)
 	}
 	if resp.StatusCode() != http.StatusOK {
 		err := common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
@@ -105,8 +105,15 @@ func checkDefaultIsID(service api.Service, ref serviceRef) error {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
-		"%s is set to %q, the name of service %s. A name here breaks as soon as the service is renamed.\nUse %s, pass the name as an argument, or run 'tiger config set service_id %s' to store its ID",
-		ref.source, ref.ref, service.ServiceID, service.ServiceID, ref.ref))
+		"%s is set to '%s', the name of service %s. A name here breaks as soon as the service is renamed.\nSet %s to %s, pass the name as an argument, or run 'tiger config set service_id %s' to store its ID",
+		ref.source, ref.ref, service.ServiceID, ref.source, service.ServiceID, ref.ref))
+}
+
+// serviceLabel identifies a service in status output by name and ID together.
+// A user who typed a name gets to see which service it resolved to, and one
+// who typed an ID still gets the name that goes with it.
+func serviceLabel(service api.Service) string {
+	return fmt.Sprintf("'%s' (%s)", service.Name, service.ServiceID)
 }
 
 // resolveServiceForWrite is resolveService for a command that changes the

@@ -62,7 +62,7 @@ service from your configuration.`,
 				api.ServiceID(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to stop Service: %w", err)
+				return fmt.Errorf("failed to stop service: %w", err)
 			}
 
 			// Handle API response
@@ -75,7 +75,7 @@ service from your configuration.`,
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Stop request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Stop request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {

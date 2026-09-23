@@ -31,13 +31,13 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "delete"},
 			opts:    []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			wantErr: "service is required",
+			wantErr: "service name or ID is required",
 		},
 		{
 			// An empty argument is a missing service, not a ref to resolve.
 			name:    "empty service",
 			args:    []string{"service", "delete", ""},
-			wantErr: "service is required",
+			wantErr: "service name or ID is required",
 		},
 		{
 			name:    "not logged in",
@@ -67,7 +67,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			args:       []string{"service", "delete", "svc-12345", "--confirm"},
 			opts:       []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup:      setupDelete(envTag("DEV")),
-			wantStderr: "Service 'svc-12345' deleted.\n",
+			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
 			name:    "non-TTY without confirm",
@@ -88,7 +88,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			opts:  []runOption{withIsTerminal(true), withStdin("svc-12345\n")},
 			setup: setupDelete(),
 			wantStderr: confirmPrompt +
-				"Service 'svc-12345' deleted.\n",
+				"Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
 			// The prompt takes the ID and nothing else: typing back the name
@@ -115,13 +115,13 @@ func TestServiceDeleteCmd(t *testing.T) {
 						HTTPResponse: httpResponse(http.StatusAccepted),
 					}, nil)
 			},
-			wantStderr: confirmPrompt + "Service 'svc-12345' deleted.\n",
+			wantStderr: confirmPrompt + "Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
 			name:       "confirm flag skips prompt",
 			args:       []string{"service", "delete", "svc-12345", "--confirm"},
 			setup:      setupDelete(),
-			wantStderr: "Service 'svc-12345' deleted.\n",
+			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
 			name: "network error",
@@ -131,7 +131,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to delete Service: connection refused",
+			wantErr: "failed to delete service: connection refused",
 		},
 		{
 			name: "API error",
@@ -151,7 +151,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name:       "rm alias",
 			args:       []string{"service", "rm", "svc-12345", "--confirm"},
 			setup:      setupDelete(),
-			wantStderr: "Service 'svc-12345' deleted.\n",
+			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
 		},
 	})
 }

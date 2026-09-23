@@ -65,14 +65,15 @@ func TestConfigSetCmd(t *testing.T) {
 			name:       "set service_id resolves a name to its ID",
 			args:       []string{"config", "set", "service_id", "test-service"},
 			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "test-service", sampleService()) },
-			wantStdout: "Set service_id = svc-12345 (test-service)\n",
+			wantStdout: "Set service_id = svc-12345\n",
+			wantStderr: "Resolved 'test-service' to svc-12345.\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
 		},
 		{
 			name:       "set service_id by ID",
 			args:       []string{"config", "set", "service_id", "svc-12345"},
 			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "svc-12345", sampleService()) },
-			wantStdout: "Set service_id = svc-12345 (test-service)\n",
+			wantStdout: "Set service_id = svc-12345\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
 		},
 		{

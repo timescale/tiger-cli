@@ -86,7 +86,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			serviceID := resolved.ServiceID
 
 			// Display resize information
-			cmd.PrintErrf("Resizing service '%s' to %s...\n", serviceID, cpuMemoryCfg)
+			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), cpuMemoryCfg)
 
 			// Prepare resize request
 			resizeReq := api.ResizeInput{
@@ -110,7 +110,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Resize request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Resize request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {

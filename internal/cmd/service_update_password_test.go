@@ -96,7 +96,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "env password and auto-generate conflict",
@@ -110,7 +110,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service "svc-12345": connection refused`,
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "API error on resolve",
@@ -138,7 +138,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 					s.ForkedFrom = &api.ForkSpec{IsStandby: new(true), ServiceID: new("svcprimary")}
 				}))
 			},
-			wantErr: `"rep1234567" is a read replica; update the password on its primary service "svcprimary" instead`,
+			wantErr: `'rep1234567' is a read replica; update the password on its primary service 'svcprimary' instead`,
 		},
 		{
 			name:    "non-interactive without password",

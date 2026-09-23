@@ -108,8 +108,8 @@ Service is being created. Use 'tiger service list' to check status.
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr:    "failed to create Service: connection refused",
-			wantStderr: "Creating service 'test-service'...\nError: failed to create Service: connection refused\n",
+			wantErr:    "failed to create service: connection refused",
+			wantStderr: "Creating service 'test-service'...\nError: failed to create service: connection refused\n",
 		},
 		{
 			name: "API error",

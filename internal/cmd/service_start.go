@@ -62,7 +62,7 @@ service from your configuration.`,
 				api.ServiceID(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to start Service: %w", err)
+				return fmt.Errorf("failed to start service: %w", err)
 			}
 
 			// Handle API response
@@ -75,7 +75,7 @@ service from your configuration.`,
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Start request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Start request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {

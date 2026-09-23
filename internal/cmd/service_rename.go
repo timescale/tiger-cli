@@ -35,7 +35,7 @@ its current name.`,
 			serviceArg, newName := args[0], strings.TrimSpace(args[1])
 
 			if serviceArg == "" {
-				return errors.New("service cannot be empty")
+				return errors.New("service name or ID is required")
 			}
 
 			if newName == "" {
@@ -72,7 +72,7 @@ its current name.`,
 			}
 			renamed := *resp.JSON200
 
-			cmd.Printf("Renamed service '%s' to '%s'.\n", serviceID, renamed.Name)
+			cmd.Printf("Renamed service %s to '%s'.\n", serviceLabel(*service), renamed.Name)
 
 			return nil
 		},

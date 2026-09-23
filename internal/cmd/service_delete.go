@@ -41,7 +41,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require an explicit service for safety: no default fallback.
 			if len(args) < 1 || args[0] == "" {
-				return errors.New("service is required")
+				return errors.New("service name or ID is required")
 			}
 			serviceArg := args[0]
 
@@ -66,7 +66,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				// Show both forms, but take only the ID: a name can move to a
 				// different service through a rename, so it is the wrong
 				// thing to authorize a delete with.
-				cmd.PrintErrf("Are you sure you want to delete service '%s' (%s)? This operation cannot be undone.\n", service.Name, serviceID)
+				cmd.PrintErrf("Are you sure you want to delete service %s? This operation cannot be undone.\n", serviceLabel(*service))
 				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
 				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
@@ -85,7 +85,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				api.ServiceID(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to delete Service: %w", err)
+				return fmt.Errorf("failed to delete service: %w", err)
 			}
 
 			// Handle response
@@ -93,7 +93,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.PrintErrf("Service '%s' deleted.\n", serviceID)
+			cmd.PrintErrf("Service %s deleted.\n", serviceLabel(*service))
 			return nil
 		},
 	}

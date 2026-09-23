@@ -110,10 +110,10 @@ The password will be saved according to your --password-storage setting
 
 			if target.IsReplica {
 				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
-					service.ServiceID)
+					serviceLabel(service))
 			}
-			cmd.PrintErrf("Password saved for service %s (role %s)\n",
-				service.ServiceID, role)
+			cmd.PrintErrf("Password saved for service %s, role %s\n",
+				serviceLabel(service), role)
 			return nil
 		},
 	}

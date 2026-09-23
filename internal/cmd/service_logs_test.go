@@ -70,7 +70,7 @@ func TestServiceLogsCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "logs"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "invalid since flag",

@@ -29,7 +29,8 @@ func TestConfigCmd(t *testing.T) {
 			name:       "cfg alias",
 			args:       []string{"cfg", "set", "service_id", "alias-service"},
 			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "alias-service", sampleService()) },
-			wantStdout: "Set service_id = svc-12345 (test-service)\n",
+			wantStdout: "Set service_id = svc-12345\n",
+			wantStderr: "Resolved 'alias-service' to svc-12345.\n",
 			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
 		},
 	})

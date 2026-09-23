@@ -42,17 +42,17 @@ func TestDbPsqlCmd(t *testing.T) {
 		{
 			name:    "service ID required",
 			args:    []string{"db", "psql"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "connect alias",
 			args:    []string{"db", "connect"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "args after -- are not the service ID",
 			args:    []string{"db", "psql", "--", "--single-transaction"},
-			wantErr: "service is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "default service ID from config with psql flags after --",
@@ -61,7 +61,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service "svc-12345": connection refused`,
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "service ID before -- separator",
@@ -69,7 +69,7 @@ func TestDbPsqlCmd(t *testing.T) {
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: `failed to resolve service "svc-12345": connection refused`,
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "API error fetching service",

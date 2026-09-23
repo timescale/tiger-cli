@@ -25,7 +25,7 @@ func TestServiceRenameCmd(t *testing.T) {
 		}
 	}
 
-	const renamedMsg = "Renamed service 'svc-12345' to 'analytics-prod'.\n"
+	const renamedMsg = "Renamed service 'test-service' (svc-12345) to 'analytics-prod'.\n"
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -46,7 +46,7 @@ func TestServiceRenameCmd(t *testing.T) {
 			// An empty argument is a missing service, not a ref to resolve.
 			name:    "empty service",
 			args:    []string{"service", "rename", "", "analytics-prod"},
-			wantErr: "service cannot be empty",
+			wantErr: "service name or ID is required",
 		},
 		{
 			name:    "empty new name",

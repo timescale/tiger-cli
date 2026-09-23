@@ -124,10 +124,11 @@ default service from your configuration.`,
 				return err
 			}
 
-			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
+			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
+			serviceID := source.ServiceID
 
 			// Determine fork strategy and target time
 			var forkStrategy api.ForkStrategy
@@ -153,9 +154,9 @@ default service from your configuration.`,
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
 			}
 			if cmd.Flags().Changed("name") {
-				cmd.PrintErrf("Forking service '%s' to '%s' at %s...\n", serviceID, name, strategyDesc)
+				cmd.PrintErrf("Forking service %s to '%s' at %s...\n", serviceLabel(*source), name, strategyDesc)
 			} else {
-				cmd.PrintErrf("Forking service '%s' at %s...\n", serviceID, strategyDesc)
+				cmd.PrintErrf("Forking service %s at %s...\n", serviceLabel(*source), strategyDesc)
 			}
 
 			// Create ForkServiceCreate request
@@ -175,7 +176,7 @@ default service from your configuration.`,
 			// Make API call to fork service
 			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, serviceID, forkReq)
 			if err != nil {
-				return fmt.Errorf("failed to fork Service: %w", err)
+				return fmt.Errorf("failed to fork service: %w", err)
 			}
 
 			// Handle API response
