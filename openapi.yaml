@@ -1259,9 +1259,10 @@ paths:
         **Preview — this endpoint is experimental and may change without notice.**
 
         Returns descriptive metadata for a named metric: what it measures,
-        its type, default aggregation, and any labels specific to it
-        (beyond the region/role/ordinal labels every metric carries). Use
-        getServiceMetricsAvailableSeries to discover valid metric names.
+        its type, default aggregation, and every label it can be filtered or
+        grouped by — its own labels plus the region/role/ordinal labels most
+        metrics also carry. Use getServiceMetricsAvailableSeries to discover
+        valid metric names.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/ServiceId'
@@ -2426,7 +2427,7 @@ components:
           type: string
           minLength: 1
           maxLength: 128
-          description: A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+          description: A human-readable name for the forked service. If not provided, defaults to "standard-fork-<parent name>" (or "recovery-fork-<parent name>" for PITR forks), with "-1", "-2", ... appended if that name is already in use in the project.
           example: "my-production-db-fork"
         cpu_millis:
           type: string
@@ -2952,6 +2953,33 @@ components:
             response are lowercased.
           items:
             $ref: '#/components/schemas/MetricLabelFilter'
+        group_by:
+          type: array
+          description: |
+            Label keys to break the result into one series per distinct value
+            combination. Optional: when omitted (or empty), all matching
+            label sets collapse into a single series.
+
+            Not accepted on the following metrics — requests are rejected
+            with `INVALID_REQUEST`:
+              - `timescale_cloud_system_cpu_total_millicores`
+              - `timescale_cloud_system_cpu_usage_millicores`
+              - `timescale_cloud_system_disk_io_read_bytes`
+              - `timescale_cloud_system_disk_io_read_ops`
+              - `timescale_cloud_system_disk_io_total_bytes`
+              - `timescale_cloud_system_disk_io_total_ops`
+              - `timescale_cloud_system_disk_io_write_bytes`
+              - `timescale_cloud_system_disk_io_write_ops`
+              - `timescale_cloud_system_disk_usage_bytes`
+              - `timescale_cloud_system_memory_total_bytes`
+              - `timescale_cloud_system_memory_usage_bytes`
+              - `timescale_cloud_database_qps`
+              - `timescale_cloud_database_num_connections`
+              - `timescale_cloud_database_job_duration_usecs`
+              - `timescale_cloud_database_job_success`
+          items:
+            type: string
+          example: ["role"]
 
     MetricLabelFilter:
       x-tigerdata-preview: true
@@ -3838,9 +3866,11 @@ components:
         labels:
           type: array
           description: |
-            Labels specific to this metric (e.g. datname on
-            pg_stat_database_*) — not the region/role/ordinal labels every
-            metric carries regardless of which one it is.
+            All labels this metric can be filtered or grouped by: its own
+            labels (e.g. datname on pg_stat_database_*) plus the
+            region/role/ordinal labels most metrics also carry. Some
+            metrics only attach a subset of those — e.g.
+            pgbouncer-sourced metrics only get region, not role/ordinal.
           items:
             $ref: '#/components/schemas/MetricLabelDetails'
 

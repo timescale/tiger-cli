@@ -1735,7 +1735,7 @@ type ForkServiceCreate struct {
 	// Example: 4
 	MemoryGbs *string `json:"memory_gbs,omitempty"`
 
-	// Name A human-readable name for the forked service. If not provided, will use parent service name with "-fork" suffix.
+	// Name A human-readable name for the forked service. If not provided, defaults to "standard-fork-<parent name>" (or "recovery-fork-<parent name>" for PITR forks), with "-1", "-2", ... appended if that name is already in use in the project.
 	//
 	// Example: my-production-db-fork
 	Name *string `json:"name,omitempty"`
@@ -1814,9 +1814,11 @@ type MetricDetails struct {
 	// Example: Number of locks currently held, grouped by relation and lock mode.
 	Description string `json:"description"`
 
-	// Labels Labels specific to this metric (e.g. datname on
-	// pg_stat_database_*) — not the region/role/ordinal labels every
-	// metric carries regardless of which one it is.
+	// Labels All labels this metric can be filtered or grouped by: its own
+	// labels (e.g. datname on pg_stat_database_*) plus the
+	// region/role/ordinal labels most metrics also carry. Some
+	// metrics only attach a subset of those — e.g.
+	// pgbouncer-sourced metrics only get region, not role/ordinal.
 	Labels []MetricLabelDetails `json:"labels"`
 
 	// Name Metric series name.
@@ -1983,6 +1985,32 @@ type MetricsSeriesRequest struct {
 	//
 	// Example: 2026-06-25T10:00:00Z
 	From time.Time `json:"from"`
+
+	// GroupBy Label keys to break the result into one series per distinct value
+	// combination. Optional: when omitted (or empty), all matching
+	// label sets collapse into a single series.
+	//
+	// Not accepted on the following metrics — requests are rejected
+	// with `INVALID_REQUEST`:
+	//   - `timescale_cloud_system_cpu_total_millicores`
+	//   - `timescale_cloud_system_cpu_usage_millicores`
+	//   - `timescale_cloud_system_disk_io_read_bytes`
+	//   - `timescale_cloud_system_disk_io_read_ops`
+	//   - `timescale_cloud_system_disk_io_total_bytes`
+	//   - `timescale_cloud_system_disk_io_total_ops`
+	//   - `timescale_cloud_system_disk_io_write_bytes`
+	//   - `timescale_cloud_system_disk_io_write_ops`
+	//   - `timescale_cloud_system_disk_usage_bytes`
+	//   - `timescale_cloud_system_memory_total_bytes`
+	//   - `timescale_cloud_system_memory_usage_bytes`
+	//   - `timescale_cloud_database_qps`
+	//   - `timescale_cloud_database_num_connections`
+	//   - `timescale_cloud_database_job_duration_usecs`
+	//   - `timescale_cloud_database_job_success`
+	//
+	//
+	// Example: ["role"]
+	GroupBy *[]string `json:"group_by,omitempty"`
 
 	// Name Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
 	//
