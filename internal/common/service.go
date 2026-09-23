@@ -33,14 +33,12 @@ func ServiceEnvironmentTag(service api.Service) api.EnvironmentTag {
 const (
 	AddonNone       = "none" // Special value for no add-ons
 	AddonTimeSeries = "time-series"
-	AddonAI         = "ai"
 )
 
 // ValidAddons returns a slice of all valid add-on values
 func ValidAddons() []string {
 	return []string{
 		AddonTimeSeries,
-		AddonAI,
 	}
 }
 

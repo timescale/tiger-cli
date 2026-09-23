@@ -156,7 +156,7 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--addons flag values",
 			args:       []string{"__complete", "service", "create", "--addons", ""},
-			wantStdout: "time-series\nai\nnone\n" + noFileComp,
+			wantStdout: "time-series\nnone\n" + noFileComp,
 			wantStderr: directive,
 			checks:     []checkFunc{checkNotLoaded},
 		},
