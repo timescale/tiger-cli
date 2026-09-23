@@ -48,7 +48,9 @@ func TestServiceMetricsSeries(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			name:         "filter without match_type defaults to EQUAL",
+			// Array-item schema defaults aren't SDK-applied, so match_type
+			// must stay nil here, not an empty string.
+			name:         "filter without match_type omits MatchType rather than sending an empty one",
 			tool:         toolServiceMetricsSeries,
 			experimental: true,
 			args:         args(map[string]any{"key": "ordinal", "value": "0"}),
