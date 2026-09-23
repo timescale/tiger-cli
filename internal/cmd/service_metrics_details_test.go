@@ -109,7 +109,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -119,7 +119,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -133,7 +133,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -146,14 +146,14 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name:       "table output with labels",
 			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts:       []runOption{experimental},
-			setup:      setupDetails("pg_stat_activity_count", fullDetails),
+			mock:       setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
 		{
 			name:       "default service id from config",
 			args:       []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
 			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup:      setupDetails("pg_stat_activity_count", fullDetails),
+			mock:       setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
 		{
@@ -163,14 +163,14 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name:       "table output without labels",
 			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "some_new_metric"},
 			opts:       []runOption{experimental},
-			setup:      setupDetails("some_new_metric", undocumentedDetails),
+			mock:       setupDetails("some_new_metric", undocumentedDetails),
 			wantStdout: undocumentedTable,
 		},
 		{
-			name:  "json output",
-			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "json"},
-			opts:  []runOption{experimental},
-			setup: setupDetails("pg_stat_activity_count", fullDetails),
+			name: "json output",
+			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "json"},
+			opts: []runOption{experimental},
+			mock: setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: `{
   "default_agg": "MAX_TOTAL",
   "description": "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -210,10 +210,10 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 `,
 		},
 		{
-			name:  "yaml output",
-			args:  []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "yaml"},
-			opts:  []runOption{experimental},
-			setup: setupDetails("pg_stat_activity_count", fullDetails),
+			name: "yaml output",
+			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "yaml"},
+			opts: []runOption{experimental},
+			mock: setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: `default_agg: MAX_TOTAL
 description: Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.
 labels:

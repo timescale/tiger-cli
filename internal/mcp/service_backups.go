@@ -72,9 +72,12 @@ func (s *Server) handleServiceBackups(ctx context.Context, req *mcp.CallToolRequ
 		return nil, ServiceBackupsOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	if resp.JSON200 == nil {
-		return nil, ServiceBackupsOutput{Backups: []api.Backup{}}, nil
+	// Default to a non-nil slice so a missing body or a JSON null marshals to
+	// `[]` rather than `null`.
+	backups := []api.Backup{}
+	if resp.JSON200 != nil && *resp.JSON200 != nil {
+		backups = *resp.JSON200
 	}
 
-	return nil, ServiceBackupsOutput{Backups: *resp.JSON200}, nil
+	return nil, ServiceBackupsOutput{Backups: backups}, nil
 }

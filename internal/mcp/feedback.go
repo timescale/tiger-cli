@@ -54,7 +54,7 @@ func (FeedbackOutput) Schema() *jsonschema.Schema {
 
 func newFeedbackTool() *mcp.Tool {
 	return &mcp.Tool{
-		Name:  "feedback",
+		Name:  toolFeedback,
 		Title: "Submit Feedback",
 		Description: `Submit feedback or a bug report to the Tiger Data team.
 

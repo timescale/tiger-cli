@@ -51,14 +51,14 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			name:       "key=value filter builds an EQUAL request",
 			args:       args("ordinal=0"),
 			opts:       []runOption{experimental},
-			setup:      expectSeries([]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}),
+			mock:       expectSeries([]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}),
 			wantStdout: noDataMsg,
 		},
 		{
 			name: "key!=value filter builds a NOT_EQUAL request",
 			args: args("role!=replica"),
 			opts: []runOption{experimental},
-			setup: expectSeries([]api.MetricLabelFilter{
+			mock: expectSeries([]api.MetricLabelFilter{
 				{Key: "role", Value: "replica", MatchType: new(api.MetricMatchTypeNOTEQUAL)},
 			}),
 			wantStdout: noDataMsg,
@@ -86,7 +86,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				"--group-by", "ordinal",
 			},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				empty := []api.MetricSeries{}
 				groupBy := []string{"role", "ordinal"}
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{

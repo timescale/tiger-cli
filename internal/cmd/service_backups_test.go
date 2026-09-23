@@ -105,7 +105,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -115,7 +115,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -129,7 +129,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -142,7 +142,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name:       "empty list",
 			args:       []string{"service", "backup", "svc-12345"},
 			opts:       []runOption{experimental},
-			setup:      setupList([]api.Backup{}),
+			mock:       setupList([]api.Backup{}),
 			wantStderr: "No backups found.\n",
 		},
 		{
@@ -151,22 +151,22 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name:       "table output",
 			args:       []string{"service", "backup", "svc-12345"},
 			opts:       []runOption{experimental},
-			setup:      setupList(backups),
+			mock:       setupList(backups),
 			wantStdout: backupsTable,
 		},
 		{
 			name:       "default service id from config",
 			args:       []string{"service", "backup"},
 			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup:      setupList(backups),
+			mock:       setupList(backups),
 			wantStdout: backupsTable,
 		},
 		{
 			// The label stays in the structured formats.
-			name:  "json output",
-			args:  []string{"service", "backup", "svc-12345", "-o", "json"},
-			opts:  []runOption{experimental},
-			setup: setupList(backups[:2]),
+			name: "json output",
+			args: []string{"service", "backup", "svc-12345", "-o", "json"},
+			opts: []runOption{experimental},
+			mock: setupList(backups[:2]),
 			wantStdout: `[
   {
     "duration_seconds": 672,
@@ -202,10 +202,10 @@ func TestServiceBackupsCmd(t *testing.T) {
 		{
 			// size_bytes renders in scientific notation: SerializeToYAML
 			// round-trips through JSON, so large integers become float64s.
-			name:  "yaml output",
-			args:  []string{"service", "backup", "svc-12345", "-o", "yaml"},
-			opts:  []runOption{experimental},
-			setup: setupList(backups[:2]),
+			name: "yaml output",
+			args: []string{"service", "backup", "svc-12345", "-o", "yaml"},
+			opts: []runOption{experimental},
+			mock: setupList(backups[:2]),
 			wantStdout: `- duration_seconds: 672
   finished_at: "2026-01-15T09:41:12Z"
   label: 20260115-093000F
@@ -236,7 +236,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name:    "env output from config file",
 			args:    []string{"service", "backup", "svc-12345"},
 			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
-			setup:   setupList(backups[:2]),
+			mock:    setupList(backups[:2]),
 			wantErr: "environment variable output is not supported for backups",
 		},
 	})
