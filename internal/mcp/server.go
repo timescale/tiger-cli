@@ -85,34 +85,42 @@ func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mc
 // to clients at initialize. Evaluated once at server start, like tool registration.
 func buildServerInstructions(cfg *config.Config, experimental bool) string {
 	const (
-		intro        = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
-		capabilities = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+		intro = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
+
+		// capabilitiesBase and readOnlyCapabilitiesBase describe what the server
+		// can do in each mode. metricsMention, when non-empty, folds into
+		// whichever one is used so the result still reads as one sentence.
+		capabilitiesBase         = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
+		readOnlyCapabilitiesBase = "Use it to list and inspect services, fetch service logs, query databases read-only, and search Tiger documentation."
+
 		// Metrics tools are registered regardless of read-only mode (they're all
-		// read-only themselves), so this is appended in every branch below.
-		metricsBlurb = " Metrics tools (service_metrics_available, service_metrics_details, service_metrics_series) cover hardware/resource usage, PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals — use them for monitoring, debugging, and performance investigation."
+		// read-only themselves), so this folds into capabilities in every branch.
+		metricsMention = " It also covers metrics — hardware/resource usage, PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals — via service_metrics_available, service_metrics_details, and service_metrics_series, for monitoring, debugging, and performance investigation."
 	)
 
 	metrics := ""
 	if experimental {
-		metrics = metricsBlurb
+		metrics = metricsMention
 	}
+	capabilities := capabilitiesBase + metrics
+	readOnlyCapabilities := readOnlyCapabilitiesBase + metrics
 
 	switch cfg.ReadOnly {
 	case config.ReadOnlyAll:
 		// The write tools aren't registered, so announce the mode instead of
 		// advertising them.
-		return intro +
+		return intro + readOnlyCapabilities + " " +
 			"READ-ONLY MODE IS ENABLED. Service-mutating tools are not registered, so do not offer to create, fork, start, stop, resize, delete, or modify services. " +
-			"db_query connects read-only, so writes and DDL are rejected by the server." + metrics
+			"db_query connects read-only, so writes and DDL are rejected by the server."
 	case config.ReadOnlyProd:
 		// The write tools are registered, so keep advertising them but explain
 		// the refusals — otherwise one looks like a bug.
 		return intro + capabilities + " " +
 			"READ-ONLY MODE IS ENABLED FOR PRODUCTION SERVICES. Services tagged PROD cannot be modified: the service-mutating tools refuse them, and db_query connects to them read-only, so writes and DDL are rejected by the server. " +
 			"Services tagged DEV are unaffected. Check a service's environment field (from service_get or service_list) before offering to modify it. " +
-			"service_create and service_fork also refuse an environment of PROD, since the mode will not create a service it would then refuse to stop or delete: leave environment at its DEV default." + metrics
+			"service_create and service_fork also refuse an environment of PROD, since the mode will not create a service it would then refuse to stop or delete: leave environment at its DEV default."
 	default:
-		return intro + capabilities + metrics
+		return intro + capabilities
 	}
 }
 
