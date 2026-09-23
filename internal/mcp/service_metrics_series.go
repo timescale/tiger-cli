@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,8 +19,9 @@ import (
 
 // MetricLabelFilterInput mirrors api.MetricLabelFilter for the tool schema.
 type MetricLabelFilterInput struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	MatchType string `json:"match_type,omitempty"`
 }
 
 // ServiceMetricsSeriesInput represents input for service_metrics_series
@@ -32,6 +34,7 @@ type ServiceMetricsSeriesInput struct {
 	Filters       []MetricLabelFilterInput `json:"filters,omitempty"`
 	BucketSeconds int                      `json:"bucket_seconds,omitempty"`
 	Fn            string                   `json:"fn,omitempty"`
+	GroupBy       []string                 `json:"group_by,omitempty"`
 }
 
 func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
@@ -59,7 +62,11 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["filters"].Examples = []any{
 		[]MetricLabelFilterInput{{Key: "ordinal", Value: "0"}},
 		[]MetricLabelFilterInput{{Key: "job_id", Value: "1000"}},
+		[]MetricLabelFilterInput{{Key: "role", Value: "replica", MatchType: "NOT_EQUAL"}},
 	}
+	schema.Properties["filters"].Items.Properties["match_type"].Description = "How to compare the label's value. EQUAL: the series must have the label equal to value. NOT_EQUAL: the series must not have the label equal to value; NOT_EQUAL also matches a series missing the label entirely. To exclude multiple values of the same label, pass multiple filters with that key. Defaults to EQUAL."
+	schema.Properties["filters"].Items.Properties["match_type"].Enum = []any{"EQUAL", "NOT_EQUAL"}
+	schema.Properties["filters"].Items.Properties["match_type"].Default = util.Must(json.Marshal("EQUAL"))
 
 	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)
@@ -67,6 +74,9 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 
 	schema.Properties["fn"].Description = "Aggregation function applied per bucket. Not accepted on these metrics (returns INVALID_REQUEST): timescale_cloud_system_cpu_total_millicores, timescale_cloud_system_cpu_usage_millicores, timescale_cloud_system_disk_io_read_bytes, timescale_cloud_system_disk_io_read_ops, timescale_cloud_system_disk_io_total_bytes, timescale_cloud_system_disk_io_total_ops, timescale_cloud_system_disk_io_write_bytes, timescale_cloud_system_disk_io_write_ops, timescale_cloud_system_disk_usage_bytes, timescale_cloud_system_memory_total_bytes, timescale_cloud_system_memory_usage_bytes, timescale_cloud_database_qps, timescale_cloud_database_num_connections, timescale_cloud_database_job_duration_usecs, timescale_cloud_database_job_success. When omitted, the server picks a sensible default for the metric (typically LAST). MIN_TOTAL and MAX_TOTAL add every series' samples together first and take the extremum of that total, for a metric with per-series labels where the combined total is the meaningful quantity (e.g. peak of total connections across all databases); MIN and MAX give the single most extreme individual series instead."
 	schema.Properties["fn"].Enum = []any{"RATE", "INCREASE", "SUM", "AVG", "MIN", "MAX", "MIN_TOTAL", "MAX_TOTAL", "COUNT", "P50", "P90", "P99", "LAST"}
+
+	schema.Properties["group_by"].Description = "Label keys to break the result into one series per distinct value combination. Not accepted on the same metrics that reject fn (returns INVALID_REQUEST). Omit, or pass an empty list, to collapse all matching label sets into a single series."
+	schema.Properties["group_by"].Examples = []any{[]string{"role"}, []string{"role", "ordinal"}}
 
 	return schema
 }
@@ -92,7 +102,8 @@ Use service_metrics_available first to discover valid metric names.
 
 The response groups data points by their label set — a single request may
 return multiple labeled series (e.g. one per replica, one per worker ordinal).
-Each series contains its full list of raw data points.
+Each series contains its full list of raw data points. Use group_by to
+control which label keys define that grouping.
 
 Available metrics include: CPU usage/allocation, memory usage/total, disk usage, and disk I/O (read/write bytes and ops).`,
 		InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
@@ -147,6 +158,9 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	if len(filters) > 0 {
 		body.Filters = &filters
 	}
+	if len(input.GroupBy) > 0 {
+		body.GroupBy = &input.GroupBy
+	}
 
 	resp, err := client.GetServiceMetricsSeriesWithResponse(ctx, projectID, input.ServiceID, body)
 	if err != nil {
@@ -176,10 +190,17 @@ func buildMetricFilters(role string, filters []MetricLabelFilterInput) []api.Met
 		out = append(out, api.MetricLabelFilter{Key: "role", Value: strings.ToLower(role)})
 	}
 	for _, f := range filters {
+		// Schema defaults/required apply to object properties, not array
+		// items, so these can still arrive empty.
 		if f.Key == "" || f.Value == "" {
 			continue
 		}
-		out = append(out, api.MetricLabelFilter{Key: f.Key, Value: f.Value})
+		filter := api.MetricLabelFilter{Key: f.Key, Value: f.Value}
+		if f.MatchType != "" {
+			matchType := api.MetricMatchType(f.MatchType)
+			filter.MatchType = &matchType
+		}
+		out = append(out, filter)
 	}
 	return out
 }
