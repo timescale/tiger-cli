@@ -73,5 +73,31 @@ func TestServiceMetricsSeries(t *testing.T) {
 			setupMock:    expectSeries(nil),
 			wantOutput:   wantEmptySeries,
 		},
+		{
+			name:         "group_by builds a GroupBy request",
+			tool:         toolServiceMetricsSeries,
+			experimental: true,
+			args: map[string]any{
+				"service_id":  "e6ue9697jf",
+				"metric_name": "some_metric",
+				"from":        "2026-05-13T00:00:00Z",
+				"to":          "2026-05-13T01:00:00Z",
+				"group_by":    []string{"role", "ordinal"},
+			},
+			setupMock: func(m *mocks.MockClientWithResponsesInterface) {
+				empty := []api.MetricSeries{}
+				groupBy := []string{"role", "ordinal"}
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "e6ue9697jf", api.MetricsSeriesRequest{
+					Name:    "some_metric",
+					From:    fromTime,
+					To:      toTime,
+					GroupBy: &groupBy,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantOutput: wantEmptySeries,
+		},
 	})
 }
