@@ -142,7 +142,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			cmd.PrintErrf("Creating service '%s'...\n", name)
 			resp, err := client.CreateServiceWithResponse(cmd.Context(), projectID, serviceCreateReq)
 			if err != nil {
-				return fmt.Errorf("failed to create Service: %w", err)
+				return fmt.Errorf("failed to create service: %w", err)
 			}
 
 			// Handle API response

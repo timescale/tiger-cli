@@ -9,11 +9,11 @@ View logs for a database service.
 Fetches and displays logs from the specified service. By default, shows the last
 100 log entries. Supports filtering by time range.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.
 
 ```
-tiger service logs [service-id] [flags]
+tiger service logs [name-or-id] [flags]
 ```
 
 ### Examples

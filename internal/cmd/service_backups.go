@@ -21,15 +21,15 @@ import (
 // TIGER_EXPERIMENTAL in buildServiceCmd.
 func buildServiceBackupsCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup [service-id]",
+		Use:   "backup [name-or-id]",
 		Short: "List backups for a service",
 		Long: `List the full and incremental backups taken for a database service.
 
 Backups run automatically on a schedule; there is no command to create or delete
 one. To restore data, create a recovery fork with tiger service fork.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.`,
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # List backups for the default service
   tiger service backup
 
@@ -47,7 +47,12 @@ from your configuration.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
+			if err != nil {
+				return err
+			}
+
+			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

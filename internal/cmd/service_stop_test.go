@@ -11,8 +11,10 @@ import (
 )
 
 func TestServiceStopCmd(t *testing.T) {
-	setupStop := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
+	// overrides apply to the resolved service, whose tag the prod gate reads.
+	setupStop := func(status api.DeployStatus, overrides ...func(*api.Service)) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRef(m, "svc-12345", sampleService(overrides...))
 			svc := sampleService(func(s *api.Service) { s.Status = status })
 			m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.StopServiceResponse{
@@ -44,37 +46,36 @@ func TestServiceStopCmd(t *testing.T) {
 			args:    []string{"service", "stop", "svc-12345"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			setup:   expectTaggedService("PROD"),
-			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
-			name: "read-only prod allows DEV service",
-			args: []string{"service", "stop", "svc-12345", "--no-wait"},
-			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectTaggedService("DEV")(m)
-				setupStop(api.DeployStatusPAUSING)(m)
-			},
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			name:  "read-only prod allows DEV service",
+			args:  []string{"service", "stop", "svc-12345", "--no-wait"},
+			opts:  []runOption{withConfig(map[string]any{"read_only": "prod"})},
+			setup: setupStop(api.DeployStatusPAUSING, envTag("DEV")),
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"service", "stop"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
-			wantErr: "failed to stop Service: connection refused",
+			wantErr: "failed to stop service: connection refused",
 		},
 		{
 			name: "API error",
 			args: []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -88,6 +89,7 @@ func TestServiceStopCmd(t *testing.T) {
 			name: "service not found",
 			args: []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -101,6 +103,7 @@ func TestServiceStopCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "stop", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -112,14 +115,14 @@ func TestServiceStopCmd(t *testing.T) {
 			name:  "no-wait",
 			args:  []string{"service", "stop", "svc-12345", "--no-wait"},
 			setup: setupStop(api.DeployStatusPAUSING),
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:  "wait returns immediately when already paused",
 			args:  []string{"service", "stop", "svc-12345"},
 			setup: setupStop(api.DeployStatusPAUSED),
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Waiting for service to stop (timeout: 10m0s)...\n" +
 				"Service stopped.\n",
 		},
@@ -136,7 +139,7 @@ func TestServiceStopCmd(t *testing.T) {
 						JSON200:      &paused,
 					}, nil)
 			},
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Waiting for service to stop (timeout: 10m0s)...\n" +
 				"⢎  Service status: PAUSING\n" +
 				"Service stopped.\n",
@@ -158,7 +161,7 @@ func TestServiceStopCmd(t *testing.T) {
 					}, nil).AnyTimes()
 			},
 			wantErr: "wait timeout reached after 10m0s - service may still be stopping",
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Waiting for service to stop (timeout: 10m0s)...\n" +
 				"⢎  Service status: PAUSING\n" +
 				"Error: wait timeout reached after 10m0s - service may still be stopping\n",
@@ -169,14 +172,14 @@ func TestServiceStopCmd(t *testing.T) {
 			args:  []string{"service", "stop", "--no-wait"},
 			opts:  []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup: setupStop(api.DeployStatusPAUSING),
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 		{
 			name:  "pause alias",
 			args:  []string{"service", "pause", "svc-12345", "--no-wait"},
 			setup: setupStop(api.DeployStatusPAUSING),
-			wantStderr: "Stop request accepted for service 'svc-12345'.\n" +
+			wantStderr: "Stop request accepted for service 'test-service' (svc-12345).\n" +
 				"Use 'tiger service get' to check service status.\n",
 		},
 	})

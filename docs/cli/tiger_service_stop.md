@@ -8,8 +8,11 @@ Stop a running database service.
 
 This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
 
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.
+
 ```
-tiger service stop [service-id] [flags]
+tiger service stop [name-or-id] [flags]
 ```
 
 ### Examples

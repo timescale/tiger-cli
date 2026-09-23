@@ -94,7 +94,7 @@ WARNING: Creates billable resources.`,
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
-			IdempotentHint:  false,      // Creating with same name creates multiple services (name is not unique)
+			IdempotentHint:  false,      // A repeat create with the same name fails: names are unique per project
 			OpenWorldHint:   new(false),
 			Title:           "Create Database Service",
 		},

@@ -475,6 +475,38 @@ paths:
         '4XX':
           $ref: '#/components/responses/ClientError'
 
+  /projects/{project_id}/services/resolve:
+    post:
+      operationId: resolveServiceRef
+      x-tigerdata-owner: prodexp
+      x-tigerdata-internal: true
+      tags:
+        - Services
+      summary: Resolve a Service Reference
+      description: |
+        Resolves a reference to a single service. The reference matches a
+        service whose ID equals it, or whose name equals it — exactly and
+        case-sensitively, with no precedence between the two. Read replica
+        sets match on either, like any other service. A reference matching
+        more than one service is refused rather than resolved.
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRefRequest'
+      responses:
+        '200':
+          description: The resolved service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '4XX':
+          $ref: '#/components/responses/ClientError'
+
   /projects/{project_id}/services/{service_id}:
     get:
       operationId: getService
@@ -1997,6 +2029,19 @@ components:
           type: string
           description: The new name for the service.
           example: "my-renamed-service"
+    ServiceRefRequest:
+      x-tigerdata-internal: true
+      type: object
+      additionalProperties: false
+      description: A reference identifying one service.
+      required:
+        - ref
+      properties:
+        ref:
+          type: string
+          minLength: 1
+          description: A service ID, a read replica set ID, or an exact service name.
+          example: "my-api-db"
     VPCRename:
       type: object
       description: Parameters for renaming a VPC.

@@ -6,13 +6,17 @@ Delete a database service
 
 Delete a database service permanently.
 
-This operation is irreversible. By default, you will be prompted to type the service ID
-to confirm deletion, unless you use the --confirm flag.
+The service can be given by ID or name, but must be given explicitly: there is
+no fallback to the default service.
+
+This operation is irreversible. By default, you will be prompted to type the
+service ID to confirm deletion — the ID, not the name — unless you use the
+--confirm flag.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.
 
 ```
-tiger service delete [service-id] [flags]
+tiger service delete [name-or-id] [flags]
 ```
 
 ### Examples

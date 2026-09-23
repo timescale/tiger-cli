@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,7 +15,7 @@ import (
 // buildServiceRenameCmd creates the rename subcommand
 func buildServiceRenameCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rename <service-id> <new-name>",
+		Use:   "rename <name-or-id> <new-name>",
 		Short: "Rename a database service",
 		Long: `Rename a database service.
 
@@ -23,17 +24,22 @@ untouched, so existing connections and connection strings keep working.
 
 Both the service and the new name are required. There is no default service
 fallback, since a single argument would be ambiguous between the service to
-rename and the name to give it.`,
+rename and the name to give it. The service to rename can be given by ID or by
+its current name.`,
 		Example: `  # Rename a service
   tiger service rename svc-12345 analytics-prod`,
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			serviceID, newName := args[0], strings.TrimSpace(args[1])
+			serviceArg, newName := args[0], strings.TrimSpace(args[1])
+
+			if serviceArg == "" {
+				return errors.New("service name or ID is required")
+			}
 
 			if newName == "" {
-				return fmt.Errorf("new name cannot be empty")
+				return errors.New("new name cannot be empty")
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -41,9 +47,11 @@ rename and the name to give it.`,
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, argServiceRef(serviceArg))
+			if err != nil {
 				return err
 			}
+			serviceID := service.ServiceID
 
 			resp, err := client.RenameServiceWithResponse(
 				cmd.Context(),
@@ -62,9 +70,9 @@ rename and the name to give it.`,
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-			service := *resp.JSON200
+			renamed := *resp.JSON200
 
-			cmd.Printf("Renamed service '%s' to '%s'.\n", serviceID, service.Name)
+			cmd.Printf("Renamed service %s to '%s'.\n", serviceLabel(*service), renamed.Name)
 
 			return nil
 		},

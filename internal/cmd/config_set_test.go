@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/timescale/tiger-cli/internal/api/mocks"
 )
 
 func TestConfigSetCmd(t *testing.T) {
@@ -58,10 +60,21 @@ func TestConfigSetCmd(t *testing.T) {
 			checks:     []checkFunc{checkConfigFile(map[string]any{"api_url": "https://new.api.com/v1"})},
 		},
 		{
-			name:       "set service_id",
-			args:       []string{"config", "set", "service_id", "new-service"},
-			wantStdout: "Set service_id = new-service\n",
-			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "new-service"})},
+			// A name is resolved at write time and stored as the ID it names,
+			// so a later rename can't strand the default.
+			name:       "set service_id resolves a name to its ID",
+			args:       []string{"config", "set", "service_id", "test-service"},
+			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "test-service", sampleService()) },
+			wantStdout: "Set service_id = svc-12345\n",
+			wantStderr: "Resolved 'test-service' to svc-12345.\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
+		},
+		{
+			name:       "set service_id by ID",
+			args:       []string{"config", "set", "service_id", "svc-12345"},
+			setup:      func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "svc-12345", sampleService()) },
+			wantStdout: "Set service_id = svc-12345\n",
+			checks:     []checkFunc{checkConfigFile(map[string]any{"service_id": "svc-12345"})},
 		},
 		{
 			name:       "set output",

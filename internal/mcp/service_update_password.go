@@ -95,13 +95,12 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	}
 	service := *serviceResp.JSON200
 
-	// The prod half of the gate, riding on the fetch above.
 	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
 	if common.IsReadReplica(service) {
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("'%s' is a read replica; update the password on its primary service '%s' instead",
 			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 	}
 

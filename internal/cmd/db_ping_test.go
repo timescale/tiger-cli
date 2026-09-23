@@ -19,7 +19,7 @@ import (
 
 func TestDbPingCmd(t *testing.T) {
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "svc-12345", sampleService())
+		expectResolveRef(m, "svc-12345", sampleService())
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -33,28 +33,27 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "ping"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "missing service id via test alias",
 			args:    []string{"db", "test"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name:    "missing service id via test-connection alias",
 			args:    []string{"db", "test-connection"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "default service id from config",
 			args: []string{"db", "ping"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -66,21 +65,16 @@ func TestDbPingCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "API error",
 			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -89,11 +83,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      nil,
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
@@ -118,7 +108,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "unreachable server",
 			args: []string{"db", "ping", "svc-12345"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
 			},
@@ -137,7 +127,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "connection timeout",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
 				}))
 			},

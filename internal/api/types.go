@@ -2560,6 +2560,14 @@ type ServiceMetrics struct {
 	StorageMb *int `json:"storage_mb,omitempty"`
 }
 
+// ServiceRefRequest A reference identifying one service.
+type ServiceRefRequest struct {
+	// Ref A service ID, a read replica set ID, or an exact service name.
+	//
+	// Example: my-api-db
+	Ref string `json:"ref"`
+}
+
 // ServiceRename Parameters for renaming a service.
 type ServiceRename struct {
 	// Name The new name for the service.
@@ -2820,6 +2828,9 @@ type UpdateExporterJSONRequestBody = ExporterUpdate
 
 // CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
 type CreateServiceJSONRequestBody = ServiceCreate
+
+// ResolveServiceRefJSONRequestBody defines body for ResolveServiceRef for application/json ContentType.
+type ResolveServiceRefJSONRequestBody = ServiceRefRequest
 
 // AttachServiceToAllowListJSONRequestBody defines body for AttachServiceToAllowList for application/json ContentType.
 type AttachServiceToAllowListJSONRequestBody = ServiceAllowListInput

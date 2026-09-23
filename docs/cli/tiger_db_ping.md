@@ -6,8 +6,8 @@ Test database connectivity
 
 Test database connectivity to a service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command tests if the database is accepting
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
 You can also pass a read replica set ID to test connectivity to that replica.
@@ -19,7 +19,7 @@ Return Codes:
   3: No attempt made (e.g., invalid parameters)
 
 ```
-tiger db ping [service-id] [flags]
+tiger db ping [name-or-id] [flags]
 ```
 
 ### Examples

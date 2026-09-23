@@ -79,6 +79,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 
 	setupList := func(backups []api.Backup) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRef(m, "svc-12345")
 			m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.GetBackupsResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
@@ -99,13 +100,14 @@ func TestServiceBackupsCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "backup"},
 			opts:    []runOption{experimental},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -116,6 +118,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -130,6 +133,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			args: []string{"service", "backup", "svc-12345"},
 			opts: []runOption{experimental},
 			setup: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),

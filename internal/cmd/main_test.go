@@ -580,6 +580,39 @@ func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
 }
 
+// expectResolveRef registers the resolve call a command makes for its service
+// ref. With no svc, the ref resolves to itself: a bare service whose ID is the
+// ref, which is what resolving an ID gives you. Pass a svc when the ref is a
+// name, so it resolves to a different ID, or when the command goes on to read
+// fields off the service.
+func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc ...api.Service) {
+	resolved := api.Service{ServiceID: ref}
+	if len(svc) > 0 {
+		resolved = svc[0]
+	}
+	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
+		Return(&api.ResolveServiceRefResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &resolved,
+		}, nil)
+}
+
+// expectResolveRefError registers a ref resolution that never reaches the API.
+func expectResolveRefError(m *mocks.MockClientWithResponsesInterface, ref string, err error) {
+	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
+		Return(nil, err)
+}
+
+// expectResolveRefStatus registers a ref resolution answered with status. A nil
+// apiErr stands in for a 200 with no body.
+func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.Error) {
+	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
+		Return(&api.ResolveServiceRefResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
 // sampleService returns an api.Service with reasonable defaults.
 // Use overrides to customize specific fields.
 func sampleService(overrides ...func(*api.Service)) api.Service {

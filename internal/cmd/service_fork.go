@@ -29,7 +29,7 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var environment string
 
 	cmd := &cobra.Command{
-		Use:   "fork [service-id]",
+		Use:   "fork [name-or-id]",
 		Short: "Fork an existing database service",
 		Long: `Fork an existing database service to create a new independent copy.
 
@@ -43,7 +43,10 @@ By default:
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.`,
+You can override any of these defaults with the corresponding flags.
+
+The source service can be given by ID or name as an argument, or will use the
+default service from your configuration.`,
 		Example: `  # Fork a service at the current state
   tiger service fork svc-12345 --now
 
@@ -109,8 +112,8 @@ You can override any of these defaults with the corresponding flags.`,
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
@@ -120,6 +123,12 @@ You can override any of these defaults with the corresponding flags.`,
 			if err != nil {
 				return err
 			}
+
+			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+			serviceID := source.ServiceID
 
 			// Determine fork strategy and target time
 			var forkStrategy api.ForkStrategy
@@ -145,9 +154,9 @@ You can override any of these defaults with the corresponding flags.`,
 				strategyDesc = fmt.Sprintf("point-in-time: %s", targetTime.Format(time.RFC3339))
 			}
 			if cmd.Flags().Changed("name") {
-				cmd.PrintErrf("Forking service '%s' to '%s' at %s...\n", serviceID, name, strategyDesc)
+				cmd.PrintErrf("Forking service %s to '%s' at %s...\n", serviceLabel(*source), name, strategyDesc)
 			} else {
-				cmd.PrintErrf("Forking service '%s' at %s...\n", serviceID, strategyDesc)
+				cmd.PrintErrf("Forking service %s at %s...\n", serviceLabel(*source), strategyDesc)
 			}
 
 			// Create ForkServiceCreate request
@@ -167,7 +176,7 @@ You can override any of these defaults with the corresponding flags.`,
 			// Make API call to fork service
 			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, serviceID, forkReq)
 			if err != nil {
-				return fmt.Errorf("failed to fork Service: %w", err)
+				return fmt.Errorf("failed to fork service: %w", err)
 			}
 
 			// Handle API response

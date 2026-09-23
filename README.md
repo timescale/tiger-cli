@@ -141,6 +141,26 @@ Tiger CLI provides the following commands:
 
 Use `tiger <command> --help` for detailed information about each command, or browse the generated [CLI reference](docs/cli/tiger.md).
 
+### Naming a Service
+
+Anywhere a command takes a service ID, it also takes the service's name:
+
+```bash
+tiger db psql my-api-db
+tiger service stop my-api-db
+tiger config set service_id my-api-db
+```
+
+A read replica set is named the same way, by its own ID or its own name.
+
+A *default* service is always an ID. `tiger config set service_id` takes a name, resolves it once and stores the ID, so the default survives a rename. `--service-id` and `TIGER_SERVICE_ID` take an ID only: they are set once and reused, so a name there would keep working right up until someone renamed the service. Given one, the CLI says which ID to use instead.
+
+Names are matched exactly and case-sensitively, and deleted services never match. A name is unique among a project's active services, and a service can't be named after another service's ID, so a reference identifies at most one service. One that matches more than one is refused rather than resolved — run `tiger service list` to find the ID you want.
+
+`tiger config set service_id` resolves what you give it and stores the ID, so a later rename can't strand the default. Destructive commands accept a name too, but their confirmation prompt still requires the service's ID.
+
+The MCP tools take IDs only: an agent has `service_list` to look one up, and a name it guessed or remembered may since have moved to a different service through a rename, or through a delete and recreate — not a risk worth taking when the tool on the other end is destructive.
+
 ## MCP Server
 
 Tiger CLI includes a Model Context Protocol (MCP) server that enables AI assistants like Claude Code to interact with your Tiger Cloud infrastructure. The MCP server provides programmatic access to database services and operations.
@@ -269,9 +289,9 @@ All configuration options can be set via `tiger config set <key> <value>`:
   Changing a protected service is refused, and so is creating one: `tiger service create`/`fork`/`start`/`stop`/`rename`/`resize`/`update-password`/`delete` and `tiger db create role` return an error. Connection strings for it open the session in Tiger Cloud's immutable read-only mode, so the server rejects writes and DDL — that covers `tiger db psql`, `tiger db query`, `tiger db uri`, the `db_query` MCP tool, and the connection strings embedded in `tiger service` output and the equivalent MCP tools.
 
   - `all` protects every service, and the MCP write tools aren't registered at all, so they don't appear in `tools/list` and can't be called.
-  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. Reading a service's tag costs one extra API call for `tiger service start`/`stop`/`rename`/`resize`/`delete`, and the operation is refused if that lookup fails. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
+  - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. These commands read the tag off the service they resolve, so the tag costs no extra API call, and the operation is refused if that lookup fails. The MCP write tools, which take IDs, fetch the service to read its tag. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
 
-- `service_id` - Default service ID. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
+- `service_id` - Default service. Stored as an ID: `tiger config set service_id` accepts a service name and resolves it before writing, so the default survives a rename. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
 ### Environment Variables
@@ -287,7 +307,7 @@ Environment variables override configuration file values. All variables use the 
 - `TIGER_READ_ONLY` - Which services this CLI may change: `all`, `prod`, or `off` (same aliases as `read_only`)
 - `TIGER_PUBLIC_KEY` - Public key to use for authentication (takes priority over stored credentials)
 - `TIGER_SECRET_KEY` - Secret key to use for authentication (takes priority over stored credentials)
-- `TIGER_SERVICE_ID` - Default service ID
+- `TIGER_SERVICE_ID` - Default service ID (a name is refused; see [Naming a Service](#naming-a-service))
 - `TIGER_VERSION_CHECK` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available; `false` to disable
 
 ### Global Flags
@@ -298,7 +318,7 @@ These flags are available on all commands and take precedence over both environm
 - `--color` - Enable/disable colored output
 - `--config-dir <path>` - Path to configuration directory (default: `~/.config/tiger`)
 - `--password-storage <method>` - Password storage method: `keyring`, `pgpass`, or `none`
-- `--service-id <id>` - Specify service ID
+- `--service-id <id>` - Service ID (a name is refused; pass one as an argument instead)
 - `--version-check` - Enable/disable checking for updates on startup
 - `-h, --help` - Show help information
 

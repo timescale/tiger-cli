@@ -6,12 +6,13 @@ Show detailed information about a service
 
 Show detailed information about a specific database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command displays comprehensive information about
-the service including configuration, status, endpoints, and resource usage.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command displays comprehensive
+information about the service including configuration, status, endpoints, and
+resource usage.
 
 ```
-tiger service get [service-id] [flags]
+tiger service get [name-or-id] [flags]
 ```
 
 ### Examples

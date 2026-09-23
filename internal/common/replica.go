@@ -61,31 +61,36 @@ func IsReadReplica(service api.Service) bool {
 
 // ResolveConnectionTargetByID fetches the service named by id — which may be a
 // primary service ID or a read replica set ID, both of which GetService
-// resolves — and works out which service holds its credentials. A standby read
-// replica connects to its own endpoint but shares the parent primary's
-// password, so the parent is fetched here too.
+// resolves — and works out which service holds its credentials. Callers that
+// already hold the service use NewConnectionTarget instead.
 func ResolveConnectionTargetByID(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*ConnectionTarget, error) {
 	service, err := GetService(ctx, client, projectID, id)
 	if err != nil {
 		return nil, err
 	}
+	return NewConnectionTarget(ctx, client, projectID, *service)
+}
 
-	if !IsReadReplica(*service) {
-		return &ConnectionTarget{ConnectionService: *service, CredentialService: *service}, nil
+// NewConnectionTarget works out which service holds the credentials for an
+// already-fetched service. A standby read replica connects to its own endpoint
+// but shares the parent primary's password, so the parent is fetched here.
+func NewConnectionTarget(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, service api.Service) (*ConnectionTarget, error) {
+	if !IsReadReplica(service) {
+		return &ConnectionTarget{ConnectionService: service, CredentialService: service}, nil
 	}
 
 	// A replica with no parent recorded has nowhere else to look, so it stands
 	// in as its own credential service.
 	parentID := util.DerefStr(service.ForkedFrom.ServiceID)
 	if parentID == "" {
-		return &ConnectionTarget{ConnectionService: *service, CredentialService: *service, IsReplica: true}, nil
+		return &ConnectionTarget{ConnectionService: service, CredentialService: service, IsReplica: true}, nil
 	}
 
 	parent, err := GetService(ctx, client, projectID, parentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch parent service %q for read replica: %w", parentID, err)
 	}
-	return &ConnectionTarget{ConnectionService: *service, CredentialService: *parent, IsReplica: true}, nil
+	return &ConnectionTarget{ConnectionService: service, CredentialService: *parent, IsReplica: true}, nil
 }
 
 // NewReplicaConnectionTarget builds a ConnectionTarget for connecting to one of

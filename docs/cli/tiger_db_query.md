@@ -9,9 +9,9 @@ Execute a SQL query against a database service and display the results.
 Unlike 'tiger db psql', this runs the query directly and does not require a
 local psql installation.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. You can also pass a read replica set ID to query that
-replica.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. You can also pass a read replica set ID to
+query that replica.
 
 The query comes from --command, from the SQL file named by --file, or, if
 neither is given, from stdin.
@@ -29,7 +29,7 @@ read-only, and read_only=prod makes sessions against services tagged PROD
 read-only while leaving DEV services writable.
 
 ```
-tiger db query [service-id] [flags]
+tiger db query [name-or-id] [flags]
 ```
 
 ### Examples

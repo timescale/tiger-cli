@@ -11,10 +11,11 @@ untouched, so existing connections and connection strings keep working.
 
 Both the service and the new name are required. There is no default service
 fallback, since a single argument would be ambiguous between the service to
-rename and the name to give it.
+rename and the name to give it. The service to rename can be given by ID or by
+its current name.
 
 ```
-tiger service rename <service-id> <new-name> [flags]
+tiger service rename <name-or-id> <new-name> [flags]
 ```
 
 ### Examples

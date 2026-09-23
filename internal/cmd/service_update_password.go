@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -17,13 +16,13 @@ func buildServiceUpdatePasswordCmd(app *common.App) *cobra.Command {
 	var autoGenerate bool
 
 	cmd := &cobra.Command{
-		Use:   "update-password [service-id]",
+		Use:   "update-password [name-or-id]",
 		Short: "Update the master password for a service",
 		Long: `Update the master password for a specific database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command updates the master password for the
-'tsdbadmin' user used to authenticate to the database service.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command updates the master password for
+the 'tsdbadmin' user used to authenticate to the database service.
 
 A read replica ID is rejected — read replicas share the primary's credentials,
 so update the password on the primary instead.`,
@@ -57,18 +56,6 @@ so update the password on the primary instead.`,
 				return err
 			}
 
-			// Refuse without an API call under read_only=all. prod needs the tag,
-			// so the real gate waits for the fetch below.
-			if cfg.ReadOnly.BlocksAll() {
-				return common.ErrReadOnly
-			}
-
-			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
-			if err != nil {
-				return err
-			}
-
 			// The password comes from the flag, falling back to the env var
 			password := newPassword
 			if password == "" {
@@ -78,31 +65,26 @@ so update the password on the primary instead.`,
 				return fmt.Errorf("cannot use --auto-generate and --new-password together")
 			}
 
-			ctx := cmd.Context()
-
-			// Fetch service details
-			serviceResp, err := client.GetServiceWithResponse(ctx, projectID, serviceID)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
-				return fmt.Errorf("failed to get service details: %w", err)
-			}
-			if serviceResp.StatusCode() != http.StatusOK {
-				return common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
-			}
-
-			if serviceResp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
-			}
-			service := *serviceResp.JSON200
-
-			// The prod half of the gate, riding on the fetch above and still
-			// ahead of any prompt or write.
-			if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
 				return err
 			}
 
+			ctx := cmd.Context()
+
+			// Gated here, ahead of any prompt or write. Resolving returns the
+			// whole service, so the replica check below needs no second fetch.
+			resolved, err := resolveServiceForWrite(ctx, cfg, client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+			serviceID := resolved.ServiceID
+			service := *resolved
+
 			// A read replica has no separate password to rotate.
 			if common.IsReadReplica(service) {
-				return fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
+				return fmt.Errorf("'%s' is a read replica; update the password on its primary service '%s' instead",
 					serviceID, util.DerefStr(service.ForkedFrom.ServiceID))
 			}
 

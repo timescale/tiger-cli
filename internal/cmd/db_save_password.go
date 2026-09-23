@@ -15,12 +15,12 @@ func buildDbSavePasswordCmd(app *common.App) *cobra.Command {
 	var password string
 
 	cmd := &cobra.Command{
-		Use:   "save-password [service-id]",
+		Use:   "save-password [name-or-id]",
 		Short: "Save password for a database service",
 		Long: `Save a password for a database service to configured password storage.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. The password can be provided via:
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. The password can be provided via:
 1. --password flag with explicit value (highest precedence)
 2. TIGER_NEW_PASSWORD environment variable
 3. Interactive prompt (if neither provided)
@@ -51,7 +51,12 @@ The password will be saved according to your --password-storage setting
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
+			if err != nil {
+				return err
+			}
+
+			resolved, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
@@ -59,7 +64,7 @@ The password will be saved according to your --password-storage setting
 			// Resolve the target so a read replica id stores the password against
 			// its parent primary: replicas share the primary's credentials, and
 			// psql/ping look the password up against the primary.
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *resolved)
 			if err != nil {
 				return err
 			}
@@ -105,10 +110,10 @@ The password will be saved according to your --password-storage setting
 
 			if target.IsReplica {
 				cmd.PrintErrf("Read replicas share the primary's credentials; saving against primary %s.\n",
-					service.ServiceID)
+					serviceLabel(service))
 			}
-			cmd.PrintErrf("Password saved for service %s (role %s)\n",
-				service.ServiceID, role)
+			cmd.PrintErrf("Password saved for service %s, role %s\n",
+				serviceLabel(service), role)
 			return nil
 		},
 	}

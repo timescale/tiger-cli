@@ -15,14 +15,15 @@ func buildDbURICmd(app *common.App) *cobra.Command {
 	var readOnly bool
 
 	cmd := &cobra.Command{
-		Use:     "uri [service-id]",
+		Use:     "uri [name-or-id]",
 		Aliases: []string{"connection-string"},
 		Short:   "Get connection URI for a service",
 		Long: `Get a PostgreSQL connection URI for connecting to a database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. The connection string includes all necessary parameters
-for establishing a database connection to the TimescaleDB/PostgreSQL service.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. The connection string includes all necessary
+parameters for establishing a database connection to the
+TimescaleDB/PostgreSQL service.
 
 You can also pass a read replica set ID to get a connection string for that replica.
 
@@ -61,12 +62,17 @@ services writable.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
 			if err != nil {
 				return err
 			}
