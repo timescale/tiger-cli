@@ -6,16 +6,17 @@ Fork an existing database service
 
 Fork an existing database service to create a new independent copy.
 
+The fork is taken at the current database state (creates new snapshot or uses
+WAL replay) unless you specify one of the timing options:
+- --last-snapshot: Fork at the last existing snapshot (faster fork)
+- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
+
 By default:
-- The fork is taken at the current database state (creates new snapshot or uses WAL replay)
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags. To fork
-from an earlier state instead of the current one, pass exactly one of:
-- --last-snapshot: Fork at the last existing snapshot (faster fork)
-- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
+You can override any of these defaults with the corresponding flags.
 
 ```
 tiger service fork [service-id] [flags]

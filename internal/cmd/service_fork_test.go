@@ -45,12 +45,12 @@ Service is being forked. Use 'tiger service list' to check status.
 		{
 			name:    "multiple timing flags",
 			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
-			wantErr: "can only specify one of --last-snapshot or --to-timestamp",
+			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",
 		},
 		{
 			name:    "hidden --now combined with another timing flag",
 			args:    []string{"service", "fork", "svc-12345", "--now", "--last-snapshot"},
-			wantErr: "--now is the default and cannot be combined with --last-snapshot or --to-timestamp",
+			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot now] were all set",
 		},
 		{
 			name:    "unparseable timestamp",

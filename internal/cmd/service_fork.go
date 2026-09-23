@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -34,16 +33,17 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 		Short: "Fork an existing database service",
 		Long: `Fork an existing database service to create a new independent copy.
 
+The fork is taken at the current database state (creates new snapshot or uses
+WAL replay) unless you specify one of the timing options:
+- --last-snapshot: Fork at the last existing snapshot (faster fork)
+- --to-timestamp: Fork at a specific point in time (point-in-time recovery)
+
 By default:
-- The fork is taken at the current database state (creates new snapshot or uses WAL replay)
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags. To fork
-from an earlier state instead of the current one, pass exactly one of:
-- --last-snapshot: Fork at the last existing snapshot (faster fork)
-- --to-timestamp: Fork at a specific point in time (point-in-time recovery)`,
+You can override any of these defaults with the corresponding flags.`,
 		Example: `  # Fork a service at the current state
   tiger service fork svc-12345
 
@@ -71,14 +71,7 @@ from an earlier state instead of the current one, pass exactly one of:
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate timing flags first - at most one may be specified
 			toTimestampSet := cmd.Flags().Changed("to-timestamp")
-			if lastSnapshot && toTimestampSet {
-				return errors.New("can only specify one of --last-snapshot or --to-timestamp")
-			}
-			if now && (lastSnapshot || toTimestampSet) {
-				return errors.New("--now is the default and cannot be combined with --last-snapshot or --to-timestamp")
-			}
 
 			// Validate and normalize environment tag (case-insensitive)
 			environment = strings.ToUpper(environment)
@@ -228,6 +221,7 @@ from an earlier state instead of the current one, pass exactly one of:
 	cmd.Flags().BoolVar(&lastSnapshot, "last-snapshot", false, "Fork at the last existing snapshot (faster)")
 	cmd.Flags().TimeVar(&toTimestamp, "to-timestamp", time.Time{}, []string{time.RFC3339}, "Fork at a specific point in time (RFC3339 format, e.g., 2025-01-15T10:30:00Z)")
 	markFlagHidden(cmd, "now")
+	cmd.MarkFlagsMutuallyExclusive("now", "last-snapshot", "to-timestamp")
 
 	// Resource customization flags
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
