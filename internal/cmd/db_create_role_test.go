@@ -45,14 +45,14 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name:    "read-only all refuses",
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
-			setup:   expectTaggedService("DEV"),
+			mock:    expectTaggedService("DEV"),
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
 			name:    "read-only prod refuses PROD service",
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup:   expectTaggedService("PROD"),
+			mock:    expectTaggedService("PROD"),
 			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
@@ -61,7 +61,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name: "read-only prod allows DEV service",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				tag := "DEV"
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Metadata = &api.ServiceMetadata{Environment: &tag}
@@ -76,7 +76,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name: "default service id from config",
 			args: []string{"db", "create", "role", "--name", "ai_analyst"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = nil
 				}))
@@ -86,7 +86,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -95,7 +95,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -108,7 +108,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -120,7 +120,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name: "read replica rejected",
 			args: []string{"db", "create", "role", "rep-67890", "--name", "ai_analyst"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "rep-67890", sampleReplica())
 			},
 			wantErr: "\"rep-67890\" is a read replica; create the role on its primary service \"svc-12345\" instead",
@@ -128,7 +128,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name: "endpoint not available",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = nil
 				}))

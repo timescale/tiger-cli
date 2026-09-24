@@ -71,9 +71,12 @@ func (s *Server) handleServiceMetricsAvailable(ctx context.Context, req *mcp.Cal
 		return nil, ServiceMetricsAvailableOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	if resp.JSON200 == nil {
-		return nil, ServiceMetricsAvailableOutput{Series: []string{}}, nil
+	// Default to a non-nil slice so a missing body or a JSON null marshals to
+	// `[]` rather than `null`.
+	series := []string{}
+	if resp.JSON200 != nil && *resp.JSON200 != nil {
+		series = *resp.JSON200
 	}
 
-	return nil, ServiceMetricsAvailableOutput{Series: *resp.JSON200}, nil
+	return nil, ServiceMetricsAvailableOutput{Series: series}, nil
 }

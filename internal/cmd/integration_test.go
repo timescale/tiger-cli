@@ -335,7 +335,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Fatalf("Failed to parse logs JSON: %v\nOutput: %s", err, output)
 		}
 
-		t.Logf("✅ Service logs fetched successfully (returned %d log entries)", len(logs))
+		t.Logf("Service logs fetched successfully (returned %d log entries)", len(logs))
 	})
 
 	t.Run("DatabasePsqlCommand_OriginalPassword", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'original_password_test': %s", output)
 		}
 
-		t.Logf("✅ psql command with original password succeeded")
+		t.Logf("psql command with original password succeeded")
 	})
 
 	t.Run("UpdatePassword", func(t *testing.T) {
@@ -433,7 +433,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("psql command succeeded but output format unexpected - expected to contain '1' or 'updated_password_test': %s", output)
 		}
 
-		t.Logf("✅ psql command with updated password succeeded")
+		t.Logf("psql command with updated password succeeded")
 	})
 
 	// These run against the service this test created, so the password
@@ -648,7 +648,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
 		}
 
-		t.Logf("✅ Successfully created basic role: %s", roleName)
+		t.Logf("Successfully created basic role: %s", roleName)
 	})
 
 	t.Run("CreateRole_WithExplicitPassword", func(t *testing.T) {
@@ -684,7 +684,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected role_name=%s in output, got: %v", roleName, result["role_name"])
 		}
 
-		t.Logf("✅ Successfully created role with explicit password: %s", roleName)
+		t.Logf("Successfully created role with explicit password: %s", roleName)
 	})
 
 	t.Run("CreateRole_WithInheritedGrants", func(t *testing.T) {
@@ -733,7 +733,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
 		}
 
-		t.Logf("✅ Successfully created read-only role with inherited grants: %s", roleName)
+		t.Logf("Successfully created read-only role with inherited grants: %s", roleName)
 	})
 
 	t.Run("CreateRole_ReadOnly", func(t *testing.T) {
@@ -768,7 +768,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected read_only=true in output, got: %v", result["read_only"])
 		}
 
-		t.Logf("✅ Successfully created read-only role: %s", roleName)
+		t.Logf("Successfully created read-only role: %s", roleName)
 	})
 
 	t.Run("CreateRole_WithStatementTimeout", func(t *testing.T) {
@@ -803,7 +803,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected statement_timeout=30s in output, got: %v", result["statement_timeout"])
 		}
 
-		t.Logf("✅ Successfully created role with statement timeout: %s", roleName)
+		t.Logf("Successfully created role with statement timeout: %s", roleName)
 	})
 
 	t.Run("CreateRole_ReadOnlyWithInheritance", func(t *testing.T) {
@@ -921,7 +921,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if !strings.Contains(readOutput, "test data") {
 			t.Errorf("Expected to read 'test data' from table, got: %s", readOutput)
 		}
-		t.Logf("✅ Read-only role successfully read data")
+		t.Logf("Read-only role successfully read data")
 
 		// Step 5: Verify read-only role CANNOT WRITE
 		t.Logf("Verifying read-only role cannot write to %s", tableName)
@@ -940,7 +940,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			if !strings.Contains(writeOutput, "read-only") && !strings.Contains(writeOutput, "permission denied") {
 				t.Logf("Warning: Write failed but error message unexpected: %s", writeOutput)
 			}
-			t.Logf("✅ Read-only role correctly prevented from writing")
+			t.Logf("Read-only role correctly prevented from writing")
 		}
 
 		// Step 6: Clean up - drop the table
@@ -952,7 +952,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			"--", "-c", fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName),
 		)
 
-		t.Logf("✅ Successfully verified read-only role with inheritance")
+		t.Logf("Successfully verified read-only role with inheritance")
 	})
 
 	t.Run("CreateRole_AllOptions", func(t *testing.T) {
@@ -1003,7 +1003,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected from_roles to contain 'tsdbadmin', got: %v", fromRoles)
 		}
 
-		t.Logf("✅ Successfully created role with all valid options: %s", roleName)
+		t.Logf("Successfully created role with all valid options: %s", roleName)
 	})
 
 	t.Run("CreateRole_VerifyRolesExist", func(t *testing.T) {
@@ -1033,7 +1033,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			if !strings.Contains(output, roleName) {
 				t.Errorf("Role %s not found in pg_roles query output: %s", roleName, output)
 			} else {
-				t.Logf("✅ Verified role exists in database: %s", roleName)
+				t.Logf("Verified role exists in database: %s", roleName)
 			}
 		}
 	})
@@ -1066,7 +1066,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			if !strings.Contains(err.Error(), "already exists") && !strings.Contains(output, "already exists") {
 				t.Logf("Note: Error message may not contain 'already exists': %v\nOutput: %s", err, output)
 			} else {
-				t.Logf("✅ Duplicate role creation correctly failed")
+				t.Logf("Duplicate role creation correctly failed")
 			}
 		}
 	})
@@ -1122,7 +1122,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if status != "PAUSED" {
 			t.Logf("Warning: Expected service status to be PAUSED, got %s", status)
 		} else {
-			t.Logf("✅ Service is correctly in PAUSED state")
+			t.Logf("Service is correctly in PAUSED state")
 		}
 	})
 
@@ -1148,7 +1148,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 				if exitErr.ExitCode() != common.ExitInvalidParameters {
 					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-stopped service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", common.ExitInvalidParameters)
+					t.Logf("Stop correctly failed with invalid parameters error (exit code %d) for already-stopped service", common.ExitInvalidParameters)
 				}
 			} else {
 				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-stopped service, got: %v", err)
@@ -1207,7 +1207,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if status != "READY" {
 			t.Logf("Warning: Expected service status to be READY, got %s", status)
 		} else {
-			t.Logf("✅ Service is correctly in READY state")
+			t.Logf("Service is correctly in READY state")
 		}
 	})
 
@@ -1233,7 +1233,7 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 				if exitErr.ExitCode() != common.ExitInvalidParameters {
 					t.Errorf("Expected exit code %d (common.ExitInvalidParameters) for already-started service, got %d. Error: %s", common.ExitInvalidParameters, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ Start correctly failed with invalid parameters error (exit code %d) for already-started service", common.ExitInvalidParameters)
+					t.Logf("Start correctly failed with invalid parameters error (exit code %d) for already-started service", common.ExitInvalidParameters)
 				}
 			} else {
 				t.Errorf("Expected exitCodeError with common.ExitInvalidParameters exit code for already-started service, got: %v", err)
@@ -1354,13 +1354,13 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if newCPUMillis != expectedCPUMillis {
 			t.Errorf("Expected CPU to be %d millicores after resize, got %d", expectedCPUMillis, newCPUMillis)
 		} else {
-			t.Logf("✅ CPU correctly resized to %d millicores (1 CPU)", newCPUMillis)
+			t.Logf("CPU correctly resized to %d millicores (1 CPU)", newCPUMillis)
 		}
 
 		if newMemoryGbs != expectedMemoryGbs {
 			t.Errorf("Expected Memory to be %d GB after resize, got %d", expectedMemoryGbs, newMemoryGbs)
 		} else {
-			t.Logf("✅ Memory correctly resized to %d GB", newMemoryGbs)
+			t.Logf("Memory correctly resized to %d GB", newMemoryGbs)
 		}
 
 		// Verify service is still in READY state after resize
@@ -1369,10 +1369,10 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 		if status != "READY" {
 			t.Logf("Warning: Expected service status to be READY after resize, got %s", status)
 		} else {
-			t.Logf("✅ Service is correctly in READY state after resize")
+			t.Logf("Service is correctly in READY state after resize")
 		}
 
-		t.Logf("✅ Service resize verified successfully")
+		t.Logf("Service resize verified successfully")
 	})
 
 	t.Run("DeleteService", func(t *testing.T) {
@@ -1624,7 +1624,7 @@ func TestServiceNotFoundIntegration(t *testing.T) {
 			if tc.reason != "" {
 				reasonMsg = fmt.Sprintf(" (%s)", tc.reason)
 			}
-			t.Logf("✅ %s correctly failed with exit code %d%s", tc.name, tc.expectedExitCode, reasonMsg)
+			t.Logf("%s correctly failed with exit code %d%s", tc.name, tc.expectedExitCode, reasonMsg)
 		})
 	}
 }
@@ -1798,7 +1798,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 				if exitErr.ExitCode() != common.ExitAuthenticationError {
 					t.Errorf("Expected exit code %d (common.ExitAuthenticationError) for %s, got %d. Error: %s", common.ExitAuthenticationError, tc.name, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ %s correctly failed with authentication error (exit code %d)", tc.name, common.ExitAuthenticationError)
+					t.Logf("%s correctly failed with authentication error (exit code %d)", tc.name, common.ExitAuthenticationError)
 				}
 			} else {
 				t.Errorf("Expected exitCodeError with common.ExitAuthenticationError exit code for %s, got: %v", tc.name, err)
@@ -1836,7 +1836,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 				if exitErr.ExitCode() != expectedExitCode {
 					t.Errorf("Expected exit code %d (%s) for %s, got %d. Error: %s", expectedExitCode, expectedDescription, tc.name, exitErr.ExitCode(), err.Error())
 				} else {
-					t.Logf("✅ %s correctly failed with %s (exit code %d)", tc.name, expectedDescription, expectedExitCode)
+					t.Logf("%s correctly failed with %s (exit code %d)", tc.name, expectedDescription, expectedExitCode)
 				}
 			} else {
 				t.Errorf("Expected exitCodeError for %s, got: %v", tc.name, err)
@@ -1850,7 +1850,7 @@ func TestAuthenticationErrorsIntegration(t *testing.T) {
 	}
 }
 
-// TestServiceForkIntegration tests forking a service with --now strategy and validates data is correctly copied
+// TestServiceForkIntegration tests forking a service at the current state (the default) and validates data is correctly copied
 func TestServiceForkIntegration(t *testing.T) {
 	keyring.MockInit()
 	// Check for required environment variables
@@ -1986,7 +1986,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Fatalf("Failed to insert test data: %v\nOutput: %s", err, output)
 		}
 
-		t.Logf("✅ Test data inserted successfully")
+		t.Logf("Test data inserted successfully")
 	})
 
 	t.Run("VerifySourceData", func(t *testing.T) {
@@ -2016,7 +2016,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Errorf("Expected 'test-row-3' in output, got: %s", output)
 		}
 
-		t.Logf("✅ Source data verified: 3 rows present")
+		t.Logf("Source data verified: 3 rows present")
 	})
 
 	t.Run("ForkService_LastSnapshot_EarlyFork", func(t *testing.T) {
@@ -2043,7 +2043,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Fatalf("Could not extract forked service ID from fork output: %s", output)
 		}
 
-		t.Logf("✅ Created --last-snapshot forked service with ID: %s", extractedServiceID)
+		t.Logf("Created --last-snapshot forked service with ID: %s", extractedServiceID)
 
 		// Delete the forked service to free up the service slot for subsequent tests
 		t.Logf("Deleting early fork service: %s", extractedServiceID)
@@ -2057,7 +2057,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Fatalf("Early fork service deletion failed: %v\nOutput: %s", err, output)
 		}
 
-		t.Logf("✅ Early fork service deleted successfully")
+		t.Logf("Early fork service deleted successfully")
 	})
 
 	t.Run("ForkService_Now", func(t *testing.T) {
@@ -2065,12 +2065,11 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Skip("No source service ID available")
 		}
 
-		t.Logf("Forking service: %s with --now strategy", sourceServiceID)
+		t.Logf("Forking service: %s at current state (default strategy)", sourceServiceID)
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
 			"service", "fork", sourceServiceID,
-			"--now",
 			"--wait-timeout", "15m",
 			"--no-set-default",
 			"--output", "json",
@@ -2085,7 +2084,7 @@ func TestServiceForkIntegration(t *testing.T) {
 		}
 
 		forkedServiceID = extractedServiceID
-		t.Logf("✅ Created forked service with ID: %s", forkedServiceID)
+		t.Logf("Created forked service with ID: %s", forkedServiceID)
 	})
 
 	t.Run("VerifyForkedData", func(t *testing.T) {
@@ -2115,7 +2114,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Errorf("Expected 'test-row-3' in forked service output, got: %s", output)
 		}
 
-		t.Logf("✅ Forked data verified: 3 rows present matching source")
+		t.Logf("Forked data verified: 3 rows present matching source")
 	})
 
 	t.Run("VerifyDataIndependence", func(t *testing.T) {
@@ -2181,7 +2180,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Errorf("Source service should not contain fork-only row, but got: %s", output)
 		}
 
-		t.Logf("✅ Data independence verified: fork and source are truly independent")
+		t.Logf("Data independence verified: fork and source are truly independent")
 	})
 
 	t.Run("DeleteForkedService_Now", func(t *testing.T) {
@@ -2189,7 +2188,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Skip("No forked service ID available")
 		}
 
-		t.Logf("Deleting --now forked service: %s", forkedServiceID)
+		t.Logf("Deleting current-state forked service: %s", forkedServiceID)
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
@@ -2202,7 +2201,7 @@ func TestServiceForkIntegration(t *testing.T) {
 
 		// Clear forkedServiceID so cleanup doesn't try to delete again
 		forkedServiceID = ""
-		t.Logf("✅ --now forked service deleted successfully")
+		t.Logf("Current-state forked service deleted successfully")
 	})
 
 	t.Run("ForkService_LastSnapshot_Success", func(t *testing.T) {
@@ -2213,7 +2212,7 @@ func TestServiceForkIntegration(t *testing.T) {
 		t.Logf("Waiting %v for snapshot to become available for --last-snapshot fork...", waitDuration)
 		time.Sleep(waitDuration)
 
-		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from --now fork exists)")
+		t.Logf("Forking service with --last-snapshot (should succeed now - snapshot from current-state fork exists)")
 
 		output, err := executeIntegrationCommand(
 			t.Context(),
@@ -2233,7 +2232,7 @@ func TestServiceForkIntegration(t *testing.T) {
 		}
 
 		forkedServiceID = extractedServiceID
-		t.Logf("✅ Created --last-snapshot forked service with ID: %s", forkedServiceID)
+		t.Logf("Created --last-snapshot forked service with ID: %s", forkedServiceID)
 	})
 
 	t.Run("VerifyLastSnapshotForkWorks", func(t *testing.T) {
@@ -2256,7 +2255,7 @@ func TestServiceForkIntegration(t *testing.T) {
 			t.Errorf("Expected to see '1' in query output, got: %s", output)
 		}
 
-		t.Logf("✅ --last-snapshot forked service is functional")
+		t.Logf("--last-snapshot forked service is functional")
 	})
 
 	t.Run("DeleteForkedService_LastSnapshot", func(t *testing.T) {
@@ -2277,7 +2276,7 @@ func TestServiceForkIntegration(t *testing.T) {
 
 		// Clear forkedServiceID so cleanup doesn't try to delete again
 		forkedServiceID = ""
-		t.Logf("✅ --last-snapshot forked service deleted successfully")
+		t.Logf("--last-snapshot forked service deleted successfully")
 	})
 
 	t.Run("DeleteSourceService", func(t *testing.T) {
@@ -2298,7 +2297,7 @@ func TestServiceForkIntegration(t *testing.T) {
 
 		// Clear sourceServiceID so cleanup doesn't try to delete again
 		sourceServiceID = ""
-		t.Logf("✅ Source service deleted successfully")
+		t.Logf("Source service deleted successfully")
 	})
 
 	t.Run("Logout", func(t *testing.T) {

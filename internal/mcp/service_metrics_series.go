@@ -171,8 +171,8 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 		return nil, nil, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	// Default to a non-nil slice so an empty result marshals to `[]` rather
-	// than `null`, which would fail the required-array output-schema validation.
+	// Default to a non-nil slice so a missing body or a JSON null marshals to
+	// `[]` rather than `null`.
 	series := []api.MetricSeries{}
 	if resp.JSON200 != nil && *resp.JSON200 != nil {
 		series = *resp.JSON200

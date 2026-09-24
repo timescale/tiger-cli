@@ -46,14 +46,14 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "service ID lists services with their names",
 			args:       []string{"__complete", "service", "get", ""},
-			setup:      listServices,
+			mock:       listServices,
 			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
 		{
 			name:       "service ID filters by what is typed",
 			args:       []string{"__complete", "service", "get", "svc-67"},
-			setup:      listServices,
+			mock:       listServices,
 			wantStdout: "svc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
@@ -75,7 +75,7 @@ func TestCompletion(t *testing.T) {
 		{
 			name: "service ID offers nothing when the API fails",
 			args: []string{"__complete", "service", "get", ""},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -85,7 +85,7 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--service-id lists services with their names",
 			args:       []string{"__complete", "service", "get", "--service-id", ""},
-			setup:      listServices,
+			mock:       listServices,
 			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
@@ -94,14 +94,14 @@ func TestCompletion(t *testing.T) {
 			// completes once a service ID has been typed.
 			name:       "--service-id completes after a positional argument",
 			args:       []string{"__complete", "service", "get", "svc-12345", "--service-id", ""},
-			setup:      listServices,
+			mock:       listServices,
 			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
 		{
 			name: "project ID lists projects with their names",
 			args: []string{"__complete", "project", "use", ""},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				projects := []api.Project{
 					{ID: "project-123", Name: "First Project"},
 					{ID: "project-456", Name: "Second Project"},

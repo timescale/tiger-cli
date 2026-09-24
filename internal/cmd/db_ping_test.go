@@ -50,7 +50,7 @@ func TestDbPingCmd(t *testing.T) {
 			name: "default service id from config",
 			args: []string{"db", "ping"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -65,7 +65,7 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name: "network error",
 			args: []string{"db", "ping", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -75,7 +75,7 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"db", "ping", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -88,7 +88,7 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"db", "ping", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -101,14 +101,14 @@ func TestDbPingCmd(t *testing.T) {
 		{
 			name:    "pooled without pooler",
 			args:    []string{"db", "ping", "svc-12345", "--pooled"},
-			setup:   setupGet,
+			mock:    setupGet,
 			wantErr: "connection pooler not available for this service",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name:    "negative timeout",
 			args:    []string{"db", "ping", "svc-12345", "--timeout=-5s"},
-			setup:   setupGet,
+			mock:    setupGet,
 			wantErr: "timeout must be positive or zero, got -5s",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
@@ -117,7 +117,7 @@ func TestDbPingCmd(t *testing.T) {
 			// environment-dependent, hence the non-exact matches.
 			name: "unreachable server",
 			args: []string{"db", "ping", "svc-12345"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("127.0.0.1"), Port: new(1)}
 				}))
@@ -136,7 +136,7 @@ func TestDbPingCmd(t *testing.T) {
 			// environment-dependent.
 			name: "connection timeout",
 			args: []string{"db", "ping", "svc-12345", "--timeout", "250ms"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = &api.Endpoint{Host: new("192.0.2.1"), Port: new(5432)}
 				}))

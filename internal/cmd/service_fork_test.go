@@ -12,7 +12,8 @@ import (
 )
 
 func TestServiceForkCmd(t *testing.T) {
-	// The default request sent by `service fork <id> --now`.
+	// The default request sent by `service fork <id>`, which forks at the
+	// current state.
 	baseReq := api.ForkServiceCreate{
 		ForkStrategy:   api.ForkStrategyNOW,
 		EnvironmentTag: new(api.EnvironmentTagDEV),
@@ -42,14 +43,14 @@ Service is being forked. Use 'tiger service list' to check status.
 
 	runCmdTests(t, []cmdTest{
 		{
-			name:    "missing timing flag",
-			args:    []string{"service", "fork", "svc-12345"},
-			wantErr: "must specify --now, --last-snapshot or --to-timestamp",
+			name:    "multiple timing flags",
+			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
+			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",
 		},
 		{
-			name:    "multiple timing flags",
+			name:    "hidden --now combined with another timing flag",
 			args:    []string{"service", "fork", "svc-12345", "--now", "--last-snapshot"},
-			wantErr: "can only specify one of --now, --last-snapshot or --to-timestamp",
+			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot now] were all set",
 		},
 		{
 			name:    "unparseable timestamp",
@@ -58,18 +59,18 @@ Service is being forked. Use 'tiger service list' to check status.
 		},
 		{
 			name:    "invalid environment",
-			args:    []string{"service", "fork", "svc-12345", "--now", "--environment", "staging"},
+			args:    []string{"service", "fork", "svc-12345", "--environment", "staging"},
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
 			name:    "not logged in",
-			args:    []string{"service", "fork", "svc-12345", "--now"},
+			args:    []string{"service", "fork", "svc-12345"},
 			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "read-only all refuses",
-			args:    []string{"service", "fork", "svc-12345", "--now"},
+			args:    []string{"service", "fork", "svc-12345"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
 			wantErr: "this operation is not allowed in read-only mode",
 		},
@@ -78,15 +79,15 @@ Service is being forked. Use 'tiger service list' to check status.
 			// source's: forking a PROD source reads production without
 			// changing it, so only the fork's own tag matters.
 			name:    "read-only prod refuses requested PROD",
-			args:    []string{"service", "fork", "svc-12345", "--now", "--environment", "PROD"},
+			args:    []string{"service", "fork", "svc-12345", "--environment", "PROD"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows requested DEV",
-			args: []string{"service", "fork", "svc-12345", "--now", "--environment", "DEV", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"service", "fork", "svc-12345", "--environment", "DEV", "--no-wait", "--no-set-default", "-o", "env"},
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -98,18 +99,18 @@ Service is being forked. Use 'tiger service list' to check status.
 		},
 		{
 			name:    "missing service id",
-			args:    []string{"service", "fork", "--now"},
+			args:    []string{"service", "fork"},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "invalid cpu/memory combination",
-			args:    []string{"service", "fork", "svc-12345", "--now", "--cpu", "999", "--memory", "1"},
+			args:    []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
 		},
 		{
 			name: "network error",
-			args: []string{"service", "fork", "svc-12345", "--now"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			args: []string{"service", "fork", "svc-12345"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -118,8 +119,8 @@ Service is being forked. Use 'tiger service list' to check status.
 		},
 		{
 			name: "API error",
-			args: []string{"service", "fork", "svc-12345", "--now"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			args: []string{"service", "fork", "svc-12345"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -132,8 +133,8 @@ Service is being forked. Use 'tiger service list' to check status.
 		},
 		{
 			name: "nil response body",
-			args: []string{"service", "fork", "svc-12345", "--now"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			args: []string{"service", "fork", "svc-12345"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -143,9 +144,9 @@ Service is being forked. Use 'tiger service list' to check status.
 			wantStderr: "Forking service 'svc-12345' at current state...\nError: empty response from API\n",
 		},
 		{
-			name: "fork now success with wait",
-			args: []string{"service", "fork", "svc-12345", "--now"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			name: "default strategy success with wait",
+			args: []string{"service", "fork", "svc-12345"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				pwForked := sampleService(func(s *api.Service) {
 					s.ServiceID = "svc-67890"
 					s.Name = "test-service-fork"
@@ -173,9 +174,9 @@ Connect with: tiger db psql
 		},
 		{
 			name: "source service id from config",
-			args: []string{"service", "fork", "--now", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"service", "fork", "--no-wait", "--no-set-default", "-o", "env"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
 					Return(&api.ForkServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -187,9 +188,23 @@ Connect with: tiger db psql
 			checks:     []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
+			// --now is hidden but still accepted, since it used to be required.
+			name: "hidden --now flag",
+			args: []string{"service", "fork", "svc-12345", "--now", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", baseReq).
+					Return(&api.ForkServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &forked,
+					}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'svc-12345' at current state..."),
+		},
+		{
 			name: "last snapshot strategy",
 			args: []string{"service", "fork", "svc-12345", "--last-snapshot", "--no-wait", "--no-set-default", "-o", "env"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyLASTSNAPSHOT,
 					EnvironmentTag: new(api.EnvironmentTagDEV),
@@ -204,7 +219,7 @@ Connect with: tiger db psql
 		{
 			name: "to-timestamp strategy",
 			args: []string{"service", "fork", "svc-12345", "--to-timestamp", "2025-01-15T10:30:00Z", "--no-wait", "--no-set-default", "-o", "env"},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyPITR,
 					TargetTime:     new(time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)),
@@ -220,11 +235,11 @@ Connect with: tiger db psql
 		{
 			name: "custom name environment and resources",
 			args: []string{
-				"service", "fork", "svc-12345", "--now", "--name", "my-fork",
+				"service", "fork", "svc-12345", "--name", "my-fork",
 				"--cpu", "2000", "--memory", "8", "--environment", "prod",
 				"--no-wait", "--no-set-default", "-o", "env",
 			},
-			setup: func(m *mocks.MockClientWithResponsesInterface) {
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
 					ForkStrategy:   api.ForkStrategyNOW,
 					Name:           new("my-fork"),

@@ -62,10 +62,18 @@ jobs:
           TIGER_SECRET_KEY_INTEGRATION: ${{ secrets.TIGER_SECRET_KEY_INTEGRATION }}
           # Runs the live-CDN upgrade test (TestUpgradeLiveCDNIntegration)
           TIGER_UPGRADE_INTEGRATION: "1"
-        run: go test -race -timeout 15m -coverprofile=coverage.out -coverpkg=./... ./...
+        # Under -coverpkg, the percentages go test prints are of the whole
+        # module, not the package. Writing covdata lets the Coverage step
+        # report real per-package figures.
+        run: mkdir -p covdata && go test -race -timeout 15m -cover -coverpkg=./... ./... -args -test.gocoverdir="$PWD/covdata"
+
+      - name: Coverage
+        run: go tool covdata percent -i=covdata
 
       - name: Generate coverage report
-        run: go tool cover -html=coverage.out -o=coverage.html
+        run: |
+          go tool covdata textfmt -i=covdata -o=coverage.out
+          go tool cover -html=coverage.out -o=coverage.html
 
       - name: Upload coverage report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

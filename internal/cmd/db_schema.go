@@ -65,7 +65,9 @@ large and may embed implementation details.`,
 
 			warnReplicaPooler(cmd, target, pooled)
 
-			result, err := common.FetchServiceSchema(cmd.Context(), cfg, target, role, pooled, common.SchemaOptions{
+			result, err := common.FetchServiceSchema(cmd.Context(), cfg, target, common.FetchServiceSchemaArgs{
+				Role:               role,
+				Pooled:             pooled,
 				Schema:             schema,
 				IncludeInternal:    internal,
 				IncludeDefinitions: definitions,
