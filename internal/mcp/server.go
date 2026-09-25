@@ -93,7 +93,7 @@ func buildServerInstructions(cfg *config.Config, experimental bool) string {
 		// can do in each mode. metricsMention, when non-empty, folds into
 		// whichever one is used so the result still reads as one sentence.
 		capabilitiesBase         = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
-		readOnlyCapabilitiesBase = "Use it to list and inspect services, fetch service logs, query databases read-only, and search Tiger documentation."
+		readOnlyCapabilitiesBase = "Use it to list and inspect services, fetch service logs, execute read-only SQL queries, and search Tiger documentation."
 
 		// Metrics tools are registered regardless of read-only mode (they're all
 		// read-only themselves), so this folds into capabilities in every branch.

@@ -103,9 +103,7 @@ Use service_metrics_available first to discover valid metric names.
 The response groups data points by their label set — a single request may
 return multiple labeled series (e.g. one per replica, one per worker ordinal).
 Each series contains its full list of raw data points. Use group_by to
-control which label keys define that grouping.
-
-Available metrics span hardware/resource usage (CPU, memory, disk, network), PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals (compression, chunks, background jobs).`,
+control which label keys define that grouping.`,
 		InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
 		OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
