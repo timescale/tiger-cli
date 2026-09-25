@@ -97,7 +97,7 @@ func buildServerInstructions(cfg *config.Config, experimental bool) string {
 
 		// Metrics tools are registered regardless of read-only mode (they're all
 		// read-only themselves), so this folds into capabilities in every branch.
-		metricsMention = " It also covers metrics: hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals."
+		metricsMention = " Available metrics also span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals."
 	)
 
 	metrics := ""

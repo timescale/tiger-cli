@@ -133,7 +133,7 @@ func TestBuildServerInstructions(t *testing.T) {
 
 	// Metrics tools are only mentioned when the experimental gate is on —
 	// otherwise they aren't registered, so mentioning them would mislead.
-	const metricsMarker = "covers metrics"
+	const metricsMarker = "Available metrics also span"
 	for _, got := range []string{readWrite, readOnly, prodOnly} {
 		if strings.Contains(got, metricsMarker) {
 			t.Errorf("instructions should not mention metrics tools when experimental is off: %q", got)
