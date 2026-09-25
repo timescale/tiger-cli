@@ -96,16 +96,14 @@ func newServiceMetricsSeriesTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceMetricsSeries,
 		Title: "Get Metric Series Data",
-		Description: `Fetch time-series data for a named metric over a specified time window.
+		Description: `Fetch time-series data for a named metric over a specified time window, for monitoring, debugging, and performance investigation.
 
 Use service_metrics_available first to discover valid metric names.
 
 The response groups data points by their label set — a single request may
 return multiple labeled series (e.g. one per replica, one per worker ordinal).
 Each series contains its full list of raw data points. Use group_by to
-control which label keys define that grouping.
-
-Available metrics include: CPU usage/allocation, memory usage/total, disk usage, and disk I/O (read/write bytes and ops).`,
+control which label keys define that grouping.`,
 		InputSchema:  ServiceMetricsSeriesInput{}.Schema(),
 		OutputSchema: ServiceMetricsSeriesOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{

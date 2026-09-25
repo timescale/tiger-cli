@@ -255,7 +255,7 @@ title: List Database Services
 Tool name: service_metrics_available
 
 Description:
-List the names of all metric series available for a service. Call this first to discover what metrics exist before fetching data with service_metrics_series.
+List the names of all metric series available for a service, for monitoring, debugging, and performance investigation. Available metrics span hardware/resource usage (CPU, memory, disk, network), PostgreSQL settings, PgBouncer connection-pool stats, PostgreSQL activity/locks/replication, and TimescaleDB internals (compression, chunks, background jobs). Call this first to discover what metrics exist before fetching data with service_metrics_series.
 
 Parameters:
   • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
@@ -271,7 +271,8 @@ Tool name: service_metrics_details
 
 Description:
 Get descriptive metadata for a metric: what it measures, its type, default
-aggregation function, and available labels.
+aggregation function, and available labels. Use this to understand a metric
+before querying it for monitoring, debugging, or performance investigation.
 
 Use service_metrics_available to discover metric names, this tool to inspect
 one, then service_metrics_series to fetch its data.

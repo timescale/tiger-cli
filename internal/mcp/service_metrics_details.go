@@ -62,7 +62,8 @@ func newServiceMetricsDetailsTool() *mcp.Tool {
 		Name:  toolServiceMetricsDetails,
 		Title: "Get Metric Details",
 		Description: fmt.Sprintf(`Get descriptive metadata for a metric: what it measures, its type, default
-aggregation function, and available labels.
+aggregation function, and available labels. Use this to understand a metric
+before querying it for monitoring, debugging, or performance investigation.
 
 Use service_metrics_available to discover metric names, this tool to inspect
 one, then service_metrics_series to fetch its data.
