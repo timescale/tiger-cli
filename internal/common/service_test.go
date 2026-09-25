@@ -7,7 +7,7 @@ import (
 )
 
 func TestValidAddons(t *testing.T) {
-	expected := []string{"time-series", "ai"}
+	expected := []string{"time-series"}
 	result := ValidAddons()
 
 	if !reflect.DeepEqual(result, expected) {
@@ -22,10 +22,9 @@ func TestIsValidAddon(t *testing.T) {
 		want  bool
 	}{
 		{"Valid time-series", "time-series", true},
-		{"Valid ai", "ai", true},
+		{"Removed ai add-on", "ai", false},
 		{"Invalid addon", "invalid", false},
 		{"Empty string", "", false},
-		{"Case sensitive - AI uppercase", "AI", false},
 		{"Case sensitive - Time-Series mixed", "Time-Series", false},
 		{"Similar but wrong", "timeseries", false},
 	}
@@ -44,9 +43,6 @@ func TestAddonConstants(t *testing.T) {
 	if AddonTimeSeries != "time-series" {
 		t.Errorf("AddonTimeSeries = %q, want %q", AddonTimeSeries, "time-series")
 	}
-	if AddonAI != "ai" {
-		t.Errorf("AddonAI = %q, want %q", AddonAI, "ai")
-	}
 	if AddonNone != "none" {
 		t.Errorf("AddonNone = %q, want %q", AddonNone, "none")
 	}
@@ -63,17 +59,14 @@ func TestValidateAddons(t *testing.T) {
 		{"Empty slice", []string{}, nil, false, ""},
 		{"Nil slice", nil, nil, false, ""},
 		{"Single addon - time-series", []string{"time-series"}, []string{"time-series"}, false, ""},
-		{"Single addon - ai", []string{"ai"}, []string{"ai"}, false, ""},
-		{"Multiple addons", []string{"time-series", "ai"}, []string{"time-series", "ai"}, false, ""},
-		{"Multiple addons reversed", []string{"ai", "time-series"}, []string{"ai", "time-series"}, false, ""},
-		{"Duplicates removed", []string{"time-series", "time-series", "ai"}, []string{"time-series", "ai"}, false, ""},
+		{"Duplicates removed", []string{"time-series", "time-series"}, []string{"time-series"}, false, ""},
 		{"None as single element", []string{"none"}, []string{}, false, ""},
 		{"None uppercase", []string{"NONE"}, []string{}, false, ""},
 		{"None mixed case", []string{"None"}, []string{}, false, ""},
 		{"Invalid addon", []string{"invalid"}, nil, true, "invalid add-on 'invalid'"},
 		{"Mix valid and invalid", []string{"time-series", "invalid"}, nil, true, "invalid add-on 'invalid'"},
-		{"Whitespace trimmed", []string{" time-series ", " ai "}, []string{"time-series", "ai"}, false, ""},
-		{"Case sensitive - AI uppercase fails", []string{"AI"}, nil, true, "invalid add-on 'AI'"},
+		{"Whitespace trimmed", []string{" time-series "}, []string{"time-series"}, false, ""},
+		{"Removed ai add-on fails", []string{"ai"}, nil, true, "invalid add-on 'ai'"},
 		{"Case sensitive - Time-Series mixed case fails", []string{"Time-Series"}, nil, true, "invalid add-on 'Time-Series'"},
 		{"Empty string is invalid", []string{""}, nil, true, "invalid add-on ''"},
 		{"Mix of valid, invalid, and empty", []string{"time-series", "", "invalid"}, nil, true, "invalid add-on ''"},

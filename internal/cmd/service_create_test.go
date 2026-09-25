@@ -35,7 +35,7 @@ func TestServiceCreateCmd(t *testing.T) {
 		{
 			name:    "invalid addon",
 			args:    []string{"service", "create", "--name", "test-service", "--addons", "invalid-addon"},
-			wantErr: "invalid add-on 'invalid-addon'. Valid add-ons: time-series, ai, or 'none' for PostgreSQL-only",
+			wantErr: "invalid add-on 'invalid-addon'. Valid add-ons: time-series, or 'none' for PostgreSQL-only",
 		},
 		{
 			name:    "negative replica count",
@@ -377,14 +377,14 @@ Service is being created. Use 'tiger service list' to check status.
 			name: "all creation flags mapped to request",
 			args: []string{
 				"service", "create", "--name", "test-service",
-				"--addons", "time-series,ai", "--region", "eu-central-1",
+				"--addons", "time-series", "--region", "eu-central-1",
 				"--replicas", "2", "--cpu", "1000", "--memory", "4",
 				"--environment", "prod", "--no-wait", "--no-set-default", "-o", "env",
 			},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, api.ServiceCreate{
 					Name:           "test-service",
-					Addons:         &[]api.ServiceCreateAddons{"time-series", "ai"},
+					Addons:         &[]api.ServiceCreateAddons{"time-series"},
 					RegionCode:     new("eu-central-1"),
 					ReplicaCount:   new(2),
 					CPUMillis:      new("1000"),
