@@ -133,21 +133,15 @@ func TestBuildServerInstructions(t *testing.T) {
 		t.Errorf("prod-mode instructions should explain that PROD services are refused: %q", prodOnly)
 	}
 
-	// Metrics tools are only mentioned when the experimental gate is on —
-	// otherwise they aren't registered, so mentioning them would mislead.
+	// Metrics tools are always registered, so the metrics blurb is always
+	// present — independent of the (now backups-only) experimental bool.
 	const metricsMarker = "Available metrics span"
-	for _, got := range []string{readWrite, readOnly, prodOnly} {
-		if strings.Contains(got, metricsMarker) {
-			t.Errorf("instructions should not mention metrics tools when experimental is off: %q", got)
-		}
-	}
-
 	readWriteExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyOff}, true)
 	readOnlyExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyAll}, true)
 	prodOnlyExperimental := buildServerInstructions(&config.Config{ReadOnly: config.ReadOnlyProd}, true)
-	for _, got := range []string{readWriteExperimental, readOnlyExperimental, prodOnlyExperimental} {
+	for _, got := range []string{readWrite, readOnly, prodOnly, readWriteExperimental, readOnlyExperimental, prodOnlyExperimental} {
 		if !strings.Contains(got, metricsMarker) {
-			t.Errorf("instructions should mention metrics tools when experimental is on: %q", got)
+			t.Errorf("instructions should always mention metrics tools: %q", got)
 		}
 	}
 }

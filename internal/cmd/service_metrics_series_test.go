@@ -11,10 +11,6 @@ import (
 )
 
 func TestServiceMetricsSeriesCmd(t *testing.T) {
-	// The command is experimental-gated (see the gate test in service_test.go),
-	// so every case registers it explicitly.
-	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
-
 	fromTime := time.Date(2026, 5, 13, 0, 0, 0, 0, time.UTC)
 	toTime := time.Date(2026, 5, 13, 1, 0, 0, 0, time.UTC)
 
@@ -52,14 +48,12 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		{
 			name:       "key=value filter builds an EQUAL request",
 			args:       args("ordinal=0"),
-			opts:       []runOption{experimental},
 			mock:       expectSeries([]api.MetricLabelFilter{{Key: "ordinal", Value: "0"}}),
 			wantStdout: noDataMsg,
 		},
 		{
 			name: "key!=value filter builds a NOT_EQUAL request",
 			args: args("role!=replica"),
-			opts: []runOption{experimental},
 			mock: expectSeries([]api.MetricLabelFilter{
 				{Key: "role", Value: "replica", MatchType: new(api.MetricMatchTypeNOTEQUAL)},
 			}),
@@ -68,13 +62,11 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		{
 			name:    "malformed filter",
 			args:    args("nokeyvalue"),
-			opts:    []runOption{experimental},
 			wantErr: `--filter must be name=value or name!=value, got "nokeyvalue"`,
 		},
 		{
 			name:    "filter missing a value after !=",
 			args:    args("role!="),
-			opts:    []runOption{experimental},
 			wantErr: `--filter must be name=value or name!=value, got "role!="`,
 		},
 		{
@@ -97,7 +89,6 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				"--group-by", "role",
 				"--group-by", "ordinal",
 			},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefID(m, "svc-12345")
 				empty := []api.MetricSeries{}
