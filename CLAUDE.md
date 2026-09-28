@@ -67,7 +67,7 @@ Generated files are marked `-diff linguist-generated=true` in `.gitattributes`: 
 
 ## CLI Reference Docs
 
-`docs/cli/` is a generated Markdown reference with one file per command, produced by `cmd/generate-docs`, which walks the command tree with cobra's `doc` package. It runs under `go generate ./...`, so any change to a command, flag, or help text needs a regeneration (CI fails on a stale or missing file). The tool forces `TIGER_EXPERIMENTAL` off for the run, so gated commands never reach the docs.
+`docs/cli/` is a generated Markdown reference with one file per command, produced by `cmd/generate-docs`, which walks the command tree with cobra's `doc` package. It runs under `go generate ./...`, so any change to a command, flag, or help text needs a regeneration (CI fails on a stale or missing file). The tool forces `TIGER_EXPERIMENTAL` off for the run, so gated commands (currently `backups`) never reach the docs.
 
 ## Command Architecture
 
@@ -108,7 +108,7 @@ Configuration is layered, with precedence **flags > `TIGER_*` env vars > config 
 
 ### Experimental Feature Gating
 
-`TIGER_EXPERIMENTAL` gates commands and MCP tools that aren't ready to be public yet, for whatever reason — including, but not limited to, anything backed by a gateway endpoint marked `x-tigerdata-preview: true` in `openapi.yaml` (those request/response shapes are still in flux, so a surface built on one must always be gated).
+`TIGER_EXPERIMENTAL` gates commands and MCP tools that aren't ready to be public yet — currently just `service backups`/`service_backups`, which is backed by a gateway endpoint marked `x-tigerdata-preview: true` in `openapi.yaml` (those request/response shapes are still in flux, so a surface built on one must always be gated). Metrics (`service metrics`/`service_metrics_*`) graduated off this gate and is now always registered.
 
 It's an env var **only**: deliberately not a config key, not a flag, and hidden from `tiger config list`. `buildRootCmd` reads it once into `app.Experimental`, and the CLI guards its `AddCommand` calls with it while the MCP server guards its `addTool` calls, so when the env var is off the gated commands and tools don't exist at all — no help entry, no completion, not advertised to MCP clients (restart the MCP server after toggling). **Never mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, or error messages.** When a feature graduates, delete the gates on both sides.
 

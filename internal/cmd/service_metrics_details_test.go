@@ -11,10 +11,6 @@ import (
 )
 
 func TestServiceMetricsDetailsCmd(t *testing.T) {
-	// The command is experimental-gated (see the gate test in service_test.go),
-	// so every case registers it explicitly.
-	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
-
 	maxTotal := api.MetricsAggFnMAXTOTAL
 	gauge := api.MetricTypeGAUGE
 
@@ -89,26 +85,23 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		{
 			name:    "not logged in",
 			args:    []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing metric flag",
 			args:    []string{"service", "metrics", "details", "svc-12345"},
-			opts:    []runOption{experimental},
 			wantErr: `required flag(s) "metric" not set`,
 		},
 		{
 			name:    "missing service id",
 			args:    []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
-			opts:    []runOption{experimental},
 			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
@@ -118,7 +111,6 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		{
 			name: "API error",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
@@ -132,7 +124,6 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		{
 			name: "nil response body",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
@@ -145,14 +136,13 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		{
 			name:       "table output with labels",
 			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
-			opts:       []runOption{experimental},
 			mock:       setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
 		{
 			name:       "default service id from config",
 			args:       []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
-			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
+			opts:       []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock:       setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: fullDetailsTable,
 		},
@@ -162,14 +152,12 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			// labels.
 			name:       "table output without labels",
 			args:       []string{"service", "metrics", "details", "svc-12345", "--metric", "some_new_metric"},
-			opts:       []runOption{experimental},
 			mock:       setupDetails("some_new_metric", undocumentedDetails),
 			wantStdout: undocumentedTable,
 		},
 		{
 			name: "json output",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "json"},
-			opts: []runOption{experimental},
 			mock: setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: `{
   "default_agg": "MAX_TOTAL",
@@ -212,7 +200,6 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 		{
 			name: "yaml output",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count", "-o", "yaml"},
-			opts: []runOption{experimental},
 			mock: setupDetails("pg_stat_activity_count", fullDetails),
 			wantStdout: `default_agg: MAX_TOTAL
 description: Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.
