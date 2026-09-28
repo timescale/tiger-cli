@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -38,10 +37,7 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceUpdatePasswordInput](nil))
 
 	setServiceIDSchemaProperties(schema)
-
-	schema.Properties["with_password"].Description = "Whether to include the newly generated password in the response. NEVER set to true unless the user explicitly asks for the password."
-	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
-	schema.Properties["with_password"].Examples = []any{false, true}
+	setWithPasswordSchemaProperties(schema)
 
 	return schema
 }
@@ -158,6 +154,8 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 	storage, err := common.SavePasswordWithResult(cfg, *service, password, "tsdbadmin")
 	if err != nil {
 		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
+	} else {
+		s.logger.Info("MCP: Password saved successfully", slog.String("method", storage.Method))
 	}
 
 	output := ServiceUpdatePasswordOutput{
