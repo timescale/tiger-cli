@@ -204,13 +204,13 @@ func TestServiceCreateTool(t *testing.T) {
 			args: map[string]any{
 				"name":       "test-service",
 				"region":     "us-west-2",
-				"addons":     []any{"time-series", "ai"},
+				"addons":     []any{"time-series"},
 				"replicas":   2,
 				"cpu_memory": "2 CPU/8 GB",
 			},
 			mock: expectCreate(api.ServiceCreate{
 				Name:           "test-service",
-				Addons:         &[]api.ServiceCreateAddons{"time-series", "ai"},
+				Addons:         &[]api.ServiceCreateAddons{"time-series"},
 				RegionCode:     new("us-west-2"),
 				ReplicaCount:   new(2),
 				CPUMillis:      new("2000"),
