@@ -85,7 +85,7 @@ func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mc
 
 // buildServerInstructions returns the `instructions` string the MCP SDK sends
 // to clients at initialize. Evaluated once at server start, like tool registration.
-func buildServerInstructions(cfg *config.Config, experimental bool) string {
+func buildServerInstructions(cfg *config.Config) string {
 	const (
 		intro = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
 
@@ -135,7 +135,7 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 		Title:   serverTitle,
 		Version: config.Version,
 	}, &mcp.ServerOptions{
-		Instructions: buildServerInstructions(cfg, app.Experimental),
+		Instructions: buildServerInstructions(cfg),
 		Logger:       logger,
 	})
 
