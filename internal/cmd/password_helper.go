@@ -50,7 +50,7 @@ func resetServicePassword(ctx context.Context, cmd *cobra.Command, cfg *config.C
 	// Generate password if not provided
 	if newPassword == "" {
 		var err error
-		if newPassword, err = util.GenerateSecurePassword(32); err != nil {
+		if newPassword, err = common.GenerateSecurePassword(32); err != nil {
 			return "", fmt.Errorf("failed to generate new password: %w", err)
 		}
 	}

@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
@@ -33,24 +32,6 @@ func (t *ConnectionTarget) Details(cfg *config.Config, opts ConnectionDetailsOpt
 		return nil, fmt.Errorf("connection pooler not available for this service")
 	}
 	return details, nil
-}
-
-// GetService fetches a single service by ID. The API resolves both primary
-// service IDs and read replica set IDs here; a read replica comes back as a
-// service whose endpoint is the replica's and whose ForkedFrom links to its
-// parent.
-func GetService(ctx context.Context, client api.ClientWithResponsesInterface, projectID, id string) (*api.Service, error) {
-	resp, err := client.GetServiceWithResponse(ctx, projectID, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch service details: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
-	}
-	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("empty response from API")
-	}
-	return resp.JSON200, nil
 }
 
 // IsReadReplica reports whether the service is a standby read replica (which

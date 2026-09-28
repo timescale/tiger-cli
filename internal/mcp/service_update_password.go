@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,10 +15,23 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// ServiceUpdatePasswordInput represents input for service_update_password
+// updatePasswordConfirmationKey is the InputRequests/InputResponses key of the
+// PROD password update prompt.
+const updatePasswordConfirmationKey = "confirm_update_password"
+
+// ServiceUpdatePasswordInput represents input for service_update_password.
+//
+// Unlike `tiger service update-password`, the tool takes no password. One
+// passed as an argument is invented by the model or typed into the chat by the
+// user, so it lands in the model's context. Asking for it through an
+// elicitation form would keep it out of the context, but not out of session
+// transcripts or the MCP client, which can't be trusted with it, and the MCP
+// spec says servers MUST NOT request passwords through form elicitation. So
+// the tool always generates the password, and the CLI remains the way to set
+// a specific one.
 type ServiceUpdatePasswordInput struct {
-	ServiceID string `json:"service_id"`
-	Password  string `json:"password"`
+	ServiceID    string `json:"service_id"`
+	WithPassword bool   `json:"with_password,omitempty"`
 }
 
 func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
@@ -25,41 +39,61 @@ func (ServiceUpdatePasswordInput) Schema() *jsonschema.Schema {
 
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["password"].Description = "The new password for the 'tsdbadmin' user. Must be strong and secure."
-	schema.Properties["password"].Examples = []any{"MySecurePassword123!"}
+	schema.Properties["with_password"].Description = "Whether to include the newly generated password in the response. NEVER set to true unless the user explicitly asks for the password."
+	schema.Properties["with_password"].Default = util.Must(json.Marshal(false))
+	schema.Properties["with_password"].Examples = []any{false, true}
 
 	return schema
 }
 
 // ServiceUpdatePasswordOutput represents output for service_update_password
 type ServiceUpdatePasswordOutput struct {
+	Updated         bool                          `json:"updated"`
 	Message         string                        `json:"message"`
+	Password        string                        `json:"password,omitempty"`
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
 func (ServiceUpdatePasswordOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
+	schema := util.Must(jsonschema.For[ServiceUpdatePasswordOutput](nil))
+
+	schema.Properties["updated"].Description = "Whether the password was updated. False when the user declined the confirmation prompt for a PROD service; do not retry unless the user asks again."
+	schema.Properties["message"].Description = "Human-readable outcome of the operation"
+	schema.Properties["password"].Description = "The new password for the tsdbadmin user (only included if with_password=true)"
+	schema.Properties["password_storage"].Description = "Where the new password was saved locally, and whether saving it succeeded"
+
+	return schema
 }
 
 func newServiceUpdatePasswordTool() *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceUpdatePassword,
 		Title: "Update Service Password",
-		Description: "Update master password for 'tsdbadmin' user of a database service. " +
-			"Takes effect immediately. May terminate existing connections.",
+		Description: `Update the master password for the 'tsdbadmin' user of a database service.
+
+The tool generates a secure random password itself; it does not accept one. The change takes effect immediately and may terminate existing connections, and applications using the old password fail to authenticate until they are updated. The new password is saved to the configured password storage and is included in the result only if with_password is true.
+
+If the user wants to set a specific password, tell them to run 'tiger service update-password' from the CLI instead, which keeps the password out of this conversation.
+
+Updating the password of a service tagged PROD automatically prompts the user, via an elicitation request through the MCP client, to confirm the update before it proceeds, so agents don't need to ask the user for confirmation themselves; if the client cannot prompt, the update is refused and the user must run 'tiger service update-password' from the CLI instead.`,
 		InputSchema:  ServiceUpdatePasswordInput{}.Schema(),
 		OutputSchema: ServiceUpdatePasswordOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
-			DestructiveHint: new(true), // Modifies authentication credentials
-			IdempotentHint:  true,      // Same password can be set multiple times
+			DestructiveHint: new(true), // Replaces the credentials existing clients use
+			IdempotentHint:  false,     // Each call generates a different password
 			OpenWorldHint:   new(false),
 			Title:           "Update Service Password",
 		},
 	}
 }
 
-// handleServiceUpdatePassword handles the service_update_password MCP tool
+// handleServiceUpdatePassword handles the service_update_password MCP tool.
+//
+// Updating the password of a PROD service is a multi round-trip call, like
+// service_delete: the first invocation returns an elicitation asking the user
+// to confirm, and the SDK re-invokes the handler with the answer in
+// InputResponses. The password is generated only on the confirmed run.
 func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallToolRequest, input ServiceUpdatePasswordInput) (*mcp.CallToolResult, ServiceUpdatePasswordOutput, error) {
 	cfg, client, projectID, err := s.app.GetAll()
 	if err != nil {
@@ -72,40 +106,54 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, common.ErrReadOnly
 	}
 
-	s.logger.Info("MCP: Updating service password",
-		slog.String("project_id", projectID),
-		slog.String("service_id", input.ServiceID))
-
-	// Prepare password update request
-	updateReq := api.UpdatePasswordInput{
-		Password: input.Password,
+	// With nowhere to save the generated password and no way to return it,
+	// the update would leave nobody knowing the new password.
+	if cfg.PasswordStorage == "none" && !input.WithPassword {
+		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("password storage is disabled (password_storage=none), so the generated password would be lost; set with_password to true to include it in the result, or ask the user to run 'tiger service update-password %s' to set a specific password", input.ServiceID)
 	}
 
-	// Fetch first so we can apply the read-only gate, reject read replicas, and
-	// reuse the service for password storage below.
-	serviceResp, err := client.GetServiceWithResponse(ctx, projectID, input.ServiceID)
+	// The service's tag decides both the prod half of the read-only gate and
+	// whether the user has to confirm, and the service is reused for password
+	// storage below.
+	service, err := common.GetService(ctx, client, projectID, input.ServiceID)
 	if err != nil {
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to get service details: %w", err)
-	}
-	if serviceResp.StatusCode() != http.StatusOK {
-		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(serviceResp.StatusCode(), serviceResp.JSON4XX)
-	}
-	if serviceResp.JSON200 == nil {
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("empty response from API")
-	}
-	service := *serviceResp.JSON200
-
-	// The prod half of the gate, riding on the fetch above.
-	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(service)); err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, err
 	}
 
-	if common.IsReadReplica(service) {
+	tag := common.ServiceEnvironmentTag(*service)
+	if err := common.CheckReadOnly(cfg, tag); err != nil {
+		return nil, ServiceUpdatePasswordOutput{}, err
+	}
+
+	if common.IsReadReplica(*service) {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("%q is a read replica; update the password on its primary service %q instead",
 			input.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 	}
 
-	resp, err := client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, updateReq)
+	if tag == api.EnvironmentTagPROD {
+		answer, answered := req.Params.InputResponses[updatePasswordConfirmationKey]
+		if !answered {
+			result, err := promptProdUpdatePassword(req, *service)
+			return result, ServiceUpdatePasswordOutput{}, err
+		}
+		if !serviceIDConfirmed(answer, input.ServiceID) {
+			return nil, ServiceUpdatePasswordOutput{
+				Updated: false,
+				Message: fmt.Sprintf("Password update cancelled: the user did not confirm updating the password of PROD service %q by typing its ID.", input.ServiceID),
+			}, nil
+		}
+	}
+
+	password, err := common.GenerateSecurePassword(32)
+	if err != nil {
+		return nil, ServiceUpdatePasswordOutput{}, err
+	}
+
+	s.logger.Info("MCP: Updating service password",
+		slog.String("project_id", projectID),
+		slog.String("service_id", input.ServiceID))
+
+	resp, err := client.UpdatePasswordWithResponse(ctx, projectID, input.ServiceID, api.UpdatePasswordInput{Password: password})
 	if err != nil {
 		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("failed to update service password: %w", err)
 	}
@@ -113,19 +161,42 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 	}
 
-	// Save the new password using the service we already fetched.
-	result, saveErr := common.SavePasswordWithResult(cfg, service, input.Password, "tsdbadmin")
-	passwordStorage := &result
-	if saveErr != nil {
-		s.logger.Warn("MCP: Password storage failed", slog.Any("error", saveErr))
-	} else {
-		s.logger.Info("MCP: Password saved successfully", slog.String("method", result.Method))
+	storage, err := common.SavePasswordWithResult(cfg, *service, password, "tsdbadmin")
+	if err != nil {
+		s.logger.Warn("MCP: Password storage failed", slog.Any("error", err))
 	}
 
 	output := ServiceUpdatePasswordOutput{
-		Message:         "Password updated for tsdbadmin",
-		PasswordStorage: passwordStorage,
+		Updated:         true,
+		Message:         updatePasswordMessage(input, err),
+		PasswordStorage: &storage,
 	}
-
+	if input.WithPassword {
+		output.Password = password
+	}
 	return nil, output, nil
+}
+
+// promptProdUpdatePassword returns the input-required result that asks the
+// user to confirm updating the password of a PROD service, refusing outright
+// when the client can't show the prompt.
+func promptProdUpdatePassword(req *mcp.CallToolRequest, service api.Service) (*mcp.CallToolResult, error) {
+	if !clientSupportsFormElicitation(req) {
+		return nil, fmt.Errorf("updating the password of service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service update-password %s' instead", service.ServiceID, service.ServiceID)
+	}
+	return serviceIDConfirmationRequest(
+		updatePasswordConfirmationKey,
+		fmt.Sprintf("Update the password of PRODUCTION service %q (%s)? The tsdbadmin password is replaced with a newly generated one: existing connections may be terminated, and applications using the old password will fail to authenticate.", service.Name, service.ServiceID),
+		service.ServiceID,
+	), nil
+}
+
+// updatePasswordMessage returns the result message for an update that went
+// through, given the error from saving the new password. It warns when the
+// password was neither saved nor returned, since then nobody knows it.
+func updatePasswordMessage(input ServiceUpdatePasswordInput, err error) string {
+	if err != nil && !input.WithPassword {
+		return "Password updated for tsdbadmin. Warning: the new password could not be saved, and was not returned because with_password was false."
+	}
+	return "Password updated for tsdbadmin."
 }
