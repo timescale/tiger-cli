@@ -106,12 +106,6 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 		return nil, ServiceUpdatePasswordOutput{}, common.ErrReadOnly
 	}
 
-	// With nowhere to save the generated password and no way to return it,
-	// the update would leave nobody knowing the new password.
-	if cfg.PasswordStorage == "none" && !input.WithPassword {
-		return nil, ServiceUpdatePasswordOutput{}, fmt.Errorf("password storage is disabled (password_storage=none), so the generated password would be lost; set with_password to true to include it in the result, or ask the user to run 'tiger service update-password %s' to set a specific password", input.ServiceID)
-	}
-
 	// The service's tag decides both the prod half of the read-only gate and
 	// whether the user has to confirm, and the service is reused for password
 	// storage below.
@@ -168,7 +162,7 @@ func (s *Server) handleServiceUpdatePassword(ctx context.Context, req *mcp.CallT
 
 	output := ServiceUpdatePasswordOutput{
 		Updated:         true,
-		Message:         updatePasswordMessage(input, err),
+		Message:         updatePasswordMessage(input, storage),
 		PasswordStorage: &storage,
 	}
 	if input.WithPassword {
@@ -192,11 +186,12 @@ func promptProdUpdatePassword(req *mcp.CallToolRequest, service api.Service) (*m
 }
 
 // updatePasswordMessage returns the result message for an update that went
-// through, given the error from saving the new password. It warns when the
-// password was neither saved nor returned, since then nobody knows it.
-func updatePasswordMessage(input ServiceUpdatePasswordInput, err error) string {
-	if err != nil && !input.WithPassword {
-		return "Password updated for tsdbadmin. Warning: the new password could not be saved, and was not returned because with_password was false."
+// through, given the outcome of saving the new password. It warns when the
+// password was neither saved (because saving failed or password storage is
+// disabled) nor returned, since then nobody knows it.
+func updatePasswordMessage(input ServiceUpdatePasswordInput, storage common.PasswordStorageResult) string {
+	if !storage.Success && !input.WithPassword {
+		return "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false."
 	}
 	return "Password updated for tsdbadmin."
 }

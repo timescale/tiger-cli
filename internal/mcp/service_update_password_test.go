@@ -128,14 +128,6 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
-			name: "disabled password storage refuses without with_password before any API call",
-			tool: toolServiceUpdatePassword,
-			args: args,
-			opts: []runOption{withConfig(map[string]any{"password_storage": "none"})},
-			wantErr: "password storage is disabled (password_storage=none), so the generated password would be lost; " +
-				"set with_password to true to include it in the result, or ask the user to run 'tiger service update-password e6ue9697jf' to set a specific password",
-		},
-		{
 			name: "service lookup network error",
 			tool: toolServiceUpdatePassword,
 			args: args,
@@ -332,7 +324,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			},
 		},
 		{
-			name: "with_password allows disabled password storage",
+			name: "with_password returns the password when storage is disabled",
 			tool: toolServiceUpdatePassword,
 			args: withPasswordArgs,
 			opts: []runOption{withConfig(map[string]any{"password_storage": "none"}), generated},
@@ -341,6 +333,24 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 				"updated":  true,
 				"message":  "Password updated for tsdbadmin.",
 				"password": password,
+				"password_storage": map[string]any{
+					"success": false,
+					"method":  "none",
+					"message": "Password not saved (--password-storage=none). Make sure to store it securely.",
+				},
+			},
+		},
+		{
+			// Disabled storage isn't a refusal: the user chose it, so the tool
+			// updates the password and warns that nobody has it.
+			name: "warns when password storage is disabled",
+			tool: toolServiceUpdatePassword,
+			args: args,
+			opts: []runOption{withConfig(map[string]any{"password_storage": "none"}), generated},
+			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
+			wantOutput: map[string]any{
+				"updated": true,
+				"message": "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false.",
 				"password_storage": map[string]any{
 					"success": false,
 					"method":  "none",
@@ -359,7 +369,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 			mock: expectGetServiceAndUpdate(sampleService(), http.StatusOK),
 			wantOutput: map[string]any{
 				"updated": true,
-				"message": "Password updated for tsdbadmin. Warning: the new password could not be saved, and was not returned because with_password was false.",
+				"message": "Password updated for tsdbadmin. Warning: the new password was not saved, and was not returned because with_password was false.",
 				"password_storage": map[string]any{
 					"success": false,
 					"method":  "pgpass",
