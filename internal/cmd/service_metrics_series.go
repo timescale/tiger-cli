@@ -92,7 +92,7 @@ service from your configuration.`,
 				return err
 			}
 
-			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
@@ -117,7 +117,7 @@ service from your configuration.`,
 				body.GroupBy = &groupBy
 			}
 
-			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, serviceID, body)
+			resp, err := client.GetServiceMetricsSeriesWithResponse(cmd.Context(), projectID, service.ServiceID, body)
 			if err != nil {
 				return fmt.Errorf("failed to fetch metric series: %w", err)
 			}

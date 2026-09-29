@@ -16,15 +16,14 @@ import (
 
 // errServiceRequired is returned when neither an argument nor a configured
 // default identifies a service.
-var errServiceRequired = errors.New("service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'")
+var errServiceRequired = errors.New("service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
 
 // serviceRef is what the user gave to identify a service, and where it came
 // from. The two resolve differently: an argument may be an ID, a read replica
 // set ID, or a name, and the API matches all of them together, while a
-// configured default is looked up by ID alone. A stored name would stop
-// working the moment someone renamed the service, and unlike an argument typed
-// fresh each time, nobody is watching when it does — so 'tiger config set
-// service_id' resolves a name once and stores the ID instead.
+// configured default must be an ID. A stored name would stop working the
+// moment someone renamed the service, and unlike an argument typed fresh each
+// time, nobody is watching when it does.
 type serviceRef struct {
 	ref string
 
@@ -67,8 +66,7 @@ func defaultServiceSource(cmd *cobra.Command) string {
 	return "the service_id config value"
 }
 
-// resolveService resolves a ref to the service it names. Callers that only
-// need the ID use resolveServiceID.
+// resolveService resolves a ref to the service it names.
 func resolveService(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (*api.Service, error) {
 	resp, err := client.ResolveServiceRefWithResponse(ctx, projectID, api.ServiceRefRequest{Ref: ref.ref})
 	if err != nil {
@@ -105,8 +103,8 @@ func checkDefaultIsID(service api.Service, ref serviceRef) error {
 		return nil
 	}
 	return common.ExitWithCode(common.ExitInvalidParameters, fmt.Errorf(
-		"%s is set to '%s', the name of service %s. A name here breaks as soon as the service is renamed.\nSet %s to %s, pass the name as an argument, or run 'tiger config set service_id %s' to store its ID",
-		ref.source, ref.ref, service.ServiceID, ref.source, service.ServiceID, ref.ref))
+		"%s is set to '%s', the name of service %s. A name here breaks as soon as the service is renamed.\nSet %s to %s, or pass the name as an argument",
+		ref.source, ref.ref, service.ServiceID, ref.source, service.ServiceID))
 }
 
 // serviceLabel identifies a service in status output by name and ID together.
@@ -143,14 +141,4 @@ func resolveServiceForWrite(ctx context.Context, cfg *config.Config, client api.
 	}
 
 	return service, nil
-}
-
-// resolveServiceID is resolveService for the commands that pass the ID to
-// another endpoint and never need the service itself.
-func resolveServiceID(ctx context.Context, client api.ClientWithResponsesInterface, projectID string, ref serviceRef) (string, error) {
-	service, err := resolveService(ctx, client, projectID, ref)
-	if err != nil {
-		return "", err
-	}
-	return service.ServiceID, nil
 }

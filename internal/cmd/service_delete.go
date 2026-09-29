@@ -56,7 +56,6 @@ Note for AI agents: Always confirm with the user before performing this destruct
 			if err != nil {
 				return err
 			}
-			serviceID := service.ServiceID
 
 			// Prompt for confirmation unless --confirm is used
 			if !confirm {
@@ -67,12 +66,12 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				// different service through a rename, so it is the wrong
 				// thing to authorize a delete with.
 				cmd.PrintErrf("Are you sure you want to delete service %s? This operation cannot be undone.\n", serviceLabel(*service))
-				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
+				cmd.PrintErrf("Type the service ID '%s' to confirm: ", service.ServiceID)
 				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
-				if confirmation != serviceID {
+				if confirmation != service.ServiceID {
 					cmd.PrintErrln("Delete operation cancelled.")
 					return nil
 				}
@@ -82,7 +81,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 			resp, err := client.DeleteServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
-				api.ServiceID(serviceID),
+				api.ServiceID(service.ServiceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to delete service: %w", err)

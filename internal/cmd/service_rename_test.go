@@ -77,10 +77,19 @@ func TestServiceRenameCmd(t *testing.T) {
 			wantStdout: renamedMsg,
 		},
 		{
+			name: "ambiguous name refused",
+			args: []string{"service", "rename", "my-api-db", "new-name"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name: "network error",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -90,7 +99,7 @@ func TestServiceRenameCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -104,7 +113,7 @@ func TestServiceRenameCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "rename", "svc-12345", "analytics-prod"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().RenameServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ServiceRename{Name: "analytics-prod"}).
 					Return(&api.RenameServiceResponse{
 						HTTPResponse: httpResponse(http.StatusOK),

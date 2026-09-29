@@ -126,7 +126,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// blocks on reading a query.
 			name:    "missing service id",
 			args:    []string{"db", "query"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "too many args",
@@ -204,6 +204,15 @@ func TestDbQueryCmd(t *testing.T) {
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"db", "query", "my-api-db", "-c", "SELECT 1"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "service paused",

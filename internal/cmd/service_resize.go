@@ -83,7 +83,6 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if err != nil {
 				return err
 			}
-			serviceID := resolved.ServiceID
 
 			// Display resize information
 			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), cpuMemoryCfg)
@@ -95,7 +94,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			}
 
 			// Make API call to resize service
-			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, serviceID, resizeReq)
+			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
 			if err != nil {
 				return fmt.Errorf("failed to resize service: %w", err)
 			}
@@ -123,7 +122,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:       client,
 				ProjectID:    projectID,
-				ServiceID:    serviceID,
+				ServiceID:    resolved.ServiceID,
 				Service:      &service,
 				TargetStatus: api.DeployStatusREADY,
 				Input:        cmd.InOrStdin(),

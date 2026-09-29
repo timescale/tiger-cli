@@ -39,8 +39,10 @@ func validServiceTypes() []string {
 // ID also takes a service name, but the tools stay IDs-only. Agents have
 // service_list, and a name it guessed or remembered may since have moved to a
 // different service through a rename, or through a delete and recreate — not a
-// risk worth taking when the tool on the other end is destructive. The API
-// itself accepts either; the pattern below is what declines them here.
+// risk worth taking when the tool on the other end is destructive. Only the
+// API's resolve operation takes a name, and the tools never call it: they
+// pass the ID straight to the ID-only endpoints, and the pattern below
+// rejects anything else before it gets that far.
 func setServiceIDSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["service_id"].Description = "Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs."
 	schema.Properties["service_id"].Examples = []any{"e6ue9697jf", "u8me885b93"}

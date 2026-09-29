@@ -47,7 +47,7 @@ func TestServiceLogsCmd(t *testing.T) {
 
 	setupLogs := func(logs api.ServiceLogs) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectResolveRef(m, "svc-12345")
+			expectResolveRefID(m, "svc-12345")
 			m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 				Return(logsResponse(&logs), nil)
 		}
@@ -63,7 +63,7 @@ func TestServiceLogsCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "logs"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "invalid since flag",
@@ -71,11 +71,20 @@ func TestServiceLogsCmd(t *testing.T) {
 			wantErr: "invalid argument \"bogus\" for \"--since\" flag: invalid time format `bogus` must be one of: `2006-01-02T15:04:05Z07:00`",
 		},
 		{
+			name: "ambiguous name refused",
+			args: []string{"service", "logs", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name:     "network error",
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -86,7 +95,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(&api.GetServiceLogsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -101,7 +110,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			args:     []string{"service", "logs", "svc-12345"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", defaultLogsParams()).
 					Return(logsResponse(nil), nil)
 			},
@@ -170,7 +179,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			args:     []string{"service", "logs", "svc-12345", "--tail", "3"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				page1 := []api.ServiceLogEntry{
 					{Message: "entry 5", Severity: "LOG"},
 					{Message: "entry 4", Severity: "LOG"},
@@ -195,7 +204,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			name: "since and until params",
 			args: []string{"service", "logs", "svc-12345", "--since", "2024-01-15T09:00:00Z", "--until", "2024-01-15T10:00:00Z"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				since := time.Date(2024, 1, 15, 9, 0, 0, 0, time.UTC)
 				until := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
@@ -214,7 +223,7 @@ func TestServiceLogsCmd(t *testing.T) {
 			args:     []string{"service", "logs", "svc-12345", "--node", "0"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceLogsWithResponse(validCtx, testProjectID, "svc-12345", &api.GetServiceLogsParams{
 					Node:  new(0),
 					Until: &logsNow,

@@ -57,7 +57,7 @@ Use 'tiger service get' to check service status.
 		{
 			name:    "missing service id",
 			args:    []string{"service", "resize", "--cpu", "2000", "--memory", "8"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "invalid cpu/memory combination",
@@ -68,6 +68,15 @@ Use 'tiger service get' to check service status.
 			name:    "missing cpu and memory",
 			args:    []string{"service", "resize", "svc-12345"},
 			wantErr: "must specify at least one of --cpu or --memory",
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "resize", "my-api-db", "--cpu", "2000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "network error",

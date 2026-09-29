@@ -110,7 +110,6 @@ default service from your configuration.`,
 			if err != nil {
 				return err
 			}
-			serviceID := source.ServiceID
 
 			// Determine fork strategy and target time
 			forkStrategy := api.ForkStrategyNOW
@@ -154,7 +153,7 @@ default service from your configuration.`,
 			}
 
 			// Make API call to fork service
-			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, serviceID, forkReq)
+			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq)
 			if err != nil {
 				return fmt.Errorf("failed to fork service: %w", err)
 			}

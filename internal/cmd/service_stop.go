@@ -53,13 +53,12 @@ service from your configuration.`,
 			if err != nil {
 				return err
 			}
-			serviceID := resolved.ServiceID
 
 			// Make the stop request
 			resp, err := client.StopServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
-				api.ServiceID(serviceID),
+				api.ServiceID(resolved.ServiceID),
 			)
 			if err != nil {
 				return fmt.Errorf("failed to stop service: %w", err)
@@ -88,7 +87,7 @@ service from your configuration.`,
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:       client,
 				ProjectID:    projectID,
-				ServiceID:    serviceID,
+				ServiceID:    resolved.ServiceID,
 				Service:      &service,
 				TargetStatus: api.DeployStatusPAUSED,
 				Input:        cmd.InOrStdin(),

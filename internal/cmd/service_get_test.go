@@ -52,7 +52,7 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "get"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
@@ -75,7 +75,7 @@ func TestServiceGetCmd(t *testing.T) {
 			// A ref matching more than one service is refused by the API; the
 			// CLI surfaces that message and points at the command that lists
 			// the candidates, which the message itself doesn't name.
-			name: "ambiguous ref refused",
+			name: "ambiguous name refused",
 			args: []string{"service", "get", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
@@ -181,7 +181,7 @@ func TestServiceGetCmd(t *testing.T) {
 			opts: []runOption{withEnv("TIGER_SERVICE_ID", "test-service")},
 			wantErr: `TIGER_SERVICE_ID is set to 'test-service', the name of service svc-12345. ` +
 				"A name here breaks as soon as the service is renamed.\n" +
-				"Set TIGER_SERVICE_ID to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+				"Set TIGER_SERVICE_ID to svc-12345, or pass the name as an argument",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
@@ -192,12 +192,10 @@ func TestServiceGetCmd(t *testing.T) {
 			},
 			wantErr: `--service-id is set to 'test-service', the name of service svc-12345. ` +
 				"A name here breaks as soon as the service is renamed.\n" +
-				"Set --service-id to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+				"Set --service-id to svc-12345, or pass the name as an argument",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
-			// A hand-edited config file is the one way a name gets stored,
-			// since 'tiger config set service_id' resolves before writing.
 			name: "name in the config file is refused",
 			args: []string{"service", "get"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -206,7 +204,7 @@ func TestServiceGetCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"service_id": "test-service"})},
 			wantErr: `the service_id config value is set to 'test-service', the name of service svc-12345. ` +
 				"A name here breaks as soon as the service is renamed.\n" +
-				"Set the service_id config value to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+				"Set the service_id config value to svc-12345, or pass the name as an argument",
 			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{

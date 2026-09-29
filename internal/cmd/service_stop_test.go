@@ -59,13 +59,22 @@ func TestServiceStopCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"service", "stop"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "stop", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "network error",
 			args: []string{"service", "stop", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -75,7 +84,7 @@ func TestServiceStopCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "stop", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -89,7 +98,7 @@ func TestServiceStopCmd(t *testing.T) {
 			name: "service not found",
 			args: []string{"service", "stop", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -103,7 +112,7 @@ func TestServiceStopCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "stop", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().StopServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.StopServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),

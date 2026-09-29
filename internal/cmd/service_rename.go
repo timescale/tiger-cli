@@ -51,12 +51,11 @@ its current name.`,
 			if err != nil {
 				return err
 			}
-			serviceID := service.ServiceID
 
 			resp, err := client.RenameServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
-				api.ServiceID(serviceID),
+				api.ServiceID(service.ServiceID),
 				api.ServiceRename{Name: newName},
 			)
 			if err != nil {

@@ -143,23 +143,14 @@ Use `tiger <command> --help` for detailed information about each command, or bro
 
 ### Naming a Service
 
-Anywhere a command takes a service ID, it also takes the service's name:
+Anywhere a command takes a service as an argument, it takes either its ID (or a read replica set ID) or its name:
 
 ```bash
 tiger db psql my-api-db
 tiger service stop my-api-db
-tiger config set service_id my-api-db
 ```
 
-A read replica set is named the same way, by its own ID or its own name.
-
-A *default* service is always an ID. `tiger config set service_id` takes a name, resolves it once and stores the ID, so the default survives a rename. `--service-id` and `TIGER_SERVICE_ID` take an ID only: they are set once and reused, so a name there would keep working right up until someone renamed the service. Given one, the CLI says which ID to use instead.
-
-Names are matched exactly and case-sensitively, and deleted services never match. A name is unique among a project's active services, and a service can't be named after another service's ID, so a reference identifies at most one service. One that matches more than one is refused rather than resolved — run `tiger service list` to find the ID you want.
-
-`tiger config set service_id` resolves what you give it and stores the ID, so a later rename can't strand the default. Destructive commands accept a name too, but their confirmation prompt still requires the service's ID.
-
-The MCP tools take IDs only: an agent has `service_list` to look one up, and a name it guessed or remembered may since have moved to a different service through a rename, or through a delete and recreate — not a risk worth taking when the tool on the other end is destructive.
+Names are matched exactly. A name that matches more than one service is refused; run `tiger service list` to find the ID you want. A default service (`tiger config set service_id`, `--service-id`, or `TIGER_SERVICE_ID`) must be an ID, and destructive commands still ask you to type the ID to confirm. The MCP tools take IDs only.
 
 ## MCP Server
 
@@ -291,7 +282,7 @@ All configuration options can be set via `tiger config set <key> <value>`:
   - `all` protects every service, and the MCP write tools aren't registered at all, so they don't appear in `tools/list` and can't be called.
   - `prod` protects only services tagged `PROD`, leaving `DEV` services writable. `tiger service create`/`fork` and the `service_create`/`service_fork` MCP tools are gated on the environment they request, so creating a `DEV` service is allowed and a `PROD` one is not — otherwise you could create a service this same mode then refuses to delete. Forking a `PROD` service into a `DEV` fork is allowed, since that reads production without changing it. The MCP write tools stay registered — they still work on `DEV` services — and refuse per call instead. These commands read the tag off the service they resolve, so the tag costs no extra API call, and the operation is refused if that lookup fails. The MCP write tools, which take IDs, fetch the service to read its tag. A read replica is judged on its own tag, so a replica of a `PROD` primary is protected only if that replica set is itself tagged `PROD`.
 
-- `service_id` - Default service. Stored as an ID: `tiger config set service_id` accepts a service name and resolves it before writing, so the default survives a rename. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
+- `service_id` - Default service ID. Cleared automatically when the active project changes: by `tiger project`, and by `tiger auth login` unless it lands on the same project as the previous login. A service belongs to the project it was created in
 - `version_check` - When `true`, the CLI checks for a newer version on each invocation (in an interactive terminal) and prints a notice if one is available. Set to `false` to disable. Default: `true`.
 
 ### Environment Variables

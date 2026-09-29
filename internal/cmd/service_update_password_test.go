@@ -96,7 +96,7 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"service", "update-password", "--new-password", "newpass123"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "env password and auto-generate conflict",
@@ -120,6 +120,15 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "update-password", "my-api-db", "--new-password", "newpass123"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body on resolve",

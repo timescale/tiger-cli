@@ -37,7 +37,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "create", "role", "--name", "ai_analyst"},
-			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			// The blanket case is refused before the ref is resolved, so no
@@ -98,6 +98,15 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"db", "create", "role", "my-api-db", "--name", "ai_analyst"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",

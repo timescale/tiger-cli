@@ -53,12 +53,12 @@ service from your configuration.`,
 				return err
 			}
 
-			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetBackupsWithResponse(cmd.Context(), projectID, serviceID)
+			resp, err := client.GetBackupsWithResponse(cmd.Context(), projectID, service.ServiceID)
 			if err != nil {
 				return fmt.Errorf("failed to list backups: %w", err)
 			}

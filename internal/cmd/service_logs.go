@@ -61,7 +61,7 @@ service from your configuration.`,
 				return err
 			}
 
-			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
@@ -88,7 +88,7 @@ service from your configuration.`,
 			logs, err := common.FetchServiceLogs(cmd.Context(), common.FetchServiceLogsArgs{
 				Client:    client,
 				ProjectID: projectID,
-				ServiceID: serviceID,
+				ServiceID: service.ServiceID,
 				Tail:      tail,
 				Since:     sincePtr,
 				Until:     untilPtr,

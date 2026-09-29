@@ -134,15 +134,12 @@ Further conventions:
 
 ### Service Refs
 
-A command that identifies a service takes a **ref**: its ID, a read replica set ID, or its name. The CLI classifies nothing — `getServiceRef` picks the ref out of `args[0]` or `cfg.ServiceID`, and `resolveService`/`resolveServiceID` (`service_ref_helper.go`) hand it to the API's resolve operation, which matches ID and name together and refuses a ref matching more than one service. Never compare a ref against a shape or try to tell an ID from a name.
+A command that identifies a service takes a **ref** — its ID, a read replica set ID, or its name — and hands it to the API's resolve operation through the helpers in `service_ref_helper.go`, which also return the whole service. Never try to tell an ID from a name in the CLI.
 
-- Resolving returns the whole service, so a command that needed one fetches nothing after it — `service get` and the `db` commands (via `common.NewConnectionTarget`) are the model. The commands that only pass an ID to another endpoint use `resolveServiceID`.
-- A command that changes the service it resolves calls `resolveServiceForWrite`, which refuses the blanket read-only case before the network call and gates on the tag the resolution returns, so neither half can be skipped or ordered wrong at a call site. Validate flags before calling it, so a bad flag costs no call either. Commands that only read a service use `resolveService`; `service fork` does too, since it gates on the environment it's about to request rather than on its source's.
-- The positional is `[name-or-id]` (`<name-or-id>` where it's required), so the usage line itself shows both accepted forms; the `Long` text reads "The service can be given by ID or name as an argument". Prose says **service**, never service ID.
-- Completion offers IDs with the name as the description, so what it inserts is the stable identifier even though a name would resolve too.
-- **A ref given as an argument may be a name; a configured default may not.** `getServiceRef` records which it was in `serviceRef.source`, and `checkDefaultIsID` refuses a default that resolved by name — `ref` not equal to the resolved `ServiceID` means it matched by name. The check runs *after* the lookup so the error can name the ID to store.
-- `config set service_id` resolves at write time and stores the ID, so a rename can't strand the default, and it's the only way to turn a name into one. It's the one config key whose write needs auth and a network call.
-- Destructive commands accept a name, but their confirmation prompt shows both forms and takes only the ID.
+- A command that changes the service it resolves uses `resolveServiceForWrite`, which carries the read-only gate; everything else uses `resolveService`.
+- Help text shows `[name-or-id]` and says the service "can be given by ID or name"; completion inserts IDs.
+- A name is accepted only as an argument. A configured default must be an ID, and one that resolves by name is refused.
+- Destructive commands accept a name, but their confirmation prompt takes only the ID.
 - MCP tools stay IDs-only — an intentional divergence, documented at `setServiceIDSchemaProperties`.
 
 ## Output

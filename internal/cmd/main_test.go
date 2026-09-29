@@ -586,20 +586,19 @@ func httpResponse(statusCode int) *http.Response {
 }
 
 // expectResolveRef registers the resolve call a command makes for its service
-// ref. With no svc, the ref resolves to itself: a bare service whose ID is the
-// ref, which is what resolving an ID gives you. Pass a svc when the ref is a
-// name, so it resolves to a different ID, or when the command goes on to read
-// fields off the service.
-func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc ...api.Service) {
-	resolved := api.Service{ServiceID: ref}
-	if len(svc) > 0 {
-		resolved = svc[0]
-	}
+// ref, answered with svc.
+func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc api.Service) {
 	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
 		Return(&api.ResolveServiceRefResponse{
 			HTTPResponse: httpResponse(http.StatusOK),
-			JSON200:      &resolved,
+			JSON200:      &svc,
 		}, nil)
+}
+
+// expectResolveRefID registers the resolution of an ID onto itself: a bare
+// service whose ID is the ref, for commands that read nothing else off it.
+func expectResolveRefID(m *mocks.MockClientWithResponsesInterface, ref string) {
+	expectResolveRef(m, ref, api.Service{ServiceID: ref})
 }
 
 // expectResolveRefError registers a ref resolution that never reaches the API.

@@ -52,12 +52,12 @@ service from your configuration.`, strings.Join(common.LegacyMetrics, ", ")),
 				return err
 			}
 
-			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, serviceID, metric)
+			resp, err := client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, service.ServiceID, metric)
 			if err != nil {
 				return fmt.Errorf("failed to get metric details: %w", err)
 			}

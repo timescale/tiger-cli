@@ -71,6 +71,15 @@ func TestServiceDeleteCmd(t *testing.T) {
 			wantStderr: "Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
+			name: "ambiguous name refused",
+			args: []string{"service", "delete", "my-api-db", "--confirm"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name:    "non-TTY without confirm",
 			args:    []string{"service", "delete", "svc-12345"},
 			mock:    func(m *mocks.MockClientWithResponsesInterface) { expectResolveRef(m, "svc-12345", sampleService()) },
@@ -122,7 +131,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"service", "delete", "svc-12345", "--confirm"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -132,7 +141,7 @@ func TestServiceDeleteCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "delete", "svc-12345", "--confirm"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRef(m, "svc-12345")
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().DeleteServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.DeleteServiceResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
