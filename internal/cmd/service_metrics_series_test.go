@@ -95,7 +95,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		{
 			// synctest's bubble clock always starts at 2000-01-01 UTC, so the
 			// default window and bucket size can be spelled out exactly.
-			name:     "omitting --from and --to defaults to the last 7 days at a 1h bucket",
+			name:     "omitting --from and --to defaults to the last 24 hours at a 1h bucket",
 			args:     []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric"},
 			synctest: true,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -103,7 +103,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				bucket := 3600
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
 					Name:          "some_metric",
-					From:          time.Date(1999, 12, 25, 0, 0, 0, 0, time.UTC),
+					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
 					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 					BucketSeconds: &bucket,
 				}).Return(&api.GetServiceMetricsSeriesResponse{
@@ -131,7 +131,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				bucket := 60
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
 					Name:          "some_metric",
-					From:          time.Date(1999, 12, 25, 0, 0, 0, 0, time.UTC),
+					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
 					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 					BucketSeconds: &bucket,
 				}).Return(&api.GetServiceMetricsSeriesResponse{

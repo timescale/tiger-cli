@@ -22,7 +22,7 @@ import (
 // the MCP tool still requires from/to explicitly, since an agent should
 // reason about the window it's asking for.
 const (
-	defaultMetricsSeriesWindow        = 7 * 24 * time.Hour
+	defaultMetricsSeriesWindow        = 24 * time.Hour
 	defaultMetricsSeriesBucketSeconds = 3600
 )
 
@@ -47,9 +47,9 @@ Use 'tiger service metrics available' to discover valid metric names.
 Each labeled series (e.g. one per replica) is returned independently with its
 full list of raw data points.
 
---from and --to default to the last 7 days when both are omitted, bucketed
+--from and --to default to the last 24 hours when both are omitted, bucketed
 into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
-		Example: `  # Fetch CPU usage for the last 7 days (the default window)
+		Example: `  # Fetch CPU usage for the last 24 hours (the default window)
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores
 
   # Fetch CPU usage for a specific hour
@@ -158,7 +158,7 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
 	}
 
 	cmd.Flags().StringVar(&metric, "metric", "", "Metric series name")
-	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339). Defaults to 7 days ago when --to is also omitted")
+	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339). Defaults to 24 hours ago when --to is also omitted")
 	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339). Defaults to now when --from is also omitted")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value or name!=value (repeatable)")

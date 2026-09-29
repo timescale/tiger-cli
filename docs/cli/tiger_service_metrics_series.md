@@ -11,7 +11,7 @@ Use 'tiger service metrics available' to discover valid metric names.
 Each labeled series (e.g. one per replica) is returned independently with its
 full list of raw data points.
 
---from and --to default to the last 7 days when both are omitted, bucketed
+--from and --to default to the last 24 hours when both are omitted, bucketed
 into 1-hour (3600s) intervals unless --bucket-seconds is also given.
 
 ```
@@ -21,7 +21,7 @@ tiger service metrics series [service-id] [flags]
 ### Examples
 
 ```
-  # Fetch CPU usage for the last 7 days (the default window)
+  # Fetch CPU usage for the last 24 hours (the default window)
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores
 
   # Fetch CPU usage for a specific hour
@@ -58,7 +58,7 @@ tiger service metrics series [service-id] [flags]
       --bucket-seconds int   Aggregation bucket size in seconds (minimum 60s). Defaults to 3600 (1h) when --from/--to are also omitted; otherwise the server auto-selects based on the time window
       --filter strings       Arbitrary label filter as name=value or name!=value (repeatable)
       --fn string            Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default
-      --from string          Start of the time window (RFC3339). Defaults to 7 days ago when --to is also omitted
+      --from string          Start of the time window (RFC3339). Defaults to 24 hours ago when --to is also omitted
       --group-by strings     Label key to break the result into one series per distinct value (repeatable). Rejected on the same metrics that reject --fn; omit to collapse into a single series
   -h, --help                 help for series
       --metric string        Metric series name
