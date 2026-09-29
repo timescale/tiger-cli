@@ -184,6 +184,30 @@ var addonsCompletion = cobra.FixedCompletions(append(common.ValidAddons(), commo
 // drawn from the same list used to validate `tiger config set password_storage`.
 var passwordStorageCompletion = cobra.FixedCompletions(config.ValidPasswordStorageOptions(), cobra.ShellCompDirectiveNoFileComp)
 
+// metricNameCompletion completes --metric on `service metrics details` and
+// `service metrics series`, drawn from the target service's available metric
+// series (the same list `service metrics available` returns).
+func metricNameCompletion(app *common.App) cobra.CompletionFunc {
+	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		cfg, client, projectID, err := app.GetAll()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		serviceID, err := getServiceID(cfg, args)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, serviceID)
+		if err != nil || resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		return filterCompletionsByPrefix(*resp.JSON200, toComplete), cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
 // metricsSeriesRoleCompletion completes --role on `service metrics series`.
 var metricsSeriesRoleCompletion = cobra.FixedCompletions([]string{"PRIMARY", "REPLICA"}, cobra.ShellCompDirectiveNoFileComp)
 

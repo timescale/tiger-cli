@@ -14,7 +14,7 @@ func buildServiceMetricsCmd(app *common.App) *cobra.Command {
 		Short: "View service metrics",
 		Long:  `Commands for querying time-series metrics for a Tiger Cloud service.`,
 	}
-	cmd.AddCommand(buildServiceMetricsAvailableSeriesCmd(app))
+	cmd.AddCommand(buildServiceMetricsAvailableCmd(app))
 	cmd.AddCommand(buildServiceMetricsDetailsCmd(app))
 	cmd.AddCommand(buildServiceMetricsSeriesCmd(app))
 	return cmd

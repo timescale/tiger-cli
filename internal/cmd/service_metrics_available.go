@@ -11,14 +11,15 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// buildServiceMetricsAvailableSeriesCmd lists the metric series available for a service
-func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
+// buildServiceMetricsAvailableCmd lists the metric series available for a service
+func buildServiceMetricsAvailableCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "available-series [service-id]",
-		Short:        "List available metric series",
-		Long:         `List the names of all metric series available for a service.`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Use:               "available [service-id]",
+		Short:             "List available metric series",
+		Long:              `List the names of all metric series available for a service.`,
+		Args:              cobra.MaximumNArgs(1),
+		SilenceUsage:      true,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {

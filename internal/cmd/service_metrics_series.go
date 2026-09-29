@@ -15,6 +15,17 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
+// defaultMetricsSeriesWindow and defaultMetricsSeriesBucketSeconds are the
+// --from/--to/--bucket-seconds values `service metrics series` uses when
+// --from and --to are both omitted, so the command works without first
+// having to construct RFC3339 timestamps. They apply at the CLI layer only —
+// the MCP tool still requires from/to explicitly, since an agent should
+// reason about the window it's asking for.
+const (
+	defaultMetricsSeriesWindow        = 7 * 24 * time.Hour
+	defaultMetricsSeriesBucketSeconds = 3600
+)
+
 // buildServiceMetricsSeriesCmd fetches time-series data for a named metric
 func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 	var metric string
@@ -31,11 +42,17 @@ func buildServiceMetricsSeriesCmd(app *common.App) *cobra.Command {
 		Short: "Get metric series data",
 		Long: `Get time-series data for a specific metric.
 
-Use 'tiger service metrics available-series' to discover valid metric names.
+Use 'tiger service metrics available' to discover valid metric names.
 
 Each labeled series (e.g. one per replica) is returned independently with its
-full list of raw data points.`,
-		Example: `  # Fetch CPU usage for the last hour
+full list of raw data points.
+
+--from and --to default to the last 7 days when both are omitted, bucketed
+into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
+		Example: `  # Fetch CPU usage for the last 7 days (the default window)
+  tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores
+
+  # Fetch CPU usage for a specific hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
 
@@ -61,9 +78,20 @@ full list of raw data points.`,
   tiger service metrics series --metric some_metric_name \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --group-by role`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		SilenceUsage:      true,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Defaulting only kicks in when both are omitted — a single
+			// explicit flag still requires its counterpart, via the RFC3339
+			// parse errors below.
+			usingDefaultWindow := from == "" && to == ""
+			if usingDefaultWindow {
+				now := time.Now().UTC()
+				from = now.Add(-defaultMetricsSeriesWindow).Format(time.RFC3339)
+				to = now.Format(time.RFC3339)
+			}
+
 			fromTime, err := time.Parse(time.RFC3339, from)
 			if err != nil {
 				return fmt.Errorf("--from must be RFC3339 (e.g., 2026-05-13T00:00:00Z): %w", err)
@@ -71,6 +99,10 @@ full list of raw data points.`,
 			toTime, err := time.Parse(time.RFC3339, to)
 			if err != nil {
 				return fmt.Errorf("--to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): %w", err)
+			}
+
+			if usingDefaultWindow && bucketSeconds == 0 {
+				bucketSeconds = defaultMetricsSeriesBucketSeconds
 			}
 
 			labelFilters, err := parseMetricFilters(role, filters)
@@ -126,21 +158,20 @@ full list of raw data points.`,
 	}
 
 	cmd.Flags().StringVar(&metric, "metric", "", "Metric series name")
-	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339)")
-	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339)")
+	cmd.Flags().StringVar(&from, "from", "", "Start of the time window (RFC3339). Defaults to 7 days ago when --to is also omitted")
+	cmd.Flags().StringVar(&to, "to", "", "End of the time window (RFC3339). Defaults to now when --from is also omitted")
 	cmd.Flags().StringVar(&role, "role", "", "Filter to a specific instance role (PRIMARY or REPLICA)")
 	cmd.Flags().StringSliceVar(&filters, "filter", nil, "Arbitrary label filter as name=value or name!=value (repeatable)")
-	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)")
+	cmd.Flags().IntVar(&bucketSeconds, "bucket-seconds", 0, "Aggregation bucket size in seconds (minimum 60s). Defaults to 3600 (1h) when --from/--to are also omitted; otherwise the server auto-selects based on the time window")
 	cmd.Flags().StringVar(&fn, "fn", "", "Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default")
 	cmd.Flags().StringSliceVar(&groupBy, "group-by", nil, "Label key to break the result into one series per distinct value (repeatable). Rejected on the same metrics that reject --fn; omit to collapse into a single series")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
 	registerFlagCompletion(cmd, "role", metricsSeriesRoleCompletion)
 	registerFlagCompletion(cmd, "fn", metricsSeriesFnCompletion)
+	registerFlagCompletion(cmd, "metric", metricNameCompletion(app))
 
 	markFlagRequired(cmd, "metric")
-	markFlagRequired(cmd, "from")
-	markFlagRequired(cmd, "to")
 
 	return cmd
 }

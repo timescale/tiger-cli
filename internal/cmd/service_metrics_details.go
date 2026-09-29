@@ -24,7 +24,7 @@ func buildServiceMetricsDetailsCmd(app *common.App) *cobra.Command {
 		Long: fmt.Sprintf(`Get descriptive metadata for a metric: what it measures, its type, default
 aggregation function, and available labels.
 
-Use 'tiger service metrics available-series' to discover valid metric names,
+Use 'tiger service metrics available' to discover valid metric names,
 then 'tiger service metrics series' to fetch its data.
 
 These metrics have no richer metadata — expect just the name back, with type,
@@ -34,8 +34,9 @@ default aggregation, description, and labels all empty: %s.`, strings.Join(commo
 
   # Get metric details as JSON
   tiger service metrics details --metric pg_stat_activity_count --output json`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		SilenceUsage:      true,
+		ValidArgsFunction: serviceIDCompletion(app),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
@@ -67,6 +68,7 @@ default aggregation, description, and labels all empty: %s.`, strings.Join(commo
 	cmd.Flags().StringVar(&metric, "metric", "", "Metric name")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
+	registerFlagCompletion(cmd, "metric", metricNameCompletion(app))
 
 	markFlagRequired(cmd, "metric")
 

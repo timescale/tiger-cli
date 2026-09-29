@@ -7,7 +7,7 @@ Get metric details
 Get descriptive metadata for a metric: what it measures, its type, default
 aggregation function, and available labels.
 
-Use 'tiger service metrics available-series' to discover valid metric names,
+Use 'tiger service metrics available' to discover valid metric names,
 then 'tiger service metrics series' to fetch its data.
 
 These metrics have no richer metadata — expect just the name back, with type,

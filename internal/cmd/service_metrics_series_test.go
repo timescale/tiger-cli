@@ -92,5 +92,54 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			},
 			wantStdout: noDataMsg,
 		},
+		{
+			// synctest's bubble clock always starts at 2000-01-01 UTC, so the
+			// default window and bucket size can be spelled out exactly.
+			name:     "omitting --from and --to defaults to the last 7 days at a 1h bucket",
+			args:     []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				empty := []api.MetricSeries{}
+				bucket := 3600
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+					Name:          "some_metric",
+					From:          time.Date(1999, 12, 25, 0, 0, 0, 0, time.UTC),
+					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+					BucketSeconds: &bucket,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantStdout: noDataMsg,
+		},
+		{
+			// Defaulting only applies when both --from and --to are omitted —
+			// giving just one still requires its counterpart.
+			name:    "omitting only --to still requires it",
+			args:    []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric", "--from", "2026-05-13T00:00:00Z"},
+			wantErr: `--to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): parsing time "" as "2006-01-02T15:04:05Z07:00": cannot parse "" as "2006"`,
+		},
+		{
+			// An explicit --bucket-seconds is respected even in the default
+			// window, rather than being overridden by the 3600s default.
+			name:     "explicit --bucket-seconds overrides the default window's bucket size",
+			args:     []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric", "--bucket-seconds", "60"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				empty := []api.MetricSeries{}
+				bucket := 60
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+					Name:          "some_metric",
+					From:          time.Date(1999, 12, 25, 0, 0, 0, 0, time.UTC),
+					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+					BucketSeconds: &bucket,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantStdout: noDataMsg,
+		},
 	})
 }

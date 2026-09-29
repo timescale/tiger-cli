@@ -1,0 +1,33 @@
+## tiger service metrics available
+
+List available metric series
+
+### Synopsis
+
+List the names of all metric series available for a service.
+
+```
+tiger service metrics available [service-id] [flags]
+```
+
+### Options
+
+```
+  -h, --help            help for available
+  -o, --output string   Output format (json, yaml, table)
+```
+
+### Options inherited from parent commands
+
+```
+      --analytics                 enable/disable usage analytics (default true)
+      --color                     enable colored output (default true)
+      --config-dir string         config directory (default "~/.config/tiger")
+      --password-storage string   password storage method (keyring, pgpass, none) (default "keyring")
+      --service-id string         service ID
+      --version-check             check for updates on startup (default true)
+```
+
+### SEE ALSO
+
+* [tiger service metrics](tiger_service_metrics.md)	 - View service metrics
