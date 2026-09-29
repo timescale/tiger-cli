@@ -72,12 +72,12 @@ func TestDbPsqlCmd(t *testing.T) {
 			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "API error fetching service",
+			name: "service not found",
 			args: []string{"db", "psql", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{

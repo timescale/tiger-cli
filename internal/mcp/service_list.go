@@ -87,7 +87,7 @@ func (s *Server) handleServiceList(ctx context.Context, req *mcp.CallToolRequest
 	s.logger.Info("MCP: Listing services", slog.String("project_id", projectID))
 
 	// Make API call to list services
-	resp, err := client.GetServicesWithResponse(ctx, projectID)
+	resp, err := client.GetServicesWithResponse(ctx, projectID, nil)
 	if err != nil {
 		return nil, ServiceListOutput{}, fmt.Errorf("failed to list services: %w", err)
 	}

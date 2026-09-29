@@ -12,7 +12,7 @@ import (
 
 func TestServiceCommandAliases(t *testing.T) {
 	emptyList := func(m *mocks.MockClientWithResponsesInterface) {
-		m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+		m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 			Return(&api.GetServicesResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &[]api.Service{},

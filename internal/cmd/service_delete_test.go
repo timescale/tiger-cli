@@ -101,10 +101,8 @@ func TestServiceDeleteCmd(t *testing.T) {
 				"Service 'test-service' (svc-12345) deleted.\n",
 		},
 		{
-			// The prompt takes the ID and nothing else: typing back the name
-			// that was used to reach the service does not authorize the
-			// delete, since a name can move to a different service through a
-			// rename.
+			// Typing back the name used to reach the service does not confirm
+			// the delete: the prompt takes only the ID.
 			name: "name typed back at the prompt does not confirm",
 			args: []string{"service", "delete", "test-service"},
 			opts: []runOption{withIsTerminal(true), withStdin("test-service\n")},

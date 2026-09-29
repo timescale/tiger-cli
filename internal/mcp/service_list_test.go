@@ -14,7 +14,7 @@ func TestServiceListTool(t *testing.T) {
 
 	expectServices := func(services []api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+			m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 				Return(&api.GetServicesResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
 					JSON200:      &services,
@@ -107,7 +107,7 @@ func TestServiceListTool(t *testing.T) {
 			name: "API error",
 			tool: toolServiceList,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusForbidden),
 						JSON4XX:      &api.ClientError{Message: new("insufficient permissions")},
@@ -120,7 +120,7 @@ func TestServiceListTool(t *testing.T) {
 			name: "nil response body lists nothing",
 			tool: toolServiceList,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(&api.GetServicesResponse{HTTPResponse: httpResponse(http.StatusOK)}, nil)
 			},
 			wantOutput: map[string]any{"services": []any{}},

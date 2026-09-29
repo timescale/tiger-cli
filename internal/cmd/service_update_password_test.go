@@ -113,12 +113,12 @@ func TestServiceUpdatePasswordCmd(t *testing.T) {
 			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "API error on resolve",
+			name: "service not found",
 			args: []string{"service", "update-password", "svc-12345", "--new-password", "newpass123"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{

@@ -1419,9 +1419,12 @@ func TestServiceLifecycleIntegration(t *testing.T) {
 			t.Errorf("Expected service get to fail for deleted service, but got output: %s", output)
 		}
 
-		// Check that error indicates service not found
-		if !strings.Contains(err.Error(), "no service with that id exists") {
-			t.Errorf("Expected 'no service with that id exists' error for deleted service, got: %v", err)
+		// Check that error indicates service not found. The ref filter
+		// answers a deleted service with an empty list, so the message is the
+		// CLI's own rather than the API's.
+		wantErr := fmt.Sprintf("service '%s' not found", deletedServiceID)
+		if err.Error() != wantErr {
+			t.Errorf("Expected %q error for deleted service, got: %v", wantErr, err)
 		}
 
 		// Check that it returns the correct exit code (this should be required)

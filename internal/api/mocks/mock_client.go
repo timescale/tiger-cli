@@ -1203,9 +1203,9 @@ func (mr *MockClientInterfaceMockRecorder) GetServiceMetricsSeriesWithBody(ctx, 
 }
 
 // GetServices mocks base method.
-func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.ProjectID, params *api.GetServicesParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID}
+	varargs := []any{ctx, projectID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1216,9 +1216,9 @@ func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.Pro
 }
 
 // GetServices indicates an expected call of GetServices.
-func (mr *MockClientInterfaceMockRecorder) GetServices(ctx, projectID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) GetServices(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServices", reflect.TypeOf((*MockClientInterface)(nil).GetServices), varargs...)
 }
 
@@ -1540,46 +1540,6 @@ func (mr *MockClientInterfaceMockRecorder) ResizeServiceWithBody(ctx, projectID,
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, serviceID, contentType, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeServiceWithBody", reflect.TypeOf((*MockClientInterface)(nil).ResizeServiceWithBody), varargs...)
-}
-
-// ResolveServiceRef mocks base method.
-func (m *MockClientInterface) ResolveServiceRef(ctx context.Context, projectID api.ProjectID, body api.ResolveServiceRefJSONRequestBody, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ResolveServiceRef", varargs...)
-	ret0, _ := ret[0].(*http.Response)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ResolveServiceRef indicates an expected call of ResolveServiceRef.
-func (mr *MockClientInterfaceMockRecorder) ResolveServiceRef(ctx, projectID, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveServiceRef", reflect.TypeOf((*MockClientInterface)(nil).ResolveServiceRef), varargs...)
-}
-
-// ResolveServiceRefWithBody mocks base method.
-func (m *MockClientInterface) ResolveServiceRefWithBody(ctx context.Context, projectID api.ProjectID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, contentType, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ResolveServiceRefWithBody", varargs...)
-	ret0, _ := ret[0].(*http.Response)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ResolveServiceRefWithBody indicates an expected call of ResolveServiceRefWithBody.
-func (mr *MockClientInterfaceMockRecorder) ResolveServiceRefWithBody(ctx, projectID, contentType, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, contentType, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveServiceRefWithBody", reflect.TypeOf((*MockClientInterface)(nil).ResolveServiceRefWithBody), varargs...)
 }
 
 // SetBackupRetention mocks base method.
@@ -3127,9 +3087,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceWithResponse(c
 }
 
 // GetServicesWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*api.GetServicesResponse, error) {
+func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.Context, projectID api.ProjectID, params *api.GetServicesParams, reqEditors ...api.RequestEditorFn) (*api.GetServicesResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID}
+	varargs := []any{ctx, projectID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3140,9 +3100,9 @@ func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.C
 }
 
 // GetServicesWithResponse indicates an expected call of GetServicesWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServicesWithResponse(ctx, projectID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServicesWithResponse(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServicesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServicesWithResponse), varargs...)
 }
 
@@ -3464,46 +3424,6 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) ResizeServiceWithRespons
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, projectID, serviceID, body}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeServiceWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResizeServiceWithResponse), varargs...)
-}
-
-// ResolveServiceRefWithBodyWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) ResolveServiceRefWithBodyWithResponse(ctx context.Context, projectID api.ProjectID, contentType string, body io.Reader, reqEditors ...api.RequestEditorFn) (*api.ResolveServiceRefResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, contentType, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ResolveServiceRefWithBodyWithResponse", varargs...)
-	ret0, _ := ret[0].(*api.ResolveServiceRefResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ResolveServiceRefWithBodyWithResponse indicates an expected call of ResolveServiceRefWithBodyWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) ResolveServiceRefWithBodyWithResponse(ctx, projectID, contentType, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, contentType, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveServiceRefWithBodyWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResolveServiceRefWithBodyWithResponse), varargs...)
-}
-
-// ResolveServiceRefWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) ResolveServiceRefWithResponse(ctx context.Context, projectID api.ProjectID, body api.ResolveServiceRefJSONRequestBody, reqEditors ...api.RequestEditorFn) (*api.ResolveServiceRefResponse, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, body}
-	for _, a := range reqEditors {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ResolveServiceRefWithResponse", varargs...)
-	ret0, _ := ret[0].(*api.ResolveServiceRefResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ResolveServiceRefWithResponse indicates an expected call of ResolveServiceRefWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) ResolveServiceRefWithResponse(ctx, projectID, body any, reqEditors ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, body}, reqEditors...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveServiceRefWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).ResolveServiceRefWithResponse), varargs...)
 }
 
 // SetBackupRetentionWithBodyWithResponse mocks base method.

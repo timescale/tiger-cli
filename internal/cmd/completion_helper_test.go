@@ -35,7 +35,7 @@ func TestCompletion(t *testing.T) {
 				s.Name = "other-service"
 			}),
 		}
-		m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+		m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 			Return(&api.GetServicesResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &services,
@@ -76,7 +76,7 @@ func TestCompletion(t *testing.T) {
 			name: "service ID offers nothing when the API fails",
 			args: []string{"__complete", "service", "get", ""},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantStdout: noFileComp,

@@ -586,12 +586,13 @@ func httpResponse(statusCode int) *http.Response {
 }
 
 // expectResolveRef registers the resolve call a command makes for its service
-// ref, answered with svc.
+// ref — the ref filter on the service list — answered with svc as the one
+// match.
 func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc api.Service) {
-	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
-		Return(&api.ResolveServiceRefResponse{
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
 			HTTPResponse: httpResponse(http.StatusOK),
-			JSON200:      &svc,
+			JSON200:      &[]api.Service{svc},
 		}, nil)
 }
 
@@ -601,17 +602,27 @@ func expectResolveRefID(m *mocks.MockClientWithResponsesInterface, ref string) {
 	expectResolveRef(m, ref, api.Service{ServiceID: ref})
 }
 
+// expectResolveRefNotFound registers a ref that matches no service, which the
+// ref filter answers with an empty list rather than a 404.
+func expectResolveRefNotFound(m *mocks.MockClientWithResponsesInterface, ref string) {
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &[]api.Service{},
+		}, nil)
+}
+
 // expectResolveRefError registers a ref resolution that never reaches the API.
 func expectResolveRefError(m *mocks.MockClientWithResponsesInterface, ref string, err error) {
-	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
 		Return(nil, err)
 }
 
 // expectResolveRefStatus registers a ref resolution answered with status. A nil
 // apiErr stands in for a 200 with no body.
 func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.Error) {
-	m.EXPECT().ResolveServiceRefWithResponse(validCtx, testProjectID, api.ServiceRefRequest{Ref: ref}).
-		Return(&api.ResolveServiceRefResponse{
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
 			HTTPResponse: httpResponse(status),
 			JSON4XX:      apiErr,
 		}, nil)

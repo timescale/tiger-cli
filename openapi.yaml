@@ -439,6 +439,22 @@ paths:
       description: Retrieves a list of all services within a specific project.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
+        - name: ref
+          in: query
+          required: false
+          x-tigerdata-internal: true
+          description: |
+            Returns only the service this reference matches: one whose ID
+            equals it, or whose name equals it — exactly and case-sensitively,
+            with no precedence between the two. A service ID, a read replica set
+            ID, or an exact service name. Read replica sets match on either and
+            are returned at the top level. A reference matching nothing returns
+            an empty list; one matching more than one service is refused rather
+            than resolved.
+          schema:
+            type: string
+            minLength: 1
+            example: "my-api-db"
       responses:
         '200':
           description: A list of services.
@@ -468,38 +484,6 @@ paths:
       responses:
         '202':
           description: Service creation request has been accepted.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Service'
-        '4XX':
-          $ref: '#/components/responses/ClientError'
-
-  /projects/{project_id}/services/resolve:
-    post:
-      operationId: resolveServiceRef
-      x-tigerdata-owner: prodexp
-      x-tigerdata-internal: true
-      tags:
-        - Services
-      summary: Resolve a Service Reference
-      description: |
-        Resolves a reference to a single service. The reference matches a
-        service whose ID equals it, or whose name equals it — exactly and
-        case-sensitively, with no precedence between the two. Read replica
-        sets match on either, like any other service. A reference matching
-        more than one service is refused rather than resolved.
-      parameters:
-        - $ref: '#/components/parameters/ProjectId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ServiceRefRequest'
-      responses:
-        '200':
-          description: The resolved service.
           content:
             application/json:
               schema:
@@ -2030,19 +2014,6 @@ components:
           type: string
           description: The new name for the service.
           example: "my-renamed-service"
-    ServiceRefRequest:
-      x-tigerdata-internal: true
-      type: object
-      additionalProperties: false
-      description: A reference identifying one service.
-      required:
-        - ref
-      properties:
-        ref:
-          type: string
-          minLength: 1
-          description: A service ID, a read replica set ID, or an exact service name.
-          example: "my-api-db"
     VPCRename:
       type: object
       description: Parameters for renaming a VPC.
@@ -2439,8 +2410,11 @@ components:
           items:
             type: string
             enum: ["time-series", "ai"]
-          description: List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
-          example: ["time-series", "ai"]
+          description: |
+            List of addons to enable for the service. 'time-series' enables TimescaleDB.
+
+            'ai' is deprecated and has no effect. To use pgvector, run `CREATE EXTENSION vector` on the service.
+          example: ["time-series"]
         region_code:
           type: string
           description: The region where the service will be created. If not provided, we'll choose the best region for you.
@@ -2982,10 +2956,6 @@ components:
               - `timescale_cloud_system_disk_usage_bytes`
               - `timescale_cloud_system_memory_total_bytes`
               - `timescale_cloud_system_memory_usage_bytes`
-              - `timescale_cloud_database_qps`
-              - `timescale_cloud_database_num_connections`
-              - `timescale_cloud_database_job_duration_usecs`
-              - `timescale_cloud_database_job_success`
           example: "RATE"
         filters:
           type: array
@@ -3018,10 +2988,6 @@ components:
               - `timescale_cloud_system_disk_usage_bytes`
               - `timescale_cloud_system_memory_total_bytes`
               - `timescale_cloud_system_memory_usage_bytes`
-              - `timescale_cloud_database_qps`
-              - `timescale_cloud_database_num_connections`
-              - `timescale_cloud_database_job_duration_usecs`
-              - `timescale_cloud_database_job_success`
           items:
             type: string
           example: ["role"]
@@ -3037,7 +3003,7 @@ components:
         key:
           type: string
           minLength: 1
-          description: Label key to match against, e.g. `role` or `job_id`.
+          description: Label key to match against, e.g. `role`.
           example: "role"
         value:
           type: string

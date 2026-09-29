@@ -134,7 +134,7 @@ Further conventions:
 
 ### Service Refs
 
-A command that identifies a service takes a **ref** — its ID, a read replica set ID, or its name — and hands it to the API's resolve operation through the helpers in `service_ref_helper.go`, which also return the whole service. Never try to tell an ID from a name in the CLI.
+A command that identifies a service takes a **ref** — its ID, a read replica set ID, or its name — and hands it to the `ref` filter on the API's service list through the helpers in `service_ref_helper.go`, which also return the whole service. Never try to tell an ID from a name in the CLI.
 
 - A command that changes the service it resolves uses `resolveServiceForWrite`, which carries the read-only gate; everything else uses `resolveService`.
 - Help text shows `[name-or-id]` and says the service "can be given by ID or name"; completion inserts IDs.
