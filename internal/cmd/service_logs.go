@@ -19,7 +19,7 @@ func buildServiceLogsCmd(app *common.App) *cobra.Command {
 	var node int
 
 	cmd := &cobra.Command{
-		Use:     "logs [service-id]",
+		Use:     "logs [name-or-id]",
 		Aliases: []string{"log"},
 		Short:   "View logs for a service",
 		Long: `View logs for a database service.
@@ -27,8 +27,8 @@ func buildServiceLogsCmd(app *common.App) *cobra.Command {
 Fetches and displays logs from the specified service. By default, shows the last
 100 log entries. Supports filtering by time range.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.`,
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # View last 100 logs for default service (default behavior)
   tiger service logs
 
@@ -55,8 +55,13 @@ from your configuration.`,
 				return err
 			}
 
-			// Determine service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
+			if err != nil {
+				return err
+			}
+
+			serviceID, err := resolveServiceID(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}

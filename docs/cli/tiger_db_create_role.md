@@ -6,9 +6,9 @@ Create a new database role
 
 Create a new database role with optional read-only enforcement.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. A read replica ID is rejected, since replicas are
-read-only; create the role on the primary instead.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. A read replica ID is rejected, since replicas
+are read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -38,7 +38,7 @@ PostgreSQL Configuration Parameters That May Be Set:
     (kills queries that exceed the specified duration, in milliseconds)
 
 ```
-tiger db create role [service-id] [flags]
+tiger db create role [name-or-id] [flags]
 ```
 
 ### Examples

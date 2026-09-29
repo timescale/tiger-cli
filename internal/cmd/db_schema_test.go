@@ -36,7 +36,7 @@ func withFetchServiceSchema(want common.FetchServiceSchemaArgs, schema *common.D
 func TestDbSchemaCmd(t *testing.T) {
 	setupGetWithStatus := func(status api.DeployStatus) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+			expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 				s.Status = status
 			}))
 		}
@@ -67,7 +67,7 @@ func TestDbSchemaCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "schema"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			// Paused readiness stops the command before any connection attempt,
@@ -82,20 +82,15 @@ func TestDbSchemaCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "schema", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "API error",
 			args: []string{"db", "schema", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
@@ -104,11 +99,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"db", "schema", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      nil,
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -142,7 +133,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			name: "replica pooled without pooler warns before readiness check",
 			args: []string{"db", "schema", "rep-67890", "--pooled"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
+				expectResolveRef(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.Status = api.DeployStatusQUEUED
 				}))
 				expectGetService(m, "svc-12345", sampleService())
@@ -179,7 +170,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			name: "prints the schema of a read replica",
 			args: []string{"db", "schema", "rep-67890", "--pooled"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica())
+				expectResolveRef(m, "rep-67890", sampleReplica())
 				expectGetService(m, "svc-12345", sampleService())
 			},
 			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},

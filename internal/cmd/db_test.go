@@ -33,7 +33,6 @@ func sampleReplica(overrides ...func(*api.Service)) api.Service {
 	return svc
 }
 
-// expectGetService expects one GetService call for id, returning svc.
 // pausedMsg and notReadyMsg build the readiness errors handleDatabaseError
 // returns, which name the service the command was pointed at.
 func pausedMsg(serviceID string) string {
@@ -44,6 +43,7 @@ func notReadyMsg(serviceID string) string {
 	return fmt.Sprintf("service is not ready — check its status with 'tiger service get %s' and try again", serviceID)
 }
 
+// expectGetService expects one GetService call for id, returning svc.
 func expectGetService(m *mocks.MockClientWithResponsesInterface, id string, svc api.Service) {
 	m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, id).
 		Return(&api.GetServiceResponse{

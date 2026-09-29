@@ -104,14 +104,19 @@ func checkStoredPassword(serviceID, want string) checkFunc {
 	}
 }
 
-// expectTaggedService registers a fetch of svc-12345 carrying the given
-// environment tag: the lookup a ...ByServiceID gate makes, or — for commands
-// that fetch the service anyway (update-password, the db commands) — the fetch
-// whose tag the gate reads.
+// envTag returns a sampleService override setting the service's environment
+// tag, which is what the prod read-only gate reads off the resolved service.
+func envTag(tag string) func(*api.Service) {
+	return func(s *api.Service) {
+		s.Metadata = &api.ServiceMetadata{Environment: &tag}
+	}
+}
+
+// expectTaggedService registers the resolution of svc-12345 onto a service
+// carrying the given environment tag — the lookup whose tag the prod gate
+// reads, with nothing registered for the write it then refuses.
 func expectTaggedService(tag string) func(*mocks.MockClientWithResponsesInterface) {
 	return func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
-			s.Metadata = &api.ServiceMetadata{Environment: &tag}
-		}))
+		expectResolveRef(m, "svc-12345", sampleService(envTag(tag)))
 	}
 }

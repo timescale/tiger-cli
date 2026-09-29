@@ -6,9 +6,10 @@ Get connection URI for a service
 
 Get a PostgreSQL connection URI for connecting to a database service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. The connection string includes all necessary parameters
-for establishing a database connection to the TimescaleDB/PostgreSQL service.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. The connection string includes all necessary
+parameters for establishing a database connection to the
+TimescaleDB/PostgreSQL service.
 
 You can also pass a read replica set ID to get a connection string for that replica.
 
@@ -23,7 +24,7 @@ read_only=prod makes those for services tagged PROD read-only while leaving DEV
 services writable.
 
 ```
-tiger db uri [service-id] [flags]
+tiger db uri [name-or-id] [flags]
 ```
 
 ### Examples

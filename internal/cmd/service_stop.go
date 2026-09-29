@@ -17,12 +17,15 @@ func buildServiceStopCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "stop [service-id]",
+		Use:     "stop [name-or-id]",
 		Aliases: []string{"pause"},
 		Short:   "Stop a running database service",
 		Long: `Stop a running database service.
 
-This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.`,
+This operation stops a service that is currently active/running. The service will transition to an inactive state and will no longer accept connections.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Stop a service (waits for completion by default)
   tiger service stop svc-12345
 
@@ -40,15 +43,17 @@ This operation stops a service that is currently active/running. The service wil
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
+			serviceID := resolved.ServiceID
 
 			// Make the stop request
 			resp, err := client.StopServiceWithResponse(
@@ -57,7 +62,7 @@ This operation stops a service that is currently active/running. The service wil
 				api.ServiceID(serviceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to stop Service: %w", err)
+				return fmt.Errorf("failed to stop service: %w", err)
 			}
 
 			// Handle API response
@@ -70,7 +75,7 @@ This operation stops a service that is currently active/running. The service wil
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Stop request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Stop request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {

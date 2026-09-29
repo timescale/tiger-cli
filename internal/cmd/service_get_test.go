@@ -38,11 +38,7 @@ func TestServiceGetCmd(t *testing.T) {
 
 	setupGet := func(service api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-				Return(&api.GetServiceResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &service,
-				}, nil)
+			expectResolveRef(m, "svc-12345", service)
 		}
 	}
 
@@ -56,38 +52,42 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "get"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <name-or-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to get service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
 			name: "not found",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusNotFound, &api.Error{Message: new("service not found")})
 			},
 			wantErr: "service not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
 		},
 		{
+			// A ref matching more than one service is refused by the API; the
+			// CLI surfaces that message and points at the command that lists
+			// the candidates, which the message itself doesn't name.
+			name: "ambiguous ref refused",
+			args: []string{"service", "get", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name: "nil response body",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -114,6 +114,16 @@ func TestServiceGetCmd(t *testing.T) {
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
+		},
+		{
+			// The ref reaches the API as typed: no client-side classification
+			// stands between a name and the service it names.
+			name: "name resolves to the service",
+			args: []string{"service", "get", "test-service", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name: "free tier table output",
@@ -157,6 +167,47 @@ func TestServiceGetCmd(t *testing.T) {
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
+		},
+		{
+			// A default must be an ID. The refusal comes after the lookup, so
+			// it can name the ID to store instead of just saying "not found".
+			// Tested here for all three layers; every command that reads the
+			// default shares this path through getServiceRef.
+			name: "name in TIGER_SERVICE_ID is refused",
+			args: []string{"service", "get"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withEnv("TIGER_SERVICE_ID", "test-service")},
+			wantErr: `TIGER_SERVICE_ID is set to 'test-service', the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Set TIGER_SERVICE_ID to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			name: "name in --service-id is refused",
+			args: []string{"service", "get", "--service-id", "test-service"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			wantErr: `--service-id is set to 'test-service', the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Set --service-id to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			// A hand-edited config file is the one way a name gets stored,
+			// since 'tiger config set service_id' resolves before writing.
+			name: "name in the config file is refused",
+			args: []string{"service", "get"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withConfig(map[string]any{"service_id": "test-service"})},
+			wantErr: `the service_id config value is set to 'test-service', the name of service svc-12345. ` +
+				"A name here breaks as soon as the service is renamed.\n" +
+				"Set the service_id config value to svc-12345, pass the name as an argument, or run 'tiger config set service_id test-service' to store its ID",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			// The API's initial_password must never appear in output without

@@ -31,6 +31,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 	// empty result — the test only cares about the request body sent.
 	expectSeries := func(filters []api.MetricLabelFilter) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRef(m, "svc-12345")
 			empty := []api.MetricSeries{}
 			m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
 				Name:    "some_metric",
@@ -87,6 +88,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345")
 				empty := []api.MetricSeries{}
 				groupBy := []string{"role", "ordinal"}
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
