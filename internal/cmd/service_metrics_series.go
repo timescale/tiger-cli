@@ -121,9 +121,9 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
 			}
 
 			body := api.MetricsSeriesRequest{
-				Name: metric,
-				From: fromTime,
-				To:   toTime,
+				MetricName: metric,
+				From:       fromTime,
+				To:         toTime,
 			}
 			if bucketSeconds > 0 {
 				bs := bucketSeconds

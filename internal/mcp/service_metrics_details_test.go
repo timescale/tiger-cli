@@ -25,7 +25,7 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 	// A documented metric: its own labels carry no description yet, while the
 	// region/role/ordinal labels every registry-backed metric gets do.
 	documented := &api.MetricDetails{
-		Name:        "pg_stat_activity_count",
+		MetricName:  "pg_stat_activity_count",
 		Type:        new(api.MetricTypeGAUGE),
 		DefaultAgg:  new(api.MetricsAggFnMAXTOTAL),
 		Description: "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -35,7 +35,7 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 		},
 	}
 	wantDocumented := map[string]any{"details": map[string]any{
-		"name":        "pg_stat_activity_count",
+		"metric_name": "pg_stat_activity_count",
 		"type":        "GAUGE",
 		"default_agg": "MAX_TOTAL",
 		"description": "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -120,9 +120,9 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name: "undocumented metric",
 			tool: toolServiceMetricsDetails,
 			args: map[string]any{"service_id": "e6ue9697jf", "metric_name": "some_new_metric"},
-			mock: expectDetails("some_new_metric", &api.MetricDetails{Name: "some_new_metric"}),
+			mock: expectDetails("some_new_metric", &api.MetricDetails{MetricName: "some_new_metric"}),
 			wantOutput: map[string]any{"details": map[string]any{
-				"name":        "some_new_metric",
+				"metric_name": "some_new_metric",
 				"type":        nil,
 				"default_agg": nil,
 				"description": "",

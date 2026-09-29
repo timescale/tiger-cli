@@ -18,7 +18,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 	// backend_type) carry no description yet, plus the region/role/ordinal
 	// labels every registry-backed metric gets, which do.
 	fullDetails := api.MetricDetails{
-		Name:        "pg_stat_activity_count",
+		MetricName:  "pg_stat_activity_count",
 		Type:        &gauge,
 		DefaultAgg:  &maxTotal,
 		Description: "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -36,7 +36,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 	// A metric with no documented metadata yet: type/default_agg are nil,
 	// description and labels are empty.
 	undocumentedDetails := api.MetricDetails{
-		Name: "some_new_metric",
+		MetricName: "some_new_metric",
 	}
 
 	const fullDetailsTable = `┌─────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -192,7 +192,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
       "name": "ordinal"
     }
   ],
-  "name": "pg_stat_activity_count",
+  "metric_name": "pg_stat_activity_count",
   "type": "GAUGE"
 }
 `,
@@ -218,7 +218,7 @@ labels:
     name: role
   - description: Per-pod ordinal within the service.
     name: ordinal
-name: pg_stat_activity_count
+metric_name: pg_stat_activity_count
 type: GAUGE
 `,
 		},

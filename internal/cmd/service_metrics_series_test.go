@@ -29,10 +29,10 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			empty := []api.MetricSeries{}
 			m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-				Name:    "some_metric",
-				From:    fromTime,
-				To:      toTime,
-				Filters: &filters,
+				MetricName: "some_metric",
+				From:       fromTime,
+				To:         toTime,
+				Filters:    &filters,
 			}).Return(&api.GetServiceMetricsSeriesResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &empty,
@@ -81,10 +81,10 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				empty := []api.MetricSeries{}
 				groupBy := []string{"role", "ordinal"}
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-					Name:    "some_metric",
-					From:    fromTime,
-					To:      toTime,
-					GroupBy: &groupBy,
+					MetricName: "some_metric",
+					From:       fromTime,
+					To:         toTime,
+					GroupBy:    &groupBy,
 				}).Return(&api.GetServiceMetricsSeriesResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
 					JSON200:      &empty,
@@ -102,7 +102,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				empty := []api.MetricSeries{}
 				bucket := 3600
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-					Name:          "some_metric",
+					MetricName:    "some_metric",
 					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
 					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 					BucketSeconds: &bucket,
@@ -130,7 +130,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				empty := []api.MetricSeries{}
 				bucket := 60
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-					Name:          "some_metric",
+					MetricName:    "some_metric",
 					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
 					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 					BucketSeconds: &bucket,

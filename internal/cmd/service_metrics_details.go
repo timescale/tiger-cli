@@ -93,7 +93,7 @@ func outputMetricDetailsTable(details api.MetricDetails, output io.Writer) error
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
-	table.Append("Name", details.Name)
+	table.Append("Name", details.MetricName)
 
 	metricType := "undocumented"
 	if details.Type != nil {
