@@ -44,6 +44,13 @@ const (
 	toolServiceBackupRegionList   = "service_backup_region_list"
 	toolServiceBackupRegionAdd    = "service_backup_region_add"
 	toolServiceBackupRegionRemove = "service_backup_region_remove"
+	toolServiceAllowListAttach    = "service_allowlist_attach"
+	toolServiceAllowListDetach    = "service_allowlist_detach"
+	toolAllowListList             = "allowlist_list"
+	toolAllowListGet              = "allowlist_get"
+	toolAllowListCreate           = "allowlist_create"
+	toolAllowListUpdate           = "allowlist_update"
+	toolAllowListDelete           = "allowlist_delete"
 	toolDBQuery                   = "db_query"
 	toolDBSchema                  = "db_schema"
 	toolFeedback                  = "feedback"
@@ -75,6 +82,11 @@ var readOnlyGatedTools = []string{
 	toolServiceBackupRegionAdd,
 	toolServiceBackupRegionRemove,
 	toolServiceDelete,
+	toolServiceAllowListAttach,
+	toolServiceAllowListDetach,
+	toolAllowListCreate,
+	toolAllowListUpdate,
+	toolAllowListDelete,
 }
 
 // addTool registers an MCP tool, skipping readOnlyGatedTools under read_only=all.
@@ -191,6 +203,9 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 	// Database operation tools
 	s.registerDatabaseTools(mode)
 
+	// IP allow list tools
+	s.registerAllowListTools(mode, experimental)
+
 	// Submitting feedback mutates no service, so the tool is absent from
 	// readOnlyGatedTools and stays registered in every read-only mode.
 	addTool(s, mode, newFeedbackTool(), s.handleFeedback)
@@ -218,13 +233,15 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
 	addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 
-	// Backups target a gateway endpoint marked `x-tigerdata-preview: true`. It is
-	// registered only when the experimental gate is on at server startup.
+	// These target gateway endpoints marked `x-tigerdata-preview: true`. They
+	// are registered only when the experimental gate is on at server startup.
 	if experimental {
 		addTool(s, mode, newServiceBackupListTool(), s.handleServiceBackupList)
 		addTool(s, mode, newServiceBackupRegionListTool(), s.handleServiceBackupRegionList)
 		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)
 		addTool(s, mode, newServiceBackupRegionRemoveTool(), s.handleServiceBackupRegionRemove)
+		addTool(s, mode, newServiceAllowListAttachTool(), s.handleServiceAllowListAttach)
+		addTool(s, mode, newServiceAllowListDetachTool(), s.handleServiceAllowListDetach)
 	}
 }
 
@@ -233,6 +250,18 @@ func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
 	addTool(s, mode, newDBQueryTool(), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
+}
+
+// registerAllowListTools targets gateway endpoints marked
+// `x-tigerdata-preview: true`, so registration is gated on experimental.
+func (s *Server) registerAllowListTools(mode config.ReadOnlyMode, experimental bool) {
+	if experimental {
+		addTool(s, mode, newAllowListListTool(), s.handleAllowListList)
+		addTool(s, mode, newAllowListGetTool(), s.handleAllowListGet)
+		addTool(s, mode, newAllowListCreateTool(), s.handleAllowListCreate)
+		addTool(s, mode, newAllowListUpdateTool(), s.handleAllowListUpdate)
+		addTool(s, mode, newAllowListDeleteTool(), s.handleAllowListDelete)
+	}
 }
 
 // analyticsMiddleware tracks analytics for all MCP requests

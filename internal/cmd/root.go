@@ -109,6 +109,11 @@ To get started, run:
 	cmd.AddCommand(buildMCPCmd(app))
 	cmd.AddCommand(buildFeedbackCmd(app))
 
+	// Experimental commands, unregistered until the preview graduates.
+	if app.Experimental {
+		cmd.AddCommand(buildAllowListCmd(app))
+	}
+
 	wrapCommands(cmd, app)
 
 	return cmd, app, nil

@@ -201,3 +201,36 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 
 	return detail
 }
+
+// AllowListOutput represents an IP allow list, shared across the allowlist
+// tools (allowlist_get, allowlist_list, allowlist_create, allowlist_update).
+type AllowListOutput struct {
+	AllowListID string    `json:"allow_list_id"`
+	ProjectID   string    `json:"project_id"`
+	Description string    `json:"description"`
+	CidrBlocks  []string  `json:"cidr_blocks"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (AllowListOutput) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[AllowListOutput](nil))
+
+	schema.Properties["allow_list_id"].Description = "Unique identifier of the IP allow list."
+	schema.Properties["project_id"].Description = "Unique identifier of the project the IP allow list belongs to."
+	schema.Properties["description"].Description = "Human-readable label for the IP allow list."
+	schema.Properties["cidr_blocks"].Description = "The IP ranges this allow list permits."
+	schema.Properties["created_at"].Description = "Timestamp when the IP allow list was created."
+
+	return schema
+}
+
+// allowListOutputFor converts an API AllowList to MCP AllowListOutput
+func allowListOutputFor(allowList api.AllowList) AllowListOutput {
+	return AllowListOutput{
+		AllowListID: allowList.AllowListID,
+		ProjectID:   allowList.ProjectID,
+		Description: allowList.Description,
+		CidrBlocks:  allowList.CidrBlocks,
+		CreatedAt:   allowList.CreatedAt,
+	}
+}
