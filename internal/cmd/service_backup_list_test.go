@@ -104,7 +104,7 @@ func TestServiceBackupListCmd(t *testing.T) {
 		},
 		{
 			name: "ambiguous name refused",
-			args: []string{"service", "backup", "my-api-db"},
+			args: []string{"service", "backup", "list", "my-api-db"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})

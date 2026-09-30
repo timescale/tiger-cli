@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -16,13 +17,16 @@ func buildServiceBackupRegionRemoveCmd(app *common.App) *cobra.Command {
 	var removeConfirm bool
 
 	cmd := &cobra.Command{
-		Use:     "remove [service-id]",
+		Use:     "remove <name-or-id>",
 		Aliases: []string{"rm"},
 		Short:   "Stop copying a service's backups to a region",
 		Long: `Stop copying a service's backups to a region.
 
-Copies already stored there are deleted in the background. By default, you
-will be prompted to type the service ID to confirm, unless you use the
+Copies already stored there are deleted in the background.
+
+The service can be given by ID or name, but must be given explicitly: there is
+no fallback to the default service. By default, you will be prompted to type
+the service ID to confirm — the ID, not the name — unless you use the
 --confirm flag.
 
 Note for AI agents: Always confirm with the user before performing this destructive operation.`,
@@ -35,16 +39,20 @@ Note for AI agents: Always confirm with the user before performing this destruct
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			serviceID := args[0]
+			// Require an explicit service for safety: no default fallback.
+			if args[0] == "" {
+				return errors.New("service name or ID is required")
+			}
 
-			// Check read-only mode before the confirmation prompt, so it refuses
-			// without asking the user to type the service ID.
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			// Gated here, ahead of the confirmation prompt, so read-only mode
+			// refuses without first asking the user to type the service ID.
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, argServiceRef(args[0]))
+			if err != nil {
 				return err
 			}
 
@@ -52,19 +60,20 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
 					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
 				}
-				cmd.PrintErrf("Are you sure you want to stop copying service '%s' backups to '%s'? Backup copies in that region will be deleted.\n", serviceID, region)
-				cmd.PrintErrf("Type the service ID '%s' to confirm: ", serviceID)
+				// Show both forms, but take only the ID, as service delete does.
+				cmd.PrintErrf("Are you sure you want to stop copying backups of service %s to '%s'? Backup copies in that region will be deleted.\n", serviceLabel(*service), region)
+				cmd.PrintErrf("Type the service ID '%s' to confirm: ", service.ServiceID)
 				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
 				if err != nil {
 					return fmt.Errorf("failed to read confirmation: %w", err)
 				}
-				if confirmation != serviceID {
+				if confirmation != service.ServiceID {
 					cmd.PrintErrln("Remove operation cancelled.")
 					return nil
 				}
 			}
 
-			resp, err := client.DeleteBackupRegionWithResponse(cmd.Context(), projectID, serviceID, region)
+			resp, err := client.DeleteBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, region)
 			if err != nil {
 				return fmt.Errorf("failed to remove backup region: %w", err)
 			}
@@ -73,7 +82,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
 			}
 
-			cmd.PrintErrf("Backups for service '%s' will no longer be copied to '%s'.\n", serviceID, region)
+			cmd.PrintErrf("Backups for service %s will no longer be copied to '%s'.\n", serviceLabel(*service), region)
 			return nil
 		},
 	}
