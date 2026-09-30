@@ -246,10 +246,12 @@ Every tool sets `Annotations`: read-only tools set `ReadOnlyHint`, write tools s
 A destructive tool that needs a human in the loop asks through MCP elicitation, rather than relying on the client's tool approval or the model's own judgment. Typically that means confirming an action against a service tagged `PROD`, while `DEV` services proceed without a prompt. `service_delete` is the model:
 
 - The handler never calls the SDK's `Elicit` directly. It returns the prompt as an input request on the tool result, and the SDK runs the handler again with the user's answer attached to the request — so everything before the prompt runs twice and must be cheap and repeatable.
-- Check the client's capabilities before prompting. A client that can't elicit gets an error naming the CLI command to run instead; the action never proceeds silently.
-- The shape of the prompt is up to the tool. `service_delete` and `service_update_password` have the user type the service ID back, as the CLI does, through the shared `serviceIDConfirmationRequest` and `serviceIDConfirmed` in `elicitation.go`, but a plain accept/decline or a different field may suit another tool.
+- Check the client's capabilities before prompting. A client that can't elicit gets an error telling the agent to ask the user to run the CLI command instead; the action never proceeds silently.
+- The shape of the prompt is up to the tool. Most have the user type the service ID back, as the CLI does, using the shared `serviceIDConfirmationRequest` and `serviceIDConfirmed` in `elicitation.go`, but a plain accept/decline or a different field may suit another tool.
 - Only an explicit confirmation proceeds. A decline, a dismissal, or a wrong answer returns a non-error result saying the user cancelled, so the model doesn't treat it as a failure to retry.
 - The tool description should say that the tool prompts the user itself, so agents don't ask for confirmation first and the user isn't asked twice.
+
+The CLI can be used to get around the MCP server's safeguards: `tiger config set read_only off` disables read-only mode, and `--confirm` skips the confirmation prompts that PROD elicitation stands in for. Text the server sends to agents should therefore never tell an agent to run a CLI command itself. Where the CLI is the way forward, it should tell the agent to ask the user to run the command.
 
 ## Read-Only Mode
 
