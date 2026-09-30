@@ -1201,13 +1201,10 @@ paths:
     get:
       operationId: getServiceMetricsAvailableSeries
       x-tigerdata-owner: prodexp
-      x-tigerdata-preview: true
       tags:
         - Services
       summary: List available metric series
       description: |
-        **Preview — this endpoint is experimental and may change without notice.**
-
         Returns the names of all metric series available for a service.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
@@ -1228,13 +1225,10 @@ paths:
     post:
       operationId: getServiceMetricsSeries
       x-tigerdata-owner: prodexp
-      x-tigerdata-preview: true
       tags:
         - Services
       summary: Get a metric series
       description: |
-        **Preview — this endpoint is experimental and may change without notice.**
-
         Returns time-series data points for a named metric within a time window.
         Use getServiceMetricsAvailableSeries to discover valid metric names.
 
@@ -1267,13 +1261,10 @@ paths:
     get:
       operationId: getServiceMetricDetails
       x-tigerdata-owner: prodexp
-      x-tigerdata-preview: true
       tags:
         - Services
       summary: Get details about a metric
       description: |
-        **Preview — this endpoint is experimental and may change without notice.**
-
         Returns descriptive metadata for a named metric: what it measures,
         its type, default aggregation, and every label it can be filtered or
         grouped by — its own labels plus the region/role/ordinal labels most
@@ -2769,7 +2760,6 @@ components:
         - INCREMENTAL
         - UNKNOWN
     MetricsAggFn:
-      x-tigerdata-preview: true
       type: string
       description: |
         Aggregation function applied to raw/pre-aggregated samples when
@@ -2807,7 +2797,6 @@ components:
         - P99
         - LAST
     MetricType:
-      x-tigerdata-preview: true
       type: string
       description: |
         The shape of a metric's underlying data.
@@ -2897,7 +2886,6 @@ components:
           example: "The requested service could not be found."
 
     MetricsSeriesRequest:
-      x-tigerdata-preview: true
       type: object
       additionalProperties: false
       description: |
@@ -2993,7 +2981,6 @@ components:
           example: ["role"]
 
     MetricLabelFilter:
-      x-tigerdata-preview: true
       type: object
       description: A single key/value label match applied to a metric series query.
       required:
@@ -3018,7 +3005,6 @@ components:
           default: EQUAL
 
     MetricMatchType:
-      x-tigerdata-preview: true
       type: string
       description: |
         - `EQUAL`: the series must have the label equal to `value`.
@@ -3030,7 +3016,6 @@ components:
         - NOT_EQUAL
 
     MetricSeries:
-      x-tigerdata-preview: true
       type: object
       description: One labeled time series — the label set plus its per-bucket data points.
       required:
@@ -3051,7 +3036,6 @@ components:
             $ref: '#/components/schemas/MetricDataPoint'
 
     MetricDataPoint:
-      x-tigerdata-preview: true
       type: object
       description: A single time/value pair within a MetricSeries.
       required:
@@ -3840,7 +3824,6 @@ components:
               example: "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://eastus-1.in.applicationinsights.azure.com/"
 
     MetricDetails:
-      x-tigerdata-preview: true
       type: object
       description: |
         Descriptive metadata for a metric series — what it is, not its
@@ -3886,7 +3869,6 @@ components:
             $ref: '#/components/schemas/MetricLabelDetails'
 
     MetricLabelDetails:
-      x-tigerdata-preview: true
       type: object
       description: One label specific to a metric.
       required:

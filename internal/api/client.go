@@ -745,16 +745,12 @@ type ClientInterface interface {
 
 	// GetServiceMetricsAvailableSeries List available metric series
 	//
-	// **Preview — this endpoint is experimental and may change without notice.**
-	//
 	// Returns the names of all metric series available for a service.
 	//
 	// Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/available-series (the `GetServiceMetricsAvailableSeries` operationId).
 	GetServiceMetricsAvailableSeries(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServiceMetricDetails Get details about a metric
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns descriptive metadata for a named metric: what it measures,
 	// its type, default aggregation, and every label it can be filtered or
@@ -766,8 +762,6 @@ type ClientInterface interface {
 	GetServiceMetricDetails(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServiceMetricsSeriesWithBody Get a metric series
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns time-series data points for a named metric within a time window.
 	// Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -783,8 +777,6 @@ type ClientInterface interface {
 	GetServiceMetricsSeriesWithBody(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServiceMetricsSeries Get a metric series
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns time-series data points for a named metric within a time window.
 	// Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -2287,8 +2279,6 @@ func (c *Client) GetServiceLogs(ctx context.Context, projectID ProjectID, servic
 
 // GetServiceMetricsAvailableSeries List available metric series
 //
-// **Preview — this endpoint is experimental and may change without notice.**
-//
 // Returns the names of all metric series available for a service.
 //
 // Corresponds with GET /projects/{project_id}/services/{service_id}/metrics/available-series (the `GetServiceMetricsAvailableSeries` operationId).
@@ -2305,8 +2295,6 @@ func (c *Client) GetServiceMetricsAvailableSeries(ctx context.Context, projectID
 }
 
 // GetServiceMetricDetails Get details about a metric
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns descriptive metadata for a named metric: what it measures,
 // its type, default aggregation, and every label it can be filtered or
@@ -2328,8 +2316,6 @@ func (c *Client) GetServiceMetricDetails(ctx context.Context, projectID ProjectI
 }
 
 // GetServiceMetricsSeriesWithBody Get a metric series
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns time-series data points for a named metric within a time window.
 // Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -2355,8 +2341,6 @@ func (c *Client) GetServiceMetricsSeriesWithBody(ctx context.Context, projectID 
 }
 
 // GetServiceMetricsSeries Get a metric series
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns time-series data points for a named metric within a time window.
 // Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -6750,8 +6734,6 @@ type ClientWithResponsesInterface interface {
 
 	// GetServiceMetricsAvailableSeriesWithResponse List available metric series
 	//
-	// **Preview — this endpoint is experimental and may change without notice.**
-	//
 	// Returns the names of all metric series available for a service.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6760,8 +6742,6 @@ type ClientWithResponsesInterface interface {
 	GetServiceMetricsAvailableSeriesWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, reqEditors ...RequestEditorFn) (*GetServiceMetricsAvailableSeriesResponse, error)
 
 	// GetServiceMetricDetailsWithResponse Get details about a metric
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns descriptive metadata for a named metric: what it measures,
 	// its type, default aggregation, and every label it can be filtered or
@@ -6775,8 +6755,6 @@ type ClientWithResponsesInterface interface {
 	GetServiceMetricDetailsWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, metricName string, reqEditors ...RequestEditorFn) (*GetServiceMetricDetailsResponse, error)
 
 	// GetServiceMetricsSeriesWithBodyWithResponse Get a metric series
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns time-series data points for a named metric within a time window.
 	// Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -6792,8 +6770,6 @@ type ClientWithResponsesInterface interface {
 	GetServiceMetricsSeriesWithBodyWithResponse(ctx context.Context, projectID ProjectID, serviceID ServiceID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetServiceMetricsSeriesResponse, error)
 
 	// GetServiceMetricsSeriesWithResponse Get a metric series
-	//
-	// **Preview — this endpoint is experimental and may change without notice.**
 	//
 	// Returns time-series data points for a named metric within a time window.
 	// Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -11092,8 +11068,6 @@ func (c *ClientWithResponses) GetServiceLogsWithResponse(ctx context.Context, pr
 
 // GetServiceMetricsAvailableSeriesWithResponse List available metric series
 //
-// **Preview — this endpoint is experimental and may change without notice.**
-//
 // Returns the names of all metric series available for a service.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -11108,8 +11082,6 @@ func (c *ClientWithResponses) GetServiceMetricsAvailableSeriesWithResponse(ctx c
 }
 
 // GetServiceMetricDetailsWithResponse Get details about a metric
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns descriptive metadata for a named metric: what it measures,
 // its type, default aggregation, and every label it can be filtered or
@@ -11129,8 +11101,6 @@ func (c *ClientWithResponses) GetServiceMetricDetailsWithResponse(ctx context.Co
 }
 
 // GetServiceMetricsSeriesWithBodyWithResponse Get a metric series
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns time-series data points for a named metric within a time window.
 // Use getServiceMetricsAvailableSeries to discover valid metric names.
@@ -11152,8 +11122,6 @@ func (c *ClientWithResponses) GetServiceMetricsSeriesWithBodyWithResponse(ctx co
 }
 
 // GetServiceMetricsSeriesWithResponse Get a metric series
-//
-// **Preview — this endpoint is experimental and may change without notice.**
 //
 // Returns time-series data points for a named metric within a time window.
 // Use getServiceMetricsAvailableSeries to discover valid metric names.
