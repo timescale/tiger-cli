@@ -20,13 +20,13 @@ func buildDbPingCmd(app *common.App) *cobra.Command {
 	var role string
 
 	cmd := &cobra.Command{
-		Use:     "ping [service-id]",
+		Use:     "ping [name-or-id]",
 		Aliases: []string{"test", "test-connection"},
 		Short:   "Test database connectivity",
 		Long: `Test database connectivity to a service.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command tests if the database is accepting
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command tests if the database is accepting
 connections and returns appropriate exit codes following pg_isready conventions.
 
 You can also pass a read replica set ID to test connectivity to that replica.
@@ -59,12 +59,17 @@ Return Codes:
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}
 
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return common.ExitWithCode(common.ExitInvalidParameters, err)
+			}
+
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
 			if err != nil {
 				return common.ExitWithCode(common.ExitInvalidParameters, err)
 			}

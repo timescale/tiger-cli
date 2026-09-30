@@ -17,12 +17,15 @@ func buildServiceStartCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "start [service-id]",
+		Use:     "start [name-or-id]",
 		Aliases: []string{"resume"},
 		Short:   "Start a stopped database service",
 		Long: `Start a stopped database service.
 
-This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.`,
+This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Start a service (waits for completion by default)
   tiger service start svc-12345
 
@@ -40,13 +43,14 @@ This operation starts a service that is currently in an inactive/stopped state. 
 				return err
 			}
 
-			// Determine source service ID
-			serviceID, err := getServiceID(cfg, args)
+			// Determine the service ref
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
 
@@ -54,10 +58,10 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			resp, err := client.StartServiceWithResponse(
 				cmd.Context(),
 				api.ProjectID(projectID),
-				api.ServiceID(serviceID),
+				api.ServiceID(resolved.ServiceID),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to start Service: %w", err)
+				return fmt.Errorf("failed to start service: %w", err)
 			}
 
 			// Handle API response
@@ -70,7 +74,7 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			}
 			service := *resp.JSON202
 
-			cmd.PrintErrf("Start request accepted for service '%s'.\n", serviceID)
+			cmd.PrintErrf("Start request accepted for service %s.\n", serviceLabel(*resolved))
 
 			// If not waiting, return early
 			if noWait {
@@ -83,7 +87,7 @@ This operation starts a service that is currently in an inactive/stopped state. 
 			if err := common.WaitForService(cmd.Context(), common.WaitForServiceArgs{
 				Client:       client,
 				ProjectID:    projectID,
-				ServiceID:    serviceID,
+				ServiceID:    resolved.ServiceID,
 				Service:      &service,
 				TargetStatus: api.DeployStatusREADY,
 				Input:        cmd.InOrStdin(),

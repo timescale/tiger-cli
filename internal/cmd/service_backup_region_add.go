@@ -15,15 +15,15 @@ func buildServiceBackupRegionAddCmd(app *common.App) *cobra.Command {
 	var region string
 
 	cmd := &cobra.Command{
-		Use:   "add [service-id]",
+		Use:   "add [name-or-id]",
 		Short: "Start copying a service's backups to another region",
 		Long: `Start copying a service's backups to another region.
 
 The region is added immediately; existing backups are copied to it in the
 background.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.`,
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # Copy the default service's backups to eu-central-1
   tiger service backup region add --region eu-central-1
 
@@ -38,16 +38,17 @@ from your configuration.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			if err := common.CheckReadOnlyByServiceID(cmd.Context(), cfg, client, projectID, serviceID); err != nil {
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
+			if err != nil {
 				return err
 			}
 
-			resp, err := client.CreateBackupRegionWithResponse(cmd.Context(), projectID, serviceID, api.BackupRegionCreate{
+			resp, err := client.CreateBackupRegionWithResponse(cmd.Context(), projectID, service.ServiceID, api.BackupRegionCreate{
 				RegionCode: region,
 			})
 			if err != nil {
@@ -62,7 +63,7 @@ from your configuration.`,
 				return fmt.Errorf("empty response from API")
 			}
 
-			cmd.PrintErrf("Backups for service '%s' will now be copied to '%s'.\n", serviceID, region)
+			cmd.PrintErrf("Backups for service %s will now be copied to '%s'.\n", serviceLabel(*service), region)
 
 			return outputBackupRegions(cmd, []api.BackupRegion{*resp.JSON201}, cfg.Output)
 		},

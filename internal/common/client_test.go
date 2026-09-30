@@ -48,7 +48,7 @@ func TestNewAPIClient_OAuthCredentials(t *testing.T) {
 	require.Equal(t, "proj-oauth-123", projectID)
 
 	// Issue a request so the client attaches the bearer token.
-	_, err = client.GetServicesWithResponse(context.Background(), projectID)
+	_, err = client.GetServicesWithResponse(context.Background(), projectID, nil)
 	require.NoError(t, err)
 	require.Equal(t, "Bearer test-access-token", gotAuth)
 }

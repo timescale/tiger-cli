@@ -18,12 +18,16 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 
 	region := api.BackupRegion{RegionCode: "eu-central-1", Created: new(time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC))}
 
-	setupAdd := func(m *mocks.MockClientWithResponsesInterface) {
-		m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
-			Return(&api.CreateBackupRegionResponse{
-				HTTPResponse: httpResponse(http.StatusCreated),
-				JSON201:      &region,
-			}, nil)
+	// overrides apply to the resolved service, whose tag the prod gate reads.
+	setupAdd := func(overrides ...func(*api.Service)) func(m *mocks.MockClientWithResponsesInterface) {
+		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRef(m, "svc-12345", sampleService(overrides...))
+			m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
+				Return(&api.CreateBackupRegionResponse{
+					HTTPResponse: httpResponse(http.StatusCreated),
+					JSON201:      &region,
+				}, nil)
+		}
 	}
 
 	runCmdTests(t, []cmdTest{
@@ -38,7 +42,7 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "backup", "region", "add", "--region", "eu-central-1"},
 			opts:    []runOption{experimental},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "missing region flag",
@@ -57,17 +61,14 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			args:    []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts:    []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
 			mock:    expectTaggedService("PROD"),
-			wantErr: `service svc-12345: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
-			name: "read-only prod allows DEV service",
-			args: []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
-			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectTaggedService("DEV")(m)
-				setupAdd(m)
-			},
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n",
+			name:       "read-only prod allows DEV service",
+			args:       []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
+			opts:       []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
+			mock:       setupAdd(envTag("DEV")),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
 			wantStdout: `┌──────────────┬──────────────────────┐
 │    REGION    │        ADDED         │
 ├──────────────┼──────────────────────┤
@@ -76,10 +77,21 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 `,
 		},
 		{
+			name: "ambiguous name refused",
+			args: []string{"service", "backup", "region", "add", "my-api-db", "--region", "eu-central-1"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name: "network error",
 			args: []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -90,6 +102,7 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			args: []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
 					Return(&api.CreateBackupRegionResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -104,6 +117,7 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			args: []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().CreateBackupRegionWithResponse(validCtx, testProjectID, "svc-12345", api.BackupRegionCreate{RegionCode: "eu-central-1"}).
 					Return(&api.CreateBackupRegionResponse{
 						HTTPResponse: httpResponse(http.StatusCreated),
@@ -116,8 +130,8 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:       "table output",
 			args:       []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts:       []runOption{experimental},
-			mock:       setupAdd,
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n",
+			mock:       setupAdd(),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
 			wantStdout: `┌──────────────┬──────────────────────┐
 │    REGION    │        ADDED         │
 ├──────────────┼──────────────────────┤
@@ -129,8 +143,8 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:       "default service id from config",
 			args:       []string{"service", "backup", "region", "add", "--region", "eu-central-1"},
 			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
-			mock:       setupAdd,
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n",
+			mock:       setupAdd(),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
 			wantStdout: `┌──────────────┬──────────────────────┐
 │    REGION    │        ADDED         │
 ├──────────────┼──────────────────────┤
@@ -142,8 +156,8 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:       "json output",
 			args:       []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1", "-o", "json"},
 			opts:       []runOption{experimental},
-			mock:       setupAdd,
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n",
+			mock:       setupAdd(),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
 			wantStdout: `[
   {
     "created": "2026-01-15T09:30:00Z",
@@ -156,8 +170,8 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:       "yaml output",
 			args:       []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1", "-o", "yaml"},
 			opts:       []runOption{experimental},
-			mock:       setupAdd,
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n",
+			mock:       setupAdd(),
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n",
 			wantStdout: `- created: "2026-01-15T09:30:00Z"
   region_code: eu-central-1
 `,
@@ -174,9 +188,9 @@ func TestServiceBackupRegionAddCmd(t *testing.T) {
 			name:    "env output from config file",
 			args:    []string{"service", "backup", "region", "add", "svc-12345", "--region", "eu-central-1"},
 			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
-			mock:    setupAdd,
+			mock:    setupAdd(),
 			wantErr: "environment variable output is not supported for backup regions",
-			wantStderr: "Backups for service 'svc-12345' will now be copied to 'eu-central-1'.\n" +
+			wantStderr: "Backups for service 'test-service' (svc-12345) will now be copied to 'eu-central-1'.\n" +
 				"Error: environment variable output is not supported for backup regions\n",
 		},
 	})

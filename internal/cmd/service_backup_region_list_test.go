@@ -31,6 +31,7 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 
 	setupList := func(regions []api.BackupRegion) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRefID(m, "svc-12345")
 			m.EXPECT().GetBackupRegionsWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.GetBackupRegionsResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
@@ -51,13 +52,24 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "backup", "region", "list"},
 			opts:    []runOption{experimental},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "backup", "region", "list", "my-api-db"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "network error",
 			args: []string{"service", "backup", "region", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupRegionsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -68,6 +80,7 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 			args: []string{"service", "backup", "region", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupRegionsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupRegionsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -82,6 +95,7 @@ func TestServiceBackupRegionListCmd(t *testing.T) {
 			args: []string{"service", "backup", "region", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupRegionsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupRegionsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),

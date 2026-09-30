@@ -24,7 +24,7 @@ func buildDbQueryCmd(app *common.App) *cobra.Command {
 	var timeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "query [service-id]",
+		Use:     "query [name-or-id]",
 		Aliases: []string{"sql"},
 		Short:   "Execute a SQL query on a database",
 		Long: `Execute a SQL query against a database service and display the results.
@@ -32,9 +32,9 @@ func buildDbQueryCmd(app *common.App) *cobra.Command {
 Unlike 'tiger db psql', this runs the query directly and does not require a
 local psql installation.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. You can also pass a read replica set ID to query that
-replica.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. You can also pass a read replica set ID to
+query that replica.
 
 The query comes from --command, from the SQL file named by --file, or, if
 neither is given, from stdin.
@@ -88,14 +88,19 @@ read-only while leaving DEV services writable.`,
 			}
 
 			// Resolve the service before reading the query: with no --command
-			// or --file, reading comes last so a missing service ID fails
+			// or --file, reading comes last so a missing service fails
 			// immediately instead of after waiting on stdin.
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
 			if err != nil {
 				return err
 			}

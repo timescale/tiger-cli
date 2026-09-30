@@ -1203,9 +1203,9 @@ func (mr *MockClientInterfaceMockRecorder) GetServiceMetricsSeriesWithBody(ctx, 
 }
 
 // GetServices mocks base method.
-func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
+func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.ProjectID, params *api.GetServicesParams, reqEditors ...api.RequestEditorFn) (*http.Response, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID}
+	varargs := []any{ctx, projectID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -1216,9 +1216,9 @@ func (m *MockClientInterface) GetServices(ctx context.Context, projectID api.Pro
 }
 
 // GetServices indicates an expected call of GetServices.
-func (mr *MockClientInterfaceMockRecorder) GetServices(ctx, projectID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder) GetServices(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServices", reflect.TypeOf((*MockClientInterface)(nil).GetServices), varargs...)
 }
 
@@ -3087,9 +3087,9 @@ func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServiceWithResponse(c
 }
 
 // GetServicesWithResponse mocks base method.
-func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.Context, projectID api.ProjectID, reqEditors ...api.RequestEditorFn) (*api.GetServicesResponse, error) {
+func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.Context, projectID api.ProjectID, params *api.GetServicesParams, reqEditors ...api.RequestEditorFn) (*api.GetServicesResponse, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID}
+	varargs := []any{ctx, projectID, params}
 	for _, a := range reqEditors {
 		varargs = append(varargs, a)
 	}
@@ -3100,9 +3100,9 @@ func (m *MockClientWithResponsesInterface) GetServicesWithResponse(ctx context.C
 }
 
 // GetServicesWithResponse indicates an expected call of GetServicesWithResponse.
-func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServicesWithResponse(ctx, projectID any, reqEditors ...any) *gomock.Call {
+func (mr *MockClientWithResponsesInterfaceMockRecorder) GetServicesWithResponse(ctx, projectID, params any, reqEditors ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID}, reqEditors...)
+	varargs := append([]any{ctx, projectID, params}, reqEditors...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServicesWithResponse", reflect.TypeOf((*MockClientWithResponsesInterface)(nil).GetServicesWithResponse), varargs...)
 }
 

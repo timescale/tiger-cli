@@ -8,8 +8,11 @@ Start a stopped database service.
 
 This operation starts a service that is currently in an inactive/stopped state. The service will transition to an active state and become available for connections.
 
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.
+
 ```
-tiger service start [service-id] [flags]
+tiger service start [name-or-id] [flags]
 ```
 
 ### Examples

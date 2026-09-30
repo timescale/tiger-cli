@@ -17,15 +17,15 @@ import (
 // buildServiceBackupRegionListCmd creates the region list subcommand.
 func buildServiceBackupRegionListCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "list [service-id]",
+		Use:     "list [name-or-id]",
 		Aliases: []string{"ls"},
 		Short:   "List a service's backup regions",
 		Long: `List the additional regions a service's backups are copied to.
 
 The region the service runs in is not listed here; it always has a copy.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.`,
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # List backup regions for the default service
   tiger service backup region list
 
@@ -43,12 +43,17 @@ from your configuration.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetBackupRegionsWithResponse(cmd.Context(), projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetBackupRegionsWithResponse(cmd.Context(), projectID, service.ServiceID)
 			if err != nil {
 				return fmt.Errorf("failed to list backup regions: %w", err)
 			}

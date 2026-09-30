@@ -73,7 +73,7 @@ func selectResult() *common.QueryResult {
 
 func TestDbQueryCmd(t *testing.T) {
 	setupGetService := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "svc-12345", sampleService())
+		expectResolveRef(m, "svc-12345", sampleService())
 	}
 
 	sqlDir := t.TempDir()
@@ -126,7 +126,7 @@ func TestDbQueryCmd(t *testing.T) {
 			// blocks on reading a query.
 			name:    "missing service id",
 			args:    []string{"db", "query"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name:    "too many args",
@@ -192,23 +192,27 @@ func TestDbQueryCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "API error",
+			name: "service not found",
 			args: []string{"db", "query", "svc-12345", "-c", "SELECT 1"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"db", "query", "my-api-db", "-c", "SELECT 1"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "service paused",

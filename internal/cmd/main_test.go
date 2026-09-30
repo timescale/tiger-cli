@@ -585,6 +585,49 @@ func httpResponse(statusCode int) *http.Response {
 	return &http.Response{StatusCode: statusCode}
 }
 
+// expectResolveRef registers the resolve call a command makes for its service
+// ref — the ref filter on the service list — answered with svc as the one
+// match.
+func expectResolveRef(m *mocks.MockClientWithResponsesInterface, ref string, svc api.Service) {
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &[]api.Service{svc},
+		}, nil)
+}
+
+// expectResolveRefID registers the resolution of an ID onto itself: a bare
+// service whose ID is the ref, for commands that read nothing else off it.
+func expectResolveRefID(m *mocks.MockClientWithResponsesInterface, ref string) {
+	expectResolveRef(m, ref, api.Service{ServiceID: ref})
+}
+
+// expectResolveRefNotFound registers a ref that matches no service, which the
+// ref filter answers with an empty list rather than a 404.
+func expectResolveRefNotFound(m *mocks.MockClientWithResponsesInterface, ref string) {
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &[]api.Service{},
+		}, nil)
+}
+
+// expectResolveRefError registers a ref resolution that never reaches the API.
+func expectResolveRefError(m *mocks.MockClientWithResponsesInterface, ref string, err error) {
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(nil, err)
+}
+
+// expectResolveRefStatus registers a ref resolution answered with status. A nil
+// apiErr stands in for a 200 with no body.
+func expectResolveRefStatus(m *mocks.MockClientWithResponsesInterface, ref string, status int, apiErr *api.Error) {
+	m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: &ref}).
+		Return(&api.GetServicesResponse{
+			HTTPResponse: httpResponse(status),
+			JSON4XX:      apiErr,
+		}, nil)
+}
+
 // sampleService returns an api.Service with reasonable defaults.
 // Use overrides to customize specific fields.
 func sampleService(overrides ...func(*api.Service)) api.Service {

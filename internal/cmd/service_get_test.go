@@ -38,11 +38,7 @@ func TestServiceGetCmd(t *testing.T) {
 
 	setupGet := func(service api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-				Return(&api.GetServiceResponse{
-					HTTPResponse: httpResponse(http.StatusOK),
-					JSON200:      &service,
-				}, nil)
+			expectResolveRef(m, "svc-12345", service)
 		}
 	}
 
@@ -56,40 +52,94 @@ func TestServiceGetCmd(t *testing.T) {
 		{
 			name:    "no service id",
 			args:    []string{"service", "get"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to get service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "not found",
+			name: "service not found",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.ClientError{Message: new("service not found")},
-					}, nil)
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			// A ref matching more than one service is refused by the API; the
+			// CLI surfaces that message and points at the command that lists
+			// the candidates, which the message itself doesn't name.
+			name: "ambiguous name refused",
+			args: []string{"service", "get", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",
 			args: []string{"service", "get", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
+		},
+		{
+			// An ambiguous ref is refused with a 400, so more than one match
+			// means the filter was ignored; the CLI refuses rather than pick.
+			name: "more than one match refused",
+			args: []string{"service", "get", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, &api.GetServicesParams{Ref: new("my-api-db")}).
+					Return(&api.GetServicesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &[]api.Service{sampleService(), sampleService()},
+					}, nil)
+			},
+			wantErr: "expected one service for 'my-api-db', got 2",
+		},
+		{
+			// A default must be an ID. The refusal comes after the lookup, so
+			// it can name the ID to store instead of just saying "not found".
+			// Tested here for all three layers; every command that reads the
+			// default shares this path through getServiceRef.
+			name: "name in TIGER_SERVICE_ID is refused",
+			args: []string{"service", "get"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withEnv("TIGER_SERVICE_ID", "test-service")},
+			wantErr: "the default service must be an ID, but TIGER_SERVICE_ID is set to the name 'test-service'. " +
+				"Set it to svc-12345, or pass the name as an argument",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			name: "name in --service-id is refused",
+			args: []string{"service", "get", "--service-id", "test-service"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			wantErr: "the default service must be an ID, but --service-id is set to the name 'test-service'. " +
+				"Set it to svc-12345, or pass the name as an argument",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			name: "name in the config file is refused",
+			args: []string{"service", "get"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			opts: []runOption{withConfig(map[string]any{"service_id": "test-service"})},
+			wantErr: "the default service must be an ID, but the service_id config value is set to the name 'test-service'. " +
+				"Set it to svc-12345, or pass the name as an argument",
+			checks: []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "table output",
@@ -282,6 +332,16 @@ status: READY
 └─────────────┴──────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: "Warning: Failed to get connection details: service endpoint not available\n",
+		},
+		{
+			// The ref reaches the API as typed: no client-side classification
+			// stands between a name and the service it names.
+			name: "name resolves to the service",
+			args: []string{"service", "get", "test-service", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "test-service", sampleService())
+			},
+			wantStdout: "PGHOST=svc-12345.project.tsdb.cloud.timescale.com\nPGPORT=5432\nPGDATABASE=tsdb\nPGUSER=tsdbadmin\n",
 		},
 		{
 			name:       "describe alias",

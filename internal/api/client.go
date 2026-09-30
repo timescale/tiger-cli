@@ -411,7 +411,7 @@ type ClientInterface interface {
 	// Retrieves a list of all services within a specific project.
 	//
 	// Corresponds with GET /projects/{project_id}/services (the `GetServices` operationId).
-	GetServices(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetServices(ctx context.Context, projectID ProjectID, params *GetServicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateServiceWithBody Create a Service
 	//
@@ -1643,8 +1643,8 @@ func (c *Client) UpdateExporter(ctx context.Context, projectID ProjectID, export
 // Retrieves a list of all services within a specific project.
 //
 // Corresponds with GET /projects/{project_id}/services (the `GetServices` operationId).
-func (c *Client) GetServices(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetServicesRequest(c.Server, projectID)
+func (c *Client) GetServices(ctx context.Context, projectID ProjectID, params *GetServicesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServicesRequest(c.Server, projectID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3652,7 +3652,7 @@ func NewUpdateExporterRequestWithBody(server string, projectID ProjectID, export
 }
 
 // NewGetServicesRequest constructs an http.Request for the GetServices method
-func NewGetServicesRequest(server string, projectID ProjectID) (*http.Request, error) {
+func NewGetServicesRequest(server string, projectID ProjectID, params *GetServicesParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -3675,6 +3675,33 @@ func NewGetServicesRequest(server string, projectID ProjectID) (*http.Request, e
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -6369,7 +6396,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /projects/{project_id}/services (the `GetServices` operationId).
-	GetServicesWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetServicesResponse, error)
+	GetServicesWithResponse(ctx context.Context, projectID ProjectID, params *GetServicesParams, reqEditors ...RequestEditorFn) (*GetServicesResponse, error)
 
 	// CreateServiceWithBodyWithResponse Create a Service
 	//
@@ -10525,8 +10552,8 @@ func (c *ClientWithResponses) UpdateExporterWithResponse(ctx context.Context, pr
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /projects/{project_id}/services (the `GetServices` operationId).
-func (c *ClientWithResponses) GetServicesWithResponse(ctx context.Context, projectID ProjectID, reqEditors ...RequestEditorFn) (*GetServicesResponse, error) {
-	rsp, err := c.GetServices(ctx, projectID, reqEditors...)
+func (c *ClientWithResponses) GetServicesWithResponse(ctx context.Context, projectID ProjectID, params *GetServicesParams, reqEditors ...RequestEditorFn) (*GetServicesResponse, error) {
+	rsp, err := c.GetServices(ctx, projectID, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

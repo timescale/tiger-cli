@@ -84,7 +84,7 @@ func TestServiceBackupRegionAddTool(t *testing.T) {
 			args:    args,
 			opts:    []runOption{experimental, withConfig(map[string]any{"read_only": "prod"})},
 			mock:    expectTaggedService("PROD", 1),
-			wantErr: `service e6ue9697jf: this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
+			wantErr: `this operation is not allowed on services tagged PROD while read_only is set to "prod"`,
 		},
 		{
 			name: "read-only prod allows DEV service",

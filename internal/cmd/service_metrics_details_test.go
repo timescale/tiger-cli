@@ -77,6 +77,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 
 	setupDetails := func(metric string, details api.MetricDetails) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRefID(m, "svc-12345")
 			m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", metric).
 				Return(&api.GetServiceMetricDetailsResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
@@ -103,13 +104,24 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			name:    "missing service id",
 			args:    []string{"service", "metrics", "details", "--metric", "pg_stat_activity_count"},
 			opts:    []runOption{experimental},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "metrics", "details", "my-api-db", "--metric", "pg_stat_activity_count"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "network error",
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -120,6 +132,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -134,6 +147,7 @@ func TestServiceMetricsDetailsCmd(t *testing.T) {
 			args: []string{"service", "metrics", "details", "svc-12345", "--metric", "pg_stat_activity_count"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "svc-12345", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
