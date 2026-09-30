@@ -18,10 +18,10 @@ func TestDbURICmd(t *testing.T) {
 	)
 
 	setupGet := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "svc-12345", sampleService())
+		expectResolveRef(m, "svc-12345", sampleService())
 	}
 	setupGetReplica := func(m *mocks.MockClientWithResponsesInterface) {
-		expectGetService(m, "rep-67890", sampleReplica())
+		expectResolveRef(m, "rep-67890", sampleReplica())
 		expectGetService(m, "svc-12345", sampleService())
 	}
 	withPooler := func(s *api.Service) {
@@ -44,39 +44,39 @@ func TestDbURICmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "uri"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
 			name: "network error",
 			args: []string{"db", "uri", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "API error",
+			name: "service not found",
 			args: []string{"db", "uri", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"db", "uri", "my-api-db"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",
 			args: []string{"db", "uri", "svc-12345"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      nil,
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -109,7 +109,7 @@ func TestDbURICmd(t *testing.T) {
 			name: "pooled with pooler available",
 			args: []string{"db", "uri", "svc-12345", "--pooled"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService(withPooler))
+				expectResolveRef(m, "svc-12345", sampleService(withPooler))
 			},
 			wantStdout: "postgresql://tsdbadmin@pooler.svc-12345.project.tsdb.cloud.timescale.com:6432/tsdb?sslmode=require\n",
 		},
@@ -183,7 +183,7 @@ func TestDbURICmd(t *testing.T) {
 			name: "replica pooled with pooler uses replica pooler",
 			args: []string{"db", "uri", "rep-67890", "--pooled"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica(func(s *api.Service) {
+				expectResolveRef(m, "rep-67890", sampleReplica(func(s *api.Service) {
 					s.ConnectionPooler = &api.ConnectionPooler{
 						Endpoint: &api.Endpoint{
 							Host: new("pooler.rep-67890.project.tsdb.cloud.timescale.com"),
@@ -206,7 +206,7 @@ func TestDbURICmd(t *testing.T) {
 			name: "replica parent fetch error",
 			args: []string{"db", "uri", "rep-67890"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica())
+				expectResolveRef(m, "rep-67890", sampleReplica())
 				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},

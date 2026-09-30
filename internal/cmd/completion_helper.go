@@ -85,7 +85,7 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	}
 
 	// Make API call to list services
-	resp, err := client.GetServicesWithResponse(cmd.Context(), projectID)
+	resp, err := client.GetServicesWithResponse(cmd.Context(), projectID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list services: %w", err)
 	}

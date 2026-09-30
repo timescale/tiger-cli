@@ -191,7 +191,7 @@ func TestServiceUpdatePasswordTool(t *testing.T) {
 					s.ForkedFrom = &api.ForkSpec{ServiceID: new("u8me885b93"), IsStandby: new(true)}
 				}))
 			},
-			wantErr: `"e6ue9697jf" is a read replica; update the password on its primary service "u8me885b93" instead`,
+			wantErr: `'e6ue9697jf' is a read replica; update the password on its primary service 'u8me885b93' instead`,
 		},
 		{
 			// A fork that isn't a standby shares nothing, so it updates normally.

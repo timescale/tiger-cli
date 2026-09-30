@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +20,7 @@ func buildServiceMetricsDetailsCmd(app *common.App) *cobra.Command {
 	var metric string
 
 	cmd := &cobra.Command{
-		Use:   "details [service-id]",
+		Use:   "details [name-or-id]",
 		Short: "Get metric details",
 		Long: fmt.Sprintf(`Get descriptive metadata for a metric: what it measures, its type, default
 aggregation function, and available labels.
@@ -28,26 +29,35 @@ Use 'tiger service metrics available-series' to discover valid metric names,
 then 'tiger service metrics series' to fetch its data.
 
 These metrics have no richer metadata — expect just the name back, with type,
-default aggregation, description, and labels all empty: %s.`, strings.Join(common.LegacyMetrics, ", ")),
+default aggregation, description, and labels all empty: %s.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`, strings.Join(common.LegacyMetrics, ", ")),
 		Example: `  # Describe a metric
   tiger service metrics details --metric pg_stat_activity_count
 
   # Get metric details as JSON
   tiger service metrics details --metric pg_stat_activity_count --output json`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, serviceID, metric)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetServiceMetricDetailsWithResponse(cmd.Context(), projectID, service.ServiceID, metric)
 			if err != nil {
 				return fmt.Errorf("failed to get metric details: %w", err)
 			}
@@ -57,7 +67,7 @@ default aggregation, description, and labels all empty: %s.`, strings.Join(commo
 			}
 
 			if resp.JSON200 == nil {
-				return fmt.Errorf("empty response from API")
+				return errors.New("empty response from API")
 			}
 
 			return outputMetricDetails(cmd.OutOrStdout(), cfg.Output, *resp.JSON200)

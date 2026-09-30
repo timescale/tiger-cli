@@ -1871,7 +1871,7 @@ type MetricLabelDetails struct {
 
 // MetricLabelFilter A single key/value label match applied to a metric series query.
 type MetricLabelFilter struct {
-	// Key Label key to match against, e.g. `role` or `job_id`.
+	// Key Label key to match against, e.g. `role`.
 	//
 	// Example: role
 	Key string `json:"key"`
@@ -1972,10 +1972,6 @@ type MetricsSeriesRequest struct {
 	//   - `timescale_cloud_system_disk_usage_bytes`
 	//   - `timescale_cloud_system_memory_total_bytes`
 	//   - `timescale_cloud_system_memory_usage_bytes`
-	//   - `timescale_cloud_database_qps`
-	//   - `timescale_cloud_database_num_connections`
-	//   - `timescale_cloud_database_job_duration_usecs`
-	//   - `timescale_cloud_database_job_success`
 	//
 	//
 	// Example: RATE
@@ -2003,10 +1999,6 @@ type MetricsSeriesRequest struct {
 	//   - `timescale_cloud_system_disk_usage_bytes`
 	//   - `timescale_cloud_system_memory_total_bytes`
 	//   - `timescale_cloud_system_memory_usage_bytes`
-	//   - `timescale_cloud_database_qps`
-	//   - `timescale_cloud_database_num_connections`
-	//   - `timescale_cloud_database_job_duration_usecs`
-	//   - `timescale_cloud_database_job_success`
 	//
 	//
 	// Example: ["role"]
@@ -2469,9 +2461,12 @@ type ServiceAllowListInput struct {
 
 // ServiceCreate Parameters for creating a service.
 type ServiceCreate struct {
-	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB, 'ai' enables AI/vector extensions.
+	// Addons List of addons to enable for the service. 'time-series' enables TimescaleDB.
 	//
-	// Example: ["time-series","ai"]
+	// 'ai' is deprecated and has no effect. To use pgvector, run `CREATE EXTENSION vector` on the service.
+	//
+	//
+	// Example: ["time-series"]
 	Addons *[]ServiceCreateAddons `json:"addons,omitempty"`
 
 	// CPUMillis The initial CPU allocation in milli-cores, or 'shared' for a shared-resource service.
@@ -2797,6 +2792,18 @@ type SubmitFeedbackJSONBody struct {
 
 // SubmitFeedbackJSONBodySource defines parameters for SubmitFeedback.
 type SubmitFeedbackJSONBodySource string
+
+// GetServicesParams defines parameters for GetServices.
+type GetServicesParams struct {
+	// Ref Returns only the service this reference matches: one whose ID
+	// equals it, or whose name equals it — exactly and case-sensitively,
+	// with no precedence between the two. A service ID, a read replica set
+	// ID, or an exact service name. Read replica sets match on either and
+	// are returned at the top level. A reference matching nothing returns
+	// an empty list; one matching more than one service is refused rather
+	// than resolved.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+}
 
 // GetServiceLogsParams defines parameters for GetServiceLogs.
 type GetServiceLogsParams struct {

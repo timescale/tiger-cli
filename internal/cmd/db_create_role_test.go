@@ -37,15 +37,14 @@ func TestDbCreateRoleCmd(t *testing.T) {
 		{
 			name:    "missing service id",
 			args:    []string{"db", "create", "role", "--name", "ai_analyst"},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			// The gate runs after the service fetch, before any connection
-			// attempt.
+			// The blanket case is refused before the ref is resolved, so no
+			// call is registered here.
 			name:    "read-only all refuses",
 			args:    []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			opts:    []runOption{withConfig(map[string]any{"read_only": "all"})},
-			mock:    expectTaggedService("DEV"),
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
@@ -63,7 +62,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				tag := "DEV"
-				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Metadata = &api.ServiceMetadata{Environment: &tag}
 					s.Endpoint = nil
 				}))
@@ -77,7 +76,7 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			args: []string{"db", "create", "role", "--name", "ai_analyst"},
 			opts: []runOption{withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = nil
 				}))
 			},
@@ -87,33 +86,33 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(nil, errors.New("connection refused"))
+				expectResolveRefError(m, "svc-12345", errors.New("connection refused"))
 			},
-			wantErr: "failed to fetch service details: connection refused",
+			wantErr: `failed to resolve service 'svc-12345': connection refused`,
 		},
 		{
-			name: "API error",
+			name: "service not found",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusNotFound),
-						JSON4XX:      &api.Error{Message: new("service not found")},
-					}, nil)
+				expectResolveRefNotFound(m, "svc-12345")
 			},
-			wantErr: "service not found",
+			wantErr: "service 'svc-12345' not found",
 			checks:  []checkFunc{checkExitCode(common.ExitServiceNotFound)},
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"db", "create", "role", "my-api-db", "--name", "ai_analyst"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "nil response body",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "svc-12345").
-					Return(&api.GetServiceResponse{
-						HTTPResponse: httpResponse(http.StatusOK),
-						JSON200:      nil,
-					}, nil)
+				expectResolveRefStatus(m, "svc-12345", http.StatusOK, nil)
 			},
 			wantErr: "empty response from API",
 		},
@@ -121,15 +120,15 @@ func TestDbCreateRoleCmd(t *testing.T) {
 			name: "read replica rejected",
 			args: []string{"db", "create", "role", "rep-67890", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "rep-67890", sampleReplica())
+				expectResolveRef(m, "rep-67890", sampleReplica())
 			},
-			wantErr: "\"rep-67890\" is a read replica; create the role on its primary service \"svc-12345\" instead",
+			wantErr: "'rep-67890' is a read replica; create the role on its primary service 'svc-12345' instead",
 		},
 		{
 			name: "endpoint not available",
 			args: []string{"db", "create", "role", "svc-12345", "--name", "ai_analyst"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "svc-12345", sampleService(func(s *api.Service) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
 					s.Endpoint = nil
 				}))
 			},

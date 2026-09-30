@@ -14,23 +14,32 @@ import (
 // buildServiceMetricsAvailableSeriesCmd lists the metric series available for a service
 func buildServiceMetricsAvailableSeriesCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "available-series [service-id]",
-		Short:        "List available metric series",
-		Long:         `List the names of all metric series available for a service.`,
-		Args:         cobra.MaximumNArgs(1),
-		SilenceUsage: true,
+		Use:   "available-series [name-or-id]",
+		Short: "List available metric series",
+		Long: `List the names of all metric series available for a service.
+
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: serviceIDCompletion(app),
+		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()
 			if err != nil {
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetServiceMetricsAvailableSeriesWithResponse(cmd.Context(), projectID, service.ServiceID)
 			if err != nil {
 				return fmt.Errorf("failed to list metric series: %w", err)
 			}

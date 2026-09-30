@@ -27,14 +27,14 @@ func buildDbPsqlCmd(app *common.App) *cobra.Command {
 	var noReplicaPrompt bool
 
 	cmd := &cobra.Command{
-		Use:     "psql [service-id]",
+		Use:     "psql [name-or-id]",
 		Aliases: []string{"connect"},
 		Short:   "Connect to a database with psql",
 		Long: `Connect to a database service using psql client.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command will launch an interactive psql session
-with the appropriate connection parameters.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command will launch an interactive psql
+session with the appropriate connection parameters.
 
 Authentication is handled automatically using:
 1. Stored password (keyring, ~/.pgpass, or none based on --password-storage setting)
@@ -93,12 +93,17 @@ skipping the prompt. Read replicas share the primary's credentials.`,
 			// Separate service ID from additional psql flags
 			serviceArgs, psqlFlags := separateServiceAndPsqlArgs(cmd, args)
 
-			serviceID, err := getServiceID(cfg, serviceArgs)
+			serviceRef, err := getServiceRef(cmd, cfg, serviceArgs)
 			if err != nil {
 				return err
 			}
 
-			target, err := common.ResolveConnectionTargetByID(cmd.Context(), client, projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			target, err := common.NewConnectionTarget(cmd.Context(), client, projectID, *service)
 			if err != nil {
 				return err
 			}
@@ -213,7 +218,7 @@ func selectConnection(
 	}
 
 	if chosen.IsReplica {
-		cmd.PrintErrf("Connecting to read replica '%s'...\n", chosen.ConnectionService.Name)
+		cmd.PrintErrf("Connecting to read replica %s...\n", serviceLabel(chosen.ConnectionService))
 	}
 	return details, nil
 }

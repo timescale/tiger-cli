@@ -7,6 +7,7 @@ import (
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/api/mocks"
+	"github.com/timescale/tiger-cli/internal/common"
 )
 
 func TestServiceMetricsSeriesCmd(t *testing.T) {
@@ -31,6 +32,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 	// empty result — the test only cares about the request body sent.
 	expectSeries := func(filters []api.MetricLabelFilter) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRefID(m, "svc-12345")
 			empty := []api.MetricSeries{}
 			m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
 				Name:    "some_metric",
@@ -76,6 +78,16 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			wantErr: `--filter must be name=value or name!=value, got "role!="`,
 		},
 		{
+			name: "ambiguous name refused",
+			args: []string{"service", "metrics", "series", "my-api-db", "--metric", "some_metric", "--from", "2026-05-13T00:00:00Z", "--to", "2026-05-13T01:00:00Z"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
 			name: "group-by builds a GroupBy request",
 			args: []string{
 				"service", "metrics", "series", "svc-12345",
@@ -87,6 +99,7 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				empty := []api.MetricSeries{}
 				groupBy := []string{"role", "ordinal"}
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{

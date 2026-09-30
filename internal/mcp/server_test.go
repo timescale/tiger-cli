@@ -21,7 +21,9 @@ var alwaysRegisteredTools = []string{
 
 // registeredToolNames returns the tool names a server advertises over a real
 // client/server session. registerDocsProxy is skipped: it connects to a remote
-// server.
+// server. experimental is always on here: this helper exists to test the
+// read-only gate, and some tools are gated on both, so leaving experimental
+// tools out would hide them from the read-only assertions too.
 func registeredToolNames(t *testing.T, readOnly config.ReadOnlyMode) []string {
 	t.Helper()
 
@@ -36,7 +38,7 @@ func registeredToolNames(t *testing.T, readOnly config.ReadOnlyMode) []string {
 		}, nil),
 		logger: ensureLogger(nil),
 	}
-	s.registerServiceTools(readOnly, false)
+	s.registerServiceTools(readOnly, true)
 	s.registerDatabaseTools(readOnly)
 
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()

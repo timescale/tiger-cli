@@ -37,7 +37,7 @@ func TestServiceListCmd(t *testing.T) {
 
 	setupList := func(services []api.Service) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
-			m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+			m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 				Return(&api.GetServicesResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
 					JSON200:      &services,
@@ -57,7 +57,7 @@ func TestServiceListCmd(t *testing.T) {
 			name: "network error",
 			args: []string{"service", "list"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(nil, errors.New("connection refused"))
 			},
 			wantErr: "failed to list services: connection refused",
@@ -66,7 +66,7 @@ func TestServiceListCmd(t *testing.T) {
 			name: "API error",
 			args: []string{"service", "list"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusInternalServerError),
 					}, nil)
@@ -78,7 +78,7 @@ func TestServiceListCmd(t *testing.T) {
 			name: "nil response body",
 			args: []string{"service", "list"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID).
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
 					Return(&api.GetServicesResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
 					}, nil)

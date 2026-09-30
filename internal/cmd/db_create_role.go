@@ -22,14 +22,14 @@ func buildDbCreateRoleCmd(app *common.App) *cobra.Command {
 	var password string
 
 	cmd := &cobra.Command{
-		Use:     "role [service-id]",
+		Use:     "role [name-or-id]",
 		Aliases: []string{"user"},
 		Short:   "Create a new database role",
 		Long: `Create a new database role with optional read-only enforcement.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. A read replica ID is rejected, since replicas are
-read-only; create the role on the primary instead.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. A read replica ID is rejected, since replicas
+are read-only; create the role on the primary instead.
 
 By default, a secure random password is auto-generated for the new role. You can:
 - Provide an explicit password with --password=<value>
@@ -94,24 +94,20 @@ PostgreSQL Configuration Parameters That May Be Set:
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			service, err := common.GetService(cmd.Context(), client, projectID, serviceID)
+			// Gated here rather than letting the server reject the CREATE ROLE.
+			service, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
 			if err != nil {
-				return err
-			}
-
-			// Refuse here rather than letting the server reject the CREATE ROLE.
-			if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*service)); err != nil {
 				return err
 			}
 
 			// A read replica is read-only, so a role can't be created there.
 			if common.IsReadReplica(*service) {
-				return fmt.Errorf("%q is a read replica; create the role on its primary service %q instead",
+				return fmt.Errorf("'%s' is a read replica; create the role on its primary service '%s' instead",
 					service.ServiceID, util.DerefStr(service.ForkedFrom.ServiceID))
 			}
 

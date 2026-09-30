@@ -16,28 +16,29 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// buildServiceBackupsCmd creates the backup command for listing a service's
-// backups. The endpoint is marked preview upstream, so registration is gated on
-// TIGER_EXPERIMENTAL in buildServiceCmd.
-func buildServiceBackupsCmd(app *common.App) *cobra.Command {
+// buildServiceBackupListCmd creates the backup list subcommand. The endpoint
+// is marked preview upstream, so registration is gated on TIGER_EXPERIMENTAL
+// in buildServiceCmd.
+func buildServiceBackupListCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "backup [service-id]",
-		Short: "List backups for a service",
+		Use:     "list [name-or-id]",
+		Aliases: []string{"ls"},
+		Short:   "List backups for a service",
 		Long: `List the full and incremental backups taken for a database service.
 
 Backups run automatically on a schedule; there is no command to create or delete
 one. To restore data, create a recovery fork with tiger service fork.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration.`,
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.`,
 		Example: `  # List backups for the default service
-  tiger service backup
+  tiger service backup list
 
   # List backups for a specific service
-  tiger service backup svc-12345
+  tiger service backup list svc-12345
 
   # Output as JSON
-  tiger service backup -o json`,
+  tiger service backup list -o json`,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceIDCompletion(app),
 		SilenceUsage:      true,
@@ -47,12 +48,17 @@ from your configuration.`,
 				return err
 			}
 
-			serviceID, err := getServiceID(cfg, args)
+			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.GetBackupsWithResponse(cmd.Context(), projectID, serviceID)
+			service, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.GetBackupsWithResponse(cmd.Context(), projectID, service.ServiceID)
 			if err != nil {
 				return fmt.Errorf("failed to list backups: %w", err)
 			}
@@ -64,7 +70,13 @@ from your configuration.`,
 			if resp.JSON200 == nil {
 				return fmt.Errorf("empty response from API")
 			}
-			backups := *resp.JSON200
+
+			// Default to a non-nil slice so a JSON null marshals to `[]` rather
+			// than `null`.
+			backups := []api.Backup{}
+			if *resp.JSON200 != nil {
+				backups = *resp.JSON200
+			}
 
 			if len(backups) == 0 {
 				cmd.PrintErrln("No backups found.")

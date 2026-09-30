@@ -6,9 +6,9 @@ Resize a database service
 
 Resize a database service by changing its CPU and memory allocation.
 
-The service ID can be provided as an argument or will use the default service
-from your configuration. This command changes the compute and memory resources
-allocated to your database service.
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration. This command changes the compute and memory
+resources allocated to your database service.
 
 The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will
@@ -21,7 +21,7 @@ Allowed CPU/Memory Configurations:
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
 
 ```
-tiger service resize [service-id] [flags]
+tiger service resize [name-or-id] [flags]
 ```
 
 ### Examples

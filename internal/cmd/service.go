@@ -42,7 +42,7 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	// Experimental commands, unregistered until the preview graduates.
 	if app.Experimental {
 		cmd.AddCommand(buildServiceMetricsCmd(app))
-		cmd.AddCommand(buildServiceBackupsCmd(app))
+		cmd.AddCommand(buildServiceBackupCmd(app))
 	}
 
 	return cmd
@@ -255,20 +255,4 @@ func printConnectMessage(cmd *cobra.Command, passwordSaved, noSetDefault bool, s
 		// If the service was set as the default, no need to include the serviceID in the command
 		cmd.PrintErrf("Connect with: tiger db psql\n")
 	}
-}
-
-// getServiceID determines the service ID from args or config
-func getServiceID(cfg *config.Config, args []string) (string, error) {
-	var serviceID string
-	if len(args) > 0 {
-		serviceID = args[0]
-	} else {
-		serviceID = cfg.ServiceID
-	}
-
-	if serviceID == "" {
-		return "", fmt.Errorf("service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'")
-	}
-
-	return serviceID, nil
 }

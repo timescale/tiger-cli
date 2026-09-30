@@ -11,7 +11,7 @@ import (
 	"github.com/timescale/tiger-cli/internal/common"
 )
 
-func TestServiceBackupsCmd(t *testing.T) {
+func TestServiceBackupListCmd(t *testing.T) {
 	// The command is experimental-gated (see the gate test in service_test.go),
 	// so every case registers it explicitly.
 	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
@@ -79,6 +79,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 
 	setupList := func(backups []api.Backup) func(m *mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectResolveRefID(m, "svc-12345")
 			m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 				Return(&api.GetBackupsResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
@@ -90,22 +91,33 @@ func TestServiceBackupsCmd(t *testing.T) {
 	runCmdTests(t, []cmdTest{
 		{
 			name:    "not logged in",
-			args:    []string{"service", "backup", "svc-12345"},
+			args:    []string{"service", "backup", "list", "svc-12345"},
 			opts:    []runOption{experimental, withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
 			name:    "missing service id",
-			args:    []string{"service", "backup"},
+			args:    []string{"service", "backup", "list"},
 			opts:    []runOption{experimental},
-			wantErr: "service ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
+		},
+		{
+			name: "ambiguous name refused",
+			args: []string{"service", "backup", "list", "my-api-db"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
+			},
+			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
+			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
 		},
 		{
 			name: "network error",
-			args: []string{"service", "backup", "svc-12345"},
+			args: []string{"service", "backup", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(nil, errors.New("connection refused"))
 			},
@@ -113,9 +125,10 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 		{
 			name: "API error",
-			args: []string{"service", "backup", "svc-12345"},
+			args: []string{"service", "backup", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusNotFound),
@@ -127,9 +140,10 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 		{
 			name: "nil response body",
-			args: []string{"service", "backup", "svc-12345"},
+			args: []string{"service", "backup", "list", "svc-12345"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
 				m.EXPECT().GetBackupsWithResponse(validCtx, testProjectID, "svc-12345").
 					Return(&api.GetBackupsResponse{
 						HTTPResponse: httpResponse(http.StatusOK),
@@ -140,7 +154,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 		{
 			name:       "empty list",
-			args:       []string{"service", "backup", "svc-12345"},
+			args:       []string{"service", "backup", "list", "svc-12345"},
 			opts:       []runOption{experimental},
 			mock:       setupList([]api.Backup{}),
 			wantStderr: "No backups found.\n",
@@ -149,14 +163,21 @@ func TestServiceBackupsCmd(t *testing.T) {
 			// The label is omitted from the table: it repeats STARTED and TYPE,
 			// and no command takes it as input.
 			name:       "table output",
-			args:       []string{"service", "backup", "svc-12345"},
+			args:       []string{"service", "backup", "list", "svc-12345"},
+			opts:       []runOption{experimental},
+			mock:       setupList(backups),
+			wantStdout: backupsTable,
+		},
+		{
+			name:       "ls alias",
+			args:       []string{"service", "backup", "ls", "svc-12345"},
 			opts:       []runOption{experimental},
 			mock:       setupList(backups),
 			wantStdout: backupsTable,
 		},
 		{
 			name:       "default service id from config",
-			args:       []string{"service", "backup"},
+			args:       []string{"service", "backup", "list"},
 			opts:       []runOption{experimental, withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock:       setupList(backups),
 			wantStdout: backupsTable,
@@ -164,7 +185,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 		{
 			// The label stays in the structured formats.
 			name: "json output",
-			args: []string{"service", "backup", "svc-12345", "-o", "json"},
+			args: []string{"service", "backup", "list", "svc-12345", "-o", "json"},
 			opts: []runOption{experimental},
 			mock: setupList(backups[:2]),
 			wantStdout: `[
@@ -203,7 +224,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			// size_bytes renders in scientific notation: SerializeToYAML
 			// round-trips through JSON, so large integers become float64s.
 			name: "yaml output",
-			args: []string{"service", "backup", "svc-12345", "-o", "yaml"},
+			args: []string{"service", "backup", "list", "svc-12345", "-o", "yaml"},
 			opts: []runOption{experimental},
 			mock: setupList(backups[:2]),
 			wantStdout: `- duration_seconds: 672
@@ -226,7 +247,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 		},
 		{
 			name:    "env output rejected by flag",
-			args:    []string{"service", "backup", "svc-12345", "-o", "env"},
+			args:    []string{"service", "backup", "list", "svc-12345", "-o", "env"},
 			opts:    []runOption{experimental},
 			wantErr: `invalid argument "env" for "-o, --output" flag: invalid output format: env (must be one of: json, yaml, table)`,
 		},
@@ -234,7 +255,7 @@ func TestServiceBackupsCmd(t *testing.T) {
 			// The flag rejects env at parse time, but a hand-edited config file
 			// can still reach outputBackups' env branch.
 			name:    "env output from config file",
-			args:    []string{"service", "backup", "svc-12345"},
+			args:    []string{"service", "backup", "list", "svc-12345"},
 			opts:    []runOption{experimental, withConfig(map[string]any{"output": "env"})},
 			mock:    setupList(backups[:2]),
 			wantErr: "environment variable output is not supported for backups",
