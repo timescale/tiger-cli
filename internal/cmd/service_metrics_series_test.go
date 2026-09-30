@@ -31,10 +31,10 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 			expectResolveRefID(m, "svc-12345")
 			empty := []api.MetricSeries{}
 			m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-				Name:    "some_metric",
-				From:    fromTime,
-				To:      toTime,
-				Filters: &filters,
+				MetricName: "some_metric",
+				From:       fromTime,
+				To:         toTime,
+				Filters:    &filters,
 			}).Return(&api.GetServiceMetricsSeriesResponse{
 				HTTPResponse: httpResponse(http.StatusOK),
 				JSON200:      &empty,
@@ -72,7 +72,6 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 		{
 			name: "ambiguous name refused",
 			args: []string{"service", "metrics", "series", "my-api-db", "--metric", "some_metric", "--from", "2026-05-13T00:00:00Z", "--to", "2026-05-13T01:00:00Z"},
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRefStatus(m, "my-api-db", http.StatusBadRequest, &api.Error{Message: new("ambiguous service name matches multiple services")})
 			},
@@ -94,10 +93,61 @@ func TestServiceMetricsSeriesCmd(t *testing.T) {
 				empty := []api.MetricSeries{}
 				groupBy := []string{"role", "ordinal"}
 				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
-					Name:    "some_metric",
-					From:    fromTime,
-					To:      toTime,
-					GroupBy: &groupBy,
+					MetricName: "some_metric",
+					From:       fromTime,
+					To:         toTime,
+					GroupBy:    &groupBy,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantStdout: noDataMsg,
+		},
+		{
+			// synctest's bubble clock always starts at 2000-01-01 UTC, so the
+			// default window and bucket size can be spelled out exactly.
+			name:     "omitting --from and --to defaults to the last 24 hours at a 1h bucket",
+			args:     []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				empty := []api.MetricSeries{}
+				bucket := 3600
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+					MetricName:    "some_metric",
+					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
+					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+					BucketSeconds: &bucket,
+				}).Return(&api.GetServiceMetricsSeriesResponse{
+					HTTPResponse: httpResponse(http.StatusOK),
+					JSON200:      &empty,
+				}, nil)
+			},
+			wantStdout: noDataMsg,
+		},
+		{
+			// Defaulting only applies when both --from and --to are omitted —
+			// giving just one still requires its counterpart.
+			name:    "omitting only --to still requires it",
+			args:    []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric", "--from", "2026-05-13T00:00:00Z"},
+			wantErr: `--to must be RFC3339 (e.g., 2026-05-13T01:00:00Z): parsing time "" as "2006-01-02T15:04:05Z07:00": cannot parse "" as "2006"`,
+		},
+		{
+			// An explicit --bucket-seconds is respected even in the default
+			// window, rather than being overridden by the 3600s default.
+			name:     "explicit --bucket-seconds overrides the default window's bucket size",
+			args:     []string{"service", "metrics", "series", "svc-12345", "--metric", "some_metric", "--bucket-seconds", "60"},
+			synctest: true,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRefID(m, "svc-12345")
+				empty := []api.MetricSeries{}
+				bucket := 60
+				m.EXPECT().GetServiceMetricsSeriesWithResponse(validCtx, testProjectID, "svc-12345", api.MetricsSeriesRequest{
+					MetricName:    "some_metric",
+					From:          time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
+					To:            time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+					BucketSeconds: &bucket,
 				}).Return(&api.GetServiceMetricsSeriesResponse{
 					HTTPResponse: httpResponse(http.StatusOK),
 					JSON200:      &empty,

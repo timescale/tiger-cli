@@ -26,6 +26,6 @@ Commands for querying time-series metrics for a Tiger Cloud service.
 ### SEE ALSO
 
 * [tiger service](tiger_service.md)	 - Manage database services
-* [tiger service metrics available-series](tiger_service_metrics_available-series.md)	 - List available metric series
+* [tiger service metrics available](tiger_service_metrics_available.md)	 - List available metric series
 * [tiger service metrics details](tiger_service_metrics_details.md)	 - Get metric details
 * [tiger service metrics series](tiger_service_metrics_series.md)	 - Get metric series data

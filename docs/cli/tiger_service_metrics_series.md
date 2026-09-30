@@ -6,19 +6,28 @@ Get metric series data
 
 Get time-series data for a specific metric.
 
-Use 'tiger service metrics available-series' to discover valid metric names.
+Use 'tiger service metrics available' to discover valid metric names.
 
 Each labeled series (e.g. one per replica) is returned independently with its
 full list of raw data points.
 
+The service can be given by ID or name as an argument, or will use the default
+service from your configuration.
+
+--from and --to default to the last 24 hours when both are omitted, bucketed
+into 1-hour (3600s) intervals unless --bucket-seconds is also given.
+
 ```
-tiger service metrics series [service-id] [flags]
+tiger service metrics series [name-or-id] [flags]
 ```
 
 ### Examples
 
 ```
-  # Fetch CPU usage for the last hour
+  # Fetch CPU usage for the last 24 hours (the default window)
+  tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores
+
+  # Fetch CPU usage for a specific hour
   tiger service metrics series --metric timescale_cloud_system_cpu_usage_millicores \
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z
 
@@ -49,16 +58,16 @@ tiger service metrics series [service-id] [flags]
 ### Options
 
 ```
-      --bucket-seconds int   Aggregation bucket size in seconds (optional; server auto-selects based on the time window when omitted, minimum 60s)
+      --bucket-seconds int   Aggregation bucket size in seconds (minimum 60s). Defaults to 3600 (1h) when --from/--to are also omitted; otherwise the server auto-selects based on the time window
       --filter strings       Arbitrary label filter as name=value or name!=value (repeatable)
       --fn string            Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default
-      --from string          Start of the time window (RFC3339)
+      --from string          Start of the time window (RFC3339). Defaults to 24 hours ago when --to is also omitted
       --group-by strings     Label key to break the result into one series per distinct value (repeatable). Rejected on the same metrics that reject --fn; omit to collapse into a single series
   -h, --help                 help for series
       --metric string        Metric series name
   -o, --output string        Output format (json, yaml, table)
       --role string          Filter to a specific instance role (PRIMARY or REPLICA)
-      --to string            End of the time window (RFC3339)
+      --to string            End of the time window (RFC3339). Defaults to now when --from is also omitted
 ```
 
 ### Options inherited from parent commands

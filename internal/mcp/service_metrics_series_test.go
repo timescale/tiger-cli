@@ -27,9 +27,9 @@ func TestServiceMetricsSeriesTool(t *testing.T) {
 	from := time.Date(2026, 5, 13, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 5, 13, 1, 0, 0, 0, time.UTC)
 	baseBody := api.MetricsSeriesRequest{
-		Name: "timescale_cloud_system_cpu_usage_millicores",
-		From: from,
-		To:   to,
+		MetricName: "timescale_cloud_system_cpu_usage_millicores",
+		From:       from,
+		To:         to,
 	}
 	// body is baseBody with the optional fields the case expects filled in.
 	body := func(apply func(*api.MetricsSeriesRequest)) api.MetricsSeriesRequest {

@@ -2905,11 +2905,11 @@ components:
         body so callers can pass an unbounded filter set without query-string
         length pressure.
       required:
-        - name
+        - metric_name
         - from
         - to
       properties:
-        name:
+        metric_name:
           type: string
           description: Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
           example: "timescale_cloud_system_cpu_usage_millicores"
@@ -3848,13 +3848,13 @@ components:
         default_agg may be null and description/labels may be empty, but
         every field below is always present in the response.
       required:
-        - name
+        - metric_name
         - description
         - type
         - default_agg
         - labels
       properties:
-        name:
+        metric_name:
           type: string
           description: Metric series name.
           example: "pg_locks_count"

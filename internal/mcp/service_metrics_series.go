@@ -141,9 +141,9 @@ func (s *Server) handleServiceMetricsSeries(ctx context.Context, req *mcp.CallTo
 	filters := buildMetricFilters(input.Role, input.Filters)
 
 	body := api.MetricsSeriesRequest{
-		Name: input.MetricName,
-		From: fromTime,
-		To:   toTime,
+		MetricName: input.MetricName,
+		From:       fromTime,
+		To:         toTime,
 	}
 	if input.BucketSeconds > 0 {
 		bs := input.BucketSeconds
