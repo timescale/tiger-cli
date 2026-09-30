@@ -15,12 +15,8 @@ import (
 )
 
 // removeBackupRegionConfirmationKey is the InputRequests/InputResponses key of
-// the PROD removal prompt, and removeBackupRegionConfirmationField the field
-// in it where the user types the service ID back.
-const (
-	removeBackupRegionConfirmationKey   = "confirm_remove_backup_region"
-	removeBackupRegionConfirmationField = "service_id"
-)
+// the PROD removal prompt.
+const removeBackupRegionConfirmationKey = "confirm_remove_backup_region"
 
 // ServiceBackupRegionRemoveInput represents input for service_backup_region_remove
 type ServiceBackupRegionRemoveInput struct {
@@ -110,7 +106,7 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 			result, err := promptProdBackupRegionRemove(req, *service, input.RegionCode)
 			return result, ServiceBackupRegionRemoveOutput{}, err
 		}
-		if !removeBackupRegionConfirmed(answer, input.ServiceID) {
+		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceBackupRegionRemoveOutput{
 				Removed: false,
 				Message: fmt.Sprintf("Removal cancelled: the user did not confirm removing backup region %q from PROD service %q by typing its ID.", input.RegionCode, input.ServiceID),
@@ -146,41 +142,11 @@ func (s *Server) handleServiceBackupRegionRemove(ctx context.Context, req *mcp.C
 // is the one outcome this tool must never produce.
 func promptProdBackupRegionRemove(req *mcp.CallToolRequest, service api.Service, regionCode string) (*mcp.CallToolResult, error) {
 	if !clientSupportsFormElicitation(req) {
-		return nil, fmt.Errorf("removing backup region %s from service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; run 'tiger service backup region remove %s --region %s' from the CLI instead", regionCode, service.ServiceID, service.ServiceID, regionCode)
+		return nil, fmt.Errorf("removing backup region %s from service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service backup region remove %s --region %s' instead", regionCode, service.ServiceID, service.ServiceID, regionCode)
 	}
-
-	// The user types the ID back, as `tiger service backup region remove`
-	// requires. See promptProdDelete for why the field is required but
-	// unconstrained otherwise.
-	return &mcp.CallToolResult{
-		InputRequests: mcp.InputRequestMap{
-			removeBackupRegionConfirmationKey: &mcp.ElicitParams{
-				Message: fmt.Sprintf("Stop copying PRODUCTION service %q (%s) backups to %q? Backup copies in that region will be deleted.", service.Name, service.ServiceID, regionCode),
-				RequestedSchema: &jsonschema.Schema{
-					Type: "object",
-					Properties: map[string]*jsonschema.Schema{
-						removeBackupRegionConfirmationField: {
-							Type:        "string",
-							Title:       "Service ID",
-							Description: fmt.Sprintf("Type the service ID %s to confirm", service.ServiceID),
-						},
-					},
-					Required: []string{removeBackupRegionConfirmationField},
-				},
-			},
-		},
-	}, nil
-}
-
-// removeBackupRegionConfirmed reports whether the user's answer to
-// promptProdBackupRegionRemove's prompt approves the removal: only an accepted
-// form with the service's exact ID typed in does. A decline, a dismissal, or a
-// mismatched ID is a no.
-func removeBackupRegionConfirmed(answer mcp.InputResponse, serviceID string) bool {
-	result, ok := answer.(*mcp.ElicitResult)
-	if !ok || result.Action != "accept" {
-		return false
-	}
-	typed, ok := result.Content[removeBackupRegionConfirmationField].(string)
-	return ok && typed == serviceID
+	return serviceIDConfirmationRequest(
+		removeBackupRegionConfirmationKey,
+		fmt.Sprintf("Stop copying PRODUCTION service %q (%s) backups to %q? Backup copies in that region will be deleted.", service.Name, service.ServiceID, regionCode),
+		service.ServiceID,
+	), nil
 }

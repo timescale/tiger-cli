@@ -37,7 +37,7 @@ func TestServiceBackupRegionRemoveTool(t *testing.T) {
 		"message": `Removal cancelled: the user did not confirm removing backup region "eu-central-1" from PROD service "e6ue9697jf" by typing its ID.`,
 	}
 	const noElicitationMsg = "removing backup region eu-central-1 from service e6ue9697jf requires the user's confirmation because it is tagged PROD, " +
-		"but this MCP client does not support elicitation; run 'tiger service backup region remove e6ue9697jf --region eu-central-1' from the CLI instead"
+		"but this MCP client does not support elicitation; ask the user to run 'tiger service backup region remove e6ue9697jf --region eu-central-1' instead"
 
 	// The prompt raised for a PROD service, as the client receives it after
 	// the JSON round trip (which is where the SDK fills in the mode).

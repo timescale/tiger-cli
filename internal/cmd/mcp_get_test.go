@@ -16,7 +16,7 @@ Get detailed information for a specific database service. Returns connection end
 
 Parameters:
   • service_id (required): string - Unique identifier of the service (10-character alphanumeric string). Use service_list to find service IDs.
-  • with_password: boolean - Whether to include the password in the response and connection string. NEVER set to true unless the user explicitly asks for the password. (default: false)
+  • with_password: boolean - Whether to include the password in the response. NEVER set to true unless the user explicitly asks for the password. (default: false)
 
 Output:
   • service (required): object

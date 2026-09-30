@@ -1,4 +1,4 @@
-package util
+package common
 
 import (
 	"crypto/rand"
@@ -6,8 +6,10 @@ import (
 	"fmt"
 )
 
-// GenerateSecurePassword generates a cryptographically secure random password
-func GenerateSecurePassword(length int) (string, error) {
+// GenerateSecurePassword generates a cryptographically secure random password.
+// It is a var so tests can pin the password and assert the request that
+// carries it exactly.
+var GenerateSecurePassword = func(length int) (string, error) {
 	// Generate random bytes
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
