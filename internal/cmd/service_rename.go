@@ -29,7 +29,7 @@ its current name.`,
 		Example: `  # Rename a service
   tiger service rename svc-12345 analytics-prod`,
 		Args:              cobra.ExactArgs(2),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			serviceArg, newName := args[0], strings.TrimSpace(args[1])

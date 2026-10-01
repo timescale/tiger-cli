@@ -34,7 +34,7 @@ service from your configuration.`,
 
   # Start service with custom wait timeout
   tiger service start svc-12345 --wait-timeout 10m`,
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		Args:              cobra.MaximumNArgs(1),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {

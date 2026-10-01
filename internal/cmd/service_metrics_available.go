@@ -21,7 +21,7 @@ func buildServiceMetricsAvailableCmd(app *common.App) *cobra.Command {
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration.`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

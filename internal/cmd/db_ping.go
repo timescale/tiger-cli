@@ -51,7 +51,7 @@ Return Codes:
   # Test connection with no timeout (wait indefinitely)
   tiger db ping svc-12345 --timeout 0`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

@@ -81,7 +81,7 @@ PostgreSQL Configuration Parameters That May Be Set:
   # Create a role with password from environment variable
   TIGER_NEW_PASSWORD=my-secure-password tiger db create role --name ai_analyst`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate arguments

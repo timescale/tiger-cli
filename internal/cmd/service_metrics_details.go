@@ -39,7 +39,7 @@ service from your configuration.`, strings.Join(common.LegacyMetrics, ", ")),
   # Get metric details as JSON
   tiger service metrics details --metric pg_stat_activity_count --output json`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

@@ -30,7 +30,7 @@ service from your configuration.`,
   # Copy a specific service's backups to eu-central-1
   tiger service backup region add svc-12345 --region eu-central-1`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

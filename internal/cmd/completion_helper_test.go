@@ -44,36 +44,66 @@ func TestCompletion(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
-			name:       "service ID lists services with their names",
+			name:       "service argument lists services by name with their IDs",
 			args:       []string{"__complete", "service", "get", ""},
 			mock:       listServices,
-			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
+			wantStdout: "test-service\tsvc-12345\nother-service\tsvc-67890\n" + noFileComp,
 			wantStderr: directive,
 		},
 		{
-			name:       "service ID filters by what is typed",
+			name:       "service argument filters names by what is typed",
+			args:       []string{"__complete", "service", "get", "oth"},
+			mock:       listServices,
+			wantStdout: "other-service\tsvc-67890\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// A prefix that matches no name falls back to IDs, with the name
+			// as the description.
+			name:       "service argument offers IDs matching what is typed",
 			args:       []string{"__complete", "service", "get", "svc-67"},
 			mock:       listServices,
 			wantStdout: "svc-67890\tother-service\n" + noFileComp,
 			wantStderr: directive,
 		},
 		{
-			// The service ID is the only positional argument, so there is
+			// Each service is offered once, by name when both match.
+			name: "service argument prefers a name over a matching ID",
+			args: []string{"__complete", "service", "get", "svc-"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				services := []api.Service{
+					sampleService(func(s *api.Service) { s.Name = "svc-primary" }),
+					sampleService(func(s *api.Service) {
+						s.ServiceID = "svc-67890"
+						s.Name = "other-service"
+					}),
+				}
+				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
+					Return(&api.GetServicesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &services,
+					}, nil)
+			},
+			wantStdout: "svc-primary\tsvc-12345\nsvc-67890\tother-service\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// The service is the only positional argument, so there is
 			// nothing to complete once one is present.
-			name:       "service ID completes only the first argument",
+			name:       "service argument completes only the first argument",
 			args:       []string{"__complete", "service", "get", "svc-12345", ""},
 			wantStdout: noFileComp,
 			wantStderr: directive,
 		},
 		{
-			name:       "service ID offers nothing when not logged in",
+			name:       "service argument offers nothing when not logged in",
 			args:       []string{"__complete", "service", "get", ""},
 			opts:       []runOption{withNotLoggedIn()},
 			wantStdout: noFileComp,
 			wantStderr: directive,
 		},
 		{
-			name: "service ID offers nothing when the API fails",
+			name: "service argument offers nothing when the API fails",
 			args: []string{"__complete", "service", "get", ""},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServicesWithResponse(validCtx, testProjectID, nil).
@@ -87,6 +117,14 @@ func TestCompletion(t *testing.T) {
 			args:       []string{"__complete", "service", "get", "--service-id", ""},
 			mock:       listServices,
 			wantStdout: "svc-12345\ttest-service\nsvc-67890\tother-service\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			// A default service must be an ID, so the flag never offers names.
+			name:       "--service-id offers only IDs",
+			args:       []string{"__complete", "service", "get", "--service-id", "oth"},
+			mock:       listServices,
+			wantStdout: noFileComp,
 			wantStderr: directive,
 		},
 		{

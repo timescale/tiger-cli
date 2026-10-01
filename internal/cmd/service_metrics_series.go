@@ -82,7 +82,7 @@ into 1-hour (3600s) intervals unless --bucket-seconds is also given.`,
     --from 2026-05-13T00:00:00Z --to 2026-05-13T01:00:00Z \
     --group-by role`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Defaulting only kicks in when both are omitted — a single
