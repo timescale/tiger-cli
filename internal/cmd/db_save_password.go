@@ -43,7 +43,7 @@ The password will be saved according to your --password-storage setting
   # Save to specific storage location
   tiger db save-password svc-12345 --password=your-password --password-storage pgpass`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

@@ -45,7 +45,7 @@ large and may embed implementation details.`,
   # Include catalog, TimescaleDB internals, and extension-owned objects
   tiger db schema svc-12345 --internal`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

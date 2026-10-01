@@ -71,7 +71,7 @@ default service from your configuration.`,
   # Fork with custom wait timeout
   tiger service fork svc-12345 --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			toTimestampSet := cmd.Flags().Changed("to-timestamp")

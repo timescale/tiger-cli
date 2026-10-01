@@ -54,7 +54,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
   # Resize with custom wait timeout
   tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

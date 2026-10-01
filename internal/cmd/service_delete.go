@@ -36,7 +36,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
   # Delete service without confirmation prompt
   tiger service delete svc-12345 --confirm`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require an explicit service for safety: no default fallback.

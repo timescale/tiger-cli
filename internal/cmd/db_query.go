@@ -75,7 +75,7 @@ read-only while leaving DEV services writable.`,
   # Query a read replica
   tiger db query rep1234567 -c "SELECT count(*) FROM events"`,
 		Args:              cobra.MaximumNArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, client, projectID, err := app.GetAll()

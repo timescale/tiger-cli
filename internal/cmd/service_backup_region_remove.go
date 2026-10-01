@@ -36,7 +36,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
   # Stop copying without a confirmation prompt
   tiger service backup region remove svc-12345 --region eu-central-1 --confirm`,
 		Args:              cobra.ExactArgs(1),
-		ValidArgsFunction: serviceIDCompletion(app),
+		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Require an explicit service for safety: no default fallback.

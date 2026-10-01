@@ -43,39 +43,50 @@ func withAppLoad(app *common.App, fn cobra.CompletionFunc) cobra.CompletionFunc 
 	}
 }
 
-func serviceIDCompletion(app *common.App) cobra.CompletionFunc {
+func serviceRefCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		// Service ID is always first positional argument
+		// The service ref is always the first positional argument
 		if len(args) > 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 
-		return completeServiceIDs(cmd, app, toComplete)
+		services, err := listServices(cmd, app)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		// Suggest each service at most once: prefer name, fall back to ID
+		results := make([]string, 0, len(services))
+		for _, service := range services {
+			if strings.HasPrefix(service.Name, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(service.Name, service.ServiceID))
+			} else if strings.HasPrefix(service.ServiceID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(service.ServiceID, service.Name))
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
 	})
 }
 
 // serviceIDFlagCompletion completes the global --service-id flag. Unlike the
-// positional completion, it offers IDs no matter how many arguments have been
-// typed — the flag is the same wherever it appears in the command line.
+// positional completion, it offers only IDs, since a default service must be
+// an ID (see serviceRef), and it offers them no matter how many arguments have
+// been typed — the flag is the same wherever it appears in the command line.
 func serviceIDFlagCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return completeServiceIDs(cmd, app, toComplete)
-	})
-}
-
-func completeServiceIDs(cmd *cobra.Command, app *common.App, toComplete string) ([]string, cobra.ShellCompDirective) {
-	services, err := listServices(cmd, app)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	results := make([]string, 0, len(services))
-	for _, service := range services {
-		if strings.HasPrefix(service.ServiceID, toComplete) {
-			results = append(results, cobra.CompletionWithDesc(service.ServiceID, service.Name))
+		services, err := listServices(cmd, app)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-	}
-	return results, cobra.ShellCompDirectiveNoFileComp
+
+		results := make([]string, 0, len(services))
+		for _, service := range services {
+			if strings.HasPrefix(service.ServiceID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(service.ServiceID, service.Name))
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 }
 
 func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
