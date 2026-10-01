@@ -15,12 +15,8 @@ import (
 )
 
 // deleteConfirmationKey is the InputRequests/InputResponses key of the PROD
-// deletion prompt, and deleteConfirmationField the field in it where the user
-// types the service ID back.
-const (
-	deleteConfirmationKey   = "confirm_delete"
-	deleteConfirmationField = "service_id"
-)
+// deletion prompt.
+const deleteConfirmationKey = "confirm_delete"
 
 // ServiceDeleteInput represents input for service_delete
 type ServiceDeleteInput struct {
@@ -108,7 +104,7 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 			result, err := promptProdDelete(req, *service)
 			return result, ServiceDeleteOutput{}, err
 		}
-		if !deleteConfirmed(answer, input.ServiceID) {
+		if !serviceIDConfirmed(answer, input.ServiceID) {
 			return nil, ServiceDeleteOutput{
 				ServiceID: input.ServiceID,
 				Deleted:   false,
@@ -142,62 +138,11 @@ func (s *Server) handleServiceDelete(ctx context.Context, req *mcp.CallToolReque
 // the loop is the one outcome this tool must never produce.
 func promptProdDelete(req *mcp.CallToolRequest, service api.Service) (*mcp.CallToolResult, error) {
 	if !clientSupportsFormElicitation(req) {
-		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; run 'tiger service delete %s' from the CLI instead", service.ServiceID, service.ServiceID)
+		return nil, fmt.Errorf("deleting service %s requires the user's confirmation because it is tagged PROD, but this MCP client does not support elicitation; ask the user to run 'tiger service delete %s' instead", service.ServiceID, service.ServiceID)
 	}
-
-	// The user types the ID back, as `tiger service delete` requires. Clients
-	// focus their accept control by default, so a bare accept/decline form
-	// would let a stray Enter delete the service; a mistyped or empty ID
-	// can't. The SDK validates the answer against this schema, and a violation
-	// fails the whole call instead of reaching deleteConfirmed, so the field
-	// carries only what clients enforce in their own form: required (Claude
-	// Code refuses to accept an empty field) but no pattern (Claude Code
-	// submits a non-matching value, which would then fail SDK validation
-	// instead of returning a clean cancellation).
-	return &mcp.CallToolResult{
-		InputRequests: mcp.InputRequestMap{
-			deleteConfirmationKey: &mcp.ElicitParams{
-				Message: fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
-				RequestedSchema: &jsonschema.Schema{
-					Type: "object",
-					Properties: map[string]*jsonschema.Schema{
-						deleteConfirmationField: {
-							Type:        "string",
-							Title:       "Service ID",
-							Description: fmt.Sprintf("Type the service ID %s to confirm", service.ServiceID),
-						},
-					},
-					Required: []string{deleteConfirmationField},
-				},
-			},
-		},
-	}, nil
-}
-
-// clientSupportsFormElicitation reports whether the client advertised form
-// elicitation. The capabilities come from the request's _meta on the newest
-// protocol and from the initialize handshake before that, which is also why a
-// stateless HTTP session on an older protocol reports none.
-func clientSupportsFormElicitation(req *mcp.CallToolRequest) bool {
-	caps := req.ClientCapabilities()
-	if caps == nil || caps.Elicitation == nil {
-		return false
-	}
-	// A client that declares elicitation without naming a mode supports form
-	// (the SDK assumes the same, for backward compatibility); one that names
-	// only url does not.
-	return caps.Elicitation.Form != nil || caps.Elicitation.URL == nil
-}
-
-// deleteConfirmed reports whether the user's answer to promptProdDelete's
-// prompt approves deleting the service with the given ID: only an accepted form
-// with that exact ID typed in does. A decline, a dismissal, or a mismatched ID
-// is a no.
-func deleteConfirmed(answer mcp.InputResponse, serviceID string) bool {
-	result, ok := answer.(*mcp.ElicitResult)
-	if !ok || result.Action != "accept" {
-		return false
-	}
-	typed, ok := result.Content[deleteConfirmationField].(string)
-	return ok && typed == serviceID
+	return serviceIDConfirmationRequest(
+		deleteConfirmationKey,
+		fmt.Sprintf("Delete PRODUCTION service %q (%s)? This permanently destroys the service and all of its data, and cannot be undone.", service.Name, service.ServiceID),
+		service.ServiceID,
+	), nil
 }
