@@ -59,13 +59,21 @@ func TestMCPListCmd(t *testing.T) {
 └──────┴──────────────┘
 `
 
-	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
+	// TIGER_EXPERIMENTAL registers the preview backups, metrics, and IP allow
+	// list tools.
 	wantTextExperimental := `┌──────┬──────────────────────────────┐
 │ TYPE │             NAME             │
 ├──────┼──────────────────────────────┤
+│ tool │ allowlist_create             │
+│ tool │ allowlist_delete             │
+│ tool │ allowlist_get                │
+│ tool │ allowlist_list               │
+│ tool │ allowlist_update             │
 │ tool │ db_query                     │
 │ tool │ db_schema                    │
 │ tool │ feedback                     │
+│ tool │ service_allowlist_attach     │
+│ tool │ service_allowlist_detach     │
 │ tool │ service_backup_list          │
 │ tool │ service_backup_region_add    │
 │ tool │ service_backup_region_list   │

@@ -42,11 +42,11 @@ func TestServiceCommandAliases(t *testing.T) {
 }
 
 // TestServiceExperimentalGate covers the registration gate for the preview
-// subtrees (`service metrics`, `service backup`): buildServiceCmd only adds
-// them when the experimental env var is truthy, so by default the commands
-// don't exist in the tree at all. Help output is asserted loosely
-// (containment) rather than exactly, so the gate test doesn't break every time
-// an unrelated subcommand's help text changes.
+// subtrees (`service metrics`, `service backup`, `service allowlist`):
+// buildServiceCmd only adds them when the experimental env var is truthy, so
+// by default the commands don't exist in the tree at all. Help output is
+// asserted loosely (containment) rather than exactly, so the gate test
+// doesn't break every time an unrelated subcommand's help text changes.
 func TestServiceExperimentalGate(t *testing.T) {
 	// matchHelp asserts the output is a help text that mentions want and none
 	// of the gated names in absent.
@@ -71,7 +71,7 @@ func TestServiceExperimentalGate(t *testing.T) {
 			// absence of any gated entry in that help.
 			name:       "unregistered by default",
 			args:       []string{"service", "metrics"},
-			wantStdout: matchHelp("Available Commands:", "metrics", "backup"),
+			wantStdout: matchHelp("Available Commands:", "metrics", "backup", "allowlist"),
 		},
 		{
 			name:       "metrics registered when experimental",
@@ -84,6 +84,12 @@ func TestServiceExperimentalGate(t *testing.T) {
 			args:       []string{"service", "backup", "--help"},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: matchHelp("Manage the backups taken for a database service"),
+		},
+		{
+			name:       "allowlist registered when experimental",
+			args:       []string{"service", "allowlist", "--help"},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp("Attach or detach the IP allow list"),
 		},
 	})
 }
