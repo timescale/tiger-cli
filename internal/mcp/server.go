@@ -90,27 +90,23 @@ func addTool[In, Out any](s *Server, mode config.ReadOnlyMode, t *mcp.Tool, h mc
 
 // buildServerInstructions returns the `instructions` string the MCP SDK sends
 // to clients at initialize. Evaluated once at server start, like tool registration.
-func buildServerInstructions(cfg *config.Config, experimental bool) string {
+func buildServerInstructions(cfg *config.Config) string {
 	const (
 		intro = "Tiger MCP provides tools for managing and querying Tiger Cloud database services (managed TimescaleDB/PostgreSQL). "
 
 		// capabilitiesBase and readOnlyCapabilitiesBase describe what the server
-		// can do in each mode. metricsMention, when non-empty, folds into
-		// whichever one is used so the result still reads as one sentence.
+		// can do in each mode. metricsMention folds into whichever one is used so
+		// the result still reads as one sentence.
 		capabilitiesBase         = "Use it to provision and fork services, start/stop/resize/delete instances, rotate credentials, fetch service logs, execute SQL queries, and search Tiger documentation."
 		readOnlyCapabilitiesBase = "Use it to list and inspect services, fetch service logs, execute read-only SQL queries, and search Tiger documentation."
 
-		// Metrics tools are registered regardless of read-only mode (they're all
-		// read-only themselves), so this folds into capabilities in every branch.
+		// Metrics tools are always registered and are all read-only themselves,
+		// so this folds into capabilities in every branch, regardless of mode.
 		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals."
 	)
 
-	metrics := ""
-	if experimental {
-		metrics = metricsMention
-	}
-	capabilities := capabilitiesBase + metrics
-	readOnlyCapabilities := readOnlyCapabilitiesBase + metrics
+	capabilities := capabilitiesBase + metricsMention
+	readOnlyCapabilities := readOnlyCapabilitiesBase + metricsMention
 
 	switch cfg.ReadOnly {
 	case config.ReadOnlyAll:
@@ -144,7 +140,7 @@ func NewServer(ctx context.Context, app *common.App, logger *slog.Logger) (*Serv
 		Title:   serverTitle,
 		Version: config.Version,
 	}, &mcp.ServerOptions{
-		Instructions: buildServerInstructions(cfg, app.Experimental),
+		Instructions: buildServerInstructions(cfg),
 		Logger:       logger,
 	})
 
@@ -218,13 +214,13 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
 	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)
+	addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
+	addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
+	addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 
-	// Metrics tools target gateway endpoints marked `x-tigerdata-preview: true`. They
-	// are registered only when the experimental gate is on at server startup.
+	// Backups target a gateway endpoint marked `x-tigerdata-preview: true`. It is
+	// registered only when the experimental gate is on at server startup.
 	if experimental {
-		addTool(s, mode, newServiceMetricsAvailableTool(), s.handleServiceMetricsAvailable)
-		addTool(s, mode, newServiceMetricsDetailsTool(), s.handleServiceMetricsDetails)
-		addTool(s, mode, newServiceMetricsSeriesTool(), s.handleServiceMetricsSeries)
 		addTool(s, mode, newServiceBackupListTool(), s.handleServiceBackupList)
 		addTool(s, mode, newServiceBackupRegionListTool(), s.handleServiceBackupRegionList)
 		addTool(s, mode, newServiceBackupRegionAddTool(), s.handleServiceBackupRegionAdd)

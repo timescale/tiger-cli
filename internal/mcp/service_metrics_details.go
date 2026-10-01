@@ -46,7 +46,7 @@ func (ServiceMetricsDetailsOutput) Schema() *jsonschema.Schema {
 	// but their content is only present once the metric is documented — every
 	// undocumented metric still returns the key, just with a null/empty value.
 	details := schema.Properties["details"]
-	details.Properties["name"].Description = "Metric series name."
+	details.Properties["metric_name"].Description = "Metric series name."
 	details.Properties["type"].Description = "The shape of this metric's data, or null if undocumented."
 	details.Properties["default_agg"].Description = "The aggregation function used by default when fn is omitted from a series query, or null if undocumented."
 	details.Properties["description"].Description = "What this metric measures, or empty if undocumented."

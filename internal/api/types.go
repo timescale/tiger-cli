@@ -1821,10 +1821,10 @@ type MetricDetails struct {
 	// pgbouncer-sourced metrics only get region, not role/ordinal.
 	Labels []MetricLabelDetails `json:"labels"`
 
-	// Name Metric series name.
+	// MetricName Metric series name.
 	//
 	// Example: pg_locks_count
-	Name string `json:"name"`
+	MetricName string `json:"metric_name"`
 
 	// Type The shape of this metric's data, or null if undocumented.
 	//
@@ -2004,10 +2004,10 @@ type MetricsSeriesRequest struct {
 	// Example: ["role"]
 	GroupBy *[]string `json:"group_by,omitempty"`
 
-	// Name Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
+	// MetricName Metric series name. Use getServiceMetricsAvailableSeries to discover valid values.
 	//
 	// Example: timescale_cloud_system_cpu_usage_millicores
-	Name string `json:"name"`
+	MetricName string `json:"metric_name"`
 
 	// To End of the time window (RFC3339; nanosecond precision accepted).
 	//

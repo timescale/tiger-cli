@@ -19,6 +19,9 @@ func TestMCPListCmd(t *testing.T) {
 		"service_get",
 		"service_list",
 		"service_logs",
+		"service_metrics_available",
+		"service_metrics_details",
+		"service_metrics_series",
 		"service_rename",
 		"service_resize",
 		"service_start",
@@ -26,40 +29,48 @@ func TestMCPListCmd(t *testing.T) {
 		"service_update_password",
 	}
 
-	wantText := `┌──────┬─────────────────────────┐
-│ TYPE │          NAME           │
-├──────┼─────────────────────────┤
-│ tool │ db_query                │
-│ tool │ db_schema               │
-│ tool │ feedback                │
-│ tool │ service_create          │
-│ tool │ service_delete          │
-│ tool │ service_fork            │
-│ tool │ service_get             │
-│ tool │ service_list            │
-│ tool │ service_logs            │
-│ tool │ service_rename          │
-│ tool │ service_resize          │
-│ tool │ service_start           │
-│ tool │ service_stop            │
-│ tool │ service_update_password │
-└──────┴─────────────────────────┘
+	wantText := `┌──────┬───────────────────────────┐
+│ TYPE │           NAME            │
+├──────┼───────────────────────────┤
+│ tool │ db_query                  │
+│ tool │ db_schema                 │
+│ tool │ feedback                  │
+│ tool │ service_create            │
+│ tool │ service_delete            │
+│ tool │ service_fork              │
+│ tool │ service_get               │
+│ tool │ service_list              │
+│ tool │ service_logs              │
+│ tool │ service_metrics_available │
+│ tool │ service_metrics_details   │
+│ tool │ service_metrics_series    │
+│ tool │ service_rename            │
+│ tool │ service_resize            │
+│ tool │ service_start             │
+│ tool │ service_stop              │
+│ tool │ service_update_password   │
+└──────┴───────────────────────────┘
 `
 
 	// Read-only mode skips the service-mutating tools at registration time.
-	wantTextReadOnly := `┌──────┬──────────────┐
-│ TYPE │     NAME     │
-├──────┼──────────────┤
-│ tool │ db_query     │
-│ tool │ db_schema    │
-│ tool │ feedback     │
-│ tool │ service_get  │
-│ tool │ service_list │
-│ tool │ service_logs │
-└──────┴──────────────┘
+	// The metrics tools are all read-only themselves, so they stay registered.
+	wantTextReadOnly := `┌──────┬───────────────────────────┐
+│ TYPE │           NAME            │
+├──────┼───────────────────────────┤
+│ tool │ db_query                  │
+│ tool │ db_schema                 │
+│ tool │ feedback                  │
+│ tool │ service_get               │
+│ tool │ service_list              │
+│ tool │ service_logs              │
+│ tool │ service_metrics_available │
+│ tool │ service_metrics_details   │
+│ tool │ service_metrics_series    │
+└──────┴───────────────────────────┘
 `
 
-	// TIGER_EXPERIMENTAL registers the preview backups and metrics tools.
+	// TIGER_EXPERIMENTAL registers the preview backup tools on top of the
+	// (always-registered) default set, which already includes metrics.
 	wantTextExperimental := `┌──────┬──────────────────────────────┐
 │ TYPE │             NAME             │
 ├──────┼──────────────────────────────┤
@@ -167,7 +178,7 @@ func TestMCPListCmd(t *testing.T) {
 			wantStdout: wantTextReadOnly,
 		},
 		{
-			name: "experimental adds metrics tools",
+			name: "experimental adds backups tool",
 			args: []string{"mcp", "list"},
 			opts: append(noDocsProxy(nil),
 				withEnv("TIGER_EXPERIMENTAL", "true")),

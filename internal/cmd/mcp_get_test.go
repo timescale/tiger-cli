@@ -291,7 +291,7 @@ Output:
     • labels (required): []object, null - All labels this metric can be filtered or grouped by: its own labels (e.g. datname on pg_stat_database_*) plus the region/role/ordinal labels most metrics also carry. A few datasources only attach a subset of those — e.g. pgbouncer-sourced metrics only get region, not role/ordinal.
       • description (required): string - What this label identifies, or empty if undocumented.
       • name (required): string - The label's key.
-    • name (required): string - Metric series name.
+    • metric_name (required): string - Metric series name.
     • type (required): string, null - The shape of this metric's data, or null if undocumented.
 
 `
@@ -352,30 +352,22 @@ Output:
 			wantErr: `capability "service_create" not found`,
 		},
 		{
-			name:    "experimental tool hidden by default",
-			args:    []string{"mcp", "get", "service_metrics_available"},
-			opts:    noDocsProxy(nil),
-			wantErr: `capability "service_metrics_available" not found`,
-		},
-		{
-			name: "experimental tool visible with gate on",
-			args: []string{"mcp", "get", "service_metrics_available"},
-			opts: append(noDocsProxy(nil),
-				withEnv("TIGER_EXPERIMENTAL", "true")),
+			name:       "service_metrics_available visible by default",
+			args:       []string{"mcp", "get", "service_metrics_available"},
+			opts:       noDocsProxy(nil),
 			wantStdout: metricsAvailableText,
 		},
 		{
-			name:    "service_metrics_details hidden by default",
-			args:    []string{"mcp", "get", "service_metrics_details"},
-			opts:    noDocsProxy(nil),
-			wantErr: `capability "service_metrics_details" not found`,
+			name:       "service_metrics_details visible by default",
+			args:       []string{"mcp", "get", "service_metrics_details"},
+			opts:       noDocsProxy(nil),
+			wantStdout: metricsDetailsText,
 		},
 		{
-			name: "service_metrics_details visible with gate on",
-			args: []string{"mcp", "get", "service_metrics_details"},
-			opts: append(noDocsProxy(nil),
-				withEnv("TIGER_EXPERIMENTAL", "true")),
-			wantStdout: metricsDetailsText,
+			name:    "experimental-gated tool hidden by default",
+			args:    []string{"mcp", "get", "service_backups"},
+			opts:    noDocsProxy(nil),
+			wantErr: `capability "service_backups" not found`,
 		},
 	})
 }

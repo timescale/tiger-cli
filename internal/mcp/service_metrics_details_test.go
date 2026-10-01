@@ -12,10 +12,6 @@ import (
 func TestServiceMetricsDetailsTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "metric_name": "pg_stat_activity_count"}
 
-	// The tool is experimental-gated (see the first case), so every other
-	// case registers it explicitly.
-	experimental := withExperimental()
-
 	expectDetails := func(metric string, details *api.MetricDetails) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
 			m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "e6ue9697jf", metric).
@@ -29,7 +25,7 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 	// A documented metric: its own labels carry no description yet, while the
 	// region/role/ordinal labels every registry-backed metric gets do.
 	documented := &api.MetricDetails{
-		Name:        "pg_stat_activity_count",
+		MetricName:  "pg_stat_activity_count",
 		Type:        new(api.MetricTypeGAUGE),
 		DefaultAgg:  new(api.MetricsAggFnMAXTOTAL),
 		Description: "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -39,7 +35,7 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 		},
 	}
 	wantDocumented := map[string]any{"details": map[string]any{
-		"name":        "pg_stat_activity_count",
+		"metric_name": "pg_stat_activity_count",
 		"type":        "GAUGE",
 		"default_agg": "MAX_TOTAL",
 		"description": "Number of connections in pg_stat_activity, grouped by state, connected role, and backend type.",
@@ -51,40 +47,28 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 
 	runToolTests(t, []toolTest{
 		{
-			// The tool is gated at registration, so without the experimental
-			// gate the server never advertises it and the SDK refuses the call
-			// itself — a transport error rather than a result.
-			name:        "not registered without the experimental gate",
-			tool:        toolServiceMetricsDetails,
-			args:        args,
-			wantCallErr: `calling "tools/call": unknown tool "service_metrics_details"`,
-		},
-		{
 			name:    "not logged in",
 			tool:    toolServiceMetricsDetails,
 			args:    args,
-			opts:    []runOption{experimental, withNotLoggedIn()},
+			opts:    []runOption{withNotLoggedIn()},
 			wantErr: notLoggedInMsg,
 		},
 		{
 			name:    "service ID failing the schema pattern",
 			tool:    toolServiceMetricsDetails,
 			args:    map[string]any{"service_id": "NOPE", "metric_name": "pg_stat_activity_count"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: validating /properties/service_id: pattern: "NOPE" does not match regular expression "^[a-z0-9]{10}$"`,
 		},
 		{
 			name:    "missing metric name",
 			tool:    toolServiceMetricsDetails,
 			args:    map[string]any{"service_id": "e6ue9697jf"},
-			opts:    []runOption{experimental},
 			wantErr: `validating "arguments": validating root: required: missing properties: ["metric_name"]`,
 		},
 		{
 			name: "network error",
 			tool: toolServiceMetricsDetails,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "e6ue9697jf", "pg_stat_activity_count").
 					Return(nil, errors.New("connection refused"))
@@ -95,7 +79,6 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name: "API error",
 			tool: toolServiceMetricsDetails,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "e6ue9697jf", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
@@ -109,7 +92,6 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name: "API error without a message body",
 			tool: toolServiceMetricsDetails,
 			args: args,
-			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				m.EXPECT().GetServiceMetricDetailsWithResponse(validCtx, testProjectID, "e6ue9697jf", "pg_stat_activity_count").
 					Return(&api.GetServiceMetricDetailsResponse{
@@ -122,7 +104,6 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name:    "nil response body",
 			tool:    toolServiceMetricsDetails,
 			args:    args,
-			opts:    []runOption{experimental},
 			mock:    expectDetails("pg_stat_activity_count", nil),
 			wantErr: "empty response from API",
 		},
@@ -130,7 +111,6 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name:       "documented metric",
 			tool:       toolServiceMetricsDetails,
 			args:       args,
-			opts:       []runOption{experimental},
 			mock:       expectDetails("pg_stat_activity_count", documented),
 			wantOutput: wantDocumented,
 		},
@@ -140,10 +120,9 @@ func TestServiceMetricsDetailsTool(t *testing.T) {
 			name: "undocumented metric",
 			tool: toolServiceMetricsDetails,
 			args: map[string]any{"service_id": "e6ue9697jf", "metric_name": "some_new_metric"},
-			opts: []runOption{experimental},
-			mock: expectDetails("some_new_metric", &api.MetricDetails{Name: "some_new_metric"}),
+			mock: expectDetails("some_new_metric", &api.MetricDetails{MetricName: "some_new_metric"}),
 			wantOutput: map[string]any{"details": map[string]any{
-				"name":        "some_new_metric",
+				"metric_name": "some_new_metric",
 				"type":        nil,
 				"default_agg": nil,
 				"description": "",

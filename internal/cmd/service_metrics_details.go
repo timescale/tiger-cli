@@ -25,7 +25,7 @@ func buildServiceMetricsDetailsCmd(app *common.App) *cobra.Command {
 		Long: fmt.Sprintf(`Get descriptive metadata for a metric: what it measures, its type, default
 aggregation function, and available labels.
 
-Use 'tiger service metrics available-series' to discover valid metric names,
+Use 'tiger service metrics available' to discover valid metric names,
 then 'tiger service metrics series' to fetch its data.
 
 These metrics have no richer metadata — expect just the name back, with type,
@@ -77,6 +77,7 @@ service from your configuration.`, strings.Join(common.LegacyMetrics, ", ")),
 	cmd.Flags().StringVar(&metric, "metric", "", "Metric name")
 	cmd.Flags().VarP(new(outputFlag), "output", "o", "Output format (json, yaml, table)")
 	registerFlagCompletion(cmd, "output", outputCompletion())
+	registerFlagCompletion(cmd, "metric", metricNameCompletion(app))
 
 	markFlagRequired(cmd, "metric")
 
@@ -101,7 +102,7 @@ func outputMetricDetailsTable(details api.MetricDetails, output io.Writer) error
 	table := tablewriter.NewWriter(output)
 	table.Header("PROPERTY", "VALUE")
 
-	table.Append("Name", details.Name)
+	table.Append("Name", details.MetricName)
 
 	metricType := "undocumented"
 	if details.Type != nil {
