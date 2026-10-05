@@ -163,7 +163,7 @@ func configKeyCompletion(cmd *cobra.Command, args []string, toComplete string) (
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+	return filterCompletionsByPrefix(config.PublicConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
 }
 
 // configKeyValueCompletion completes the <key> and <value> arguments of
@@ -172,7 +172,7 @@ func configKeyValueCompletion(cmd *cobra.Command, args []string, toComplete stri
 	switch len(args) {
 	case 0:
 		// Completing the key
-		return filterCompletionsByPrefix(config.ValidConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		return filterCompletionsByPrefix(config.PublicConfigOptions(), toComplete), cobra.ShellCompDirectiveNoFileComp
 	case 1:
 		// Completing the value, based on the key already typed
 		return filterCompletionsByPrefix(config.ValidConfigOptionValues(args[0]), toComplete), cobra.ShellCompDirectiveNoFileComp
