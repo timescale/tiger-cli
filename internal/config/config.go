@@ -209,7 +209,9 @@ func LoadForOutput(configDir string, opts OutputOptions) (*ConfigOutput, error) 
 	v.SetConfigFile(GetConfigFile(configDir))
 
 	if opts.WithEnv {
-		applyEnvOverrides(v)
+		if err := applyEnvOverrides(v); err != nil {
+			return nil, fmt.Errorf("failed to bind env vars: %w", err)
+		}
 	}
 	if !opts.NoDefaults {
 		applyDefaults(v)
@@ -253,7 +255,9 @@ func LoadForOutput(configDir string, opts OutputOptions) (*ConfigOutput, error) 
 func (c *Config) reload() error {
 	v := viper.New()
 	v.SetConfigFile(c.GetConfigFile())
-	applyEnvOverrides(v)
+	if err := applyEnvOverrides(v); err != nil {
+		return fmt.Errorf("failed to bind env vars: %w", err)
+	}
 	applyDefaults(v)
 
 	if err := bindFlags(v, c.flags); err != nil {
@@ -440,9 +444,17 @@ func applyDefaults(v *viper.Viper) {
 	}
 }
 
-func applyEnvOverrides(v *viper.Viper) {
+// applyEnvOverrides binds every config key to its TIGER_<KEY> env var. Binding
+// explicitly, rather than via AutomaticEnv, makes viper aware of a key set only
+// by env var, so it appears in `config list --with-env --no-defaults`.
+func applyEnvOverrides(v *viper.Viper) error {
 	v.SetEnvPrefix("TIGER")
-	v.AutomaticEnv()
+	for key := range defaultValues {
+		if err := v.BindEnv(key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func readInConfig(v *viper.Viper) error {

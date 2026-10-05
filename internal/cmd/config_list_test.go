@@ -207,6 +207,21 @@ version_check: true
 `,
 		},
 		{
+			name: "with-env and no-defaults shows a key set only by env var",
+			args: []string{"config", "list", "--with-env", "--no-defaults"},
+			opts: []runOption{
+				withConfig(map[string]any{"analytics": false}),
+				withEnv("TIGER_SERVICE_ID", "env-service"),
+			},
+			wantStdout: `┌────────────┬─────────────┐
+│  PROPERTY  │    VALUE    │
+├────────────┼─────────────┤
+│ analytics  │ false       │
+│ service_id │ env-service │
+└────────────┴─────────────┘
+`,
+		},
+		{
 			name:       "env override ignored without with-env",
 			args:       []string{"config", "list"},
 			opts:       []runOption{withEnv("TIGER_SERVICE_ID", "env-service")},
@@ -307,6 +322,17 @@ read_only: "off"
 releases_url: https://cli.tigerdata.com
 service_id: ""
 version_check: true
+`,
+		},
+		{
+			name: "all with with-env and no-defaults shows a private key set only by env var",
+			args: []string{"config", "list", "--all", "--with-env", "--no-defaults"},
+			opts: []runOption{withEnv("TIGER_API_URL", "https://env.api.com/v1")},
+			wantStdout: `┌──────────┬────────────────────────┐
+│ PROPERTY │         VALUE          │
+├──────────┼────────────────────────┤
+│ api_url  │ https://env.api.com/v1 │
+└──────────┴────────────────────────┘
 `,
 		},
 		{
