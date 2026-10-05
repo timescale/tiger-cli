@@ -159,14 +159,18 @@ homebrew_casks:
     skip_upload: auto # Skips prerelease builds
     url:
       template: "https://cli.tigerdata.com/releases/{{ .Tag }}/{{ .ArtifactName }}"
-    hooks:
-      # TODO: Sign and notarize instead of removing quarantine bit
-      # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tiger"]
-          end
+    # TODO: Sign and notarize instead of removing quarantine bit
+    # See: https://goreleaser.com/customization/homebrew_casks/#signing-and-notarizing
+    #
+    # GoReleaser's hooks.post.install renders the `postflight` stanza Homebrew
+    # has deprecated, so emit `postflight_steps` by hand until GoReleaser can
+    # (goreleaser/goreleaser#6870).
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/tiger"]
+        end
+      end
     # Shell completions
     completions:
       bash: "completions/tiger.bash"
