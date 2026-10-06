@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -24,7 +25,7 @@ func buildMCPHTTPCmd(app *common.App) *cobra.Command {
 		Short: "Start MCP server with HTTP transport",
 		Long: `Start the MCP server using HTTP transport.
 
-The server will automatically find an available port if the specified port is busy.`,
+The server listens on the given port and fails if that port is already in use.`,
 		Example: `  # Start HTTP server on default port 8080
   tiger mcp start http
 
@@ -64,26 +65,13 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 	}
 	defer server.Close()
 
-	// Find available port and get the listener
-	listener, actualPort, err := getListener(host, port)
+	address := net.JoinHostPort(host, strconv.Itoa(port))
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		logger.Error("Failed to get listener",
-			slog.String("host", host),
-			slog.Int("port", port),
-			slog.Any("error", err),
-		)
-		return fmt.Errorf("failed to get listener: %w", err)
+		logger.Error("Failed to listen", slog.Any("error", err))
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	defer listener.Close()
-
-	if actualPort != port {
-		logger.Info("Specified port was busy, using alternative port",
-			slog.Int("requested_port", port),
-			slog.Int("actual_port", actualPort),
-		)
-	}
-
-	address := fmt.Sprintf("%s:%d", host, actualPort)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -127,16 +115,4 @@ func startHTTPServer(cmd *cobra.Command, app *common.App, host string, port int)
 		return fmt.Errorf("failed to close MCP server: %w", err)
 	}
 	return nil
-}
-
-// getListener finds an available port starting from the specified port and returns the listener
-func getListener(host string, startPort int) (net.Listener, int, error) {
-	for port := startPort; port < startPort+100; port++ {
-		address := fmt.Sprintf("%s:%d", host, port)
-		listener, err := net.Listen("tcp", address)
-		if err == nil {
-			return listener, port, nil
-		}
-	}
-	return nil, 0, fmt.Errorf("no available port found in range %d-%d", startPort, startPort+99)
 }
