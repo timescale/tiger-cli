@@ -1,50 +1,49 @@
 ## tiger skills install
 
-Install agent skills for an AI coding agent
+Install agent skills for AI coding agents
 
 ### Synopsis
 
-Install agent skills for an AI coding agent.
+Install agent skills for AI coding agents.
 
-Skills are installed for the current user into ~/.agents/skills, which most
-coding agents read, or into the client's own skills directory for clients that
-don't.
+Skills are installed for the current user into one or more install locations:
+the universal ~/.agents/skills directory, which most coding agents read, and
+the skills directories of clients that don't read it. Each argument selects a
+location, either by name or by the name of a client that reads it.
+
+Install locations:
+  universal                ~/.agents/skills (Cursor, Devin, Codex, Gemini CLI, VS Code, GitHub Copilot CLI)
+  claude-code              ~/.claude/skills (Claude Code)
+  antigravity              ~/.gemini/config/skills (Google Antigravity)
+  kiro-cli                 ~/.kiro/skills (Kiro CLI)
+
+With no arguments, you're prompted to select locations interactively. The
+locations Tiger CLI has installed skills to before are selected by default, or
+universal if there are none; use --no-prompt (or run without a terminal) to
+install to them without prompting.
 
 Re-running the command updates the installed skills to the latest version and
 removes any that are no longer available. Existing skills that weren't
 installed by Tiger CLI are never replaced unless --force is given.
 
-Supported Clients:
-  claude-code              Claude Code (~/.claude/skills)
-  cursor                   Cursor (~/.agents/skills)
-  devin                    Devin (~/.agents/skills)
-  codex                    Codex (~/.agents/skills)
-  gemini                   Gemini CLI (~/.agents/skills)
-  vscode                   VS Code (~/.agents/skills)
-  antigravity              Google Antigravity (~/.gemini/antigravity/skills)
-  kiro-cli                 Kiro CLI (~/.kiro/skills)
-  copilot                  GitHub Copilot CLI (~/.agents/skills)
-
-If no client is specified, you'll be prompted to select one interactively.
-
 ```
-tiger skills install [client] [flags]
+tiger skills install [client...] [flags]
 ```
 
 ### Examples
 
 ```
-  # Interactive client selection
+  # Interactive selection
   tiger skills install
 
-  # Install for Claude Code
-  tiger skills install claude-code
+  # Update the skills wherever they were installed before
+  tiger skills install --no-prompt
 
-  # Install for Codex
-  tiger skills install codex
+  # Install to ~/.agents/skills and for Claude Code
+  tiger skills install universal claude-code
 
   # Install into a custom skills directory
-  tiger skills install claude-code --skills-dir ~/my-skills
+  tiger skills install --skills-dir ~/my-skills
 ```
 
 ### Options
@@ -52,7 +51,8 @@ tiger skills install [client] [flags]
 ```
       --force               Replace existing skills that weren't installed by Tiger CLI
   -h, --help                help for install
-      --skills-dir string   Custom skills directory to install into (overrides the client's default)
+      --no-prompt           Install to the default locations without prompting
+      --skills-dir string   Install into this skills directory only (not remembered for later installs)
 ```
 
 ### Options inherited from parent commands

@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +16,9 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/cobra"
 )
 
 // tarEntry is one entry of a test tarball, named relative to the repo root.
@@ -204,11 +207,50 @@ func writeTree(t *testing.T, root string, tree map[string]string) {
 }
 
 // skillsInstallOutput is the exact stdout of a successful install of the
-// fixture skills into dir, with removed holding any lines reporting removed
-// skills.
-func skillsInstallOutput(dir, clientName string, removed ...string) string {
-	return fmt.Sprintf("Installed 2 skills to %s:\n  alpha\n  beta\n%s\nRestart %s to load the new skills.\n",
-		dir, strings.Join(removed, ""), clientName)
+// fixture skills into dirs, with removed holding any sections reporting
+// removed skills.
+func skillsInstallOutput(dirs []string, removed ...string) string {
+	var b strings.Builder
+	b.WriteString("Installed 2 skills:\n  alpha\n  beta\n\nInstalled to:\n")
+	for _, dir := range dirs {
+		b.WriteString("  " + dir + "\n")
+	}
+	for _, r := range removed {
+		b.WriteString("\n" + r)
+	}
+	b.WriteString("\nRestart your coding agents to load the new skills.\n")
+	return b.String()
+}
+
+// skillsTargetLabels are the install locations, in the order the picker
+// offers them.
+var skillsTargetLabels = []string{"Universal", "Claude Code", "Google Antigravity", "Kiro CLI"}
+
+// withSelectSkillsTargets stubs the interactive install location picker: it
+// expects to be offered the locations with want preselected, and answers with
+// choose. A nil want expects the picker not to be shown at all.
+func withSelectSkillsTargets(want, choose []bool) runOption {
+	return withSetup(func(t *testing.T) {
+		original := selectSkillsTargets
+		selectSkillsTargets = func(_ *cobra.Command, targets []skillsTarget, selected []bool) ([]bool, error) {
+			if want == nil {
+				t.Error("install location picker shown, want none")
+				return selected, nil
+			}
+			labels := make([]string, len(targets))
+			for i, target := range targets {
+				labels[i] = target.label
+			}
+			if diff := cmp.Diff(skillsTargetLabels, labels); diff != "" {
+				t.Errorf("picker locations mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(want, selected); diff != "" {
+				t.Errorf("picker preselection mismatch (-want +got):\n%s", diff)
+			}
+			return choose, nil
+		}
+		t.Cleanup(func() { selectSkillsTargets = original })
+	})
 }
 
 func TestSkillsInstallCmd(t *testing.T) {
@@ -252,14 +294,39 @@ func TestSkillsInstallCmd(t *testing.T) {
 		}
 	}
 
-	codexHome := t.TempDir()
-	claudeHome := t.TempDir()
-	claudeConfigHome := t.TempDir()
-	claudeEmptyEnvHome := t.TempDir()
+	// home creates a home directory seeded with tree (see writeTree).
+	home := func(tree map[string]string) string {
+		dir := t.TempDir()
+		writeTree(t, dir, tree)
+		return dir
+	}
+	// withTrees merges trees into one.
+	withTrees := func(trees ...map[string]string) map[string]string {
+		merged := map[string]string{}
+		for _, tree := range trees {
+			maps.Copy(merged, tree)
+		}
+		return merged
+	}
+
+	universalHome := home(nil)
+	claudeHome := home(nil)
+	multiHome := home(nil)
+	claudeConfigHome := home(nil)
 	claudeConfigDir := filepath.Join(claudeConfigHome, "claude-config")
-	kiroHome := t.TempDir()
-	antigravityHome := t.TempDir()
-	aliasHome := t.TempDir()
+	claudeEmptyEnvHome := home(nil)
+	antigravityHome := home(nil)
+	aliasHome := home(nil)
+	firstDefaultHome := home(nil)
+	customHome := home(nil)
+
+	// existingClaude holds an earlier install for Claude Code only, so it's
+	// what the defaults select; existingBoth adds one to the universal
+	// directory.
+	existingClaude := installedSkills(".claude/skills")
+	existingClaudeHome := home(existingClaude)
+	existingBothHome := home(withTrees(installedSkills(".agents/skills"), existingClaude))
+	pickerHome := home(withTrees(installedSkills(".agents/skills"), existingClaude))
 
 	// reinstallHome holds a previous install: one of our skills with a stale
 	// file (replaced), one no longer available (removed), skills of the
@@ -283,64 +350,71 @@ func TestSkillsInstallCmd(t *testing.T) {
 		"marked/.tiger-cli":                            skillMarkerContent,
 		"marked/SKILL.md":                              "marked skill",
 	})
-	reinstallTree := installedSkills(".claude/skills")
-	reinstallTree[".claude/skills/other/SKILL.md"] = "user's skill"
-	reinstallTree[".claude/skills/.hidden/SKILL.md"] = "user's hidden entry"
-	reinstallTree[".claude/skills/linked"] = "-> " + filepath.Join(reinstallHome, "marked")
-	reinstallTree["marked/.tiger-cli"] = skillMarkerContent
-	reinstallTree["marked/SKILL.md"] = "marked skill"
+	reinstallTree := withTrees(installedSkills(".claude/skills"), map[string]string{
+		".claude/skills/other/SKILL.md":   "user's skill",
+		".claude/skills/.hidden/SKILL.md": "user's hidden entry",
+		".claude/skills/linked":           "-> " + filepath.Join(reinstallHome, "marked"),
+		"marked/.tiger-cli":               skillMarkerContent,
+		"marked/SKILL.md":                 "marked skill",
+	})
 
-	// conflictTree holds a symlink and a directory of the user's under the
-	// names of skills being installed, which aren't replaced without --force.
-	// The symlink counts as the user's even though it points at one of our
-	// skills, since Tiger CLI never creates symlinks.
+	// conflictTree holds things of the user's under the names of skills being
+	// installed, in both of the locations being installed to, which aren't
+	// replaced without --force. The symlink counts as the user's even though
+	// it points at one of our skills, since Tiger CLI never creates symlinks.
 	conflictHome := t.TempDir()
 	conflictTree := map[string]string{
-		".agents/skills/alpha":         "-> " + filepath.Join(conflictHome, "marked"),
-		".agents/skills/beta/SKILL.md": "user's beta",
-		"marked/.tiger-cli":            skillMarkerContent,
-		"marked/SKILL.md":              "marked skill",
+		".agents/skills/alpha":           "-> " + filepath.Join(conflictHome, "marked"),
+		".agents/skills/beta/.tiger-cli": skillMarkerContent,
+		".agents/skills/beta/SKILL.md":   "our beta",
+		".claude/skills/beta/SKILL.md":   "user's beta",
+		"marked/.tiger-cli":              skillMarkerContent,
+		"marked/SKILL.md":                "marked skill",
 	}
 	writeTree(t, conflictHome, conflictTree)
 
 	// forceHome holds a symlink and a directory of the user's under the names
 	// of skills being installed. --force replaces both; the symlink is
 	// replaced as a link, leaving its target alone.
-	forceHome := t.TempDir()
-	writeTree(t, forceHome, map[string]string{
-		".agents/skills/alpha":         "-> " + filepath.Join(forceHome, "elsewhere"),
+	forceHome := home(map[string]string{
+		".agents/skills/alpha":         "-> " + filepath.Join("..", "..", "elsewhere"),
 		".agents/skills/beta/SKILL.md": "user's beta",
 		".agents/skills/beta/stale.md": "stale",
 		"elsewhere/SKILL.md":           "symlink target",
 	})
-	forceTree := installedSkills(".agents/skills")
-	forceTree["elsewhere/SKILL.md"] = "symlink target"
+	forceTree := withTrees(installedSkills(".agents/skills"), map[string]string{"elsewhere/SKILL.md": "symlink target"})
 
-	customHome := t.TempDir()
+	universalDir := func(home string) string { return filepath.Join(home, ".agents", "skills") }
+	claudeDir := func(home string) string { return filepath.Join(home, ".claude", "skills") }
 
 	rateLimitReset := time.Date(2030, 1, 1, 15, 4, 0, 0, time.UTC).Unix()
 
 	runCmdTests(t, []cmdTest{
 		{
-			name:    "too many arguments",
-			args:    []string{"skills", "install", "codex", "cursor"},
-			wantErr: "accepts at most 1 arg(s), received 2",
-		},
-		{
-			name:    "no client and no TTY",
-			args:    []string{"skills", "install"},
-			wantErr: "TTY not detected - specify a client as an argument (e.g. 'tiger skills install claude-code')",
+			name:    "--skills-dir with client arguments",
+			args:    []string{"skills", "install", "claude-code", "--skills-dir", "/tmp/skills"},
+			wantErr: "--skills-dir can't be combined with client arguments",
 		},
 		{
 			name:    "unsupported client",
-			args:    []string{"skills", "install", "bogus"},
-			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
+			args:    []string{"skills", "install", "claude-code", "bogus"},
+			wantErr: "unsupported client: bogus. Supported clients: universal, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, copilot, copilot-cli, claude-code, antigravity, agy, kiro-cli",
+		},
+		{
+			name: "nothing selected in the picker",
+			args: []string{"skills", "install"},
+			opts: []runOption{
+				withEnv("HOME", home(nil)),
+				withIsTerminal(true),
+				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{false, false, false, false}),
+			},
+			wantErr: "no install locations selected",
 		},
 		{
 			name: "download fails",
-			args: []string{"skills", "install", "codex"},
+			args: []string{"skills", "install", "universal"},
 			opts: []runOption{
-				withEnv("HOME", t.TempDir()),
+				withEnv("HOME", home(nil)),
 				withSkillsServer(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
 				}),
@@ -349,9 +423,9 @@ func TestSkillsInstallCmd(t *testing.T) {
 		},
 		{
 			name: "rate limited",
-			args: []string{"skills", "install", "codex"},
+			args: []string{"skills", "install", "universal"},
 			opts: []runOption{
-				withEnv("HOME", t.TempDir()),
+				withEnv("HOME", home(nil)),
 				withSkillsServer(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("X-RateLimit-Remaining", "0")
 					w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(rateLimitReset, 10))
@@ -362,9 +436,9 @@ func TestSkillsInstallCmd(t *testing.T) {
 		},
 		{
 			name: "invalid archive",
-			args: []string{"skills", "install", "codex"},
+			args: []string{"skills", "install", "universal"},
 			opts: []runOption{
-				withEnv("HOME", t.TempDir()),
+				withEnv("HOME", home(nil)),
 				withSkillsServer(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("not a tarball"))
 				}),
@@ -373,33 +447,51 @@ func TestSkillsInstallCmd(t *testing.T) {
 		},
 		{
 			name: "no skills in archive",
-			args: []string{"skills", "install", "codex"},
+			args: []string{"skills", "install", "universal"},
 			opts: []runOption{
-				withEnv("HOME", t.TempDir()),
+				withEnv("HOME", home(nil)),
 				withSkillsTarball(skillsTarball(t, tarEntry{name: "README.md", body: "repo readme"})),
 			},
 			wantErr: "no skills found",
 		},
 		{
-			name:    "existing skills not installed by Tiger CLI",
-			args:    []string{"skills", "install", "codex"},
-			opts:    []runOption{withEnv("HOME", conflictHome), withSkillsTarball(tarball)},
-			wantErr: fmt.Sprintf("skills already exist in %s and weren't installed by Tiger CLI: alpha, beta. Use --force to replace them", filepath.Join(conflictHome, ".agents", "skills")),
-			checks:  []checkFunc{checkTree(conflictHome, conflictTree)},
+			name: "existing skills not installed by Tiger CLI",
+			args: []string{"skills", "install", "universal", "claude-code"},
+			opts: []runOption{withEnv("HOME", conflictHome), withSkillsTarball(tarball)},
+			wantErr: fmt.Sprintf("skills already exist and weren't installed by Tiger CLI: %s, %s. Use --force to replace them",
+				filepath.Join(universalDir(conflictHome), "alpha"), filepath.Join(claudeDir(conflictHome), "beta")),
+			checks: []checkFunc{checkTree(conflictHome, conflictTree)},
 		},
 		{
 			name:       "installs to ~/.agents/skills",
-			args:       []string{"skills", "install", "codex"},
-			opts:       []runOption{withEnv("HOME", codexHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(codexHome, ".agents", "skills"), "Codex"),
-			checks:     []checkFunc{checkTree(codexHome, installedSkills(".agents/skills"))},
+			args:       []string{"skills", "install", "universal"},
+			opts:       []runOption{withEnv("HOME", universalHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput([]string{universalDir(universalHome)}),
+			checks:     []checkFunc{checkTree(universalHome, installedSkills(".agents/skills"))},
 		},
 		{
-			name:       "installs to claude code's skills directory",
+			// Arguments select exactly the locations named, so the universal
+			// directory isn't written.
+			name:       "installs to claude code's skills directory only",
 			args:       []string{"skills", "install", "claude-code"},
 			opts:       []runOption{withEnv("HOME", claudeHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(claudeHome, ".claude", "skills"), "Claude Code"),
+			wantStdout: skillsInstallOutput([]string{claudeDir(claudeHome)}),
 			checks:     []checkFunc{checkTree(claudeHome, installedSkills(".claude/skills"))},
+		},
+		{
+			name: "installs to several locations",
+			args: []string{"skills", "install", "kiro-cli", "claude-code", "universal"},
+			opts: []runOption{withEnv("HOME", multiHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput([]string{
+				universalDir(multiHome),
+				claudeDir(multiHome),
+				filepath.Join(multiHome, ".kiro", "skills"),
+			}),
+			checks: []checkFunc{checkTree(multiHome, withTrees(
+				installedSkills(".agents/skills"),
+				installedSkills(".claude/skills"),
+				installedSkills(".kiro/skills"),
+			))},
 		},
 		{
 			name: "respects CLAUDE_CONFIG_DIR",
@@ -409,7 +501,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 				withEnv("CLAUDE_CONFIG_DIR", claudeConfigDir),
 				withSkillsTarball(tarball),
 			},
-			wantStdout: skillsInstallOutput(filepath.Join(claudeConfigDir, "skills"), "Claude Code"),
+			wantStdout: skillsInstallOutput([]string{filepath.Join(claudeConfigDir, "skills")}),
 			checks:     []checkFunc{checkTree(claudeConfigHome, installedSkills("claude-config/skills"))},
 		},
 		{
@@ -420,29 +512,79 @@ func TestSkillsInstallCmd(t *testing.T) {
 				withEnv("CLAUDE_CONFIG_DIR", ""),
 				withSkillsTarball(tarball),
 			},
-			wantStdout: skillsInstallOutput(filepath.Join(claudeEmptyEnvHome, ".claude", "skills"), "Claude Code"),
+			wantStdout: skillsInstallOutput([]string{claudeDir(claudeEmptyEnvHome)}),
 			checks:     []checkFunc{checkTree(claudeEmptyEnvHome, installedSkills(".claude/skills"))},
-		},
-		{
-			name:       "installs to kiro's skills directory",
-			args:       []string{"skills", "install", "kiro-cli"},
-			opts:       []runOption{withEnv("HOME", kiroHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(kiroHome, ".kiro", "skills"), "Kiro CLI"),
-			checks:     []checkFunc{checkTree(kiroHome, installedSkills(".kiro/skills"))},
 		},
 		{
 			name:       "installs to antigravity's skills directory",
 			args:       []string{"skills", "install", "antigravity"},
 			opts:       []runOption{withEnv("HOME", antigravityHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(antigravityHome, ".gemini", "antigravity", "skills"), "Google Antigravity"),
-			checks:     []checkFunc{checkTree(antigravityHome, installedSkills(".gemini/antigravity/skills"))},
+			wantStdout: skillsInstallOutput([]string{filepath.Join(antigravityHome, ".gemini", "config", "skills")}),
+			checks:     []checkFunc{checkTree(antigravityHome, installedSkills(".gemini/config/skills"))},
+		},
+		{
+			// Client names that read the universal directory select it, once.
+			name:       "add alias and case-insensitive client names",
+			args:       []string{"skills", "add", "CURSOR", "codex"},
+			opts:       []runOption{withEnv("HOME", aliasHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput([]string{universalDir(aliasHome)}),
+			checks:     []checkFunc{checkTree(aliasHome, installedSkills(".agents/skills"))},
+		},
+		{
+			name:       "defaults to universal without a terminal",
+			args:       []string{"skills", "install"},
+			opts:       []runOption{withEnv("HOME", firstDefaultHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput([]string{universalDir(firstDefaultHome)}),
+			checks:     []checkFunc{checkTree(firstDefaultHome, installedSkills(".agents/skills"))},
+		},
+		{
+			// An earlier install for Claude Code only is what the defaults
+			// select, so the universal directory isn't added.
+			name:       "defaults to earlier installs without a terminal",
+			args:       []string{"skills", "install"},
+			opts:       []runOption{withEnv("HOME", existingClaudeHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
+			checks:     []checkFunc{checkTree(existingClaudeHome, existingClaude)},
+		},
+		{
+			name: "--no-prompt installs to the defaults without the picker",
+			args: []string{"skills", "install", "--no-prompt"},
+			opts: []runOption{
+				withEnv("HOME", existingBothHome),
+				withIsTerminal(true),
+				withSelectSkillsTargets(nil, nil),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{universalDir(existingBothHome), claudeDir(existingBothHome)}),
+			checks: []checkFunc{checkTree(existingBothHome, withTrees(
+				installedSkills(".agents/skills"),
+				existingClaude,
+			))},
+		},
+		{
+			// The picker starts from the earlier installs; what's chosen is
+			// installed, and an unchosen earlier install is left as it is.
+			name: "installs to the locations chosen in the picker",
+			args: []string{"skills", "install"},
+			opts: []runOption{
+				withEnv("HOME", pickerHome),
+				withIsTerminal(true),
+				withSelectSkillsTargets([]bool{true, true, false, false}, []bool{false, true, false, true}),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{claudeDir(pickerHome), filepath.Join(pickerHome, ".kiro", "skills")}),
+			checks: []checkFunc{checkTree(pickerHome, withTrees(
+				installedSkills(".agents/skills"),
+				existingClaude,
+				installedSkills(".kiro/skills"),
+			))},
 		},
 		{
 			name: "reinstall replaces our skills and removes ones no longer available",
 			args: []string{"skills", "install", "claude-code"},
 			opts: []runOption{withEnv("HOME", reinstallHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code",
-				"Removed retired (no longer available).\n"),
+			wantStdout: skillsInstallOutput([]string{claudeDir(reinstallHome)},
+				fmt.Sprintf("Removed from %s (no longer available):\n  retired\n", claudeDir(reinstallHome))),
 			checks: []checkFunc{
 				checkTree(reinstallHome, reinstallTree),
 				// Running again over a current install leaves it unchanged.
@@ -451,31 +593,78 @@ func TestSkillsInstallCmd(t *testing.T) {
 					if again.err != nil {
 						t.Fatalf("second install failed: %v", again.err)
 					}
-					assertOutput(t, again.stdout, skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code"))
+					assertOutput(t, again.stdout, skillsInstallOutput([]string{claudeDir(reinstallHome)}))
 				},
 				checkTree(reinstallHome, reinstallTree),
 			},
 		},
 		{
 			name:       "--force replaces skills not installed by Tiger CLI",
-			args:       []string{"skills", "install", "codex", "--force"},
+			args:       []string{"skills", "install", "universal", "--force"},
 			opts:       []runOption{withEnv("HOME", forceHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(forceHome, ".agents", "skills"), "Codex"),
+			wantStdout: skillsInstallOutput([]string{universalDir(forceHome)}),
 			checks:     []checkFunc{checkTree(forceHome, forceTree)},
 		},
 		{
-			name:       "--skills-dir overrides the client's directory",
-			args:       []string{"skills", "install", "claude-code", "--skills-dir", "~/custom"},
-			opts:       []runOption{withEnv("HOME", customHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(customHome, "custom"), "Claude Code"),
+			name: "--skills-dir installs there only",
+			args: []string{"skills", "install", "--skills-dir", "~/custom"},
+			opts: []runOption{
+				withEnv("HOME", customHome),
+				withIsTerminal(true),
+				withSelectSkillsTargets(nil, nil),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{filepath.Join(customHome, "custom")}),
 			checks:     []checkFunc{checkTree(customHome, installedSkills("custom"))},
 		},
-		{
-			name:       "add alias and case-insensitive client name",
-			args:       []string{"skills", "add", "CODEX"},
-			opts:       []runOption{withEnv("HOME", aliasHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(aliasHome, ".agents", "skills"), "Codex"),
-			checks:     []checkFunc{checkTree(aliasHome, installedSkills(".agents/skills"))},
-		},
 	})
+}
+
+// TestSkillsPickerModel checks the picker's keys: toggling, moving, and that
+// only enter confirms. Helper-level because the picker is a Bubble Tea model
+// that needs a real TTY to run through the command; the command tests stub it
+// via withSelectSkillsTargets.
+func TestSkillsPickerModel(t *testing.T) {
+	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
+	// stringifies to "\x03" and would match nothing.
+	cases := []struct {
+		name          string
+		keys          []tea.KeyPressMsg
+		wantSelected  []bool
+		wantConfirmed bool
+	}{
+		{"enter keeps the preselection", []tea.KeyPressMsg{{Code: tea.KeyEnter}}, []bool{true, false, false}, true},
+		{"space toggles the current row", []tea.KeyPressMsg{{Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{false, false, false}, true},
+		{"down then space toggles the next row", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{true, true, false}, true},
+		{"number keys toggle their row", []tea.KeyPressMsg{{Code: '3'}, {Code: '1'}, {Code: tea.KeyEnter}}, []bool{false, false, true}, true},
+		{"number keys past the end do nothing", []tea.KeyPressMsg{{Code: '4'}, {Code: tea.KeyEnter}}, []bool{true, false, false}, true},
+		{"cursor can't run past the end", []tea.KeyPressMsg{{Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeySpace}, {Code: tea.KeyEnter}}, []bool{true, false, true}, true},
+		{"q cancels", []tea.KeyPressMsg{{Code: tea.KeySpace}, {Code: 'q'}}, []bool{false, false, false}, false},
+		{"esc cancels", []tea.KeyPressMsg{{Code: tea.KeyEsc}}, []bool{true, false, false}, false},
+		{"ctrl+c cancels", []tea.KeyPressMsg{{Code: 'c', Mod: tea.ModCtrl}}, []bool{true, false, false}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var m tea.Model = skillsPickerModel{items: []skillsPickerItem{
+				{label: "Universal", dir: "~/.agents/skills", selected: true},
+				{label: "Claude Code", dir: "~/.claude/skills"},
+				{label: "Kiro CLI", dir: "~/.kiro/skills"},
+			}}
+			for _, key := range tc.keys {
+				m, _ = m.Update(key)
+			}
+			result := m.(skillsPickerModel)
+			selected := make([]bool, len(result.items))
+			for i, item := range result.items {
+				selected[i] = item.selected
+			}
+			if diff := cmp.Diff(tc.wantSelected, selected); diff != "" {
+				t.Errorf("selection mismatch (-want +got):\n%s", diff)
+			}
+			if result.confirmed != tc.wantConfirmed {
+				t.Errorf("confirmed = %v, want %v", result.confirmed, tc.wantConfirmed)
+			}
+		})
+	}
 }

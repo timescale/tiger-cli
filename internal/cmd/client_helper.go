@@ -37,7 +37,8 @@ type clientConfig struct {
 	// buildMCPInstallCommand builds the CLI install command for CLI-based clients
 	// Parameters: serverName (name to register), command (binary path), args (arguments to binary)
 	buildMCPInstallCommand func(serverName, command string, args []string) ([]string, error)
-	// SkillsDir is the user-level directory skills are installed into.
+	// SkillsDir is the user-level skills directory of a client that doesn't
+	// read the universal ~/.agents/skills. Empty for clients that do.
 	SkillsDir string
 	// SkillsDirEnv overrides SkillsDir for clients whose skills directory can
 	// be relocated by an env var. It's a path containing env var references
@@ -80,7 +81,6 @@ var supportedClients = []clientConfig{
 		MCPConfigPaths: []string{
 			"~/.cursor/mcp.json",
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Devin,
@@ -92,7 +92,6 @@ var supportedClients = []clientConfig{
 		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"devin", "mcp", "add", "-s", "user", serverName, "--", command}, args...), nil
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Codex,
@@ -105,7 +104,6 @@ var supportedClients = []clientConfig{
 		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"codex", "mcp", "add", serverName, command}, args...), nil
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Gemini,
@@ -117,7 +115,6 @@ var supportedClients = []clientConfig{
 		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"gemini", "mcp", "add", "-s", "user", serverName, command}, args...), nil
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  VSCode,
@@ -139,7 +136,6 @@ var supportedClients = []clientConfig{
 			}
 			return []string{"code", "--add-mcp", string(j)}, nil
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:           Antigravity,
@@ -147,9 +143,9 @@ var supportedClients = []clientConfig{
 		EditorNames:          []string{"antigravity", "agy"},
 		MCPServersPathPrefix: "/mcpServers",
 		MCPConfigPaths: []string{
-			"~/.gemini/antigravity/mcp_config.json",
+			"~/.gemini/config/mcp_config.json",
 		},
-		SkillsDir: "~/.gemini/antigravity/skills",
+		SkillsDir: "~/.gemini/config/skills",
 	},
 	{
 		ClientType:  KiroCLI,
@@ -174,7 +170,6 @@ var supportedClients = []clientConfig{
 		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
 		},
-		SkillsDir: "~/.agents/skills",
 	},
 }
 

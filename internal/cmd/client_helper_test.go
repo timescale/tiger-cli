@@ -52,9 +52,6 @@ func TestFindClientConfig(t *testing.T) {
 			if len(found.MCPConfigPaths) == 0 && found.buildMCPInstallCommand == nil {
 				t.Errorf("%s: CLI-only clients must have buildMCPInstallCommand", cfg.ClientType)
 			}
-			if found.SkillsDir == "" {
-				t.Errorf("%s: needs SkillsDir", cfg.ClientType)
-			}
 		}
 	})
 }

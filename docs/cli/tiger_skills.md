@@ -29,4 +29,4 @@ with PostgreSQL, TimescaleDB, and Tiger Cloud.
 ### SEE ALSO
 
 * [tiger](tiger.md)	 - Tiger CLI - Tiger Cloud Platform command-line interface
-* [tiger skills install](tiger_skills_install.md)	 - Install agent skills for an AI coding agent
+* [tiger skills install](tiger_skills_install.md)	 - Install agent skills for AI coding agents

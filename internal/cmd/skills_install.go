@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -49,61 +51,86 @@ var skillsTarballURL = "https://api.github.com/repos/" + skillsRepo + "/tarball/
 
 func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
 	var force bool
+	var noPrompt bool
 	var skillsDirFlag string
 
 	cmd := &cobra.Command{
-		Use:     "install [client]",
+		Use:     "install [client...]",
 		Aliases: []string{"add"},
-		Short:   "Install agent skills for an AI coding agent",
-		Long: fmt.Sprintf(`Install agent skills for an AI coding agent.
+		Short:   "Install agent skills for AI coding agents",
+		Long: fmt.Sprintf(`Install agent skills for AI coding agents.
 
-Skills are installed for the current user into ~/.agents/skills, which most
-coding agents read, or into the client's own skills directory for clients that
-don't.
+Skills are installed for the current user into one or more install locations:
+the universal ~/.agents/skills directory, which most coding agents read, and
+the skills directories of clients that don't read it. Each argument selects a
+location, either by name or by the name of a client that reads it.
+
+%s
+With no arguments, you're prompted to select locations interactively. The
+locations Tiger CLI has installed skills to before are selected by default, or
+universal if there are none; use --no-prompt (or run without a terminal) to
+install to them without prompting.
 
 Re-running the command updates the installed skills to the latest version and
 removes any that are no longer available. Existing skills that weren't
-installed by Tiger CLI are never replaced unless --force is given.
-
-%s
-If no client is specified, you'll be prompted to select one interactively.`, generateSkillsClientsHelp()),
-		Example: `  # Interactive client selection
+installed by Tiger CLI are never replaced unless --force is given.`, generateSkillsTargetsHelp()),
+		Example: `  # Interactive selection
   tiger skills install
 
-  # Install for Claude Code
-  tiger skills install claude-code
+  # Update the skills wherever they were installed before
+  tiger skills install --no-prompt
 
-  # Install for Codex
-  tiger skills install codex
+  # Install to ~/.agents/skills and for Claude Code
+  tiger skills install universal claude-code
 
   # Install into a custom skills directory
-  tiger skills install claude-code --skills-dir ~/my-skills`,
-		Args:         cobra.MaximumNArgs(1),
-		ValidArgs:    getValidEditorNames(),
+  tiger skills install --skills-dir ~/my-skills`,
+		ValidArgs:    skillsTargetNames(),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var clientName string
-			if len(args) == 0 {
-				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - specify a client as an argument (e.g. 'tiger skills install claude-code')")
-				}
-				var err error
-				clientName, err = selectClientInteractively(cmd, "Select a client to install skills for:")
+			if skillsDirFlag != "" && len(args) > 0 {
+				return errors.New("--skills-dir can't be combined with client arguments")
+			}
+
+			var dirs []string
+			switch {
+			case skillsDirFlag != "":
+				dir, err := filepath.Abs(util.ExpandPath(skillsDirFlag))
 				if err != nil {
-					return fmt.Errorf("failed to select client: %w", err)
+					return fmt.Errorf("failed to resolve skills directory: %w", err)
 				}
-			} else {
-				clientName = args[0]
-			}
-
-			clientCfg, err := findClientConfig(clientName)
-			if err != nil {
-				return err
-			}
-
-			skillsDir, err := resolveSkillsDir(clientCfg, skillsDirFlag)
-			if err != nil {
-				return err
+				dirs = []string{dir}
+			case len(args) > 0:
+				targets, err := findSkillsTargets(args)
+				if err != nil {
+					return err
+				}
+				if dirs, err = resolveSkillsTargetDirs(targets); err != nil {
+					return err
+				}
+			default:
+				targets := skillsTargets()
+				targetDirs, err := resolveSkillsTargetDirs(targets)
+				if err != nil {
+					return err
+				}
+				selected, err := defaultSkillsTargets(targetDirs)
+				if err != nil {
+					return err
+				}
+				if !noPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
+					if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
+						return err
+					}
+				}
+				for i, dir := range targetDirs {
+					if selected[i] {
+						dirs = append(dirs, dir)
+					}
+				}
+				if len(dirs) == 0 {
+					return errors.New("no install locations selected")
+				}
 			}
 
 			skills, err := fetchSkills(cmd.Context())
@@ -111,63 +138,165 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 				return err
 			}
 
-			removed, err := installSkills(skills, skillsDir, force)
-			if err != nil {
-				return err
+			if !force {
+				if err := checkSkillConflicts(skills, dirs); err != nil {
+					return err
+				}
 			}
 
-			cmd.Printf("Installed %d skills to %s:\n", len(skills), skillsDir)
+			removed := make([][]string, len(dirs))
+			for i, dir := range dirs {
+				if removed[i], err = installSkills(skills, dir); err != nil {
+					return err
+				}
+			}
+
+			cmd.Printf("Installed %d skills:\n", len(skills))
 			for _, s := range skills {
 				cmd.Printf("  %s\n", s.name)
 			}
-			for _, name := range removed {
-				cmd.Printf("Removed %s (no longer available).\n", name)
+			cmd.Printf("\nInstalled to:\n")
+			for _, dir := range dirs {
+				cmd.Printf("  %s\n", dir)
 			}
-			cmd.Printf("\nRestart %s to load the new skills.\n", clientCfg.Name)
+			for i, dir := range dirs {
+				if len(removed[i]) == 0 {
+					continue
+				}
+				cmd.Printf("\nRemoved from %s (no longer available):\n", dir)
+				for _, name := range removed[i] {
+					cmd.Printf("  %s\n", name)
+				}
+			}
+			cmd.Printf("\nRestart your coding agents to load the new skills.\n")
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "Replace existing skills that weren't installed by Tiger CLI")
-	cmd.Flags().StringVar(&skillsDirFlag, "skills-dir", "", "Custom skills directory to install into (overrides the client's default)")
+	cmd.Flags().BoolVar(&noPrompt, "no-prompt", false, "Install to the default locations without prompting")
+	cmd.Flags().StringVar(&skillsDirFlag, "skills-dir", "", "Install into this skills directory only (not remembered for later installs)")
 	registerFlagCompletion(cmd, "skills-dir", dirCompletion)
 
 	return cmd
 }
 
-// generateSkillsClientsHelp generates the supported clients section of the
-// help text, noting where each client's skills land.
-func generateSkillsClientsHelp() string {
+// skillsTarget is a location skills can be installed to: the universal
+// directory most clients read, or the skills directory of a client that
+// doesn't read it.
+type skillsTarget struct {
+	label   string   // display name
+	names   []string // names that select it on the command line; the first is canonical
+	readers []string // display names of the clients that read it
+	dir     string   // see clientConfig.SkillsDir
+	dirEnv  string   // see clientConfig.SkillsDirEnv
+}
+
+// skillsTargets returns every install location: universal first, then each
+// client with a skills directory of its own, in supportedClients order.
+func skillsTargets() []skillsTarget {
+	targets := []skillsTarget{{
+		label: "Universal",
+		names: []string{"universal"},
+		dir:   "~/.agents/skills",
+	}}
+	for _, c := range supportedClients {
+		if c.SkillsDir == "" {
+			targets[0].names = append(targets[0].names, c.EditorNames...)
+			targets[0].readers = append(targets[0].readers, c.Name)
+			continue
+		}
+		targets = append(targets, skillsTarget{
+			label:   c.Name,
+			names:   c.EditorNames,
+			readers: []string{c.Name},
+			dir:     c.SkillsDir,
+			dirEnv:  c.SkillsDirEnv,
+		})
+	}
+	return targets
+}
+
+// skillsTargetNames returns every name that selects an install location.
+func skillsTargetNames() []string {
+	var names []string
+	for _, t := range skillsTargets() {
+		names = append(names, t.names...)
+	}
+	return names
+}
+
+// findSkillsTargets returns the install locations the given names select, in
+// skillsTargets order and without duplicates. Names match case-insensitively.
+func findSkillsTargets(names []string) ([]skillsTarget, error) {
+	targets := skillsTargets()
+	selected := make([]bool, len(targets))
+	for _, name := range names {
+		i := slices.IndexFunc(targets, func(t skillsTarget) bool {
+			return slices.ContainsFunc(t.names, func(n string) bool { return strings.EqualFold(n, name) })
+		})
+		if i < 0 {
+			return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", name, strings.Join(skillsTargetNames(), ", "))
+		}
+		selected[i] = true
+	}
+	var result []skillsTarget
+	for i, t := range targets {
+		if selected[i] {
+			result = append(result, t)
+		}
+	}
+	return result, nil
+}
+
+// generateSkillsTargetsHelp generates the install locations section of the
+// help text.
+func generateSkillsTargetsHelp() string {
 	var b strings.Builder
-	b.WriteString("Supported Clients:\n")
-	for _, cfg := range supportedClients {
-		fmt.Fprintf(&b, "  %-24s %s (%s)\n", cfg.EditorNames[0], cfg.Name, cfg.SkillsDir)
+	b.WriteString("Install locations:\n")
+	for _, t := range skillsTargets() {
+		fmt.Fprintf(&b, "  %-24s %s (%s)\n", t.names[0], t.dir, strings.Join(t.readers, ", "))
 	}
 	return b.String()
 }
 
-// resolveSkillsDir returns the absolute directory to install skills into for
-// the given client, or custom (relative to the working directory) if set.
-func resolveSkillsDir(cfg *clientConfig, custom string) (string, error) {
-	var dir string
-	if custom != "" {
-		abs, err := filepath.Abs(util.ExpandPath(custom))
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve skills directory: %w", err)
+// resolveSkillsTargetDirs returns the absolute directory of each target.
+func resolveSkillsTargetDirs(targets []skillsTarget) ([]string, error) {
+	dirs := make([]string, len(targets))
+	for i, t := range targets {
+		var dir string
+		if expanded, ok := expandEnvStrict(t.dirEnv); t.dirEnv != "" && ok {
+			dir = filepath.Clean(expanded)
+		} else {
+			dir = util.ExpandPath(t.dir)
 		}
-		return abs, nil
+		// ExpandPath leaves a ~ in place if the home directory is unknown,
+		// which would otherwise install relative to the working directory.
+		if !filepath.IsAbs(dir) {
+			return nil, fmt.Errorf("failed to determine skills directory: %s is not an absolute path", dir)
+		}
+		dirs[i] = dir
 	}
-	if expanded, ok := expandEnvStrict(cfg.SkillsDirEnv); cfg.SkillsDirEnv != "" && ok {
-		dir = filepath.Clean(expanded)
-	} else {
-		dir = util.ExpandPath(cfg.SkillsDir)
+	return dirs, nil
+}
+
+// defaultSkillsTargets reports which of dirs are selected by default: those
+// holding skills Tiger CLI installed, or the first (universal) if none do.
+func defaultSkillsTargets(dirs []string) ([]bool, error) {
+	selected := make([]bool, len(dirs))
+	found := false
+	for i, dir := range dirs {
+		has, err := hasInstalledSkills(dir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check for installed skills: %w", err)
+		}
+		selected[i] = has
+		found = found || has
 	}
-	// ExpandPath leaves a ~ in place if the home directory is unknown, which
-	// would otherwise install relative to the working directory.
-	if !filepath.IsAbs(dir) {
-		return "", fmt.Errorf("failed to determine skills directory: %s is not an absolute path", dir)
+	if !found {
+		selected[0] = true
 	}
-	return dir, nil
+	return selected, nil
 }
 
 // expandEnvStrict expands env var references in s, reporting false if any
@@ -383,28 +512,33 @@ func (a *repoArchive) children(dir string) []string {
 	return names
 }
 
-// installSkills writes each skill into skillsDir, replacing any existing copy,
-// then removes skills Tiger CLI installed earlier that are no longer among
-// them, returning their names. Unless force is set, it refuses up front to
-// replace anything Tiger CLI didn't install.
-func installSkills(skills []skill, skillsDir string, force bool) ([]string, error) {
-	if !force {
-		var conflicts []string
+// checkSkillConflicts returns an error naming every place in dirs where a
+// skill would replace something Tiger CLI didn't install.
+func checkSkillConflicts(skills []skill, dirs []string) error {
+	var conflicts []string
+	for _, dir := range dirs {
 		for _, s := range skills {
-			exists, owned, err := skillOwnership(filepath.Join(skillsDir, s.name))
+			p := filepath.Join(dir, s.name)
+			exists, owned, err := skillOwnership(p)
 			if err != nil {
-				return nil, fmt.Errorf("failed to check existing skill %s: %w", s.name, err)
+				return fmt.Errorf("failed to check existing skill %s: %w", p, err)
 			}
 			if exists && !owned {
-				conflicts = append(conflicts, s.name)
+				conflicts = append(conflicts, p)
 			}
 		}
-		if len(conflicts) > 0 {
-			return nil, fmt.Errorf("skills already exist in %s and weren't installed by Tiger CLI: %s. Use --force to replace them",
-				skillsDir, strings.Join(conflicts, ", "))
-		}
 	}
+	if len(conflicts) > 0 {
+		return fmt.Errorf("skills already exist and weren't installed by Tiger CLI: %s. Use --force to replace them",
+			strings.Join(conflicts, ", "))
+	}
+	return nil
+}
 
+// installSkills writes each skill into skillsDir, replacing any existing copy,
+// then removes skills Tiger CLI installed earlier that are no longer among
+// them, returning their names.
+func installSkills(skills []skill, skillsDir string) ([]string, error) {
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create skills directory: %w", err)
 	}
@@ -419,6 +553,30 @@ func installSkills(skills []skill, skillsDir string, force bool) ([]string, erro
 		return nil, fmt.Errorf("failed to remove skills that are no longer available: %w", err)
 	}
 	return removed, nil
+}
+
+// hasInstalledSkills reports whether skillsDir holds any skill Tiger CLI
+// installed.
+func hasInstalledSkills(skillsDir string) (bool, error) {
+	entries, err := os.ReadDir(skillsDir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), skillsTempPrefix) {
+			continue
+		}
+		_, owned, err := skillOwnership(filepath.Join(skillsDir, e.Name()))
+		if err != nil {
+			return false, err
+		}
+		if owned {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // removeStaleSkills removes the skills in skillsDir that Tiger CLI installed
@@ -548,4 +706,158 @@ func replacePath(src, dst string) error {
 		return err
 	}
 	return os.RemoveAll(aside)
+}
+
+// skillsPickerItem is one install location offered by the picker.
+type skillsPickerItem struct {
+	label    string
+	dir      string // as displayed
+	selected bool
+}
+
+// selectSkillsTargets prompts the user to choose install locations, starting
+// from the given selection, and returns the chosen selection. It's a var so
+// command tests can stub the interactive picker.
+var selectSkillsTargets = func(cmd *cobra.Command, targets []skillsTarget, selected []bool) ([]bool, error) {
+	dirs, err := resolveSkillsTargetDirs(targets)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]skillsPickerItem, len(targets))
+	for i, t := range targets {
+		items[i] = skillsPickerItem{
+			label:    t.label,
+			dir:      displayPath(dirs[i]),
+			selected: selected[i],
+		}
+	}
+
+	model := skillsPickerModel{
+		header: fmt.Sprintf("Select where to install agent skills. %s installs to %s,\nwhich %s read.",
+			targets[0].label, items[0].dir, joinWithAnd(targets[0].readers)),
+		items: items,
+	}
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
+	final, err := program.Run()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run install location selection: %w", err)
+	}
+
+	result := final.(skillsPickerModel)
+	if !result.confirmed {
+		return nil, errors.New("installation cancelled")
+	}
+	chosen := make([]bool, len(result.items))
+	for i, item := range result.items {
+		chosen[i] = item.selected
+	}
+	return chosen, nil
+}
+
+// Colors for the install location picker, taken from the terminal theme.
+// Bright colors and bold are avoided because some themes render them as greys,
+// and dim text uses the faint attribute so it suits light and dark themes
+// alike. They honor color.NoColor, which the command lifecycle sets from the
+// color config option.
+var (
+	skillsPickerCursorColor = color.New(color.FgBlue)
+	skillsPickerCheckColor  = color.New(color.FgGreen)
+	skillsPickerDimColor    = color.New(color.Faint)
+)
+
+// skillsPickerModel is the Bubble Tea model for the install location picker.
+type skillsPickerModel struct {
+	header    string
+	items     []skillsPickerItem
+	cursor    int
+	confirmed bool
+}
+
+func (m skillsPickerModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m skillsPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+	switch k := key.String(); k {
+	case "ctrl+c", "q", "esc":
+		return m, tea.Quit
+	case "enter":
+		m.confirmed = true
+		return m, tea.Quit
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j":
+		if m.cursor < len(m.items)-1 {
+			m.cursor++
+		}
+	case "space":
+		m.items[m.cursor].selected = !m.items[m.cursor].selected
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		if i := int(k[0] - '1'); i < len(m.items) {
+			m.cursor = i
+			m.items[i].selected = !m.items[i].selected
+		}
+	}
+	return m, nil
+}
+
+func (m skillsPickerModel) View() tea.View {
+	if m.confirmed {
+		return tea.NewView("")
+	}
+	width := 0
+	for _, item := range m.items {
+		width = max(width, len(item.label))
+	}
+
+	var b strings.Builder
+	b.WriteString(m.header + "\n\n")
+	for i, item := range m.items {
+		cursor := " "
+		if m.cursor == i {
+			cursor = skillsPickerCursorColor.Sprint(">")
+		}
+		check := " "
+		if item.selected {
+			check = skillsPickerCheckColor.Sprint("✓")
+		}
+		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, skillsPickerDimColor.Sprint(item.dir))
+	}
+	b.WriteString("\n" + skillsPickerDimColor.Sprint("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
+	return tea.NewView(b.String())
+}
+
+// displayPath abbreviates the home directory in path to ~.
+func displayPath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if rel, ok := strings.CutPrefix(path, home+string(filepath.Separator)); ok {
+		return filepath.Join("~", rel)
+	}
+	return path
+}
+
+// joinWithAnd joins items into an English list ("a, b, and c").
+func joinWithAnd(items []string) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
+	}
+	return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
 }
