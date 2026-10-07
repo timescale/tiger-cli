@@ -18,6 +18,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
@@ -733,8 +734,8 @@ var selectSkillsTargets = func(cmd *cobra.Command, targets []skillsTarget, selec
 	}
 
 	model := skillsPickerModel{
-		header: fmt.Sprintf("Select where to install agent skills. %s installs to %s,\nwhich %s read.",
-			targets[0].label, items[0].dir, joinWithAnd(targets[0].readers)),
+		header: ansi.Wordwrap(fmt.Sprintf("Select where to install agent skills. %s installs to %s, which %s read.",
+			targets[0].label, items[0].dir, joinWithAnd(append(slices.Clone(targets[0].readers), "many other agents"))), 80, ""),
 		items: items,
 	}
 	program := tea.NewProgram(model,

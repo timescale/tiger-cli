@@ -8,9 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/hujson"
 
@@ -67,7 +70,7 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 					return fmt.Errorf("TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')")
 				}
 				var err error
-				clientName, err = selectClientInteractively(cmd, "Select an MCP client to configure:")
+				clientName, err = selectClientInteractively(cmd)
 				if err != nil {
 					return fmt.Errorf("failed to select client: %w", err)
 				}
@@ -110,6 +113,15 @@ type InstallOptions struct {
 	CreateBackup bool
 	// CustomConfigPath overrides the default config file location
 	CustomConfigPath string
+}
+
+// getValidEditorNames returns all valid client names from supportedClients
+func getValidEditorNames() []string {
+	var validNames []string
+	for _, client := range supportedClients {
+		validNames = append(validNames, client.EditorNames...)
+	}
+	return validNames
 }
 
 // ClientInfo contains information about a supported MCP client.
@@ -251,6 +263,26 @@ func installTigerMCPForClient(cmd *cobra.Command, clientName string, createBacku
 	return nil
 }
 
+// findClientConfig finds the client configuration for a given client name
+// This consolidates the logic of mapping client names to client types and finding the config
+func findClientConfig(clientName string) (*clientConfig, error) {
+	normalizedName := strings.ToLower(clientName)
+
+	// Look up in our supported clients config
+	for i := range supportedClients {
+		for _, name := range supportedClients[i].EditorNames {
+			if strings.ToLower(name) == normalizedName {
+				return &supportedClients[i], nil
+			}
+		}
+	}
+
+	// Build list of supported clients from our config for error message
+	supportedNames := getValidEditorNames()
+
+	return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", clientName, strings.Join(supportedNames, ", "))
+}
+
 // generateSupportedEditorsHelp generates the supported clients section for help text
 func generateSupportedEditorsHelp() string {
 	var result strings.Builder
@@ -306,6 +338,144 @@ func defaultGetTigerExecutablePath() (string, error) {
 	}
 
 	return tigerPath, nil
+}
+
+// ClientOption represents a client choice for interactive selection
+type ClientOption struct {
+	Name       string // Display name
+	ClientName string // Client name to pass to installMCPForClient
+}
+
+// selectClientInteractively prompts the user to select a client using Bubble Tea
+func selectClientInteractively(cmd *cobra.Command) (string, error) {
+	// Build client options from supportedClients
+	var options []ClientOption
+	for _, cfg := range supportedClients {
+		// Use the first client name as the primary identifier
+		primaryName := cfg.EditorNames[0]
+		options = append(options, ClientOption{
+			Name:       cfg.Name,
+			ClientName: primaryName,
+		})
+	}
+
+	// Sort options alphabetically by name
+	sort.Slice(options, func(i, j int) bool {
+		return options[i].Name < options[j].Name
+	})
+
+	model := clientSelectModel{
+		options: options,
+		cursor:  0,
+	}
+
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
+	finalModel, err := program.Run()
+	if err != nil {
+		return "", fmt.Errorf("failed to run editor selection: %w", err)
+	}
+
+	result := finalModel.(clientSelectModel)
+	if result.selected == "" {
+		return "", fmt.Errorf("no editor selected")
+	}
+
+	return result.selected, nil
+}
+
+// clientSelectModel represents the Bubble Tea model for client selection
+type clientSelectModel struct {
+	options      []ClientOption
+	cursor       int
+	selected     string
+	numberBuffer string
+}
+
+func (m clientSelectModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m clientSelectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "up", "k":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			// Clear buffer when using arrows
+			m.numberBuffer = ""
+			if m.cursor < len(m.options)-1 {
+				m.cursor++
+			}
+		case "enter", "space":
+			m.selected = m.options[m.cursor].ClientName
+			return m, tea.Quit
+		case "backspace":
+			// Handle backspace to remove last character from buffer
+			if len(m.numberBuffer) > 0 {
+				m.updateNumberBuffer(m.numberBuffer[:len(m.numberBuffer)-1])
+			}
+		case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			// Add digit to buffer and update cursor position
+			m.updateNumberBuffer(m.numberBuffer + msg.String())
+		case "ctrl+w":
+			// Clear buffer
+			m.numberBuffer = ""
+		}
+	}
+	return m, nil
+}
+
+// updateNumberBuffer moves the cursor to the editor matching the number buffer
+func (m *clientSelectModel) updateNumberBuffer(newBuffer string) {
+	if newBuffer == "" {
+		m.numberBuffer = newBuffer
+		return
+	}
+
+	// Parse the buffer as a number
+	num, err := strconv.Atoi(newBuffer)
+	if err != nil {
+		return
+	}
+
+	// Convert from 1-based to 0-based index and validate bounds
+	index := num - 1
+	if index >= 0 && index < len(m.options) {
+		m.numberBuffer = newBuffer
+		m.cursor = index
+	}
+}
+
+func (m clientSelectModel) View() tea.View {
+	var s strings.Builder
+	s.WriteString("Select an MCP client to configure:\n\n")
+
+	for i, option := range m.options {
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+		s.WriteString(fmt.Sprintf("%s %d. %s\n", cursor, i+1, option.Name))
+	}
+
+	// Show the current number buffer if user is typing
+	if m.numberBuffer != "" {
+		s.WriteString(fmt.Sprintf("\nTyping: %s", m.numberBuffer))
+	}
+
+	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
+	return tea.NewView(s.String())
 }
 
 // addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig
