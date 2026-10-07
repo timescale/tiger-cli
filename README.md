@@ -267,8 +267,12 @@ tiger skills install claude-code
 
 Skills are installed for the current user into `~/.agents/skills`, which most
 coding agents read, or into the client's own skills directory for clients that
-don't (Claude Code, Kiro CLI, Google Antigravity). Re-run the command to update
-the skills to the latest version.
+don't (Claude Code, Kiro CLI, Google Antigravity). Use `--skills-dir` to install
+somewhere else.
+
+Re-run the command to update the skills to the latest version; skills that are
+no longer available are removed. Existing skills that weren't installed by
+Tiger CLI are never replaced unless you pass `--force`.
 
 ## Configuration
 

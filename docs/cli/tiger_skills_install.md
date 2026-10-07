@@ -10,8 +10,9 @@ Skills are installed for the current user into ~/.agents/skills, which most
 coding agents read, or into the client's own skills directory for clients that
 don't.
 
-Existing skills with the same names are replaced, so re-running the command
-updates the installed skills to the latest version.
+Re-running the command updates the installed skills to the latest version and
+removes any that are no longer available. Existing skills that weren't
+installed by Tiger CLI are never replaced unless --force is given.
 
 Supported Clients:
   claude-code              Claude Code (~/.claude/skills)
@@ -41,12 +42,17 @@ tiger skills install [client] [flags]
 
   # Install for Codex
   tiger skills install codex
+
+  # Install into a custom skills directory
+  tiger skills install claude-code --skills-dir ~/my-skills
 ```
 
 ### Options
 
 ```
-  -h, --help   help for install
+      --force               Replace existing skills that weren't installed by Tiger CLI
+  -h, --help                help for install
+      --skills-dir string   Custom skills directory to install into (overrides the client's default)
 ```
 
 ### Options inherited from parent commands

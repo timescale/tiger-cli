@@ -204,9 +204,11 @@ func writeTree(t *testing.T, root string, tree map[string]string) {
 }
 
 // skillsInstallOutput is the exact stdout of a successful install of the
-// fixture skills into dir.
-func skillsInstallOutput(dir, clientName string) string {
-	return fmt.Sprintf("Installed 2 skills to %s:\n  alpha\n  beta\n\nRestart %s to load the new skills.\n", dir, clientName)
+// fixture skills into dir, with removed holding any lines reporting removed
+// skills.
+func skillsInstallOutput(dir, clientName string, removed ...string) string {
+	return fmt.Sprintf("Installed 2 skills to %s:\n  alpha\n  beta\n%s\nRestart %s to load the new skills.\n",
+		dir, strings.Join(removed, ""), clientName)
 }
 
 func TestSkillsInstallCmd(t *testing.T) {
@@ -236,9 +238,11 @@ func TestSkillsInstallCmd(t *testing.T) {
 	// the home directory).
 	installedSkills := func(dir string) map[string]string {
 		return map[string]string{
+			dir + "/alpha/.tiger-cli":                    skillMarkerContent,
 			dir + "/alpha/SKILL.md":                      "alpha skill",
 			dir + "/alpha/references/guide.md":           "alpha guide",
 			dir + "/alpha/scripts/run.sh":                "[executable] #!/bin/sh",
+			dir + "/beta/.tiger-cli":                     skillMarkerContent,
 			dir + "/beta/SKILL.md":                       "beta skill",
 			dir + "/beta/references/alpha-guide.md":      "alpha guide",
 			dir + "/beta/references/alpha-refs/guide.md": "alpha guide",
@@ -257,20 +261,62 @@ func TestSkillsInstallCmd(t *testing.T) {
 	antigravityHome := t.TempDir()
 	aliasHome := t.TempDir()
 
-	// reinstallHome holds a previous install to be replaced: a skill with a
-	// stale file, a skill that's a symlink to elsewhere (replaced as a link,
-	// leaving its target alone), and an unrelated skill that must be kept.
+	// reinstallHome holds a previous install: one of our skills with a stale
+	// file (replaced), one no longer available (removed), skills of the
+	// user's, hidden or not, and a symlink of the user's to a skill of ours
+	// (kept), and both kinds of temporary directory left by an install that
+	// was killed (quietly removed).
 	reinstallHome := t.TempDir()
 	writeTree(t, reinstallHome, map[string]string{
-		".claude/skills/alpha":          "-> " + filepath.Join(reinstallHome, "elsewhere"),
-		".claude/skills/beta/SKILL.md":  "old beta",
-		".claude/skills/beta/stale.md":  "stale",
-		".claude/skills/other/SKILL.md": "unrelated skill",
-		"elsewhere/SKILL.md":            "symlink target",
+		".claude/skills/alpha/.tiger-cli":              skillMarkerContent,
+		".claude/skills/alpha/SKILL.md":                "old alpha",
+		".claude/skills/alpha/stale.md":                "stale",
+		".claude/skills/retired/.tiger-cli":            skillMarkerContent,
+		".claude/skills/retired/SKILL.md":              "retired skill",
+		".claude/skills/other/SKILL.md":                "user's skill",
+		".claude/skills/.tiger-beta-123/.tiger-cli":    skillMarkerContent,
+		".claude/skills/.tiger-beta-123/SKILL.md":      "leftover",
+		".claude/skills/.tiger-old-456/old/.tiger-cli": skillMarkerContent,
+		".claude/skills/.tiger-old-456/old/SKILL.md":   "leftover",
+		".claude/skills/.hidden/SKILL.md":              "user's hidden entry",
+		".claude/skills/linked":                        "-> " + filepath.Join(reinstallHome, "marked"),
+		"marked/.tiger-cli":                            skillMarkerContent,
+		"marked/SKILL.md":                              "marked skill",
 	})
 	reinstallTree := installedSkills(".claude/skills")
-	reinstallTree[".claude/skills/other/SKILL.md"] = "unrelated skill"
-	reinstallTree["elsewhere/SKILL.md"] = "symlink target"
+	reinstallTree[".claude/skills/other/SKILL.md"] = "user's skill"
+	reinstallTree[".claude/skills/.hidden/SKILL.md"] = "user's hidden entry"
+	reinstallTree[".claude/skills/linked"] = "-> " + filepath.Join(reinstallHome, "marked")
+	reinstallTree["marked/.tiger-cli"] = skillMarkerContent
+	reinstallTree["marked/SKILL.md"] = "marked skill"
+
+	// conflictTree holds a symlink and a directory of the user's under the
+	// names of skills being installed, which aren't replaced without --force.
+	// The symlink counts as the user's even though it points at one of our
+	// skills, since Tiger CLI never creates symlinks.
+	conflictHome := t.TempDir()
+	conflictTree := map[string]string{
+		".agents/skills/alpha":         "-> " + filepath.Join(conflictHome, "marked"),
+		".agents/skills/beta/SKILL.md": "user's beta",
+		"marked/.tiger-cli":            skillMarkerContent,
+		"marked/SKILL.md":              "marked skill",
+	}
+	writeTree(t, conflictHome, conflictTree)
+
+	// forceHome holds a symlink and a directory of the user's under the names
+	// of skills being installed. --force replaces both; the symlink is
+	// replaced as a link, leaving its target alone.
+	forceHome := t.TempDir()
+	writeTree(t, forceHome, map[string]string{
+		".agents/skills/alpha":         "-> " + filepath.Join(forceHome, "elsewhere"),
+		".agents/skills/beta/SKILL.md": "user's beta",
+		".agents/skills/beta/stale.md": "stale",
+		"elsewhere/SKILL.md":           "symlink target",
+	})
+	forceTree := installedSkills(".agents/skills")
+	forceTree["elsewhere/SKILL.md"] = "symlink target"
+
+	customHome := t.TempDir()
 
 	rateLimitReset := time.Date(2030, 1, 1, 15, 4, 0, 0, time.UTC).Unix()
 
@@ -335,6 +381,13 @@ func TestSkillsInstallCmd(t *testing.T) {
 			wantErr: "no skills found",
 		},
 		{
+			name:    "existing skills not installed by Tiger CLI",
+			args:    []string{"skills", "install", "codex"},
+			opts:    []runOption{withEnv("HOME", conflictHome), withSkillsTarball(tarball)},
+			wantErr: fmt.Sprintf("skills already exist in %s and weren't installed by Tiger CLI: alpha, beta. Use --force to replace them", filepath.Join(conflictHome, ".agents", "skills")),
+			checks:  []checkFunc{checkTree(conflictHome, conflictTree)},
+		},
+		{
 			name:       "installs to ~/.agents/skills",
 			args:       []string{"skills", "install", "codex"},
 			opts:       []runOption{withEnv("HOME", codexHome), withSkillsTarball(tarball)},
@@ -385,10 +438,11 @@ func TestSkillsInstallCmd(t *testing.T) {
 			checks:     []checkFunc{checkTree(antigravityHome, installedSkills(".gemini/antigravity/skills"))},
 		},
 		{
-			name:       "reinstall replaces existing skills",
-			args:       []string{"skills", "install", "claude-code"},
-			opts:       []runOption{withEnv("HOME", reinstallHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code"),
+			name: "reinstall replaces our skills and removes ones no longer available",
+			args: []string{"skills", "install", "claude-code"},
+			opts: []runOption{withEnv("HOME", reinstallHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code",
+				"Removed retired (no longer available).\n"),
 			checks: []checkFunc{
 				checkTree(reinstallHome, reinstallTree),
 				// Running again over a current install leaves it unchanged.
@@ -397,9 +451,24 @@ func TestSkillsInstallCmd(t *testing.T) {
 					if again.err != nil {
 						t.Fatalf("second install failed: %v", again.err)
 					}
+					assertOutput(t, again.stdout, skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code"))
 				},
 				checkTree(reinstallHome, reinstallTree),
 			},
+		},
+		{
+			name:       "--force replaces skills not installed by Tiger CLI",
+			args:       []string{"skills", "install", "codex", "--force"},
+			opts:       []runOption{withEnv("HOME", forceHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(forceHome, ".agents", "skills"), "Codex"),
+			checks:     []checkFunc{checkTree(forceHome, forceTree)},
+		},
+		{
+			name:       "--skills-dir overrides the client's directory",
+			args:       []string{"skills", "install", "claude-code", "--skills-dir", "~/custom"},
+			opts:       []runOption{withEnv("HOME", customHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(customHome, "custom"), "Claude Code"),
+			checks:     []checkFunc{checkTree(customHome, installedSkills("custom"))},
 		},
 		{
 			name:       "add alias and case-insensitive client name",

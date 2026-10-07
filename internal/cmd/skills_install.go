@@ -30,6 +30,16 @@ const (
 	// skillsRepoDir is the directory within the repo holding one subdirectory
 	// per skill.
 	skillsRepoDir = "skills"
+
+	// skillMarkerFile is written into every skill Tiger CLI installs, marking
+	// it as one a later install may replace or remove.
+	skillMarkerFile    = ".tiger-cli"
+	skillMarkerContent = "This skill is managed by Tiger CLI. Running 'tiger skills install' updates it\n" +
+		"to the latest version, or removes it if it's no longer available.\n"
+
+	// skillsTempPrefix starts the name of every temporary directory an install
+	// creates in the skills directory.
+	skillsTempPrefix = ".tiger-"
 )
 
 // skillsTarballURL is the GitHub REST API endpoint for the skills repo's
@@ -38,6 +48,9 @@ const (
 var skillsTarballURL = "https://api.github.com/repos/" + skillsRepo + "/tarball/" + skillsRepoRef
 
 func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
+	var force bool
+	var skillsDirFlag string
+
 	cmd := &cobra.Command{
 		Use:     "install [client]",
 		Aliases: []string{"add"},
@@ -48,8 +61,9 @@ Skills are installed for the current user into ~/.agents/skills, which most
 coding agents read, or into the client's own skills directory for clients that
 don't.
 
-Existing skills with the same names are replaced, so re-running the command
-updates the installed skills to the latest version.
+Re-running the command updates the installed skills to the latest version and
+removes any that are no longer available. Existing skills that weren't
+installed by Tiger CLI are never replaced unless --force is given.
 
 %s
 If no client is specified, you'll be prompted to select one interactively.`, generateSkillsClientsHelp()),
@@ -60,7 +74,10 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
   tiger skills install claude-code
 
   # Install for Codex
-  tiger skills install codex`,
+  tiger skills install codex
+
+  # Install into a custom skills directory
+  tiger skills install claude-code --skills-dir ~/my-skills`,
 		Args:         cobra.MaximumNArgs(1),
 		ValidArgs:    getValidEditorNames(),
 		SilenceUsage: true,
@@ -84,7 +101,7 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 				return err
 			}
 
-			skillsDir, err := resolveSkillsDir(clientCfg)
+			skillsDir, err := resolveSkillsDir(clientCfg, skillsDirFlag)
 			if err != nil {
 				return err
 			}
@@ -94,7 +111,8 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 				return err
 			}
 
-			if err := installSkills(skills, skillsDir); err != nil {
+			removed, err := installSkills(skills, skillsDir, force)
+			if err != nil {
 				return err
 			}
 
@@ -102,10 +120,17 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 			for _, s := range skills {
 				cmd.Printf("  %s\n", s.name)
 			}
+			for _, name := range removed {
+				cmd.Printf("Removed %s (no longer available).\n", name)
+			}
 			cmd.Printf("\nRestart %s to load the new skills.\n", clientCfg.Name)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&force, "force", false, "Replace existing skills that weren't installed by Tiger CLI")
+	cmd.Flags().StringVar(&skillsDirFlag, "skills-dir", "", "Custom skills directory to install into (overrides the client's default)")
+	registerFlagCompletion(cmd, "skills-dir", dirCompletion)
 
 	return cmd
 }
@@ -122,9 +147,16 @@ func generateSkillsClientsHelp() string {
 }
 
 // resolveSkillsDir returns the absolute directory to install skills into for
-// the given client.
-func resolveSkillsDir(cfg *clientConfig) (string, error) {
+// the given client, or custom (relative to the working directory) if set.
+func resolveSkillsDir(cfg *clientConfig, custom string) (string, error) {
 	var dir string
+	if custom != "" {
+		abs, err := filepath.Abs(util.ExpandPath(custom))
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve skills directory: %w", err)
+		}
+		return abs, nil
+	}
 	if expanded, ok := expandEnvStrict(cfg.SkillsDirEnv); cfg.SkillsDirEnv != "" && ok {
 		dir = filepath.Clean(expanded)
 	} else {
@@ -351,24 +383,112 @@ func (a *repoArchive) children(dir string) []string {
 	return names
 }
 
-// installSkills writes each skill into skillsDir, replacing any existing copy.
-func installSkills(skills []skill, skillsDir string) error {
+// installSkills writes each skill into skillsDir, replacing any existing copy,
+// then removes skills Tiger CLI installed earlier that are no longer among
+// them, returning their names. Unless force is set, it refuses up front to
+// replace anything Tiger CLI didn't install.
+func installSkills(skills []skill, skillsDir string, force bool) ([]string, error) {
+	if !force {
+		var conflicts []string
+		for _, s := range skills {
+			exists, owned, err := skillOwnership(filepath.Join(skillsDir, s.name))
+			if err != nil {
+				return nil, fmt.Errorf("failed to check existing skill %s: %w", s.name, err)
+			}
+			if exists && !owned {
+				conflicts = append(conflicts, s.name)
+			}
+		}
+		if len(conflicts) > 0 {
+			return nil, fmt.Errorf("skills already exist in %s and weren't installed by Tiger CLI: %s. Use --force to replace them",
+				skillsDir, strings.Join(conflicts, ", "))
+		}
+	}
+
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create skills directory: %w", err)
+		return nil, fmt.Errorf("failed to create skills directory: %w", err)
 	}
 	for _, s := range skills {
 		if err := writeSkill(filepath.Join(skillsDir, s.name), s); err != nil {
-			return fmt.Errorf("failed to install skill %s: %w", s.name, err)
+			return nil, fmt.Errorf("failed to install skill %s: %w", s.name, err)
 		}
 	}
-	return nil
+
+	removed, err := removeStaleSkills(skills, skillsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove skills that are no longer available: %w", err)
+	}
+	return removed, nil
 }
 
-// writeSkill writes s to dir, replacing whatever is there. The new copy is
-// built in a temporary directory beside dir and swapped in, so a failure
-// partway through leaves the existing copy intact.
+// removeStaleSkills removes the skills in skillsDir that Tiger CLI installed
+// but that aren't among skills, returning their names. It also quietly removes
+// temporary directories left behind by an install that was killed partway
+// through.
+func removeStaleSkills(skills []skill, skillsDir string) ([]string, error) {
+	current := make(map[string]bool, len(skills))
+	for _, s := range skills {
+		current[s.name] = true
+	}
+
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return nil, err
+	}
+	var removed []string
+	for _, e := range entries {
+		if !e.IsDir() || current[e.Name()] {
+			continue
+		}
+		dir := filepath.Join(skillsDir, e.Name())
+		if strings.HasPrefix(e.Name(), skillsTempPrefix) {
+			if err := os.RemoveAll(dir); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		_, owned, err := skillOwnership(dir)
+		if err != nil {
+			return nil, err
+		}
+		if !owned {
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			return nil, err
+		}
+		removed = append(removed, e.Name())
+	}
+	return removed, nil
+}
+
+// skillOwnership reports whether anything exists at dir, and whether it's a
+// skill Tiger CLI installed: a directory (not a symlink, since Tiger CLI never
+// creates those) holding the marker file.
+func skillOwnership(dir string) (exists, owned bool, err error) {
+	info, err := os.Lstat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, false, nil
+	} else if err != nil {
+		return false, false, err
+	}
+	if !info.IsDir() {
+		return true, false, nil
+	}
+	info, err = os.Lstat(filepath.Join(dir, skillMarkerFile))
+	if errors.Is(err, fs.ErrNotExist) {
+		return true, false, nil
+	} else if err != nil {
+		return true, false, err
+	}
+	return true, info.Mode().IsRegular(), nil
+}
+
+// writeSkill writes s to dir along with the marker file, replacing whatever
+// is there. The new copy is built in a temporary directory beside dir and
+// swapped in, so a failure partway through leaves the existing copy intact.
 func writeSkill(dir string, s skill) error {
-	tmp, err := os.MkdirTemp(filepath.Dir(dir), ".tiger-"+s.name+"-")
+	tmp, err := os.MkdirTemp(filepath.Dir(dir), skillsTempPrefix+s.name+"-")
 	if err != nil {
 		return err
 	}
@@ -386,6 +506,9 @@ func writeSkill(dir string, s skill) error {
 		if err := os.WriteFile(p, f.data, mode); err != nil {
 			return err
 		}
+	}
+	if err := os.WriteFile(filepath.Join(tmp, skillMarkerFile), []byte(skillMarkerContent), 0o644); err != nil {
+		return err
 	}
 	// MkdirTemp creates the directory 0700; skills are ordinary user files.
 	if err := os.Chmod(tmp, 0o755); err != nil {
@@ -408,7 +531,7 @@ func replacePath(src, dst string) error {
 		return err
 	}
 
-	aside, err := os.MkdirTemp(filepath.Dir(dst), ".tiger-old-")
+	aside, err := os.MkdirTemp(filepath.Dir(dst), skillsTempPrefix+"old-")
 	if err != nil {
 		return err
 	}
