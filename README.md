@@ -254,9 +254,8 @@ tiger config set docs_mcp false
 
 ## Agent Skills
 
-Tiger CLI can install the curated PostgreSQL and TimescaleDB skills from
-[pg-aiguide](https://github.com/timescale/pg-aiguide) — the same skills the
-MCP server proxies — directly into your coding agent:
+Tiger CLI can install curated PostgreSQL and TimescaleDB skills directly into
+your coding agent:
 
 ```bash
 # Interactive installation (prompts for client selection)
@@ -267,9 +266,9 @@ tiger skills install claude-code
 ```
 
 Skills are installed for the current user into `~/.agents/skills`, which most
-coding agents read. For clients that use their own skills directory (Claude
-Code, Kiro CLI, Google Antigravity), each skill is symlinked into that
-directory. Re-run the command to update the skills to the latest version.
+coding agents read, or into the client's own skills directory for clients that
+don't (Claude Code, Kiro CLI, Google Antigravity). Re-run the command to update
+the skills to the latest version.
 
 ## Configuration
 

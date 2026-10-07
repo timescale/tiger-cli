@@ -45,12 +45,15 @@ func TestFindClientConfig(t *testing.T) {
 			}
 			// Every client needs an install mechanism: JSON patching (path
 			// prefix) or a CLI install command.
-			if found.MCPServersPathPrefix == "" && found.buildInstallCommand == nil {
-				t.Errorf("%s: needs MCPServersPathPrefix or buildInstallCommand", cfg.ClientType)
+			if found.MCPServersPathPrefix == "" && found.buildMCPInstallCommand == nil {
+				t.Errorf("%s: needs MCPServersPathPrefix or buildMCPInstallCommand", cfg.ClientType)
 			}
 			// CLI-only clients (no config paths) must have an install command.
-			if len(found.ConfigPaths) == 0 && found.buildInstallCommand == nil {
-				t.Errorf("%s: CLI-only clients must have buildInstallCommand", cfg.ClientType)
+			if len(found.MCPConfigPaths) == 0 && found.buildMCPInstallCommand == nil {
+				t.Errorf("%s: CLI-only clients must have buildMCPInstallCommand", cfg.ClientType)
+			}
+			if found.SkillsDir == "" {
+				t.Errorf("%s: needs SkillsDir", cfg.ClientType)
 			}
 		}
 	})

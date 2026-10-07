@@ -454,15 +454,15 @@ func TestFindClientConfigFile(t *testing.T) {
 	t.Run("per-client fallback paths", func(t *testing.T) {
 		t.Setenv("HOME", t.TempDir())
 		for _, cfg := range supportedClients {
-			if len(cfg.ConfigPaths) == 0 {
+			if len(cfg.MCPConfigPaths) == 0 {
 				continue
 			}
-			got, err := findClientConfigFile(cfg.ConfigPaths)
+			got, err := findClientConfigFile(cfg.MCPConfigPaths)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", cfg.Name, err)
 				continue
 			}
-			if want := util.ExpandPath(cfg.ConfigPaths[0]); got != want {
+			if want := util.ExpandPath(cfg.MCPConfigPaths[0]); got != want {
 				t.Errorf("%s: fallback = %q, want %q", cfg.Name, got, want)
 			}
 		}
@@ -485,7 +485,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 		cfg := &clientConfig{
 			ClientType: "test-client",
 			Name:       "Test Client",
-			buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+			buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 				return []string{"nonexistent-command-12345", "arg1", "arg2"}, nil
 			},
 		}
@@ -512,7 +512,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 			Copilot:    {"copilot", "mcp", "add", "tiger", "--", "/path/to/tiger", "mcp", "start"},
 		}
 		for _, cfg := range supportedClients {
-			if cfg.buildInstallCommand == nil {
+			if cfg.buildMCPInstallCommand == nil {
 				continue
 			}
 			wantCmd, ok := want[cfg.ClientType]
@@ -520,7 +520,7 @@ func TestAddMCPServerViaCLI(t *testing.T) {
 				t.Errorf("%s: CLI-based client missing from expected command table", cfg.ClientType)
 				continue
 			}
-			got, err := cfg.BuildInstallCommand("tiger", "/path/to/tiger", []string{"mcp", "start"})
+			got, err := cfg.BuildMCPInstallCommand("tiger", "/path/to/tiger", []string{"mcp", "start"})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", cfg.ClientType, err)
 				continue

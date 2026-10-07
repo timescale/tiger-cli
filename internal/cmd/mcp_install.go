@@ -162,17 +162,17 @@ func InstallMCPForClient(opts InstallOptions) error {
 	if opts.CustomConfigPath != "" {
 		// Expand custom config path for ~ and environment variables, then use it directly
 		configPath = util.ExpandPath(opts.CustomConfigPath)
-	} else if len(clientCfg.ConfigPaths) > 0 {
+	} else if len(clientCfg.MCPConfigPaths) > 0 {
 		// Use manual config path discovery for clients with configured paths
-		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
+		configPath, err = findClientConfigFile(clientCfg.MCPConfigPaths)
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", opts.ClientName, err)
 		}
-	} else if clientCfg.buildInstallCommand == nil {
-		// Client has neither ConfigPaths nor buildInstallCommand
-		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", opts.ClientName)
+	} else if clientCfg.buildMCPInstallCommand == nil {
+		// Client has neither MCPConfigPaths nor buildMCPInstallCommand
+		return fmt.Errorf("client %s has no MCPConfigPaths or buildMCPInstallCommand defined", opts.ClientName)
 	}
-	// else: CLI-only client - configPath remains empty, will use buildInstallCommand
+	// else: CLI-only client - configPath remains empty, will use buildMCPInstallCommand
 
 	// Create backup if requested and we have a config file
 	if opts.CreateBackup && configPath != "" {
@@ -183,7 +183,7 @@ func InstallMCPForClient(opts InstallOptions) error {
 	}
 
 	// Add MCP server to configuration
-	if clientCfg.buildInstallCommand != nil {
+	if clientCfg.buildMCPInstallCommand != nil {
 		// Use CLI approach when install command builder is configured
 		if err := addMCPServerViaCLI(clientCfg, opts.ServerName, opts.Command, opts.Args); err != nil {
 			return fmt.Errorf("failed to add MCP server configuration: %w", err)
@@ -224,8 +224,8 @@ func installTigerMCPForClient(cmd *cobra.Command, clientName string, createBacku
 	configPath := customConfigPath
 	if configPath == "" {
 		clientCfg, _ := findClientConfig(clientName)
-		if clientCfg != nil && len(clientCfg.ConfigPaths) > 0 {
-			configPath, _ = findClientConfigFile(clientCfg.ConfigPaths)
+		if clientCfg != nil && len(clientCfg.MCPConfigPaths) > 0 {
+			configPath, _ = findClientConfigFile(clientCfg.MCPConfigPaths)
 		}
 	}
 
@@ -310,12 +310,12 @@ func defaultGetTigerExecutablePath() (string, error) {
 
 // addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig
 func addMCPServerViaCLI(clientCfg *clientConfig, serverName, command string, args []string) error {
-	if clientCfg.buildInstallCommand == nil {
+	if clientCfg.buildMCPInstallCommand == nil {
 		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
 	}
 
 	// Build the install command with the provided parameters
-	installCommand, err := clientCfg.BuildInstallCommand(serverName, command, args)
+	installCommand, err := clientCfg.BuildMCPInstallCommand(serverName, command, args)
 	if err != nil {
 		return fmt.Errorf("failed to build install command: %w", err)
 	}

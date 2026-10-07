@@ -6,10 +6,9 @@ Install agent skills for an AI coding agent
 
 Install agent skills for an AI coding agent.
 
-Skills are downloaded from https://github.com/timescale/pg-aiguide and installed
-for the current user into ~/.agents/skills, which most coding agents read. For
-clients that read skills from their own directory, each skill is symlinked
-into that directory, so every client shares a single copy.
+Skills are installed for the current user into ~/.agents/skills, which most
+coding agents read, or into the client's own skills directory for clients that
+don't.
 
 Existing skills with the same names are replaced, so re-running the command
 updates the installed skills to the latest version.

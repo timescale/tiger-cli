@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,22 +33,25 @@ type clientConfig struct {
 	Name                 string
 	EditorNames          []string // Supported client names for this client
 	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor)
-	ConfigPaths          []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
-	// buildInstallCommand builds the CLI install command for CLI-based clients
+	MCPConfigPaths       []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
+	// buildMCPInstallCommand builds the CLI install command for CLI-based clients
 	// Parameters: serverName (name to register), command (binary path), args (arguments to binary)
-	buildInstallCommand func(serverName, command string, args []string) ([]string, error)
-	// skillsDir returns the user-level skills directory for clients that don't
-	// read skills from ~/.agents/skills, given the home directory and an env
-	// var lookup. Nil for clients that do.
-	skillsDir func(home string, getenv func(string) string) string
+	buildMCPInstallCommand func(serverName, command string, args []string) ([]string, error)
+	// SkillsDir is the user-level directory skills are installed into.
+	SkillsDir string
+	// SkillsDirEnv overrides SkillsDir for clients whose skills directory can
+	// be relocated by an env var. It's a path containing env var references
+	// (e.g. "${CLAUDE_CONFIG_DIR}/skills"), used only when every variable it
+	// references is set and non-empty.
+	SkillsDirEnv string
 }
 
-// BuildInstallCommand constructs the install command with the given parameters
-func (c *clientConfig) BuildInstallCommand(serverName, command string, args []string) ([]string, error) {
-	if c.buildInstallCommand == nil {
+// BuildMCPInstallCommand constructs the install command with the given parameters
+func (c *clientConfig) BuildMCPInstallCommand(serverName, command string, args []string) ([]string, error) {
+	if c.buildMCPInstallCommand == nil {
 		return nil, nil
 	}
-	return c.buildInstallCommand(serverName, command, args)
+	return c.buildMCPInstallCommand(serverName, command, args)
 }
 
 // supportedClients defines the clients we support for Tiger MCP installation
@@ -61,69 +63,72 @@ var supportedClients = []clientConfig{
 		ClientType:  ClaudeCode,
 		Name:        "Claude Code",
 		EditorNames: []string{"claude-code"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.claude.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"claude", "mcp", "add", "-s", "user", serverName, command}, args...), nil
 		},
-		skillsDir: func(home string, getenv func(string) string) string {
-			return filepath.Join(envOr(getenv, "CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude")), "skills")
-		},
+		SkillsDir:    "~/.claude/skills",
+		SkillsDirEnv: "${CLAUDE_CONFIG_DIR}/skills",
 	},
 	{
 		ClientType:           Cursor,
 		Name:                 "Cursor",
 		EditorNames:          []string{"cursor"},
 		MCPServersPathPrefix: "/mcpServers",
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.cursor/mcp.json",
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Devin,
 		Name:        "Devin",
 		EditorNames: []string{"devin"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.config/devin/mcp_config.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"devin", "mcp", "add", "-s", "user", serverName, "--", command}, args...), nil
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Codex,
 		Name:        "Codex",
 		EditorNames: []string{"codex"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.codex/config.toml",
 			"$CODEX_HOME/config.toml",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"codex", "mcp", "add", serverName, command}, args...), nil
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  Gemini,
 		Name:        "Gemini CLI",
 		EditorNames: []string{"gemini", "gemini-cli"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.gemini/settings.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"gemini", "mcp", "add", "-s", "user", serverName, command}, args...), nil
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:  VSCode,
 		Name:        "VS Code",
 		EditorNames: []string{"vscode", "code", "vs-code"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.config/Code/User/mcp.json",
 			"~/Library/Application Support/Code/User/mcp.json",
 			"~/AppData/Roaming/Code/User/mcp.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			j, err := json.Marshal(map[string]any{
 				"name":    serverName,
 				"command": command,
@@ -134,43 +139,42 @@ var supportedClients = []clientConfig{
 			}
 			return []string{"code", "--add-mcp", string(j)}, nil
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 	{
 		ClientType:           Antigravity,
 		Name:                 "Google Antigravity",
 		EditorNames:          []string{"antigravity", "agy"},
 		MCPServersPathPrefix: "/mcpServers",
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.gemini/antigravity/mcp_config.json",
 		},
-		skillsDir: func(home string, getenv func(string) string) string {
-			return filepath.Join(home, ".gemini", "antigravity", "skills")
-		},
+		SkillsDir: "~/.gemini/antigravity/skills",
 	},
 	{
 		ClientType:  KiroCLI,
 		Name:        "Kiro CLI",
 		EditorNames: []string{"kiro-cli"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.kiro/settings/mcp.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return []string{"kiro-cli", "mcp", "add", "--name", serverName, "--command", command, "--args", strings.Join(args, ",")}, nil
 		},
-		skillsDir: func(home string, getenv func(string) string) string {
-			return filepath.Join(envOr(getenv, "KIRO_HOME", filepath.Join(home, ".kiro")), "skills")
-		},
+		SkillsDir:    "~/.kiro/skills",
+		SkillsDirEnv: "${KIRO_HOME}/skills",
 	},
 	{
 		ClientType:  Copilot,
 		Name:        "GitHub Copilot CLI",
 		EditorNames: []string{"copilot", "copilot-cli"},
-		ConfigPaths: []string{
+		MCPConfigPaths: []string{
 			"~/.copilot/mcp-config.json",
 		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
+		buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
 			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
 		},
+		SkillsDir: "~/.agents/skills",
 	},
 }
 
@@ -341,13 +345,4 @@ func (m clientSelectModel) View() tea.View {
 
 	s.WriteString("\nUse ↑/↓ arrows or number keys to navigate, enter to select, q to quit")
 	return tea.NewView(s.String())
-}
-
-// envOr returns the value of the environment variable key, or fallback if it
-// is unset or empty.
-func envOr(getenv func(string) string, key, fallback string) string {
-	if v := getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

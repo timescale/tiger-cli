@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/fs"
-	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -205,18 +204,16 @@ func writeTree(t *testing.T, root string, tree map[string]string) {
 }
 
 // skillsInstallOutput is the exact stdout of a successful install of the
-// fixture skills. linkLine is the line describing the client directory, if
-// any.
-func skillsInstallOutput(home, linkLine, clientName string) string {
-	return fmt.Sprintf("Installed 2 skills to %s:\n  alpha\n  beta\n%s\nRestart %s to load the new skills.\n",
-		filepath.Join(home, ".agents", "skills"), linkLine, clientName)
+// fixture skills into dir.
+func skillsInstallOutput(dir, clientName string) string {
+	return fmt.Sprintf("Installed 2 skills to %s:\n  alpha\n  beta\n\nRestart %s to load the new skills.\n", dir, clientName)
 }
 
 func TestSkillsInstallCmd(t *testing.T) {
 	// The fixture repo exercises skill discovery and symlink resolution:
-	// file and directory symlinks between skills, one that climbs out of
-	// skills/ but stays in the repo, and absolute, dangling, and looping ones
-	// (skipped), plus entries that aren't valid skills.
+	// file and directory symlinks between skills (resolved), and ones that
+	// leave skills/, are absolute, dangle, or loop (skipped), plus entries
+	// that aren't skills.
 	tarball := skillsTarball(t,
 		tarEntry{name: "README.md", body: "repo readme"},
 		tarEntry{name: "skills/"},
@@ -232,60 +229,48 @@ func TestSkillsInstallCmd(t *testing.T) {
 		tarEntry{name: "skills/beta/references/absolute.md", link: "/etc/passwd"},
 		tarEntry{name: "skills/beta/references/dangling.md", link: "missing.md"},
 		tarEntry{name: "skills/beta/references/loop.md", link: "loop.md"},
-		tarEntry{name: "skills/Bad_Name/SKILL.md", body: "invalid name"},
+		tarEntry{name: "skills/beta/references/loop-dir", link: "."},
 		tarEntry{name: "skills/no-skill-md/README.md", body: "no SKILL.md"},
 	)
-	// installedSkills is the tree the fixture installs under ~/.agents/skills.
-	installedSkills := map[string]string{
-		".agents/skills/alpha/SKILL.md":                      "alpha skill",
-		".agents/skills/alpha/references/guide.md":           "alpha guide",
-		".agents/skills/alpha/scripts/run.sh":                "[executable] #!/bin/sh",
-		".agents/skills/beta/SKILL.md":                       "beta skill",
-		".agents/skills/beta/references/alpha-guide.md":      "alpha guide",
-		".agents/skills/beta/references/alpha-refs/guide.md": "alpha guide",
-		".agents/skills/beta/references/readme.md":           "repo readme",
-	}
-	// withLinks returns installedSkills plus symlinks to each skill from the
-	// client directory linkDir (relative to home).
-	withLinks := func(home, linkDir string) map[string]string {
-		tree := map[string]string{
-			linkDir + "/alpha": "-> " + filepath.Join(home, ".agents", "skills", "alpha"),
-			linkDir + "/beta":  "-> " + filepath.Join(home, ".agents", "skills", "beta"),
+	// installedSkills is the tree the fixture installs into dir (relative to
+	// the home directory).
+	installedSkills := func(dir string) map[string]string {
+		return map[string]string{
+			dir + "/alpha/SKILL.md":                      "alpha skill",
+			dir + "/alpha/references/guide.md":           "alpha guide",
+			dir + "/alpha/scripts/run.sh":                "[executable] #!/bin/sh",
+			dir + "/beta/SKILL.md":                       "beta skill",
+			dir + "/beta/references/alpha-guide.md":      "alpha guide",
+			dir + "/beta/references/alpha-refs/guide.md": "alpha guide",
+			// A directory symlink cycle is followed once, then cut off.
+			dir + "/beta/references/loop-dir/alpha-guide.md":      "alpha guide",
+			dir + "/beta/references/loop-dir/alpha-refs/guide.md": "alpha guide",
 		}
-		maps.Copy(tree, installedSkills)
-		return tree
 	}
 
 	codexHome := t.TempDir()
 	claudeHome := t.TempDir()
 	claudeConfigHome := t.TempDir()
+	claudeEmptyEnvHome := t.TempDir()
 	claudeConfigDir := filepath.Join(claudeConfigHome, "claude-config")
 	kiroHome := t.TempDir()
 	antigravityHome := t.TempDir()
 	aliasHome := t.TempDir()
 
-	// reinstallHome holds a previous install to be replaced: a stale skill
-	// directory, a client entry that's a real directory, a client symlink
-	// pointing elsewhere, and an unrelated skill that must be left alone.
+	// reinstallHome holds a previous install to be replaced: a skill with a
+	// stale file, a skill that's a symlink to elsewhere (replaced as a link,
+	// leaving its target alone), and an unrelated skill that must be kept.
 	reinstallHome := t.TempDir()
 	writeTree(t, reinstallHome, map[string]string{
-		".agents/skills/alpha/SKILL.md": "old alpha",
-		".agents/skills/alpha/stale.md": "stale",
-		".agents/skills/other/SKILL.md": "unrelated skill",
-		".claude/skills/alpha":          "-> /somewhere/else/alpha",
-		".claude/skills/beta/SKILL.md":  "old beta copy",
+		".claude/skills/alpha":          "-> " + filepath.Join(reinstallHome, "elsewhere"),
+		".claude/skills/beta/SKILL.md":  "old beta",
+		".claude/skills/beta/stale.md":  "stale",
+		".claude/skills/other/SKILL.md": "unrelated skill",
+		"elsewhere/SKILL.md":            "symlink target",
 	})
-	reinstallTree := withLinks(reinstallHome, ".claude/skills")
-	reinstallTree[".agents/skills/other/SKILL.md"] = "unrelated skill"
-
-	// sharedHome has ~/.claude/skills symlinked to ~/.agents/skills, so the
-	// skills are already visible to Claude Code and no per-skill links are made.
-	sharedHome := t.TempDir()
-	writeTree(t, sharedHome, map[string]string{
-		".claude/skills": "-> " + filepath.Join(sharedHome, ".agents", "skills"),
-	})
-	sharedTree := map[string]string{".claude/skills": "-> " + filepath.Join(sharedHome, ".agents", "skills")}
-	maps.Copy(sharedTree, installedSkills)
+	reinstallTree := installedSkills(".claude/skills")
+	reinstallTree[".claude/skills/other/SKILL.md"] = "unrelated skill"
+	reinstallTree["elsewhere/SKILL.md"] = "symlink target"
 
 	rateLimitReset := time.Date(2030, 1, 1, 15, 4, 0, 0, time.UTC).Unix()
 
@@ -347,22 +332,21 @@ func TestSkillsInstallCmd(t *testing.T) {
 				withEnv("HOME", t.TempDir()),
 				withSkillsTarball(skillsTarball(t, tarEntry{name: "README.md", body: "repo readme"})),
 			},
-			wantErr: "no skills found in timescale/pg-aiguide",
+			wantErr: "no skills found",
 		},
 		{
 			name:       "installs to ~/.agents/skills",
 			args:       []string{"skills", "install", "codex"},
 			opts:       []runOption{withEnv("HOME", codexHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(codexHome, "", "Codex"),
-			checks:     []checkFunc{checkTree(codexHome, installedSkills)},
+			wantStdout: skillsInstallOutput(filepath.Join(codexHome, ".agents", "skills"), "Codex"),
+			checks:     []checkFunc{checkTree(codexHome, installedSkills(".agents/skills"))},
 		},
 		{
-			name: "symlinks into claude code's skills directory",
-			args: []string{"skills", "install", "claude-code"},
-			opts: []runOption{withEnv("HOME", claudeHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(claudeHome,
-				fmt.Sprintf("Linked skills into %s.\n", filepath.Join(claudeHome, ".claude", "skills")), "Claude Code"),
-			checks: []checkFunc{checkTree(claudeHome, withLinks(claudeHome, ".claude/skills"))},
+			name:       "installs to claude code's skills directory",
+			args:       []string{"skills", "install", "claude-code"},
+			opts:       []runOption{withEnv("HOME", claudeHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(claudeHome, ".claude", "skills"), "Claude Code"),
+			checks:     []checkFunc{checkTree(claudeHome, installedSkills(".claude/skills"))},
 		},
 		{
 			name: "respects CLAUDE_CONFIG_DIR",
@@ -372,32 +356,39 @@ func TestSkillsInstallCmd(t *testing.T) {
 				withEnv("CLAUDE_CONFIG_DIR", claudeConfigDir),
 				withSkillsTarball(tarball),
 			},
-			wantStdout: skillsInstallOutput(claudeConfigHome,
-				fmt.Sprintf("Linked skills into %s.\n", filepath.Join(claudeConfigDir, "skills")), "Claude Code"),
-			checks: []checkFunc{checkTree(claudeConfigHome, withLinks(claudeConfigHome, "claude-config/skills"))},
+			wantStdout: skillsInstallOutput(filepath.Join(claudeConfigDir, "skills"), "Claude Code"),
+			checks:     []checkFunc{checkTree(claudeConfigHome, installedSkills("claude-config/skills"))},
 		},
 		{
-			name: "symlinks into kiro's skills directory",
-			args: []string{"skills", "install", "kiro-cli"},
-			opts: []runOption{withEnv("HOME", kiroHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(kiroHome,
-				fmt.Sprintf("Linked skills into %s.\n", filepath.Join(kiroHome, ".kiro", "skills")), "Kiro CLI"),
-			checks: []checkFunc{checkTree(kiroHome, withLinks(kiroHome, ".kiro/skills"))},
-		},
-		{
-			name: "symlinks into antigravity's skills directory",
-			args: []string{"skills", "install", "antigravity"},
-			opts: []runOption{withEnv("HOME", antigravityHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(antigravityHome,
-				fmt.Sprintf("Linked skills into %s.\n", filepath.Join(antigravityHome, ".gemini", "antigravity", "skills")), "Google Antigravity"),
-			checks: []checkFunc{checkTree(antigravityHome, withLinks(antigravityHome, ".gemini/antigravity/skills"))},
-		},
-		{
-			name: "reinstall replaces existing skills and links",
+			name: "empty CLAUDE_CONFIG_DIR counts as unset",
 			args: []string{"skills", "install", "claude-code"},
-			opts: []runOption{withEnv("HOME", reinstallHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(reinstallHome,
-				fmt.Sprintf("Linked skills into %s.\n", filepath.Join(reinstallHome, ".claude", "skills")), "Claude Code"),
+			opts: []runOption{
+				withEnv("HOME", claudeEmptyEnvHome),
+				withEnv("CLAUDE_CONFIG_DIR", ""),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput(filepath.Join(claudeEmptyEnvHome, ".claude", "skills"), "Claude Code"),
+			checks:     []checkFunc{checkTree(claudeEmptyEnvHome, installedSkills(".claude/skills"))},
+		},
+		{
+			name:       "installs to kiro's skills directory",
+			args:       []string{"skills", "install", "kiro-cli"},
+			opts:       []runOption{withEnv("HOME", kiroHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(kiroHome, ".kiro", "skills"), "Kiro CLI"),
+			checks:     []checkFunc{checkTree(kiroHome, installedSkills(".kiro/skills"))},
+		},
+		{
+			name:       "installs to antigravity's skills directory",
+			args:       []string{"skills", "install", "antigravity"},
+			opts:       []runOption{withEnv("HOME", antigravityHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(antigravityHome, ".gemini", "antigravity", "skills"), "Google Antigravity"),
+			checks:     []checkFunc{checkTree(antigravityHome, installedSkills(".gemini/antigravity/skills"))},
+		},
+		{
+			name:       "reinstall replaces existing skills",
+			args:       []string{"skills", "install", "claude-code"},
+			opts:       []runOption{withEnv("HOME", reinstallHome), withSkillsTarball(tarball)},
+			wantStdout: skillsInstallOutput(filepath.Join(reinstallHome, ".claude", "skills"), "Claude Code"),
 			checks: []checkFunc{
 				checkTree(reinstallHome, reinstallTree),
 				// Running again over a current install leaves it unchanged.
@@ -411,18 +402,11 @@ func TestSkillsInstallCmd(t *testing.T) {
 			},
 		},
 		{
-			name:       "client directory already shared with ~/.agents/skills",
-			args:       []string{"skills", "install", "claude-code"},
-			opts:       []runOption{withEnv("HOME", sharedHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(sharedHome, "", "Claude Code"),
-			checks:     []checkFunc{checkTree(sharedHome, sharedTree)},
-		},
-		{
 			name:       "add alias and case-insensitive client name",
 			args:       []string{"skills", "add", "CODEX"},
 			opts:       []runOption{withEnv("HOME", aliasHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput(aliasHome, "", "Codex"),
-			checks:     []checkFunc{checkTree(aliasHome, installedSkills)},
+			wantStdout: skillsInstallOutput(filepath.Join(aliasHome, ".agents", "skills"), "Codex"),
+			checks:     []checkFunc{checkTree(aliasHome, installedSkills(".agents/skills"))},
 		},
 	})
 }

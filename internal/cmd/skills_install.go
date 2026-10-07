@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -31,24 +30,12 @@ const (
 	// skillsRepoDir is the directory within the repo holding one subdirectory
 	// per skill.
 	skillsRepoDir = "skills"
-
-	// maxSkillsArchiveSize bounds the decompressed archive, guarding against a
-	// runaway download.
-	maxSkillsArchiveSize = 256 << 20
-	// maxSymlinkHops bounds symlink resolution within the archive, which also
-	// breaks symlink cycles.
-	maxSymlinkHops = 40
 )
 
 // skillsTarballURL is the GitHub REST API endpoint for the skills repo's
 // tarball. GitHub answers it with a redirect to a short-lived download URL.
 // It's a var so tests can point it at a local server.
 var skillsTarballURL = "https://api.github.com/repos/" + skillsRepo + "/tarball/" + skillsRepoRef
-
-// skillNamePattern matches valid skill names per the Agent Skills
-// specification. Anything else is skipped, which also keeps every name safe to
-// use as a path component.
-var skillNamePattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
 	cmd := &cobra.Command{
@@ -57,16 +44,15 @@ func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
 		Short:   "Install agent skills for an AI coding agent",
 		Long: fmt.Sprintf(`Install agent skills for an AI coding agent.
 
-Skills are downloaded from https://github.com/%s and installed
-for the current user into ~/.agents/skills, which most coding agents read. For
-clients that read skills from their own directory, each skill is symlinked
-into that directory, so every client shares a single copy.
+Skills are installed for the current user into ~/.agents/skills, which most
+coding agents read, or into the client's own skills directory for clients that
+don't.
 
 Existing skills with the same names are replaced, so re-running the command
 updates the installed skills to the latest version.
 
 %s
-If no client is specified, you'll be prompted to select one interactively.`, skillsRepo, generateSkillsClientsHelp()),
+If no client is specified, you'll be prompted to select one interactively.`, generateSkillsClientsHelp()),
 		Example: `  # Interactive client selection
   tiger skills install
 
@@ -98,14 +84,9 @@ If no client is specified, you'll be prompted to select one interactively.`, ski
 				return err
 			}
 
-			home, err := os.UserHomeDir()
+			skillsDir, err := resolveSkillsDir(clientCfg)
 			if err != nil {
-				return fmt.Errorf("failed to determine home directory: %w", err)
-			}
-			skillsDir := filepath.Join(home, ".agents", "skills")
-			var linkDir string
-			if clientCfg.skillsDir != nil {
-				linkDir = clientCfg.skillsDir(home, os.Getenv)
+				return err
 			}
 
 			skills, err := fetchSkills(cmd.Context())
@@ -113,20 +94,13 @@ If no client is specified, you'll be prompted to select one interactively.`, ski
 				return err
 			}
 
-			result, err := installSkills(skills, skillsDir, linkDir)
-			if err != nil {
+			if err := installSkills(skills, skillsDir); err != nil {
 				return err
 			}
 
 			cmd.Printf("Installed %d skills to %s:\n", len(skills), skillsDir)
 			for _, s := range skills {
 				cmd.Printf("  %s\n", s.name)
-			}
-			switch {
-			case result.copied:
-				cmd.Printf("Copied skills into %s (symlinks are not supported here).\n", linkDir)
-			case result.linked:
-				cmd.Printf("Linked skills into %s.\n", linkDir)
 			}
 			cmd.Printf("\nRestart %s to load the new skills.\n", clientCfg.Name)
 			return nil
@@ -137,20 +111,45 @@ If no client is specified, you'll be prompted to select one interactively.`, ski
 }
 
 // generateSkillsClientsHelp generates the supported clients section of the
-// help text, noting where each client's skills land. Env var overrides are
-// ignored so the text doesn't depend on the environment it's generated in.
+// help text, noting where each client's skills land.
 func generateSkillsClientsHelp() string {
-	noEnv := func(string) string { return "" }
 	var b strings.Builder
 	b.WriteString("Supported Clients:\n")
 	for _, cfg := range supportedClients {
-		dir := "~/.agents/skills"
-		if cfg.skillsDir != nil {
-			dir = cfg.skillsDir("~", noEnv)
-		}
-		fmt.Fprintf(&b, "  %-24s %s (%s)\n", cfg.EditorNames[0], cfg.Name, dir)
+		fmt.Fprintf(&b, "  %-24s %s (%s)\n", cfg.EditorNames[0], cfg.Name, cfg.SkillsDir)
 	}
 	return b.String()
+}
+
+// resolveSkillsDir returns the absolute directory to install skills into for
+// the given client.
+func resolveSkillsDir(cfg *clientConfig) (string, error) {
+	var dir string
+	if expanded, ok := expandEnvStrict(cfg.SkillsDirEnv); cfg.SkillsDirEnv != "" && ok {
+		dir = filepath.Clean(expanded)
+	} else {
+		dir = util.ExpandPath(cfg.SkillsDir)
+	}
+	// ExpandPath leaves a ~ in place if the home directory is unknown, which
+	// would otherwise install relative to the working directory.
+	if !filepath.IsAbs(dir) {
+		return "", fmt.Errorf("failed to determine skills directory: %s is not an absolute path", dir)
+	}
+	return dir, nil
+}
+
+// expandEnvStrict expands env var references in s, reporting false if any
+// referenced variable is unset or empty.
+func expandEnvStrict(s string) (string, bool) {
+	ok := true
+	expanded := os.Expand(s, func(name string) string {
+		v := os.Getenv(name)
+		if v == "" {
+			ok = false
+		}
+		return v
+	})
+	return expanded, ok
 }
 
 // skill is one skill directory, with its contents held in memory.
@@ -190,8 +189,11 @@ func fetchSkills(ctx context.Context) ([]skill, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read skills archive: %w", err)
 	}
+	if err := resp.Body.Close(); err != nil {
+		return nil, fmt.Errorf("failed to read skills archive: %w", err)
+	}
 	if len(skills) == 0 {
-		return nil, fmt.Errorf("no skills found in %s", skillsRepo)
+		return nil, errors.New("no skills found")
 	}
 	return skills, nil
 }
@@ -212,8 +214,9 @@ func skillsDownloadError(resp *http.Response) error {
 
 // extractSkills reads a gzipped tarball of the skills repo and returns its
 // skills, sorted by name. A skill is a subdirectory of skillsRepoDir holding a
-// SKILL.md. Symlinks within the repo are resolved to the files they point at,
-// since skills share files that way and an installed skill must stand alone.
+// SKILL.md. Symlinks within skillsRepoDir are resolved to the files they point
+// at, since skills share files that way and an installed skill must stand
+// alone; anything else in the repo is ignored.
 func extractSkills(r io.Reader) ([]skill, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
@@ -221,11 +224,11 @@ func extractSkills(r io.Reader) ([]skill, error) {
 	}
 	defer gz.Close()
 
-	a := &skillsArchive{
-		files: map[string]skillFile{},
+	a := &repoArchive{
+		files: map[string]archiveFile{},
 		links: map[string]string{},
 	}
-	tr := tar.NewReader(io.LimitReader(gz, maxSkillsArchiveSize))
+	tr := tar.NewReader(gz)
 	for {
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -236,11 +239,10 @@ func extractSkills(r io.Reader) ([]skill, error) {
 		}
 
 		// GitHub tarballs nest everything under a single top-level directory
-		// named after the repo and commit. Entries outside it (the pax global
-		// header) have no slash and are skipped.
-		_, name, ok := strings.Cut(hdr.Name, "/")
-		name = strings.TrimSuffix(name, "/")
-		if !ok || !fs.ValidPath(name) || name == "." {
+		// named after the repo and commit. ValidPath keeps names safe to
+		// join onto the install directory later.
+		_, name, _ := strings.Cut(hdr.Name, "/")
+		if !strings.HasPrefix(name, skillsRepoDir+"/") || !fs.ValidPath(name) {
 			continue
 		}
 
@@ -250,13 +252,12 @@ func extractSkills(r io.Reader) ([]skill, error) {
 			if err != nil {
 				return nil, err
 			}
-			a.files[name] = skillFile{
+			a.files[name] = archiveFile{
 				executable: hdr.Mode&0o111 != 0,
 				data:       data,
 			}
 		case tar.TypeSymlink:
-			// Absolute targets point outside the repo, and relative ones may
-			// climb out of it; either way they can't be resolved.
+			// An absolute target can't refer to a file in the repo.
 			if path.IsAbs(hdr.Linkname) {
 				continue
 			}
@@ -264,13 +265,14 @@ func extractSkills(r io.Reader) ([]skill, error) {
 		}
 	}
 
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+
 	var skills []skill
 	for _, name := range a.children(skillsRepoDir) {
-		if !skillNamePattern.MatchString(name) {
-			continue
-		}
 		s := skill{name: name}
-		a.walk(path.Join(skillsRepoDir, name), "", 0, func(f skillFile) {
+		a.walk(path.Join(skillsRepoDir, name), "", map[string]bool{}, func(f skillFile) {
 			s.files = append(s.files, f)
 		})
 		if !slices.ContainsFunc(s.files, func(f skillFile) bool { return f.path == "SKILL.md" }) {
@@ -282,37 +284,49 @@ func extractSkills(r io.Reader) ([]skill, error) {
 	return skills, nil
 }
 
-// skillsArchive indexes the regular files and symlinks of an extracted
-// tarball by their slash-separated path within the repo.
-type skillsArchive struct {
-	files map[string]skillFile
+// repoArchive indexes the regular files and symlinks under skillsRepoDir in
+// the repo's tarball by their slash-separated path within the repo.
+type repoArchive struct {
+	files map[string]archiveFile
 	links map[string]string // symlink path -> target path
 }
 
+// archiveFile is a regular file in the repo's tarball.
+type archiveFile struct {
+	executable bool
+	data       []byte
+}
+
 // walk emits every regular file reachable at src, which may be a file, a
-// symlink, or a directory, with paths rebased from src onto dst. Dangling
-// symlinks, and those nested more than maxSymlinkHops deep, are skipped.
-func (a *skillsArchive) walk(src, dst string, hops int, emit func(skillFile)) {
+// symlink, or a directory, with paths rebased from src onto dst. following
+// holds the symlinks being resolved on the way to src, so a symlink that leads
+// back to one of them (a cycle) is skipped, as are dangling symlinks.
+func (a *repoArchive) walk(src, dst string, following map[string]bool, emit func(skillFile)) {
 	if f, ok := a.files[src]; ok {
 		if dst != "" {
-			f.path = dst
-			emit(f)
+			emit(skillFile{
+				path:       dst,
+				executable: f.executable,
+				data:       f.data,
+			})
 		}
 		return
 	}
 	if target, ok := a.links[src]; ok {
-		if hops < maxSymlinkHops {
-			a.walk(target, dst, hops+1, emit)
+		if !following[src] {
+			following[src] = true
+			a.walk(target, dst, following, emit)
+			delete(following, src)
 		}
 		return
 	}
 	for _, child := range a.children(src) {
-		a.walk(path.Join(src, child), path.Join(dst, child), hops, emit)
+		a.walk(path.Join(src, child), path.Join(dst, child), following, emit)
 	}
 }
 
 // children returns the sorted names of the entries directly inside dir.
-func (a *skillsArchive) children(dir string) []string {
+func (a *repoArchive) children(dir string) []string {
 	prefix := dir + "/"
 	seen := map[string]bool{}
 	var names []string
@@ -337,60 +351,18 @@ func (a *skillsArchive) children(dir string) []string {
 	return names
 }
 
-// installSkillsResult reports how skills reached the client's own skills
-// directory, if it has one.
-type installSkillsResult struct {
-	linked bool // symlinked into the client's directory
-	copied bool // copied into the client's directory, as symlinks failed
-}
-
-// installSkills writes each skill into skillsDir, replacing any existing copy,
-// then symlinks it into linkDir if set. Linking is skipped when linkDir
-// resolves to skillsDir itself (e.g. the user has symlinked one to the other).
-func installSkills(skills []skill, skillsDir, linkDir string) (installSkillsResult, error) {
-	var result installSkillsResult
+// installSkills writes each skill into skillsDir, replacing any existing copy.
+func installSkills(skills []skill, skillsDir string) error {
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
-		return result, fmt.Errorf("failed to create skills directory: %w", err)
+		return fmt.Errorf("failed to create skills directory: %w", err)
 	}
 	for _, s := range skills {
 		if err := writeSkill(filepath.Join(skillsDir, s.name), s); err != nil {
-			return result, fmt.Errorf("failed to install skill %s: %w", s.name, err)
+			return fmt.Errorf("failed to install skill %s: %w", s.name, err)
 		}
 	}
-
-	if linkDir == "" {
-		return result, nil
-	}
-	if err := os.MkdirAll(linkDir, 0o755); err != nil {
-		return result, fmt.Errorf("failed to create skills directory: %w", err)
-	}
-	same, err := sameDir(skillsDir, linkDir)
-	if err != nil {
-		return result, err
-	}
-	if same {
-		return result, nil
-	}
-	for _, s := range skills {
-		target := filepath.Join(skillsDir, s.name)
-		link := filepath.Join(linkDir, s.name)
-		err := linkSkill(target, link)
-		if errors.Is(err, errSymlinkUnsupported) {
-			err = writeSkill(link, s)
-			result.copied = true
-		} else {
-			result.linked = true
-		}
-		if err != nil {
-			return result, fmt.Errorf("failed to link skill %s: %w", s.name, err)
-		}
-	}
-	return result, nil
+	return nil
 }
-
-// errSymlinkUnsupported reports that a symlink couldn't be created (e.g. on
-// Windows without Developer Mode), so the caller should fall back to a copy.
-var errSymlinkUnsupported = errors.New("symlinks not supported")
 
 // writeSkill writes s to dir, replacing whatever is there. The new copy is
 // built in a temporary directory beside dir and swapped in, so a failure
@@ -419,34 +391,16 @@ func writeSkill(dir string, s skill) error {
 	if err := os.Chmod(tmp, 0o755); err != nil {
 		return err
 	}
-	return replacePath(tmp, dir)
-}
-
-// linkSkill points link at target, replacing whatever is at link unless it's
-// already the right symlink. The symlink is created under a temporary name
-// and swapped in, so link is never left missing.
-func linkSkill(target, link string) error {
-	if current, err := os.Readlink(link); err == nil && current == target {
-		return nil
-	}
-
-	tmp, err := os.MkdirTemp(filepath.Dir(link), ".tiger-"+filepath.Base(link)+"-")
-	if err != nil {
+	if err := replacePath(tmp, dir); err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmp)
-
-	tmpLink := filepath.Join(tmp, "link")
-	if err := os.Symlink(target, tmpLink); err != nil {
-		return fmt.Errorf("%w: %w", errSymlinkUnsupported, err)
-	}
-	return replacePath(tmpLink, link)
+	return os.RemoveAll(tmp)
 }
 
 // replacePath moves src to dst, replacing any file, directory, or symlink at
 // dst. A rename can't replace a non-empty directory, so the existing entry is
-// first moved aside, and restored if the swap fails. Symlinks are moved and
-// removed as links, never followed.
+// first moved aside, and restored if the swap fails. A symlink at dst is
+// removed as a link, never followed.
 func replacePath(src, dst string) error {
 	if _, err := os.Lstat(dst); errors.Is(err, fs.ErrNotExist) {
 		return os.Rename(src, dst)
@@ -470,19 +424,5 @@ func replacePath(src, dst string) error {
 		}
 		return err
 	}
-	return nil
-}
-
-// sameDir reports whether a and b resolve to the same directory once symlinks
-// are followed.
-func sameDir(a, b string) (bool, error) {
-	ra, err := filepath.EvalSymlinks(a)
-	if err != nil {
-		return false, err
-	}
-	rb, err := filepath.EvalSymlinks(b)
-	if err != nil {
-		return false, err
-	}
-	return ra == rb, nil
+	return os.RemoveAll(aside)
 }
