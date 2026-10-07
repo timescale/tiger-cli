@@ -6,7 +6,7 @@ Start MCP server with HTTP transport
 
 Start the MCP server using HTTP transport.
 
-The server will automatically find an available port if the specified port is busy.
+The server listens on the given port and fails if that port is already in use.
 
 ```
 tiger mcp start http [flags]
