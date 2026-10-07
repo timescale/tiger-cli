@@ -317,15 +317,13 @@ func TestSkillsInstallCmd(t *testing.T) {
 	claudeEmptyEnvHome := home(nil)
 	antigravityHome := home(nil)
 	aliasHome := home(nil)
-	firstDefaultHome := home(nil)
+	universalPickerHome := home(nil)
 	customHome := home(nil)
 
-	// existingClaude holds an earlier install for Claude Code only, so it's
-	// what the defaults select; existingBoth adds one to the universal
-	// directory.
+	// existingClaude is an earlier install for Claude Code, which the picker
+	// starts with selected.
 	existingClaude := installedSkills(".claude/skills")
 	existingClaudeHome := home(existingClaude)
-	existingBothHome := home(withTrees(installedSkills(".agents/skills"), existingClaude))
 	pickerHome := home(withTrees(installedSkills(".agents/skills"), existingClaude))
 
 	// reinstallHome holds a previous install: one of our skills with a stale
@@ -399,6 +397,12 @@ func TestSkillsInstallCmd(t *testing.T) {
 			name:    "unsupported client",
 			args:    []string{"skills", "install", "claude-code", "bogus"},
 			wantErr: "unsupported client: bogus. Supported clients: universal, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, copilot, copilot-cli, claude-code, antigravity, agy, kiro-cli",
+		},
+		{
+			name:    "no arguments and no TTY",
+			args:    []string{"skills", "install"},
+			opts:    []runOption{withEnv("HOME", home(nil))},
+			wantErr: "TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')",
 		},
 		{
 			name: "nothing selected in the picker",
@@ -531,35 +535,32 @@ func TestSkillsInstallCmd(t *testing.T) {
 			checks:     []checkFunc{checkTree(aliasHome, installedSkills(".agents/skills"))},
 		},
 		{
-			name:       "defaults to universal without a terminal",
-			args:       []string{"skills", "install"},
-			opts:       []runOption{withEnv("HOME", firstDefaultHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput([]string{universalDir(firstDefaultHome)}),
-			checks:     []checkFunc{checkTree(firstDefaultHome, installedSkills(".agents/skills"))},
-		},
-		{
-			// An earlier install for Claude Code only is what the defaults
-			// select, so the universal directory isn't added.
-			name:       "defaults to earlier installs without a terminal",
-			args:       []string{"skills", "install"},
-			opts:       []runOption{withEnv("HOME", existingClaudeHome), withSkillsTarball(tarball)},
-			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
-			checks:     []checkFunc{checkTree(existingClaudeHome, existingClaude)},
-		},
-		{
-			name: "--no-prompt installs to the defaults without the picker",
-			args: []string{"skills", "install", "--no-prompt"},
+			// Without other installs, the picker starts with universal
+			// selected.
+			name: "installs to universal from the picker",
+			args: []string{"skills", "install"},
 			opts: []runOption{
-				withEnv("HOME", existingBothHome),
+				withEnv("HOME", universalPickerHome),
 				withIsTerminal(true),
-				withSelectSkillsTargets(nil, nil),
+				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{true, false, false, false}),
 				withSkillsTarball(tarball),
 			},
-			wantStdout: skillsInstallOutput([]string{universalDir(existingBothHome), claudeDir(existingBothHome)}),
-			checks: []checkFunc{checkTree(existingBothHome, withTrees(
-				installedSkills(".agents/skills"),
-				existingClaude,
-			))},
+			wantStdout: skillsInstallOutput([]string{universalDir(universalPickerHome)}),
+			checks:     []checkFunc{checkTree(universalPickerHome, installedSkills(".agents/skills"))},
+		},
+		{
+			// An earlier install for Claude Code only is what the picker
+			// starts with, so universal isn't selected.
+			name: "picker starts from earlier installs",
+			args: []string{"skills", "install"},
+			opts: []runOption{
+				withEnv("HOME", existingClaudeHome),
+				withIsTerminal(true),
+				withSelectSkillsTargets([]bool{false, true, false, false}, []bool{false, true, false, false}),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
+			checks:     []checkFunc{checkTree(existingClaudeHome, existingClaude)},
 		},
 		{
 			// The picker starts from the earlier installs; what's chosen is

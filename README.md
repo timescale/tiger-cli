@@ -275,9 +275,9 @@ to install into a directory of your choice instead.
 
 Re-run the command to update the skills to the latest version; skills that are
 no longer available are removed. With no arguments, the locations you've
-installed to before are selected by default, and `--no-prompt` installs to them
-without prompting. Existing skills that weren't installed by Tiger CLI are
-never replaced unless you pass `--force`.
+installed to before are selected in the picker to start with. Existing skills
+that weren't installed by Tiger CLI are never replaced unless you pass
+`--force`.
 
 ## Configuration
 

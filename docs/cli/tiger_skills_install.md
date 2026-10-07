@@ -17,10 +17,8 @@ Install locations:
   antigravity              ~/.gemini/config/skills (Google Antigravity)
   kiro-cli                 ~/.kiro/skills (Kiro CLI)
 
-With no arguments, you're prompted to select locations interactively. The
-locations Tiger CLI has installed skills to before are selected by default, or
-universal if there are none; use --no-prompt (or run without a terminal) to
-install to them without prompting.
+With no arguments, you're prompted to select locations interactively, starting
+from the locations Tiger CLI has installed skills to before.
 
 Re-running the command updates the installed skills to the latest version and
 removes any that are no longer available. Existing skills that weren't
@@ -36,9 +34,6 @@ tiger skills install [client...] [flags]
   # Interactive selection
   tiger skills install
 
-  # Update the skills wherever they were installed before
-  tiger skills install --no-prompt
-
   # Install to ~/.agents/skills and for Claude Code
   tiger skills install universal claude-code
 
@@ -51,7 +46,6 @@ tiger skills install [client...] [flags]
 ```
       --force               Replace existing skills that weren't installed by Tiger CLI
   -h, --help                help for install
-      --no-prompt           Install to the default locations without prompting
       --skills-dir string   Install into this skills directory only (not remembered for later installs)
 ```
 

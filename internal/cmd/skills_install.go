@@ -52,7 +52,6 @@ var skillsTarballURL = "https://api.github.com/repos/" + skillsRepo + "/tarball/
 
 func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
 	var force bool
-	var noPrompt bool
 	var skillsDirFlag string
 
 	cmd := &cobra.Command{
@@ -67,19 +66,14 @@ the skills directories of clients that don't read it. Each argument selects a
 location, either by name or by the name of a client that reads it.
 
 %s
-With no arguments, you're prompted to select locations interactively. The
-locations Tiger CLI has installed skills to before are selected by default, or
-universal if there are none; use --no-prompt (or run without a terminal) to
-install to them without prompting.
+With no arguments, you're prompted to select locations interactively, starting
+from the locations Tiger CLI has installed skills to before.
 
 Re-running the command updates the installed skills to the latest version and
 removes any that are no longer available. Existing skills that weren't
 installed by Tiger CLI are never replaced unless --force is given.`, generateSkillsTargetsHelp()),
 		Example: `  # Interactive selection
   tiger skills install
-
-  # Update the skills wherever they were installed before
-  tiger skills install --no-prompt
 
   # Install to ~/.agents/skills and for Claude Code
   tiger skills install universal claude-code
@@ -115,14 +109,15 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 				if err != nil {
 					return err
 				}
-				selected, err := defaultSkillsTargets(targetDirs)
+				selected, err := preselectSkillsTargets(targetDirs)
 				if err != nil {
 					return err
 				}
-				if !noPrompt && util.IsTerminal(cmd.InOrStdin()) && util.IsTerminal(cmd.ErrOrStderr()) {
-					if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
-						return err
-					}
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+					return errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
+				}
+				if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
+					return err
 				}
 				for i, dir := range targetDirs {
 					if selected[i] {
@@ -175,7 +170,6 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "Replace existing skills that weren't installed by Tiger CLI")
-	cmd.Flags().BoolVar(&noPrompt, "no-prompt", false, "Install to the default locations without prompting")
 	cmd.Flags().StringVar(&skillsDirFlag, "skills-dir", "", "Install into this skills directory only (not remembered for later installs)")
 	registerFlagCompletion(cmd, "skills-dir", dirCompletion)
 
@@ -281,9 +275,10 @@ func resolveSkillsTargetDirs(targets []skillsTarget) ([]string, error) {
 	return dirs, nil
 }
 
-// defaultSkillsTargets reports which of dirs are selected by default: those
-// holding skills Tiger CLI installed, or the first (universal) if none do.
-func defaultSkillsTargets(dirs []string) ([]bool, error) {
+// preselectSkillsTargets reports which of dirs the picker starts with
+// selected: those holding skills Tiger CLI installed, or the first (universal)
+// if none do.
+func preselectSkillsTargets(dirs []string) ([]bool, error) {
 	selected := make([]bool, len(dirs))
 	found := false
 	for i, dir := range dirs {
