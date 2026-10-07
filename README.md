@@ -92,6 +92,9 @@ tiger db query -c "SELECT now()"
 
 # Install the MCP server
 tiger mcp install
+
+# Install agent skills for your coding agent
+tiger skills install
 ```
 
 ## Usage
@@ -135,6 +138,8 @@ Tiger CLI provides the following commands:
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
+- `tiger skills` - Agent skills for AI coding agents
+  - `install` - Install PostgreSQL and TimescaleDB skills for an AI coding agent (alias: `add`)
 - `tiger feedback` - Submit feedback or a bug report to the Tiger Data team (pass the message as an argument or on stdin)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
@@ -246,6 +251,25 @@ To disable the documentation proxy:
 ```bash
 tiger config set docs_mcp false
 ```
+
+## Agent Skills
+
+Tiger CLI can install the curated PostgreSQL and TimescaleDB skills from
+[pg-aiguide](https://github.com/timescale/pg-aiguide) — the same skills the
+MCP server proxies — directly into your coding agent:
+
+```bash
+# Interactive installation (prompts for client selection)
+tiger skills install
+
+# Or specify your client directly
+tiger skills install claude-code
+```
+
+Skills are installed for the current user into `~/.agents/skills`, which most
+coding agents read. For clients that use their own skills directory (Claude
+Code, Kiro CLI, Google Antigravity), each skill is symlinked into that
+directory. Re-run the command to update the skills to the latest version.
 
 ## Configuration
 

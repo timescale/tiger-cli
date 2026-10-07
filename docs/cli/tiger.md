@@ -34,5 +34,6 @@ To get started, run:
 * [tiger mcp](tiger_mcp.md)	 - Tiger Model Context Protocol (MCP) server
 * [tiger project](tiger_project.md)	 - Manage Tiger Cloud projects
 * [tiger service](tiger_service.md)	 - Manage database services
+* [tiger skills](tiger_skills.md)	 - Manage agent skills for AI coding agents
 * [tiger upgrade](tiger_upgrade.md)	 - Upgrade the Tiger CLI to the latest version
 * [tiger version](tiger_version.md)	 - Show version information

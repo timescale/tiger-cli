@@ -107,6 +107,7 @@ To get started, run:
 	cmd.AddCommand(buildServiceCmd(app))
 	cmd.AddCommand(buildDbCmd(app))
 	cmd.AddCommand(buildMCPCmd(app))
+	cmd.AddCommand(buildSkillsCmd(app))
 	cmd.AddCommand(buildFeedbackCmd(app))
 
 	wrapCommands(cmd, app)
