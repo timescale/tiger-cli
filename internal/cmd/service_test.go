@@ -42,12 +42,12 @@ func TestServiceCommandAliases(t *testing.T) {
 }
 
 // TestServiceExperimentalGate covers the registration gate for the remaining
-// preview subtree (`service backup`): buildServiceCmd only adds it when the
-// experimental env var is truthy, so by default the command doesn't exist in
-// the tree at all. `service metrics` graduated off this gate and is asserted
-// present regardless of the flag. Help output is asserted loosely
-// (containment) rather than exactly, so the gate test doesn't break every time
-// an unrelated subcommand's help text changes.
+// preview subtrees (`service backup`, `service allowlist`): buildServiceCmd
+// only adds them when the experimental env var is truthy, so by default the
+// commands don't exist in the tree at all. `service metrics` graduated off
+// this gate and is asserted present regardless of the flag. Help output is
+// asserted loosely (containment) rather than exactly, so the gate test
+// doesn't break every time an unrelated subcommand's help text changes.
 func TestServiceExperimentalGate(t *testing.T) {
 	// matchHelp asserts the output is a help text that mentions want and none
 	// of the gated names in absent.
@@ -69,10 +69,10 @@ func TestServiceExperimentalGate(t *testing.T) {
 			// Cobra only reports "unknown command" at the root level; for a
 			// non-root group it treats the unknown name as a stray argument
 			// and prints the group's help. The gate is observable as the
-			// absence of the gated entry in that help.
-			name:       "backup unregistered by default",
+			// absence of any gated entry in that help.
+			name:       "unregistered by default",
 			args:       []string{"service", "backup"},
-			wantStdout: matchHelp("Available Commands:", "backup"),
+			wantStdout: matchHelp("Available Commands:", "backup", "allowlist"),
 		},
 		{
 			name:       "metrics registered by default",
@@ -84,6 +84,12 @@ func TestServiceExperimentalGate(t *testing.T) {
 			args:       []string{"service", "backup", "--help"},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: matchHelp("Manage the backups taken for a database service"),
+		},
+		{
+			name:       "allowlist registered when experimental",
+			args:       []string{"service", "allowlist", "--help"},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp("Attach or detach the IP allow list"),
 		},
 	})
 }
