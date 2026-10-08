@@ -315,6 +315,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 	claudeConfigHome := home(nil)
 	claudeConfigDir := filepath.Join(claudeConfigHome, "claude-config")
 	claudeEmptyEnvHome := home(nil)
+	claudeRelativeEnvHome := home(nil)
 	antigravityHome := home(nil)
 	aliasHome := home(nil)
 	universalPickerHome := home(nil)
@@ -519,6 +520,17 @@ func TestSkillsInstallCmd(t *testing.T) {
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(claudeEmptyEnvHome)}),
 			checks:     []checkFunc{checkTree(claudeEmptyEnvHome, installedSkills(".claude/skills"))},
+		},
+		{
+			name: "relative CLAUDE_CONFIG_DIR is ignored",
+			args: []string{"skills", "install", "claude-code"},
+			opts: []runOption{
+				withEnv("HOME", claudeRelativeEnvHome),
+				withEnv("CLAUDE_CONFIG_DIR", "claude-config"),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{claudeDir(claudeRelativeEnvHome)}),
+			checks:     []checkFunc{checkTree(claudeRelativeEnvHome, installedSkills(".claude/skills"))},
 		},
 		{
 			name:       "installs to antigravity's skills directory",

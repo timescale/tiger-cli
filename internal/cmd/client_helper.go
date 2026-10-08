@@ -38,7 +38,7 @@ type clientConfig struct {
 	// SkillsDirEnv overrides SkillsDir for clients whose skills directory can
 	// be relocated by an env var. It's a path containing env var references
 	// (e.g. "${CLAUDE_CONFIG_DIR}/skills"), used only when every variable it
-	// references is set and non-empty.
+	// references is set and non-empty, and it expands to an absolute path.
 	SkillsDirEnv string
 }
 

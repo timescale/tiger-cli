@@ -349,18 +349,21 @@ var selectSkillsTargets = func(cmd *cobra.Command, targets []skillsTarget, selec
 	return chosen, nil
 }
 
-// resolveSkillsTargetDirs returns the absolute directory of each target.
+// resolveSkillsTargetDirs returns the absolute directory of each target. An
+// env var override that doesn't give an absolute path is ignored, since
+// there's no telling what a relative one is relative to.
 func resolveSkillsTargetDirs(targets []skillsTarget) ([]string, error) {
 	dirs := make([]string, len(targets))
 	for i, t := range targets {
-		var dir string
-		if expanded, ok := expandEnvStrict(t.dirEnv); t.dirEnv != "" && ok {
-			dir = filepath.Clean(expanded)
-		} else {
-			dir = util.ExpandPath(t.dir)
+		if t.dirEnv != "" {
+			if expanded, ok := expandEnvStrict(t.dirEnv); ok && filepath.IsAbs(expanded) {
+				dirs[i] = filepath.Clean(expanded)
+				continue
+			}
 		}
 		// ExpandPath leaves a ~ in place if the home directory is unknown,
 		// which would otherwise install relative to the working directory.
+		dir := util.ExpandPath(t.dir)
 		if !filepath.IsAbs(dir) {
 			return nil, fmt.Errorf("failed to determine skills directory: %s is not an absolute path", dir)
 		}
