@@ -91,7 +91,7 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 
   # Install into a custom skills directory
   tiger skills install --skills-dir ~/my-skills`,
-		ValidArgs:    skillsTargetNames(),
+		ValidArgs:    skillsTargetNames(skillsTargets()),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if skillsDirFlag != "" && len(args) > 0 {
@@ -202,7 +202,7 @@ func skillsDirsFromArgs(names []string) ([]string, error) {
 			return slices.ContainsFunc(t.names, func(n string) bool { return strings.EqualFold(n, name) })
 		})
 		if i < 0 {
-			return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", name, strings.Join(skillsTargetNames(), ", "))
+			return nil, fmt.Errorf("unsupported client: %s. Supported clients: %s", name, strings.Join(skillsTargetNames(targets), ", "))
 		}
 		selected[i] = true
 	}
@@ -215,10 +215,10 @@ func skillsDirsFromArgs(names []string) ([]string, error) {
 	return resolveSkillsTargetDirs(result)
 }
 
-// skillsTargetNames returns every name that selects an install location.
-func skillsTargetNames() []string {
+// skillsTargetNames returns every name that selects one of targets.
+func skillsTargetNames(targets []skillsTarget) []string {
 	var names []string
-	for _, t := range skillsTargets() {
+	for _, t := range targets {
 		names = append(names, t.names...)
 	}
 	return names
@@ -617,7 +617,6 @@ func extractSkills(r io.Reader) ([]skill, error) {
 		if !slices.ContainsFunc(s.files, func(f skillFile) bool { return f.path == "SKILL.md" }) {
 			continue
 		}
-		slices.SortFunc(s.files, func(a, b skillFile) int { return strings.Compare(a.path, b.path) })
 		skills = append(skills, s)
 	}
 	return skills, nil
