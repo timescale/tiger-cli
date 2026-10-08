@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -222,35 +224,39 @@ func skillsInstallOutput(dirs []string, removed ...string) string {
 	return b.String()
 }
 
-// skillsTargetLabels are the install locations, in the order the picker
-// offers them.
-var skillsTargetLabels = []string{"Universal", "Claude Code", "Google Antigravity", "Kiro CLI"}
-
-// withSelectSkillsTargets stubs the interactive install location picker: it
-// expects to be offered the locations with want preselected, and answers with
-// choose. A nil want expects the picker not to be shown at all.
-func withSelectSkillsTargets(want, choose []bool) runOption {
+// withRunSkillsPicker stubs the interactive install location picker: it
+// expects to be offered exactly want, and answers with choose. A nil want
+// expects the picker not to be shown at all.
+func withRunSkillsPicker(want []skillsPickerItem, choose []bool) runOption {
 	return withSetup(func(t *testing.T) {
-		original := selectSkillsTargets
-		selectSkillsTargets = func(_ *cobra.Command, targets []skillsTarget, selected []bool) ([]bool, error) {
+		original := runSkillsPicker
+		runSkillsPicker = func(_ *cobra.Command, _ string, items []skillsPickerItem) ([]bool, error) {
 			if want == nil {
 				t.Error("install location picker shown, want none")
-				return selected, nil
+				return nil, errors.New("picker shown")
 			}
-			labels := make([]string, len(targets))
-			for i, target := range targets {
-				labels[i] = target.label
-			}
-			if diff := cmp.Diff(skillsTargetLabels, labels); diff != "" {
-				t.Errorf("picker locations mismatch (-want +got):\n%s", diff)
-			}
-			if diff := cmp.Diff(want, selected); diff != "" {
-				t.Errorf("picker preselection mismatch (-want +got):\n%s", diff)
+			if diff := cmp.Diff(want, items, cmp.AllowUnexported(skillsPickerItem{})); diff != "" {
+				t.Errorf("picker items mismatch (-want +got):\n%s", diff)
 			}
 			return choose, nil
 		}
-		t.Cleanup(func() { selectSkillsTargets = original })
+		t.Cleanup(func() { runSkillsPicker = original })
 	})
+}
+
+// pickerItems returns the items the picker offers with the default install
+// locations (the home directory shown as ~), selecting those in selected.
+func pickerItems(selected ...string) []skillsPickerItem {
+	items := []skillsPickerItem{
+		{label: "Universal", dir: "~/.agents/skills"},
+		{label: "Claude Code", dir: "~/.claude/skills"},
+		{label: "Google Antigravity", dir: "~/.gemini/config/skills"},
+		{label: "Kiro CLI", dir: "~/.kiro/skills"},
+	}
+	for i := range items {
+		items[i].selected = slices.Contains(selected, items[i].label)
+	}
+	return items
 }
 
 func TestSkillsInstallCmd(t *testing.T) {
@@ -316,6 +322,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 	claudeConfigDir := filepath.Join(claudeConfigHome, "claude-config")
 	claudeEmptyEnvHome := home(nil)
 	claudeRelativeEnvHome := home(nil)
+	claudePickerEnvHome := home(nil)
 	antigravityHome := home(nil)
 	aliasHome := home(nil)
 	universalPickerHome := home(nil)
@@ -412,7 +419,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", home(nil)),
 				withIsTerminal(true),
-				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{false, false, false, false}),
+				withRunSkillsPicker(pickerItems("Universal"), []bool{false, false, false, false}),
 			},
 			wantErr: "no install locations selected",
 		},
@@ -555,7 +562,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", universalPickerHome),
 				withIsTerminal(true),
-				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{true, false, false, false}),
+				withRunSkillsPicker(pickerItems("Universal"), []bool{true, false, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{universalDir(universalPickerHome)}),
@@ -569,7 +576,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", existingClaudeHome),
 				withIsTerminal(true),
-				withSelectSkillsTargets([]bool{false, true, false, false}, []bool{false, true, false, false}),
+				withRunSkillsPicker(pickerItems("Claude Code"), []bool{false, true, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
@@ -595,11 +602,31 @@ func TestSkillsInstallCmd(t *testing.T) {
 					}
 					t.Cleanup(func() { os.Chmod(dir, 0o755) })
 				}),
-				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{true, false, false, false}),
+				withRunSkillsPicker(pickerItems("Universal"), []bool{true, false, false, false}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{universalDir(unreadableHome)}),
 			checks:     []checkFunc{checkTree(filepath.Join(unreadableHome, ".agents"), installedSkills("skills"))},
+		},
+		{
+			// The picker shows where each location actually is, including an
+			// env var override.
+			name: "picker shows CLAUDE_CONFIG_DIR",
+			args: []string{"skills", "install"},
+			opts: []runOption{
+				withEnv("HOME", claudePickerEnvHome),
+				withEnv("CLAUDE_CONFIG_DIR", filepath.Join(claudePickerEnvHome, "claude-config")),
+				withIsTerminal(true),
+				withRunSkillsPicker([]skillsPickerItem{
+					{label: "Universal", dir: "~/.agents/skills", selected: true},
+					{label: "Claude Code", dir: "~/claude-config/skills"},
+					{label: "Google Antigravity", dir: "~/.gemini/config/skills"},
+					{label: "Kiro CLI", dir: "~/.kiro/skills"},
+				}, []bool{false, true, false, false}),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{filepath.Join(claudePickerEnvHome, "claude-config", "skills")}),
+			checks:     []checkFunc{checkTree(claudePickerEnvHome, installedSkills("claude-config/skills"))},
 		},
 		{
 			// The picker starts from the earlier installs; what's chosen is
@@ -609,7 +636,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", pickerHome),
 				withIsTerminal(true),
-				withSelectSkillsTargets([]bool{true, true, false, false}, []bool{false, true, false, true}),
+				withRunSkillsPicker(pickerItems("Universal", "Claude Code"), []bool{false, true, false, true}),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(pickerHome), filepath.Join(pickerHome, ".kiro", "skills")}),
@@ -651,7 +678,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 			opts: []runOption{
 				withEnv("HOME", customHome),
 				withIsTerminal(true),
-				withSelectSkillsTargets(nil, nil),
+				withRunSkillsPicker(nil, nil),
 				withSkillsTarball(tarball),
 			},
 			wantStdout: skillsInstallOutput([]string{filepath.Join(customHome, "custom")}),
@@ -663,7 +690,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 // TestSkillsPickerModel checks the picker's keys: toggling, moving, and that
 // only enter confirms. Helper-level because the picker is a Bubble Tea model
 // that needs a real TTY to run through the command; the command tests stub it
-// via withSelectSkillsTargets.
+// via withRunSkillsPicker.
 func TestSkillsPickerModel(t *testing.T) {
 	// Ctrl+C is {Code: 'c', Mod: tea.ModCtrl}; the raw control byte {Code: 3}
 	// stringifies to "\x03" and would match nothing.

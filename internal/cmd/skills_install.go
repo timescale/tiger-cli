@@ -99,42 +99,17 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 			}
 
 			var dirs []string
+			var err error
 			switch {
 			case skillsDirFlag != "":
-				dir, err := filepath.Abs(util.ExpandPath(skillsDirFlag))
-				if err != nil {
-					return fmt.Errorf("failed to resolve skills directory: %w", err)
-				}
-				dirs = []string{dir}
+				dirs, err = skillsDirsFromFlag(skillsDirFlag)
 			case len(args) > 0:
-				targets, err := findSkillsTargets(args)
-				if err != nil {
-					return err
-				}
-				if dirs, err = resolveSkillsTargetDirs(targets); err != nil {
-					return err
-				}
+				dirs, err = skillsDirsFromArgs(args)
 			default:
-				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
-				}
-				targets := skillsTargets()
-				targetDirs, err := resolveSkillsTargetDirs(targets)
-				if err != nil {
-					return err
-				}
-				selected := preselectSkillsTargets(targetDirs)
-				if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
-					return err
-				}
-				for i, dir := range targetDirs {
-					if selected[i] {
-						dirs = append(dirs, dir)
-					}
-				}
-				if len(dirs) == 0 {
-					return errors.New("no install locations selected")
-				}
+				dirs, err = skillsDirsFromPicker(cmd)
+			}
+			if err != nil {
+				return err
 			}
 
 			skills, err := fetchSkills(cmd.Context())
@@ -184,6 +159,16 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 	return cmd
 }
 
+// skillsDirsFromFlag returns the directory given by --skills-dir, made
+// absolute (relative to the working directory).
+func skillsDirsFromFlag(path string) ([]string, error) {
+	dir, err := filepath.Abs(util.ExpandPath(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve skills directory: %w", err)
+	}
+	return []string{dir}, nil
+}
+
 // skillsTarget is a location skills can be installed to: the universal
 // directory most clients read, or the skills directory of a client that
 // doesn't read it.
@@ -206,9 +191,10 @@ func generateSkillsTargetsHelp() string {
 	return b.String()
 }
 
-// findSkillsTargets returns the install locations the given names select, in
-// skillsTargets order and without duplicates. Names match case-insensitively.
-func findSkillsTargets(names []string) ([]skillsTarget, error) {
+// skillsDirsFromArgs returns the directories of the install locations the
+// given names select, in skillsTargets order and without duplicates. Names
+// match case-insensitively.
+func skillsDirsFromArgs(names []string) ([]string, error) {
 	targets := skillsTargets()
 	selected := make([]bool, len(targets))
 	for _, name := range names {
@@ -226,7 +212,7 @@ func findSkillsTargets(names []string) ([]skillsTarget, error) {
 			result = append(result, t)
 		}
 	}
-	return result, nil
+	return resolveSkillsTargetDirs(result)
 }
 
 // skillsTargetNames returns every name that selects an install location.
@@ -236,6 +222,53 @@ func skillsTargetNames() []string {
 		names = append(names, t.names...)
 	}
 	return names
+}
+
+// skillsPickerItem is one install location offered by the picker.
+type skillsPickerItem struct {
+	label    string
+	dir      string // as displayed
+	selected bool
+}
+
+// skillsDirsFromPicker prompts the user to choose install locations, starting
+// from the ones preselectSkillsDirs picks, and returns the chosen
+// directories. It fails without a terminal to prompt on.
+func skillsDirsFromPicker(cmd *cobra.Command) ([]string, error) {
+	if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+		return nil, errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
+	}
+	targets := skillsTargets()
+	dirs, err := resolveSkillsTargetDirs(targets)
+	if err != nil {
+		return nil, err
+	}
+	selected := preselectSkillsDirs(dirs)
+	items := make([]skillsPickerItem, len(targets))
+	for i, t := range targets {
+		items[i] = skillsPickerItem{
+			label:    t.label,
+			dir:      displayPath(dirs[i]),
+			selected: selected[i],
+		}
+	}
+	header := ansi.Wordwrap(fmt.Sprintf("Select where to install agent skills. %s installs to %s, which %s read.",
+		targets[0].label, items[0].dir, joinWithAnd(append(slices.Clone(targets[0].readers), "many other agents"))), 80, "")
+
+	chosen, err := runSkillsPicker(cmd, header, items)
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	for i, dir := range dirs {
+		if chosen[i] {
+			result = append(result, dir)
+		}
+	}
+	if len(result) == 0 {
+		return nil, errors.New("no install locations selected")
+	}
+	return result, nil
 }
 
 // skillsTargets returns every install location: universal first, then each
@@ -261,92 +294,6 @@ func skillsTargets() []skillsTarget {
 		})
 	}
 	return targets
-}
-
-// preselectSkillsTargets reports which of dirs the picker starts with
-// selected: those holding skills Tiger CLI installed, or the first (universal)
-// if none do.
-func preselectSkillsTargets(dirs []string) []bool {
-	selected := make([]bool, len(dirs))
-	found := false
-	for i, dir := range dirs {
-		selected[i] = hasInstalledSkills(dir)
-		found = found || selected[i]
-	}
-	if !found {
-		selected[0] = true
-	}
-	return selected
-}
-
-// hasInstalledSkills reports whether skillsDir holds any skill Tiger CLI
-// installed. Anything that can't be inspected counts as not installed: this
-// only decides what the picker starts with, and installing to skillsDir would
-// report the underlying problem.
-func hasInstalledSkills(skillsDir string) bool {
-	entries, err := os.ReadDir(skillsDir)
-	if err != nil {
-		return false
-	}
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), skillsTempPrefix) {
-			continue
-		}
-		if _, owned, err := skillOwnership(filepath.Join(skillsDir, e.Name())); err == nil && owned {
-			return true
-		}
-	}
-	return false
-}
-
-// skillsPickerItem is one install location offered by the picker.
-type skillsPickerItem struct {
-	label    string
-	dir      string // as displayed
-	selected bool
-}
-
-// selectSkillsTargets prompts the user to choose install locations, starting
-// from the given selection, and returns the chosen selection. It's a var so
-// command tests can stub the interactive picker.
-var selectSkillsTargets = func(cmd *cobra.Command, targets []skillsTarget, selected []bool) ([]bool, error) {
-	dirs, err := resolveSkillsTargetDirs(targets)
-	if err != nil {
-		return nil, err
-	}
-	items := make([]skillsPickerItem, len(targets))
-	for i, t := range targets {
-		items[i] = skillsPickerItem{
-			label:    t.label,
-			dir:      displayPath(dirs[i]),
-			selected: selected[i],
-		}
-	}
-
-	model := skillsPickerModel{
-		header: ansi.Wordwrap(fmt.Sprintf("Select where to install agent skills. %s installs to %s, which %s read.",
-			targets[0].label, items[0].dir, joinWithAnd(append(slices.Clone(targets[0].readers), "many other agents"))), 80, ""),
-		items: items,
-	}
-	program := tea.NewProgram(model,
-		tea.WithInput(cmd.InOrStdin()),
-		tea.WithOutput(cmd.ErrOrStderr()),
-		tea.WithContext(cmd.Context()),
-		tea.WithoutSignalHandler())
-	final, err := program.Run()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run install location selection: %w", err)
-	}
-
-	result := final.(skillsPickerModel)
-	if !result.confirmed {
-		return nil, errors.New("installation cancelled")
-	}
-	chosen := make([]bool, len(result.items))
-	for i, item := range result.items {
-		chosen[i] = item.selected
-	}
-	return chosen, nil
 }
 
 // resolveSkillsTargetDirs returns the absolute directory of each target. An
@@ -384,6 +331,71 @@ func expandEnvStrict(s string) (string, bool) {
 		return v
 	})
 	return expanded, ok
+}
+
+// preselectSkillsDirs reports which of dirs the picker starts with
+// selected: those holding skills Tiger CLI installed, or the first (universal)
+// if none do.
+func preselectSkillsDirs(dirs []string) []bool {
+	selected := make([]bool, len(dirs))
+	found := false
+	for i, dir := range dirs {
+		selected[i] = hasInstalledSkills(dir)
+		found = found || selected[i]
+	}
+	if !found {
+		selected[0] = true
+	}
+	return selected
+}
+
+// hasInstalledSkills reports whether skillsDir holds any skill Tiger CLI
+// installed. Anything that can't be inspected counts as not installed: this
+// only decides what the picker starts with, and installing to skillsDir would
+// report the underlying problem.
+func hasInstalledSkills(skillsDir string) bool {
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), skillsTempPrefix) {
+			continue
+		}
+		if _, owned, err := skillOwnership(filepath.Join(skillsDir, e.Name())); err == nil && owned {
+			return true
+		}
+	}
+	return false
+}
+
+// runSkillsPicker runs the interactive install location picker over items and
+// returns which of them the user chose. It's a var so command tests can stub
+// the interactive part.
+var runSkillsPicker = func(cmd *cobra.Command, header string, items []skillsPickerItem) ([]bool, error) {
+	model := skillsPickerModel{
+		header: header,
+		items:  items,
+	}
+	program := tea.NewProgram(model,
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.ErrOrStderr()),
+		tea.WithContext(cmd.Context()),
+		tea.WithoutSignalHandler())
+	final, err := program.Run()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run install location selection: %w", err)
+	}
+
+	result := final.(skillsPickerModel)
+	if !result.confirmed {
+		return nil, errors.New("installation cancelled")
+	}
+	chosen := make([]bool, len(result.items))
+	for i, item := range result.items {
+		chosen[i] = item.selected
+	}
+	return chosen, nil
 }
 
 // skillsPickerModel is the Bubble Tea model for the install location picker.
