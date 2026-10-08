@@ -115,6 +115,9 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 					return err
 				}
 			default:
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+					return errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
+				}
 				targets := skillsTargets()
 				targetDirs, err := resolveSkillsTargetDirs(targets)
 				if err != nil {
@@ -123,9 +126,6 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 				selected, err := preselectSkillsTargets(targetDirs)
 				if err != nil {
 					return err
-				}
-				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
-					return errors.New("TTY not detected - specify install locations as arguments (e.g. 'tiger skills install universal')")
 				}
 				if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
 					return err
