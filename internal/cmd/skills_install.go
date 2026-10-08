@@ -404,6 +404,7 @@ type skillsPickerModel struct {
 	items     []skillsPickerItem
 	cursor    int
 	confirmed bool
+	done      bool // set on quitting, however that happens, to clear the picker
 }
 
 func (m skillsPickerModel) Init() tea.Cmd {
@@ -417,9 +418,11 @@ func (m skillsPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch k := key.String(); k {
 	case "ctrl+c", "q", "esc":
+		m.done = true
 		return m, tea.Quit
 	case "enter":
 		m.confirmed = true
+		m.done = true
 		return m, tea.Quit
 	case "up", "k":
 		if m.cursor > 0 {
@@ -441,7 +444,7 @@ func (m skillsPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m skillsPickerModel) View() tea.View {
-	if m.confirmed {
+	if m.done {
 		return tea.NewView("")
 	}
 	width := 0

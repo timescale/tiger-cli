@@ -732,6 +732,9 @@ func TestSkillsPickerModel(t *testing.T) {
 			if result.confirmed != tc.wantConfirmed {
 				t.Errorf("confirmed = %v, want %v", result.confirmed, tc.wantConfirmed)
 			}
+			if !result.done {
+				t.Error("done = false, want true (every case ends by quitting)")
+			}
 		})
 	}
 }
