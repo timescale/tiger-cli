@@ -93,21 +93,6 @@ If no client is specified, you'll be prompted to select one interactively.`, gen
 	return cmd
 }
 
-// MCPClient represents our internal client types
-type MCPClient string
-
-const (
-	ClaudeCode  MCPClient = "claude-code"
-	Cursor      MCPClient = "cursor" // Both the IDE and the CLI
-	Devin       MCPClient = "devin"
-	Codex       MCPClient = "codex"
-	Gemini      MCPClient = "gemini"
-	VSCode      MCPClient = "vscode"
-	Antigravity MCPClient = "antigravity"
-	KiroCLI     MCPClient = "kiro-cli"
-	Copilot     MCPClient = "copilot" // Both the IDE and the CLI
-)
-
 // MCPServerConfig represents the MCP server configuration
 type MCPServerConfig struct {
 	Command string   `json:"command"`
@@ -128,139 +113,6 @@ type InstallOptions struct {
 	CreateBackup bool
 	// CustomConfigPath overrides the default config file location
 	CustomConfigPath string
-}
-
-// clientConfig represents our own client configuration for Tiger MCP installation
-type clientConfig struct {
-	ClientType           MCPClient // Our internal client type
-	Name                 string
-	EditorNames          []string // Supported client names for this client
-	MCPServersPathPrefix string   // JSON path prefix for MCP servers config (only for JSON config manipulation clients like Cursor)
-	ConfigPaths          []string // Config file locations - used for backup on all clients, and for JSON manipulation on JSON-config clients
-	// buildInstallCommand builds the CLI install command for CLI-based clients
-	// Parameters: serverName (name to register), command (binary path), args (arguments to binary)
-	buildInstallCommand func(serverName, command string, args []string) ([]string, error)
-}
-
-// BuildInstallCommand constructs the install command with the given parameters
-func (c *clientConfig) BuildInstallCommand(serverName, command string, args []string) ([]string, error) {
-	if c.buildInstallCommand == nil {
-		return nil, nil
-	}
-	return c.buildInstallCommand(serverName, command, args)
-}
-
-// supportedClients defines the clients we support for Tiger MCP installation
-// Note: A good place to find the json config location for MCPServersPathPrefix
-// is in the supportedClientIntegrations map found in:
-// https://github.com/stacklok/toolhive/blob/main/pkg/client/config.go
-var supportedClients = []clientConfig{
-	{
-		ClientType:  ClaudeCode,
-		Name:        "Claude Code",
-		EditorNames: []string{"claude-code"},
-		ConfigPaths: []string{
-			"~/.claude.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"claude", "mcp", "add", "-s", "user", serverName, command}, args...), nil
-		},
-	},
-	{
-		ClientType:           Cursor,
-		Name:                 "Cursor",
-		EditorNames:          []string{"cursor"},
-		MCPServersPathPrefix: "/mcpServers",
-		ConfigPaths: []string{
-			"~/.cursor/mcp.json",
-		},
-	},
-	{
-		ClientType:  Devin,
-		Name:        "Devin",
-		EditorNames: []string{"devin"},
-		ConfigPaths: []string{
-			"~/.config/devin/mcp_config.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"devin", "mcp", "add", "-s", "user", serverName, "--", command}, args...), nil
-		},
-	},
-	{
-		ClientType:  Codex,
-		Name:        "Codex",
-		EditorNames: []string{"codex"},
-		ConfigPaths: []string{
-			"~/.codex/config.toml",
-			"$CODEX_HOME/config.toml",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"codex", "mcp", "add", serverName, command}, args...), nil
-		},
-	},
-	{
-		ClientType:  Gemini,
-		Name:        "Gemini CLI",
-		EditorNames: []string{"gemini", "gemini-cli"},
-		ConfigPaths: []string{
-			"~/.gemini/settings.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"gemini", "mcp", "add", "-s", "user", serverName, command}, args...), nil
-		},
-	},
-	{
-		ClientType:  VSCode,
-		Name:        "VS Code",
-		EditorNames: []string{"vscode", "code", "vs-code"},
-		ConfigPaths: []string{
-			"~/.config/Code/User/mcp.json",
-			"~/Library/Application Support/Code/User/mcp.json",
-			"~/AppData/Roaming/Code/User/mcp.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			j, err := json.Marshal(map[string]any{
-				"name":    serverName,
-				"command": command,
-				"args":    args,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal MCP config: %w", err)
-			}
-			return []string{"code", "--add-mcp", string(j)}, nil
-		},
-	},
-	{
-		ClientType:           Antigravity,
-		Name:                 "Google Antigravity",
-		EditorNames:          []string{"antigravity", "agy"},
-		MCPServersPathPrefix: "/mcpServers",
-		ConfigPaths: []string{
-			"~/.gemini/antigravity/mcp_config.json",
-		},
-	},
-	{
-		ClientType:  KiroCLI,
-		Name:        "Kiro CLI",
-		EditorNames: []string{"kiro-cli"},
-		ConfigPaths: []string{
-			"~/.kiro/settings/mcp.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return []string{"kiro-cli", "mcp", "add", "--name", serverName, "--command", command, "--args", strings.Join(args, ",")}, nil
-		},
-	},
-	{
-		ClientType:  Copilot,
-		Name:        "GitHub Copilot CLI",
-		EditorNames: []string{"copilot", "copilot-cli"},
-		ConfigPaths: []string{
-			"~/.copilot/mcp-config.json",
-		},
-		buildInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-			return append([]string{"copilot", "mcp", "add", serverName, "--", command}, args...), nil
-		},
-	},
 }
 
 // getValidEditorNames returns all valid client names from supportedClients
@@ -322,17 +174,17 @@ func InstallMCPForClient(opts InstallOptions) error {
 	if opts.CustomConfigPath != "" {
 		// Expand custom config path for ~ and environment variables, then use it directly
 		configPath = util.ExpandPath(opts.CustomConfigPath)
-	} else if len(clientCfg.ConfigPaths) > 0 {
+	} else if len(clientCfg.MCPConfigPaths) > 0 {
 		// Use manual config path discovery for clients with configured paths
-		configPath, err = findClientConfigFile(clientCfg.ConfigPaths)
+		configPath, err = findClientConfigFile(clientCfg.MCPConfigPaths)
 		if err != nil {
 			return fmt.Errorf("failed to find configuration for %s: %w", opts.ClientName, err)
 		}
-	} else if clientCfg.buildInstallCommand == nil {
-		// Client has neither ConfigPaths nor buildInstallCommand
-		return fmt.Errorf("client %s has no ConfigPaths or buildInstallCommand defined", opts.ClientName)
+	} else if clientCfg.buildMCPInstallCommand == nil {
+		// Client has neither MCPConfigPaths nor buildMCPInstallCommand
+		return fmt.Errorf("client %s has no MCPConfigPaths or buildMCPInstallCommand defined", opts.ClientName)
 	}
-	// else: CLI-only client - configPath remains empty, will use buildInstallCommand
+	// else: CLI-only client - configPath remains empty, will use buildMCPInstallCommand
 
 	// Create backup if requested and we have a config file
 	if opts.CreateBackup && configPath != "" {
@@ -343,7 +195,7 @@ func InstallMCPForClient(opts InstallOptions) error {
 	}
 
 	// Add MCP server to configuration
-	if clientCfg.buildInstallCommand != nil {
+	if clientCfg.buildMCPInstallCommand != nil {
 		// Use CLI approach when install command builder is configured
 		if err := addMCPServerViaCLI(clientCfg, opts.ServerName, opts.Command, opts.Args); err != nil {
 			return fmt.Errorf("failed to add MCP server configuration: %w", err)
@@ -384,8 +236,8 @@ func installTigerMCPForClient(cmd *cobra.Command, clientName string, createBacku
 	configPath := customConfigPath
 	if configPath == "" {
 		clientCfg, _ := findClientConfig(clientName)
-		if clientCfg != nil && len(clientCfg.ConfigPaths) > 0 {
-			configPath, _ = findClientConfigFile(clientCfg.ConfigPaths)
+		if clientCfg != nil && len(clientCfg.MCPConfigPaths) > 0 {
+			configPath, _ = findClientConfigFile(clientCfg.MCPConfigPaths)
 		}
 	}
 
@@ -628,12 +480,12 @@ func (m clientSelectModel) View() tea.View {
 
 // addMCPServerViaCLI adds an MCP server using a CLI command configured in clientConfig
 func addMCPServerViaCLI(clientCfg *clientConfig, serverName, command string, args []string) error {
-	if clientCfg.buildInstallCommand == nil {
+	if clientCfg.buildMCPInstallCommand == nil {
 		return fmt.Errorf("no install command configured for client %s", clientCfg.Name)
 	}
 
 	// Build the install command with the provided parameters
-	installCommand, err := clientCfg.BuildInstallCommand(serverName, command, args)
+	installCommand, err := clientCfg.BuildMCPInstallCommand(serverName, command, args)
 	if err != nil {
 		return fmt.Errorf("failed to build install command: %w", err)
 	}

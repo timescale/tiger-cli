@@ -92,6 +92,9 @@ tiger db query -c "SELECT now()"
 
 # Install the MCP server
 tiger mcp install
+
+# Install agent skills for your coding agent
+tiger skills install
 ```
 
 ## Usage
@@ -135,6 +138,8 @@ Tiger CLI provides the following commands:
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
+- `tiger skills` - Agent skills for AI coding agents
+  - `install` - Install PostgreSQL and TimescaleDB skills for AI coding agents (alias: `add`)
 - `tiger feedback` - Submit feedback or a bug report to the Tiger Data team (pass the message as an argument or on stdin)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
@@ -246,6 +251,33 @@ To disable the documentation proxy:
 ```bash
 tiger config set docs_mcp false
 ```
+
+## Agent Skills
+
+Tiger CLI can install curated PostgreSQL and TimescaleDB skills directly into
+your coding agents:
+
+```bash
+# Interactive installation (prompts for install locations)
+tiger skills install
+
+# Or name the locations directly
+tiger skills install universal claude-code
+```
+
+Skills are installed for the current user. The `universal` location,
+`~/.agents/skills`, is read by most coding agents (Cursor, Codex, Gemini CLI,
+VS Code, GitHub Copilot CLI, Devin). Claude Code, Kiro CLI, and Google
+Antigravity read their own skills directories, so they're separate locations
+(`claude-code`, `kiro-cli`, `antigravity`). Naming a client that reads
+`~/.agents/skills`, such as `cursor`, selects `universal`. Use `--skills-dir`
+to install into a directory of your choice instead.
+
+Re-run the command to update the skills to the latest version; skills that are
+no longer available are removed. With no arguments, the locations you've
+installed to before are selected in the picker to start with. Existing skills
+that weren't installed by Tiger CLI are never replaced unless you pass
+`--force`.
 
 ## Configuration
 
