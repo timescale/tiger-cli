@@ -95,22 +95,36 @@ func parseReadOnlyMode(value string) (ReadOnlyMode, error) {
 	return "", fmt.Errorf("invalid read_only value: %s (must be all, prod, or off)", value)
 }
 
-var defaultValues = map[string]any{
+// publicDefaultValues holds the user-facing config keys, which `tiger config
+// list` shows and shell completion offers.
+var publicDefaultValues = map[string]any{
 	"analytics":        DefaultAnalytics,
-	"api_url":          DefaultAPIURL,
 	"color":            DefaultColor,
-	"console_url":      DefaultConsoleURL,
 	"docs_mcp":         DefaultDocsMCP,
-	"docs_mcp_url":     DefaultDocsMCPURL,
-	"gateway_url":      DefaultGatewayURL,
 	"mcp_max_rows":     DefaultMCPMaxRows,
 	"output":           DefaultOutput,
 	"password_storage": DefaultPasswordStorage,
 	"read_only":        DefaultReadOnly,
-	"releases_url":     DefaultReleasesURL,
 	"service_id":       "",
 	"version_check":    DefaultVersionCheck,
 }
+
+// privateDefaultValues holds internal config keys, mostly for pointing the CLI
+// at other environments. They're settable like any other key, but hidden from
+// `tiger config list` (unless --all is given) and from shell completion.
+var privateDefaultValues = map[string]any{
+	"api_url":      DefaultAPIURL,
+	"console_url":  DefaultConsoleURL,
+	"docs_mcp_url": DefaultDocsMCPURL,
+	"gateway_url":  DefaultGatewayURL,
+	"releases_url": DefaultReleasesURL,
+}
+
+var defaultValues = func() map[string]any {
+	m := maps.Clone(publicDefaultValues)
+	maps.Copy(m, privateDefaultValues)
+	return m
+}()
 
 // flagBindings maps CLI flag names to the config keys they override. Flags
 // missing from a caller's flag set are skipped, so command-local flags (e.g.
@@ -180,17 +194,26 @@ func Load(flags *pflag.FlagSet) (*Config, error) {
 	return cfg, nil
 }
 
+// OutputOptions controls which values LoadForOutput reports.
+type OutputOptions struct {
+	WithEnv    bool // apply TIGER_* env var overrides
+	NoDefaults bool // omit keys that aren't explicitly set
+	All        bool // include private keys
+}
+
 // LoadForOutput loads config values for display purposes using a fresh viper
 // instance, independent of CLI flags. This keeps `tiger config list -o json`
 // from reporting the flag's format as the configured `output` value.
-func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutput, error) {
+func LoadForOutput(configDir string, opts OutputOptions) (*ConfigOutput, error) {
 	v := viper.New()
 	v.SetConfigFile(GetConfigFile(configDir))
 
-	if withEnv {
-		applyEnvOverrides(v)
+	if opts.WithEnv {
+		if err := applyEnvOverrides(v); err != nil {
+			return nil, fmt.Errorf("failed to bind env vars: %w", err)
+		}
 	}
-	if !noDefaults {
+	if !opts.NoDefaults {
 		applyDefaults(v)
 	}
 
@@ -198,6 +221,18 @@ func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutp
 		return nil, err
 	}
 	migrateVersionCheck(v)
+
+	// Private keys are dropped wherever they came from (default, file, or env),
+	// so --all is the only way to see one.
+	if !opts.All {
+		public := viper.New()
+		for _, key := range v.AllKeys() {
+			if _, private := privateDefaultValues[key]; !private {
+				public.Set(key, v.Get(key))
+			}
+		}
+		v = public
+	}
 
 	cfg := &ConfigOutput{}
 	if err := v.Unmarshal(cfg); err != nil {
@@ -220,7 +255,9 @@ func LoadForOutput(configDir string, withEnv bool, noDefaults bool) (*ConfigOutp
 func (c *Config) reload() error {
 	v := viper.New()
 	v.SetConfigFile(c.GetConfigFile())
-	applyEnvOverrides(v)
+	if err := applyEnvOverrides(v); err != nil {
+		return fmt.Errorf("failed to bind env vars: %w", err)
+	}
 	applyDefaults(v)
 
 	if err := bindFlags(v, c.flags); err != nil {
@@ -342,6 +379,12 @@ func ValidConfigOptions() []string {
 	return slices.Sorted(maps.Keys(defaultValues))
 }
 
+// PublicConfigOptions returns the config keys offered by shell completion,
+// sorted like ValidConfigOptions. Private keys are left out.
+func PublicConfigOptions() []string {
+	return slices.Sorted(maps.Keys(publicDefaultValues))
+}
+
 // ValidConfigOptionValues returns known completion values for a config key's
 // value, or nil if the key doesn't have a fixed set of values.
 func ValidConfigOptionValues(key string) []string {
@@ -401,9 +444,17 @@ func applyDefaults(v *viper.Viper) {
 	}
 }
 
-func applyEnvOverrides(v *viper.Viper) {
+// applyEnvOverrides binds every config key to its TIGER_<KEY> env var. Binding
+// explicitly, rather than via AutomaticEnv, makes viper aware of a key set only
+// by env var, so it appears in `config list --with-env --no-defaults`.
+func applyEnvOverrides(v *viper.Viper) error {
 	v.SetEnvPrefix("TIGER")
-	v.AutomaticEnv()
+	for key := range defaultValues {
+		if err := v.BindEnv(key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func readInConfig(v *viper.Viper) error {

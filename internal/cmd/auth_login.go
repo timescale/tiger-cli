@@ -235,7 +235,7 @@ func offerProdProtection(cmd *cobra.Command, cfg *config.Config) bool {
 		return true
 	}
 
-	stored, err := config.LoadForOutput(cfg.ConfigDir, false, true)
+	stored, err := config.LoadForOutput(cfg.ConfigDir, config.OutputOptions{NoDefaults: true})
 	if err != nil {
 		// Can't tell whether it was ever answered, so don't ask — but do print the
 		// bullet, which is the harmless half of the two.

@@ -60,6 +60,15 @@ func TestConfigKeyRegistriesAgree(t *testing.T) {
 		}
 	})
 
+	// A key in both maps would be private or public depending on map order.
+	t.Run("public and private keys are disjoint", func(t *testing.T) {
+		for key := range privateDefaultValues {
+			if _, ok := publicDefaultValues[key]; ok {
+				t.Errorf("config key %q is both public and private", key)
+			}
+		}
+	})
+
 	// Every flag that claims to override a config value must name a real one.
 	t.Run("flagBindings target real keys", func(t *testing.T) {
 		for flag, key := range flagBindings {

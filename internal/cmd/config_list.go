@@ -15,6 +15,7 @@ import (
 func buildConfigListCmd(app *common.App) *cobra.Command {
 	var noDefaults bool
 	var withEnv bool
+	var all bool
 
 	cmd := &cobra.Command{
 		Use:          "list",
@@ -29,7 +30,11 @@ func buildConfigListCmd(app *common.App) *cobra.Command {
 			// Values are re-read free of env and CLI flags (unless --with-env
 			// is given), so `config list -o json` reports the configured
 			// `output` value rather than the flag's.
-			cfgOut, err := config.LoadForOutput(cfg.ConfigDir, withEnv, noDefaults)
+			cfgOut, err := config.LoadForOutput(cfg.ConfigDir, config.OutputOptions{
+				WithEnv:    withEnv,
+				NoDefaults: noDefaults,
+				All:        all,
+			})
 			if err != nil {
 				return err
 			}
@@ -50,6 +55,8 @@ func buildConfigListCmd(app *common.App) *cobra.Command {
 	registerFlagCompletion(cmd, "output", outputCompletion())
 	cmd.Flags().BoolVar(&noDefaults, "no-defaults", false, "do not show default values for unset fields")
 	cmd.Flags().BoolVar(&withEnv, "with-env", false, "apply environment variable overrides")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "include internal config values")
+	markFlagHidden(cmd, "all")
 
 	return cmd
 }
