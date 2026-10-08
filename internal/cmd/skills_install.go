@@ -736,7 +736,7 @@ func installSkills(skills []skill, skillsDir string) ([]string, error) {
 // is there. The new copy is built in a temporary directory beside dir and
 // swapped in, so a failure partway through leaves the existing copy intact.
 func writeSkill(dir string, s skill) error {
-	tmp, err := os.MkdirTemp(filepath.Dir(dir), skillsTempPrefix+s.name+"-")
+	tmp, err := os.MkdirTemp(filepath.Dir(dir), skillsTempPrefix+"new-"+s.name+"-")
 	if err != nil {
 		return err
 	}
@@ -770,7 +770,8 @@ func writeSkill(dir string, s skill) error {
 
 // replacePath moves src to dst, replacing any file, directory, or symlink at
 // dst. A rename can't replace a non-empty directory, so the existing entry is
-// first moved aside, and restored if the swap fails. A symlink at dst is
+// first moved aside, and restored if the swap fails. If restoring fails too,
+// it's left where it was moved and the error says where. A symlink at dst is
 // removed as a link, never followed.
 func replacePath(src, dst string) error {
 	if _, err := os.Lstat(dst); errors.Is(err, fs.ErrNotExist) {
@@ -783,7 +784,12 @@ func replacePath(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(aside)
+	keepAside := false
+	defer func() {
+		if !keepAside {
+			os.RemoveAll(aside)
+		}
+	}()
 
 	old := filepath.Join(aside, "old")
 	if err := os.Rename(dst, old); err != nil {
@@ -791,7 +797,8 @@ func replacePath(src, dst string) error {
 	}
 	if err := os.Rename(src, dst); err != nil {
 		if restoreErr := os.Rename(old, dst); restoreErr != nil {
-			return fmt.Errorf("%w (and failed to restore %s: %w)", err, dst, restoreErr)
+			keepAside = true
+			return fmt.Errorf("%w (and failed to restore %s, so the previous copy was left at %s: %w)", err, dst, old, restoreErr)
 		}
 		return err
 	}
