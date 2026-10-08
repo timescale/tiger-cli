@@ -123,10 +123,7 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 				if err != nil {
 					return err
 				}
-				selected, err := preselectSkillsTargets(targetDirs)
-				if err != nil {
-					return err
-				}
+				selected := preselectSkillsTargets(targetDirs)
 				if selected, err = selectSkillsTargets(cmd, targets, selected); err != nil {
 					return err
 				}
@@ -269,45 +266,37 @@ func skillsTargets() []skillsTarget {
 // preselectSkillsTargets reports which of dirs the picker starts with
 // selected: those holding skills Tiger CLI installed, or the first (universal)
 // if none do.
-func preselectSkillsTargets(dirs []string) ([]bool, error) {
+func preselectSkillsTargets(dirs []string) []bool {
 	selected := make([]bool, len(dirs))
 	found := false
 	for i, dir := range dirs {
-		has, err := hasInstalledSkills(dir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check for installed skills: %w", err)
-		}
-		selected[i] = has
-		found = found || has
+		selected[i] = hasInstalledSkills(dir)
+		found = found || selected[i]
 	}
 	if !found {
 		selected[0] = true
 	}
-	return selected, nil
+	return selected
 }
 
 // hasInstalledSkills reports whether skillsDir holds any skill Tiger CLI
-// installed.
-func hasInstalledSkills(skillsDir string) (bool, error) {
+// installed. Anything that can't be inspected counts as not installed: this
+// only decides what the picker starts with, and installing to skillsDir would
+// report the underlying problem.
+func hasInstalledSkills(skillsDir string) bool {
 	entries, err := os.ReadDir(skillsDir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
-	} else if err != nil {
-		return false, err
+	if err != nil {
+		return false
 	}
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), skillsTempPrefix) {
 			continue
 		}
-		_, owned, err := skillOwnership(filepath.Join(skillsDir, e.Name()))
-		if err != nil {
-			return false, err
-		}
-		if owned {
-			return true, nil
+		if _, owned, err := skillOwnership(filepath.Join(skillsDir, e.Name())); err == nil && owned {
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 // skillsPickerItem is one install location offered by the picker.

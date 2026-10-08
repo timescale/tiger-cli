@@ -325,6 +325,7 @@ func TestSkillsInstallCmd(t *testing.T) {
 	existingClaude := installedSkills(".claude/skills")
 	existingClaudeHome := home(existingClaude)
 	pickerHome := home(withTrees(installedSkills(".agents/skills"), existingClaude))
+	unreadableHome := home(existingClaude)
 
 	// reinstallHome holds a previous install: one of our skills with a stale
 	// file (replaced), one no longer available (removed), skills of the
@@ -561,6 +562,32 @@ func TestSkillsInstallCmd(t *testing.T) {
 			},
 			wantStdout: skillsInstallOutput([]string{claudeDir(existingClaudeHome)}),
 			checks:     []checkFunc{checkTree(existingClaudeHome, existingClaude)},
+		},
+		{
+			// A location that can't be inspected starts unselected, even
+			// though it holds an earlier install. The directory is made
+			// unreadable by the setup hook (and restored, so t.TempDir can
+			// clean up); root ignores file permissions, hence the skip.
+			name: "picker leaves locations it can't inspect unselected",
+			args: []string{"skills", "install"},
+			opts: []runOption{
+				withEnv("HOME", unreadableHome),
+				withIsTerminal(true),
+				withSetup(func(t *testing.T) {
+					if os.Geteuid() == 0 {
+						t.Skip("cannot test permission errors as root user")
+					}
+					dir := claudeDir(unreadableHome)
+					if err := os.Chmod(dir, 0o000); err != nil {
+						t.Fatalf("failed to chmod dir: %v", err)
+					}
+					t.Cleanup(func() { os.Chmod(dir, 0o755) })
+				}),
+				withSelectSkillsTargets([]bool{true, false, false, false}, []bool{true, false, false, false}),
+				withSkillsTarball(tarball),
+			},
+			wantStdout: skillsInstallOutput([]string{universalDir(unreadableHome)}),
+			checks:     []checkFunc{checkTree(filepath.Join(unreadableHome, ".agents"), installedSkills("skills"))},
 		},
 		{
 			// The picker starts from the earlier installs; what's chosen is
