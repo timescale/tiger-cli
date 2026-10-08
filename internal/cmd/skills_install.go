@@ -159,14 +159,15 @@ installed by Tiger CLI are never replaced unless --force is given.`, generateSki
 	return cmd
 }
 
-// skillsDirsFromFlag returns the directory given by --skills-dir, made
-// absolute (relative to the working directory).
-func skillsDirsFromFlag(path string) ([]string, error) {
-	dir, err := filepath.Abs(util.ExpandPath(path))
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve skills directory: %w", err)
+// generateSkillsTargetsHelp generates the install locations section of the
+// help text.
+func generateSkillsTargetsHelp() string {
+	var b strings.Builder
+	b.WriteString("Install locations:\n")
+	for _, t := range skillsTargets() {
+		fmt.Fprintf(&b, "  %-24s %s (%s)\n", t.names[0], t.dir, strings.Join(t.readers, ", "))
 	}
-	return []string{dir}, nil
+	return b.String()
 }
 
 // skillsTarget is a location skills can be installed to: the universal
@@ -180,15 +181,48 @@ type skillsTarget struct {
 	dirEnv  string   // see clientConfig.SkillsDirEnv
 }
 
-// generateSkillsTargetsHelp generates the install locations section of the
-// help text.
-func generateSkillsTargetsHelp() string {
-	var b strings.Builder
-	b.WriteString("Install locations:\n")
-	for _, t := range skillsTargets() {
-		fmt.Fprintf(&b, "  %-24s %s (%s)\n", t.names[0], t.dir, strings.Join(t.readers, ", "))
+// skillsTargets returns every install location: universal first, then each
+// client with a skills directory of its own, in supportedClients order.
+func skillsTargets() []skillsTarget {
+	targets := []skillsTarget{{
+		label: "Universal",
+		names: []string{"universal"},
+		dir:   "~/.agents/skills",
+	}}
+	for _, c := range supportedClients {
+		if c.SkillsDir == "" {
+			targets[0].names = append(targets[0].names, c.EditorNames...)
+			targets[0].readers = append(targets[0].readers, c.Name)
+			continue
+		}
+		targets = append(targets, skillsTarget{
+			label:   c.Name,
+			names:   c.EditorNames,
+			readers: []string{c.Name},
+			dir:     c.SkillsDir,
+			dirEnv:  c.SkillsDirEnv,
+		})
 	}
-	return b.String()
+	return targets
+}
+
+// skillsTargetNames returns every name that selects one of targets.
+func skillsTargetNames(targets []skillsTarget) []string {
+	var names []string
+	for _, t := range targets {
+		names = append(names, t.names...)
+	}
+	return names
+}
+
+// skillsDirsFromFlag returns the directory given by --skills-dir, made
+// absolute (relative to the working directory).
+func skillsDirsFromFlag(path string) ([]string, error) {
+	dir, err := filepath.Abs(util.ExpandPath(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve skills directory: %w", err)
+	}
+	return []string{dir}, nil
 }
 
 // skillsDirsFromArgs returns the directories of the install locations the
@@ -213,15 +247,6 @@ func skillsDirsFromArgs(names []string) ([]string, error) {
 		}
 	}
 	return resolveSkillsTargetDirs(result)
-}
-
-// skillsTargetNames returns every name that selects one of targets.
-func skillsTargetNames(targets []skillsTarget) []string {
-	var names []string
-	for _, t := range targets {
-		names = append(names, t.names...)
-	}
-	return names
 }
 
 // skillsPickerItem is one install location offered by the picker.
@@ -269,31 +294,6 @@ func skillsDirsFromPicker(cmd *cobra.Command) ([]string, error) {
 		return nil, errors.New("no install locations selected")
 	}
 	return result, nil
-}
-
-// skillsTargets returns every install location: universal first, then each
-// client with a skills directory of its own, in supportedClients order.
-func skillsTargets() []skillsTarget {
-	targets := []skillsTarget{{
-		label: "Universal",
-		names: []string{"universal"},
-		dir:   "~/.agents/skills",
-	}}
-	for _, c := range supportedClients {
-		if c.SkillsDir == "" {
-			targets[0].names = append(targets[0].names, c.EditorNames...)
-			targets[0].readers = append(targets[0].readers, c.Name)
-			continue
-		}
-		targets = append(targets, skillsTarget{
-			label:   c.Name,
-			names:   c.EditorNames,
-			readers: []string{c.Name},
-			dir:     c.SkillsDir,
-			dirEnv:  c.SkillsDirEnv,
-		})
-	}
-	return targets
 }
 
 // resolveSkillsTargetDirs returns the absolute directory of each target. An
@@ -367,6 +367,31 @@ func hasInstalledSkills(skillsDir string) bool {
 		}
 	}
 	return false
+}
+
+// displayPath abbreviates the home directory in path to ~.
+func displayPath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if rel, ok := strings.CutPrefix(path, home+string(filepath.Separator)); ok {
+		return filepath.Join("~", rel)
+	}
+	return path
+}
+
+// joinWithAnd joins items into an English list ("a, b, and c").
+func joinWithAnd(items []string) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
+	}
+	return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
 }
 
 // runSkillsPicker runs the interactive install location picker over items and
@@ -467,31 +492,6 @@ func (m skillsPickerModel) View() tea.View {
 	}
 	b.WriteString("\n" + skillsPickerDimColor.Sprint("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
 	return tea.NewView(b.String())
-}
-
-// displayPath abbreviates the home directory in path to ~.
-func displayPath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	if rel, ok := strings.CutPrefix(path, home+string(filepath.Separator)); ok {
-		return filepath.Join("~", rel)
-	}
-	return path
-}
-
-// joinWithAnd joins items into an English list ("a, b, and c").
-func joinWithAnd(items []string) string {
-	switch len(items) {
-	case 0:
-		return ""
-	case 1:
-		return items[0]
-	case 2:
-		return items[0] + " and " + items[1]
-	}
-	return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
 }
 
 // skill is one skill directory, with its contents held in memory.
