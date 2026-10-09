@@ -8,14 +8,16 @@ import (
 	"golang.org/x/term"
 )
 
+// fileDescriptor is implemented by *os.File and by wrappers around one (*TermWriter).
+type fileDescriptor interface {
+	Fd() uintptr
+}
+
 // IsTerminal is a helper for detecting whether an [io.Writer] or [io.Reader]
 // is an interactive terminal / TTY. It is a variable so that tests can
 // override it.
 var IsTerminal = func(v any) bool {
-	if tw, ok := v.(*TermWriter); ok {
-		return term.IsTerminal(int(tw.Fd()))
-	}
-	if f, ok := v.(*os.File); ok {
+	if f, ok := v.(fileDescriptor); ok {
 		return term.IsTerminal(int(f.Fd()))
 	}
 	return false
@@ -27,7 +29,7 @@ var IsTerminal = func(v any) bool {
 // for automatic color downsampling.
 type TermWriter struct {
 	*os.File
-	ColorProfile *colorprofile.Writer
+	colorProfile *colorprofile.Writer
 }
 
 // NewTermWriter creates a TermWriter that writes through a colorprofile.Writer
@@ -35,20 +37,25 @@ type TermWriter struct {
 func NewTermWriter(f *os.File) *TermWriter {
 	return &TermWriter{
 		File:         f,
-		ColorProfile: colorprofile.NewWriter(f, os.Environ()),
+		colorProfile: colorprofile.NewWriter(f, os.Environ()),
 	}
 }
 
 func (tw *TermWriter) Write(p []byte) (int, error) {
-	return tw.ColorProfile.Write(p)
+	return tw.colorProfile.Write(p)
+}
+
+// DisableColor makes the writer strip all ANSI color sequences.
+func (tw *TermWriter) DisableColor() {
+	tw.colorProfile.Profile = colorprofile.Ascii
 }
 
 // TryUnwrapFile attempts to extract the underlying *os.File from a writer.
 // If the writer is a *TermWriter, the embedded *os.File is returned; otherwise
-// the original writer is returned unchanged. This is needed when passing writers to exec.Cmd, since
-// os/exec only passes file descriptors directly to child processes when the
-// writer is an *os.File. Any other io.Writer causes os/exec to create a pipe,
-// which breaks TTY detection in the child process.
+// the original writer is returned unchanged. This is needed when passing
+// writers to exec.Cmd, since os/exec only passes file descriptors directly to
+// child processes when the writer is an *os.File. Any other io.Writer causes
+// os/exec to create a pipe, which breaks TTY detection in the child process.
 func TryUnwrapFile(w io.Writer) io.Writer {
 	if tw, ok := w.(*TermWriter); ok {
 		return tw.File

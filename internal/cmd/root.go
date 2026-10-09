@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/colorprofile"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -149,12 +148,9 @@ func wrapCommands(cmd *cobra.Command, app *common.App, stdoutWriter, stderrWrite
 				return err
 			}
 
-			// Disable colors by setting the color profile to ASCII, which
-			// causes the colorprofile writers to strip ANSI color sequences
-			// from all output.
 			if !cfg.Color {
-				stdoutWriter.ColorProfile.Profile = colorprofile.Ascii
-				stderrWriter.ColorProfile.Profile = colorprofile.Ascii
+				stdoutWriter.DisableColor()
+				stderrWriter.DisableColor()
 			}
 
 			// Check for a newer release in the background, printing the result
