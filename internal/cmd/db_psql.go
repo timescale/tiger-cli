@@ -656,8 +656,8 @@ func buildPsqlCommand(cfg *config.Config, details *common.ConnectionDetails, psq
 
 	// Use cmd's input/output streams for testability while maintaining CLI behavior
 	psqlCmd.Stdin = cmd.InOrStdin()
-	psqlCmd.Stdout = cmd.OutOrStdout()
-	psqlCmd.Stderr = cmd.ErrOrStderr()
+	psqlCmd.Stdout = util.TryUnwrapFile(cmd.OutOrStdout())
+	psqlCmd.Stderr = util.TryUnwrapFile(cmd.ErrOrStderr())
 
 	// Use provided password directly if available
 	if password != "" {

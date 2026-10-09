@@ -55,7 +55,7 @@ func buildVersionCmd(app *common.App) *cobra.Command {
 					versionOutput.UpdateAvailable = &result.UpdateAvailable
 					updateAvailable = result.UpdateAvailable
 					// Print warning _after_ other output
-					defer version.PrintUpdateWarning(result, cfg, cmd.ErrOrStderr())
+					defer version.PrintUpdateWarning(result, cmd.ErrOrStderr())
 				}
 			}
 

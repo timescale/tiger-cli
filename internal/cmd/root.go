@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -43,6 +42,9 @@ func buildRootCmd(ctx context.Context) (*cobra.Command, *common.App, error) {
 		Experimental: experimental,
 	}
 
+	stdoutWriter := util.NewTermWriter(os.Stdout)
+	stderrWriter := util.NewTermWriter(os.Stderr)
+
 	cmd := &cobra.Command{
 		Use:   "tiger",
 		Short: "Tiger CLI - Tiger Cloud Platform command-line interface",
@@ -63,8 +65,12 @@ To get started, run:
 	// Wire up the output streams explicitly. Cobra's cmd.Print* helpers write to
 	// OutOrStderr(), which falls back to stderr when no out writer is set, so
 	// without this every cmd.Printf would land on stderr.
-	cmd.SetOut(os.Stdout)
-	cmd.SetErr(os.Stderr)
+	//
+	// Both are wrapped in colorprofile writers that automatically downsample or
+	// strip ANSI color sequences based on terminal capabilities, giving us a
+	// single place to control color output.
+	cmd.SetOut(stdoutWriter)
+	cmd.SetErr(stderrWriter)
 
 	// Complete nothing where no completion is registered, rather than falling
 	// back to filenames. Cobra checks this on the command and its parents, so
@@ -109,7 +115,7 @@ To get started, run:
 	cmd.AddCommand(buildMCPCmd(app))
 	cmd.AddCommand(buildFeedbackCmd(app))
 
-	wrapCommands(cmd, app)
+	wrapCommands(cmd, app, stdoutWriter, stderrWriter)
 
 	return cmd, app, nil
 }
@@ -125,7 +131,7 @@ To get started, run:
 // keyring, and the network. Completion functions that do need the config or
 // client load on demand via withAppLoad. Group commands (`tiger service`) have no
 // RunE of their own and only print help, so they're skipped as well.
-func wrapCommands(cmd *cobra.Command, app *common.App) {
+func wrapCommands(cmd *cobra.Command, app *common.App, stdoutWriter, stderrWriter *util.TermWriter) {
 	// Wrap this command's RunE if it exists
 	if cmd.RunE != nil {
 		originalRunE := cmd.RunE
@@ -143,7 +149,8 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 			}
 
 			if !cfg.Color {
-				color.NoColor = true
+				stdoutWriter.DisableColor()
+				stderrWriter.DisableColor()
 			}
 
 			// Check for a newer release in the background, printing the result
@@ -173,7 +180,7 @@ func wrapCommands(cmd *cobra.Command, app *common.App) {
 
 	// Recursively wrap all children
 	for _, child := range cmd.Commands() {
-		wrapCommands(child, app)
+		wrapCommands(child, app, stdoutWriter, stderrWriter)
 	}
 }
 
@@ -230,7 +237,7 @@ func versionCheck(cmd *cobra.Command, cfg *config.Config) func() {
 			return
 		}
 
-		version.PrintUpdateWarning(res.result, cfg, cmd.ErrOrStderr())
+		version.PrintUpdateWarning(res.result, cmd.ErrOrStderr())
 	}
 }
 

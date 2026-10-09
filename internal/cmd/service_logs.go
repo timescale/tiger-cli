@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/common"
@@ -106,22 +106,13 @@ service from your configuration.`,
 			case "yaml":
 				return util.SerializeToYAML(outputWriter, logs)
 			default: // text format (default)
-				// Apply colorization if color is enabled and output is a terminal
-				shouldColorize := cfg.Color && util.IsTerminal(outputWriter)
-				if shouldColorize {
-					// Temporarily enable color for this output
-					original := color.NoColor
-					defer func() { color.NoColor = original }()
-					color.NoColor = false
-				}
-
 				for _, entry := range logs {
 					line := entry.Message
 					if !entry.Timestamp.IsZero() {
 						// Local timezone for terminal output; MCP and public API use UTC.
 						line = entry.Timestamp.Local().Format("2006-01-02 15:04:05 MST") + " " + line
 					}
-					cmd.Println(colorizeLogEntry(line, entry.Severity, shouldColorize))
+					cmd.Println(colorizeLogEntry(line, entry.Severity))
 				}
 			}
 
@@ -140,31 +131,35 @@ service from your configuration.`,
 	return cmd
 }
 
+// Log severity styles
+var (
+	logErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Red)
+	logWarningStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
+	logInfoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+	logDebugStyle   = lipgloss.NewStyle().Foreground(lipgloss.Magenta)
+)
+
 // colorizeLogEntry colorizes the severity token (e.g. "ERROR:") within the log
 // line using the API-provided severity field. Using the structured field avoids
 // false positives where a severity word appears in the message body rather than
-// as an actual log level. If colorEnabled is false, returns the line unchanged.
+// as an actual log level.
 //
 // PostgreSQL severity levels: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS
-func colorizeLogEntry(line, severity string, colorEnabled bool) string {
-	if !colorEnabled || severity == "" {
-		return line
-	}
-
-	var colorFn func(string, ...any) string
+func colorizeLogEntry(line, severity string) string {
+	var style lipgloss.Style
 	switch strings.ToUpper(severity) {
 	case "ERROR", "FATAL", "PANIC":
-		colorFn = color.RedString
+		style = logErrorStyle
 	case "WARNING":
-		colorFn = color.YellowString
+		style = logWarningStyle
 	case "LOG", "INFO", "NOTICE":
-		colorFn = color.BlueString
+		style = logInfoStyle
 	case "DEBUG":
-		colorFn = color.MagentaString
+		style = logDebugStyle
 	default:
 		return line
 	}
 
 	token := strings.ToUpper(severity) + ":"
-	return strings.Replace(line, token, colorFn(token), 1)
+	return strings.Replace(line, token, style.Render(token), 1)
 }
