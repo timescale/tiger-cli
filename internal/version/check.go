@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/Masterminds/semver/v3"
 	"github.com/cli/safeexec"
-	"github.com/fatih/color"
+
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
-	"github.com/timescale/tiger-cli/internal/util"
 )
 
 // InstallMethod represents how Tiger CLI was installed
@@ -226,8 +226,9 @@ func CheckForUpdate(ctx context.Context, cfg *config.Config) (*CheckResult, erro
 }
 
 // PrintUpdateWarning writes a warning to output if an update is available.
-// Callers pass the command's stderr writer.
-func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output io.Writer) {
+// Callers pass the command's stderr writer, whose colorprofile writer strips
+// the colors when they're disabled or unsupported.
+func PrintUpdateWarning(result *CheckResult, output io.Writer) {
 	if result == nil || output == nil {
 		return
 	}
@@ -235,16 +236,12 @@ func PrintUpdateWarning(result *CheckResult, cfg *config.Config, output io.Write
 		return
 	}
 
-	// need to set color.NoColor correctly for the `output` (stderr)
-	if cfg.Color && util.IsTerminal(output) {
-		original := color.NoColor
-		defer func() { color.NoColor = original }()
-		color.NoColor = false
-	}
+	yellow := lipgloss.NewStyle().Foreground(lipgloss.Yellow)
+	cyan := lipgloss.NewStyle().Foreground(lipgloss.Cyan)
 	fmt.Fprintf(output, "\n\n%s %s → %s\nTo upgrade: %s\n",
-		color.YellowString("A new version of Tiger CLI is available:"),
-		color.CyanString(result.CurrentVersion),
-		color.CyanString(result.LatestVersion),
+		yellow.Render("A new version of Tiger CLI is available:"),
+		cyan.Render(result.CurrentVersion),
+		cyan.Render(result.LatestVersion),
 		result.UpdateCommand,
 	)
 }

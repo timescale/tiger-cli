@@ -74,13 +74,13 @@ Generated files are marked `-diff linguist-generated=true` in `.gitattributes`: 
 The CLI has **zero global command state**: `buildRootCmd(ctx)` builds the entire command tree fresh on each invocation, and no command uses `init()` registration or package-level flag variables.
 
 - `buildRootCmd` creates the per-invocation `*common.App` and passes it to a `build*Cmd(app)` builder function for each command; group builders add their own subcommand builders in turn. Any command body can reach the config and API client through the App without loading them itself.
-- `wrapCommands` wraps the `RunE` of every command in the tree with the shared per-invocation lifecycle: `app.SetFlags(cmd.Flags())` followed by `app.Load(ctx)` (the single config + API client load), setting `color.NoColor` from `cfg.Color`, starting a background version check (whose output is deferred until after the command's own), and deferred analytics tracking. There are no `PersistentPreRunE`/`PersistentPostRunE` hooks.
+- `wrapCommands` wraps the `RunE` of every command in the tree with the shared per-invocation lifecycle: `app.SetFlags(cmd.Flags())` followed by `app.Load(ctx)` (the single config + API client load), disabling color on the output writers when `cfg.Color` is off, starting a background version check (whose output is deferred until after the command's own), and deferred analytics tracking. There are no `PersistentPreRunE`/`PersistentPostRunE` hooks.
 - Always use `RunE`, never `Run` — a `Run` command would silently skip the lifecycle. Cobra's built-in `help`, `completion`, and `__complete` commands are added after `wrapCommands` runs and are deliberately left unwrapped, so they never touch the config file, the system keyring, or the network. Completion functions that do need the config or client wrap themselves with `withAppLoad` (`completion_helper.go`).
 - Declare flags as local variables inside the builder function. Flags that override config values are the exception — see [Configuration](#configuration).
 
 ### One File Per Command
 
-Every command gets its own file in `internal/cmd/`, named to match the command in snake_case: `tiger service create` → `service_create.go`. Group commands with no `RunE` of their own still get a file (`tiger service` → `service.go`). Within a file, constants and package-level variables come first, then the `build*Cmd()` function, then helpers used only by that command. Tests mirror this layout (`service_create.go` → `service_create_test.go`), with package-wide test scaffolding in `main_test.go` and `integration_test.go` as a single cross-command suite.
+Every command gets its own file in `internal/cmd/`, named to match the command in snake_case: `tiger service create` → `service_create.go`. Group commands with no `RunE` of their own still get a file (`tiger service` → `service.go`). Within a file, package-level constants and variables that other code may reference come first, then the `build*Cmd()` function, then helpers used only by that command. Constants and variables used by just one helper sit directly above it (`colorizeLogEntry`'s styles in `service_logs.go`). Tests mirror this layout (`service_create.go` → `service_create_test.go`), with package-wide test scaffolding in `main_test.go` and `integration_test.go` as a single cross-command suite.
 
 ### Where Helpers Go
 
@@ -146,7 +146,7 @@ A command that identifies a service takes a **ref** — its ID, a read replica s
 
 ### Streams
 
-`buildRootCmd` calls `cmd.SetOut(os.Stdout)` and `cmd.SetErr(os.Stderr)`. Both are **required**: cobra's `cmd.Print*` helpers write to `OutOrStderr()`, which falls back to stderr when no out writer is set, so without them every `cmd.Printf` in the CLI would silently land on the wrong stream.
+`buildRootCmd` wraps `os.Stdout` and `os.Stderr` in `util.TermWriter`s and sets them with `cmd.SetOut` and `cmd.SetErr`. Both are **required**: cobra's `cmd.Print*` helpers write to `OutOrStderr()`, which falls back to stderr when no out writer is set, so without them every `cmd.Printf` in the CLI would silently land on the wrong stream. A `TermWriter` routes writes through a colorprofile writer (which downsamples or strips ANSI sequences to suit the terminal) while still exposing the underlying file, so `util.IsTerminal` and BubbleTea see a real terminal. When handing a stream to a child process (`exec.Cmd`), unwrap it with `util.TryUnwrapFile` so the child inherits the file descriptor and its TTY rather than a pipe (`db psql` is the model).
 
 - **stdout** gets the command's primary output: the data payload (table, JSON, YAML, env vars), and in the plain-text path the result text itself.
 - **stderr** gets everything else: errors and warnings; interactive UI (confirmation prompts, password prompts, spinners); and progress/status messages that accompany structured output, so a piped stdout stays clean. `tiger service create` is the model — every status line is `cmd.PrintErrf`, and only the final service payload goes to stdout.
@@ -157,7 +157,7 @@ Helper functions inside `internal/cmd` take the `*cobra.Command` and print throu
 
 - Commands with structured output take `-o`/`--output` with `json`, `yaml`, and `table` (the default); some commands support extras (`env`, `bare`). Register the flag with the validating flag types in `flag_helper.go` (`new(outputFlag)` and friends, with no bound variable) and read the value from `cfg.Output` — `output` is a config value.
 - Serialize with `util.SerializeToJSON` and `util.SerializeToYAML`. **Don't add `yaml:` struct tags to output types** — `SerializeToYAML` encodes to JSON first and converts, so only `json:` tags matter and the two formats stay consistent (including for generated types that only carry `json:` tags).
-- Colored output uses `fatih/color`; the lifecycle sets `color.NoColor` from `cfg.Color`, so commands need no per-command wiring.
+- Colored output uses lipgloss styles, restricted to the base ANSI colors (`lipgloss.Red`, `lipgloss.Cyan`, …) rather than 256-color or true-color values, which can clash with some terminal themes. Render styles unconditionally: the output writers strip colors when the stream isn't a terminal, and the lifecycle disables color on them when `cfg.Color` is off, so commands need no per-command wiring.
 
 ### Tone
 
