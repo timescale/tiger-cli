@@ -156,9 +156,10 @@ func TestCompletion(t *testing.T) {
 		{
 			// Config keys come straight from the registry, so this list is the
 			// same one `tiger config list` renders (see TestConfigListCoversEveryKey).
-			name:       "config set completes keys",
+			// Private keys are left out.
+			name:       "config set completes public keys",
 			args:       []string{"__complete", "config", "set", ""},
-			wantStdout: "analytics\napi_url\ncolor\nconsole_url\ndocs_mcp\ndocs_mcp_url\ngateway_url\nmcp_max_rows\noutput\npassword_storage\nread_only\nreleases_url\nservice_id\nversion_check\n" + noFileComp,
+			wantStdout: "analytics\ncolor\ndocs_mcp\nmcp_max_rows\noutput\npassword_storage\nread_only\nservice_id\nversion_check\n" + noFileComp,
 			wantStderr: directive,
 			checks:     []checkFunc{checkNotLoaded},
 		},
@@ -178,9 +179,9 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			name:       "config unset completes keys",
+			name:       "config unset completes public keys",
 			args:       []string{"__complete", "config", "unset", "docs"},
-			wantStdout: "docs_mcp\ndocs_mcp_url\n" + noFileComp,
+			wantStdout: "docs_mcp\n" + noFileComp,
 			wantStderr: directive,
 			checks:     []checkFunc{checkNotLoaded},
 		},
