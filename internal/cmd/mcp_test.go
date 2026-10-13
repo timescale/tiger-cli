@@ -3,7 +3,6 @@ package cmd
 import (
 	"maps"
 	"regexp"
-	"strings"
 	"testing"
 )
 
@@ -29,18 +28,5 @@ func matchLog(want string) matcher {
 	return matchFunc(func(t *testing.T, got string) {
 		t.Helper()
 		assertOutput(t, logTimestamp.ReplaceAllString(got, ""), want)
-	})
-}
-
-// matchLogPort is matchLog for output naming a port the OS picked rather than
-// one the test chose. The want text is matched literally except for "<port>",
-// which stands in for any port number.
-func matchLogPort(want string) matcher {
-	re := regexp.MustCompile("^" + strings.ReplaceAll(regexp.QuoteMeta(want), "<port>", `\d+`) + "$")
-	return matchFunc(func(t *testing.T, got string) {
-		t.Helper()
-		if stripped := logTimestamp.ReplaceAllString(got, ""); !re.MatchString(stripped) {
-			t.Errorf("log = %q, want %q (<port> matching any port)", stripped, want)
-		}
 	})
 }
