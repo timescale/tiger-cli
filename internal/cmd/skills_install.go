@@ -18,8 +18,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -49,17 +49,6 @@ const (
 // tarball. GitHub answers it with a redirect to a short-lived download URL.
 // It's a var so tests can point it at a local server.
 var skillsTarballURL = "https://api.github.com/repos/" + skillsRepo + "/tarball/" + skillsRepoRef
-
-// Colors for the install location picker, taken from the terminal theme.
-// Bright colors and bold are avoided because some themes render them as greys,
-// and dim text uses the faint attribute so it suits light and dark themes
-// alike. They honor color.NoColor, which the command lifecycle sets from the
-// color config option.
-var (
-	skillsPickerCursorColor = color.New(color.FgBlue)
-	skillsPickerCheckColor  = color.New(color.FgGreen)
-	skillsPickerDimColor    = color.New(color.Faint)
-)
 
 func buildSkillsInstallCmd(_ *common.App) *cobra.Command {
 	var force bool
@@ -468,6 +457,16 @@ func (m skillsPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// Styles for the install location picker, taken from the terminal theme.
+// Bright colors and bold are avoided because some themes render them as greys,
+// and dim text uses the faint attribute so it suits light and dark themes
+// alike.
+var (
+	skillsPickerCursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+	skillsPickerCheckStyle  = lipgloss.NewStyle().Foreground(lipgloss.Green)
+	skillsPickerDimStyle    = lipgloss.NewStyle().Faint(true)
+)
+
 func (m skillsPickerModel) View() tea.View {
 	if m.done {
 		return tea.NewView("")
@@ -482,15 +481,15 @@ func (m skillsPickerModel) View() tea.View {
 	for i, item := range m.items {
 		cursor := " "
 		if m.cursor == i {
-			cursor = skillsPickerCursorColor.Sprint(">")
+			cursor = skillsPickerCursorStyle.Render(">")
 		}
 		check := " "
 		if item.selected {
-			check = skillsPickerCheckColor.Sprint("✓")
+			check = skillsPickerCheckStyle.Render("✓")
 		}
-		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, skillsPickerDimColor.Sprint(item.dir))
+		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, skillsPickerDimStyle.Render(item.dir))
 	}
-	b.WriteString("\n" + skillsPickerDimColor.Sprint("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
+	b.WriteString("\n" + skillsPickerDimStyle.Render("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
 	return tea.NewView(b.String())
 }
 
