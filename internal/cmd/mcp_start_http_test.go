@@ -12,7 +12,7 @@ import (
 )
 
 // freePort returns a port nothing is listening on, and (when hold is true)
-// keeps it occupied for the rest of the test so the command has to fall back.
+// keeps it occupied for the rest of the test so binding it fails.
 func freePort(t *testing.T, hold bool) int {
 	t.Helper()
 	listener, err := net.Listen("tcp", "localhost:0")
@@ -56,27 +56,13 @@ INFO Tiger MCP server started address=localhost:%d
 `, port) + shutdown),
 		},
 		{
-			// The port scan walks forward from the requested one. Which port
-			// it lands on depends on what else is running, so only the
-			// fallback itself is asserted.
-			name: "falls back to another port when the requested one is busy",
-			args: []string{"mcp", "start", "http", "--port", fmt.Sprint(busyPort)},
-			opts: append(noDocsProxy(nil), withContext(cancelled)),
-			wantStderr: matchLogPort(fmt.Sprintf(`INFO Docs MCP proxy is disabled
-INFO Specified port was busy, using alternative port requested_port=%d actual_port=<port>
-INFO Tiger MCP server started address=localhost:<port>
-`, busyPort) + shutdown),
-		},
-		{
-			// 192.0.2.1 is TEST-NET-1: it resolves to nothing local, so
-			// every port in the scan range fails to bind.
-			name:    "reports when no port in range is available",
-			args:    []string{"mcp", "start", "http", "--host", "192.0.2.1"},
+			name:    "fails when the requested port is busy",
+			args:    []string{"mcp", "start", "http", "--port", fmt.Sprint(busyPort)},
 			opts:    append(noDocsProxy(nil), withContext(cancelled)),
-			wantErr: "failed to get listener: no available port found in range 8080-8179",
-			wantStderr: matchLog(`INFO Docs MCP proxy is disabled
-ERROR Failed to get listener host=192.0.2.1 port=8080 error="no available port found in range 8080-8179"
-`),
+			wantErr: fmt.Sprintf("failed to listen: listen tcp 127.0.0.1:%d: bind: address already in use", busyPort),
+			wantStderr: matchLog(fmt.Sprintf(`INFO Docs MCP proxy is disabled
+ERROR Failed to listen error="listen tcp 127.0.0.1:%d: bind: address already in use"
+`, busyPort)),
 		},
 		{
 			name:    "rejects positional args",
