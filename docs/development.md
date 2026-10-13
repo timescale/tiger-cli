@@ -39,6 +39,9 @@ There are a handful of configuration options and environment variables that are 
 - `console_url` (`TIGER_CONSOLE_URL`) - Tiger Cloud Console URL (default: https://console.cloud.tigerdata.com)
 - `gateway_url` (`TIGER_GATEWAY_URL`) - Tiger Cloud Gateway URL (default: https://console.cloud.tigerdata.com/api)
 - `docs_mcp_url` (`TIGER_DOCS_MCP_URL`) - Docs MCP server URL (default: https://mcp.tigerdata.com/docs)
+- `releases_url` (`TIGER_RELEASES_URL`) - Release CDN used by `tiger upgrade` and the version check (default: https://cli.tigerdata.com)
+
+These are internal options: `tiger config list` and shell completion leave them out. Pass the hidden `--all` (`-a`) flag to `tiger config list` to include them.
 
 ## Running Tests
 
