@@ -27,6 +27,7 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	var noSetDefault bool
 	var withPassword bool
 	var environment string
+	var platform string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -97,6 +98,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
+			// --platform only exists behind the experimental gate.
+			if app.Experimental {
+				platform = strings.ToLower(platform)
+				if !slices.Contains(validPlatforms, platform) {
+					return fmt.Errorf("platform must be one of: %s (got '%s')", strings.Join(validPlatforms, ", "), platform)
+				}
+			}
+
 			// Validate and normalize CPU/Memory configuration
 			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
 			if err != nil {
@@ -132,6 +141,11 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			if region != "" {
 				serviceCreateReq.RegionCode = &region
+			}
+
+			// Without the gate the field is left nil and the API defaults to STANDARD.
+			if app.Experimental {
+				serviceCreateReq.Platform = new(api.ServicePlatform(strings.ToUpper(platform)))
 			}
 
 			// Make API call to create service
@@ -192,7 +206,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				}
 			}
 
-			if err := outputService(cmd, cfg, service, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, service, app.Experimental, cfg.Output, withPassword, false); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -210,6 +224,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes or 'shared'")
 	cmd.Flags().IntVar(&replicas, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")
+	if app.Experimental {
+		cmd.Flags().StringVar(&platform, "platform", "standard", "Storage platform (standard or fluid)")
+		registerFlagCompletion(cmd, "platform", platformCompletion)
+	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this service as the default service")

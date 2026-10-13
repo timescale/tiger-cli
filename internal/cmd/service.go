@@ -57,9 +57,9 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, format string, withPassword bool, strict bool) error {
+func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
-	outputSvc := prepareServiceForOutput(cmd, cfg, service, withPassword)
+	outputSvc := prepareServiceForOutput(cmd, cfg, service, experimental, withPassword)
 	if strict && withPassword && outputSvc.Password == "" {
 		return fmt.Errorf("password requested but not available for service %s", outputSvc.ServiceID)
 	}
@@ -98,6 +98,9 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Append("Service ID", service.ServiceID)
 	table.Append("Name", service.Name)
 	table.Append("Status", string(service.Status))
+	if service.Platform != nil {
+		table.Append("Platform", string(*service.Platform))
+	}
 	table.Append("Type", string(service.ServiceType))
 	table.Append("Region", service.RegionCode)
 
@@ -181,11 +184,16 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, withPassword bool) OutputService {
+// The platform field is a preview field, so it is dropped unless experimental
+// is set.
+func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, withPassword bool) OutputService {
 	outputSvc := OutputService{
 		Service: service,
 	}
 	outputSvc.Service.InitialPassword = nil
+	if !experimental {
+		outputSvc.Service.Platform = nil
+	}
 
 	opts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",

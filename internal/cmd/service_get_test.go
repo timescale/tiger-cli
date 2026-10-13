@@ -32,6 +32,11 @@ func TestServiceGetCmd(t *testing.T) {
 		s.Resources[0].Spec.MemoryGbs = nil
 	})
 
+	fluidService := sampleService(func(s *api.Service) {
+		s.Platform = new(api.ServicePlatformFLUID)
+	})
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
+
 	withInitialPassword := sampleService(func(s *api.Service) {
 		s.InitialPassword = new("super-secret-pw")
 	})
@@ -257,6 +262,96 @@ endpoint:
   port: 5432
 host: svc-12345.project.tsdb.cloud.timescale.com
 name: test-service
+port: 5432
+project_id: test-project-123
+region_code: us-east-1
+resources:
+  - id: resource-1
+    spec:
+      cpu_millis: 1000
+      memory_gbs: 4
+role: tsdbadmin
+service_id: svc-12345
+service_type: TIMESCALEDB
+status: READY
+`,
+		},
+		{
+			// The platform is a preview field: the output cases above carry one
+			// from sampleService and drop it, while these show it with the gate.
+			name: "experimental table output shows platform",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGet(fluidService),
+			opts: []runOption{experimental},
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Platform          │ FLUID                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 1 cores (1000m)                                                                             │
+│ Memory            │ 4 GB                                                                                        │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
+			name: "experimental json output includes platform",
+			args: []string{"service", "get", "svc-12345", "-o", "json"},
+			mock: setupGet(fluidService),
+			opts: []runOption{experimental},
+			wantStdout: `{
+  "created": "2025-01-15T10:30:00Z",
+  "endpoint": {
+    "host": "svc-12345.project.tsdb.cloud.timescale.com",
+    "port": 5432
+  },
+  "name": "test-service",
+  "platform": "FLUID",
+  "project_id": "test-project-123",
+  "region_code": "us-east-1",
+  "resources": [
+    {
+      "id": "resource-1",
+      "spec": {
+        "cpu_millis": 1000,
+        "memory_gbs": 4
+      }
+    }
+  ],
+  "service_id": "svc-12345",
+  "service_type": "TIMESCALEDB",
+  "status": "READY",
+  "role": "tsdbadmin",
+  "host": "svc-12345.project.tsdb.cloud.timescale.com",
+  "port": 5432,
+  "database": "tsdb",
+  "connection_string": "postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+  "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345"
+}
+`,
+		},
+		{
+			name: "experimental yaml output includes platform",
+			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
+			mock: setupGet(fluidService),
+			opts: []runOption{experimental},
+			wantStdout: `connection_string: postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
+console_url: https://console.cloud.tigerdata.com/dashboard/services/svc-12345
+created: "2025-01-15T10:30:00Z"
+database: tsdb
+endpoint:
+  host: svc-12345.project.tsdb.cloud.timescale.com
+  port: 5432
+host: svc-12345.project.tsdb.cloud.timescale.com
+name: test-service
+platform: FLUID
 port: 5432
 project_id: test-project-123
 region_code: us-east-1

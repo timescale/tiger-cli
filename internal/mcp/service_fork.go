@@ -74,7 +74,10 @@ func (ServiceForkOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceForkOutput](nil))
 }
 
-func newServiceForkTool() *mcp.Tool {
+func newServiceForkTool(experimental bool) *mcp.Tool {
+	outputSchema := ServiceForkOutput{}.Schema()
+	gatePlatformProperty(outputSchema.Properties["service"], experimental)
+
 	return &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
@@ -92,7 +95,7 @@ By default:
 
 WARNING: Creates billable resources.`,
 		InputSchema:  ServiceForkInput{}.Schema(),
-		OutputSchema: ServiceForkOutput{}.Schema(),
+		OutputSchema: outputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing

@@ -986,7 +986,7 @@ type ClientInterface interface {
 
 	// CreateVPCWithBody Create a VPC
 	//
-	// Creates a new Virtual Private Cloud (VPC).
+	// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -995,7 +995,7 @@ type ClientInterface interface {
 
 	// CreateVPC Create a VPC
 	//
-	// Creates a new Virtual Private Cloud (VPC).
+	// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1004,7 +1004,7 @@ type ClientInterface interface {
 
 	// DeleteVPC Delete a VPC
 	//
-	// Deletes a specific VPC.
+	// Deletes a specific VPC. This is an asynchronous operation.
 	//
 	// Corresponds with DELETE /projects/{project_id}/vpcs/{vpc_id} (the `DeleteVPC` operationId).
 	DeleteVPC(ctx context.Context, projectID ProjectID, vpcID VPCId, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1025,7 +1025,7 @@ type ClientInterface interface {
 
 	// CreateVPCPeeringWithBody Create a VPC Peering
 	//
-	// Creates a new VPC peering connection.
+	// Creates a new VPC peering connection. This is an asynchronous operation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1034,7 +1034,7 @@ type ClientInterface interface {
 
 	// CreateVPCPeering Create a VPC Peering
 	//
-	// Creates a new VPC peering connection.
+	// Creates a new VPC peering connection. This is an asynchronous operation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1043,7 +1043,7 @@ type ClientInterface interface {
 
 	// DeleteVPCPeering Delete a VPC Peering
 	//
-	// Deletes a specific VPC peering connection.
+	// Deletes a specific VPC peering connection. This is an asynchronous operation.
 	//
 	// Corresponds with DELETE /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id} (the `DeleteVPCPeering` operationId).
 	DeleteVPCPeering(ctx context.Context, projectID ProjectID, vpcID VPCId, peeringID PeeringID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2790,7 +2790,7 @@ func (c *Client) GetVPCs(ctx context.Context, projectID ProjectID, reqEditors ..
 
 // CreateVPCWithBody Create a VPC
 //
-// Creates a new Virtual Private Cloud (VPC).
+// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2809,7 +2809,7 @@ func (c *Client) CreateVPCWithBody(ctx context.Context, projectID ProjectID, con
 
 // CreateVPC Create a VPC
 //
-// Creates a new Virtual Private Cloud (VPC).
+// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2828,7 +2828,7 @@ func (c *Client) CreateVPC(ctx context.Context, projectID ProjectID, body Create
 
 // DeleteVPC Delete a VPC
 //
-// Deletes a specific VPC.
+// Deletes a specific VPC. This is an asynchronous operation.
 //
 // Corresponds with DELETE /projects/{project_id}/vpcs/{vpc_id} (the `DeleteVPC` operationId).
 func (c *Client) DeleteVPC(ctx context.Context, projectID ProjectID, vpcID VPCId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2879,7 +2879,7 @@ func (c *Client) GetVPCPeerings(ctx context.Context, projectID ProjectID, vpcID 
 
 // CreateVPCPeeringWithBody Create a VPC Peering
 //
-// Creates a new VPC peering connection.
+// Creates a new VPC peering connection. This is an asynchronous operation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2898,7 +2898,7 @@ func (c *Client) CreateVPCPeeringWithBody(ctx context.Context, projectID Project
 
 // CreateVPCPeering Create a VPC Peering
 //
-// Creates a new VPC peering connection.
+// Creates a new VPC peering connection. This is an asynchronous operation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2917,7 +2917,7 @@ func (c *Client) CreateVPCPeering(ctx context.Context, projectID ProjectID, vpcI
 
 // DeleteVPCPeering Delete a VPC Peering
 //
-// Deletes a specific VPC peering connection.
+// Deletes a specific VPC peering connection. This is an asynchronous operation.
 //
 // Corresponds with DELETE /projects/{project_id}/vpcs/{vpc_id}/peerings/{peering_id} (the `DeleteVPCPeering` operationId).
 func (c *Client) DeleteVPCPeering(ctx context.Context, projectID ProjectID, vpcID VPCId, peeringID PeeringID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6993,7 +6993,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateVPCWithBodyWithResponse Create a VPC
 	//
-	// Creates a new Virtual Private Cloud (VPC).
+	// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7002,7 +7002,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateVPCWithResponse Create a VPC
 	//
-	// Creates a new Virtual Private Cloud (VPC).
+	// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7011,7 +7011,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteVPCWithResponse Delete a VPC
 	//
-	// Deletes a specific VPC.
+	// Deletes a specific VPC. This is an asynchronous operation.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7038,7 +7038,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateVPCPeeringWithBodyWithResponse Create a VPC Peering
 	//
-	// Creates a new VPC peering connection.
+	// Creates a new VPC peering connection. This is an asynchronous operation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7047,7 +7047,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateVPCPeeringWithResponse Create a VPC Peering
 	//
-	// Creates a new VPC peering connection.
+	// Creates a new VPC peering connection. This is an asynchronous operation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7056,7 +7056,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteVPCPeeringWithResponse Delete a VPC Peering
 	//
-	// Deletes a specific VPC peering connection.
+	// Deletes a specific VPC peering connection. This is an asynchronous operation.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -9678,15 +9678,15 @@ func (r GetVPCsResponse) ContentType() string {
 type CreateVPCResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *VPC
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *VPC
 	// JSON4XX the response for an HTTP 4XX `application/json` response
 	JSON4XX *ClientError
 }
 
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateVPCResponse) GetJSON201() *VPC {
-	return r.JSON201
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CreateVPCResponse) GetJSON202() *VPC {
+	return r.JSON202
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
@@ -9863,15 +9863,15 @@ func (r GetVPCPeeringsResponse) ContentType() string {
 type CreateVPCPeeringResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Peering
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Peering
 	// JSON4XX the response for an HTTP 4XX `application/json` response
 	JSON4XX *ClientError
 }
 
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateVPCPeeringResponse) GetJSON201() *Peering {
-	return r.JSON201
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CreateVPCPeeringResponse) GetJSON202() *Peering {
+	return r.JSON202
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
@@ -11489,7 +11489,7 @@ func (c *ClientWithResponses) GetVPCsWithResponse(ctx context.Context, projectID
 
 // CreateVPCWithBodyWithResponse Create a VPC
 //
-// Creates a new Virtual Private Cloud (VPC).
+// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11504,7 +11504,7 @@ func (c *ClientWithResponses) CreateVPCWithBodyWithResponse(ctx context.Context,
 
 // CreateVPCWithResponse Create a VPC
 //
-// Creates a new Virtual Private Cloud (VPC).
+// Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11519,7 +11519,7 @@ func (c *ClientWithResponses) CreateVPCWithResponse(ctx context.Context, project
 
 // DeleteVPCWithResponse Delete a VPC
 //
-// Deletes a specific VPC.
+// Deletes a specific VPC. This is an asynchronous operation.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11564,7 +11564,7 @@ func (c *ClientWithResponses) GetVPCPeeringsWithResponse(ctx context.Context, pr
 
 // CreateVPCPeeringWithBodyWithResponse Create a VPC Peering
 //
-// Creates a new VPC peering connection.
+// Creates a new VPC peering connection. This is an asynchronous operation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11579,7 +11579,7 @@ func (c *ClientWithResponses) CreateVPCPeeringWithBodyWithResponse(ctx context.C
 
 // CreateVPCPeeringWithResponse Create a VPC Peering
 //
-// Creates a new VPC peering connection.
+// Creates a new VPC peering connection. This is an asynchronous operation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11594,7 +11594,7 @@ func (c *ClientWithResponses) CreateVPCPeeringWithResponse(ctx context.Context, 
 
 // DeleteVPCPeeringWithResponse Delete a VPC Peering
 //
-// Deletes a specific VPC peering connection.
+// Deletes a specific VPC peering connection. This is an asynchronous operation.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -13449,12 +13449,12 @@ func ParseCreateVPCResponse(rsp *http.Response) (*CreateVPCResponse, error) {
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
 		var dest VPC
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON201 = &dest
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
@@ -13482,7 +13482,7 @@ func ParseDeleteVPCResponse(rsp *http.Response) (*DeleteVPCResponse, error) {
 	}
 
 	switch {
-	case rsp.StatusCode == 204:
+	case rsp.StatusCode == 202:
 		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
@@ -13577,12 +13577,12 @@ func ParseCreateVPCPeeringResponse(rsp *http.Response) (*CreateVPCPeeringRespons
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
 		var dest Peering
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON201 = &dest
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError
@@ -13610,7 +13610,7 @@ func ParseDeleteVPCPeeringResponse(rsp *http.Response) (*DeleteVPCPeeringRespons
 	}
 
 	switch {
-	case rsp.StatusCode == 204:
+	case rsp.StatusCode == 202:
 		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:

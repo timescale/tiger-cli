@@ -187,6 +187,11 @@ var validEnvironmentTags = []string{"DEV", "PROD"}
 
 var environmentCompletion = cobra.FixedCompletions(validEnvironmentTags, cobra.ShellCompDirectiveNoFileComp)
 
+// validPlatforms are the accepted values for --platform on `service create`.
+var validPlatforms = []string{"standard", "fluid"}
+
+var platformCompletion = cobra.FixedCompletions(validPlatforms, cobra.ShellCompDirectiveNoFileComp)
+
 // addonsCompletion completes --addons on `service create`, drawn from the
 // same list used to validate it (common.ValidateAddons).
 var addonsCompletion = cobra.FixedCompletions(append(common.ValidAddons(), common.AddonNone), cobra.ShellCompDirectiveNoFileComp)

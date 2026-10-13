@@ -21,6 +21,10 @@ const (
 	serviceTypeVector      = "VECTOR"
 )
 
+// validPlatforms are the accepted values for service_create's platform
+// parameter, lowercase to match the CLI's --platform flag.
+var validPlatforms = []string{"standard", "fluid"}
+
 // Wait timeout for MCP tool operations
 const waitTimeout = 10 * time.Minute
 
@@ -56,6 +60,22 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
+// gatePlatformProperty removes the preview platform property from a schema
+// unless the experimental gate is on, so clients aren't told about it. Input
+// schemas reject unknown properties, so this also rejects the parameter.
+func gatePlatformProperty(schema *jsonschema.Schema, experimental bool) {
+	if !experimental {
+		delete(schema.Properties, "platform")
+	}
+}
+
+// setPlatformSchemaProperties sets the platform schema properties shared by the
+// service output types.
+func setPlatformSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["platform"].Description = "Storage platform the service runs on"
+	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
+}
+
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty"`
@@ -77,6 +97,7 @@ type ServiceDetail struct {
 	ServiceID        string        `json:"id"`
 	Name             string        `json:"name"`
 	Status           string        `json:"status"`
+	Platform         string        `json:"platform,omitempty"`
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
@@ -96,6 +117,8 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
+
+	setPlatformSchemaProperties(schema)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
@@ -123,6 +146,11 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Created:   service.Created.Format("2006-01-02T15:04:05Z"),
 		// The read_only=prod instructions tell the model to check this first.
 		Environment: string(common.ServiceEnvironmentTag(service)),
+	}
+
+	// The platform is a preview field, returned only behind the gate.
+	if s.app.Experimental {
+		detail.Platform = string(util.Deref(service.Platform))
 	}
 
 	// Add resource information if available

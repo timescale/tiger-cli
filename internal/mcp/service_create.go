@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,6 +24,7 @@ type ServiceCreateInput struct {
 	CPUMemory    string             `json:"cpu_memory,omitempty"`
 	Replicas     int                `json:"replicas,omitempty"`
 	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	Platform     string             `json:"platform,omitempty"`
 	Wait         bool               `json:"wait,omitempty"`
 	SetDefault   bool               `json:"set_default,omitempty"`
 	WithPassword bool               `json:"with_password,omitempty"`
@@ -54,6 +56,10 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
+	schema.Properties["platform"].Description = "Storage platform to create the service on"
+	schema.Properties["platform"].Enum = util.AnySlice(validPlatforms)
+	schema.Properties["platform"].Default = util.Must(json.Marshal("standard"))
+
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
@@ -78,7 +84,12 @@ func (ServiceCreateOutput) Schema() *jsonschema.Schema {
 	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
 }
 
-func newServiceCreateTool() *mcp.Tool {
+func newServiceCreateTool(experimental bool) *mcp.Tool {
+	inputSchema := ServiceCreateInput{}.Schema()
+	gatePlatformProperty(inputSchema, experimental)
+	outputSchema := ServiceCreateOutput{}.Schema()
+	gatePlatformProperty(outputSchema.Properties["service"], experimental)
+
 	return &mcp.Tool{
 		Name:  toolServiceCreate,
 		Title: "Create Database Service",
@@ -89,8 +100,8 @@ The default type of service created depends on the user's plan:
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceCreateInput{}.Schema(),
-		OutputSchema: ServiceCreateOutput{}.Schema(),
+		InputSchema:  inputSchema,
+		OutputSchema: outputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -129,6 +140,14 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
+	// The platform parameter only exists behind the experimental gate. Without
+	// it the field is left nil and the API defaults to STANDARD; with it, the
+	// SDK applies the schema's default.
+	var platform *api.ServicePlatform
+	if s.app.Experimental {
+		platform = new(api.ServicePlatform(strings.ToUpper(input.Platform)))
+	}
+
 	s.logger.Info("MCP: Creating service",
 		slog.String("project_id", projectID),
 		slog.String("name", input.Name),
@@ -138,6 +157,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("memory", memoryGBs),
 		slog.Int("replicas", input.Replicas),
 		slog.String("environment", string(input.Environment)),
+		slog.String("platform", input.Platform),
 	)
 
 	// Prepare service creation request
@@ -149,6 +169,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
 		EnvironmentTag: &input.Environment,
+		Platform:       platform,
 	}
 
 	// Make API call to create service

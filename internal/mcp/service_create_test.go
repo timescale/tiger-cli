@@ -110,6 +110,21 @@ func TestServiceCreateTool(t *testing.T) {
 				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`,
 		},
 		{
+			// platform is a preview parameter, so without the gate it isn't in
+			// the schema, which rejects unknown properties.
+			name:    "platform rejected without the experimental gate",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "platform": "fluid"},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["platform"]`,
+		},
+		{
+			name:    "unknown platform rejected by the schema",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "platform": "hybrid"},
+			opts:    []runOption{withExperimental()},
+			wantErr: `validating "arguments": validating root: validating /properties/platform: enum: hybrid does not equal any of: [standard fluid]`,
+		},
+		{
 			name:    "replica count above the maximum rejected by the schema",
 			tool:    toolServiceCreate,
 			args:    map[string]any{"name": "test-service", "replicas": 6},
@@ -177,11 +192,42 @@ func TestServiceCreateTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
+			// Without the experimental gate, no platform is sent.
 			name:       "creates a service with the schema defaults",
 			tool:       toolServiceCreate,
 			args:       args,
 			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
+		},
+		{
+			name: "experimental sends the standard platform by default",
+			tool: toolServiceCreate,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformSTANDARD)
+				expectCreate(req)(m)
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"platform": "STANDARD"}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name: "experimental passes platform fluid through and returns it",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "platform": "fluid"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				expectCreate(req, func(s *api.Service) { s.Platform = new(api.ServicePlatformFLUID) })(m)
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"platform": "FLUID"}),
+				"message": acceptedMsg,
+			},
 		},
 		{
 			name: "auto-generates a name when none is given",

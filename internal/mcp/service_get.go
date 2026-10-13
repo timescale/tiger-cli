@@ -38,14 +38,17 @@ func (ServiceGetOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceGetTool() *mcp.Tool {
+func newServiceGetTool(experimental bool) *mcp.Tool {
+	outputSchema := ServiceGetOutput{}.Schema()
+	gatePlatformProperty(outputSchema.Properties["service"], experimental)
+
 	return &mcp.Tool{
 		Name:  toolServiceGet,
 		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
 			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
 		InputSchema:  ServiceGetInput{}.Schema(),
-		OutputSchema: ServiceGetOutput{}.Schema(),
+		OutputSchema: outputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),

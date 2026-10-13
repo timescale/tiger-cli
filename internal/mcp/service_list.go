@@ -37,6 +37,7 @@ type ServiceInfo struct {
 	ServiceID   string        `json:"id"`
 	Name        string        `json:"name"`
 	Status      string        `json:"status"`
+	Platform    string        `json:"platform,omitempty"`
 	Type        string        `json:"type"`
 	Region      string        `json:"region"`
 	Created     string        `json:"created,omitempty"`
@@ -52,6 +53,8 @@ func (ServiceInfo) Schema() *jsonschema.Schema {
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 
+	setPlatformSchemaProperties(schema)
+
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
@@ -61,14 +64,17 @@ func (ServiceInfo) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceListTool() *mcp.Tool {
+func newServiceListTool(experimental bool) *mcp.Tool {
+	outputSchema := ServiceListOutput{}.Schema()
+	gatePlatformProperty(outputSchema.Properties["services"].Items, experimental)
+
 	return &mcp.Tool{
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
 			"Returns services with status, type, region, and resource allocation.",
 		InputSchema:  ServiceListInput{}.Schema(),
-		OutputSchema: ServiceListOutput{}.Schema(),
+		OutputSchema: outputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),
@@ -125,6 +131,11 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		// The read_only=prod instructions point the model at this field, so a list
 		// result has to carry it too, not just ServiceDetail.
 		Environment: string(common.ServiceEnvironmentTag(service)),
+	}
+
+	// The platform is a preview field, returned only behind the gate.
+	if s.app.Experimental {
+		info.Platform = string(util.Deref(service.Platform))
 	}
 
 	// Add resource information if available

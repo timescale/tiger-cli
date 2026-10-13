@@ -30,6 +30,7 @@ func TestServiceCreateCmd(t *testing.T) {
 	}
 
 	svc := sampleService()
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -46,6 +47,18 @@ func TestServiceCreateCmd(t *testing.T) {
 			name:    "invalid environment",
 			args:    []string{"service", "create", "--name", "test-service", "--environment", "staging"},
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
+		},
+		{
+			// --platform is a preview flag, so without the gate it doesn't exist.
+			name:    "platform flag rejected without experimental",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid"},
+			wantErr: "unknown flag: --platform",
+		},
+		{
+			name:    "invalid platform",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "hybrid"},
+			opts:    []runOption{experimental},
+			wantErr: "platform must be one of: standard, fluid (got 'hybrid')",
 		},
 		{
 			name:    "invalid cpu/memory combination",
@@ -374,6 +387,7 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
+			// Without the experimental gate, no platform is sent.
 			name: "all creation flags mapped to request",
 			args: []string{
 				"service", "create", "--name", "test-service",
@@ -399,6 +413,67 @@ Service is being created. Use 'tiger service list' to check status.
 PGPORT=5432
 PGDATABASE=tsdb
 PGUSER=tsdbadmin
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental sends the standard platform by default",
+			args: []string{"service", "create", "--name", "test-service", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformSTANDARD)
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+PGPORT=5432
+PGDATABASE=tsdb
+PGUSER=tsdbadmin
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental platform fluid mapped to request and shown in output",
+			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--no-wait", "--no-set-default"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				fluidSvc := sampleService(func(s *api.Service) {
+					s.Platform = new(api.ServicePlatformFLUID)
+				})
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Platform          │ FLUID                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 1 cores (1000m)                                                                             │
+│ Memory            │ 4 GB                                                                                        │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345

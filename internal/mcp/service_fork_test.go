@@ -187,6 +187,21 @@ func TestServiceForkTool(t *testing.T) {
 			wantOutput: accepted,
 		},
 		{
+			// The platform is a preview field: the case above carries one from
+			// sampleService and drops it, while this one returns it.
+			name: "experimental returns the platform",
+			tool: toolServiceFork,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: expectFork(baseReq, func(s *api.Service) {
+				s.Platform = new(api.ServicePlatformFLUID)
+			}),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"platform": "FLUID"}),
+				"message": acceptedMsg,
+			},
+		},
+		{
 			name: "forks from the last snapshot",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "LAST_SNAPSHOT"},
