@@ -435,6 +435,26 @@ func withReadPassword(password string) runOption {
 	})
 }
 
+// withRunPicker stubs the interactive checkbox picker: it expects to be
+// offered exactly want, and answers with choose. A nil want expects the picker
+// not to be shown at all.
+func withRunPicker(want []pickerItem, choose []bool) runOption {
+	return withSetup(func(t *testing.T) {
+		original := runPicker
+		runPicker = func(_ *cobra.Command, _ string, items []pickerItem) ([]bool, error) {
+			if want == nil {
+				t.Error("picker shown, want none")
+				return nil, errors.New("picker shown")
+			}
+			if diff := cmp.Diff(want, items, cmp.AllowUnexported(pickerItem{})); diff != "" {
+				t.Errorf("picker items mismatch (-want +got):\n%s", diff)
+			}
+			return choose, nil
+		}
+		t.Cleanup(func() { runPicker = original })
+	})
+}
+
 // withOpenBrowser overrides openBrowser for the duration of the test. By
 // default, runCommand stubs openBrowser to return an error (installed before
 // the setup hooks run, so this override lands on top of it). Use this to

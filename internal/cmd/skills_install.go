@@ -17,8 +17,6 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 
@@ -238,13 +236,6 @@ func skillsDirsFromArgs(names []string) ([]string, error) {
 	return resolveSkillsTargetDirs(result)
 }
 
-// skillsPickerItem is one install location offered by the picker.
-type skillsPickerItem struct {
-	label    string
-	dir      string // as displayed
-	selected bool
-}
-
 // skillsDirsFromPicker prompts the user to choose install locations, starting
 // from the ones preselectSkillsDirs picks, and returns the chosen
 // directories. It fails without a terminal to prompt on.
@@ -258,18 +249,18 @@ func skillsDirsFromPicker(cmd *cobra.Command) ([]string, error) {
 		return nil, err
 	}
 	selected := preselectSkillsDirs(dirs)
-	items := make([]skillsPickerItem, len(targets))
+	items := make([]pickerItem, len(targets))
 	for i, t := range targets {
-		items[i] = skillsPickerItem{
+		items[i] = pickerItem{
 			label:    t.label,
-			dir:      displayPath(dirs[i]),
+			detail:   displayPath(dirs[i]),
 			selected: selected[i],
 		}
 	}
 	header := ansi.Wordwrap(fmt.Sprintf("Select where to install agent skills. %s installs to %s, which %s read.",
-		targets[0].label, items[0].dir, joinWithAnd(append(slices.Clone(targets[0].readers), "many other agents"))), 80, "")
+		targets[0].label, items[0].detail, joinWithAnd(append(slices.Clone(targets[0].readers), "many other agents"))), 80, "")
 
-	chosen, err := runSkillsPicker(cmd, header, items)
+	chosen, err := runPicker(cmd, header, items)
 	if err != nil {
 		return nil, err
 	}
@@ -285,41 +276,17 @@ func skillsDirsFromPicker(cmd *cobra.Command) ([]string, error) {
 	return result, nil
 }
 
-// resolveSkillsTargetDirs returns the absolute directory of each target. An
-// env var override that doesn't give an absolute path is ignored, since
-// there's no telling what a relative one is relative to.
+// resolveSkillsTargetDirs returns the absolute directory of each target.
 func resolveSkillsTargetDirs(targets []skillsTarget) ([]string, error) {
 	dirs := make([]string, len(targets))
 	for i, t := range targets {
-		if t.dirEnv != "" {
-			if expanded, ok := expandEnvStrict(t.dirEnv); ok && filepath.IsAbs(expanded) {
-				dirs[i] = filepath.Clean(expanded)
-				continue
-			}
-		}
-		// ExpandPath leaves a ~ in place if the home directory is unknown,
-		// which would otherwise install relative to the working directory.
-		dir := util.ExpandPath(t.dir)
-		if !filepath.IsAbs(dir) {
-			return nil, fmt.Errorf("failed to determine skills directory: %s is not an absolute path", dir)
+		dir, err := resolveClientPath(t.dir, t.dirEnv)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine skills directory: %w", err)
 		}
 		dirs[i] = dir
 	}
 	return dirs, nil
-}
-
-// expandEnvStrict expands env var references in s, reporting false if any
-// referenced variable is unset or empty.
-func expandEnvStrict(s string) (string, bool) {
-	ok := true
-	expanded := os.Expand(s, func(name string) string {
-		v := os.Getenv(name)
-		if v == "" {
-			ok = false
-		}
-		return v
-	})
-	return expanded, ok
 }
 
 // preselectSkillsDirs reports which of dirs the picker starts with
@@ -358,18 +325,6 @@ func hasInstalledSkills(skillsDir string) bool {
 	return false
 }
 
-// displayPath abbreviates the home directory in path to ~.
-func displayPath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	if rel, ok := strings.CutPrefix(path, home+string(filepath.Separator)); ok {
-		return filepath.Join("~", rel)
-	}
-	return path
-}
-
 // joinWithAnd joins items into an English list ("a, b, and c").
 func joinWithAnd(items []string) string {
 	switch len(items) {
@@ -381,116 +336,6 @@ func joinWithAnd(items []string) string {
 		return items[0] + " and " + items[1]
 	}
 	return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
-}
-
-// runSkillsPicker runs the interactive install location picker over items and
-// returns which of them the user chose. It's a var so command tests can stub
-// the interactive part.
-var runSkillsPicker = func(cmd *cobra.Command, header string, items []skillsPickerItem) ([]bool, error) {
-	model := skillsPickerModel{
-		header: header,
-		items:  items,
-	}
-	program := tea.NewProgram(model,
-		tea.WithInput(cmd.InOrStdin()),
-		tea.WithOutput(cmd.ErrOrStderr()),
-		tea.WithContext(cmd.Context()),
-		tea.WithoutSignalHandler())
-	final, err := program.Run()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run install location selection: %w", err)
-	}
-
-	result := final.(skillsPickerModel)
-	if !result.confirmed {
-		return nil, errors.New("installation cancelled")
-	}
-	chosen := make([]bool, len(result.items))
-	for i, item := range result.items {
-		chosen[i] = item.selected
-	}
-	return chosen, nil
-}
-
-// skillsPickerModel is the Bubble Tea model for the install location picker.
-type skillsPickerModel struct {
-	header    string
-	items     []skillsPickerItem
-	cursor    int
-	confirmed bool
-	done      bool // set on quitting, however that happens, to clear the picker
-}
-
-func (m skillsPickerModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m skillsPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	key, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
-	}
-	switch k := key.String(); k {
-	case "ctrl+c", "q", "esc":
-		m.done = true
-		return m, tea.Quit
-	case "enter":
-		m.confirmed = true
-		m.done = true
-		return m, tea.Quit
-	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case "down", "j":
-		if m.cursor < len(m.items)-1 {
-			m.cursor++
-		}
-	case "space":
-		m.items[m.cursor].selected = !m.items[m.cursor].selected
-	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		if i := int(k[0] - '1'); i < len(m.items) {
-			m.cursor = i
-			m.items[i].selected = !m.items[i].selected
-		}
-	}
-	return m, nil
-}
-
-// Styles for the install location picker, taken from the terminal theme.
-// Bright colors and bold are avoided because some themes render them as greys,
-// and dim text uses the faint attribute so it suits light and dark themes
-// alike.
-var (
-	skillsPickerCursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Blue)
-	skillsPickerCheckStyle  = lipgloss.NewStyle().Foreground(lipgloss.Green)
-	skillsPickerDimStyle    = lipgloss.NewStyle().Faint(true)
-)
-
-func (m skillsPickerModel) View() tea.View {
-	if m.done {
-		return tea.NewView("")
-	}
-	width := 0
-	for _, item := range m.items {
-		width = max(width, len(item.label))
-	}
-
-	var b strings.Builder
-	b.WriteString(m.header + "\n\n")
-	for i, item := range m.items {
-		cursor := " "
-		if m.cursor == i {
-			cursor = skillsPickerCursorStyle.Render(">")
-		}
-		check := " "
-		if item.selected {
-			check = skillsPickerCheckStyle.Render("✓")
-		}
-		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, skillsPickerDimStyle.Render(item.dir))
-	}
-	b.WriteString("\n" + skillsPickerDimStyle.Render("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
-	return tea.NewView(b.String())
 }
 
 // skill is one skill directory, with its contents held in memory.

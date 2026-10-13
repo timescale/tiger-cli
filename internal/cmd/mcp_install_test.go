@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -23,582 +24,724 @@ func stubTigerExecutablePath(t *testing.T, path string) {
 	t.Cleanup(func() { tigerExecutablePathFunc = original })
 }
 
-// installSuccessOutput is the exact stdout `tiger mcp install` prints after a
-// successful file-based installation.
-func installSuccessOutput(clientName, configPath string) string {
-	return fmt.Sprintf(`Installed Tiger MCP server configuration for %s
-Configuration file: %s
+// withMCPHome isolates client config lookups to home: it sets HOME, clears
+// the env vars that relocate client configs, and pins the platform to Linux
+// so the expected paths don't depend on where the tests run.
+func withMCPHome(home string) runOption {
+	return withSetup(func(t *testing.T) {
+		t.Setenv("HOME", home)
+		for _, v := range []string{"APPDATA", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "COPILOT_HOME", "GEMINI_CLI_HOME", "KIRO_HOME", "XDG_CONFIG_HOME"} {
+			t.Setenv(v, "")
+		}
+		original := goos
+		goos = "linux"
+		t.Cleanup(func() { goos = original })
+	})
+}
 
-Next steps:
-   1. Restart %s to load the new configuration
-   2. The Tiger MCP server will be available as 'tiger'
+// withGOOS makes the client config paths those of the given platform. It
+// goes after withMCPHome, which pins Linux.
+func withGOOS(platform string) runOption {
+	return withSetup(func(t *testing.T) {
+		original := goos
+		goos = platform
+		t.Cleanup(func() { goos = original })
+	})
+}
+
+// installedFor is one line of the install command's list of clients.
+type installedFor struct {
+	client string
+	path   string
+}
+
+// mcpInstalledList is the list of clients the install command prints.
+func mcpInstalledList(installed ...installedFor) string {
+	width := 0
+	for _, in := range installed {
+		width = max(width, len(in.client))
+	}
+	var b strings.Builder
+	b.WriteString("Installed Tiger MCP server for:\n")
+	for _, in := range installed {
+		fmt.Fprintf(&b, "  %-*s  %s\n", width, in.client, in.path)
+	}
+	return b.String()
+}
+
+// mcpInstallOutput is the exact stdout of a successful install.
+func mcpInstallOutput(installed ...installedFor) string {
+	return mcpInstalledList(installed...) + `
+Restart your coding agents to load the new configuration.
 
 Try asking your AI assistant:
-   • "List my Tiger Cloud services"
-   • "Create a new database service called my-app-db"
-   • "Show me Tiger Cloud documentation about hypertables"
-   • "What are the best practices for PostgreSQL indexing?"
-   • "Help me optimize my PostgreSQL queries"
-   • "Help me create a new database schema for my application"
-   • "Help me figure out which tables should be hypertables"
-`, clientName, configPath, clientName)
+  "List my Tiger Cloud services"
+  "Create a new database service called my-app-db"
+  "Show me Tiger Cloud documentation about hypertables"
+  "What are the best practices for PostgreSQL indexing?"
+  "Help me optimize my PostgreSQL queries"
+  "Help me create a new database schema for my application"
+  "Help me figure out which tables should be hypertables"
+`
 }
 
-// tigerServerEntry is the MCP server entry the install command writes (with
-// the executable path stubbed to "tiger").
-func tigerServerEntry() map[string]any {
-	return map[string]any{
-		"command": "tiger",
-		"args":    []any{"mcp", "start"},
+// mcpPickerItems returns the items the picker offers with the default
+// (Linux) config paths, selecting the clients named in selected.
+func mcpPickerItems(selected ...string) []pickerItem {
+	items := []pickerItem{
+		{label: "Claude Code", detail: "~/.claude.json"},
+		{label: "Cursor", detail: "~/.cursor/mcp.json"},
+		{label: "Devin", detail: "~/.config/devin/mcp_config.json"},
+		{label: "Codex", detail: "~/.codex/config.toml"},
+		{label: "Gemini CLI", detail: "~/.gemini/settings.json"},
+		{label: "VS Code", detail: "~/.config/Code/User/mcp.json"},
+		{label: "Google Antigravity", detail: "~/.gemini/config/mcp_config.json"},
+		{label: "Kiro CLI", detail: "~/.kiro/settings/mcp.json"},
+		{label: "GitHub Copilot CLI", detail: "~/.copilot/mcp-config.json"},
+	}
+	for i := range items {
+		items[i].selected = slices.Contains(selected, items[i].label)
+	}
+	return items
+}
+
+// tigerEntryLines are the command and args of the Tiger entry an install
+// writes to a JSON config (with the executable stubbed to "tiger"), at the
+// indentation of a fresh file.
+const tigerEntryLines = `      "command": "tiger",
+      "args": [
+        "mcp",
+        "start"
+      ]`
+
+// freshJSONConfig is the JSON config an install creates where there was none,
+// holding only the Tiger entry, whose lines are given.
+func freshJSONConfig(serversKey, entryLines string) string {
+	return fmt.Sprintf("{\n  %q: {\n    \"tiger\": {\n%s\n    }\n  }\n}\n", serversKey, entryLines)
+}
+
+// freshConfigs are the config files, relative to the home directory, that
+// installing for each client creates on Linux where there were none.
+var freshConfigs = map[MCPClient]struct {
+	path    string
+	content string
+}{
+	ClaudeCode:  {".claude.json", freshJSONConfig("mcpServers", "      \"type\": \"stdio\",\n"+tigerEntryLines)},
+	Cursor:      {".cursor/mcp.json", freshJSONConfig("mcpServers", tigerEntryLines)},
+	Devin:       {".config/devin/mcp_config.json", freshJSONConfig("mcpServers", "      \"transport\": \"stdio\",\n"+tigerEntryLines)},
+	Codex:       {".codex/config.toml", "[mcp_servers.tiger]\ncommand = 'tiger'\nargs = ['mcp', 'start']\n"},
+	Gemini:      {".gemini/settings.json", freshJSONConfig("mcpServers", tigerEntryLines)},
+	VSCode:      {".config/Code/User/mcp.json", freshJSONConfig("servers", tigerEntryLines)},
+	Antigravity: {".gemini/config/mcp_config.json", freshJSONConfig("mcpServers", tigerEntryLines)},
+	KiroCLI:     {".kiro/settings/mcp.json", freshJSONConfig("mcpServers", tigerEntryLines)},
+	Copilot:     {".copilot/mcp-config.json", freshJSONConfig("mcpServers", "      \"type\": \"local\",\n"+tigerEntryLines+",\n      \"tools\": [\n        \"*\"\n      ]")},
+}
+
+// freshTree returns the tree (see readTree) that installing for clients
+// creates in an empty directory, with each file's path relative to it
+// rewritten by rebase if set.
+func freshTree(rebase func(string) string, clients ...MCPClient) map[string]string {
+	tree := map[string]string{}
+	for _, c := range clients {
+		f := freshConfigs[c]
+		p := f.path
+		if rebase != nil {
+			p = rebase(p)
+		}
+		tree[p] = f.content
+	}
+	return tree
+}
+
+// checkFile asserts the exact content of the file at path.
+func checkFile(path, want string) checkFunc {
+	return func(t *testing.T, _ cmdResult) {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("failed to read %s: %v", path, err)
+		}
+		if diff := cmp.Diff(want, string(data)); diff != "" {
+			t.Errorf("%s mismatch (-want +got):\n%s", path, diff)
+		}
 	}
 }
 
-func readJSONFile(t *testing.T, path string) map[string]any {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("failed to read %s: %v", path, err)
-	}
-	var parsed map[string]any
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("file %s is not valid JSON: %v", path, err)
-	}
-	return parsed
-}
-
-func assertJSONFile(t *testing.T, path string, want map[string]any) {
-	t.Helper()
-	if diff := cmp.Diff(want, readJSONFile(t, path)); diff != "" {
-		t.Errorf("config file mismatch (-want +got):\n%s", diff)
+// checkMode asserts the permissions of the file at path.
+func checkMode(path string, want os.FileMode) checkFunc {
+	return func(t *testing.T, _ cmdResult) {
+		t.Helper()
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("failed to stat %s: %v", path, err)
+		}
+		if got := info.Mode().Perm(); got != want {
+			t.Errorf("%s mode = %o, want %o", path, got, want)
+		}
 	}
 }
 
-// backupFiles returns the backup files created alongside configPath.
-func backupFiles(t *testing.T, configPath string) []string {
-	t.Helper()
-	matches, err := filepath.Glob(configPath + ".backup.*")
-	if err != nil {
-		t.Fatalf("failed to glob backup files: %v", err)
+// checkBackups asserts the contents of the backups made of the config file at
+// path, and that each has the given permissions.
+func checkBackups(path string, mode os.FileMode, want ...string) checkFunc {
+	return func(t *testing.T, _ cmdResult) {
+		t.Helper()
+		matches, err := filepath.Glob(path + ".backup.*")
+		if err != nil {
+			t.Fatalf("failed to glob backups: %v", err)
+		}
+		var got []string
+		for _, m := range matches {
+			data, err := os.ReadFile(m)
+			if err != nil {
+				t.Fatalf("failed to read backup: %v", err)
+			}
+			got = append(got, string(data))
+			checkMode(m, mode)(t, cmdResult{})
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("backups of %s mismatch (-want +got):\n%s", path, diff)
+		}
 	}
-	return matches
+}
+
+// withChmod sets the permissions of path for the case, restoring them (so
+// t.TempDir can clean up) when it ends. Root ignores file permissions, so the
+// case is skipped when run as root.
+func withChmod(path string, mode os.FileMode) runOption {
+	return withSetup(func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("cannot test permission errors as root user")
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("failed to stat %s: %v", path, err)
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatalf("failed to chmod %s: %v", path, err)
+		}
+		t.Cleanup(func() { os.Chmod(path, info.Mode().Perm()) })
+	})
 }
 
 func TestMCPInstallCmd(t *testing.T) {
 	stubTigerExecutablePath(t, "tiger")
 
-	dir := t.TempDir()
-	home := t.TempDir()
-
-	// path returns a per-case config file path; seed pre-creates it.
-	path := func(caseName string) string {
-		return filepath.Join(dir, caseName, "mcp.json")
-	}
-	seed := func(caseName, content string, mode os.FileMode) string {
-		t.Helper()
-		p := path(caseName)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatalf("failed to create config dir: %v", err)
+	// home creates a home directory seeded with tree (see writeTree). Its
+	// path has symlinks resolved (on macOS, the temporary directory is under
+	// one), like the paths of the config files an install writes through.
+	home := func(tree map[string]string) string {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
 		}
-		if err := os.WriteFile(p, []byte(content), mode); err != nil {
-			t.Fatalf("failed to seed config file: %v", err)
-		}
-		return p
+		writeTree(t, dir, tree)
+		return dir
 	}
 
-	// Stub `claude` and `devin` on PATH so the CLI-based install paths run end-to-end
-	// without the real clients; the script records its argv for the check.
-	stubBin := t.TempDir()
-	argvFile := filepath.Join(stubBin, "argv")
-	stubScript := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\n", argvFile)
-	for _, stub := range []string{"claude", "devin"} {
-		if err := os.WriteFile(filepath.Join(stubBin, stub), []byte(stubScript), 0o755); err != nil {
-			t.Fatalf("failed to write %s stub: %v", stub, err)
-		}
+	// pickerTree is a previous install for Claude Code (outdated) and Codex,
+	// plus an entry in a config file that doesn't parse (so it doesn't count)
+	// and a Cursor config holding only another server.
+	pickerTree := map[string]string{
+		".claude.json":          `{"mcpServers": {"tiger": {"command": "/old/tiger", "args": ["mcp", "start"]}}}`,
+		".codex/config.toml":    "[mcp_servers.tiger]\ncommand = \"/old/tiger\"\nargs = [\"mcp\", \"start\"]\n",
+		".gemini/settings.json": `{"mcpServers": {"tiger": {}`,
+		".cursor/mcp.json":      `{"mcpServers": {"other": {"command": "other"}}}`,
 	}
-	cliHome := t.TempDir()
+	pickerHome := home(pickerTree)
 
-	mergePath := seed("merge", `{"mcpServers": {"server1": {"command": "cmd1", "args": ["arg1"]}, "server2": {"command": "cmd2", "args": ["arg2", "arg3"]}}}`, 0o644)
-	otherPath := seed("other", `{"other": "config"}`, 0o644)
-	idempotentPath := seed("idempotent", `{"mcpServers": {"existing": {"command": "existing", "args": ["arg1"]}, "tiger": {"command": "/old/path/to/tiger", "args": ["old", "args"]}}}`, 0o644)
-	emptyPath := seed("empty", "", 0o644)
-	backupInitial := `{"mcpServers": {"existing": {"command": "test", "args": ["arg1"]}}}`
-	backupPath := seed("backup", backupInitial, 0o644)
-	permsPath := seed("perms", `{"test": "data"}`, 0o600)
-	badPath := seed("bad", `{invalid json`, 0o644)
+	unparseableTree := map[string]string{".codex/config.toml": "model = "}
+	unparseableHome := home(unparseableTree)
+	invalidJSONHome := home(map[string]string{".cursor/mcp.json": "{invalid json"})
+	notObjectHome := home(map[string]string{".cursor/mcp.json": "[]"})
+	serversNotObjectHome := home(map[string]string{".cursor/mcp.json": `{"mcpServers": []}`})
+	unreadableHome := home(map[string]string{".cursor/mcp.json": "{}"})
+	unwritableHome := home(map[string]string{".codex/config.toml": ""})
+	freshHome := home(nil)
 
-	// For "backup fails when config is unreadable": the directory is made
-	// unreadable by that case's setup hook, so the paths are just declared here.
-	lockedDir := filepath.Join(dir, "locked")
-	lockedConfigPath := filepath.Join(lockedDir, "config.json")
+	// geminiConfig has comments and four-space indentation, which an install
+	// keeps, adding the entry in the same style.
+	geminiConfig := `{
+    // Theme
+    "theme": "dark",
+    "mcpServers": {
+        "other": {
+            "command": "other"
+        }
+    }
+}
+`
+	geminiHome := home(map[string]string{".gemini/settings.json": geminiConfig})
+
+	tabsConfig := "{\n\t\"theme\": \"dark\"\n}\n"
+	tabsHome := home(map[string]string{".cursor/mcp.json": tabsConfig})
+
+	// claudeConfig has an outdated entry, written on one line by hand.
+	claudeConfig := `{
+  "numStartups": 3,
+  "mcpServers": {
+    "tiger": {"type": "stdio", "command": "/old/tiger", "args": ["mcp", "start"], "env": {}} // mine
+  },
+  "projects": {}
+}
+`
+	claudeHome := home(map[string]string{".claude.json": claudeConfig})
+
+	// upToDateTree holds the current entries, laid out differently from how
+	// an install would write them.
+	upToDateTree := map[string]string{
+		".cursor/mcp.json":   `{"mcpServers":{"tiger":{"command":"tiger","args":["mcp","start"]}}}`,
+		".codex/config.toml": "[mcp_servers]\ntiger = { command = \"tiger\", args = [\"mcp\", \"start\"] }\n",
+	}
+	upToDateHome := home(upToDateTree)
+
+	codexConfig := `# Codex settings
+model = "gpt-5"
+
+[mcp_servers.other]
+command = "other" # trailing
+
+[mcp_servers.tiger]
+command = "/old/tiger"
+args = ["mcp", "start"]
+
+[mcp_servers.tiger.env]
+A = "b"
+
+[profiles.fast]
+model = "gpt-5-mini"
+`
+	codexHome := home(map[string]string{".codex/config.toml": codexConfig})
+
+	envHome := home(nil)
+	relativeEnvHome := home(nil)
+	macHome := home(nil)
+	windowsHome := home(nil)
+	noAppDataHome := home(nil)
+	symlinkHome := home(map[string]string{
+		".cursor/mcp.json":     "-> ../dotfiles/cursor.json",
+		"dotfiles/cursor.json": "{}",
+	})
+	backupHome := home(map[string]string{".cursor/mcp.json": "{}"})
+	noBackupHome := home(map[string]string{".cursor/mcp.json": "{}"})
+	customHome := home(nil)
+	aliasHome := home(nil)
 
 	runCmdTests(t, []cmdTest{
 		{
-			name:    "too many arguments",
-			args:    []string{"mcp", "install", "cursor", "devin"},
-			wantErr: "accepts at most 1 arg(s), received 2",
+			name:    "--config-path without a client",
+			args:    []string{"mcp", "install", "--config-path", "/tmp/mcp.json"},
+			wantErr: "--config-path requires exactly one client argument",
 		},
 		{
-			name:    "no client and no TTY",
-			args:    []string{"mcp", "install"},
-			wantErr: "TTY not detected - specify a client as an argument (e.g. 'tiger mcp install claude-code')",
+			name:    "--config-path with several clients",
+			args:    []string{"mcp", "install", "cursor", "codex", "--config-path", "/tmp/mcp.json"},
+			wantErr: "--config-path requires exactly one client argument",
 		},
 		{
 			name:    "unsupported client",
-			args:    []string{"mcp", "install", "bogus"},
+			args:    []string{"mcp", "install", "cursor", "bogus"},
 			wantErr: "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli",
 		},
 		{
-			name:    "invalid existing config",
-			args:    []string{"mcp", "install", "cursor", "--no-backup", "--config-path", badPath},
-			wantErr: "failed to add MCP server configuration: failed to parse existing config: hujson: line 1, column 2: invalid literal: invalid",
+			name:    "no arguments and no TTY",
+			args:    []string{"mcp", "install"},
+			opts:    []runOption{withMCPHome(home(nil))},
+			wantErr: "TTY not detected - specify clients as arguments (e.g. 'tiger mcp install claude-code')",
 		},
 		{
-			// Backups are enabled (the default) but nothing exists to back up.
-			name:       "creates config file and directories",
-			args:       []string{"mcp", "install", "cursor", "--config-path", path("fresh")},
-			wantStdout: installSuccessOutput("cursor", path("fresh")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, path("fresh"), map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-				info, err := os.Stat(path("fresh"))
-				if err != nil {
-					t.Fatalf("failed to stat config file: %v", err)
-				}
-				if got := info.Mode().Perm(); got != 0o600 {
-					t.Errorf("new config file mode = %o, want 0600", got)
-				}
-				if backups := backupFiles(t, path("fresh")); len(backups) != 0 {
-					t.Errorf("expected no backup files, got %v", backups)
-				}
-			}},
-		},
-		{
-			name:       "merges with existing servers",
-			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", mergePath},
-			wantStdout: installSuccessOutput("cursor", mergePath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, mergePath, map[string]any{
-					"mcpServers": map[string]any{
-						"server1": map[string]any{"command": "cmd1", "args": []any{"arg1"}},
-						"server2": map[string]any{"command": "cmd2", "args": []any{"arg2", "arg3"}},
-						"tiger":   tigerServerEntry(),
-					},
-				})
-				// --no-backup skips the backup of the existing file.
-				if backups := backupFiles(t, mergePath); len(backups) != 0 {
-					t.Errorf("expected no backup files with --no-backup, got %v", backups)
-				}
-			}},
-		},
-		{
-			name:       "preserves unrelated config keys",
-			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", otherPath},
-			wantStdout: installSuccessOutput("cursor", otherPath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, otherPath, map[string]any{
-					"other":      "config",
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-			}},
-		},
-		{
-			name:       "updates existing tiger entry idempotently",
-			args:       []string{"mcp", "install", "cursor", "--no-backup", "--config-path", idempotentPath},
-			wantStdout: installSuccessOutput("cursor", idempotentPath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				want := map[string]any{
-					"mcpServers": map[string]any{
-						"existing": map[string]any{"command": "existing", "args": []any{"arg1"}},
-						"tiger":    tigerServerEntry(),
-					},
-				}
-				assertJSONFile(t, idempotentPath, want)
-
-				// A second install must leave the config unchanged.
-				again := runCommand(t, []string{"mcp", "install", "cursor", "--no-backup", "--config-path", idempotentPath}, nil)
-				if again.err != nil {
-					t.Fatalf("second install failed: %v", again.err)
-				}
-				assertJSONFile(t, idempotentPath, want)
-			}},
-		},
-		{
-			name:       "handles empty config file and backs it up",
-			args:       []string{"mcp", "install", "cursor", "--config-path", emptyPath},
-			wantStdout: installSuccessOutput("cursor", emptyPath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, emptyPath, map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-				backups := backupFiles(t, emptyPath)
-				if len(backups) != 1 {
-					t.Fatalf("expected 1 backup file, got %v", backups)
-				}
-				content, err := os.ReadFile(backups[0])
-				if err != nil {
-					t.Fatalf("failed to read backup: %v", err)
-				}
-				if len(content) != 0 {
-					t.Errorf("backup of empty file should be empty, got %q", content)
-				}
-			}},
-		},
-		{
-			name:       "creates backup by default",
-			args:       []string{"mcp", "install", "cursor", "--config-path", backupPath},
-			wantStdout: installSuccessOutput("cursor", backupPath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				backups := backupFiles(t, backupPath)
-				if len(backups) != 1 {
-					t.Fatalf("expected 1 backup file, got %v", backups)
-				}
-				content, err := os.ReadFile(backups[0])
-				if err != nil {
-					t.Fatalf("failed to read backup: %v", err)
-				}
-				assertOutput(t, string(content), backupInitial)
-				assertJSONFile(t, backupPath, map[string]any{
-					"mcpServers": map[string]any{
-						"existing": map[string]any{"command": "test", "args": []any{"arg1"}},
-						"tiger":    tigerServerEntry(),
-					},
-				})
-
-				// A second install creates a second, distinct backup.
-				again := runCommand(t, []string{"mcp", "install", "cursor", "--config-path", backupPath}, nil)
-				if again.err != nil {
-					t.Fatalf("second install failed: %v", again.err)
-				}
-				if backups := backupFiles(t, backupPath); len(backups) != 2 {
-					t.Errorf("expected 2 distinct backup files, got %v", backups)
-				}
-			}},
-		},
-		{
-			name:       "backup preserves file permissions",
-			args:       []string{"mcp", "install", "cursor", "--config-path", permsPath},
-			wantStdout: installSuccessOutput("cursor", permsPath),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				backups := backupFiles(t, permsPath)
-				if len(backups) != 1 {
-					t.Fatalf("expected 1 backup file, got %v", backups)
-				}
-				for _, p := range append(backups, permsPath) {
-					info, err := os.Stat(p)
-					if err != nil {
-						t.Fatalf("failed to stat %s: %v", p, err)
-					}
-					if got := info.Mode().Perm(); got != 0o600 {
-						t.Errorf("%s mode = %o, want 0600", p, got)
-					}
-				}
-			}},
-		},
-		{
-			// claude-code installs via the client's own CLI rather than JSON
-			// patching; the stub on PATH records the exact command run.
-			name: "cli-based client runs the client's install command",
-			args: []string{"mcp", "install", "claude-code"},
+			name: "nothing selected in the picker",
+			args: []string{"mcp", "install"},
 			opts: []runOption{
-				withEnv("PATH", stubBin),
-				withEnv("HOME", cliHome),
+				withMCPHome(home(nil)),
+				withIsTerminal(true),
+				withRunPicker(mcpPickerItems(), make([]bool, 9)),
 			},
-			wantStdout: installSuccessOutput("claude-code", filepath.Join(cliHome, ".claude.json")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				argv, err := os.ReadFile(argvFile)
-				if err != nil {
-					t.Fatalf("claude stub was not invoked: %v", err)
-				}
-				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\ntiger\nmcp\nstart\n")
-			}},
+			wantErr: "no clients selected",
 		},
 		{
-			name:       "default config path under HOME",
+			// The picker starts from the clients the server is installed for.
+			// What's chosen is installed, and an unchosen earlier install is
+			// left as it is.
+			name: "installs for the clients chosen in the picker",
+			args: []string{"mcp", "install"},
+			opts: []runOption{
+				withMCPHome(pickerHome),
+				withIsTerminal(true),
+				withRunPicker(mcpPickerItems("Claude Code", "Codex"), []bool{true, true, false, false, false, false, false, false, false}),
+			},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Claude Code", filepath.Join(pickerHome, ".claude.json")},
+				installedFor{"Cursor", filepath.Join(pickerHome, ".cursor", "mcp.json")},
+			),
+			checks: []checkFunc{
+				checkFile(filepath.Join(pickerHome, ".claude.json"), `{"mcpServers": {"tiger": {
+      "type": "stdio",
+      "command": "tiger",
+      "args": [
+        "mcp",
+        "start"
+      ]
+    }}}`),
+				checkFile(filepath.Join(pickerHome, ".cursor", "mcp.json"), `{"mcpServers": {"other": {"command": "other"},
+    "tiger": {
+      "command": "tiger",
+      "args": [
+        "mcp",
+        "start"
+      ]
+    }}}`),
+				checkFile(filepath.Join(pickerHome, ".codex", "config.toml"), pickerTree[".codex/config.toml"]),
+				checkFile(filepath.Join(pickerHome, ".gemini", "settings.json"), pickerTree[".gemini/settings.json"]),
+			},
+		},
+		{
+			// Every config file is read before any is written, so Claude
+			// Code's isn't created.
+			name:    "unparseable config stops every install",
+			args:    []string{"mcp", "install", "claude-code", "codex"},
+			opts:    []runOption{withMCPHome(unparseableHome)},
+			wantErr: fmt.Sprintf("failed to install for Codex: failed to parse %s: toml: expected value, not end of input", filepath.Join(unparseableHome, ".codex", "config.toml")),
+			checks:  []checkFunc{checkTree(unparseableHome, unparseableTree)},
+		},
+		{
+			name:    "invalid JSON config",
+			args:    []string{"mcp", "install", "cursor"},
+			opts:    []runOption{withMCPHome(invalidJSONHome)},
+			wantErr: fmt.Sprintf("failed to install for Cursor: failed to parse %s: hujson: line 1, column 2: invalid literal: invalid", filepath.Join(invalidJSONHome, ".cursor", "mcp.json")),
+		},
+		{
+			name:    "config that isn't a JSON object",
+			args:    []string{"mcp", "install", "cursor"},
+			opts:    []runOption{withMCPHome(notObjectHome)},
+			wantErr: fmt.Sprintf("failed to install for Cursor: failed to parse %s: not a JSON object", filepath.Join(notObjectHome, ".cursor", "mcp.json")),
+		},
+		{
+			name:    "servers that aren't a JSON object",
+			args:    []string{"mcp", "install", "cursor"},
+			opts:    []runOption{withMCPHome(serversNotObjectHome)},
+			wantErr: fmt.Sprintf("failed to install for Cursor: failed to parse %s: mcpServers is not an object", filepath.Join(serversNotObjectHome, ".cursor", "mcp.json")),
+		},
+		{
+			name: "unreadable config",
+			args: []string{"mcp", "install", "cursor"},
+			opts: []runOption{
+				withMCPHome(unreadableHome),
+				withChmod(filepath.Join(unreadableHome, ".cursor", "mcp.json"), 0o000),
+			},
+			wantErr: fmt.Sprintf("failed to install for Cursor: failed to read configuration file: open %s: permission denied", filepath.Join(unreadableHome, ".cursor", "mcp.json")),
+		},
+		{
+			// A failure partway through reports the clients already installed.
+			// The temporary file's name is random, hence the regexp.
+			name: "write failure",
+			args: []string{"mcp", "install", "claude-code", "codex", "--no-backup"},
+			opts: []runOption{
+				withMCPHome(unwritableHome),
+				withChmod(filepath.Join(unwritableHome, ".codex"), 0o555),
+			},
+			wantStdout: mcpInstalledList(installedFor{"Claude Code", filepath.Join(unwritableHome, ".claude.json")}),
+			wantErr: matchRegexp(`^failed to install for Codex: failed to write configuration file: open ` +
+				regexp.QuoteMeta(filepath.Join(unwritableHome, ".codex", ".config.toml.tiger-")) + `\d+: permission denied$`),
+			checks: []checkFunc{checkFile(filepath.Join(unwritableHome, ".claude.json"), freshConfigs[ClaudeCode].content)},
+		},
+		{
+			name: "installs for every client",
+			args: []string{"mcp", "install", "claude-code", "cursor", "devin", "codex", "gemini", "vscode", "antigravity", "kiro-cli", "copilot"},
+			opts: []runOption{withMCPHome(freshHome)},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Claude Code", filepath.Join(freshHome, ".claude.json")},
+				installedFor{"Cursor", filepath.Join(freshHome, ".cursor", "mcp.json")},
+				installedFor{"Devin", filepath.Join(freshHome, ".config", "devin", "mcp_config.json")},
+				installedFor{"Codex", filepath.Join(freshHome, ".codex", "config.toml")},
+				installedFor{"Gemini CLI", filepath.Join(freshHome, ".gemini", "settings.json")},
+				installedFor{"VS Code", filepath.Join(freshHome, ".config", "Code", "User", "mcp.json")},
+				installedFor{"Google Antigravity", filepath.Join(freshHome, ".gemini", "config", "mcp_config.json")},
+				installedFor{"Kiro CLI", filepath.Join(freshHome, ".kiro", "settings", "mcp.json")},
+				installedFor{"GitHub Copilot CLI", filepath.Join(freshHome, ".copilot", "mcp-config.json")},
+			),
+			checks: []checkFunc{
+				checkTree(freshHome, freshTree(nil, ClaudeCode, Cursor, Devin, Codex, Gemini, VSCode, Antigravity, KiroCLI, Copilot)),
+				checkMode(filepath.Join(freshHome, ".claude.json"), 0o600),
+			},
+		},
+		{
+			name:       "keeps the rest of a JSON config as it is",
+			args:       []string{"mcp", "install", "gemini"},
+			opts:       []runOption{withMCPHome(geminiHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Gemini CLI", filepath.Join(geminiHome, ".gemini", "settings.json")}),
+			checks: []checkFunc{
+				checkFile(filepath.Join(geminiHome, ".gemini", "settings.json"), `{
+    // Theme
+    "theme": "dark",
+    "mcpServers": {
+        "other": {
+            "command": "other"
+        },
+        "tiger": {
+            "command": "tiger",
+            "args": [
+                "mcp",
+                "start"
+            ]
+        }
+    }
+}
+`),
+				checkBackups(filepath.Join(geminiHome, ".gemini", "settings.json"), 0o644, geminiConfig),
+			},
+		},
+		{
+			name:       "adds the servers to a JSON config without any",
 			args:       []string{"mcp", "install", "cursor", "--no-backup"},
-			opts:       []runOption{withEnv("HOME", home)},
-			wantStdout: installSuccessOutput("cursor", filepath.Join(home, ".cursor", "mcp.json")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, filepath.Join(home, ".cursor", "mcp.json"), map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-			}},
+			opts:       []runOption{withMCPHome(tabsHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Cursor", filepath.Join(tabsHome, ".cursor", "mcp.json")}),
+			checks: []checkFunc{checkFile(filepath.Join(tabsHome, ".cursor", "mcp.json"), `{
+	"theme": "dark",
+	"mcpServers": {
+		"tiger": {
+			"command": "tiger",
+			"args": [
+				"mcp",
+				"start"
+			]
+		}
+	}
+}
+`)},
 		},
 		{
-			name: "installs devin (cli)",
-			args: []string{"mcp", "install", "devin"},
+			// The whole entry is replaced, dropping fields the install doesn't
+			// write, but a comment beside it stays.
+			name:       "replaces an outdated JSON entry",
+			args:       []string{"mcp", "install", "claude-code", "--no-backup"},
+			opts:       []runOption{withMCPHome(claudeHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Claude Code", filepath.Join(claudeHome, ".claude.json")}),
+			checks: []checkFunc{checkFile(filepath.Join(claudeHome, ".claude.json"), `{
+  "numStartups": 3,
+  "mcpServers": {
+    "tiger": {
+      "type": "stdio",
+      "command": "tiger",
+      "args": [
+        "mcp",
+        "start"
+      ]
+    } // mine
+  },
+  "projects": {}
+}
+`)},
+		},
+		{
+			name:       "replaces an outdated TOML entry",
+			args:       []string{"mcp", "install", "codex", "--no-backup"},
+			opts:       []runOption{withMCPHome(codexHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Codex", filepath.Join(codexHome, ".codex", "config.toml")}),
+			checks: []checkFunc{checkFile(filepath.Join(codexHome, ".codex", "config.toml"), `# Codex settings
+model = "gpt-5"
+
+[mcp_servers.other]
+command = "other" # trailing
+
+[mcp_servers.tiger]
+command = 'tiger'
+args = ['mcp', 'start']
+
+[profiles.fast]
+model = "gpt-5-mini"
+`)},
+		},
+		{
+			// Config files already holding the current entries aren't
+			// rewritten or backed up, however they're laid out.
+			name: "leaves up-to-date configs alone",
+			args: []string{"mcp", "install", "cursor", "codex"},
+			opts: []runOption{withMCPHome(upToDateHome)},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Cursor", filepath.Join(upToDateHome, ".cursor", "mcp.json")},
+				installedFor{"Codex", filepath.Join(upToDateHome, ".codex", "config.toml")},
+			),
+			checks: []checkFunc{checkTree(upToDateHome, upToDateTree)},
+		},
+		{
+			name: "respects env vars that relocate configs",
+			args: []string{"mcp", "install", "claude-code", "devin", "codex", "gemini", "vscode", "kiro-cli", "copilot"},
 			opts: []runOption{
-				withEnv("PATH", stubBin),
-				withEnv("HOME", cliHome),
+				withMCPHome(envHome),
+				withEnv("CLAUDE_CONFIG_DIR", filepath.Join(envHome, "claude")),
+				withEnv("CODEX_HOME", filepath.Join(envHome, "codex")),
+				withEnv("COPILOT_HOME", filepath.Join(envHome, "copilot")),
+				withEnv("GEMINI_CLI_HOME", filepath.Join(envHome, "gemini")),
+				withEnv("KIRO_HOME", filepath.Join(envHome, "kiro")),
+				withEnv("XDG_CONFIG_HOME", filepath.Join(envHome, "xdg")),
 			},
-			wantStdout: installSuccessOutput("devin", filepath.Join(cliHome, ".config", "devin", "mcp_config.json")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				argv, err := os.ReadFile(argvFile)
-				if err != nil {
-					t.Fatalf("devin stub was not invoked: %v", err)
+			wantStdout: mcpInstallOutput(
+				installedFor{"Claude Code", filepath.Join(envHome, "claude", ".claude.json")},
+				installedFor{"Devin", filepath.Join(envHome, "xdg", "devin", "mcp_config.json")},
+				installedFor{"Codex", filepath.Join(envHome, "codex", "config.toml")},
+				installedFor{"Gemini CLI", filepath.Join(envHome, "gemini", ".gemini", "settings.json")},
+				installedFor{"VS Code", filepath.Join(envHome, "xdg", "Code", "User", "mcp.json")},
+				installedFor{"Kiro CLI", filepath.Join(envHome, "kiro", "settings", "mcp.json")},
+				installedFor{"GitHub Copilot CLI", filepath.Join(envHome, "copilot", "mcp-config.json")},
+			),
+			checks: []checkFunc{checkTree(envHome, freshTree(func(p string) string {
+				for from, to := range map[string]string{".config/": "xdg/", ".codex/": "codex/", ".copilot/": "copilot/", ".kiro/": "kiro/", ".gemini/": "gemini/.gemini/"} {
+					if rest, ok := strings.CutPrefix(p, from); ok {
+						return to + rest
+					}
 				}
-				assertOutput(t, string(argv), "mcp\nadd\n-s\nuser\ntiger\n--\ntiger\nmcp\nstart\n")
-			}},
+				return "claude/" + p
+			}, ClaudeCode, Devin, Codex, Gemini, VSCode, KiroCLI, Copilot))},
 		},
 		{
-			name:       "client name is case-insensitive",
-			args:       []string{"mcp", "install", "CURSOR", "--no-backup", "--config-path", path("upper")},
-			wantStdout: installSuccessOutput("CURSOR", path("upper")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, path("upper"), map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-			}},
+			name: "relative env var is ignored",
+			args: []string{"mcp", "install", "codex"},
+			opts: []runOption{
+				withMCPHome(relativeEnvHome),
+				withEnv("CODEX_HOME", "codex"),
+			},
+			wantStdout: mcpInstallOutput(installedFor{"Codex", filepath.Join(relativeEnvHome, ".codex", "config.toml")}),
+			checks:     []checkFunc{checkTree(relativeEnvHome, freshTree(nil, Codex))},
 		},
 		{
-			name:       "add alias",
-			args:       []string{"mcp", "add", "cursor", "--no-backup", "--config-path", path("alias")},
-			wantStdout: installSuccessOutput("cursor", path("alias")),
-			checks: []checkFunc{func(t *testing.T, result cmdResult) {
-				assertJSONFile(t, path("alias"), map[string]any{
-					"mcpServers": map[string]any{"tiger": tigerServerEntry()},
-				})
-			}},
-		},
-		{
-			// The backup read must fail, so the config sits in a directory the
-			// setup hook makes unreadable (and restores, so t.TempDir can
-			// clean up). Root ignores file permissions, hence the skip.
-			name: "backup fails when config is unreadable",
-			args: []string{"mcp", "install", "cursor", "--config-path", lockedConfigPath},
-			opts: []runOption{withSetup(func(t *testing.T) {
-				if os.Geteuid() == 0 {
-					t.Skip("cannot test permission errors as root user")
-				}
-				if err := os.MkdirAll(lockedDir, 0o755); err != nil {
-					t.Fatalf("failed to create dir: %v", err)
-				}
-				if err := os.WriteFile(lockedConfigPath, []byte(`{"test": "data"}`), 0o644); err != nil {
-					t.Fatalf("failed to seed config file: %v", err)
-				}
-				if err := os.Chmod(lockedDir, 0o444); err != nil {
-					t.Fatalf("failed to chmod dir: %v", err)
-				}
-				t.Cleanup(func() { os.Chmod(lockedDir, 0o755) })
+			name: "macOS config paths",
+			args: []string{"mcp", "install", "devin", "vscode"},
+			opts: []runOption{withMCPHome(macHome), withGOOS("darwin")},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Devin", filepath.Join(macHome, ".config", "devin", "mcp_config.json")},
+				installedFor{"VS Code", filepath.Join(macHome, "Library", "Application Support", "Code", "User", "mcp.json")},
+			),
+			checks: []checkFunc{checkTree(macHome, map[string]string{
+				".config/devin/mcp_config.json":                  freshConfigs[Devin].content,
+				"Library/Application Support/Code/User/mcp.json": freshConfigs[VSCode].content,
 			})},
-			wantErr: fmt.Sprintf("failed to create backup: failed to read original config file: open %s: permission denied", lockedConfigPath),
+		},
+		{
+			name: "Windows config paths",
+			args: []string{"mcp", "install", "claude-code", "devin", "vscode"},
+			opts: []runOption{
+				withMCPHome(windowsHome),
+				withGOOS("windows"),
+				withEnv("APPDATA", filepath.Join(windowsHome, "AppData", "Roaming")),
+			},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Claude Code", filepath.Join(windowsHome, ".claude.json")},
+				installedFor{"Devin", filepath.Join(windowsHome, "AppData", "Roaming", "devin", "mcp_config.json")},
+				installedFor{"VS Code", filepath.Join(windowsHome, "AppData", "Roaming", "Code", "User", "mcp.json")},
+			),
+			checks: []checkFunc{checkTree(windowsHome, map[string]string{
+				".claude.json":                          freshConfigs[ClaudeCode].content,
+				"AppData/Roaming/devin/mcp_config.json": freshConfigs[Devin].content,
+				"AppData/Roaming/Code/User/mcp.json":    freshConfigs[VSCode].content,
+			})},
+		},
+		{
+			name:    "Windows without APPDATA",
+			args:    []string{"mcp", "install", "devin"},
+			opts:    []runOption{withMCPHome(noAppDataHome), withGOOS("windows")},
+			wantErr: "failed to install for Devin: failed to determine configuration file: ${APPDATA}/devin/mcp_config.json references an unset environment variable",
+		},
+		{
+			name:       "writes through a symlinked config",
+			args:       []string{"mcp", "install", "cursor", "--no-backup"},
+			opts:       []runOption{withMCPHome(symlinkHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Cursor", filepath.Join(symlinkHome, ".cursor", "mcp.json")}),
+			checks: []checkFunc{checkTree(symlinkHome, map[string]string{
+				".cursor/mcp.json":     "-> ../dotfiles/cursor.json",
+				"dotfiles/cursor.json": "{\n  \"mcpServers\": {\n    \"tiger\": {\n" + tigerEntryLines + "\n    }\n  }\n}",
+			})},
+		},
+		{
+			name: "backs up the config, keeping its permissions",
+			args: []string{"mcp", "install", "cursor"},
+			opts: []runOption{
+				withMCPHome(backupHome),
+				withChmod(filepath.Join(backupHome, ".cursor", "mcp.json"), 0o640),
+			},
+			wantStdout: mcpInstallOutput(installedFor{"Cursor", filepath.Join(backupHome, ".cursor", "mcp.json")}),
+			checks: []checkFunc{
+				checkMode(filepath.Join(backupHome, ".cursor", "mcp.json"), 0o640),
+				checkBackups(filepath.Join(backupHome, ".cursor", "mcp.json"), 0o640, "{}"),
+			},
+		},
+		{
+			name:       "--no-backup",
+			args:       []string{"mcp", "install", "cursor", "--no-backup"},
+			opts:       []runOption{withMCPHome(noBackupHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Cursor", filepath.Join(noBackupHome, ".cursor", "mcp.json")}),
+			checks:     []checkFunc{checkBackups(filepath.Join(noBackupHome, ".cursor", "mcp.json"), 0o644)},
+		},
+		{
+			// The file keeps the client's format whatever it's named.
+			name:       "--config-path",
+			args:       []string{"mcp", "install", "codex", "--config-path", "~/custom/codex.json"},
+			opts:       []runOption{withMCPHome(customHome)},
+			wantStdout: mcpInstallOutput(installedFor{"Codex", filepath.Join(customHome, "custom", "codex.json")}),
+			checks:     []checkFunc{checkTree(customHome, map[string]string{"custom/codex.json": freshConfigs[Codex].content})},
+		},
+		{
+			// Clients are installed once each, in the supported clients
+			// order.
+			name: "add alias and case-insensitive, repeated client names",
+			args: []string{"mcp", "add", "CURSOR", "claude-code", "cursor"},
+			opts: []runOption{withMCPHome(aliasHome)},
+			wantStdout: mcpInstallOutput(
+				installedFor{"Claude Code", filepath.Join(aliasHome, ".claude.json")},
+				installedFor{"Cursor", filepath.Join(aliasHome, ".cursor", "mcp.json")},
+			),
+			checks: []checkFunc{checkTree(aliasHome, freshTree(nil, ClaudeCode, Cursor))},
 		},
 	})
 }
 
-// TestFindClientConfig covers the client-name lookup table: behavior that the
-// command-level cases only exercise for cursor.
-func TestFindClientConfig(t *testing.T) {
-	mappings := []struct {
-		clientName   string
-		expectedType MCPClient
-		expectedName string
-	}{
-		{"claude-code", ClaudeCode, "Claude Code"},
-		{"CLAUDE-CODE", ClaudeCode, "Claude Code"},
-		{"cursor", Cursor, "Cursor"},
-		{"CURSOR", Cursor, "Cursor"},
-		{"devin", Devin, "Devin"},
-		{"DEVIN", Devin, "Devin"},
-		{"codex", Codex, "Codex"},
-		{"CODEX", Codex, "Codex"},
+// TestInstallMCPForClient covers what pkg/mcpinstall adds over the command,
+// which always passes every option: validating them, and installing under a
+// name and command of the caller's.
+func TestInstallMCPForClient(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "mcp.json")
+	valid := InstallOptions{
+		ClientName:       "cursor",
+		ServerName:       "other",
+		Command:          "/usr/bin/other",
+		Args:             []string{"serve"},
+		CustomConfigPath: configPath,
 	}
-	for _, m := range mappings {
-		t.Run(m.clientName, func(t *testing.T) {
-			cfg, err := findClientConfig(m.clientName)
+	cases := []struct {
+		name    string
+		modify  func(*InstallOptions)
+		wantErr string
+	}{
+		{"missing client", func(o *InstallOptions) { o.ClientName = "" }, "missing required option: ClientName"},
+		{"missing server name", func(o *InstallOptions) { o.ServerName = "" }, "missing required option: ServerName"},
+		{"missing command", func(o *InstallOptions) { o.Command = "" }, "missing required option: Command"},
+		{"missing args", func(o *InstallOptions) { o.Args = nil }, "missing required option: Args"},
+		{"unsupported client", func(o *InstallOptions) { o.ClientName = "bogus" }, "unsupported client: bogus. Supported clients: claude-code, cursor, devin, codex, gemini, gemini-cli, vscode, code, vs-code, antigravity, agy, kiro-cli, copilot, copilot-cli"},
+		{"installs", func(*InstallOptions) {}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := valid
+			tc.modify(&opts)
+			err := InstallMCPForClient(opts)
+			gotErr := ""
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				gotErr = err.Error()
 			}
-			if cfg.ClientType != m.expectedType {
-				t.Errorf("ClientType = %q, want %q", cfg.ClientType, m.expectedType)
-			}
-			if cfg.Name != m.expectedName {
-				t.Errorf("Name = %q, want %q", cfg.Name, m.expectedName)
-			}
+			assertOutput(t, gotErr, tc.wantErr)
 		})
 	}
-
-	t.Run("every client is installable", func(t *testing.T) {
-		for _, cfg := range supportedClients {
-			found, err := findClientConfig(cfg.EditorNames[0])
-			if err != nil {
-				t.Fatalf("findClientConfig(%q) failed: %v", cfg.EditorNames[0], err)
-			}
-			if found.Name == "" {
-				t.Errorf("%s: Name should not be empty", cfg.ClientType)
-			}
-			// Every client needs an install mechanism: JSON patching (path
-			// prefix) or a CLI install command.
-			if found.MCPServersPathPrefix == "" && found.buildMCPInstallCommand == nil {
-				t.Errorf("%s: needs MCPServersPathPrefix or buildMCPInstallCommand", cfg.ClientType)
-			}
-			// CLI-only clients (no config paths) must have an install command.
-			if len(found.MCPConfigPaths) == 0 && found.buildMCPInstallCommand == nil {
-				t.Errorf("%s: CLI-only clients must have buildMCPInstallCommand", cfg.ClientType)
-			}
-		}
-	})
+	checkFile(configPath, `{
+  "mcpServers": {
+    "other": {
+      "command": "/usr/bin/other",
+      "args": [
+        "serve"
+      ]
+    }
+  }
 }
-
-// TestFindClientConfigFile covers config file discovery, including each
-// client's per-client fallback path.
-func TestFindClientConfigFile(t *testing.T) {
-	t.Run("errors when no config paths provided", func(t *testing.T) {
-		for _, paths := range [][]string{{}, nil} {
-			if _, err := findClientConfigFile(paths); err == nil {
-				t.Errorf("findClientConfigFile(%v) should error", paths)
-			} else {
-				assertOutput(t, err.Error(), "no config paths provided")
-			}
-		}
-	})
-
-	t.Run("finds existing config file", func(t *testing.T) {
-		configPath := filepath.Join(t.TempDir(), "config.json")
-		if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		got, err := findClientConfigFile([]string{configPath})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		assertOutput(t, got, configPath)
-	})
-
-	t.Run("falls back to first path when none exist", func(t *testing.T) {
-		dir := t.TempDir()
-		fallback := filepath.Join(dir, "fallback.json")
-		got, err := findClientConfigFile([]string{fallback, filepath.Join(dir, "a.json"), filepath.Join(dir, "b.json")})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		assertOutput(t, got, fallback)
-	})
-
-	t.Run("prefers first existing file", func(t *testing.T) {
-		dir := t.TempDir()
-		first := filepath.Join(dir, "first.json")
-		second := filepath.Join(dir, "second.json")
-		for _, p := range []string{first, second} {
-			if err := os.WriteFile(p, []byte(`{}`), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}
-		got, err := findClientConfigFile([]string{first, second})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		assertOutput(t, got, first)
-	})
-
-	t.Run("expands environment variables", func(t *testing.T) {
-		dir := t.TempDir()
-		configPath := filepath.Join(dir, "config.json")
-		if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("FINDCONFIGFILE_TEST_DIR", dir)
-		got, err := findClientConfigFile([]string{"$FINDCONFIGFILE_TEST_DIR/config.json"})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		assertOutput(t, got, configPath)
-	})
-
-	t.Run("per-client fallback paths", func(t *testing.T) {
-		t.Setenv("HOME", t.TempDir())
-		for _, cfg := range supportedClients {
-			if len(cfg.MCPConfigPaths) == 0 {
-				continue
-			}
-			got, err := findClientConfigFile(cfg.MCPConfigPaths)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", cfg.Name, err)
-				continue
-			}
-			if want := util.ExpandPath(cfg.MCPConfigPaths[0]); got != want {
-				t.Errorf("%s: fallback = %q, want %q", cfg.Name, got, want)
-			}
-		}
-	})
-}
-
-// TestAddMCPServerViaCLI covers the CLI-based install path, which the command
-// tests can't reach without real client binaries on PATH.
-func TestAddMCPServerViaCLI(t *testing.T) {
-	t.Run("errors when no install command configured", func(t *testing.T) {
-		cfg := &clientConfig{ClientType: "test-client", Name: "Test Client"}
-		err := addMCPServerViaCLI(cfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		assertOutput(t, err.Error(), "no install command configured for client Test Client")
-	})
-
-	t.Run("errors when command execution fails", func(t *testing.T) {
-		cfg := &clientConfig{
-			ClientType: "test-client",
-			Name:       "Test Client",
-			buildMCPInstallCommand: func(serverName, command string, args []string) ([]string, error) {
-				return []string{"nonexistent-command-12345", "arg1", "arg2"}, nil
-			},
-		}
-		err := addMCPServerViaCLI(cfg, "tiger", "/path/to/tiger", []string{"mcp", "start"})
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "failed to run Test Client installation command") {
-			t.Errorf("error should mention installation command failure, got: %v", err)
-		}
-	})
-
-	// The install commands themselves would exec the real client binaries, so
-	// pin each CLI-based client's exact argv here instead. The command-level
-	// "cli-based client" case executes claude-code's end-to-end via a stub.
-	t.Run("builds the expected command per client", func(t *testing.T) {
-		want := map[MCPClient][]string{
-			ClaudeCode: {"claude", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
-			Codex:      {"codex", "mcp", "add", "tiger", "/path/to/tiger", "mcp", "start"},
-			Devin:      {"devin", "mcp", "add", "-s", "user", "tiger", "--", "/path/to/tiger", "mcp", "start"},
-			Gemini:     {"gemini", "mcp", "add", "-s", "user", "tiger", "/path/to/tiger", "mcp", "start"},
-			VSCode:     {"code", "--add-mcp", `{"args":["mcp","start"],"command":"/path/to/tiger","name":"tiger"}`},
-			KiroCLI:    {"kiro-cli", "mcp", "add", "--name", "tiger", "--command", "/path/to/tiger", "--args", "mcp,start"},
-			Copilot:    {"copilot", "mcp", "add", "tiger", "--", "/path/to/tiger", "mcp", "start"},
-		}
-		for _, cfg := range supportedClients {
-			if cfg.buildMCPInstallCommand == nil {
-				continue
-			}
-			wantCmd, ok := want[cfg.ClientType]
-			if !ok {
-				t.Errorf("%s: CLI-based client missing from expected command table", cfg.ClientType)
-				continue
-			}
-			got, err := cfg.BuildMCPInstallCommand("tiger", "/path/to/tiger", []string{"mcp", "start"})
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", cfg.ClientType, err)
-				continue
-			}
-			if diff := cmp.Diff(wantCmd, got); diff != "" {
-				t.Errorf("%s: install command mismatch (-want +got):\n%s", cfg.ClientType, diff)
-			}
-		}
-	})
-}
-
-// TestAddMCPServerViaJSON covers the path-prefix parameterization, which the
-// command tests can't reach: every supported JSON client uses /mcpServers.
-func TestAddMCPServerViaJSON(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(configPath, []byte(`{}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := addMCPServerViaJSON(configPath, "/servers", "tiger", "tiger", []string{"mcp", "start"}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertJSONFile(t, configPath, map[string]any{
-		"servers": map[string]any{"tiger": tigerServerEntry()},
-	})
+`)(t, cmdResult{})
 }
 
 // TestExpandPath covers the path expansion the install command relies on for

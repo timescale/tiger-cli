@@ -1,13 +1,14 @@
 ## tiger mcp install
 
-Install and configure Tiger MCP server for a client
+Install and configure Tiger MCP server for clients
 
 ### Synopsis
 
-Install and configure the Tiger MCP server for a specific MCP client or AI assistant.
+Install and configure the Tiger MCP server for one or more MCP clients or AI
+assistants.
 
-This command automates the configuration process by modifying the appropriate
-configuration files for the specified client.
+The server is added to each client's user-level MCP configuration file, so it's
+available in all projects. Other servers configured there are left alone.
 
 Supported Clients:
   claude-code              Configure for Claude Code
@@ -20,17 +21,15 @@ Supported Clients:
   kiro-cli                 Configure for Kiro CLI
   copilot                  Configure for GitHub Copilot CLI
 
-The command will:
-- Automatically detect the appropriate configuration file location
-- Create the configuration directory if it doesn't exist
-- Create a backup of existing configuration by default
-- Merge with existing MCP server configurations (doesn't overwrite other servers)
-- Validate the configuration after installation
+With no arguments, you're prompted to select clients interactively, starting
+from the clients the server is already installed for.
 
-If no client is specified, you'll be prompted to select one interactively.
+Re-running the command replaces an existing Tiger MCP server entry with the
+current one. Each configuration file is backed up before it's changed, unless
+--no-backup is given.
 
 ```
-tiger mcp install [client] [flags]
+tiger mcp install [client...] [flags]
 ```
 
 ### Examples
@@ -39,23 +38,20 @@ tiger mcp install [client] [flags]
   # Interactive client selection
   tiger mcp install
 
-  # Install for Claude Code (User scope - available in all projects)
-  tiger mcp install claude-code
+  # Install for Claude Code and Cursor
+  tiger mcp install claude-code cursor
 
-  # Install for Cursor IDE
-  tiger mcp install cursor
-
-  # Install without creating backup
+  # Install without creating a backup
   tiger mcp install claude-code --no-backup
 
-  # Use custom configuration file path
+  # Use a custom configuration file path
   tiger mcp install claude-code --config-path ~/custom/config.json
 ```
 
 ### Options
 
 ```
-      --config-path string   Custom path to configuration file (overrides default locations)
+      --config-path string   Custom path to configuration file (overrides default locations; requires a single client)
   -h, --help                 help for install
       --no-backup            Skip creating backup of existing configuration (default: create backup)
 ```

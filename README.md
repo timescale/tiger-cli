@@ -166,18 +166,23 @@ Tiger CLI includes a Model Context Protocol (MCP) server that enables AI assista
 Configure the MCP server for your AI assistant:
 
 ```bash
-# Interactive installation (prompts for client selection)
+# Interactive installation (prompts for clients)
 tiger mcp install
 
-# Or specify your client directly
-tiger mcp install claude-code      # Claude Code
-tiger mcp install codex            # Codex
-tiger mcp install copilot          # GitHub Copilot CLI
-tiger mcp install cursor           # Cursor IDE
-tiger mcp install devin            # Devin
-tiger mcp install gemini           # Gemini CLI
-tiger mcp install vscode           # VS Code
+# Or name one or more clients directly
+tiger mcp install claude-code cursor
 ```
+
+Supported clients are `claude-code` (Claude Code), `codex` (Codex), `copilot`
+(GitHub Copilot CLI), `cursor` (Cursor), `devin` (Devin), `gemini` (Gemini
+CLI), `vscode` (VS Code), `antigravity` (Google Antigravity), and `kiro-cli`
+(Kiro CLI).
+
+The server is added to each client's user-level MCP configuration file, leaving
+the rest of the file as it is, and the file is backed up first unless you pass
+`--no-backup`. Re-running the command is safe: it replaces an existing Tiger MCP
+server entry with the current one. With no arguments, the clients the server is
+already installed for are selected in the picker to start with.
 
 After installation, restart your AI assistant to activate the Tiger MCP server.
 

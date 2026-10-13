@@ -41,6 +41,6 @@ tiger mcp [flags]
 
 * [tiger](tiger.md)	 - Tiger CLI - Tiger Cloud Platform command-line interface
 * [tiger mcp get](tiger_mcp_get.md)	 - Get detailed information about a specific MCP capability
-* [tiger mcp install](tiger_mcp_install.md)	 - Install and configure Tiger MCP server for a client
+* [tiger mcp install](tiger_mcp_install.md)	 - Install and configure Tiger MCP server for clients
 * [tiger mcp list](tiger_mcp_list.md)	 - List available MCP tools, prompts, and resources
 * [tiger mcp start](tiger_mcp_start.md)	 - Start the Tiger MCP server
