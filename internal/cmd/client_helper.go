@@ -74,10 +74,6 @@ type mcpServerEntry struct {
 	Tools     []string `json:"tools,omitempty"`
 }
 
-// goos is the operating system that picks between an mcpConfigFile's paths.
-// It's a var so tests can check every platform's paths.
-var goos = runtime.GOOS
-
 // supportedClients defines the clients we support for Tiger MCP installation.
 // Each client's config file location and entry format match what its own
 // `mcp add` command writes.
@@ -190,6 +186,10 @@ var supportedClients = []clientConfig{
 func (f mcpConfigFile) isTOML() bool {
 	return strings.EqualFold(filepath.Ext(f.Path), ".toml")
 }
+
+// goos is the operating system that picks between an mcpConfigFile's paths.
+// It's a var so tests can check every platform's paths.
+var goos = runtime.GOOS
 
 // resolvePath returns the config file's absolute location on this platform.
 func (f mcpConfigFile) resolvePath() (string, error) {

@@ -8,19 +8,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/fatih/color"
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
-)
-
-// Colors for the checkbox picker, taken from the terminal theme. Bright colors
-// and bold are avoided because some themes render them as greys, and dim text
-// uses the faint attribute so it suits light and dark themes alike. They honor
-// color.NoColor, which the command lifecycle sets from the color config
-// option.
-var (
-	pickerCursorColor = color.New(color.FgBlue)
-	pickerCheckColor  = color.New(color.FgGreen)
-	pickerDimColor    = color.New(color.Faint)
 )
 
 // pickerItem is one row of the checkbox picker.
@@ -105,6 +94,15 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// Styles for the checkbox picker, taken from the terminal theme. Bright colors
+// and bold are avoided because some themes render them as greys, and dim text
+// uses the faint attribute so it suits light and dark themes alike.
+var (
+	pickerCursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+	pickerCheckStyle  = lipgloss.NewStyle().Foreground(lipgloss.Green)
+	pickerDimStyle    = lipgloss.NewStyle().Faint(true)
+)
+
 func (m pickerModel) View() tea.View {
 	if m.done {
 		return tea.NewView("")
@@ -119,15 +117,15 @@ func (m pickerModel) View() tea.View {
 	for i, item := range m.items {
 		cursor := " "
 		if m.cursor == i {
-			cursor = pickerCursorColor.Sprint(">")
+			cursor = pickerCursorStyle.Render(">")
 		}
 		check := " "
 		if item.selected {
-			check = pickerCheckColor.Sprint("✓")
+			check = pickerCheckStyle.Render("✓")
 		}
-		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, pickerDimColor.Sprint(item.detail))
+		fmt.Fprintf(&b, "%s [%s] %d. %-*s  %s\n", cursor, check, i+1, width, item.label, pickerDimStyle.Render(item.detail))
 	}
-	b.WriteString("\n" + pickerDimColor.Sprint("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
+	b.WriteString("\n" + pickerDimStyle.Render("Use ↑/↓ to navigate, space or number keys to toggle, enter to confirm, q to quit"))
 	return tea.NewView(b.String())
 }
 
