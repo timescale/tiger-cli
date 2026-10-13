@@ -100,13 +100,16 @@ default service from your configuration.`,
 				return err
 			}
 
-			// Use provided custom values, validate against allowed combinations
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
+			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
 
-			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			// Validate custom values against the combinations of the source's
+			// platform, which the fork inherits. Not gated on experimental:
+			// only a service already created on the fluid platform gets the
+			// fluid combinations.
+			cpuMemoryCfg, err := common.CPUMemoryConfigsFor(util.Deref(source.Platform)).ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -240,8 +243,9 @@ default service from your configuration.`,
 
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	cpuMemoryConfigs := cpuMemoryCompletionConfigs(common.StandardCPUMemoryConfigs(), app.Experimental)
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
 
 	return cmd
 }

@@ -44,7 +44,7 @@ func (ServiceForkInput) Schema() *jsonschema.Schema {
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(allCPUMemoryConfigs().Strings())
 
 	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused, and deleting a PROD fork always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
@@ -75,9 +75,6 @@ func (ServiceForkOutput) Schema() *jsonschema.Schema {
 }
 
 func newServiceForkTool(experimental bool) *mcp.Tool {
-	outputSchema := ServiceForkOutput{}.Schema()
-	gatePlatformProperty(outputSchema.Properties["service"], experimental)
-
 	return &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
@@ -94,8 +91,8 @@ By default:
 - The forked service will be set as the default service
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceForkInput{}.Schema(),
-		OutputSchema: outputSchema,
+		InputSchema:  gatePlatform(ServiceForkInput{}.Schema(), experimental),
+		OutputSchema: gatePlatform(ServiceForkOutput{}.Schema(), experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -136,7 +133,7 @@ func (s *Server) handleServiceFork(ctx context.Context, req *mcp.CallToolRequest
 	// Parse CPU/Memory configuration if provided
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := allCPUMemoryConfigs().Parse(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceForkOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}

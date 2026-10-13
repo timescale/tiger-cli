@@ -34,6 +34,20 @@ func TestServiceCreateCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			// The fluid platform is a preview, so its help text is gated.
+			name:       "help omits the fluid platform",
+			args:       []string{"service", "create", "--help"},
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid"),
+		},
+		{
+			name: "experimental help lists the fluid platform configurations",
+			args: []string{"service", "create", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
+  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB     |  4 CPU (4000m) / 32GB
+  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
+		{
 			name:    "invalid addon",
 			args:    []string{"service", "create", "--name", "test-service", "--addons", "invalid-addon"},
 			wantErr: "invalid add-on 'invalid-addon'. Valid add-ons: time-series, or 'none' for PostgreSQL-only",
@@ -64,6 +78,12 @@ func TestServiceCreateCmd(t *testing.T) {
 			name:    "invalid cpu/memory combination",
 			args:    []string{"service", "create", "--name", "test-service", "--cpu", "3000", "--memory", "8"},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			name:    "fluid platform rejects a standard cpu/memory combination",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1000", "--memory", "4"},
+			opts:    []runOption{experimental},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "unparseable wait timeout",
@@ -449,9 +469,7 @@ Service is being created. Use 'tiger service list' to check status.
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Platform = new(api.ServicePlatformFLUID)
-				fluidSvc := sampleService(func(s *api.Service) {
-					s.Platform = new(api.ServicePlatformFLUID)
-				})
+				fluidSvc := sampleService(fluidPlatform)
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -474,6 +492,31 @@ Service is being created. Use 'tiger service list' to check status.
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
 │ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
 └───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental fluid platform cpu only auto-configures memory",
+			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1000", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				req.CPUMillis = new("1000")
+				req.MemoryGbs = new("8")
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+PGPORT=5432
+PGDATABASE=tsdb
+PGUSER=tsdbadmin
 `,
 			wantStderr: `Creating service 'test-service'...
 Service ID: svc-12345

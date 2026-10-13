@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/timescale/tiger-cli/internal/api"
 )
 
 // CPUMemoryConfig represents an allowed CPU/Memory configuration
@@ -72,8 +74,9 @@ func (c *CPUMemoryConfig) String() string {
 
 type CPUMemoryConfigs []CPUMemoryConfig
 
-// GetAllowedCPUMemoryConfigs returns the allowed CPU/Memory configurations from the spec
-func GetAllowedCPUMemoryConfigs() CPUMemoryConfigs {
+// StandardCPUMemoryConfigs returns the allowed CPU/Memory configurations for
+// services on the standard platform.
+func StandardCPUMemoryConfigs() CPUMemoryConfigs {
 	return CPUMemoryConfigs{
 		{Shared: true},                     // shared CPU, shared memory
 		{CPUMillis: 500, MemoryGBs: 2},     // 0.5 CPU, 2GB
@@ -86,11 +89,34 @@ func GetAllowedCPUMemoryConfigs() CPUMemoryConfigs {
 	}
 }
 
-// GetAllowedResizeCPUMemoryConfigs returns the allowed CPU/Memory configurations for resize operations (excludes shared)
-func GetAllowedResizeCPUMemoryConfigs() CPUMemoryConfigs {
-	all := GetAllowedCPUMemoryConfigs()
-	filtered := make(CPUMemoryConfigs, 0, len(all)-1)
-	for _, config := range all {
+// FluidCPUMemoryConfigs returns the allowed CPU/Memory configurations for
+// services on the fluid platform: 8GB of memory per CPU, with no shared option.
+func FluidCPUMemoryConfigs() CPUMemoryConfigs {
+	return CPUMemoryConfigs{
+		{CPUMillis: 500, MemoryGBs: 4},     // 0.5 CPU, 4GB
+		{CPUMillis: 1000, MemoryGBs: 8},    // 1 CPU, 8GB
+		{CPUMillis: 2000, MemoryGBs: 16},   // 2 CPU, 16GB
+		{CPUMillis: 4000, MemoryGBs: 32},   // 4 CPU, 32GB
+		{CPUMillis: 8000, MemoryGBs: 64},   // 8 CPU, 64GB
+		{CPUMillis: 16000, MemoryGBs: 128}, // 16 CPU, 128GB
+		{CPUMillis: 32000, MemoryGBs: 256}, // 32 CPU, 256GB
+	}
+}
+
+// CPUMemoryConfigsFor returns the allowed CPU/Memory configurations for a
+// platform. An empty platform is standard, as the API defaults it to.
+func CPUMemoryConfigsFor(platform api.ServicePlatform) CPUMemoryConfigs {
+	if platform == api.ServicePlatformFLUID {
+		return FluidCPUMemoryConfigs()
+	}
+	return StandardCPUMemoryConfigs()
+}
+
+// WithoutShared returns the configurations other than shared/shared, which a
+// service can't be resized onto.
+func (c CPUMemoryConfigs) WithoutShared() CPUMemoryConfigs {
+	filtered := make(CPUMemoryConfigs, 0, len(c))
+	for _, config := range c {
 		if !config.Shared {
 			filtered = append(filtered, config)
 		}
@@ -112,33 +138,29 @@ func (c CPUMemoryConfigs) String() string {
 	return strings.Join(c.Strings(), ", ")
 }
 
-// ValidateAndNormalizeCPUMemory validates CPU/Memory values and applies auto-configuration logic
-func ValidateAndNormalizeCPUMemory(cpuMillis, memoryGBs string) (*CPUMemoryConfig, error) {
+// ValidateAndNormalize validates CPU/Memory values against the configurations
+// and fills in whichever one was omitted from the matching configuration.
+func (c CPUMemoryConfigs) ValidateAndNormalize(cpuMillis, memoryGBs string) (*CPUMemoryConfig, error) {
 	// Return nil for omitted CPU/memory so that values are omitted from the API request
 	if cpuMillis == "" && memoryGBs == "" {
 		return nil, nil
 	}
 
-	configs := GetAllowedCPUMemoryConfigs()
-	for _, config := range configs {
+	for _, config := range c {
 		if config.Matches(cpuMillis, memoryGBs) {
 			return &config, nil
 		}
 	}
 
 	// If no match, provide helpful error
-	return nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", configs)
+	return nil, fmt.Errorf("invalid CPU/Memory combination. Allowed combinations: %s", c)
 }
 
-// ParseCPUMemory parses a CPU/memory combination string (e.g., "2 CPU/8GB")
-// and returns millicores and GB. If "shared" is given, returns "shared" for
-// both CPU and memory.
-func ParseCPUMemory(cpuMemoryStr string) (string, string, error) {
-	// Get allowed configurations
-	configs := GetAllowedCPUMemoryConfigs()
-
-	// Find matching configuration by comparing string representation
-	for _, config := range configs {
+// Parse parses a CPU/memory combination string (e.g., "2 CPU/8 GB") from the
+// configurations and returns millicores and GB. If "shared" is given, returns
+// "shared" for both CPU and memory.
+func (c CPUMemoryConfigs) Parse(cpuMemoryStr string) (string, string, error) {
+	for _, config := range c {
 		if config.String() == cpuMemoryStr {
 			if config.Shared {
 				return "shared", "shared", nil
@@ -148,5 +170,5 @@ func ParseCPUMemory(cpuMemoryStr string) (string, string, error) {
 	}
 
 	// If no match found, return error with valid options
-	return "", "", fmt.Errorf("invalid CPU/Memory combination '%s'. Valid options: %s", cpuMemoryStr, configs.String())
+	return "", "", fmt.Errorf("invalid CPU/Memory combination '%s'. Valid options: %s", cpuMemoryStr, c.String())
 }

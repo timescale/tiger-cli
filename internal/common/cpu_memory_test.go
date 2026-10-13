@@ -2,9 +2,10 @@ package common
 
 import "testing"
 
-func TestValidateAndNormalizeCPUMemory(t *testing.T) {
+func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 	testCases := []struct {
 		name         string
+		configs      CPUMemoryConfigs // StandardCPUMemoryConfigs if nil
 		cpuMillis    string
 		memoryGbs    string
 		expectError  bool
@@ -85,6 +86,33 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name:        "Fluid CPU only auto-configure memory (1 CPU -> 8GB)",
+			configs:     FluidCPUMemoryConfigs(),
+			cpuMillis:   "1000",
+			expectedCPU: 1000,
+			expectedMem: 8,
+		},
+		{
+			name:        "Fluid memory only auto-configure CPU (16GB -> 2 CPU)",
+			configs:     FluidCPUMemoryConfigs(),
+			memoryGbs:   "16",
+			expectedCPU: 2000,
+			expectedMem: 16,
+		},
+		{
+			name:        "Fluid rejects a standard combination (1 CPU, 4GB)",
+			configs:     FluidCPUMemoryConfigs(),
+			cpuMillis:   "1000",
+			memoryGbs:   "4",
+			expectError: true,
+		},
+		{
+			name:        "Fluid rejects shared",
+			configs:     FluidCPUMemoryConfigs(),
+			cpuMillis:   "shared",
+			expectError: true,
+		},
+		{
 			name:        "Neither flag set (returns nil)",
 			cpuMillis:   "",
 			memoryGbs:   "",
@@ -95,7 +123,11 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config, err := ValidateAndNormalizeCPUMemory(tc.cpuMillis, tc.memoryGbs)
+			configs := tc.configs
+			if configs == nil {
+				configs = StandardCPUMemoryConfigs()
+			}
+			config, err := configs.ValidateAndNormalize(tc.cpuMillis, tc.memoryGbs)
 
 			if tc.expectError {
 				if err == nil {
@@ -139,8 +171,8 @@ func TestValidateAndNormalizeCPUMemory(t *testing.T) {
 	}
 }
 
-func TestGetAllowedCPUMemoryConfigs(t *testing.T) {
-	configs := GetAllowedCPUMemoryConfigs()
+func TestStandardCPUMemoryConfigs(t *testing.T) {
+	configs := StandardCPUMemoryConfigs()
 
 	// Verify we have the expected number of configurations (including shared)
 	expectedCount := 8

@@ -210,7 +210,7 @@ func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental boo
 	addTool(s, mode, newServiceUpdatePasswordTool(), s.handleServiceUpdatePassword)
 	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
-	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceResizeTool(experimental), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
 	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)

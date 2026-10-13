@@ -77,8 +77,16 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: fmt.Sprintf(enumMsg, "3 CPU/12 GB"),
 		},
 		{
-			// ParseCPUMemory accepts shared, but a service can't be resized onto
-			// the free tier, so the enum leaves it out.
+			// The fluid platform is a preview, so its combinations are left out
+			// of the enum without the experimental gate.
+			name:    "rejects a fluid combination without the experimental gate",
+			tool:    toolServiceResize,
+			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/16 GB"},
+			wantErr: fmt.Sprintf(enumMsg, "2 CPU/16 GB"),
+		},
+		{
+			// A service can't be resized onto the free tier, so the enum leaves
+			// shared out.
 			name:    "rejects resizing to shared resources",
 			tool:    toolServiceResize,
 			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "shared/shared"},
@@ -153,6 +161,33 @@ func TestServiceResizeTool(t *testing.T) {
 			args:       args,
 			mock:       expectResize(api.DeployStatusCONFIGURING),
 			wantOutput: accepted,
+		},
+		{
+			// The tool takes any platform's combination, leaving the API to
+			// check it against the service's platform.
+			name: "experimental passes a fluid combination through",
+			tool: toolServiceResize,
+			args: map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/16 GB"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				svc := sampleService(func(s *api.Service) {
+					s.Status = api.DeployStatusCONFIGURING
+					s.Platform = new(api.ServicePlatformFLUID)
+					s.Resources = []api.Resource{{
+						Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16)},
+					}}
+				})
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16"}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantOutput: map[string]any{
+				"status":    "CONFIGURING",
+				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
+				"message":   "Resize request accepted. The service may still be resizing.",
+			},
 		},
 		{
 			// Already at the target status, so the wait returns without polling.

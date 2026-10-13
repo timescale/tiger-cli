@@ -101,11 +101,20 @@ func TestServiceForkTool(t *testing.T) {
 		},
 		{
 			// The schema's enum rejects a bad combination before the handler's
-			// own ParseCPUMemory ever sees it.
+			// own parse ever sees it.
 			name: "invalid cpu/memory combination",
 			tool: toolServiceFork,
 			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "999 CPU/1 GB"},
 			wantErr: "validating \"arguments\": validating root: validating /properties/cpu_memory: enum: 999 CPU/1 GB does not equal any of: " +
+				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]",
+		},
+		{
+			// The fluid platform is a preview, so its combinations are left out
+			// of the enum without the experimental gate.
+			name: "fluid cpu/memory combination rejected without the experimental gate",
+			tool: toolServiceFork,
+			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "2 CPU/16 GB"},
+			wantErr: "validating \"arguments\": validating root: validating /properties/cpu_memory: enum: 2 CPU/16 GB does not equal any of: " +
 				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]",
 		},
 		{
@@ -248,6 +257,30 @@ func TestServiceForkTool(t *testing.T) {
 					"name":        "my-forked-db",
 					"environment": "PROD",
 					"resources":   map[string]any{"cpu": "1 cores", "memory": "4 GB"},
+				}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			// The tool takes any platform's combination, leaving the API to
+			// check it against the source's platform.
+			name: "experimental passes a fluid cpu/memory combination through",
+			tool: toolServiceFork,
+			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "cpu_memory": "2 CPU/16 GB"},
+			opts: []runOption{withExperimental()},
+			mock: expectFork(api.ForkServiceCreate{
+				ForkStrategy:   api.ForkStrategyNOW,
+				CPUMillis:      new("2000"),
+				MemoryGbs:      new("16"),
+				EnvironmentTag: new(api.EnvironmentTagDEV),
+			}, func(s *api.Service) {
+				s.Platform = new(api.ServicePlatformFLUID)
+				s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16)}}}
+			}),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"platform":  "FLUID",
+					"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
 				}),
 				"message": acceptedMsg,
 			},

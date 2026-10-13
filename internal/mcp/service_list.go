@@ -65,16 +65,13 @@ func (ServiceInfo) Schema() *jsonschema.Schema {
 }
 
 func newServiceListTool(experimental bool) *mcp.Tool {
-	outputSchema := ServiceListOutput{}.Schema()
-	gatePlatformProperty(outputSchema.Properties["services"].Items, experimental)
-
 	return &mcp.Tool{
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
 			"Returns services with status, type, region, and resource allocation.",
 		InputSchema:  ServiceListInput{}.Schema(),
-		OutputSchema: outputSchema,
+		OutputSchema: gatePlatform(ServiceListOutput{}.Schema(), experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),

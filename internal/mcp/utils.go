@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -60,13 +61,39 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
-// gatePlatformProperty removes the preview platform property from a schema
-// unless the experimental gate is on, so clients aren't told about it. Input
-// schemas reject unknown properties, so this also rejects the parameter.
-func gatePlatformProperty(schema *jsonschema.Schema, experimental bool) {
+// allCPUMemoryConfigs returns every platform's CPU/Memory configurations. The
+// fork and resize tools accept any of them, leaving the API to check them
+// against the service's platform.
+func allCPUMemoryConfigs() common.CPUMemoryConfigs {
+	return append(common.StandardCPUMemoryConfigs(), common.FluidCPUMemoryConfigs()...)
+}
+
+// gatePlatform strips the preview platform surface from a tool schema unless
+// the experimental gate is on, so clients aren't told about it: every platform
+// property, at any depth, and the fluid values of any cpu_memory enum. Input
+// schemas reject unknown properties and values, so this also rejects them as
+// arguments.
+func gatePlatform(schema *jsonschema.Schema, experimental bool) *jsonschema.Schema {
 	if !experimental {
-		delete(schema.Properties, "platform")
+		stripPlatform(schema, util.AnySlice(common.FluidCPUMemoryConfigs().Strings()))
 	}
+	return schema
+}
+
+func stripPlatform(schema *jsonschema.Schema, fluidCPUMemory []any) {
+	if schema == nil {
+		return
+	}
+	delete(schema.Properties, "platform")
+	if cpuMemory, ok := schema.Properties["cpu_memory"]; ok {
+		cpuMemory.Enum = slices.DeleteFunc(cpuMemory.Enum, func(v any) bool {
+			return slices.Contains(fluidCPUMemory, v)
+		})
+	}
+	for _, property := range schema.Properties {
+		stripPlatform(property, fluidCPUMemory)
+	}
+	stripPlatform(schema.Items, fluidCPUMemory)
 }
 
 // setPlatformSchemaProperties sets the platform schema properties shared by the

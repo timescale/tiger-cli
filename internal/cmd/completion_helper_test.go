@@ -200,6 +200,37 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
+			name:       "--platform flag values when experimental",
+			args:       []string{"__complete", "service", "create", "--platform", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "standard\nfluid\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--cpu flag values",
+			args:       []string{"__complete", "service", "create", "--cpu", ""},
+			wantStdout: "shared\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--memory flag values",
+			args:       []string{"__complete", "service", "create", "--memory", ""},
+			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The fluid platform's values join the standard ones once each.
+			name:       "--memory flag values include the fluid platform's when experimental",
+			args:       []string{"__complete", "service", "create", "--memory", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n256\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
 			name:       "--password-storage flag values",
 			args:       []string{"__complete", "service", "get", "--password-storage", ""},
 			wantStdout: "keyring\npgpass\nnone\n" + noFileComp,

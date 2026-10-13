@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -257,13 +258,26 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 	return cobra.FixedCompletions(config.ValidOutputFormats(extra...), cobra.ShellCompDirectiveNoFileComp)
 }
 
+// cpuMemoryCompletionConfigs returns the configurations --cpu and --memory
+// complete from: the command's standard platform configurations, plus the
+// fluid platform's behind the experimental gate.
+func cpuMemoryCompletionConfigs(standard common.CPUMemoryConfigs, experimental bool) common.CPUMemoryConfigs {
+	if !experimental {
+		return standard
+	}
+	return append(standard, common.FluidCPUMemoryConfigs()...)
+}
+
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
-// (common.ValidateAndNormalizeCPUMemory).
+// (common.CPUMemoryConfigs.ValidateAndNormalize). Values the configurations
+// share are offered once.
 func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
 	values := make([]string, 0, len(configs))
 	for _, c := range configs {
-		values = append(values, *c.CPUMillisString())
+		if v := *c.CPUMillisString(); !slices.Contains(values, v) {
+			values = append(values, v)
+		}
 	}
 	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
 }
@@ -271,7 +285,9 @@ func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
 func memoryCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
 	values := make([]string, 0, len(configs))
 	for _, c := range configs {
-		values = append(values, *c.MemoryGBsString())
+		if v := *c.MemoryGBsString(); !slices.Contains(values, v) {
+			values = append(values, v)
+		}
 	}
 	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
 }

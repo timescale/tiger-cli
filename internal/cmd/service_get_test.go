@@ -32,9 +32,7 @@ func TestServiceGetCmd(t *testing.T) {
 		s.Resources[0].Spec.MemoryGbs = nil
 	})
 
-	fluidService := sampleService(func(s *api.Service) {
-		s.Platform = new(api.ServicePlatformFLUID)
-	})
+	fluidService := sampleService(fluidPlatform)
 	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	withInitialPassword := sampleService(func(s *api.Service) {

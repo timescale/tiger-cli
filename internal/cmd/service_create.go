@@ -29,6 +29,14 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	var environment string
 	var platform string
 
+	// The fluid platform is a preview, so its help text is shown only behind
+	// the experimental gate.
+	var fluidDefaultHelp, fluidExampleHelp string
+	if app.Experimental {
+		fluidDefaultHelp = "\n- Fluid platform (--platform fluid): Creates a service with 0.5 CPU / 4 GB memory and the 'time-series' add-on"
+		fluidExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid"
+	}
+
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new database service",
@@ -36,14 +44,13 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 
 The default type of service created depends on your plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
-- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefaultHelp + `
 
 By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
-Allowed CPU/Memory Configurations:
-  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
+` + cpuMemoryHelp(`  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
+  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`, app.Experimental) + `
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
@@ -74,7 +81,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
   tiger service create --name quick-db --no-wait
 
   # Create service with custom wait timeout
-  tiger service create --name patient-db --wait-timeout 1h`,
+  tiger service create --name patient-db --wait-timeout 1h` + fluidExampleHelp,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -98,16 +105,19 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return fmt.Errorf("environment must be one of: %s (got '%s')", strings.Join(validEnvironmentTags, ", "), environment)
 			}
 
-			// --platform only exists behind the experimental gate.
+			// --platform only exists behind the experimental gate. Without it
+			// the platform is left empty, which the API defaults to STANDARD.
+			var servicePlatform api.ServicePlatform
 			if app.Experimental {
 				platform = strings.ToLower(platform)
 				if !slices.Contains(validPlatforms, platform) {
 					return fmt.Errorf("platform must be one of: %s (got '%s')", strings.Join(validPlatforms, ", "), platform)
 				}
+				servicePlatform = api.ServicePlatform(strings.ToUpper(platform))
 			}
 
 			// Validate and normalize CPU/Memory configuration
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
+			cpuMemoryCfg, err := common.CPUMemoryConfigsFor(servicePlatform).ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -143,9 +153,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				serviceCreateReq.RegionCode = &region
 			}
 
-			// Without the gate the field is left nil and the API defaults to STANDARD.
 			if app.Experimental {
-				serviceCreateReq.Platform = new(api.ServicePlatform(strings.ToUpper(platform)))
+				serviceCreateReq.Platform = &servicePlatform
 			}
 
 			// Make API call to create service
@@ -237,8 +246,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	registerFlagCompletion(cmd, "addons", addonsCompletion)
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	cpuMemoryConfigs := cpuMemoryCompletionConfigs(common.StandardCPUMemoryConfigs(), app.Experimental)
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
 
 	return cmd
 }

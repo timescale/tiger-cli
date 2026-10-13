@@ -48,6 +48,22 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
+// fluidCPUMemoryHelp is the fluid platform's table of CPU/Memory
+// configurations, for cpuMemoryHelp.
+const fluidCPUMemoryHelp = `  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB     |  4 CPU (4000m) / 32GB
+  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`
+
+// cpuMemoryHelp renders the allowed CPU/Memory configurations section of a
+// command's help text from its standard platform table. The fluid platform is
+// a preview, so its table is added only behind the experimental gate.
+func cpuMemoryHelp(standard string, experimental bool) string {
+	if !experimental {
+		return "Allowed CPU/Memory Configurations:\n" + standard
+	}
+	return "Allowed CPU/Memory Configurations (standard platform):\n" + standard +
+		"\n\nAllowed CPU/Memory Configurations (fluid platform):\n" + fluidCPUMemoryHelp
+}
+
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
