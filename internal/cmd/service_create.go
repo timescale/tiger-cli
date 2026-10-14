@@ -110,8 +110,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			var servicePlatform api.ServicePlatform
 			if app.Experimental {
 				platform = strings.ToLower(platform)
-				if !slices.Contains(validPlatforms, platform) {
-					return fmt.Errorf("platform must be one of: %s (got '%s')", strings.Join(validPlatforms, ", "), platform)
+				if !slices.Contains(common.ValidPlatforms(), platform) {
+					return fmt.Errorf("platform must be one of: %s (got '%s')", strings.Join(common.ValidPlatforms(), ", "), platform)
 				}
 				servicePlatform = api.ServicePlatform(strings.ToUpper(platform))
 			}
@@ -234,7 +234,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().IntVar(&replicas, "replicas", 0, "Number of high-availability replicas")
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	if app.Experimental {
-		cmd.Flags().StringVar(&platform, "platform", "standard", "Storage platform (standard or fluid)")
+		cmd.Flags().StringVar(&platform, "platform", common.PlatformStandard, "Storage platform (standard or fluid)")
 		registerFlagCompletion(cmd, "platform", platformCompletion)
 	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")

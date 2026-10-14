@@ -64,6 +64,21 @@ func ValidAddons() []string {
 	}
 }
 
+// Platform constants - the API's ServicePlatform values, lowercased to match
+// the other flag and parameter values users type
+const (
+	PlatformStandard = "standard"
+	PlatformFluid    = "fluid"
+)
+
+// ValidPlatforms returns a slice of all valid platform values
+func ValidPlatforms() []string {
+	return []string{
+		PlatformStandard,
+		PlatformFluid,
+	}
+}
+
 // IsValidAddon checks if the given add-on is valid (case-sensitive as per API spec)
 func IsValidAddon(addon string) bool {
 	return slices.Contains(ValidAddons(), addon)

@@ -21,10 +21,6 @@ const (
 	serviceTypeVector      = "VECTOR"
 )
 
-// validPlatforms are the accepted values for service_create's platform
-// parameter, lowercase to match the CLI's --platform flag.
-var validPlatforms = []string{"standard", "fluid"}
-
 // Wait timeout for MCP tool operations
 const waitTimeout = 10 * time.Minute
 

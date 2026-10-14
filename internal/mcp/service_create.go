@@ -60,8 +60,8 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	// it is removed, and the schema rejects it as an unknown property.
 	if experimental {
 		schema.Properties["platform"].Description = "Storage platform to create the service on. Fluid services take the cpu_memory configurations with 8 GB of memory per CPU, and no shared configuration."
-		schema.Properties["platform"].Enum = util.AnySlice(validPlatforms)
-		schema.Properties["platform"].Default = util.Must(json.Marshal("standard"))
+		schema.Properties["platform"].Enum = util.AnySlice(common.ValidPlatforms())
+		schema.Properties["platform"].Default = util.Must(json.Marshal(common.PlatformStandard))
 	} else {
 		delete(schema.Properties, "platform")
 	}
