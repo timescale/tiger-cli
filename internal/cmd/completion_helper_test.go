@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -29,6 +31,16 @@ func TestCompletion(t *testing.T) {
 	// --cpu and --memory values ask the shell to keep their numeric order.
 	const keepOrder = ":36\n"
 	const keepOrderDirective = "Completion ended with directive: ShellCompDirectiveNoFileComp, ShellCompDirectiveKeepOrder\n"
+
+	// iopsSteps renders the --iops candidates from one value to another, one
+	// per line in increments of 1000, as the completion lists them.
+	iopsSteps := func(from, to int) string {
+		var b strings.Builder
+		for v := from; v <= to; v += 1000 {
+			fmt.Fprintf(&b, "%d\n", v)
+		}
+		return b.String()
+	}
 
 	listServices := func(m *mocks.MockClientWithResponsesInterface) {
 		services := []api.Service{
@@ -265,6 +277,50 @@ func TestCompletion(t *testing.T) {
 			name:       "--memory flag values for resize omit shared",
 			args:       []string{"__complete", "service", "resize", "--memory", ""},
 			wantStdout: "2\n4\n8\n16\n32\n64\n128\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// Without --cpu or --memory yet, every fluid CPU allocation's range
+			// is offered, once each. No range holds 5000.
+			name:       "--iops flag values",
+			args:       []string{"__complete", "service", "create", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "3000\n4000\n" + iopsSteps(6000, 192000) + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--iops flag values narrow to a given cpu",
+			args:       []string{"__complete", "service", "resize", "--cpu", "4000", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: iopsSteps(6000, 48000) + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The fluid platform's 16 GB goes with 2 CPU.
+			name:       "--iops flag values narrow to a given memory",
+			args:       []string{"__complete", "service", "fork", "--memory", "16", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: iopsSteps(6000, 16000) + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--iops flag values empty for a cpu with no fluid range",
+			args:       []string{"__complete", "service", "create", "--cpu", "shared", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// IOPS apply only to the fluid platform.
+			name:       "--iops flag values empty for the standard platform",
+			args:       []string{"__complete", "service", "create", "--platform", "standard", "--iops", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},

@@ -34,10 +34,10 @@ func TestServiceCreateCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
-			// The fluid platform is a preview, so its help text is gated.
-			name:       "help omits the fluid platform",
+			// The fluid platform and IOPS are a preview, so their help text is gated.
+			name:       "help omits the fluid platform and IOPS",
 			args:       []string{"service", "create", "--help"},
-			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid"),
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid", "IOPS", "--iops"),
 		},
 		{
 			name: "experimental help lists the fluid platform configurations",
@@ -46,6 +46,19 @@ func TestServiceCreateCmd(t *testing.T) {
 			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
   0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
   4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
+		{
+			name: "experimental help lists the IOPS ranges",
+			args: []string{"service", "create", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Provisioned IOPS (fluid platform only):
+Set --iops in increments of 1000. The allowed range depends on your plan and the
+service's CPU allocation. Across all plans, it spans:
+  0.25 CPU: 3000        |  0.5 CPU: 4000         |  1 CPU: 6000-12000     |  2 CPU: 6000-16000
+  4 CPU: 6000-48000     |  8 CPU: 6000-64000     |  16 CPU: 24000-128000  |  32 CPU: 32000-192000
+
+If --iops is not given, the service gets the baseline IOPS for your plan and its
+CPU allocation.`),
 		},
 		{
 			name:    "invalid addon",
@@ -67,6 +80,12 @@ func TestServiceCreateCmd(t *testing.T) {
 			name:    "platform flag rejected without experimental",
 			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid"},
 			wantErr: "unknown flag: --platform",
+		},
+		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "create", "--name", "test-service", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
 		},
 		{
 			name:    "invalid platform",
@@ -463,13 +482,15 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
-			name: "experimental platform fluid mapped to request and shown in output",
-			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--no-wait", "--no-set-default"},
+			// The API validates the IOPS value, so it's sent as given.
+			name: "experimental platform fluid and iops mapped to request and shown in output",
+			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--iops", "12000", "--no-wait", "--no-set-default"},
 			opts: []runOption{experimental},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				req := baseReq
 				req.Platform = new(api.ServicePlatformFLUID)
-				fluidSvc := sampleService(fluidPlatform)
+				req.Iops = new(12000)
+				fluidSvc := sampleService(fluidPlatform, withIOPS(12000))
 				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
 					Return(&api.CreateServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
@@ -487,6 +508,7 @@ Service is being created. Use 'tiger service list' to check status.
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 12000                                                                                       │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │

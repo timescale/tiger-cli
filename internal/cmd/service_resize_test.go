@@ -12,21 +12,47 @@ import (
 
 func TestServiceResizeCmd(t *testing.T) {
 	svc := sampleService()
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
+
+	// A fluid service at 1 CPU/8 GB, whose current allocation an IOPS-only
+	// resize sends back.
+	fluidSvc := sampleService(fluidPlatform, func(s *api.Service) {
+		s.Resources[0].Spec.MemoryGbs = new(8)
+	})
 
 	runCmdTests(t, []cmdTest{
 		{
-			// The fluid platform is a preview, so its help text is gated.
-			name:       "help omits the fluid platform",
+			// The fluid platform and IOPS are a preview, so their help text is gated.
+			name:       "help omits the fluid platform and IOPS",
 			args:       []string{"service", "resize", "--help"},
-			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid"),
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid", "IOPS", "--iops"),
 		},
 		{
 			name: "experimental help lists the fluid platform configurations",
 			args: []string{"service", "resize", "--help"},
-			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			opts: []runOption{experimental},
 			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
   0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
   4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
+		{
+			name: "experimental help says resize changes IOPS",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Resize a database service by changing its CPU, memory, and provisioned IOPS
+allocation.`),
+		},
+		{
+			name: "experimental help lists the IOPS ranges",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Provisioned IOPS (fluid platform only):
+Set --iops in increments of 1000. The allowed range depends on your plan and the
+service's CPU allocation. Across all plans, it spans:
+  0.25 CPU: 3000        |  0.5 CPU: 4000         |  1 CPU: 6000-12000     |  2 CPU: 6000-16000
+  4 CPU: 6000-48000     |  8 CPU: 6000-64000     |  16 CPU: 24000-128000  |  32 CPU: 32000-192000
+
+If only --iops is given, the service keeps its current CPU and memory.`),
 		},
 		{
 			name:    "not logged in",
@@ -79,6 +105,18 @@ Use 'tiger service get' to check service status.
 			wantErr: "must specify at least one of --cpu or --memory",
 		},
 		{
+			// --iops is a preview flag, so without the gate it doesn't exist.
+			name:    "iops flag rejected without experimental",
+			args:    []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			wantErr: "unknown flag: --iops",
+		},
+		{
+			name:    "experimental missing cpu, memory, and iops",
+			args:    []string{"service", "resize", "svc-12345"},
+			opts:    []runOption{experimental},
+			wantErr: "must specify at least one of --cpu, --memory, or --iops",
+		},
+		{
 			name: "ambiguous name refused",
 			args: []string{"service", "resize", "my-api-db", "--cpu", "2000", "--memory", "8"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -113,6 +151,19 @@ Use 'tiger service get' to check service status.
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
 			},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+		},
+		{
+			// A shared service has no CPU/memory for an IOPS-only resize to
+			// keep, and the API requires both.
+			name: "iops only on a service without a known allocation",
+			args: []string{"service", "resize", "svc-12345", "--iops", "12000"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(func(s *api.Service) {
+					s.Resources[0].Spec = &api.ResourceSpec{}
+				}))
+			},
+			wantErr: "current CPU and memory of service svc-12345 are unknown; specify --cpu or --memory",
 		},
 		{
 			name: "network error",
@@ -233,6 +284,43 @@ Use 'tiger service get' to check service status.
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
 Use 'tiger service get' to check service status.
+`,
+		},
+		{
+			// The API requires CPU and memory, so an IOPS-only resize sends the
+			// current allocation. The API validates the IOPS value.
+			name: "experimental iops only keeps the current cpu and memory",
+			args: []string{"service", "resize", "svc-12345", "--iops", "12000", "--no-wait"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidSvc)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "1000", MemoryGbs: "8", Iops: new(12000)}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 1 CPU/8 GB, 12000 IOPS...
+Resize request accepted for service 'test-service' (svc-12345).
+Use 'tiger service get' to check service status.
+`,
+		},
+		{
+			name: "experimental iops with cpu, with wait",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--iops", "16000"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", fluidSvc)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16", Iops: new(16000)}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB, 16000 IOPS...
+Resize request accepted for service 'test-service' (svc-12345).
+Waiting for resize to complete (timeout: 10m0s)...
+Service resized to 2 CPU/16 GB, 16000 IOPS.
 `,
 		},
 		{
