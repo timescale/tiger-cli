@@ -324,6 +324,49 @@ func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) c
 	return common.AllowedCPUMemoryConfigs(shared, experimental)
 }
 
+// iopsCompletion completes --iops on `service create`, `fork`, and `resize`,
+// offering every value in the fluid IOPS ranges (common.FluidIOPSRanges) in
+// ascending order. A --cpu or --memory already on the line narrows them to
+// that CPU allocation's range, and an explicit --platform standard offers
+// none, since IOPS apply only to the fluid platform.
+func iopsCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	const directive = cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	if platform := cmd.Flags().Lookup("platform"); platform != nil && platform.Changed &&
+		strings.ToLower(platform.Value.String()) != common.PlatformFluid {
+		return nil, directive
+	}
+
+	cpuMillis := 0
+	if cpu := cmd.Flags().Lookup("cpu"); cpu != nil && cpu.Changed {
+		cpuMillis = -1 // No range matches unless the value is a fluid CPU allocation
+		if v, err := strconv.Atoi(cpu.Value.String()); err == nil {
+			cpuMillis = v
+		}
+	} else if memory := cmd.Flags().Lookup("memory"); memory != nil && memory.Changed {
+		cpuMillis = -1
+		for _, c := range common.FluidCPUMemoryConfigs() {
+			if strconv.Itoa(c.MemoryGBs) == memory.Value.String() {
+				cpuMillis = c.CPUMillis
+			}
+		}
+	}
+
+	var values []int
+	for _, r := range common.FluidIOPSRanges() {
+		if cpuMillis == 0 || r.CPUMillis == cpuMillis {
+			values = append(values, r.Values()...)
+		}
+	}
+	slices.Sort(values)
+	values = slices.Compact(values)
+
+	completions := make([]string, len(values))
+	for i, v := range values {
+		completions[i] = strconv.Itoa(v)
+	}
+	return completions, directive
+}
+
 // mcpGetCompletion provides custom completions for the get command
 func mcpGetCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

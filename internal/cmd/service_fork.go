@@ -27,12 +27,15 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var memory string
 	var withPassword bool
 	var environment string
+	var iops int
 
-	// The platform is a preview, so its help text is shown only behind the
-	// experimental gate.
-	var platformHelp string
+	// The platform and IOPS are a preview, so their help text is shown only
+	// behind the experimental gate.
+	var platformHelp, iopsExampleHelp string
 	if app.Experimental {
-		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so custom\n--cpu and --memory values must be valid for that platform."
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so custom\n--cpu and --memory values must be valid for that platform.\n\n" +
+			iopsHelp("If --iops is not given, the fork inherits the source service's IOPS.")
+		iopsExampleHelp = "\n\n  # Fork a fluid service with more provisioned IOPS\n  tiger service fork svc-12345 --iops 12000"
 	}
 
 	cmd := &cobra.Command{
@@ -76,7 +79,7 @@ default service from your configuration.`,
   tiger service fork svc-12345 --no-wait
 
   # Fork with custom wait timeout
-  tiger service fork svc-12345 --wait-timeout 45m`,
+  tiger service fork svc-12345 --wait-timeout 45m` + iopsExampleHelp,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
@@ -161,6 +164,9 @@ default service from your configuration.`,
 			if name != "" {
 				forkReq.Name = &name
 			}
+			if app.Experimental && cmd.Flags().Changed("iops") {
+				forkReq.Iops = &iops
+			}
 
 			// Make API call to fork service
 			forkResp, err := client.ForkServiceWithResponse(cmd.Context(), projectID, source.ServiceID, forkReq)
@@ -244,6 +250,10 @@ default service from your configuration.`,
 	// Resource customization flags
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
+	if app.Experimental {
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS, in increments of 1000 (fluid platform only; inherits from source if not specified)")
+		registerFlagCompletion(cmd, "iops", iopsCompletion)
+	}
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")
 	cmd.Flags().BoolVar(&withPassword, "with-password", false, "Include password in output")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")

@@ -28,13 +28,16 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	var withPassword bool
 	var environment string
 	var platform string
+	var iops int
 
-	// The fluid platform is a preview, so its help text is shown only behind
-	// the experimental gate.
-	var fluidDefaultHelp, fluidExampleHelp string
+	// The fluid platform and IOPS are a preview, so their help text is shown
+	// only behind the experimental gate.
+	var fluidDefaultHelp, fluidIOPSHelp, fluidExampleHelp string
 	if app.Experimental {
 		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB\nmemory and the 'time-series' add-on by default."
-		fluidExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid"
+		fluidIOPSHelp = "\n\n" + iopsHelp("If --iops is not given, the service gets the baseline IOPS for your plan and its\nCPU allocation.")
+		fluidExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid" +
+			"\n\n  # Create a service on the fluid platform with provisioned IOPS\n  tiger service create --name fast-db --platform fluid --cpu 2000 --iops 12000"
 	}
 
 	cmd := &cobra.Command{
@@ -51,7 +54,7 @@ commands. Use --no-set-default to prevent this behavior.
 
 ` + cpuMemoryHelp(true, app.Experimental) + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).` + fluidIOPSHelp,
 		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 
@@ -154,6 +157,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 
 			if app.Experimental {
 				serviceCreateReq.Platform = &servicePlatform
+				if cmd.Flags().Changed("iops") {
+					serviceCreateReq.Iops = &iops
+				}
 			}
 
 			// Make API call to create service
@@ -235,6 +241,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	if app.Experimental {
 		cmd.Flags().StringVar(&platform, "platform", common.PlatformStandard, "Storage platform (standard or fluid)")
 		registerFlagCompletion(cmd, "platform", platformCompletion)
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS, in increments of 1000 (fluid platform only)")
+		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 30*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
