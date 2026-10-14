@@ -250,9 +250,8 @@ default service from your configuration.`,
 
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	cpuMemoryConfigs := cpuMemoryCompletionConfigs(true, app.Experimental)
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(true, app.Experimental))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(true, app.Experimental))
 
 	return cmd
 }

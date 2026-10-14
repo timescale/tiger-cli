@@ -27,7 +27,7 @@ func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 	setServiceIDSchemaProperties(schema)
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryConfigs(experimental).WithoutShared().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(false, experimental).Strings())
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))

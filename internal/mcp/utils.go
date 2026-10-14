@@ -56,16 +56,6 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
-// cpuMemoryConfigs returns the CPU/Memory configurations a tool's cpu_memory
-// enum offers: the standard platform's, plus the fluid platform's behind the
-// experimental gate.
-func cpuMemoryConfigs(experimental bool) common.CPUMemoryConfigs {
-	if !experimental {
-		return common.StandardCPUMemoryConfigs()
-	}
-	return append(common.StandardCPUMemoryConfigs(), common.FluidCPUMemoryConfigs()...)
-}
-
 // setPlatformSchemaProperties sets the platform property shared by the service
 // output types. The platform is a preview field, so without the experimental
 // gate the property is removed and clients aren't told about it.

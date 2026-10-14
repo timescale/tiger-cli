@@ -148,9 +148,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
-	cpuMemoryConfigs := cpuMemoryCompletionConfigs(false, app.Experimental)
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(false, app.Experimental))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))
 
 	return cmd
 }

@@ -261,6 +261,14 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
+			// A service can't be resized onto shared CPU/memory.
+			name:       "--memory flag values for resize omit shared",
+			args:       []string{"__complete", "service", "resize", "--memory", ""},
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
 			name:       "--password-storage flag values",
 			args:       []string{"__complete", "service", "get", "--password-storage", ""},
 			wantStdout: "keyring\npgpass\nnone\n" + noFileComp,

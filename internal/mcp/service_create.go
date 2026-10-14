@@ -44,7 +44,7 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryConfigs(experimental).Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(true, experimental).Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = new(0.0)

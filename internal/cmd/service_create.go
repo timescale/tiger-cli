@@ -245,13 +245,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	registerFlagCompletion(cmd, "addons", addonsCompletion)
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	if app.Experimental {
-		registerFlagCompletion(cmd, "cpu", platformCPUCompletion)
-		registerFlagCompletion(cmd, "memory", platformMemoryCompletion)
-	} else {
-		registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryCompletionConfigs(true, false)))
-		registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryCompletionConfigs(true, false)))
-	}
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(true, app.Experimental))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(true, app.Experimental))
 
 	return cmd
 }

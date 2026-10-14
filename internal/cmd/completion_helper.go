@@ -258,88 +258,70 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 	return cobra.FixedCompletions(config.ValidOutputFormats(extra...), cobra.ShellCompDirectiveNoFileComp)
 }
 
-// cpuMemoryCompletionConfigs returns the configurations --cpu and --memory
-// complete from: the standard platform's, including shared/shared if shared is
-// set (a service can't be resized onto it), plus the fluid platform's behind
-// the experimental gate.
-func cpuMemoryCompletionConfigs(shared, experimental bool) common.CPUMemoryConfigs {
-	configs := common.StandardCPUMemoryConfigs()
-	if !shared {
-		configs = configs.WithoutShared()
-	}
-	if experimental {
-		configs = append(configs, common.FluidCPUMemoryConfigs()...)
-	}
-	return configs
-}
-
-// platformCPUCompletion and platformMemoryCompletion complete --cpu and
-// --memory on `service create` behind the experimental gate, where --platform
-// exists: from the combinations of the platform already given, or of every
-// platform when it hasn't been (it may still come later on the line).
-func platformCPUCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return cpuCompletion(platformCPUMemoryConfigs(cmd))(cmd, args, toComplete)
-}
-
-func platformMemoryCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return memoryCompletion(platformCPUMemoryConfigs(cmd))(cmd, args, toComplete)
-}
-
-func platformCPUMemoryConfigs(cmd *cobra.Command) common.CPUMemoryConfigs {
-	all := cpuMemoryCompletionConfigs(true, true)
-	if !cmd.Flags().Changed("platform") {
-		return all
-	}
-	platform, err := cmd.Flags().GetString("platform")
-	if err != nil {
-		return all
-	}
-	switch strings.ToLower(platform) {
-	case common.PlatformStandard:
-		return common.StandardCPUMemoryConfigs()
-	case common.PlatformFluid:
-		return common.FluidCPUMemoryConfigs()
-	default:
-		return all
-	}
-}
-
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
-// (common.CPUMemoryConfigs.ValidateAndNormalize).
-func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	return sizeCompletion(configs, func(c common.CPUMemoryConfig) int { return c.CPUMillis })
+// (common.AllowedCPUMemoryConfigs). shared includes shared/shared, which a
+// service can't be resized onto, and experimental includes the fluid platform's
+// configurations, which are a preview.
+func cpuCompletion(shared, experimental bool) cobra.CompletionFunc {
+	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.CPUMillis })
 }
 
-func memoryCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	return sizeCompletion(configs, func(c common.CPUMemoryConfig) int { return c.MemoryGBs })
+func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
+	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.MemoryGBs })
 }
 
-// sizeCompletion completes the sizes size reads off configs, each once, in
-// ascending numeric order with "shared" last. The configurations can come from
-// more than one platform, so the order is imposed here, and the shell is told
-// to keep it rather than sort the values as strings.
-func sizeCompletion(configs common.CPUMemoryConfigs, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
-	sizes := make([]int, 0, len(configs))
-	shared := false
-	for _, c := range configs {
-		if c.Shared {
-			shared = true
-		} else {
-			sizes = append(sizes, size(c))
+// sizeCompletion completes the sizes size reads off the allowed
+// configurations, each once, in ascending numeric order with "shared" last.
+// The configurations can come from more than one platform, so the order is
+// imposed here, and the shell is told to keep it rather than sort the values
+// as strings.
+func sizeCompletion(shared, experimental bool, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		configs := completionCPUMemoryConfigs(cmd, shared, experimental)
+
+		sizes := make([]int, 0, len(configs))
+		hasShared := false
+		for _, c := range configs {
+			if c.Shared {
+				hasShared = true
+			} else {
+				sizes = append(sizes, size(c))
+			}
+		}
+		slices.Sort(sizes)
+		sizes = slices.Compact(sizes)
+
+		values := make([]string, 0, len(sizes)+1)
+		for _, s := range sizes {
+			values = append(values, strconv.Itoa(s))
+		}
+		if hasShared {
+			values = append(values, "shared")
+		}
+		return values, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
+	}
+}
+
+// completionCPUMemoryConfigs returns the configurations sizeCompletion draws
+// from. On a command with a --platform flag (`service create` behind the
+// experimental gate) that's already been given, they narrow to that platform's;
+// otherwise every allowed platform's are offered, since --platform may still
+// come later on the line.
+func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) common.CPUMemoryConfigs {
+	if platform := cmd.Flags().Lookup("platform"); platform != nil && platform.Changed {
+		switch strings.ToLower(platform.Value.String()) {
+		case common.PlatformStandard:
+			configs := common.StandardCPUMemoryConfigs()
+			if !shared {
+				return configs.WithoutShared()
+			}
+			return configs
+		case common.PlatformFluid:
+			return common.FluidCPUMemoryConfigs()
 		}
 	}
-	slices.Sort(sizes)
-	sizes = slices.Compact(sizes)
-
-	values := make([]string, 0, len(sizes)+1)
-	for _, s := range sizes {
-		values = append(values, strconv.Itoa(s))
-	}
-	if shared {
-		values = append(values, "shared")
-	}
-	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveKeepOrder)
+	return common.AllowedCPUMemoryConfigs(shared, experimental)
 }
 
 // mcpGetCompletion provides custom completions for the get command
