@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -187,6 +189,10 @@ var validEnvironmentTags = []string{"DEV", "PROD"}
 
 var environmentCompletion = cobra.FixedCompletions(validEnvironmentTags, cobra.ShellCompDirectiveNoFileComp)
 
+// platformCompletion completes --platform on `service create`, drawn from the
+// same list used to validate it (common.ValidPlatforms).
+var platformCompletion = cobra.FixedCompletions(common.ValidPlatforms(), cobra.ShellCompDirectiveNoFileComp)
+
 // addonsCompletion completes --addons on `service create`, drawn from the
 // same list used to validate it (common.ValidateAddons).
 var addonsCompletion = cobra.FixedCompletions(append(common.ValidAddons(), common.AddonNone), cobra.ShellCompDirectiveNoFileComp)
@@ -254,21 +260,68 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
-// (common.ValidateAndNormalizeCPUMemory).
-func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	values := make([]string, 0, len(configs))
-	for _, c := range configs {
-		values = append(values, *c.CPUMillisString())
-	}
-	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
+// (common.AllowedCPUMemoryConfigs). shared includes shared/shared, which a
+// service can't be resized onto, and experimental includes the fluid platform's
+// configurations, which are a preview.
+func cpuCompletion(shared, experimental bool) cobra.CompletionFunc {
+	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.CPUMillis })
 }
 
-func memoryCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	values := make([]string, 0, len(configs))
-	for _, c := range configs {
-		values = append(values, *c.MemoryGBsString())
+func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
+	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.MemoryGBs })
+}
+
+// sizeCompletion completes the sizes size reads off the allowed
+// configurations, each once, in ascending numeric order with "shared" last.
+// The configurations can come from more than one platform, so the order is
+// imposed here, and the shell is told to keep it rather than sort the values
+// as strings.
+func sizeCompletion(shared, experimental bool, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		configs := completionCPUMemoryConfigs(cmd, shared, experimental)
+
+		sizes := make([]int, 0, len(configs))
+		hasShared := false
+		for _, c := range configs {
+			if c.Shared {
+				hasShared = true
+			} else {
+				sizes = append(sizes, size(c))
+			}
+		}
+		slices.Sort(sizes)
+		sizes = slices.Compact(sizes)
+
+		values := make([]string, 0, len(sizes)+1)
+		for _, s := range sizes {
+			values = append(values, strconv.Itoa(s))
+		}
+		if hasShared {
+			values = append(values, "shared")
+		}
+		return values, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 	}
-	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
+}
+
+// completionCPUMemoryConfigs returns the configurations sizeCompletion draws
+// from. On a command with a --platform flag (`service create` behind the
+// experimental gate) that's already been given, they narrow to that platform's;
+// otherwise every allowed platform's are offered, since --platform may still
+// come later on the line.
+func completionCPUMemoryConfigs(cmd *cobra.Command, shared, experimental bool) common.CPUMemoryConfigs {
+	if platform := cmd.Flags().Lookup("platform"); platform != nil && platform.Changed {
+		switch strings.ToLower(platform.Value.String()) {
+		case common.PlatformStandard:
+			configs := common.StandardCPUMemoryConfigs()
+			if !shared {
+				return configs.WithoutShared()
+			}
+			return configs
+		case common.PlatformFluid:
+			return common.FluidCPUMemoryConfigs()
+		}
+	}
+	return common.AllowedCPUMemoryConfigs(shared, experimental)
 }
 
 // mcpGetCompletion provides custom completions for the get command

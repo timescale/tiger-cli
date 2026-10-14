@@ -32,20 +32,20 @@ type ServiceGetOutput struct {
 	Service ServiceDetail `json:"service"`
 }
 
-func (ServiceGetOutput) Schema() *jsonschema.Schema {
+func (ServiceGetOutput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceGetOutput](nil))
-	schema.Properties["service"] = ServiceDetail{}.Schema()
+	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
 	return schema
 }
 
-func newServiceGetTool() *mcp.Tool {
+func newServiceGetTool(experimental bool) *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceGet,
 		Title: "Get Service Details",
 		Description: "Get detailed information for a specific database service. " +
 			"Returns connection endpoints, replica configuration, resource allocation, creation time, and status.",
 		InputSchema:  ServiceGetInput{}.Schema(),
-		OutputSchema: ServiceGetOutput{}.Schema(),
+		OutputSchema: ServiceGetOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),

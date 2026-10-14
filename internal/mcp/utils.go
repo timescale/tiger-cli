@@ -56,6 +56,42 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
+// setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
+// includes shared/shared, which a service can't be resized onto. Without the
+// experimental gate, only the standard platform's combinations are offered.
+// Behind it, the enum spans both platforms, so description is followed by
+// platformDescription, which says how the platform is decided, and then by
+// which combinations go with which: an enum can't express that, and every
+// tool's description must stand alone, since clients that search tools may
+// load one without the others.
+func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared, experimental bool, description, platformDescription string) {
+	property := schema.Properties["cpu_memory"]
+	property.Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(shared, experimental).Strings())
+	if !experimental {
+		property.Description = description
+		return
+	}
+
+	standard := common.StandardCPUMemoryConfigs()
+	if !shared {
+		standard = standard.WithoutShared()
+	}
+	property.Description = fmt.Sprintf("%s %s Standard platform: %s. Fluid platform: %s.",
+		description, platformDescription, standard, common.FluidCPUMemoryConfigs())
+}
+
+// setPlatformSchemaProperties sets the platform property shared by the service
+// output types. The platform is a preview field, so without the experimental
+// gate the property is removed and clients aren't told about it.
+func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
+	if !experimental {
+		delete(schema.Properties, "platform")
+		return
+	}
+	schema.Properties["platform"].Description = "Storage platform the service runs on"
+	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
+}
+
 // ResourceInfo represents resource allocation information
 type ResourceInfo struct {
 	CPU    string `json:"cpu,omitempty"`
@@ -77,6 +113,7 @@ type ServiceDetail struct {
 	ServiceID        string        `json:"id"`
 	Name             string        `json:"name"`
 	Status           string        `json:"status"`
+	Platform         string        `json:"platform,omitempty"`
 	Type             string        `json:"type"`
 	Region           string        `json:"region"`
 	Created          string        `json:"created,omitempty"`
@@ -89,13 +126,15 @@ type ServiceDetail struct {
 	ConnectionString string        `json:"connection_string"`
 }
 
-func (ServiceDetail) Schema() *jsonschema.Schema {
+func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
 
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
 
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
+
+	setPlatformSchemaProperties(schema, experimental)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
@@ -125,6 +164,11 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
+	// The platform is a preview field, returned only behind the gate.
+	if s.app.Experimental {
+		detail.Platform = string(util.Deref(service.Platform))
+	}
+
 	// Add resource information if available
 	if len(service.Resources) > 0 {
 		resource := service.Resources[0]
@@ -132,12 +176,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 			detail.Resources = &ResourceInfo{}
 
 			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					detail.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
-				} else {
-					detail.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
-				}
+				detail.Resources.CPU = common.FormatCPUCores(*resource.Spec.CPUMillis) + " cores"
 			} else {
 				// CPU is null - this indicates a free tier service
 				detail.Resources.CPU = "shared"

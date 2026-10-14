@@ -48,6 +48,33 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
+// Tables of CPU/Memory configurations for cpuMemoryHelp: the standard
+// platform's, with and without shared/shared, and the fluid platform's.
+const (
+	standardCPUMemoryHelp = `  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
+  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`
+	standardNoSharedCPUMemoryHelp = `  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`
+	fluidCPUMemoryHelp = `  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`
+)
+
+// cpuMemoryHelp renders the allowed CPU/Memory configurations section of a
+// command's help text. shared includes shared/shared, which a service can't be
+// resized onto. The fluid platform is a preview, so its table is added only
+// behind the experimental gate (it has no shared configuration).
+func cpuMemoryHelp(shared, experimental bool) string {
+	standard := standardNoSharedCPUMemoryHelp
+	if shared {
+		standard = standardCPUMemoryHelp
+	}
+	if !experimental {
+		return "Allowed CPU/Memory Configurations:\n" + standard
+	}
+	return "Allowed CPU/Memory Configurations (standard platform):\n" + standard +
+		"\n\nAllowed CPU/Memory Configurations (fluid platform):\n" + fluidCPUMemoryHelp
+}
+
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service
@@ -57,9 +84,9 @@ type OutputService struct {
 }
 
 // outputService formats and outputs a single service based on the specified format
-func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, format string, withPassword bool, strict bool) error {
+func outputService(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, format string, withPassword bool, strict bool) error {
 	// Prepare the output service with computed fields
-	outputSvc := prepareServiceForOutput(cmd, cfg, service, withPassword)
+	outputSvc := prepareServiceForOutput(cmd, cfg, service, experimental, withPassword)
 	if strict && withPassword && outputSvc.Password == "" {
 		return fmt.Errorf("password requested but not available for service %s", outputSvc.ServiceID)
 	}
@@ -98,6 +125,9 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	table.Append("Service ID", service.ServiceID)
 	table.Append("Name", service.Name)
 	table.Append("Status", string(service.Status))
+	if service.Platform != nil {
+		table.Append("Platform", string(*service.Platform))
+	}
 	table.Append("Type", string(service.ServiceType))
 	table.Append("Region", service.RegionCode)
 
@@ -111,12 +141,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 		resource := service.Resources[0] // Get first resource
 		if resource.Spec != nil {
 			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					table.Append("CPU", fmt.Sprintf("%.0f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
-				} else {
-					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
-				}
+				table.Append("CPU", fmt.Sprintf("%s cores (%dm)", common.FormatCPUCores(*resource.Spec.CPUMillis), *resource.Spec.CPUMillis))
 			} else {
 				// CPU is null - this indicates a free tier service
 				table.Append("CPU", "shared")
@@ -181,11 +206,16 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 
 // prepareServiceForOutput builds the output view of a service. cmd may be nil,
 // in which case the connection-details warning is dropped rather than printed.
-func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, withPassword bool) OutputService {
+// The platform field is a preview field, so it is dropped unless experimental
+// is set.
+func prepareServiceForOutput(cmd *cobra.Command, cfg *config.Config, service api.Service, experimental bool, withPassword bool) OutputService {
 	outputSvc := OutputService{
 		Service: service,
 	}
 	outputSvc.Service.InitialPassword = nil
+	if !experimental {
+		outputSvc.Service.Platform = nil
+	}
 
 	opts := common.ConnectionDetailsOptions{
 		Role:            "tsdbadmin",

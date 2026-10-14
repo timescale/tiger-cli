@@ -137,5 +137,30 @@ func TestServiceListTool(t *testing.T) {
 			mock:       expectServices(services),
 			wantOutput: listed,
 		},
+		{
+			// The platform is a preview field: the case above carries one from
+			// sampleService and drops it, while this one returns it.
+			name: "experimental lists the platform",
+			tool: toolServiceList,
+			opts: []runOption{withExperimental()},
+			mock: expectServices([]api.Service{sampleService(func(s *api.Service) {
+				s.Created = created
+				s.Platform = new(api.ServicePlatformFLUID)
+			})}),
+			wantOutput: map[string]any{
+				"services": []any{
+					map[string]any{
+						"id":          "e6ue9697jf",
+						"name":        "test-service",
+						"status":      "READY",
+						"platform":    "FLUID",
+						"type":        "TIMESCALEDB",
+						"region":      "us-east-1",
+						"created":     "2025-01-15T09:30:00Z",
+						"environment": "DEV",
+					},
+				},
+			},
+		},
 	})
 }

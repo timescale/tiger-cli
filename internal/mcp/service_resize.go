@@ -22,12 +22,13 @@ type ServiceResizeInput struct {
 	Wait      bool   `json:"wait,omitempty"`
 }
 
-func (ServiceResizeInput) Schema() *jsonschema.Schema {
+func (ServiceResizeInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceResizeInput](nil))
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedResizeCPUMemoryConfigs().Strings())
+	setCPUMemorySchemaProperties(schema, false, experimental,
+		"CPU and memory allocation combination.",
+		"The valid combinations depend on the service's platform (the platform field from service_get).")
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be done resizing before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -50,7 +51,7 @@ func (ServiceResizeOutput) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceResizeTool() *mcp.Tool {
+func newServiceResizeTool(experimental bool) *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceResize,
 		Title: "Resize Database Service",
@@ -60,7 +61,7 @@ This tool changes the compute resources allocated to your database service. The 
 may be temporarily unavailable during the resize operation.
 
 WARNING: Creates billable resource changes. Increasing resources will increase costs.`,
-		InputSchema:  ServiceResizeInput{}.Schema(),
+		InputSchema:  ServiceResizeInput{}.Schema(experimental),
 		OutputSchema: ServiceResizeOutput{}.Schema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
@@ -79,7 +80,16 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		return nil, ServiceResizeOutput{}, err
 	}
 
-	if err := common.CheckReadOnlyByServiceID(ctx, cfg, client, projectID, input.ServiceID); err != nil {
+	// The CPU/memory check needs the service, so refuse read_only=all before
+	// fetching it, then gate on the fetched service's own tag.
+	if cfg.ReadOnly.BlocksAll() {
+		return nil, ServiceResizeOutput{}, common.ErrReadOnly
+	}
+	current, err := common.GetService(ctx, client, projectID, input.ServiceID)
+	if err != nil {
+		return nil, ServiceResizeOutput{}, err
+	}
+	if err := common.CheckReadOnly(cfg, common.ServiceEnvironmentTag(*current)); err != nil {
 		return nil, ServiceResizeOutput{}, err
 	}
 
@@ -89,8 +99,10 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		slog.String("cpu_memory", input.CPUMemory),
 	)
 
-	// Parse CPU/Memory combination
-	cpuMillis, memoryGBs, err := common.ParseCPUMemory(input.CPUMemory)
+	// Parse CPU/Memory combination against the combinations of the service's
+	// platform. Not gated on experimental: only a service already created on
+	// the fluid platform gets the fluid combinations.
+	cpuMillis, memoryGBs, err := common.CPUMemoryConfigsFor(util.Deref(current.Platform)).WithoutShared().Parse(input.CPUMemory)
 	if err != nil {
 		return nil, ServiceResizeOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 	}

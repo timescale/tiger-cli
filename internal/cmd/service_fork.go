@@ -28,6 +28,13 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var withPassword bool
 	var environment string
 
+	// The platform is a preview, so its help text is shown only behind the
+	// experimental gate.
+	var platformHelp string
+	if app.Experimental {
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so custom\n--cpu and --memory values must be valid for that platform."
+	}
+
 	cmd := &cobra.Command{
 		Use:   "fork [name-or-id]",
 		Short: "Fork an existing database service",
@@ -43,7 +50,7 @@ By default:
 - CPU and memory will be inherited from the source service
 - The forked service will be set as your default service
 
-You can override any of these defaults with the corresponding flags.
+You can override any of these defaults with the corresponding flags.` + platformHelp + `
 
 The source service can be given by ID or name as an argument, or will use the
 default service from your configuration.`,
@@ -100,13 +107,16 @@ default service from your configuration.`,
 				return err
 			}
 
-			// Use provided custom values, validate against allowed combinations
-			cpuMemoryCfg, err := common.ValidateAndNormalizeCPUMemory(cpu, memory)
+			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
 			if err != nil {
 				return err
 			}
 
-			source, err := resolveService(cmd.Context(), client, projectID, serviceRef)
+			// Validate custom values against the combinations of the source's
+			// platform, which the fork inherits. Not gated on experimental:
+			// only a service already created on the fluid platform gets the
+			// fluid combinations.
+			cpuMemoryCfg, err := common.CPUMemoryConfigsFor(util.Deref(source.Platform)).ValidateAndNormalize(cpu, memory)
 			if err != nil {
 				return err
 			}
@@ -207,7 +217,7 @@ default service from your configuration.`,
 				}
 			}
 
-			if err := outputService(cmd, cfg, forkedService, cfg.Output, withPassword, false); err != nil {
+			if err := outputService(cmd, cfg, forkedService, app.Experimental, cfg.Output, withPassword, false); err != nil {
 				cmd.PrintErrf("Warning: Failed to output service details: %v\n", err)
 			}
 
@@ -240,8 +250,8 @@ default service from your configuration.`,
 
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(common.GetAllowedCPUMemoryConfigs()))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(common.GetAllowedCPUMemoryConfigs()))
+	registerFlagCompletion(cmd, "cpu", cpuCompletion(true, app.Experimental))
+	registerFlagCompletion(cmd, "memory", memoryCompletion(true, app.Experimental))
 
 	return cmd
 }

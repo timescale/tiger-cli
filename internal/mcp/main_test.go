@@ -447,6 +447,8 @@ func httpResponse(statusCode int) *http.Response {
 
 // sampleService returns an api.Service with reasonable defaults. It carries no
 // endpoint, so a tool that connects to it fails before opening a connection.
+// It carries a platform, as the API always returns one, so every case without
+// the experimental gate also proves the field is dropped from output.
 // Use overrides to customize specific fields.
 func sampleService(overrides ...func(*api.Service)) api.Service {
 	svc := api.Service{
@@ -456,6 +458,7 @@ func sampleService(overrides ...func(*api.Service)) api.Service {
 		ServiceType: api.ServiceTypeTIMESCALEDB,
 		RegionCode:  "us-east-1",
 		Status:      api.DeployStatusREADY,
+		Platform:    new(api.ServicePlatformSTANDARD),
 	}
 	for _, o := range overrides {
 		o(&svc)
