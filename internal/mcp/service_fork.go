@@ -77,6 +77,12 @@ func (ServiceForkOutput) Schema(experimental bool) *jsonschema.Schema {
 }
 
 func newServiceForkTool(experimental bool) *mcp.Tool {
+	// The platform is a preview, described only behind the gate.
+	var platformHelp string
+	if experimental {
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so a custom cpu_memory value must be valid for that platform."
+	}
+
 	return &mcp.Tool{
 		Name:  toolServiceFork,
 		Title: "Fork Database Service",
@@ -90,7 +96,7 @@ You must specify a fork strategy:
 By default:
 - Name will be auto-generated from the source service name
 - CPU and memory will be inherited from the source service
-- The forked service will be set as the default service
+- The forked service will be set as the default service` + platformHelp + `
 
 WARNING: Creates billable resources.`,
 		InputSchema:  ServiceForkInput{}.Schema(experimental),

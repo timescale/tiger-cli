@@ -43,6 +43,19 @@ Service is being forked. Use 'tiger service list' to check status.
 
 	runCmdTests(t, []cmdTest{
 		{
+			// The platform is a preview, so its help text is gated.
+			name:       "help omits the platform",
+			args:       []string{"service", "fork", "--help"},
+			wantStdout: matchHelp("You can override any of these defaults", "platform"),
+		},
+		{
+			name: "experimental help says the fork keeps the source's platform",
+			args: []string{"service", "fork", "--help"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp(`The fork is always created on the same platform as the source service, so custom
+--cpu and --memory values must be valid for that platform.`),
+		},
+		{
 			name:    "multiple timing flags",
 			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
 			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",

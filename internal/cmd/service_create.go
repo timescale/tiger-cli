@@ -33,7 +33,7 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	// the experimental gate.
 	var fluidDefaultHelp, fluidExampleHelp string
 	if app.Experimental {
-		fluidDefaultHelp = "\n- Fluid platform (--platform fluid): Creates a service with 0.25 CPU / 2 GB memory and the 'time-series' add-on"
+		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB\nmemory and the 'time-series' add-on by default."
 		fluidExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid"
 	}
 
