@@ -118,6 +118,14 @@ func TestServiceForkTool(t *testing.T) {
 				"[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]",
 		},
 		{
+			// iops is a preview parameter, so without the gate it isn't in the
+			// schema, which rejects unknown properties.
+			name:    "iops rejected without the experimental gate",
+			tool:    toolServiceFork,
+			args:    map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "iops": 12000},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
+		},
+		{
 			// The tool isn't registered under read_only=all at startup; this is
 			// the handler's own check catching a config change made since.
 			name:    "read-only all refuses without an API call",
@@ -311,6 +319,29 @@ func TestServiceForkTool(t *testing.T) {
 				"service": detail(map[string]any{
 					"platform":  "FLUID",
 					"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
+				}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			// The API validates the IOPS value, so it's sent as given, without
+			// a lookup of the source.
+			name: "experimental passes iops through and returns it",
+			tool: toolServiceFork,
+			args: map[string]any{"service_id": "e6ue9697jf", "fork_strategy": "NOW", "iops": 12000},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Iops = new(12000)
+				expectFork(req, func(s *api.Service) {
+					s.Platform = new(api.ServicePlatformFLUID)
+					s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16), Iops: new(12000)}}}
+				})(m)
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"platform":  "FLUID",
+					"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
 				}),
 				"message": acceptedMsg,
 			},

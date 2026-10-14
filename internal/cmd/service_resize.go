@@ -106,8 +106,9 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 			// The API requires CPU and memory on every resize, so an IOPS-only
 			// resize sends the service's current allocation.
 			if cpuMemoryCfg == nil {
-				if cpuMemoryCfg, err = currentCPUMemory(*resolved); err != nil {
-					return err
+				var ok bool
+				if cpuMemoryCfg, ok = common.CurrentCPUMemory(*resolved); !ok {
+					return fmt.Errorf("current CPU and memory of service %s are unknown; specify --cpu or --memory", resolved.ServiceID)
 				}
 			}
 
@@ -187,19 +188,4 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	registerFlagCompletion(cmd, "memory", memoryCompletion(false, app.Experimental))
 
 	return cmd
-}
-
-// currentCPUMemory returns the service's current CPU/memory allocation, for a
-// resize that changes only its IOPS.
-func currentCPUMemory(service api.Service) (*common.CPUMemoryConfig, error) {
-	if len(service.Resources) > 0 && service.Resources[0].Spec != nil {
-		spec := service.Resources[0].Spec
-		if spec.CPUMillis != nil && spec.MemoryGbs != nil {
-			return &common.CPUMemoryConfig{
-				CPUMillis: *spec.CPUMillis,
-				MemoryGBs: *spec.MemoryGbs,
-			}, nil
-		}
-	}
-	return nil, fmt.Errorf("current CPU and memory of service %s are unknown; specify --cpu or --memory", service.ServiceID)
 }

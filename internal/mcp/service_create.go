@@ -25,6 +25,7 @@ type ServiceCreateInput struct {
 	Replicas     int                `json:"replicas,omitempty"`
 	Environment  api.EnvironmentTag `json:"environment,omitempty"`
 	Platform     string             `json:"platform,omitempty"`
+	IOPS         *int               `json:"iops,omitempty"`
 	Wait         bool               `json:"wait,omitempty"`
 	SetDefault   bool               `json:"set_default,omitempty"`
 	WithPassword bool               `json:"with_password,omitempty"`
@@ -67,6 +68,9 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 		delete(schema.Properties, "platform")
 	}
 
+	setIOPSSchemaProperties(schema, experimental,
+		"If not specified, the service gets the baseline IOPS for the user's plan and its CPU allocation.")
+
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
@@ -94,10 +98,10 @@ func (ServiceCreateOutput) Schema(experimental bool) *jsonschema.Schema {
 }
 
 func newServiceCreateTool(experimental bool) *mcp.Tool {
-	// The fluid platform is a preview, described only behind the gate.
+	// The fluid platform and IOPS are a preview, described only behind the gate.
 	var fluidDefault string
 	if experimental {
-		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory and the 'time-series' add-on by default."
+		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory and the 'time-series' add-on by default, and can be given provisioned IOPS (iops)."
 	}
 
 	return &mcp.Tool{
@@ -168,6 +172,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		slog.Int("replicas", input.Replicas),
 		slog.String("environment", string(input.Environment)),
 		slog.String("platform", input.Platform),
+		slog.Any("iops", input.IOPS),
 	)
 
 	// Prepare service creation request
@@ -182,6 +187,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 	}
 	if s.app.Experimental {
 		serviceCreateReq.Platform = &platform
+		serviceCreateReq.Iops = input.IOPS
 	}
 
 	// Make API call to create service
