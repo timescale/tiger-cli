@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -305,26 +306,40 @@ func platformCPUMemoryConfigs(cmd *cobra.Command) common.CPUMemoryConfigs {
 
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
-// (common.CPUMemoryConfigs.ValidateAndNormalize). Values the configurations
-// share are offered once.
+// (common.CPUMemoryConfigs.ValidateAndNormalize).
 func cpuCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	values := make([]string, 0, len(configs))
-	for _, c := range configs {
-		if v := *c.CPUMillisString(); !slices.Contains(values, v) {
-			values = append(values, v)
-		}
-	}
-	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
+	return sizeCompletion(configs, func(c common.CPUMemoryConfig) int { return c.CPUMillis })
 }
 
 func memoryCompletion(configs common.CPUMemoryConfigs) cobra.CompletionFunc {
-	values := make([]string, 0, len(configs))
+	return sizeCompletion(configs, func(c common.CPUMemoryConfig) int { return c.MemoryGBs })
+}
+
+// sizeCompletion completes the sizes size reads off configs, each once, in
+// ascending numeric order with "shared" last. The configurations can come from
+// more than one platform, so the order is imposed here, and the shell is told
+// to keep it rather than sort the values as strings.
+func sizeCompletion(configs common.CPUMemoryConfigs, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
+	sizes := make([]int, 0, len(configs))
+	shared := false
 	for _, c := range configs {
-		if v := *c.MemoryGBsString(); !slices.Contains(values, v) {
-			values = append(values, v)
+		if c.Shared {
+			shared = true
+		} else {
+			sizes = append(sizes, size(c))
 		}
 	}
-	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp)
+	slices.Sort(sizes)
+	sizes = slices.Compact(sizes)
+
+	values := make([]string, 0, len(sizes)+1)
+	for _, s := range sizes {
+		values = append(values, strconv.Itoa(s))
+	}
+	if shared {
+		values = append(values, "shared")
+	}
+	return cobra.FixedCompletions(values, cobra.ShellCompDirectiveNoFileComp|cobra.ShellCompDirectiveKeepOrder)
 }
 
 // mcpGetCompletion provides custom completions for the get command

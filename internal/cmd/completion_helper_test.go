@@ -26,6 +26,9 @@ import (
 func TestCompletion(t *testing.T) {
 	const noFileComp = ":4\n"
 	const directive = "Completion ended with directive: ShellCompDirectiveNoFileComp\n"
+	// --cpu and --memory values ask the shell to keep their numeric order.
+	const keepOrder = ":36\n"
+	const keepOrderDirective = "Completion ended with directive: ShellCompDirectiveNoFileComp, ShellCompDirectiveKeepOrder\n"
 
 	listServices := func(m *mocks.MockClientWithResponsesInterface) {
 		services := []api.Service{
@@ -210,15 +213,15 @@ func TestCompletion(t *testing.T) {
 		{
 			name:       "--cpu flag values",
 			args:       []string{"__complete", "service", "create", "--cpu", ""},
-			wantStdout: "shared\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + noFileComp,
-			wantStderr: directive,
+			wantStdout: "500\n1000\n2000\n4000\n8000\n16000\n32000\nshared\n" + keepOrder,
+			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
 			name:       "--memory flag values",
 			args:       []string{"__complete", "service", "create", "--memory", ""},
-			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n" + noFileComp,
-			wantStderr: directive,
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\nshared\n" + keepOrder,
+			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
@@ -227,24 +230,34 @@ func TestCompletion(t *testing.T) {
 			name:       "--memory flag values include the fluid platform's when experimental",
 			args:       []string{"__complete", "service", "create", "--memory", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n256\n" + noFileComp,
-			wantStderr: directive,
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\nshared\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			// The fluid platform's smaller sizes sort in among the standard
+			// ones rather than trailing them.
+			name:       "--cpu flag values include the fluid platform's when experimental",
+			args:       []string{"__complete", "service", "create", "--cpu", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\nshared\n" + keepOrder,
+			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
 			name:       "--cpu flag values narrow to a given fluid platform",
 			args:       []string{"__complete", "service", "create", "--platform", "fluid", "--cpu", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + noFileComp,
-			wantStderr: directive,
+			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + keepOrder,
+			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
 			name:       "--memory flag values narrow to a given standard platform",
 			args:       []string{"__complete", "service", "create", "--platform", "standard", "--memory", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n" + noFileComp,
-			wantStderr: directive,
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\nshared\n" + keepOrder,
+			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
