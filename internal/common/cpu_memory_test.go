@@ -5,7 +5,7 @@ import "testing"
 func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 	testCases := []struct {
 		name         string
-		configs      CPUMemoryConfigs // StandardCPUMemoryConfigs if nil
+		configs      CPUMemoryConfigs
 		cpuMillis    string
 		memoryGbs    string
 		expectError  bool
@@ -16,6 +16,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 	}{
 		{
 			name:        "Valid combination both set (1 CPU, 4GB)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "1000",
 			memoryGbs:   "4",
 			expectError: false,
@@ -24,6 +25,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:        "Valid combination both set (0.5 CPU, 2GB)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "500",
 			memoryGbs:   "2",
 			expectError: false,
@@ -32,6 +34,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:         "Valid shared/shared combination",
+			configs:      StandardCPUMemoryConfigs(),
 			cpuMillis:    "shared",
 			memoryGbs:    "shared",
 			expectError:  false,
@@ -39,6 +42,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:         "CPU shared, memory empty (auto-configure to shared)",
+			configs:      StandardCPUMemoryConfigs(),
 			cpuMillis:    "shared",
 			memoryGbs:    "",
 			expectError:  false,
@@ -46,6 +50,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:         "CPU empty, memory shared (auto-configure to shared)",
+			configs:      StandardCPUMemoryConfigs(),
 			cpuMillis:    "",
 			memoryGbs:    "shared",
 			expectError:  false,
@@ -53,12 +58,14 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:        "Invalid combination both set (1 CPU, 8GB)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "1000",
 			memoryGbs:   "8",
 			expectError: true,
 		},
 		{
 			name:        "CPU only auto-configure memory (2 CPU -> 8GB)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "2000",
 			memoryGbs:   "",
 			expectError: false,
@@ -67,6 +74,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:        "Memory only auto-configure CPU (16GB -> 4 CPU)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "",
 			memoryGbs:   "16",
 			expectError: false,
@@ -75,12 +83,14 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:        "Invalid CPU only",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "1500",
 			memoryGbs:   "",
 			expectError: true,
 		},
 		{
 			name:        "Invalid memory only",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "",
 			memoryGbs:   "12",
 			expectError: true,
@@ -121,6 +131,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 		},
 		{
 			name:        "Neither flag set (returns nil)",
+			configs:     StandardCPUMemoryConfigs(),
 			cpuMillis:   "",
 			memoryGbs:   "",
 			expectError: false,
@@ -130,11 +141,7 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			configs := tc.configs
-			if configs == nil {
-				configs = StandardCPUMemoryConfigs()
-			}
-			config, err := configs.ValidateAndNormalize(tc.cpuMillis, tc.memoryGbs)
+			config, err := tc.configs.ValidateAndNormalize(tc.cpuMillis, tc.memoryGbs)
 
 			if tc.expectError {
 				if err == nil {
@@ -213,14 +220,14 @@ func TestStandardCPUMemoryConfigs(t *testing.T) {
 func TestCPUMemoryConfigs_String(t *testing.T) {
 	configs := CPUMemoryConfigs{
 		{Shared: true},
+		{CPUMillis: 250, MemoryGBs: 2},
 		{CPUMillis: 500, MemoryGBs: 2},
 		{CPUMillis: 1000, MemoryGBs: 4},
 		{CPUMillis: 2000, MemoryGBs: 8},
-		{CPUMillis: 250, MemoryGBs: 2},
 	}
 
 	result := configs.String()
-	expected := "shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 0.25 CPU/2 GB"
+	expected := "shared/shared, 0.25 CPU/2 GB, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB"
 
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
