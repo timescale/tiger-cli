@@ -56,6 +56,30 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
+// setCPUMemorySchemaProperties sets a tool's cpu_memory property. shared
+// includes shared/shared, which a service can't be resized onto. Without the
+// experimental gate, only the standard platform's combinations are offered.
+// Behind it, the enum spans both platforms, so description is followed by
+// platformDescription, which says how the platform is decided, and then by
+// which combinations go with which: an enum can't express that, and every
+// tool's description must stand alone, since clients that search tools may
+// load one without the others.
+func setCPUMemorySchemaProperties(schema *jsonschema.Schema, shared, experimental bool, description, platformDescription string) {
+	property := schema.Properties["cpu_memory"]
+	property.Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(shared, experimental).Strings())
+	if !experimental {
+		property.Description = description
+		return
+	}
+
+	standard := common.StandardCPUMemoryConfigs()
+	if !shared {
+		standard = standard.WithoutShared()
+	}
+	property.Description = fmt.Sprintf("%s %s Standard platform: %s. Fluid platform: %s.",
+		description, platformDescription, standard, common.FluidCPUMemoryConfigs())
+}
+
 // setPlatformSchemaProperties sets the platform property shared by the service
 // output types. The platform is a preview field, so without the experimental
 // gate the property is removed and clients aren't told about it.

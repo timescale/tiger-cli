@@ -43,8 +43,9 @@ func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["target_time"].Description = "Target timestamp for point-in-time recovery (RFC3339 format). Only used when fork_strategy is 'PITR'."
 	schema.Properties["target_time"].Examples = []any{"2025-01-15T10:30:00Z", "2024-12-01T00:00:00Z"}
 
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations. If not specified, inherits from source service."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(true, experimental).Strings())
+	setCPUMemorySchemaProperties(schema, true, experimental,
+		"CPU and memory allocation combination. If not specified, inherits from source service.",
+		"The fork is always on the source service's platform (the platform field from service_get), and the valid combinations depend on it.")
 
 	schema.Properties["environment"].Description = "Environment tag for the fork, which is independent of the source service's tag. Use 'PROD' only for production workloads — under read-only mode for production services, forking a PROD source into a DEV fork is allowed but creating a PROD fork is refused, and deleting a PROD fork always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
@@ -80,7 +81,7 @@ func newServiceForkTool(experimental bool) *mcp.Tool {
 	// The platform is a preview, described only behind the gate.
 	var platformHelp string
 	if experimental {
-		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so a custom cpu_memory value must be valid for that platform."
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations."
 	}
 
 	return &mcp.Tool{

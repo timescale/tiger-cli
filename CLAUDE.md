@@ -234,7 +234,8 @@ Generate the base schema from the struct with `util.Must(jsonschema.For[Input](n
 
 - Set a `Description` on every field there, never through `jsonschema` struct tags, so all schema detail for input and output types alike lives in one place.
 - Use the JSON Schema properties (`Default`, `Minimum`/`Maximum`, `Enum`, `Pattern`, `MaxLength`, …) both to document values for AI assistants and to reject invalid arguments before they reach the handler.
-- Illustrative values never go inline in a description string. A field whose values form a fixed, exhaustive set gets an `Enum` and nothing more; every other field gets `Examples`, and a preferred value is signalled with `Default`.
+- Illustrative values never go inline in a description string. A field whose values form a fixed, exhaustive set gets an `Enum` and nothing more; every other field gets `Examples`, and a preferred value is signalled with `Default`. The one exception is a description that says which enum values apply when, which the enum itself can't express (the per-platform `cpu_memory` combinations in `setCPUMemorySchemaProperties`).
+- Every tool's descriptions must stand alone. Clients that search tools may load one without the others, so don't rely on another tool's description to explain a parameter.
 - The MCP SDK applies schema defaults to the raw arguments before unmarshaling them into the input struct, so a handler reads a defaulted field directly and never re-applies the default itself.
 - `jsonschema.For` doesn't call the `Schema()` methods of nested types, so a nested output type's `Schema()` (or, for a property that must stay nullable, its `set*SchemaProperties` helper) is wired in explicitly by the enclosing type's `Schema()` — `ServiceListOutput` is the model.
 - Accessing a property that doesn't exist in the generated schema panics at startup, which keeps the schema and the struct in sync.

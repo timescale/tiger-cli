@@ -43,8 +43,9 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.AllowedCPUMemoryConfigs(true, experimental).Strings())
+	setCPUMemorySchemaProperties(schema, true, experimental,
+		"CPU and memory allocation combination.",
+		"The valid combinations depend on the platform parameter.")
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = new(0.0)
@@ -59,7 +60,7 @@ func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	// The platform is a preview parameter, so without the experimental gate
 	// it is removed, and the schema rejects it as an unknown property.
 	if experimental {
-		schema.Properties["platform"].Description = "Storage platform to create the service on. Fluid services take the cpu_memory configurations with 8 GB of memory per CPU, and no shared configuration."
+		schema.Properties["platform"].Description = "Storage platform to create the service on. It determines the valid cpu_memory combinations."
 		schema.Properties["platform"].Enum = util.AnySlice(common.ValidPlatforms())
 		schema.Properties["platform"].Default = util.Must(json.Marshal(common.PlatformStandard))
 	} else {
