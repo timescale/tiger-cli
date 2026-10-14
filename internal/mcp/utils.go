@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"slices"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -61,44 +60,24 @@ func setWithPasswordSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["with_password"].Examples = []any{false, true}
 }
 
-// allCPUMemoryConfigs returns every platform's CPU/Memory configurations. The
-// fork and resize tools accept any of them, leaving the API to check them
-// against the service's platform.
-func allCPUMemoryConfigs() common.CPUMemoryConfigs {
+// cpuMemoryConfigs returns the CPU/Memory configurations a tool's cpu_memory
+// enum offers: the standard platform's, plus the fluid platform's behind the
+// experimental gate.
+func cpuMemoryConfigs(experimental bool) common.CPUMemoryConfigs {
+	if !experimental {
+		return common.StandardCPUMemoryConfigs()
+	}
 	return append(common.StandardCPUMemoryConfigs(), common.FluidCPUMemoryConfigs()...)
 }
 
-// gatePlatform strips the preview platform surface from a tool schema unless
-// the experimental gate is on, so clients aren't told about it: every platform
-// property, at any depth, and the fluid values of any cpu_memory enum. Input
-// schemas reject unknown properties and values, so this also rejects them as
-// arguments.
-func gatePlatform(schema *jsonschema.Schema, experimental bool) *jsonschema.Schema {
+// setPlatformSchemaProperties sets the platform property shared by the service
+// output types. The platform is a preview field, so without the experimental
+// gate the property is removed and clients aren't told about it.
+func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 	if !experimental {
-		stripPlatform(schema, util.AnySlice(common.FluidCPUMemoryConfigs().Strings()))
-	}
-	return schema
-}
-
-func stripPlatform(schema *jsonschema.Schema, fluidCPUMemory []any) {
-	if schema == nil {
+		delete(schema.Properties, "platform")
 		return
 	}
-	delete(schema.Properties, "platform")
-	if cpuMemory, ok := schema.Properties["cpu_memory"]; ok {
-		cpuMemory.Enum = slices.DeleteFunc(cpuMemory.Enum, func(v any) bool {
-			return slices.Contains(fluidCPUMemory, v)
-		})
-	}
-	for _, property := range schema.Properties {
-		stripPlatform(property, fluidCPUMemory)
-	}
-	stripPlatform(schema.Items, fluidCPUMemory)
-}
-
-// setPlatformSchemaProperties sets the platform schema properties shared by the
-// service output types.
-func setPlatformSchemaProperties(schema *jsonschema.Schema) {
 	schema.Properties["platform"].Description = "Storage platform the service runs on"
 	schema.Properties["platform"].Enum = []any{api.ServicePlatformSTANDARD, api.ServicePlatformFLUID}
 }
@@ -137,7 +116,7 @@ type ServiceDetail struct {
 	ConnectionString string        `json:"connection_string"`
 }
 
-func (ServiceDetail) Schema() *jsonschema.Schema {
+func (ServiceDetail) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceDetail](nil))
 
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
@@ -145,7 +124,7 @@ func (ServiceDetail) Schema() *jsonschema.Schema {
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
 
-	setPlatformSchemaProperties(schema)
+	setPlatformSchemaProperties(schema, experimental)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
@@ -187,12 +166,7 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 			detail.Resources = &ResourceInfo{}
 
 			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					detail.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
-				} else {
-					detail.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
-				}
+				detail.Resources.CPU = common.FormatCPUCores(*resource.Spec.CPUMillis) + " cores"
 			} else {
 				// CPU is null - this indicates a free tier service
 				detail.Resources.CPU = "shared"

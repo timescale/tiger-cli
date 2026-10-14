@@ -44,8 +44,8 @@ func TestServiceCreateCmd(t *testing.T) {
 			args: []string{"service", "create", "--help"},
 			opts: []runOption{experimental},
 			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
-  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB     |  4 CPU (4000m) / 32GB
-  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
 		},
 		{
 			name:    "invalid addon",
@@ -83,7 +83,7 @@ func TestServiceCreateCmd(t *testing.T) {
 			name:    "fluid platform rejects a standard cpu/memory combination",
 			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1000", "--memory", "4"},
 			opts:    []runOption{experimental},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "unparseable wait timeout",

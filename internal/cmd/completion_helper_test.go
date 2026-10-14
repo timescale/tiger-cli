@@ -222,11 +222,28 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			// The fluid platform's values join the standard ones once each.
+			// Without --platform yet, the fluid platform's values join the
+			// standard ones, once each.
 			name:       "--memory flag values include the fluid platform's when experimental",
 			args:       []string{"__complete", "service", "create", "--memory", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
 			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n256\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--cpu flag values narrow to a given fluid platform",
+			args:       []string{"__complete", "service", "create", "--platform", "fluid", "--cpu", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + noFileComp,
+			wantStderr: directive,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--memory flag values narrow to a given standard platform",
+			args:       []string{"__complete", "service", "create", "--platform", "standard", "--memory", ""},
+			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: "shared\n2\n4\n8\n16\n32\n64\n128\n" + noFileComp,
 			wantStderr: directive,
 			checks:     []checkFunc{checkNotLoaded},
 		},

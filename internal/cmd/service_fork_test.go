@@ -129,7 +129,7 @@ Service is being forked. Use 'tiger service list' to check status.
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
 			},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name: "network error",

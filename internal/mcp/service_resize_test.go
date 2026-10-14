@@ -25,8 +25,14 @@ func TestServiceResizeTool(t *testing.T) {
 			}}
 		})
 	}
+	// expectLookup registers the fetch of the service being resized, whose
+	// platform decides the combinations cpu_memory is checked against.
+	expectLookup := func(m *mocks.MockClientWithResponsesInterface) {
+		expectGetService(m, "e6ue9697jf", sampleService())
+	}
 	expectResize := func(status api.DeployStatus) func(*mocks.MockClientWithResponsesInterface) {
 		return func(m *mocks.MockClientWithResponsesInterface) {
+			expectLookup(m)
 			svc := resizedService(status)
 			m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 				Return(&api.ResizeServiceResponse{
@@ -102,7 +108,7 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: "this operation is not allowed in read-only mode",
 		},
 		{
-			// Only the tag lookup is registered: an attempted resize fails as an
+			// Only the lookup is registered: an attempted resize fails as an
 			// unexpected call.
 			name:    "read-only prod refuses PROD service",
 			tool:    toolServiceResize,
@@ -117,16 +123,46 @@ func TestServiceResizeTool(t *testing.T) {
 			args: args,
 			opts: []runOption{withConfig(map[string]any{"read_only": "prod"})},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				// The one lookup serves both the read-only gate and the
+				// cpu_memory check.
 				expectTaggedService("DEV", 1)(m)
-				expectResize(api.DeployStatusCONFIGURING)(m)
+				svc := resizedService(api.DeployStatusCONFIGURING)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
 			},
 			wantOutput: accepted,
+		},
+		{
+			name: "service lookup error",
+			tool: toolServiceResize,
+			args: args,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				m.EXPECT().GetServiceWithResponse(validCtx, testProjectID, "e6ue9697jf").
+					Return(nil, errors.New("connection refused"))
+			},
+			wantErr: "failed to fetch service details: connection refused",
+		},
+		{
+			// Not gated on experimental: only a fluid service gets these.
+			name: "cpu_memory must match the service's platform",
+			tool: toolServiceResize,
+			args: args,
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+					s.Platform = new(api.ServicePlatformFLUID)
+				}))
+			},
+			wantErr: "invalid CPU/Memory specification: invalid CPU/Memory combination '2 CPU/8 GB'. Valid options: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name: "network error",
 			tool: toolServiceResize,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectLookup(m)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(nil, errors.New("connection refused"))
 			},
@@ -137,6 +173,7 @@ func TestServiceResizeTool(t *testing.T) {
 			tool: toolServiceResize,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectLookup(m)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusBadRequest),
@@ -150,6 +187,7 @@ func TestServiceResizeTool(t *testing.T) {
 			tool: toolServiceResize,
 			args: args,
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectLookup(m)
 				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", resizeReq).
 					Return(&api.ResizeServiceResponse{HTTPResponse: httpResponse(http.StatusAccepted)}, nil)
 			},
@@ -163,13 +201,14 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: accepted,
 		},
 		{
-			// The tool takes any platform's combination, leaving the API to
-			// check it against the service's platform.
-			name: "experimental passes a fluid combination through",
+			name: "experimental passes a fluid combination through for a fluid service",
 			tool: toolServiceResize,
 			args: map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/16 GB"},
 			opts: []runOption{withExperimental()},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
+					s.Platform = new(api.ServicePlatformFLUID)
+				}))
 				svc := sampleService(func(s *api.Service) {
 					s.Status = api.DeployStatusCONFIGURING
 					s.Platform = new(api.ServicePlatformFLUID)

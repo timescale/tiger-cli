@@ -50,8 +50,8 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 
 // fluidCPUMemoryHelp is the fluid platform's table of CPU/Memory
 // configurations, for cpuMemoryHelp.
-const fluidCPUMemoryHelp = `  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB     |  4 CPU (4000m) / 32GB
-  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`
+const fluidCPUMemoryHelp = `  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`
 
 // cpuMemoryHelp renders the allowed CPU/Memory configurations section of a
 // command's help text from its standard platform table. The fluid platform is
@@ -130,12 +130,7 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 		resource := service.Resources[0] // Get first resource
 		if resource.Spec != nil {
 			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					table.Append("CPU", fmt.Sprintf("%.0f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
-				} else {
-					table.Append("CPU", fmt.Sprintf("%.1f cores (%dm)", cpuCores, *resource.Spec.CPUMillis))
-				}
+				table.Append("CPU", fmt.Sprintf("%s cores (%dm)", common.FormatCPUCores(*resource.Spec.CPUMillis), *resource.Spec.CPUMillis))
 			} else {
 				// CPU is null - this indicates a free tier service
 				table.Append("CPU", "shared")

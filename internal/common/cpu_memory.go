@@ -65,11 +65,13 @@ func (c *CPUMemoryConfig) String() string {
 		return "shared/shared"
 	}
 
-	cpuCores := float64(c.CPUMillis) / 1000
-	if cpuCores == float64(int(cpuCores)) {
-		return fmt.Sprintf("%.0f CPU/%d GB", cpuCores, c.MemoryGBs)
-	}
-	return fmt.Sprintf("%.1f CPU/%d GB", cpuCores, c.MemoryGBs)
+	return fmt.Sprintf("%s CPU/%d GB", FormatCPUCores(c.CPUMillis), c.MemoryGBs)
+}
+
+// FormatCPUCores formats millicores as a number of cores with as many decimal
+// places as it needs (e.g. "0.25", "0.5", "2").
+func FormatCPUCores(cpuMillis int) string {
+	return strconv.FormatFloat(float64(cpuMillis)/1000, 'f', -1, 64)
 }
 
 type CPUMemoryConfigs []CPUMemoryConfig
@@ -93,6 +95,7 @@ func StandardCPUMemoryConfigs() CPUMemoryConfigs {
 // services on the fluid platform: 8GB of memory per CPU, with no shared option.
 func FluidCPUMemoryConfigs() CPUMemoryConfigs {
 	return CPUMemoryConfigs{
+		{CPUMillis: 250, MemoryGBs: 2},     // 0.25 CPU, 2GB
 		{CPUMillis: 500, MemoryGBs: 4},     // 0.5 CPU, 4GB
 		{CPUMillis: 1000, MemoryGBs: 8},    // 1 CPU, 8GB
 		{CPUMillis: 2000, MemoryGBs: 16},   // 2 CPU, 16GB

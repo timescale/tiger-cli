@@ -113,6 +113,8 @@ Configuration is layered, with precedence **flags > `TIGER_*` env vars > config 
 
 It's an env var **only**: deliberately not a config key, not a flag, and hidden from `tiger config list`. `buildRootCmd` reads it once into `app.Experimental`, and the CLI guards its `AddCommand` calls with it while the MCP server guards its `addTool` calls, so when the env var is off the gated commands and tools don't exist at all — no help entry, no completion, not advertised to MCP clients (restart the MCP server after toggling). **Never mention `TIGER_EXPERIMENTAL` in user-facing docs, command help, or error messages.** When a feature graduates, delete the gates on both sides.
 
+A preview field on an otherwise public command or tool (the service `platform`) is gated at a finer grain. The CLI registers its flag, help text, and completions only behind `app.Experimental` and drops the field from output (`prepareServiceForOutput`). On the MCP side, the affected input and output types take `Schema(experimental bool)` and leave the property out when it's off, so the schema rejects the parameter, and handlers read `s.app.Experimental` before sending or returning the field.
+
 ## Command Patterns
 
 All cobra commands must:

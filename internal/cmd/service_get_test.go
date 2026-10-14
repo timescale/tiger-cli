@@ -190,6 +190,31 @@ func TestServiceGetCmd(t *testing.T) {
 `,
 		},
 		{
+			// Fractional cores print with as many decimal places as they need.
+			name: "fractional cpu table output",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Resources[0].Spec.CPUMillis = new(250)
+				s.Resources[0].Spec.MemoryGbs = new(2)
+			})),
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 0.25 cores (250m)                                                                           │
+│ Memory            │ 2 GB                                                                                        │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+		},
+		{
 			name: "default service id from config",
 			args: []string{"service", "get"},
 			mock: setupGet(freeTierService),

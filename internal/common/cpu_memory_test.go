@@ -100,6 +100,13 @@ func TestCPUMemoryConfigs_ValidateAndNormalize(t *testing.T) {
 			expectedMem: 16,
 		},
 		{
+			name:        "Fluid memory only auto-configures the smallest CPU (2GB -> 0.25 CPU)",
+			configs:     FluidCPUMemoryConfigs(),
+			memoryGbs:   "2",
+			expectedCPU: 250,
+			expectedMem: 2,
+		},
+		{
 			name:        "Fluid rejects a standard combination (1 CPU, 4GB)",
 			configs:     FluidCPUMemoryConfigs(),
 			cpuMillis:   "1000",
@@ -209,10 +216,11 @@ func TestCPUMemoryConfigs_String(t *testing.T) {
 		{CPUMillis: 500, MemoryGBs: 2},
 		{CPUMillis: 1000, MemoryGBs: 4},
 		{CPUMillis: 2000, MemoryGBs: 8},
+		{CPUMillis: 250, MemoryGBs: 2},
 	}
 
 	result := configs.String()
-	expected := "shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB"
+	expected := "shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 0.25 CPU/2 GB"
 
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)

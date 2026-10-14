@@ -30,7 +30,7 @@ type ServiceCreateInput struct {
 	WithPassword bool               `json:"with_password,omitempty"`
 }
 
-func (ServiceCreateInput) Schema() *jsonschema.Schema {
+func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
@@ -44,7 +44,7 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
 	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(allCPUMemoryConfigs().Strings())
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(cpuMemoryConfigs(experimental).Strings())
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = new(0.0)
@@ -56,9 +56,15 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
-	schema.Properties["platform"].Description = "Storage platform to create the service on. Fluid services take the cpu_memory configurations with 8 GB of memory per CPU, and no shared configuration."
-	schema.Properties["platform"].Enum = util.AnySlice(validPlatforms)
-	schema.Properties["platform"].Default = util.Must(json.Marshal("standard"))
+	// The platform is a preview parameter, so without the experimental gate
+	// it is removed, and the schema rejects it as an unknown property.
+	if experimental {
+		schema.Properties["platform"].Description = "Storage platform to create the service on. Fluid services take the cpu_memory configurations with 8 GB of memory per CPU, and no shared configuration."
+		schema.Properties["platform"].Enum = util.AnySlice(validPlatforms)
+		schema.Properties["platform"].Default = util.Must(json.Marshal("standard"))
+	} else {
+		delete(schema.Properties, "platform")
+	}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -80,15 +86,17 @@ type ServiceCreateOutput struct {
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-func (ServiceCreateOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
+func (ServiceCreateOutput) Schema(experimental bool) *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceCreateOutput](nil))
+	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	return schema
 }
 
 func newServiceCreateTool(experimental bool) *mcp.Tool {
 	// The fluid platform is a preview, described only behind the gate.
 	var fluidDefault string
 	if experimental {
-		fluidDefault = "\n- Fluid platform: Creates a service with 0.5 CPU / 4 GB memory and the 'time-series' add-on"
+		fluidDefault = "\n- Fluid platform: Creates a service with 0.25 CPU / 2 GB memory and the 'time-series' add-on"
 	}
 
 	return &mcp.Tool{
@@ -101,8 +109,8 @@ The default type of service created depends on the user's plan:
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefault + `
 
 WARNING: Creates billable resources.`,
-		InputSchema:  gatePlatform(ServiceCreateInput{}.Schema(), experimental),
-		OutputSchema: gatePlatform(ServiceCreateOutput{}.Schema(), experimental),
+		InputSchema:  ServiceCreateInput{}.Schema(experimental),
+		OutputSchema: ServiceCreateOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing

@@ -33,7 +33,7 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	// the experimental gate.
 	var fluidDefaultHelp, fluidExampleHelp string
 	if app.Experimental {
-		fluidDefaultHelp = "\n- Fluid platform (--platform fluid): Creates a service with 0.5 CPU / 4 GB memory and the 'time-series' add-on"
+		fluidDefaultHelp = "\n- Fluid platform (--platform fluid): Creates a service with 0.25 CPU / 2 GB memory and the 'time-series' add-on"
 		fluidExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid"
 	}
 
@@ -246,9 +246,13 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	registerFlagCompletion(cmd, "addons", addonsCompletion)
 	registerFlagCompletion(cmd, "environment", environmentCompletion)
 	registerFlagCompletion(cmd, "output", outputCompletion("env"))
-	cpuMemoryConfigs := cpuMemoryCompletionConfigs(common.StandardCPUMemoryConfigs(), app.Experimental)
-	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
-	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
+	if app.Experimental {
+		registerFlagCompletion(cmd, "cpu", platformCPUCompletion)
+		registerFlagCompletion(cmd, "memory", platformMemoryCompletion)
+	} else {
+		registerFlagCompletion(cmd, "cpu", cpuCompletion(common.StandardCPUMemoryConfigs()))
+		registerFlagCompletion(cmd, "memory", memoryCompletion(common.StandardCPUMemoryConfigs()))
+	}
 
 	return cmd
 }

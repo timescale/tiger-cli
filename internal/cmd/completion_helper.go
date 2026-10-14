@@ -268,6 +268,37 @@ func cpuMemoryCompletionConfigs(standard common.CPUMemoryConfigs, experimental b
 	return append(standard, common.FluidCPUMemoryConfigs()...)
 }
 
+// platformCPUCompletion and platformMemoryCompletion complete --cpu and
+// --memory on `service create` behind the experimental gate, where --platform
+// exists: from the combinations of the platform already given, or of every
+// platform when it hasn't been (it may still come later on the line).
+func platformCPUCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return cpuCompletion(platformCPUMemoryConfigs(cmd))(cmd, args, toComplete)
+}
+
+func platformMemoryCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return memoryCompletion(platformCPUMemoryConfigs(cmd))(cmd, args, toComplete)
+}
+
+func platformCPUMemoryConfigs(cmd *cobra.Command) common.CPUMemoryConfigs {
+	all := append(common.StandardCPUMemoryConfigs(), common.FluidCPUMemoryConfigs()...)
+	if !cmd.Flags().Changed("platform") {
+		return all
+	}
+	platform, err := cmd.Flags().GetString("platform")
+	if err != nil {
+		return all
+	}
+	switch strings.ToLower(platform) {
+	case "standard":
+		return common.StandardCPUMemoryConfigs()
+	case "fluid":
+		return common.FluidCPUMemoryConfigs()
+	default:
+		return all
+	}
+}
+
 // cpuCompletion and memoryCompletion complete the --cpu and --memory flags,
 // drawn from the same allowed configurations used to validate the pair
 // (common.CPUMemoryConfigs.ValidateAndNormalize). Values the configurations
