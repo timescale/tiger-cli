@@ -49,8 +49,7 @@ The default type of service created depends on your plan:
 By default, the newly created service will be set as your default service for future
 commands. Use --no-set-default to prevent this behavior.
 
-` + cpuMemoryHelp(`  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
-  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`, app.Experimental) + `
+` + cpuMemoryHelp(true, app.Experimental) + `
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
@@ -250,8 +249,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 		registerFlagCompletion(cmd, "cpu", platformCPUCompletion)
 		registerFlagCompletion(cmd, "memory", platformMemoryCompletion)
 	} else {
-		registerFlagCompletion(cmd, "cpu", cpuCompletion(common.StandardCPUMemoryConfigs()))
-		registerFlagCompletion(cmd, "memory", memoryCompletion(common.StandardCPUMemoryConfigs()))
+		registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryCompletionConfigs(true, false)))
+		registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryCompletionConfigs(true, false)))
 	}
 
 	return cmd

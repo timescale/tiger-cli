@@ -258,13 +258,18 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 }
 
 // cpuMemoryCompletionConfigs returns the configurations --cpu and --memory
-// complete from: the command's standard platform configurations, plus the
-// fluid platform's behind the experimental gate.
-func cpuMemoryCompletionConfigs(standard common.CPUMemoryConfigs, experimental bool) common.CPUMemoryConfigs {
-	if !experimental {
-		return standard
+// complete from: the standard platform's, including shared/shared if shared is
+// set (a service can't be resized onto it), plus the fluid platform's behind
+// the experimental gate.
+func cpuMemoryCompletionConfigs(shared, experimental bool) common.CPUMemoryConfigs {
+	configs := common.StandardCPUMemoryConfigs()
+	if !shared {
+		configs = configs.WithoutShared()
 	}
-	return append(standard, common.FluidCPUMemoryConfigs()...)
+	if experimental {
+		configs = append(configs, common.FluidCPUMemoryConfigs()...)
+	}
+	return configs
 }
 
 // platformCPUCompletion and platformMemoryCompletion complete --cpu and
@@ -280,7 +285,7 @@ func platformMemoryCompletion(cmd *cobra.Command, args []string, toComplete stri
 }
 
 func platformCPUMemoryConfigs(cmd *cobra.Command) common.CPUMemoryConfigs {
-	all := append(common.StandardCPUMemoryConfigs(), common.FluidCPUMemoryConfigs()...)
+	all := cpuMemoryCompletionConfigs(true, true)
 	if !cmd.Flags().Changed("platform") {
 		return all
 	}

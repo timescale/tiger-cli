@@ -32,8 +32,7 @@ The service may be temporarily unavailable during the resize operation. Note
 that changing resources will affect your billing - increasing resources will
 increase costs.
 
-` + cpuMemoryHelp(`  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
-  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`, app.Experimental) + `
+` + cpuMemoryHelp(false, app.Experimental) + `
 
 Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
 		Example: `  # Resize default service to 2 CPU cores and 8GB memory
@@ -149,7 +148,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
-	cpuMemoryConfigs := cpuMemoryCompletionConfigs(common.StandardCPUMemoryConfigs().WithoutShared(), app.Experimental)
+	cpuMemoryConfigs := cpuMemoryCompletionConfigs(false, app.Experimental)
 	registerFlagCompletion(cmd, "cpu", cpuCompletion(cpuMemoryConfigs))
 	registerFlagCompletion(cmd, "memory", memoryCompletion(cpuMemoryConfigs))
 

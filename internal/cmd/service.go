@@ -48,15 +48,26 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	return cmd
 }
 
-// fluidCPUMemoryHelp is the fluid platform's table of CPU/Memory
-// configurations, for cpuMemoryHelp.
-const fluidCPUMemoryHelp = `  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+// Tables of CPU/Memory configurations for cpuMemoryHelp: the standard
+// platform's, with and without shared/shared, and the fluid platform's.
+const (
+	standardCPUMemoryHelp = `  shared / shared       |  0.5 CPU (500m) / 2GB    |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB
+  4 CPU (4000m) / 16GB  |  8 CPU (8000m) / 32GB    |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`
+	standardNoSharedCPUMemoryHelp = `  0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
+  8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB`
+	fluidCPUMemoryHelp = `  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
   4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`
+)
 
 // cpuMemoryHelp renders the allowed CPU/Memory configurations section of a
-// command's help text from its standard platform table. The fluid platform is
-// a preview, so its table is added only behind the experimental gate.
-func cpuMemoryHelp(standard string, experimental bool) string {
+// command's help text. shared includes shared/shared, which a service can't be
+// resized onto. The fluid platform is a preview, so its table is added only
+// behind the experimental gate (it has no shared configuration).
+func cpuMemoryHelp(shared, experimental bool) string {
+	standard := standardNoSharedCPUMemoryHelp
+	if shared {
+		standard = standardCPUMemoryHelp
+	}
 	if !experimental {
 		return "Allowed CPU/Memory Configurations:\n" + standard
 	}
