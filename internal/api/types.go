@@ -1814,6 +1814,11 @@ type ForkServiceCreate struct {
 	// - PITR: Point-in-time recovery using target_time
 	ForkStrategy ForkStrategy `json:"fork_strategy"`
 
+	// Iops Provisioned IOPS for the forked service's storage. If not provided, will inherit from parent service.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
 	//
 	// Example: 4
@@ -2346,6 +2351,11 @@ type ReadReplicaSet struct {
 	// Example: alb8jicdpr
 	ID string `json:"id"`
 
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs Memory allocation in gigabytes.
 	//
 	// Example: 1
@@ -2393,6 +2403,11 @@ type ReadReplicaSetCreate struct {
 	// Example: 250
 	CPUMillis int `json:"cpu_millis"`
 
+	// Iops Provisioned IOPS for the replica set's storage.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs The initial memory allocation in gigabytes.
 	//
 	// Example: 1
@@ -2424,6 +2439,11 @@ type ResizeInput struct {
 	// Example: 1000
 	CPUMillis string `json:"cpu_millis"`
 
+	// Iops The new provisioned IOPS for the storage volume.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs The new memory allocation in gigabytes.
 	//
 	// Example: 4
@@ -2447,6 +2467,11 @@ type ResourceSpec struct {
 	//
 	// Example: 1000
 	CPUMillis *int `json:"cpu_millis,omitempty"`
+
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs Memory allocation in gigabytes.
 	//
@@ -2579,6 +2604,11 @@ type ServiceCreate struct {
 
 	// EnvironmentTag The environment tag for the service.
 	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
+
+	// Iops Requested provisioned IOPS for the service's storage.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
 	//
