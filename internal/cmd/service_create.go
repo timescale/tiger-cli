@@ -34,7 +34,7 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	// only behind the experimental gate.
 	var fluidDefaultHelp, iopsSectionHelp, experimentalExampleHelp string
 	if app.Experimental {
-		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with the\n'time-series' add-on, and with 0.25 CPU / 2 GB memory by default."
+		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB\nmemory by default."
 		iopsSectionHelp = "\n\n" + iopsHelp("If --iops is not given, the service gets the baseline IOPS for your plan and its\nCPU allocation.")
 		experimentalExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid" +
 			"\n\n  # Create a service with provisioned IOPS\n  tiger service create --name fast-db --cpu 2000 --iops 16000"

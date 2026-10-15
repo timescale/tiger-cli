@@ -60,8 +60,8 @@ CPU/memory allocation. See the Tiger Data documentation for details.`),
 			name: "experimental help describes the fluid platform's defaults",
 			args: []string{"service", "create", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with the
-'time-series' add-on, and with 0.25 CPU / 2 GB memory by default.`),
+			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB
+memory by default.`),
 		},
 		{
 			name:    "invalid addon",

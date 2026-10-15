@@ -101,7 +101,7 @@ func newServiceCreateTool(experimental bool) *mcp.Tool {
 	// The fluid platform is a preview, described only behind the gate.
 	var fluidDefault string
 	if experimental {
-		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with the 'time-series' add-on, and with 0.25 CPU / 2 GB memory by default."
+		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory by default."
 	}
 
 	return &mcp.Tool{
