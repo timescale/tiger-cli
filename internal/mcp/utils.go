@@ -106,8 +106,8 @@ func setIOPSSchemaProperties(schema *jsonschema.Schema, experimental bool, defau
 	}
 	property := schema.Properties["iops"]
 	property.Description = strings.TrimSpace("Provisioned IOPS for the service's storage. " +
-		"The allowed values depend on the user's plan, the service's platform, and its CPU/memory allocation; " +
-		"check the Tiger Data documentation for them. " + defaultDescription)
+		"Check the Tiger Data documentation for the allowed values, which depend on the user's plan, the service's platform, and its CPU/memory allocation. " +
+		defaultDescription)
 	property.Minimum = new(0.0)
 	property.Examples = []any{16000, 32000}
 }
