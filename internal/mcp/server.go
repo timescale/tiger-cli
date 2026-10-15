@@ -103,7 +103,7 @@ func buildServerInstructions(cfg *config.Config) string {
 		// Metrics tools are always registered and are all read-only themselves,
 		// so this folds into capabilities in every branch, regardless of mode.
 		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals." +
-			" Call service_metrics_available for valid metric names instead of guessing them, and compute service_metrics_series from/to from the current time (to must not be in the future)."
+			" Call service_metrics_available for valid metric names."
 	)
 
 	capabilities := capabilitiesBase + metricsMention
