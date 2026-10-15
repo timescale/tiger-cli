@@ -58,16 +58,16 @@ tiger service metrics series [name-or-id] [flags]
 ### Options
 
 ```
-      --bucket-seconds int   Aggregation bucket size in seconds (minimum 60s). Defaults to 3600 (1h) when --from/--to are also omitted; otherwise the server auto-selects based on the time window
+      --bucket-seconds int   Aggregation bucket size in seconds (smallest supported value is 60). Defaults to 3600 (1h) when --from/--to are also omitted; otherwise the server auto-selects based on the time window
       --filter strings       Arbitrary label filter as name=value or name!=value (repeatable)
-      --fn string            Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_* resource/qps/connections/jobs metrics; omit to let the server pick the default
+      --fn string            Aggregation function applied per bucket. One of: RATE, INCREASE, SUM, AVG, MIN, MAX, MIN_TOTAL, MAX_TOTAL, COUNT, P50, P90, P99, LAST. Rejected on the timescale_cloud_system_* resource metrics; omit to let the server pick the default
       --from string          Start of the time window (RFC3339). Defaults to 24 hours ago when --to is also omitted
       --group-by strings     Label key to break the result into one series per distinct value (repeatable). Rejected on the same metrics that reject --fn; omit to collapse into a single series
   -h, --help                 help for series
       --metric string        Metric series name
   -o, --output string        Output format (json, yaml, table)
       --role string          Filter to a specific instance role (PRIMARY or REPLICA)
-      --to string            End of the time window (RFC3339). Defaults to now when --from is also omitted
+      --to string            End of the time window (RFC3339). Must not be in the future. Defaults to now when --from is also omitted
 ```
 
 ### Options inherited from parent commands
