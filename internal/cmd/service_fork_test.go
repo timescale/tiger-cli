@@ -43,6 +43,19 @@ Service is being forked. Use 'tiger service list' to check status.
 
 	runCmdTests(t, []cmdTest{
 		{
+			// The platform is a preview, so its help text is gated.
+			name:       "help omits the platform",
+			args:       []string{"service", "fork", "--help"},
+			wantStdout: matchHelp("You can override any of these defaults", "platform"),
+		},
+		{
+			name: "experimental help says the fork keeps the source's platform",
+			args: []string{"service", "fork", "--help"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp(`The fork is always created on the same platform as the source service, so custom
+--cpu and --memory values must be valid for that platform.`),
+		},
+		{
 			name:    "multiple timing flags",
 			args:    []string{"service", "fork", "svc-12345", "--last-snapshot", "--to-timestamp", "2025-01-15T10:30:00Z"},
 			wantErr: "if any flags in the group [now last-snapshot to-timestamp] are set none of the others can be; [last-snapshot to-timestamp] were all set",
@@ -104,11 +117,6 @@ Service is being forked. Use 'tiger service list' to check status.
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
-		},
-		{
 			name: "ambiguous name refused",
 			args: []string{"service", "fork", "my-api-db"},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
@@ -116,6 +124,25 @@ Service is being forked. Use 'tiger service list' to check status.
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			// The combination is validated against the source's platform, which
+			// the fork inherits, so the source is fetched first.
+			name: "invalid cpu/memory combination",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "999", "--memory", "1"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			// Not gated on experimental: only a fluid source gets these.
+			name: "fluid source rejects a standard combination",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name: "network error",
@@ -272,6 +299,24 @@ Connect with: tiger db psql
 			},
 			wantStdout: forkedEnv,
 			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) to 'my-fork' at current state..."),
+		},
+		{
+			name: "fluid source cpu only auto-configures memory",
+			args: []string{"service", "fork", "svc-12345", "--cpu", "2000", "--no-wait", "--no-set-default", "-o", "env"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+				m.EXPECT().ForkServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ForkServiceCreate{
+					ForkStrategy:   api.ForkStrategyNOW,
+					CPUMillis:      new("2000"),
+					MemoryGbs:      new("16"),
+					EnvironmentTag: new(api.EnvironmentTagDEV),
+				}).Return(&api.ForkServiceResponse{
+					HTTPResponse: httpResponse(http.StatusAccepted),
+					JSON202:      &forked,
+				}, nil)
+			},
+			wantStdout: forkedEnv,
+			wantStderr: noWaitStderr("Forking service 'test-service' (svc-12345) at current state..."),
 		},
 	})
 }

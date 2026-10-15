@@ -26,9 +26,9 @@ type ServiceListOutput struct {
 	Services []ServiceInfo `json:"services"`
 }
 
-func (ServiceListOutput) Schema() *jsonschema.Schema {
+func (ServiceListOutput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceListOutput](nil))
-	schema.Properties["services"].Items = ServiceInfo{}.Schema()
+	schema.Properties["services"].Items = ServiceInfo{}.Schema(experimental)
 	return schema
 }
 
@@ -37,6 +37,7 @@ type ServiceInfo struct {
 	ServiceID   string        `json:"id"`
 	Name        string        `json:"name"`
 	Status      string        `json:"status"`
+	Platform    string        `json:"platform,omitempty"`
 	Type        string        `json:"type"`
 	Region      string        `json:"region"`
 	Created     string        `json:"created,omitempty"`
@@ -44,13 +45,15 @@ type ServiceInfo struct {
 	Resources   *ResourceInfo `json:"resources,omitempty"`
 }
 
-func (ServiceInfo) Schema() *jsonschema.Schema {
+func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceInfo](nil))
 
 	schema.Properties["id"].Description = "Service identifier (10-character alphanumeric string)"
 
 	schema.Properties["status"].Description = "Service status"
 	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "CONFIGURING", "UPGRADING"}
+
+	setPlatformSchemaProperties(schema, experimental)
 
 	schema.Properties["type"].Enum = util.AnySlice(validServiceTypes())
 
@@ -61,14 +64,14 @@ func (ServiceInfo) Schema() *jsonschema.Schema {
 	return schema
 }
 
-func newServiceListTool() *mcp.Tool {
+func newServiceListTool(experimental bool) *mcp.Tool {
 	return &mcp.Tool{
 		Name:  toolServiceList,
 		Title: "List Database Services",
 		Description: "List all database services in your Tiger Cloud project. " +
 			"Returns services with status, type, region, and resource allocation.",
 		InputSchema:  ServiceListInput{}.Schema(),
-		OutputSchema: ServiceListOutput{}.Schema(),
+		OutputSchema: ServiceListOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:  true,
 			OpenWorldHint: new(false),
@@ -127,6 +130,11 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		Environment: string(common.ServiceEnvironmentTag(service)),
 	}
 
+	// The platform is a preview field, returned only behind the gate.
+	if s.app.Experimental {
+		info.Platform = string(util.Deref(service.Platform))
+	}
+
 	// Add resource information if available
 	if len(service.Resources) > 0 {
 		resource := service.Resources[0]
@@ -134,12 +142,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 			info.Resources = &ResourceInfo{}
 
 			if resource.Spec.CPUMillis != nil {
-				cpuCores := float64(*resource.Spec.CPUMillis) / 1000
-				if cpuCores == float64(int(cpuCores)) {
-					info.Resources.CPU = fmt.Sprintf("%.0f cores", cpuCores)
-				} else {
-					info.Resources.CPU = fmt.Sprintf("%.1f cores", cpuCores)
-				}
+				info.Resources.CPU = common.FormatCPUCores(*resource.Spec.CPUMillis) + " cores"
 			} else {
 				// CPU is null - this indicates a free tier service
 				info.Resources.CPU = "shared"

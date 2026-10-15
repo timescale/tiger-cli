@@ -142,6 +142,34 @@ func TestServiceGetTool(t *testing.T) {
 			wantOutput: full,
 		},
 		{
+			// The platform is a preview field: the case above carries one from
+			// sampleService and drops it, while this one returns it.
+			name: "experimental returns the platform",
+			tool: toolServiceGet,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Created = created
+				s.Endpoint = endpoint
+				s.Platform = new(api.ServicePlatformFLUID)
+			})),
+			wantOutput: map[string]any{
+				"service": map[string]any{
+					"id":                "e6ue9697jf",
+					"name":              "test-service",
+					"status":            "READY",
+					"platform":          "FLUID",
+					"type":              "TIMESCALEDB",
+					"region":            "us-east-1",
+					"created":           "2025-01-15T09:30:00Z",
+					"environment":       "DEV",
+					"replicas":          float64(0),
+					"direct_endpoint":   "e6ue9697jf.project.tsdb.cloud.timescale.com:5432",
+					"connection_string": "postgresql://tsdbadmin@e6ue9697jf.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require",
+				},
+			},
+		},
+		{
 			name:       "gets service with password",
 			tool:       toolServiceGet,
 			args:       argsWithPassword,

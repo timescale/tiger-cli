@@ -30,8 +30,23 @@ func TestServiceCreateCmd(t *testing.T) {
 	}
 
 	svc := sampleService()
+	experimental := withEnv("TIGER_EXPERIMENTAL", "true")
 
 	runCmdTests(t, []cmdTest{
+		{
+			// The fluid platform is a preview, so its help text is gated.
+			name:       "help omits the fluid platform",
+			args:       []string{"service", "create", "--help"},
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid"),
+		},
+		{
+			name: "experimental help lists the fluid platform configurations",
+			args: []string{"service", "create", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
+  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
 		{
 			name:    "invalid addon",
 			args:    []string{"service", "create", "--name", "test-service", "--addons", "invalid-addon"},
@@ -48,9 +63,27 @@ func TestServiceCreateCmd(t *testing.T) {
 			wantErr: "environment must be one of: DEV, PROD (got 'STAGING')",
 		},
 		{
+			// --platform is a preview flag, so without the gate it doesn't exist.
+			name:    "platform flag rejected without experimental",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid"},
+			wantErr: "unknown flag: --platform",
+		},
+		{
+			name:    "invalid platform",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "hybrid"},
+			opts:    []runOption{experimental},
+			wantErr: "platform must be one of: standard, fluid (got 'hybrid')",
+		},
+		{
 			name:    "invalid cpu/memory combination",
 			args:    []string{"service", "create", "--name", "test-service", "--cpu", "3000", "--memory", "8"},
 			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			name:    "fluid platform rejects a standard cpu/memory combination",
+			args:    []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1000", "--memory", "4"},
+			opts:    []runOption{experimental},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name:    "unparseable wait timeout",
@@ -374,6 +407,7 @@ Service is being created. Use 'tiger service list' to check status.
 `,
 		},
 		{
+			// Without the experimental gate, no platform is sent.
 			name: "all creation flags mapped to request",
 			args: []string{
 				"service", "create", "--name", "test-service",
@@ -394,6 +428,90 @@ Service is being created. Use 'tiger service list' to check status.
 					HTTPResponse: httpResponse(http.StatusAccepted),
 					JSON202:      &svc,
 				}, nil)
+			},
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+PGPORT=5432
+PGDATABASE=tsdb
+PGUSER=tsdbadmin
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental sends the standard platform by default",
+			args: []string{"service", "create", "--name", "test-service", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformSTANDARD)
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
+PGPORT=5432
+PGDATABASE=tsdb
+PGUSER=tsdbadmin
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental platform fluid mapped to request and shown in output",
+			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--no-wait", "--no-set-default"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				fluidSvc := sampleService(fluidPlatform)
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &fluidSvc,
+					}, nil)
+			},
+			wantStdout: `┌───────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+│     PROPERTY      │                                            VALUE                                            │
+├───────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Service ID        │ svc-12345                                                                                   │
+│ Name              │ test-service                                                                                │
+│ Status            │ READY                                                                                       │
+│ Platform          │ FLUID                                                                                       │
+│ Type              │ TIMESCALEDB                                                                                 │
+│ Region            │ us-east-1                                                                                   │
+│ CPU               │ 1 cores (1000m)                                                                             │
+│ Memory            │ 4 GB                                                                                        │
+│ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
+│ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
+│ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
+│ Console URL       │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345                            │
+└───────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: `Creating service 'test-service'...
+Service ID: svc-12345
+Service is being created. Use 'tiger service list' to check status.
+`,
+		},
+		{
+			name: "experimental fluid platform cpu only auto-configures memory",
+			args: []string{"service", "create", "--name", "test-service", "--platform", "fluid", "--cpu", "1000", "--no-wait", "--no-set-default", "-o", "env"},
+			opts: []runOption{experimental},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				req.CPUMillis = new("1000")
+				req.MemoryGbs = new("8")
+				m.EXPECT().CreateServiceWithResponse(validCtx, testProjectID, req).
+					Return(&api.CreateServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
 			},
 			wantStdout: `PGHOST=svc-12345.project.tsdb.cloud.timescale.com
 PGPORT=5432

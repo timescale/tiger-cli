@@ -15,6 +15,20 @@ func TestServiceResizeCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			// The fluid platform is a preview, so its help text is gated.
+			name:       "help omits the fluid platform",
+			args:       []string{"service", "resize", "--help"},
+			wantStdout: matchHelp("Allowed CPU/Memory Configurations:", "fluid"),
+		},
+		{
+			name: "experimental help lists the fluid platform configurations",
+			args: []string{"service", "resize", "--help"},
+			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
+			wantStdout: matchHelp(`Allowed CPU/Memory Configurations (fluid platform):
+  0.25 CPU (250m) / 2GB  |  0.5 CPU (500m) / 4GB  |  1 CPU (1000m) / 8GB      |  2 CPU (2000m) / 16GB
+  4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
 			opts:    []runOption{withNotLoggedIn()},
@@ -60,11 +74,6 @@ Use 'tiger service get' to check service status.
 			wantErr: "service name or ID is required. Provide it as an argument or set a default with 'tiger config set service_id <service-id>'",
 		},
 		{
-			name:    "invalid cpu/memory combination",
-			args:    []string{"service", "resize", "svc-12345", "--cpu", "3000", "--memory", "8"},
-			wantErr: "invalid CPU/Memory combination. Allowed combinations: shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
-		},
-		{
 			name:    "missing cpu and memory",
 			args:    []string{"service", "resize", "svc-12345"},
 			wantErr: "must specify at least one of --cpu or --memory",
@@ -77,6 +86,33 @@ Use 'tiger service get' to check service status.
 			},
 			wantErr: "ambiguous service name matches multiple services\nRun 'tiger service list' to find the ID you want",
 			checks:  []checkFunc{checkExitCode(common.ExitInvalidParameters)},
+		},
+		{
+			// The combination is validated against the service's platform, so
+			// the service is fetched first.
+			name: "invalid cpu/memory combination",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "3000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			name: "shared rejected",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "shared"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService())
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
+		},
+		{
+			// Not gated on experimental: only a fluid service gets these.
+			name: "fluid service rejects a standard combination",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--memory", "8"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+			},
+			wantErr: "invalid CPU/Memory combination. Allowed combinations: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
 			name: "network error",
@@ -179,6 +215,22 @@ Use 'tiger service get' to check service status.
 					}, nil)
 			},
 			wantStderr: `Resizing service 'test-service' (svc-12345) to 4 CPU/16 GB...
+Resize request accepted for service 'test-service' (svc-12345).
+Use 'tiger service get' to check service status.
+`,
+		},
+		{
+			name: "fluid service cpu only auto-configures memory",
+			args: []string{"service", "resize", "svc-12345", "--cpu", "2000", "--no-wait"},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform))
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "svc-12345", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16"}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantStderr: `Resizing service 'test-service' (svc-12345) to 2 CPU/16 GB...
 Resize request accepted for service 'test-service' (svc-12345).
 Use 'tiger service get' to check service status.
 `,
