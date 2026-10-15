@@ -75,30 +75,15 @@ func cpuMemoryHelp(shared, experimental bool) string {
 		"\n\nAllowed CPU/Memory Configurations (fluid platform):\n" + fluidCPUMemoryHelp
 }
 
-// iopsHelp renders the provisioned IOPS section of a command's help text,
-// listing the widest range for each fluid CPU allocation. defaultHelp says what
-// happens when --iops is omitted, and may be empty. IOPS are a preview, so
-// callers add this only behind the experimental gate.
+// iopsHelp renders the provisioned IOPS paragraph of a command's help text:
+// defaultHelp, which says what happens when --iops is omitted, followed by
+// where to find the allowed values. Those depend on too much to list here, and
+// a list would go stale in installed CLIs. IOPS are a preview, so callers add
+// this only behind the experimental gate.
 func iopsHelp(defaultHelp string) string {
-	const columns = 4
-	ranges := common.FluidIOPSRanges()
-	rows := make([]string, 0, (len(ranges)+columns-1)/columns)
-	for start := 0; start < len(ranges); start += columns {
-		row := ranges[start:min(start+columns, len(ranges))]
-		cells := make([]string, len(row))
-		for i, r := range row {
-			cells[i] = fmt.Sprintf("%-20s", r)
-		}
-		rows = append(rows, strings.TrimRight("  "+strings.Join(cells, "  |  "), " "))
-	}
-
-	help := "Provisioned IOPS (fluid platform only):\n" +
-		"Set --iops in increments of 1000. The allowed range depends on your plan and the\n" +
-		"service's CPU allocation. Across all plans, it spans:\n" + strings.Join(rows, "\n")
-	if defaultHelp != "" {
-		help += "\n\n" + defaultHelp
-	}
-	return help
+	return defaultHelp + `
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details.`
 }
 
 // OutputService represents a service with computed fields for output

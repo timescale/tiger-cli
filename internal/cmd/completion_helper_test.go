@@ -281,46 +281,12 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
-			// Without --cpu or --memory yet, every fluid CPU allocation's range
-			// is offered, once each. No range holds 5000.
+			// The widest range across every plan, platform, and CPU/memory
+			// allocation: the API validates the value.
 			name:       "--iops flag values",
 			args:       []string{"__complete", "service", "create", "--iops", ""},
 			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: "3000\n4000\n" + iopsSteps(6000, 192000) + keepOrder,
-			wantStderr: keepOrderDirective,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			name:       "--iops flag values narrow to a given cpu",
-			args:       []string{"__complete", "service", "resize", "--cpu", "4000", "--iops", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: iopsSteps(6000, 48000) + keepOrder,
-			wantStderr: keepOrderDirective,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			// The fluid platform's 16 GB goes with 2 CPU.
-			name:       "--iops flag values narrow to a given memory",
-			args:       []string{"__complete", "service", "fork", "--memory", "16", "--iops", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: iopsSteps(6000, 16000) + keepOrder,
-			wantStderr: keepOrderDirective,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			name:       "--iops flag values empty for a cpu with no fluid range",
-			args:       []string{"__complete", "service", "create", "--cpu", "shared", "--iops", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: keepOrder,
-			wantStderr: keepOrderDirective,
-			checks:     []checkFunc{checkNotLoaded},
-		},
-		{
-			// IOPS apply only to the fluid platform.
-			name:       "--iops flag values empty for the standard platform",
-			args:       []string{"__complete", "service", "create", "--platform", "standard", "--iops", ""},
-			opts:       []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: keepOrder,
+			wantStdout: iopsSteps(3000, 256000) + keepOrder,
 			wantStderr: keepOrderDirective,
 			checks:     []checkFunc{checkNotLoaded},
 		},

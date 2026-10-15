@@ -43,16 +43,12 @@ func TestServiceResizeCmd(t *testing.T) {
 allocation.`),
 		},
 		{
-			name: "experimental help lists the IOPS ranges",
+			name: "experimental help says where to find the allowed IOPS values",
 			args: []string{"service", "resize", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Provisioned IOPS (fluid platform only):
-Set --iops in increments of 1000. The allowed range depends on your plan and the
-service's CPU allocation. Across all plans, it spans:
-  0.25 CPU: 3000        |  0.5 CPU: 4000         |  1 CPU: 6000-12000     |  2 CPU: 6000-16000
-  4 CPU: 6000-48000     |  8 CPU: 6000-64000     |  16 CPU: 24000-128000  |  32 CPU: 32000-192000
-
-If only --iops is given, the service keeps its current CPU and memory.`),
+			wantStdout: matchHelp(`If only --iops is given, the service keeps its current CPU and memory.
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details.`),
 		},
 		{
 			name:    "not logged in",

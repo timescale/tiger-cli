@@ -96,19 +96,20 @@ func setPlatformSchemaProperties(schema *jsonschema.Schema, experimental bool) {
 // setIOPSSchemaProperties sets a tool's iops input property. IOPS are a
 // preview parameter, so without the experimental gate the property is removed,
 // and the schema rejects it as an unknown property. defaultDescription, if
-// any, says what happens when iops is omitted. The API validates the value, since the
-// allowed range depends on the plan, which the tool can't see.
+// any, says what happens when iops is omitted. The allowed values aren't
+// listed: they depend on too much to describe, and would go stale. The API
+// validates the value.
 func setIOPSSchemaProperties(schema *jsonschema.Schema, experimental bool, defaultDescription string) {
 	if !experimental {
 		delete(schema.Properties, "iops")
 		return
 	}
 	property := schema.Properties["iops"]
-	property.Description = strings.TrimSpace(fmt.Sprintf("Provisioned IOPS for the service's storage, in increments of 1000. "+
-		"Only valid for services on the fluid platform. The allowed range depends on the user's plan and the service's CPU allocation. "+
-		"Across all plans, it spans: %s. %s", common.FluidIOPSRangesString(), defaultDescription))
+	property.Description = strings.TrimSpace("Provisioned IOPS for the service's storage. " +
+		"The allowed values depend on the user's plan, the service's platform, and its CPU/memory allocation; " +
+		"check the Tiger Data documentation for them. " + defaultDescription)
 	property.Minimum = new(0.0)
-	property.Examples = []any{6000, 12000}
+	property.Examples = []any{16000, 32000}
 }
 
 // ResourceInfo represents resource allocation information

@@ -48,17 +48,20 @@ func TestServiceCreateCmd(t *testing.T) {
   4 CPU (4000m) / 32GB   |  8 CPU (8000m) / 64GB  |  16 CPU (16000m) / 128GB  |  32 CPU (32000m) / 256GB`),
 		},
 		{
-			name: "experimental help lists the IOPS ranges",
+			name: "experimental help says where to find the allowed IOPS values",
 			args: []string{"service", "create", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Provisioned IOPS (fluid platform only):
-Set --iops in increments of 1000. The allowed range depends on your plan and the
-service's CPU allocation. Across all plans, it spans:
-  0.25 CPU: 3000        |  0.5 CPU: 4000         |  1 CPU: 6000-12000     |  2 CPU: 6000-16000
-  4 CPU: 6000-48000     |  8 CPU: 6000-64000     |  16 CPU: 24000-128000  |  32 CPU: 32000-192000
-
-If --iops is not given, the service gets the baseline IOPS for your plan and its
-CPU allocation.`),
+			wantStdout: matchHelp(`If --iops is not given, the service gets the baseline IOPS for your plan and its
+CPU allocation.
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details.`),
+		},
+		{
+			name: "experimental help describes the fluid platform's defaults",
+			args: []string{"service", "create", "--help"},
+			opts: []runOption{experimental},
+			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with the
+'time-series' add-on, and with 0.25 CPU / 2 GB memory by default.`),
 		},
 		{
 			name:    "invalid addon",

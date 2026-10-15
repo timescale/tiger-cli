@@ -59,13 +59,9 @@ Service is being forked. Use 'tiger service list' to check status.
 			name: "experimental help says the fork inherits the source's IOPS",
 			args: []string{"service", "fork", "--help"},
 			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: matchHelp(`Provisioned IOPS (fluid platform only):
-Set --iops in increments of 1000. The allowed range depends on your plan and the
-service's CPU allocation. Across all plans, it spans:
-  0.25 CPU: 3000        |  0.5 CPU: 4000         |  1 CPU: 6000-12000     |  2 CPU: 6000-16000
-  4 CPU: 6000-48000     |  8 CPU: 6000-64000     |  16 CPU: 24000-128000  |  32 CPU: 32000-192000
-
-If --iops is not given, the fork inherits the source service's IOPS.`),
+			wantStdout: matchHelp(`If --iops is not given, the fork inherits the source service's IOPS.
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details.`),
 		},
 		{
 			name:    "multiple timing flags",

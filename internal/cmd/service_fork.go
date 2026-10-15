@@ -35,7 +35,7 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	if app.Experimental {
 		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so custom\n--cpu and --memory values must be valid for that platform.\n\n" +
 			iopsHelp("If --iops is not given, the fork inherits the source service's IOPS.")
-		iopsExampleHelp = "\n\n  # Fork a fluid service with more provisioned IOPS\n  tiger service fork svc-12345 --iops 12000"
+		iopsExampleHelp = "\n\n  # Fork a service with more provisioned IOPS\n  tiger service fork svc-12345 --iops 16000"
 	}
 
 	cmd := &cobra.Command{
@@ -251,7 +251,7 @@ default service from your configuration.`,
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (inherits from source if not specified)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (inherits from source if not specified)")
 	if app.Experimental {
-		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS, in increments of 1000 (fluid platform only; inherits from source if not specified)")
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS (inherits from source if not specified)")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
 	cmd.Flags().StringVar(&environment, "environment", "DEV", "Environment tag (DEV or PROD)")

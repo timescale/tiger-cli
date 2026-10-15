@@ -27,7 +27,7 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	if app.Experimental {
 		iopsDescHelp = ", memory, and provisioned IOPS\n"
 		iopsSectionHelp = "\n\n" + iopsHelp("If only --iops is given, the service keeps its current CPU and memory.")
-		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS of a fluid service\n  tiger service resize --iops 12000"
+		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
 	} else {
 		iopsDescHelp = " and memory "
 	}
@@ -178,7 +178,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
 	if app.Experimental {
-		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS, in increments of 1000 (fluid platform only)")
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
 		registerFlagCompletion(cmd, "iops", iopsCompletion)
 	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
