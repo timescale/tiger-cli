@@ -267,7 +267,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ProjectId'
       summary: Create a VPC
-      description: Creates a new Virtual Private Cloud (VPC).
+      description: Creates a new Virtual Private Cloud (VPC). This is an asynchronous operation.
       requestBody:
         required: true
         content:
@@ -275,8 +275,8 @@ paths:
             schema:
               $ref: '#/components/schemas/VPCCreate'
       responses:
-        '201':
-          description: VPC created successfully.
+        '202':
+          description: VPC creation request has been accepted.
           content:
             application/json:
               schema:
@@ -310,13 +310,13 @@ paths:
       tags:
         - VPCs
       summary: Delete a VPC
-      description: Deletes a specific VPC.
+      description: Deletes a specific VPC. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
       responses:
-        '204':
-          description: VPC deleted successfully.
+        '202':
+          description: Deletion request has been accepted.
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -371,7 +371,7 @@ paths:
       tags:
         - VPCs
       summary: Create a VPC Peering
-      description: Creates a new VPC peering connection.
+      description: Creates a new VPC peering connection. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
@@ -382,8 +382,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PeeringCreate'
       responses:
-        '201':
-          description: VPC peering created successfully.
+        '202':
+          description: VPC peering creation request has been accepted.
           content:
             application/json:
               schema:
@@ -418,14 +418,14 @@ paths:
       tags:
         - VPCs
       summary: Delete a VPC Peering
-      description: Deletes a specific VPC peering connection.
+      description: Deletes a specific VPC peering connection. This is an asynchronous operation.
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/VPCId'
         - $ref: '#/components/parameters/PeeringId'
       responses:
-        '204':
-          description: VPC peering deleted successfully.
+        '202':
+          description: Deletion request has been accepted.
         '4XX':
           $ref: '#/components/responses/ClientError'
 
@@ -1955,12 +1955,19 @@ components:
         - name
         - cidr
         - region_code
+        - created
+        - status
       properties:
         id:
           type: string
           readOnly: true
           description: The unique identifier for the VPC.
           example: "1234567890"
+        provisioned_id:
+          type: string
+          readOnly: true
+          description: The provider-assigned identifier for the provisioned VPC. Absent until provisioning completes.
+          example: "vpc-0123456789abcdef0"
         name:
           type: string
           description: The name of the VPC.
@@ -1974,6 +1981,33 @@ components:
           type: string
           description: The cloud region where the VPC is hosted.
           example: "us-east-1"
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: "2025-01-15T09:30:00Z"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/VPCStatus'
+          description: Current status of the VPC.
+    VPCStatus:
+      type: string
+      description: |
+        The current status of the VPC:
+        - CREATING: the VPC is being provisioned
+        - CREATED: the VPC is provisioned and ready
+        - DELETING: the VPC is being deleted
+        - DELETED: the VPC has been deleted
+        - ERROR: the VPC is in an error state
+        - UNKNOWN: an unrecognized state
+      enum:
+      - CREATING
+      - CREATED
+      - DELETING
+      - DELETED
+      - ERROR
+      - UNKNOWN
+      example: "CREATED"
     VPCCreate:
       type: object
       description: Parameters for creating a VPC.
@@ -2023,6 +2057,7 @@ components:
         - peer_account_id
         - peer_region_code
         - peer_vpc_id
+        - status
       properties:
         id:
           type: string
@@ -2044,15 +2079,42 @@ components:
         provisioned_id:
           type: string
           description: The provider-assigned identifier for the provisioned peering.
-          example: "1234567890"
-        status:
+          example: "pcx-0123456789abcdef0"
+        created:
           type: string
-          description: The current status of the peering connection.
-          example: "active"
+          format: date-time
+          description: Creation timestamp.
+          example: "2025-01-15T09:30:00Z"
+        status:
+          allOf:
+            - $ref: '#/components/schemas/PeeringConnectionStatus'
+          description: Current status of the peering connection.
         error_message:
           type: string
           description: A human-readable error message when the peering connection failed.
           example: "VPC not found"
+    PeeringConnectionStatus:
+      type: string
+      description: |
+        The current status of a VPC peering connection:
+        - PENDING: the peering request has been made and is awaiting action
+        - TIMEOUT: the peering request timed out before being resolved
+        - APPROVED: the peering request has been approved
+        - ACTIVE: the peering connection is active
+        - DISABLED: the peering connection has been disabled
+        - DELETING: the peering connection is being deleted
+        - INVALID: the peering request is invalid
+        - UNKNOWN: an unrecognized state
+      enum:
+      - PENDING
+      - TIMEOUT
+      - APPROVED
+      - ACTIVE
+      - DISABLED
+      - DELETING
+      - INVALID
+      - UNKNOWN
+      example: "ACTIVE"
     PeeringCreate:
       type: object
       description: Parameters for creating a VPC peering connection.
@@ -2218,6 +2280,11 @@ components:
             A newly attached log exporter only starts carrying logs once the
             service has restarted.
           example: "9b2e4d61-7a30-4c58-8f0d-6e1a3c9b4d27"
+        platform:
+          x-tigerdata-preview: true
+          allOf:
+            - $ref: '#/components/schemas/ServicePlatform'
+          description: The storage platform the service runs on.
     Resource:
       type: object
       description: A resource allocated to the service.
@@ -2264,6 +2331,16 @@ components:
       - TIMESCALEDB
       - POSTGRES
       - VECTOR
+    ServicePlatform:
+      x-tigerdata-preview: true
+      type: string
+      description: |
+        The storage platform the service runs on:
+        - STANDARD: traditional cloud block storage
+        - FLUID: Tiger Data's Fluid Storage platform
+      enum:
+      - STANDARD
+      - FLUID
     EnvironmentTag:
         type: string
         enum:
@@ -2428,6 +2505,12 @@ components:
             - $ref: '#/components/schemas/EnvironmentTag'
           description: The environment tag for the service.
           default: DEV
+        platform:
+          x-tigerdata-preview: true
+          allOf:
+            - $ref: '#/components/schemas/ServicePlatform'
+          description: The storage platform to create the service on.
+          default: STANDARD
     ForkServiceCreate:
       type: object
       required:
@@ -2496,6 +2579,7 @@ components:
           example: 250
     SetHAReplicaInput:
       type: object
+      minProperties: 1
       properties:
         sync_replica_count:
           type: integer

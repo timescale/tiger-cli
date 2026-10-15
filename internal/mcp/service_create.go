@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,12 +24,13 @@ type ServiceCreateInput struct {
 	CPUMemory    string             `json:"cpu_memory,omitempty"`
 	Replicas     int                `json:"replicas,omitempty"`
 	Environment  api.EnvironmentTag `json:"environment,omitempty"`
+	Platform     string             `json:"platform,omitempty"`
 	Wait         bool               `json:"wait,omitempty"`
 	SetDefault   bool               `json:"set_default,omitempty"`
 	WithPassword bool               `json:"with_password,omitempty"`
 }
 
-func (ServiceCreateInput) Schema() *jsonschema.Schema {
+func (ServiceCreateInput) Schema(experimental bool) *jsonschema.Schema {
 	schema := util.Must(jsonschema.For[ServiceCreateInput](nil))
 
 	schema.Properties["name"].Description = "Human-readable name for the service (auto-generated if not provided)"
@@ -41,8 +43,9 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["region"].Description = "AWS region where the service will be deployed. Choose the region closest to your users for optimal performance."
 	schema.Properties["region"].Examples = []any{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"}
 
-	schema.Properties["cpu_memory"].Description = "CPU and memory allocation combination. Choose from the available configurations."
-	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.GetAllowedCPUMemoryConfigs().Strings())
+	setCPUMemorySchemaProperties(schema, true, experimental,
+		"CPU and memory allocation combination.",
+		"The valid combinations depend on the platform parameter.")
 
 	schema.Properties["replicas"].Description = "Number of high-availability replicas for fault tolerance. Higher replica counts increase cost but improve availability."
 	schema.Properties["replicas"].Minimum = new(0.0)
@@ -53,6 +56,16 @@ func (ServiceCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["environment"].Description = "Environment tag for the new service. Use 'PROD' only for production workloads — under read-only mode for production services, creating a PROD service is refused, and deleting a PROD service always requires the user's confirmation."
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
+
+	// The platform is a preview parameter, so without the experimental gate
+	// it is removed, and the schema rejects it as an unknown property.
+	if experimental {
+		schema.Properties["platform"].Description = "Storage platform to create the service on. It determines the valid cpu_memory combinations."
+		schema.Properties["platform"].Enum = util.AnySlice(common.ValidPlatforms())
+		schema.Properties["platform"].Default = util.Must(json.Marshal(common.PlatformStandard))
+	} else {
+		delete(schema.Properties, "platform")
+	}
 
 	schema.Properties["wait"].Description = "Whether to wait for the service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -74,11 +87,19 @@ type ServiceCreateOutput struct {
 	PasswordStorage *common.PasswordStorageResult `json:"password_storage,omitempty"`
 }
 
-func (ServiceCreateOutput) Schema() *jsonschema.Schema {
-	return util.Must(jsonschema.For[ServiceCreateOutput](nil))
+func (ServiceCreateOutput) Schema(experimental bool) *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[ServiceCreateOutput](nil))
+	schema.Properties["service"] = ServiceDetail{}.Schema(experimental)
+	return schema
 }
 
-func newServiceCreateTool() *mcp.Tool {
+func newServiceCreateTool(experimental bool) *mcp.Tool {
+	// The fluid platform is a preview, described only behind the gate.
+	var fluidDefault string
+	if experimental {
+		fluidDefault = "\n\nServices on the fluid platform (platform 'fluid') are created with 0.25 CPU / 2 GB memory and the 'time-series' add-on by default."
+	}
+
 	return &mcp.Tool{
 		Name:  toolServiceCreate,
 		Title: "Create Database Service",
@@ -86,11 +107,11 @@ func newServiceCreateTool() *mcp.Tool {
 
 The default type of service created depends on the user's plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
-- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on
+- Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefault + `
 
 WARNING: Creates billable resources.`,
-		InputSchema:  ServiceCreateInput{}.Schema(),
-		OutputSchema: ServiceCreateOutput{}.Schema(),
+		InputSchema:  ServiceCreateInput{}.Schema(experimental),
+		OutputSchema: ServiceCreateOutput{}.Schema(experimental),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    false,
 			DestructiveHint: new(false), // Creates resources but doesn't modify existing
@@ -120,9 +141,17 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		input.Name = common.GenerateServiceName()
 	}
 
+	// The platform parameter only exists behind the experimental gate. Without
+	// it the platform is left empty, which the API defaults to STANDARD; with
+	// it, the SDK applies the schema's default.
+	var platform api.ServicePlatform
+	if s.app.Experimental {
+		platform = api.ServicePlatform(strings.ToUpper(input.Platform))
+	}
+
 	var cpuMillis, memoryGBs *string
 	if input.CPUMemory != "" {
-		cpuMillisStr, memoryGBsStr, err := common.ParseCPUMemory(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.CPUMemoryConfigsFor(platform).Parse(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceCreateOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
@@ -138,6 +167,7 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("memory", memoryGBs),
 		slog.Int("replicas", input.Replicas),
 		slog.String("environment", string(input.Environment)),
+		slog.String("platform", input.Platform),
 	)
 
 	// Prepare service creation request
@@ -149,6 +179,9 @@ func (s *Server) handleServiceCreate(ctx context.Context, req *mcp.CallToolReque
 		CPUMillis:      cpuMillis,
 		MemoryGbs:      memoryGBs,
 		EnvironmentTag: &input.Environment,
+	}
+	if s.app.Experimental {
+		serviceCreateReq.Platform = &platform
 	}
 
 	// Make API call to create service

@@ -53,7 +53,7 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 			}
 
 			// Output services in requested format
-			return outputServices(cmd, cfg, services, cfg.Output)
+			return outputServices(cmd, cfg, services, app.Experimental, cfg.Output)
 		},
 	}
 
@@ -64,8 +64,8 @@ func buildServiceListCmd(app *common.App) *cobra.Command {
 }
 
 // outputServices formats and outputs the services list based on the specified format
-func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Service, format string) error {
-	outputServices := prepareServicesForOutput(cmd, cfg, services)
+func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Service, experimental bool, format string) error {
+	outputServices := prepareServicesForOutput(cmd, cfg, services, experimental)
 
 	outputWriter := cmd.OutOrStdout()
 
@@ -82,10 +82,10 @@ func outputServices(cmd *cobra.Command, cfg *config.Config, services []api.Servi
 }
 
 // prepareServicesForOutput creates copies of services with sensitive fields removed
-func prepareServicesForOutput(cmd *cobra.Command, cfg *config.Config, services []api.Service) []OutputService {
+func prepareServicesForOutput(cmd *cobra.Command, cfg *config.Config, services []api.Service, experimental bool) []OutputService {
 	prepared := make([]OutputService, len(services))
 	for i, service := range services {
-		prepared[i] = prepareServiceForOutput(cmd, cfg, service, false)
+		prepared[i] = prepareServiceForOutput(cmd, cfg, service, experimental, false)
 	}
 	return prepared
 }

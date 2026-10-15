@@ -525,6 +525,42 @@ func (e MetricsAggFn) Valid() bool {
 	}
 }
 
+// Defines values for PeeringConnectionStatus.
+const (
+	PeeringConnectionStatusACTIVE   PeeringConnectionStatus = "ACTIVE"
+	PeeringConnectionStatusAPPROVED PeeringConnectionStatus = "APPROVED"
+	PeeringConnectionStatusDELETING PeeringConnectionStatus = "DELETING"
+	PeeringConnectionStatusDISABLED PeeringConnectionStatus = "DISABLED"
+	PeeringConnectionStatusINVALID  PeeringConnectionStatus = "INVALID"
+	PeeringConnectionStatusPENDING  PeeringConnectionStatus = "PENDING"
+	PeeringConnectionStatusTIMEOUT  PeeringConnectionStatus = "TIMEOUT"
+	PeeringConnectionStatusUNKNOWN  PeeringConnectionStatus = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the PeeringConnectionStatus enum.
+func (e PeeringConnectionStatus) Valid() bool {
+	switch e {
+	case PeeringConnectionStatusACTIVE:
+		return true
+	case PeeringConnectionStatusAPPROVED:
+		return true
+	case PeeringConnectionStatusDELETING:
+		return true
+	case PeeringConnectionStatusDISABLED:
+		return true
+	case PeeringConnectionStatusINVALID:
+		return true
+	case PeeringConnectionStatusPENDING:
+		return true
+	case PeeringConnectionStatusTIMEOUT:
+		return true
+	case PeeringConnectionStatusUNKNOWN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PrometheusMetricsExporterType.
 const (
 	PrometheusMetricsExporterTypePROMETHEUSMETRICS PrometheusMetricsExporterType = "PROMETHEUS_METRICS"
@@ -615,6 +651,24 @@ func (e ServiceCreateAddons) Valid() bool {
 	}
 }
 
+// Defines values for ServicePlatform.
+const (
+	ServicePlatformFLUID    ServicePlatform = "FLUID"
+	ServicePlatformSTANDARD ServicePlatform = "STANDARD"
+)
+
+// Valid indicates whether the value is a known member of the ServicePlatform enum.
+func (e ServicePlatform) Valid() bool {
+	switch e {
+	case ServicePlatformFLUID:
+		return true
+	case ServicePlatformSTANDARD:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceType.
 const (
 	ServiceTypePOSTGRES    ServiceType = "POSTGRES"
@@ -648,6 +702,36 @@ func (e SetEnvironmentInputEnvironment) Valid() bool {
 	case SetEnvironmentInputEnvironmentDEV:
 		return true
 	case SetEnvironmentInputEnvironmentPROD:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VPCStatus.
+const (
+	VPCStatusCREATED  VPCStatus = "CREATED"
+	VPCStatusCREATING VPCStatus = "CREATING"
+	VPCStatusDELETED  VPCStatus = "DELETED"
+	VPCStatusDELETING VPCStatus = "DELETING"
+	VPCStatusERROR    VPCStatus = "ERROR"
+	VPCStatusUNKNOWN  VPCStatus = "UNKNOWN"
+)
+
+// Valid indicates whether the value is a known member of the VPCStatus enum.
+func (e VPCStatus) Valid() bool {
+	switch e {
+	case VPCStatusCREATED:
+		return true
+	case VPCStatusCREATING:
+		return true
+	case VPCStatusDELETED:
+		return true
+	case VPCStatusDELETING:
+		return true
+	case VPCStatusERROR:
+		return true
+	case VPCStatusUNKNOWN:
 		return true
 	default:
 		return false
@@ -2017,6 +2101,11 @@ type MetricsSeriesRequest struct {
 
 // Peering A VPC peering connection to an external cloud account.
 type Peering struct {
+	// Created Creation timestamp.
+	//
+	// Example: 2025-01-15T09:30:00Z
+	Created *time.Time `json:"created,omitempty"`
+
 	// ErrorMessage A human-readable error message when the peering connection failed.
 	//
 	// Example: VPC not found
@@ -2044,14 +2133,25 @@ type Peering struct {
 
 	// ProvisionedID The provider-assigned identifier for the provisioned peering.
 	//
-	// Example: 1234567890
+	// Example: pcx-0123456789abcdef0
 	ProvisionedID *string `json:"provisioned_id,omitempty"`
 
-	// Status The current status of the peering connection.
-	//
-	// Example: active
-	Status *string `json:"status,omitempty"`
+	// Status Current status of the peering connection.
+	Status PeeringConnectionStatus `json:"status"`
 }
+
+// PeeringConnectionStatus The current status of a VPC peering connection:
+// - PENDING: the peering request has been made and is awaiting action
+// - TIMEOUT: the peering request timed out before being resolved
+// - APPROVED: the peering request has been approved
+// - ACTIVE: the peering connection is active
+// - DISABLED: the peering connection has been disabled
+// - DELETING: the peering connection is being deleted
+// - INVALID: the peering request is invalid
+// - UNKNOWN: an unrecognized state
+//
+// Example: ACTIVE
+type PeeringConnectionStatus string
 
 // PeeringCreate Parameters for creating a VPC peering connection.
 type PeeringCreate struct {
@@ -2416,6 +2516,9 @@ type Service struct {
 	// Example: my-production-db
 	Name string `json:"name"`
 
+	// Platform The storage platform the service runs on.
+	Platform *ServicePlatform `json:"platform,omitempty"`
+
 	// ProjectID The project this service belongs to.
 	//
 	// Example: rp1pz7uyae
@@ -2486,6 +2589,9 @@ type ServiceCreate struct {
 	//
 	// Example: my-production-db
 	Name string `json:"name"`
+
+	// Platform The storage platform to create the service on.
+	Platform *ServicePlatform `json:"platform,omitempty"`
 
 	// RegionCode The region where the service will be created. If not provided, we'll choose the best region for you.
 	//
@@ -2583,6 +2689,11 @@ type ServiceMetrics struct {
 	StorageMb *int `json:"storage_mb,omitempty"`
 }
 
+// ServicePlatform The storage platform the service runs on:
+// - STANDARD: traditional cloud block storage
+// - FLUID: Tiger Data's Fluid Storage platform
+type ServicePlatform string
+
 // ServiceRename Parameters for renaming a service.
 type ServiceRename struct {
 	// Name The new name for the service.
@@ -2649,6 +2760,11 @@ type VPC struct {
 	// Example: 10.0.0.0/16
 	Cidr string `json:"cidr"`
 
+	// Created Creation timestamp.
+	//
+	// Example: 2025-01-15T09:30:00Z
+	Created time.Time `json:"created"`
+
 	// ID The unique identifier for the VPC.
 	//
 	// Example: 1234567890
@@ -2659,10 +2775,18 @@ type VPC struct {
 	// Example: my-production-vpc
 	Name string `json:"name"`
 
+	// ProvisionedID The provider-assigned identifier for the provisioned VPC. Absent until provisioning completes.
+	//
+	// Example: vpc-0123456789abcdef0
+	ProvisionedID *string `json:"provisioned_id,omitempty"`
+
 	// RegionCode The cloud region where the VPC is hosted.
 	//
 	// Example: us-east-1
 	RegionCode string `json:"region_code"`
+
+	// Status Current status of the VPC.
+	Status VPCStatus `json:"status"`
 }
 
 // VPCCreate Parameters for creating a VPC.
@@ -2708,6 +2832,17 @@ type VPCRename struct {
 	// Example: my-renamed-vpc
 	Name string `json:"name"`
 }
+
+// VPCStatus The current status of the VPC:
+// - CREATING: the VPC is being provisioned
+// - CREATED: the VPC is provisioned and ready
+// - DELETING: the VPC is being deleted
+// - DELETED: the VPC has been deleted
+// - ERROR: the VPC is in an error state
+// - UNKNOWN: an unrecognized state
+//
+// Example: CREATED
+type VPCStatus string
 
 // AllowListID Example: 1234567890
 type AllowListID = string

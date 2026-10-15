@@ -102,7 +102,8 @@ func buildServerInstructions(cfg *config.Config) string {
 
 		// Metrics tools are always registered and are all read-only themselves,
 		// so this folds into capabilities in every branch, regardless of mode.
-		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals."
+		metricsMention = " Available metrics span hardware/resource usage, PostgreSQL settings, PgBouncer stats, database activity, and TimescaleDB internals." +
+			" Call service_metrics_available for valid metric names."
 	)
 
 	capabilities := capabilitiesBase + metricsMention
@@ -203,14 +204,14 @@ func (s *Server) registerTools(ctx context.Context, mode config.ReadOnlyMode, ex
 
 // registerServiceTools registers service management tools with comprehensive schemas and descriptions
 func (s *Server) registerServiceTools(mode config.ReadOnlyMode, experimental bool) {
-	addTool(s, mode, newServiceListTool(), s.handleServiceList)
-	addTool(s, mode, newServiceGetTool(), s.handleServiceGet)
-	addTool(s, mode, newServiceCreateTool(), s.handleServiceCreate)
-	addTool(s, mode, newServiceForkTool(), s.handleServiceFork)
+	addTool(s, mode, newServiceListTool(experimental), s.handleServiceList)
+	addTool(s, mode, newServiceGetTool(experimental), s.handleServiceGet)
+	addTool(s, mode, newServiceCreateTool(experimental), s.handleServiceCreate)
+	addTool(s, mode, newServiceForkTool(experimental), s.handleServiceFork)
 	addTool(s, mode, newServiceUpdatePasswordTool(), s.handleServiceUpdatePassword)
 	addTool(s, mode, newServiceStartTool(), s.handleServiceStart)
 	addTool(s, mode, newServiceStopTool(), s.handleServiceStop)
-	addTool(s, mode, newServiceResizeTool(), s.handleServiceResize)
+	addTool(s, mode, newServiceResizeTool(experimental), s.handleServiceResize)
 	addTool(s, mode, newServiceRenameTool(), s.handleServiceRename)
 	addTool(s, mode, newServiceDeleteTool(), s.handleServiceDelete)
 	addTool(s, mode, newServiceLogsTool(), s.handleServiceLogs)

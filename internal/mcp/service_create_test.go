@@ -101,13 +101,47 @@ func TestServiceCreateTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/environment: enum: STAGING does not equal any of: [DEV PROD]`,
 		},
 		{
-			// The enum is generated from the same configs ParseCPUMemory
-			// accepts, so an invalid value never reaches the handler.
+			// The enum is generated from the same configs the handler parses
+			// with, so an invalid value never reaches the handler.
 			name: "unknown cpu_memory rejected by the schema",
 			tool: toolServiceCreate,
 			args: map[string]any{"name": "test-service", "cpu_memory": "3 CPU/8 GB"},
 			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 3 CPU/8 GB does not equal any of: ` +
 				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`,
+		},
+		{
+			// platform is a preview parameter, so without the gate it isn't in
+			// the schema, which rejects unknown properties.
+			name:    "platform rejected without the experimental gate",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "platform": "fluid"},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["platform"]`,
+		},
+		{
+			name:    "unknown platform rejected by the schema",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "platform": "hybrid"},
+			opts:    []runOption{withExperimental()},
+			wantErr: `validating "arguments": validating root: validating /properties/platform: enum: hybrid does not equal any of: [standard fluid]`,
+		},
+		{
+			// The fluid platform is a preview, so its combinations are left out
+			// of the enum without the experimental gate.
+			name: "fluid cpu_memory rejected by the schema without the experimental gate",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "cpu_memory": "1 CPU/8 GB"},
+			wantErr: `validating "arguments": validating root: validating /properties/cpu_memory: enum: 1 CPU/8 GB does not equal any of: ` +
+				`[shared/shared 0.5 CPU/2 GB 1 CPU/4 GB 2 CPU/8 GB 4 CPU/16 GB 8 CPU/32 GB 16 CPU/64 GB 32 CPU/128 GB]`,
+		},
+		{
+			// The enum takes every platform's combinations, so the handler
+			// checks the one given against the requested platform.
+			name: "experimental cpu_memory must match the platform",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "cpu_memory": "1 CPU/8 GB"},
+			opts: []runOption{withExperimental()},
+			wantErr: "invalid CPU/Memory specification: invalid CPU/Memory combination '1 CPU/8 GB'. Valid options: " +
+				"shared/shared, 0.5 CPU/2 GB, 1 CPU/4 GB, 2 CPU/8 GB, 4 CPU/16 GB, 8 CPU/32 GB, 16 CPU/64 GB, 32 CPU/128 GB",
 		},
 		{
 			name:    "replica count above the maximum rejected by the schema",
@@ -177,11 +211,42 @@ func TestServiceCreateTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
+			// Without the experimental gate, no platform is sent.
 			name:       "creates a service with the schema defaults",
 			tool:       toolServiceCreate,
 			args:       args,
 			mock:       expectCreate(baseReq),
 			wantOutput: accepted,
+		},
+		{
+			name: "experimental sends the standard platform by default",
+			tool: toolServiceCreate,
+			args: args,
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformSTANDARD)
+				expectCreate(req)(m)
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"platform": "STANDARD"}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name: "experimental passes platform fluid through and returns it",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "platform": "fluid"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				req := baseReq
+				req.Platform = new(api.ServicePlatformFLUID)
+				expectCreate(req, func(s *api.Service) { s.Platform = new(api.ServicePlatformFLUID) })(m)
+			},
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{"platform": "FLUID"}),
+				"message": acceptedMsg,
+			},
 		},
 		{
 			name: "auto-generates a name when none is given",
@@ -226,6 +291,30 @@ func TestServiceCreateTool(t *testing.T) {
 					"region":    "us-west-2",
 					"replicas":  float64(2),
 					"resources": map[string]any{"cpu": "2 cores", "memory": "8 GB"},
+				}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			name: "experimental passes a fluid cpu_memory through",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "platform": "fluid", "cpu_memory": "1 CPU/8 GB"},
+			opts: []runOption{withExperimental()},
+			mock: expectCreate(api.ServiceCreate{
+				Name:           "test-service",
+				ReplicaCount:   new(0),
+				CPUMillis:      new("1000"),
+				MemoryGbs:      new("8"),
+				EnvironmentTag: new(api.EnvironmentTagDEV),
+				Platform:       new(api.ServicePlatformFLUID),
+			}, func(s *api.Service) {
+				s.Platform = new(api.ServicePlatformFLUID)
+				s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(1000), MemoryGbs: new(8)}}}
+			}),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"platform":  "FLUID",
+					"resources": map[string]any{"cpu": "1 cores", "memory": "8 GB"},
 				}),
 				"message": acceptedMsg,
 			},
