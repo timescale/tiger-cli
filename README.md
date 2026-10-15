@@ -120,6 +120,9 @@ Tiger CLI provides the following commands:
   - `delete` - Delete a service (alias: `rm`)
   - `update-password` - Update service master password
   - `logs` - View service logs (alias: `log`)
+  - `metrics available` - List the metric names available for a service
+  - `metrics details` - Show a metric's description, type, default aggregation and labels
+  - `metrics series` - Fetch a metric's time series, with label filters, an aggregation function, group by and bucket size
 - `tiger db` - Database operations
   - `psql` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip) (alias: `connect`)
   - `query` - Execute a SQL query against a database and display the results, without needing psql (alias: `sql`)
@@ -226,6 +229,11 @@ The MCP server exposes the following tools to AI assistants:
 - `service_delete` - Permanently delete a database service (asks you to confirm first if the service is tagged PROD)
 - `service_update_password` - Set a new, randomly generated master password for a service (asks you to confirm first if the service is tagged PROD)
 - `service_logs` - View logs for a database service
+
+**Service Metrics:**
+- `service_metrics_available` - List the metric names available for a service (hardware usage, PostgreSQL settings and activity, PgBouncer pools, TimescaleDB internals)
+- `service_metrics_details` - Show a metric's description, type, default aggregation and labels
+- `service_metrics_series` - Fetch a metric's time series over a time window, with label filters, an aggregation function, group by and bucket size
 
 **Database Operations:**
 - `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
