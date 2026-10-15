@@ -2308,6 +2308,7 @@ components:
           description: Memory allocation in gigabytes.
           example: 4
         iops:
+          x-tigerdata-preview: true
           type: integer
           description: Provisioned IOPS for the storage volume.
           example: 3000
@@ -2452,6 +2453,7 @@ components:
           description: Memory allocation in gigabytes.
           example: 1
         iops:
+          x-tigerdata-preview: true
           type: integer
           description: Provisioned IOPS for the storage volume.
           example: 3000
@@ -2509,6 +2511,7 @@ components:
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
           example: "4"
         iops:
+          x-tigerdata-preview: true
           type: integer
           minimum: 0
           description: Requested provisioned IOPS for the service's storage.
@@ -2544,6 +2547,7 @@ components:
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
           example: "4"
         iops:
+          x-tigerdata-preview: true
           type: integer
           minimum: 0
           description: Provisioned IOPS for the forked service's storage. If not provided, will inherit from parent service.
@@ -2641,6 +2645,7 @@ components:
           description: The initial memory allocation in gigabytes.
           example: 1
         iops:
+          x-tigerdata-preview: true
           type: integer
           minimum: 0
           description: Provisioned IOPS for the replica set's storage.
@@ -2663,6 +2668,7 @@ components:
           description: The new memory allocation in gigabytes.
           example: "4"
         iops:
+          x-tigerdata-preview: true
           type: integer
           minimum: 0
           description: The new provisioned IOPS for the storage volume.
@@ -3040,8 +3046,9 @@ components:
           description: |
             Aggregation function applied to raw/pre-aggregated samples when
             collapsing them into one value per output bucket. Optional: when
-            omitted the server picks the default for the metric (currently
-            `LAST`).
+            omitted the server uses the metric's default aggregation (the
+            `default_agg` of the metric details endpoint), or `LAST` when the
+            metric declares none.
 
             Not accepted on the following metrics — requests are rejected
             with `INVALID_REQUEST`:

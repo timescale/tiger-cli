@@ -2045,8 +2045,9 @@ type MetricsSeriesRequest struct {
 
 	// Fn Aggregation function applied to raw/pre-aggregated samples when
 	// collapsing them into one value per output bucket. Optional: when
-	// omitted the server picks the default for the metric (currently
-	// `LAST`).
+	// omitted the server uses the metric's default aggregation (the
+	// `default_agg` of the metric details endpoint), or `LAST` when the
+	// metric declares none.
 	//
 	// Not accepted on the following metrics — requests are rejected
 	// with `INVALID_REQUEST`:
