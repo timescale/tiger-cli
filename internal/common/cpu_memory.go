@@ -74,22 +74,6 @@ func FormatCPUCores(cpuMillis int) string {
 	return strconv.FormatFloat(float64(cpuMillis)/1000, 'f', -1, 64)
 }
 
-// CurrentCPUMemory returns the service's current CPU/memory allocation, or
-// false if it has none (a shared service) or the API didn't return it.
-func CurrentCPUMemory(service api.Service) (*CPUMemoryConfig, bool) {
-	if len(service.Resources) == 0 || service.Resources[0].Spec == nil {
-		return nil, false
-	}
-	spec := service.Resources[0].Spec
-	if spec.CPUMillis == nil || spec.MemoryGbs == nil {
-		return nil, false
-	}
-	return &CPUMemoryConfig{
-		CPUMillis: *spec.CPUMillis,
-		MemoryGBs: *spec.MemoryGbs,
-	}, true
-}
-
 type CPUMemoryConfigs []CPUMemoryConfig
 
 // StandardCPUMemoryConfigs returns the allowed CPU/Memory configurations for

@@ -117,27 +117,21 @@ func (s *Server) handleServiceResize(ctx context.Context, req *mcp.CallToolReque
 		slog.Any("iops", input.IOPS),
 	)
 
-	// The schema requires cpu_memory unless the experimental gate adds iops,
-	// and the API requires CPU and memory on every resize, so an IOPS-only
-	// resize sends the service's current allocation.
-	var cpuMillis, memoryGBs string
-	if input.CPUMemory == "" {
-		if input.IOPS == nil {
-			return nil, ServiceResizeOutput{}, errors.New("at least one of cpu_memory or iops is required")
-		}
-		currentCPUMemory, ok := common.CurrentCPUMemory(*current)
-		if !ok {
-			return nil, ServiceResizeOutput{}, fmt.Errorf("current CPU and memory of service %s are unknown; specify cpu_memory", input.ServiceID)
-		}
-		cpuMillis, memoryGBs = *currentCPUMemory.CPUMillisString(), *currentCPUMemory.MemoryGBsString()
-	} else {
+	// The schema requires cpu_memory unless the experimental gate adds iops.
+	// An IOPS-only resize omits CPU and memory, which the API leaves unchanged.
+	if input.CPUMemory == "" && input.IOPS == nil {
+		return nil, ServiceResizeOutput{}, errors.New("at least one of cpu_memory or iops is required")
+	}
+	var cpuMillis, memoryGBs *string
+	if input.CPUMemory != "" {
 		// Parse CPU/Memory combination against the combinations of the
 		// service's platform. Not gated on experimental: only a service already
 		// created on the fluid platform gets the fluid combinations.
-		cpuMillis, memoryGBs, err = common.CPUMemoryConfigsFor(util.Deref(current.Platform)).WithoutShared().Parse(input.CPUMemory)
+		cpuMillisStr, memoryGBsStr, err := common.CPUMemoryConfigsFor(util.Deref(current.Platform)).WithoutShared().Parse(input.CPUMemory)
 		if err != nil {
 			return nil, ServiceResizeOutput{}, fmt.Errorf("invalid CPU/Memory specification: %w", err)
 		}
+		cpuMillis, memoryGBs = &cpuMillisStr, &memoryGBsStr
 	}
 
 	// Prepare resize request

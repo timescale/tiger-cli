@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -103,25 +104,21 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// The API requires CPU and memory on every resize, so an IOPS-only
-			// resize sends the service's current allocation.
-			if cpuMemoryCfg == nil {
-				var ok bool
-				if cpuMemoryCfg, ok = common.CurrentCPUMemory(*resolved); !ok {
-					return fmt.Errorf("current CPU and memory of service %s are unknown; specify --cpu or --memory", resolved.ServiceID)
-				}
-			}
-
-			// Prepare resize request
+			// Prepare resize request. An IOPS-only resize omits CPU and memory,
+			// which the API leaves unchanged.
 			resizeReq := api.ResizeInput{
-				CPUMillis: *cpuMemoryCfg.CPUMillisString(),
-				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
+				CPUMillis: cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs: cpuMemoryCfg.MemoryGBsString(),
 			}
-			target := cpuMemoryCfg.String()
+			var targets []string
+			if cpuMemoryCfg != nil {
+				targets = append(targets, cpuMemoryCfg.String())
+			}
 			if iopsSet {
 				resizeReq.Iops = &iops
-				target = fmt.Sprintf("%s, %d IOPS", target, iops)
+				targets = append(targets, fmt.Sprintf("%d IOPS", iops))
 			}
+			target := strings.Join(targets, ", ")
 
 			// Display resize information
 			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), target)

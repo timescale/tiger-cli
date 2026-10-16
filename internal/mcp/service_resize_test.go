@@ -14,7 +14,7 @@ func TestServiceResizeTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB"}
 	waitArgs := map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB", "wait": true}
 
-	resizeReq := api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}
+	resizeReq := api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}
 
 	// The resized service, as the API reports it once the new spec is applied.
 	resizedService := func(status api.DeployStatus) api.Service {
@@ -176,20 +176,6 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: "at least one of cpu_memory or iops is required",
 		},
 		{
-			// A shared service has no CPU/memory for an IOPS-only resize to
-			// keep, and the API requires both.
-			name: "experimental iops only on a service without a known allocation",
-			tool: toolServiceResize,
-			args: map[string]any{"service_id": "e6ue9697jf", "iops": 12000},
-			opts: []runOption{withExperimental()},
-			mock: func(m *mocks.MockClientWithResponsesInterface) {
-				expectGetService(m, "e6ue9697jf", sampleService(func(s *api.Service) {
-					s.Resources = []api.Resource{{Spec: &api.ResourceSpec{}}}
-				}))
-			},
-			wantErr: "current CPU and memory of service e6ue9697jf are unknown; specify cpu_memory",
-		},
-		{
 			name: "network error",
 			tool: toolServiceResize,
 			args: args,
@@ -248,7 +234,7 @@ func TestServiceResizeTool(t *testing.T) {
 						Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16)},
 					}}
 				})
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
@@ -261,9 +247,9 @@ func TestServiceResizeTool(t *testing.T) {
 			},
 		},
 		{
-			// The API requires CPU and memory, so an IOPS-only resize sends the
-			// current allocation. The API validates the IOPS value.
-			name: "experimental iops only keeps the current cpu and memory",
+			// CPU and memory are omitted, which the API leaves unchanged. The
+			// API validates the IOPS value.
+			name: "experimental iops only omits cpu and memory",
 			tool: toolServiceResize,
 			args: map[string]any{"service_id": "e6ue9697jf", "iops": 12000},
 			opts: []runOption{withExperimental()},
@@ -278,7 +264,7 @@ func TestServiceResizeTool(t *testing.T) {
 				}
 				expectGetService(m, "e6ue9697jf", fluid(6000))
 				svc := fluid(12000)
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16", Iops: new(12000)}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{Iops: new(12000)}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
