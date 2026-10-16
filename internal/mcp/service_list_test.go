@@ -25,10 +25,12 @@ func TestServiceListTool(t *testing.T) {
 	// One service per conversion branch: whole cores with an untagged (DEV)
 	// service, fractional cores with a PROD tag, a free tier service whose null
 	// CPU and memory read as "shared", and a service with no resources at all.
+	// The first carries IOPS, a preview field dropped without the experimental
+	// gate.
 	services := []api.Service{
 		sampleService(func(s *api.Service) {
 			s.Created = created
-			s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(4000), MemoryGbs: new(16)}}}
+			s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(4000), MemoryGbs: new(16), Iops: new(6000)}}}
 		}),
 		sampleService(func(s *api.Service) {
 			s.ServiceID = "u8me885b93"
@@ -138,14 +140,15 @@ func TestServiceListTool(t *testing.T) {
 			wantOutput: listed,
 		},
 		{
-			// The platform is a preview field: the case above carries one from
-			// sampleService and drops it, while this one returns it.
-			name: "experimental lists the platform",
+			// The platform and IOPS are preview fields: the case above carries
+			// them and drops them, while this one returns them.
+			name: "experimental lists the platform and IOPS",
 			tool: toolServiceList,
 			opts: []runOption{withExperimental()},
 			mock: expectServices([]api.Service{sampleService(func(s *api.Service) {
 				s.Created = created
 				s.Platform = new(api.ServicePlatformFLUID)
+				s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16), Iops: new(12000)}}}
 			})}),
 			wantOutput: map[string]any{
 				"services": []any{
@@ -158,6 +161,7 @@ func TestServiceListTool(t *testing.T) {
 						"region":      "us-east-1",
 						"created":     "2025-01-15T09:30:00Z",
 						"environment": "DEV",
+						"resources":   map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
 					},
 				},
 			},

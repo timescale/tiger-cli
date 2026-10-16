@@ -1814,6 +1814,11 @@ type ForkServiceCreate struct {
 	// - PITR: Point-in-time recovery using target_time
 	ForkStrategy ForkStrategy `json:"fork_strategy"`
 
+	// Iops Provisioned IOPS for the forked service's storage. If not provided, will inherit from parent service.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
 	//
 	// Example: 4
@@ -2040,8 +2045,9 @@ type MetricsSeriesRequest struct {
 
 	// Fn Aggregation function applied to raw/pre-aggregated samples when
 	// collapsing them into one value per output bucket. Optional: when
-	// omitted the server picks the default for the metric (currently
-	// `LAST`).
+	// omitted the server uses the metric's default aggregation (the
+	// `default_agg` of the metric details endpoint), or `LAST` when the
+	// metric declares none.
 	//
 	// Not accepted on the following metrics — requests are rejected
 	// with `INVALID_REQUEST`:
@@ -2346,6 +2352,11 @@ type ReadReplicaSet struct {
 	// Example: alb8jicdpr
 	ID string `json:"id"`
 
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs Memory allocation in gigabytes.
 	//
 	// Example: 1
@@ -2393,6 +2404,11 @@ type ReadReplicaSetCreate struct {
 	// Example: 250
 	CPUMillis int `json:"cpu_millis"`
 
+	// Iops Provisioned IOPS for the replica set's storage.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
+
 	// MemoryGbs The initial memory allocation in gigabytes.
 	//
 	// Example: 1
@@ -2417,17 +2433,22 @@ type ReplicaSetMetadata struct {
 	Environment *string `json:"environment,omitempty"`
 }
 
-// ResizeInput Parameters for resizing a service.
+// ResizeInput At least one of cpu_millis, memory_gbs, or iops must be provided. cpu_millis and memory_gbs must be provided together.
 type ResizeInput struct {
 	// CPUMillis The new CPU allocation in milli-cores.
 	//
 	// Example: 1000
-	CPUMillis string `json:"cpu_millis"`
+	CPUMillis *string `json:"cpu_millis,omitempty"`
+
+	// Iops The new provisioned IOPS for the storage volume.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs The new memory allocation in gigabytes.
 	//
 	// Example: 4
-	MemoryGbs string `json:"memory_gbs"`
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 }
 
 // Resource A resource allocated to the service.
@@ -2447,6 +2468,11 @@ type ResourceSpec struct {
 	//
 	// Example: 1000
 	CPUMillis *int `json:"cpu_millis,omitempty"`
+
+	// Iops Provisioned IOPS for the storage volume.
+	//
+	// Example: 3000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs Memory allocation in gigabytes.
 	//
@@ -2579,6 +2605,11 @@ type ServiceCreate struct {
 
 	// EnvironmentTag The environment tag for the service.
 	EnvironmentTag *EnvironmentTag `json:"environment_tag,omitempty"`
+
+	// Iops Requested provisioned IOPS for the service's storage.
+	//
+	// Example: 4000
+	Iops *int `json:"iops,omitempty"`
 
 	// MemoryGbs The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
 	//

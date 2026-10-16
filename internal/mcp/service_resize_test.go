@@ -14,7 +14,7 @@ func TestServiceResizeTool(t *testing.T) {
 	args := map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB"}
 	waitArgs := map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB", "wait": true}
 
-	resizeReq := api.ResizeInput{CPUMillis: "2000", MemoryGbs: "8"}
+	resizeReq := api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("8")}
 
 	// The resized service, as the API reports it once the new spec is applied.
 	resizedService := func(status api.DeployStatus) api.Service {
@@ -75,6 +75,14 @@ func TestServiceResizeTool(t *testing.T) {
 			tool:    toolServiceResize,
 			args:    map[string]any{"service_id": "e6ue9697jf"},
 			wantErr: `validating "arguments": validating root: required: missing properties: ["cpu_memory"]`,
+		},
+		{
+			// iops is a preview parameter, so without the gate it isn't in the
+			// schema, which rejects unknown properties.
+			name:    "iops rejected without the experimental gate",
+			tool:    toolServiceResize,
+			args:    map[string]any{"service_id": "e6ue9697jf", "cpu_memory": "2 CPU/8 GB", "iops": 12000},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
 		},
 		{
 			name:    "rejects an unsupported CPU/memory combination",
@@ -158,6 +166,16 @@ func TestServiceResizeTool(t *testing.T) {
 			wantErr: "invalid CPU/Memory specification: invalid CPU/Memory combination '2 CPU/8 GB'. Valid options: 0.25 CPU/2 GB, 0.5 CPU/4 GB, 1 CPU/8 GB, 2 CPU/16 GB, 4 CPU/32 GB, 8 CPU/64 GB, 16 CPU/128 GB, 32 CPU/256 GB",
 		},
 		{
+			// Behind the gate cpu_memory is optional, so the handler requires
+			// at least one of the two after the lookup.
+			name:    "experimental requires cpu_memory or iops",
+			tool:    toolServiceResize,
+			args:    map[string]any{"service_id": "e6ue9697jf"},
+			opts:    []runOption{withExperimental()},
+			mock:    expectLookup,
+			wantErr: "at least one of cpu_memory or iops is required",
+		},
+		{
 			name: "network error",
 			tool: toolServiceResize,
 			args: args,
@@ -216,7 +234,7 @@ func TestServiceResizeTool(t *testing.T) {
 						Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16)},
 					}}
 				})
-				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: "2000", MemoryGbs: "16"}).
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{CPUMillis: new("2000"), MemoryGbs: new("16")}).
 					Return(&api.ResizeServiceResponse{
 						HTTPResponse: httpResponse(http.StatusAccepted),
 						JSON202:      &svc,
@@ -225,6 +243,36 @@ func TestServiceResizeTool(t *testing.T) {
 			wantOutput: map[string]any{
 				"status":    "CONFIGURING",
 				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB"},
+				"message":   "Resize request accepted. The service may still be resizing.",
+			},
+		},
+		{
+			// CPU and memory are omitted, which the API leaves unchanged. The
+			// API validates the IOPS value.
+			name: "experimental iops only omits cpu and memory",
+			tool: toolServiceResize,
+			args: map[string]any{"service_id": "e6ue9697jf", "iops": 12000},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				fluid := func(iops int) api.Service {
+					return sampleService(func(s *api.Service) {
+						s.Platform = new(api.ServicePlatformFLUID)
+						s.Resources = []api.Resource{{
+							Spec: &api.ResourceSpec{CPUMillis: new(2000), MemoryGbs: new(16), Iops: new(iops)},
+						}}
+					})
+				}
+				expectGetService(m, "e6ue9697jf", fluid(6000))
+				svc := fluid(12000)
+				m.EXPECT().ResizeServiceWithResponse(validCtx, testProjectID, "e6ue9697jf", api.ResizeInput{Iops: new(12000)}).
+					Return(&api.ResizeServiceResponse{
+						HTTPResponse: httpResponse(http.StatusAccepted),
+						JSON202:      &svc,
+					}, nil)
+			},
+			wantOutput: map[string]any{
+				"status":    "READY",
+				"resources": map[string]any{"cpu": "2 cores", "memory": "16 GB", "iops": float64(12000)},
 				"message":   "Resize request accepted. The service may still be resizing.",
 			},
 		},

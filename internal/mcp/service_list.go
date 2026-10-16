@@ -59,7 +59,7 @@ func (ServiceInfo) Schema(experimental bool) *jsonschema.Schema {
 
 	schema.Properties["environment"].Description = "Environment tag (DEV or PROD). Under read_only=prod, services tagged PROD cannot be modified."
 
-	setResourceInfoSchemaProperties(schema.Properties["resources"])
+	setResourceInfoSchemaProperties(schema.Properties["resources"], experimental)
 
 	return schema
 }
@@ -135,27 +135,7 @@ func (s *Server) convertToServiceInfo(service api.Service) ServiceInfo {
 		info.Platform = string(util.Deref(service.Platform))
 	}
 
-	// Add resource information if available
-	if len(service.Resources) > 0 {
-		resource := service.Resources[0]
-		if resource.Spec != nil {
-			info.Resources = &ResourceInfo{}
-
-			if resource.Spec.CPUMillis != nil {
-				info.Resources.CPU = common.FormatCPUCores(*resource.Spec.CPUMillis) + " cores"
-			} else {
-				// CPU is null - this indicates a free tier service
-				info.Resources.CPU = "shared"
-			}
-
-			if resource.Spec.MemoryGbs != nil {
-				info.Resources.Memory = fmt.Sprintf("%d GB", *resource.Spec.MemoryGbs)
-			} else {
-				// Memory is null - this indicates a free tier service
-				info.Resources.Memory = "shared"
-			}
-		}
-	}
+	info.Resources = convertToResourceInfo(service, s.app.Experimental)
 
 	return info
 }

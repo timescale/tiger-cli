@@ -125,6 +125,22 @@ func TestServiceCreateTool(t *testing.T) {
 			wantErr: `validating "arguments": validating root: validating /properties/platform: enum: hybrid does not equal any of: [standard fluid]`,
 		},
 		{
+			// iops is a preview parameter, so without the gate it isn't in the
+			// schema, which rejects unknown properties.
+			name:    "iops rejected without the experimental gate",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "iops": 12000},
+			wantErr: `validating "arguments": validating root: unexpected additional properties ["iops"]`,
+		},
+		{
+			// Beyond the sign, the API validates the value.
+			name:    "negative iops rejected by the schema",
+			tool:    toolServiceCreate,
+			args:    map[string]any{"name": "test-service", "iops": -1000},
+			opts:    []runOption{withExperimental()},
+			wantErr: `validating "arguments": validating root: validating /properties/iops: minimum: -1000/1 is less than 0.000000`,
+		},
+		{
 			// The fluid platform is a preview, so its combinations are left out
 			// of the enum without the experimental gate.
 			name: "fluid cpu_memory rejected by the schema without the experimental gate",
@@ -315,6 +331,32 @@ func TestServiceCreateTool(t *testing.T) {
 				"service": detail(map[string]any{
 					"platform":  "FLUID",
 					"resources": map[string]any{"cpu": "1 cores", "memory": "8 GB"},
+				}),
+				"message": acceptedMsg,
+			},
+		},
+		{
+			// The API validates the IOPS value, so it's sent as given.
+			name: "experimental passes iops through and returns it",
+			tool: toolServiceCreate,
+			args: map[string]any{"name": "test-service", "platform": "fluid", "cpu_memory": "1 CPU/8 GB", "iops": 12000},
+			opts: []runOption{withExperimental()},
+			mock: expectCreate(api.ServiceCreate{
+				Name:           "test-service",
+				ReplicaCount:   new(0),
+				CPUMillis:      new("1000"),
+				MemoryGbs:      new("8"),
+				Iops:           new(12000),
+				EnvironmentTag: new(api.EnvironmentTagDEV),
+				Platform:       new(api.ServicePlatformFLUID),
+			}, func(s *api.Service) {
+				s.Platform = new(api.ServicePlatformFLUID)
+				s.Resources = []api.Resource{{Spec: &api.ResourceSpec{CPUMillis: new(1000), MemoryGbs: new(8), Iops: new(12000)}}}
+			}),
+			wantOutput: map[string]any{
+				"service": detail(map[string]any{
+					"platform":  "FLUID",
+					"resources": map[string]any{"cpu": "1 cores", "memory": "8 GB", "iops": float64(12000)},
 				}),
 				"message": acceptedMsg,
 			},

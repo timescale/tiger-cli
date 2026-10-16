@@ -2307,6 +2307,11 @@ components:
           type: integer
           description: Memory allocation in gigabytes.
           example: 4
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
         volume_type:
           type: string
           description: Type of storage volume.
@@ -2447,6 +2452,11 @@ components:
           type: integer
           description: Memory allocation in gigabytes.
           example: 1
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          description: Provisioned IOPS for the storage volume.
+          example: 3000
         metadata:
           $ref: '#/components/schemas/ReplicaSetMetadata'
         endpoint:
@@ -2500,6 +2510,12 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Requested provisioned IOPS for the service's storage.
+          example: 4000
         environment_tag:
           allOf:
             - $ref: '#/components/schemas/EnvironmentTag'
@@ -2530,6 +2546,12 @@ components:
           type: string
           description: The initial memory allocation in gigabytes, or 'shared' for a shared-resource service. If not provided, will inherit from parent service.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Provisioned IOPS for the forked service's storage. If not provided, will inherit from parent service.
+          example: 4000
         fork_strategy:
           $ref: '#/components/schemas/ForkStrategy'
         target_time:
@@ -2622,12 +2644,15 @@ components:
           minimum: 1
           description: The initial memory allocation in gigabytes.
           example: 1
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: Provisioned IOPS for the replica set's storage.
+          example: 3000
     ResizeInput:
       type: object
-      description: Parameters for resizing a service.
-      required:
-        - cpu_millis
-        - memory_gbs
+      minProperties: 1
       properties:
         cpu_millis:
           type: string
@@ -2639,6 +2664,15 @@ components:
           pattern: "^[0-9]+$"
           description: The new memory allocation in gigabytes.
           example: "4"
+        iops:
+          x-tigerdata-preview: true
+          type: integer
+          minimum: 0
+          description: The new provisioned IOPS for the storage volume.
+          example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
     UpdatePasswordInput:
       type: object
       description: Parameters for updating a service's password.
@@ -3012,8 +3046,9 @@ components:
           description: |
             Aggregation function applied to raw/pre-aggregated samples when
             collapsing them into one value per output bucket. Optional: when
-            omitted the server picks the default for the metric (currently
-            `LAST`).
+            omitted the server uses the metric's default aggregation (the
+            `default_agg` of the metric details endpoint), or `LAST` when the
+            metric declares none.
 
             Not accepted on the following metrics — requests are rejected
             with `INVALID_REQUEST`:

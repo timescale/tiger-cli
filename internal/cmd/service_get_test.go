@@ -300,9 +300,10 @@ status: READY
 `,
 		},
 		{
-			// The platform is a preview field: the output cases above carry one
-			// from sampleService and drop it, while these show it with the gate.
-			name: "experimental table output shows platform",
+			// The platform and IOPS are preview fields: the output cases above
+			// carry them from sampleService and drop them, while these show them
+			// with the gate.
+			name: "experimental table output shows platform and IOPS",
 			args: []string{"service", "get", "svc-12345"},
 			mock: setupGet(fluidService),
 			opts: []runOption{experimental},
@@ -317,6 +318,7 @@ status: READY
 │ Region            │ us-east-1                                                                                   │
 │ CPU               │ 1 cores (1000m)                                                                             │
 │ Memory            │ 4 GB                                                                                        │
+│ IOPS              │ 6000                                                                                        │
 │ Direct Endpoint   │ svc-12345.project.tsdb.cloud.timescale.com:5432                                             │
 │ Created           │ 2025-01-15 10:30:00 UTC                                                                     │
 │ Connection String │ postgresql://tsdbadmin@svc-12345.project.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require │
@@ -325,7 +327,7 @@ status: READY
 `,
 		},
 		{
-			name: "experimental json output includes platform",
+			name: "experimental json output includes platform and IOPS",
 			args: []string{"service", "get", "svc-12345", "-o", "json"},
 			mock: setupGet(fluidService),
 			opts: []runOption{experimental},
@@ -344,6 +346,7 @@ status: READY
       "id": "resource-1",
       "spec": {
         "cpu_millis": 1000,
+        "iops": 6000,
         "memory_gbs": 4
       }
     }
@@ -361,7 +364,7 @@ status: READY
 `,
 		},
 		{
-			name: "experimental yaml output includes platform",
+			name: "experimental yaml output includes platform and IOPS",
 			args: []string{"service", "get", "svc-12345", "-o", "yaml"},
 			mock: setupGet(fluidService),
 			opts: []runOption{experimental},
@@ -382,6 +385,7 @@ resources:
   - id: resource-1
     spec:
       cpu_millis: 1000
+      iops: 6000
       memory_gbs: 4
 role: tsdbadmin
 service_id: svc-12345

@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,11 +20,27 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var memory string
 	var noWait bool
 	var waitTimeout time.Duration
+	var iops int
+
+	// IOPS are a preview, so their help text is shown only behind the
+	// experimental gate.
+	var iopsDescHelp, iopsSectionHelp, iopsExampleHelp string
+	if app.Experimental {
+		iopsDescHelp = ", memory, and provisioned IOPS\n"
+		iopsSectionHelp = `
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory.`
+		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
+	} else {
+		iopsDescHelp = " and memory "
+	}
 
 	cmd := &cobra.Command{
 		Use:   "resize [name-or-id]",
 		Short: "Resize a database service",
-		Long: `Resize a database service by changing its CPU and memory allocation.
+		Long: `Resize a database service by changing its CPU` + iopsDescHelp + `allocation.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. This command changes the compute and memory
@@ -34,7 +52,8 @@ increase costs.
 
 ` + cpuMemoryHelp(false, app.Experimental) + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).`,
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).` + iopsSectionHelp,
 		Example: `  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 
@@ -51,7 +70,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
   tiger service resize --cpu 2000 --memory 8 --no-wait
 
   # Resize with custom wait timeout
-  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m`,
+  tiger service resize --cpu 2000 --memory 8 --wait-timeout 45m` + iopsExampleHelp,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
@@ -67,9 +86,14 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// At least one of CPU or memory must be specified
-			if cpu == "" && memory == "" {
-				return fmt.Errorf("must specify at least one of --cpu or --memory")
+			// --iops only exists behind the experimental gate
+			iopsSet := app.Experimental && cmd.Flags().Changed("iops")
+
+			if cpu == "" && memory == "" && !iopsSet {
+				if app.Experimental {
+					return errors.New("must specify at least one of --cpu, --memory, or --iops")
+				}
+				return errors.New("must specify at least one of --cpu or --memory")
 			}
 
 			resolved, err := resolveServiceForWrite(cmd.Context(), cfg, client, projectID, serviceRef)
@@ -85,14 +109,24 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			// Display resize information
-			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), cpuMemoryCfg)
-
-			// Prepare resize request
+			// Prepare resize request. An IOPS-only resize omits CPU and memory,
+			// which the API leaves unchanged.
 			resizeReq := api.ResizeInput{
-				CPUMillis: *cpuMemoryCfg.CPUMillisString(),
-				MemoryGbs: *cpuMemoryCfg.MemoryGBsString(),
+				CPUMillis: cpuMemoryCfg.CPUMillisString(),
+				MemoryGbs: cpuMemoryCfg.MemoryGBsString(),
 			}
+			var targets []string
+			if cpuMemoryCfg != nil {
+				targets = append(targets, cpuMemoryCfg.String())
+			}
+			if iopsSet {
+				resizeReq.Iops = &iops
+				targets = append(targets, fmt.Sprintf("%d IOPS", iops))
+			}
+			target := strings.Join(targets, ", ")
+
+			// Display resize information
+			cmd.PrintErrf("Resizing service %s to %s...\n", serviceLabel(*resolved), target)
 
 			// Make API call to resize service
 			resp, err := client.ResizeServiceWithResponse(cmd.Context(), projectID, resolved.ServiceID, resizeReq)
@@ -137,7 +171,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			cmd.PrintErrf("Service resized to %s.\n", cpuMemoryCfg)
+			cmd.PrintErrf("Service resized to %s.\n", target)
 			return nil
 		},
 	}
@@ -145,6 +179,10 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 	// Add flags
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes")
+	if app.Experimental {
+		cmd.Flags().IntVar(&iops, "iops", 0, "Provisioned IOPS")
+		registerFlagCompletion(cmd, "iops", iopsCompletion)
+	}
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for resize operation to complete")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Maximum time to wait for operation to complete")
 
