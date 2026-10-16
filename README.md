@@ -92,6 +92,9 @@ tiger db query -c "SELECT now()"
 
 # Install the MCP server
 tiger mcp install
+
+# Install agent skills for your coding agent
+tiger skills install
 ```
 
 ## Usage
@@ -117,6 +120,9 @@ Tiger CLI provides the following commands:
   - `delete` - Delete a service (alias: `rm`)
   - `update-password` - Update service master password
   - `logs` - View service logs (alias: `log`)
+  - `metrics available` - List the metric names available for a service
+  - `metrics details` - Show a metric's description, type, default aggregation and labels
+  - `metrics series` - Fetch a metric's time series, with label filters, an aggregation function, group by and bucket size
 - `tiger db` - Database operations
   - `psql` - Connect to a database with psql (in an interactive terminal, if the service has read replicas, offers to connect to one of them; use `--no-replica-prompt` to skip) (alias: `connect`)
   - `query` - Execute a SQL query against a database and display the results, without needing psql (alias: `sql`)
@@ -135,6 +141,8 @@ Tiger CLI provides the following commands:
   - `start` - Start the MCP server
   - `list` - List available MCP tools, prompts, and resources (alias: `ls`)
   - `get` - Get detailed information about a specific MCP capability (aliases: `describe`, `show`)
+- `tiger skills` - Agent skills for AI coding agents
+  - `install` - Install PostgreSQL and TimescaleDB skills for AI coding agents (alias: `add`)
 - `tiger feedback` - Submit feedback or a bug report to the Tiger Data team (pass the message as an argument or on stdin)
 - `tiger version` - Show version information
 - `tiger upgrade` - Upgrade the Tiger CLI to the latest version (alias: `update`)
@@ -222,6 +230,11 @@ The MCP server exposes the following tools to AI assistants:
 - `service_update_password` - Set a new, randomly generated master password for a service (asks you to confirm first if the service is tagged PROD)
 - `service_logs` - View logs for a database service
 
+**Service Metrics:**
+- `service_metrics_available` - List the metric names available for a service (hardware usage, PostgreSQL settings and activity, PgBouncer pools, TimescaleDB internals)
+- `service_metrics_details` - Show a metric's description, type, default aggregation and labels
+- `service_metrics_series` - Fetch a metric's time series over a time window, with label filters, an aggregation function, group by and bucket size
+
 **Database Operations:**
 - `db_query` - Execute SQL queries against a database service, passed inline or as a path to a SQL file, with support for parameterized queries, custom timeouts, and connection pooling
 - `db_schema` - Display a service's database schema (tables, views, materialized views, enums, functions, procedures, indexes, triggers, and TimescaleDB hypertable/continuous aggregate metadata) as readable text for an agent's context
@@ -246,6 +259,33 @@ To disable the documentation proxy:
 ```bash
 tiger config set docs_mcp false
 ```
+
+## Agent Skills
+
+Tiger CLI can install curated PostgreSQL and TimescaleDB skills directly into
+your coding agents:
+
+```bash
+# Interactive installation (prompts for install locations)
+tiger skills install
+
+# Or name the locations directly
+tiger skills install universal claude-code
+```
+
+Skills are installed for the current user. The `universal` location,
+`~/.agents/skills`, is read by most coding agents (Cursor, Codex, Gemini CLI,
+VS Code, GitHub Copilot CLI, Devin). Claude Code, Kiro CLI, and Google
+Antigravity read their own skills directories, so they're separate locations
+(`claude-code`, `kiro-cli`, `antigravity`). Naming a client that reads
+`~/.agents/skills`, such as `cursor`, selects `universal`. Use `--skills-dir`
+to install into a directory of your choice instead.
+
+Re-run the command to update the skills to the latest version; skills that are
+no longer available are removed. With no arguments, the locations you've
+installed to before are selected in the picker to start with. Existing skills
+that weren't installed by Tiger CLI are never replaced unless you pass
+`--force`.
 
 ## Configuration
 

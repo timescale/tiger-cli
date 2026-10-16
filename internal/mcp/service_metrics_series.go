@@ -42,17 +42,17 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 
 	setServiceIDSchemaProperties(schema)
 
-	schema.Properties["metric_name"].Description = "Name of the metric series to fetch. Use service_metrics_available to discover valid names."
+	schema.Properties["metric_name"].Description = "Name of the metric series to fetch. Must be a name returned by service_metrics_available; do not guess names."
 	schema.Properties["metric_name"].Examples = []any{
 		"timescale_cloud_system_cpu_usage_millicores",
 		"timescale_cloud_system_memory_usage_bytes",
 		"timescale_cloud_system_disk_usage_bytes",
 	}
 
-	schema.Properties["from"].Description = "Start of the time window (RFC3339 format)."
+	schema.Properties["from"].Description = "Start of the time window (RFC3339 format). Derive it from the current time; the examples are placeholders."
 	schema.Properties["from"].Examples = []any{"2026-05-13T00:00:00Z", "2026-05-13T09:00:00Z"}
 
-	schema.Properties["to"].Description = "End of the time window (RFC3339 format)."
+	schema.Properties["to"].Description = "End of the time window (RFC3339 format). Must not be in the future; use the current time to get the latest data."
 	schema.Properties["to"].Examples = []any{"2026-05-13T01:00:00Z", "2026-05-13T10:00:00Z"}
 
 	schema.Properties["role"].Description = "Convenience filter for the 'role' label. Omit to include all roles. Equivalent to passing {key:\"role\", value:\"primary\"|\"replica\"} via filters."
@@ -68,7 +68,7 @@ func (ServiceMetricsSeriesInput) Schema() *jsonschema.Schema {
 	schema.Properties["filters"].Items.Properties["match_type"].Enum = []any{"EQUAL", "NOT_EQUAL"}
 	schema.Properties["filters"].Items.Properties["match_type"].Default = util.Must(json.Marshal("EQUAL"))
 
-	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Optional — when omitted, the server picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). Minimum 60s."
+	schema.Properties["bucket_seconds"].Description = "Aggregation bucket size in seconds. Omit unless a specific resolution is needed: the server then picks a default matched to the window (roughly 1m for windows up to 1h, 1h for up to 30d, 1d beyond that). The smallest supported value is 60."
 	schema.Properties["bucket_seconds"].Minimum = new(60.0)
 	schema.Properties["bucket_seconds"].Examples = []any{60, 300, 3600}
 
