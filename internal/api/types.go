@@ -2433,12 +2433,12 @@ type ReplicaSetMetadata struct {
 	Environment *string `json:"environment,omitempty"`
 }
 
-// ResizeInput Parameters for resizing a service.
+// ResizeInput At least one of cpu_millis, memory_gbs, or iops must be provided. cpu_millis and memory_gbs must be provided together.
 type ResizeInput struct {
 	// CPUMillis The new CPU allocation in milli-cores.
 	//
 	// Example: 1000
-	CPUMillis string `json:"cpu_millis"`
+	CPUMillis *string `json:"cpu_millis,omitempty"`
 
 	// Iops The new provisioned IOPS for the storage volume.
 	//
@@ -2448,7 +2448,7 @@ type ResizeInput struct {
 	// MemoryGbs The new memory allocation in gigabytes.
 	//
 	// Example: 4
-	MemoryGbs string `json:"memory_gbs"`
+	MemoryGbs *string `json:"memory_gbs,omitempty"`
 }
 
 // Resource A resource allocated to the service.

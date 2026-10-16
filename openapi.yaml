@@ -2652,10 +2652,7 @@ components:
           example: 3000
     ResizeInput:
       type: object
-      description: Parameters for resizing a service.
-      required:
-        - cpu_millis
-        - memory_gbs
+      minProperties: 1
       properties:
         cpu_millis:
           type: string
@@ -2673,6 +2670,9 @@ components:
           minimum: 0
           description: The new provisioned IOPS for the storage volume.
           example: 4000
+      description: >-
+        At least one of cpu_millis, memory_gbs, or iops must be provided.
+        cpu_millis and memory_gbs must be provided together.
     UpdatePasswordInput:
       type: object
       description: Parameters for updating a service's password.
