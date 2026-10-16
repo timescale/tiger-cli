@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/timescale/tiger-cli/internal/api"
@@ -36,22 +37,114 @@ type WaitForServiceArgs struct {
 // WaitForService polls a service until it reports TargetStatus, showing its
 // current status next to a spinner in the meantime.
 func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
-	if args.Service.Status == args.TargetStatus {
+	return waitForStatus(ctx, waitArgs{
+		kind:         "service",
+		title:        "Service",
+		status:       &args.Service.Status,
+		targetStatus: args.TargetStatus,
+		input:        args.Input,
+		output:       args.Output,
+		timeout:      args.Timeout,
+		timeoutMsg:   args.TimeoutMsg,
+		poll: func(ctx context.Context) (int, string, *api.DeployStatus, error) {
+			resp, err := args.Client.GetServiceWithResponse(ctx, args.ProjectID, args.ServiceID)
+			if err != nil {
+				return 0, "", nil, err
+			}
+			if resp.JSON200 == nil {
+				return resp.StatusCode(), resp.Status(), nil, nil
+			}
+			return resp.StatusCode(), resp.Status(), &resp.JSON200.Status, nil
+		},
+	})
+}
+
+type WaitForBranchArgs struct {
+	Client    api.ClientWithResponsesInterface
+	ProjectID string
+	BranchID  string
+
+	// Branch is the branch as last returned by the API. Unlike
+	// WaitForServiceArgs.Service, the whole branch is replaced on every poll,
+	// so fields that only appear once the branch is provisioned (its endpoint)
+	// are there for the caller afterwards.
+	Branch *api.Branch
+
+	// TargetStatus, Input, Output, Timeout, and TimeoutMsg work as in
+	// WaitForServiceArgs.
+	TargetStatus api.DeployStatus
+	Input        io.Reader
+	Output       io.Writer
+	Timeout      time.Duration
+	TimeoutMsg   string
+}
+
+// WaitForBranch polls a branch until it reports TargetStatus, showing its
+// current status next to a spinner in the meantime.
+func WaitForBranch(ctx context.Context, args WaitForBranchArgs) error {
+	return waitForStatus(ctx, waitArgs{
+		kind:         "branch",
+		title:        "Branch",
+		status:       &args.Branch.Status,
+		targetStatus: args.TargetStatus,
+		input:        args.Input,
+		output:       args.Output,
+		timeout:      args.Timeout,
+		timeoutMsg:   args.TimeoutMsg,
+		poll: func(ctx context.Context) (int, string, *api.DeployStatus, error) {
+			resp, err := args.Client.GetBranchWithResponse(ctx, args.ProjectID, args.BranchID)
+			if err != nil {
+				return 0, "", nil, err
+			}
+			if resp.JSON200 == nil {
+				return resp.StatusCode(), resp.Status(), nil, nil
+			}
+			*args.Branch = *resp.JSON200
+			return resp.StatusCode(), resp.Status(), &args.Branch.Status, nil
+		},
+	})
+}
+
+// waitArgs is what waitForStatus needs to poll any resource with a
+// DeployStatus.
+type waitArgs struct {
+	// kind names the resource in error messages, and title in the spinner's
+	// status message.
+	kind  string
+	title string
+
+	// status is updated in place as polling proceeds.
+	status       *api.DeployStatus
+	targetStatus api.DeployStatus
+
+	// poll fetches the resource once, returning the HTTP status code and
+	// text, and the resource's status when the response carried a body.
+	poll func(ctx context.Context) (code int, httpStatus string, current *api.DeployStatus, err error)
+
+	input      io.Reader
+	output     io.Writer
+	timeout    time.Duration
+	timeoutMsg string
+}
+
+// waitForStatus is the poll loop behind WaitForService and WaitForBranch.
+func waitForStatus(ctx context.Context, args waitArgs) error {
+	if *args.status == args.targetStatus {
 		return nil
 	}
 
 	// The spinner cancels this context on Ctrl+C, which the loop below reports
 	// as a canceled wait.
-	ctx, cancel := context.WithTimeout(ctx, args.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, args.timeout)
 	defer cancel()
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	spinner := NewSpinner(SpinnerArgs{
-		Input:   args.Input,
-		Output:  args.Output,
-		Message: statusMessage(args.Service),
+		Input:   args.input,
+		Output:  args.output,
+		Message: statusMessage(args.title, *args.status),
 		Cancel:  cancel,
 	})
 	defer spinner.Stop()
@@ -61,42 +154,42 @@ func WaitForService(ctx context.Context, args WaitForServiceArgs) error {
 		case <-ctx.Done():
 			switch {
 			case errors.Is(ctx.Err(), context.DeadlineExceeded):
-				return ExitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", args.Timeout, args.TimeoutMsg))
+				return ExitWithCode(ExitTimeout, fmt.Errorf("wait timeout reached after %v - %s", args.timeout, args.timeoutMsg))
 			case errors.Is(ctx.Err(), context.Canceled):
-				return fmt.Errorf("canceled waiting - %s", args.TimeoutMsg)
+				return fmt.Errorf("canceled waiting - %s", args.timeoutMsg)
 			default:
-				return fmt.Errorf("error waiting - %s: %w", args.TimeoutMsg, ctx.Err())
+				return fmt.Errorf("error waiting - %s: %w", args.timeoutMsg, ctx.Err())
 			}
 		case <-ticker.C:
-			resp, err := args.Client.GetServiceWithResponse(ctx, args.ProjectID, args.ServiceID)
+			code, httpStatus, current, err := args.poll(ctx)
 			if err != nil {
-				spinner.Update(fmt.Sprintf("Error checking service status: %s", err))
+				spinner.Update(fmt.Sprintf("Error checking %s status: %s", args.kind, err))
 				continue
 			}
 
-			switch resp.StatusCode() {
-			case 200:
-				if resp.JSON200 == nil {
+			switch code {
+			case http.StatusOK:
+				if current == nil {
 					return errors.New("no response body returned from API")
 				}
-				args.Service.Status = resp.JSON200.Status
-				if args.Service.Status == args.TargetStatus {
+				*args.status = *current
+				if *args.status == args.targetStatus {
 					return nil
 				}
-				spinner.Update(statusMessage(args.Service))
-			case 404:
-				// Can happen if user deletes service while it's still provisioning
-				return errors.New("service not found")
-			case 500:
+				spinner.Update(statusMessage(args.title, *args.status))
+			case http.StatusNotFound:
+				// Can happen if user deletes the resource while it's still provisioning
+				return fmt.Errorf("%s not found", args.kind)
+			case http.StatusInternalServerError:
 				// Assume 500s are temporary server-side issues, and that it's safe to keep polling
-				spinner.Update("Error checking service status: internal server error")
+				spinner.Update(fmt.Sprintf("Error checking %s status: internal server error", args.kind))
 			default:
-				return fmt.Errorf("received unexpected %s while checking service status", resp.Status())
+				return fmt.Errorf("received unexpected %s while checking %s status", httpStatus, args.kind)
 			}
 		}
 	}
 }
 
-func statusMessage(service *api.Service) string {
-	return fmt.Sprintf("Service status: %s", service.Status)
+func statusMessage(title string, status api.DeployStatus) string {
+	return fmt.Sprintf("%s status: %s", title, status)
 }

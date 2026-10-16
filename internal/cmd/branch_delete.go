@@ -1,0 +1,89 @@
+package cmd
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/spf13/cobra"
+
+	"github.com/timescale/tiger-cli/internal/common"
+	"github.com/timescale/tiger-cli/internal/util"
+)
+
+// buildBranchDeleteCmd creates the delete subcommand
+func buildBranchDeleteCmd(app *common.App) *cobra.Command {
+	var confirm bool
+
+	cmd := &cobra.Command{
+		Use:     "delete <branch-id>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a branch",
+		Long: `Delete a branch permanently, along with any changes made on it. The parent
+service is not affected.
+
+The branch must be given explicitly by ID: there is no fallback to the default.
+
+This operation is irreversible. By default, you will be prompted to type the
+branch ID to confirm deletion, unless you use the --confirm flag.
+
+Note for AI agents: Always confirm with the user before performing this destructive operation.`,
+		Example: `  # Delete a branch (with confirmation prompt)
+  tiger branch delete br-12345
+
+  # Delete a branch without confirmation prompt
+  tiger branch delete br-12345 --confirm`,
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: branchIDCompletion(app),
+		SilenceUsage:      true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Require an explicit branch for safety: no default fallback.
+			if len(args) < 1 || args[0] == "" {
+				return errors.New("branch ID is required")
+			}
+
+			cfg, client, projectID, err := app.GetAll()
+			if err != nil {
+				return err
+			}
+
+			// Gated here, ahead of the confirmation prompt, so read-only mode
+			// refuses without first asking the user to type the branch ID.
+			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, args[0])
+			if err != nil {
+				return err
+			}
+
+			if !confirm {
+				if !util.IsTerminal(cmd.InOrStdin()) || !util.IsTerminal(cmd.ErrOrStderr()) {
+					return fmt.Errorf("TTY not detected - cannot prompt for confirmation. Use --confirm to skip the prompt")
+				}
+				cmd.PrintErrf("Are you sure you want to delete branch %s? This operation cannot be undone.\n", branchLabel(*branch))
+				cmd.PrintErrf("Type the branch ID '%s' to confirm: ", branch.ID)
+				confirmation, err := util.ReadLine(cmd.Context(), cmd.InOrStdin())
+				if err != nil {
+					return fmt.Errorf("failed to read confirmation: %w", err)
+				}
+				if confirmation != branch.ID {
+					cmd.PrintErrln("Delete operation cancelled.")
+					return nil
+				}
+			}
+
+			resp, err := client.DeleteBranchWithResponse(cmd.Context(), projectID, branch.ID)
+			if err != nil {
+				return fmt.Errorf("failed to delete branch: %w", err)
+			}
+			if resp.StatusCode() != http.StatusAccepted {
+				return common.ExitWithErrorFromStatusCode(resp.StatusCode(), resp.JSON4XX)
+			}
+
+			cmd.PrintErrf("Branch %s deleted.\n", branchLabel(*branch))
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt (AI agents must confirm with user first)")
+
+	return cmd
+}

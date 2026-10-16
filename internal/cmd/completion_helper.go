@@ -115,6 +115,34 @@ func listServices(cmd *cobra.Command, app *common.App) ([]api.Service, error) {
 	return *resp.JSON200, nil
 }
 
+// branchIDCompletion completes a branch ID argument. Branch commands take only
+// IDs for now, so unlike serviceRefCompletion it offers no names.
+func branchIDCompletion(app *common.App) cobra.CompletionFunc {
+	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// The branch ID is always the first positional argument
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		client, projectID, err := app.GetClient()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		resp, err := client.GetBranchesWithResponse(cmd.Context(), projectID, nil)
+		if err != nil || resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		results := make([]string, 0, len(*resp.JSON200))
+		for _, branch := range *resp.JSON200 {
+			if strings.HasPrefix(branch.ID, toComplete) {
+				results = append(results, cobra.CompletionWithDesc(branch.ID, branch.Name))
+			}
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+}
+
 func projectIDCompletion(app *common.App) cobra.CompletionFunc {
 	return withAppLoad(app, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		// Project ID is always first positional argument
@@ -264,11 +292,34 @@ func outputCompletion(extra ...string) cobra.CompletionFunc {
 // service can't be resized onto, and experimental includes the fluid platform's
 // configurations, which are a preview.
 func cpuCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.CPUMillis })
+	return sizeCompletion(serviceConfigs(shared, experimental), cpuMillis)
 }
 
 func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
-	return sizeCompletion(shared, experimental, func(c common.CPUMemoryConfig) int { return c.MemoryGBs })
+	return sizeCompletion(serviceConfigs(shared, experimental), memoryGBs)
+}
+
+// branchCPUCompletion and branchMemoryCompletion complete the --cpu and
+// --memory flags of the branch commands, which only take the configurations
+// in common.BranchCPUMemoryConfigs.
+var (
+	branchCPUCompletion    = sizeCompletion(branchConfigs, cpuMillis)
+	branchMemoryCompletion = sizeCompletion(branchConfigs, memoryGBs)
+)
+
+func cpuMillis(c common.CPUMemoryConfig) int { return c.CPUMillis }
+func memoryGBs(c common.CPUMemoryConfig) int { return c.MemoryGBs }
+
+// serviceConfigs returns the configurations the service commands' sizes are
+// drawn from (see completionCPUMemoryConfigs).
+func serviceConfigs(shared, experimental bool) func(*cobra.Command) common.CPUMemoryConfigs {
+	return func(cmd *cobra.Command) common.CPUMemoryConfigs {
+		return completionCPUMemoryConfigs(cmd, shared, experimental)
+	}
+}
+
+func branchConfigs(*cobra.Command) common.CPUMemoryConfigs {
+	return common.BranchCPUMemoryConfigs()
 }
 
 // sizeCompletion completes the sizes size reads off the allowed
@@ -276,9 +327,9 @@ func memoryCompletion(shared, experimental bool) cobra.CompletionFunc {
 // The configurations can come from more than one platform, so the order is
 // imposed here, and the shell is told to keep it rather than sort the values
 // as strings.
-func sizeCompletion(shared, experimental bool, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
+func sizeCompletion(configsFor func(*cobra.Command) common.CPUMemoryConfigs, size func(common.CPUMemoryConfig) int) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		configs := completionCPUMemoryConfigs(cmd, shared, experimental)
+		configs := configsFor(cmd)
 
 		sizes := make([]int, 0, len(configs))
 		hasShared := false

@@ -1203,6 +1203,81 @@ type BackupRetentionByTimeType string
 // - `UNKNOWN`: a type this version of the API does not name.
 type BackupType string
 
+// Branch A branch, addressed independently of its parent service.
+type Branch struct {
+	// CPUMillis CPU allocation in milli-cores.
+	//
+	// Example: 500
+	CPUMillis int `json:"cpu_millis"`
+
+	// Created Creation timestamp.
+	//
+	// Example: 2026-09-01T09:30:00Z
+	Created time.Time `json:"created"`
+
+	// Endpoint A network endpoint for connecting to a service.
+	Endpoint *Endpoint `json:"endpoint,omitempty"`
+
+	// ID The unique identifier for the branch.
+	//
+	// Example: br4nch1d9x
+	ID string `json:"id"`
+
+	// MemoryGbs Memory allocation in gigabytes.
+	//
+	// Example: 4
+	MemoryGbs int `json:"memory_gbs"`
+
+	// Name The name of the branch.
+	//
+	// Example: my-production-db-pr-412
+	Name string `json:"name"`
+
+	// ProjectID The project this branch belongs to.
+	//
+	// Example: rp1pz7uyae
+	ProjectID string `json:"project_id"`
+
+	// ServiceID The ID of the parent service this branch was created from.
+	//
+	// Example: d1k5vk7hf2
+	ServiceID string `json:"service_id"`
+
+	// Status Current status of the branch.
+	Status DeployStatus `json:"status"`
+}
+
+// BranchCreate Parameters for creating a branch.
+type BranchCreate struct {
+	// CPUMillis The initial CPU allocation in milli-cores. Defaults to 500 if not provided.
+	//
+	// Example: 500
+	CPUMillis *int `json:"cpu_millis,omitempty"`
+
+	// MemoryGbs The initial memory allocation in gigabytes. Defaults to 4 if not provided.
+	//
+	// Example: 4
+	MemoryGbs *int `json:"memory_gbs,omitempty"`
+
+	// Name A human-readable name for the branch. If not provided, defaults to "branch-<parent name>", with "-1", "-2", ... appended if that name is already in use in the project.
+	//
+	// Example: my-production-db-pr-412
+	Name *string `json:"name,omitempty"`
+
+	// ServiceID The ID of the service to branch from.
+	//
+	// Example: d1k5vk7hf2
+	ServiceID string `json:"service_id"`
+}
+
+// BranchRename Parameters for renaming a branch.
+type BranchRename struct {
+	// Name The new name for the branch.
+	//
+	// Example: my-production-db-pr-412
+	Name string `json:"name"`
+}
+
 // CloudWatchLogsConfig Where a CloudWatch logs exporter writes, and how it authenticates.
 type CloudWatchLogsConfig struct {
 	// AwsRegion The AWS region the log group is in. Independent of the exporter's own
@@ -2040,8 +2115,9 @@ type MetricsSeriesRequest struct {
 
 	// Fn Aggregation function applied to raw/pre-aggregated samples when
 	// collapsing them into one value per output bucket. Optional: when
-	// omitted the server picks the default for the metric (currently
-	// `LAST`).
+	// omitted the server uses the metric's default aggregation (the
+	// `default_agg` of the metric details endpoint), or `LAST` when the
+	// metric declares none.
 	//
 	// Not accepted on the following metrics — requests are rejected
 	// with `INVALID_REQUEST`:
@@ -2850,6 +2926,9 @@ type AllowListID = string
 // BackupRegionCode Example: eu-central-1
 type BackupRegionCode = string
 
+// BranchID Example: br4nch1d9x
+type BranchID = string
+
 // ExporterID Example: 3f7c1c9a-0d2e-4d76-9a1b-5c8e0f2a7b31
 type ExporterID = openapi_types.UUID
 
@@ -2928,6 +3007,15 @@ type SubmitFeedbackJSONBody struct {
 // SubmitFeedbackJSONBodySource defines parameters for SubmitFeedback.
 type SubmitFeedbackJSONBodySource string
 
+// GetBranchesParams defines parameters for GetBranches.
+type GetBranchesParams struct {
+	// Ref Returns only the branch this reference matches: one whose ID
+	// equals it, or whose name equals it, exactly and case-sensitively,
+	// with no precedence between the two. A reference matching nothing,
+	// or matching a service that isn't a branch, returns an empty list.
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+}
+
 // GetServicesParams defines parameters for GetServices.
 type GetServicesParams struct {
 	// Ref Returns only the service this reference matches: one whose ID
@@ -2981,6 +3069,18 @@ type CreateAllowListJSONRequestBody = AllowListCreate
 
 // UpdateAllowListJSONRequestBody defines body for UpdateAllowList for application/json ContentType.
 type UpdateAllowListJSONRequestBody = AllowListUpdate
+
+// CreateBranchJSONRequestBody defines body for CreateBranch for application/json ContentType.
+type CreateBranchJSONRequestBody = BranchCreate
+
+// RenameBranchJSONRequestBody defines body for RenameBranch for application/json ContentType.
+type RenameBranchJSONRequestBody = BranchRename
+
+// ResizeBranchJSONRequestBody defines body for ResizeBranch for application/json ContentType.
+type ResizeBranchJSONRequestBody = ResizeInput
+
+// UpdateBranchPasswordJSONRequestBody defines body for UpdateBranchPassword for application/json ContentType.
+type UpdateBranchPasswordJSONRequestBody = UpdatePasswordInput
 
 // CreateExporterJSONRequestBody defines body for CreateExporter for application/json ContentType.
 type CreateExporterJSONRequestBody = ExporterCreate

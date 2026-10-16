@@ -82,3 +82,23 @@ func promptAndResetPassword(
 
 	return resetServicePassword(ctx, cmd, cfg, client, service, role, newPassword)
 }
+
+// printPasswordStorageResult reports the outcome of saving a password and
+// returns whether it was saved.
+func printPasswordStorageResult(cmd *cobra.Command, result common.PasswordStorageResult) bool {
+	if result.Method == "none" && result.Message == "No password provided" {
+		// Don't output anything for empty password
+		return false
+	}
+
+	// Only a real storage failure is a warning; the "none" method is informational.
+	if result.Success {
+		cmd.PrintErrf("%s\n", result.Message)
+		return true
+	} else if result.Method == "none" {
+		cmd.PrintErrf("%s\n", result.Message)
+	} else {
+		cmd.PrintErrf("Warning: %s\n", result.Message)
+	}
+	return false
+}

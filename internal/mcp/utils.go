@@ -240,3 +240,100 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 
 	return detail
 }
+
+// setBranchIDSchemaProperties sets common branch_id schema properties. Like
+// service_id, branch_id is IDs-only (see setServiceIDSchemaProperties).
+//
+// TODO: confirm the branch ID format with the API. The pattern assumes branch
+// IDs look like service IDs, which branches are on the platform side.
+func setBranchIDSchemaProperties(schema *jsonschema.Schema) {
+	schema.Properties["branch_id"].Description = "Unique identifier of the branch (10-character alphanumeric string). Use branch_list to find branch IDs."
+	schema.Properties["branch_id"].Examples = []any{"br4nch1d9x", "k2m9x2sd3a"}
+	schema.Properties["branch_id"].Pattern = "^[a-z0-9]{10}$"
+}
+
+// setBranchCPUMemorySchemaProperties sets a branch tool's cpu_memory property,
+// offering only the combinations a branch can have.
+func setBranchCPUMemorySchemaProperties(schema *jsonschema.Schema, description string) {
+	schema.Properties["cpu_memory"].Description = description
+	schema.Properties["cpu_memory"].Enum = util.AnySlice(common.BranchCPUMemoryConfigs().Strings())
+}
+
+// BranchDetail represents detailed branch information
+type BranchDetail struct {
+	BranchID         string        `json:"id"`
+	Name             string        `json:"name"`
+	ServiceID        string        `json:"service_id"`
+	Status           string        `json:"status"`
+	Created          string        `json:"created,omitempty"`
+	Resources        *ResourceInfo `json:"resources,omitempty"`
+	DirectEndpoint   string        `json:"direct_endpoint,omitempty"`
+	ConnectionString string        `json:"connection_string,omitempty"`
+}
+
+func (BranchDetail) Schema() *jsonschema.Schema {
+	schema := util.Must(jsonschema.For[BranchDetail](nil))
+
+	schema.Properties["id"].Description = "Branch identifier (10-character alphanumeric string)"
+	schema.Properties["name"].Description = "Branch name, unique within its parent service"
+	schema.Properties["service_id"].Description = "ID of the parent service the branch was created from"
+
+	schema.Properties["status"].Description = "Branch status"
+	schema.Properties["status"].Examples = []any{"READY", "PAUSED", "QUEUED", "CONFIGURING"}
+
+	setResourceInfoSchemaProperties(schema.Properties["resources"])
+
+	schema.Properties["direct_endpoint"].Description = "Direct database connection endpoint (absent while the branch is still provisioning)"
+	schema.Properties["connection_string"].Description = "PostgreSQL connection string, without a password. The branch has the same users and passwords as its parent service had when the branch was created."
+
+	return schema
+}
+
+// convertToBranchDetail converts an API Branch to MCP BranchDetail
+func (s *Server) convertToBranchDetail(cfg *config.Config, branch api.Branch) BranchDetail {
+	detail := BranchDetail{
+		BranchID:  branch.ID,
+		Name:      branch.Name,
+		ServiceID: branch.ServiceID,
+		Status:    string(branch.Status),
+		Created:   branch.Created.Format("2006-01-02T15:04:05Z"),
+		Resources: &ResourceInfo{
+			CPU:    common.FormatCPUCores(branch.CPUMillis) + " cores",
+			Memory: fmt.Sprintf("%d GB", branch.MemoryGbs),
+		},
+	}
+
+	// A branch that's still provisioning may have no endpoint yet.
+	if branch.Endpoint == nil {
+		return detail
+	}
+	if branch.Endpoint.Host != nil {
+		port := "5432"
+		if branch.Endpoint.Port != nil {
+			port = fmt.Sprintf("%d", *branch.Endpoint.Port)
+		}
+		detail.DirectEndpoint = fmt.Sprintf("%s:%s", *branch.Endpoint.Host, port)
+	}
+	if details, err := common.GetConnectionDetails(cfg, common.BranchAsService(branch), common.ConnectionDetailsOptions{
+		Role:     "tsdbadmin",
+		ReadOnly: common.CheckReadOnly(cfg, common.BranchEnvironmentTag) != nil,
+	}); err != nil {
+		s.logger.Error("MCP: Failed to build connection string", slog.Any("error", err))
+	} else {
+		detail.ConnectionString = details.String()
+	}
+
+	return detail
+}
+
+// parseBranchCPUMemory returns the branch configuration a cpu_memory value
+// names. The schema's enum already rejects anything else, so an error here
+// means the two have drifted apart.
+func parseBranchCPUMemory(cpuMemory string) (common.CPUMemoryConfig, error) {
+	for _, c := range common.BranchCPUMemoryConfigs() {
+		if c.String() == cpuMemory {
+			return c, nil
+		}
+	}
+	return common.CPUMemoryConfig{}, fmt.Errorf("invalid CPU/Memory specification '%s'. Valid options: %s", cpuMemory, common.BranchCPUMemoryConfigs())
+}

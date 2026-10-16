@@ -302,6 +302,148 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 	UpdateAllowList(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetBranches List All Branches
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a list of every branch in a project, across all parent
+	// services.
+	//
+	// Corresponds with GET /projects/{project_id}/branches (the `GetBranches` operationId).
+	GetBranches(ctx context.Context, projectID ProjectID, params *GetBranchesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBranchWithBody Create a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Creates a new branch from the service identified by `service_id` in
+	// the request body. A branch shares its parent's data at the moment of
+	// creation and gets its own, independently-sized compute. This is an
+	// asynchronous operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+	CreateBranchWithBody(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateBranch Create a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Creates a new branch from the service identified by `service_id` in
+	// the request body. A branch shares its parent's data at the moment of
+	// creation and gets its own, independently-sized compute. This is an
+	// asynchronous operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+	CreateBranch(ctx context.Context, projectID ProjectID, body CreateBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBranch Delete a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Deletes a specific branch. This is an asynchronous operation.
+	//
+	// Corresponds with DELETE /projects/{project_id}/branches/{branch_id} (the `DeleteBranch` operationId).
+	DeleteBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBranch Get a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the details of a specific branch by its ID.
+	//
+	// Corresponds with GET /projects/{project_id}/branches/{branch_id} (the `GetBranch` operationId).
+	GetBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenameBranchWithBody Rename a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Updates the name of a specific branch.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+	RenameBranchWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenameBranch Rename a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Updates the name of a specific branch.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+	RenameBranch(ctx context.Context, projectID ProjectID, branchID BranchID, body RenameBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResizeBranchWithBody Resize a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Changes the compute allocation for a specific branch. Storage size is
+	// shared with the parent and is not resized through this operation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+	ResizeBranchWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResizeBranch Resize a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Changes the compute allocation for a specific branch. Storage size is
+	// shared with the parent and is not resized through this operation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+	ResizeBranch(ctx context.Context, projectID ProjectID, branchID BranchID, body ResizeBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartBranch Start a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts a stopped branch. This is an asynchronous operation.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/start (the `StartBranch` operationId).
+	StartBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopBranch Stop a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops a running branch. This is an asynchronous operation.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/stop (the `StopBranch` operationId).
+	StopBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBranchPasswordWithBody Update Branch Password
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets a new master password for the branch.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+	UpdateBranchPasswordWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateBranchPassword Update Branch Password
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets a new master password for the branch.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+	UpdateBranchPassword(ctx context.Context, projectID ProjectID, branchID BranchID, body UpdateBranchPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetExporters List All Exporters
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -1446,6 +1588,278 @@ func (c *Client) UpdateAllowListWithBody(ctx context.Context, projectID ProjectI
 // Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 func (c *Client) UpdateAllowList(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAllowListRequest(c.Server, projectID, allowListID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBranches List All Branches
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a list of every branch in a project, across all parent
+// services.
+//
+// Corresponds with GET /projects/{project_id}/branches (the `GetBranches` operationId).
+func (c *Client) GetBranches(ctx context.Context, projectID ProjectID, params *GetBranchesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBranchesRequest(c.Server, projectID, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBranchWithBody Create a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Creates a new branch from the service identified by `service_id` in
+// the request body. A branch shares its parent's data at the moment of
+// creation and gets its own, independently-sized compute. This is an
+// asynchronous operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+func (c *Client) CreateBranchWithBody(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBranchRequestWithBody(c.Server, projectID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateBranch Create a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Creates a new branch from the service identified by `service_id` in
+// the request body. A branch shares its parent's data at the moment of
+// creation and gets its own, independently-sized compute. This is an
+// asynchronous operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+func (c *Client) CreateBranch(ctx context.Context, projectID ProjectID, body CreateBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateBranchRequest(c.Server, projectID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBranch Delete a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Deletes a specific branch. This is an asynchronous operation.
+//
+// Corresponds with DELETE /projects/{project_id}/branches/{branch_id} (the `DeleteBranch` operationId).
+func (c *Client) DeleteBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBranchRequest(c.Server, projectID, branchID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBranch Get a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the details of a specific branch by its ID.
+//
+// Corresponds with GET /projects/{project_id}/branches/{branch_id} (the `GetBranch` operationId).
+func (c *Client) GetBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBranchRequest(c.Server, projectID, branchID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RenameBranchWithBody Rename a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Updates the name of a specific branch.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+func (c *Client) RenameBranchWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameBranchRequestWithBody(c.Server, projectID, branchID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RenameBranch Rename a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Updates the name of a specific branch.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+func (c *Client) RenameBranch(ctx context.Context, projectID ProjectID, branchID BranchID, body RenameBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameBranchRequest(c.Server, projectID, branchID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResizeBranchWithBody Resize a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Changes the compute allocation for a specific branch. Storage size is
+// shared with the parent and is not resized through this operation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+func (c *Client) ResizeBranchWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeBranchRequestWithBody(c.Server, projectID, branchID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResizeBranch Resize a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Changes the compute allocation for a specific branch. Storage size is
+// shared with the parent and is not resized through this operation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+func (c *Client) ResizeBranch(ctx context.Context, projectID ProjectID, branchID BranchID, body ResizeBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResizeBranchRequest(c.Server, projectID, branchID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartBranch Start a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts a stopped branch. This is an asynchronous operation.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/start (the `StartBranch` operationId).
+func (c *Client) StartBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartBranchRequest(c.Server, projectID, branchID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopBranch Stop a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops a running branch. This is an asynchronous operation.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/stop (the `StopBranch` operationId).
+func (c *Client) StopBranch(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopBranchRequest(c.Server, projectID, branchID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateBranchPasswordWithBody Update Branch Password
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets a new master password for the branch.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+func (c *Client) UpdateBranchPasswordWithBody(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBranchPasswordRequestWithBody(c.Server, projectID, branchID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateBranchPassword Update Branch Password
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets a new master password for the branch.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+func (c *Client) UpdateBranchPassword(ctx context.Context, projectID ProjectID, branchID BranchID, body UpdateBranchPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateBranchPasswordRequest(c.Server, projectID, branchID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3409,6 +3823,440 @@ func NewUpdateAllowListRequestWithBody(server string, projectID ProjectID, allow
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetBranchesRequest constructs an http.Request for the GetBranches method
+func NewGetBranchesRequest(server string, projectID ProjectID, params *GetBranchesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateBranchRequest calls the generic CreateBranch builder with application/json body
+func NewCreateBranchRequest(server string, projectID ProjectID, body CreateBranchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateBranchRequestWithBody(server, projectID, "application/json", bodyReader)
+}
+
+// NewCreateBranchRequestWithBody constructs an http.Request for the CreateBranch method, with any body, and a specified content type
+func NewCreateBranchRequestWithBody(server string, projectID ProjectID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBranchRequest constructs an http.Request for the DeleteBranch method
+func NewDeleteBranchRequest(server string, projectID ProjectID, branchID BranchID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBranchRequest constructs an http.Request for the GetBranch method
+func NewGetBranchRequest(server string, projectID ProjectID, branchID BranchID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRenameBranchRequest calls the generic RenameBranch builder with application/json body
+func NewRenameBranchRequest(server string, projectID ProjectID, branchID BranchID, body RenameBranchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRenameBranchRequestWithBody(server, projectID, branchID, "application/json", bodyReader)
+}
+
+// NewRenameBranchRequestWithBody constructs an http.Request for the RenameBranch method, with any body, and a specified content type
+func NewRenameBranchRequestWithBody(server string, projectID ProjectID, branchID BranchID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s/rename", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResizeBranchRequest calls the generic ResizeBranch builder with application/json body
+func NewResizeBranchRequest(server string, projectID ProjectID, branchID BranchID, body ResizeBranchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewResizeBranchRequestWithBody(server, projectID, branchID, "application/json", bodyReader)
+}
+
+// NewResizeBranchRequestWithBody constructs an http.Request for the ResizeBranch method, with any body, and a specified content type
+func NewResizeBranchRequestWithBody(server string, projectID ProjectID, branchID BranchID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s/resize", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewStartBranchRequest constructs an http.Request for the StartBranch method
+func NewStartBranchRequest(server string, projectID ProjectID, branchID BranchID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s/start", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStopBranchRequest constructs an http.Request for the StopBranch method
+func NewStopBranchRequest(server string, projectID ProjectID, branchID BranchID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s/stop", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateBranchPasswordRequest calls the generic UpdateBranchPassword builder with application/json body
+func NewUpdateBranchPasswordRequest(server string, projectID ProjectID, branchID BranchID, body UpdateBranchPasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateBranchPasswordRequestWithBody(server, projectID, branchID, "application/json", bodyReader)
+}
+
+// NewUpdateBranchPasswordRequestWithBody constructs an http.Request for the UpdateBranchPassword method, with any body, and a specified content type
+func NewUpdateBranchPasswordRequestWithBody(server string, projectID ProjectID, branchID BranchID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project_id", projectID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "branch_id", branchID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/branches/%s/updatePassword", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -6263,6 +7111,158 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project_id}/allow-lists/{allow_list_id} (the `UpdateAllowList` operationId).
 	UpdateAllowListWithResponse(ctx context.Context, projectID ProjectID, allowListID AllowListID, body UpdateAllowListJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAllowListResponse, error)
 
+	// GetBranchesWithResponse List All Branches
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves a list of every branch in a project, across all parent
+	// services.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/branches (the `GetBranches` operationId).
+	GetBranchesWithResponse(ctx context.Context, projectID ProjectID, params *GetBranchesParams, reqEditors ...RequestEditorFn) (*GetBranchesResponse, error)
+
+	// CreateBranchWithBodyWithResponse Create a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Creates a new branch from the service identified by `service_id` in
+	// the request body. A branch shares its parent's data at the moment of
+	// creation and gets its own, independently-sized compute. This is an
+	// asynchronous operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+	CreateBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBranchResponse, error)
+
+	// CreateBranchWithResponse Create a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Creates a new branch from the service identified by `service_id` in
+	// the request body. A branch shares its parent's data at the moment of
+	// creation and gets its own, independently-sized compute. This is an
+	// asynchronous operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+	CreateBranchWithResponse(ctx context.Context, projectID ProjectID, body CreateBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBranchResponse, error)
+
+	// DeleteBranchWithResponse Delete a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Deletes a specific branch. This is an asynchronous operation.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project_id}/branches/{branch_id} (the `DeleteBranch` operationId).
+	DeleteBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*DeleteBranchResponse, error)
+
+	// GetBranchWithResponse Get a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Retrieves the details of a specific branch by its ID.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project_id}/branches/{branch_id} (the `GetBranch` operationId).
+	GetBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*GetBranchResponse, error)
+
+	// RenameBranchWithBodyWithResponse Rename a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Updates the name of a specific branch.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+	RenameBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameBranchResponse, error)
+
+	// RenameBranchWithResponse Rename a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Updates the name of a specific branch.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+	RenameBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body RenameBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameBranchResponse, error)
+
+	// ResizeBranchWithBodyWithResponse Resize a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Changes the compute allocation for a specific branch. Storage size is
+	// shared with the parent and is not resized through this operation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+	ResizeBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeBranchResponse, error)
+
+	// ResizeBranchWithResponse Resize a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Changes the compute allocation for a specific branch. Storage size is
+	// shared with the parent and is not resized through this operation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+	ResizeBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body ResizeBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeBranchResponse, error)
+
+	// StartBranchWithResponse Start a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Starts a stopped branch. This is an asynchronous operation.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/start (the `StartBranch` operationId).
+	StartBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*StartBranchResponse, error)
+
+	// StopBranchWithResponse Stop a Branch
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Stops a running branch. This is an asynchronous operation.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/stop (the `StopBranch` operationId).
+	StopBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*StopBranchResponse, error)
+
+	// UpdateBranchPasswordWithBodyWithResponse Update Branch Password
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets a new master password for the branch.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+	UpdateBranchPasswordWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBranchPasswordResponse, error)
+
+	// UpdateBranchPasswordWithResponse Update Branch Password
+	//
+	// **Preview - this endpoint is experimental and may change without notice.**
+	//
+	// Sets a new master password for the branch.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+	UpdateBranchPasswordWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body UpdateBranchPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBranchPasswordResponse, error)
+
 	// GetExportersWithResponse List All Exporters
 	//
 	// **Preview - this endpoint is experimental and may change without notice.**
@@ -7592,6 +8592,424 @@ func (r UpdateAllowListResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateAllowListResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBranchesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBranchesResponse) GetJSON200() *[]Branch {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBranchesResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBranchesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBranchesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBranchesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBranchesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CreateBranchResponse) GetJSON202() *Branch {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBranchResponse) GetJSON200() *Branch {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RenameBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RenameBranchResponse) GetJSON200() *Branch {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r RenameBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r RenameBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RenameBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RenameBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RenameBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResizeBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r ResizeBranchResponse) GetJSON202() *Branch {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ResizeBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ResizeBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResizeBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResizeBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResizeBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r StartBranchResponse) GetJSON202() *Branch {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StartBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r StartBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StopBranchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Branch
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r StopBranchResponse) GetJSON202() *Branch {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StopBranchResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r StopBranchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopBranchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopBranchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopBranchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateBranchPasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ClientError
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdateBranchPasswordResponse) GetJSON4XX() *ClientError {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateBranchPasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateBranchPasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateBranchPasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateBranchPasswordResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10369,6 +11787,236 @@ func (c *ClientWithResponses) UpdateAllowListWithResponse(ctx context.Context, p
 	return ParseUpdateAllowListResponse(rsp)
 }
 
+// GetBranchesWithResponse List All Branches
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves a list of every branch in a project, across all parent
+// services.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/branches (the `GetBranches` operationId).
+func (c *ClientWithResponses) GetBranchesWithResponse(ctx context.Context, projectID ProjectID, params *GetBranchesParams, reqEditors ...RequestEditorFn) (*GetBranchesResponse, error) {
+	rsp, err := c.GetBranches(ctx, projectID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBranchesResponse(rsp)
+}
+
+// CreateBranchWithBodyWithResponse Create a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Creates a new branch from the service identified by `service_id` in
+// the request body. A branch shares its parent's data at the moment of
+// creation and gets its own, independently-sized compute. This is an
+// asynchronous operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+func (c *ClientWithResponses) CreateBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateBranchResponse, error) {
+	rsp, err := c.CreateBranchWithBody(ctx, projectID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBranchResponse(rsp)
+}
+
+// CreateBranchWithResponse Create a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Creates a new branch from the service identified by `service_id` in
+// the request body. A branch shares its parent's data at the moment of
+// creation and gets its own, independently-sized compute. This is an
+// asynchronous operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches (the `CreateBranch` operationId).
+func (c *ClientWithResponses) CreateBranchWithResponse(ctx context.Context, projectID ProjectID, body CreateBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateBranchResponse, error) {
+	rsp, err := c.CreateBranch(ctx, projectID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateBranchResponse(rsp)
+}
+
+// DeleteBranchWithResponse Delete a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Deletes a specific branch. This is an asynchronous operation.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project_id}/branches/{branch_id} (the `DeleteBranch` operationId).
+func (c *ClientWithResponses) DeleteBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*DeleteBranchResponse, error) {
+	rsp, err := c.DeleteBranch(ctx, projectID, branchID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBranchResponse(rsp)
+}
+
+// GetBranchWithResponse Get a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Retrieves the details of a specific branch by its ID.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project_id}/branches/{branch_id} (the `GetBranch` operationId).
+func (c *ClientWithResponses) GetBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*GetBranchResponse, error) {
+	rsp, err := c.GetBranch(ctx, projectID, branchID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBranchResponse(rsp)
+}
+
+// RenameBranchWithBodyWithResponse Rename a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Updates the name of a specific branch.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+func (c *ClientWithResponses) RenameBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenameBranchResponse, error) {
+	rsp, err := c.RenameBranchWithBody(ctx, projectID, branchID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenameBranchResponse(rsp)
+}
+
+// RenameBranchWithResponse Rename a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Updates the name of a specific branch.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/rename (the `RenameBranch` operationId).
+func (c *ClientWithResponses) RenameBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body RenameBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*RenameBranchResponse, error) {
+	rsp, err := c.RenameBranch(ctx, projectID, branchID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenameBranchResponse(rsp)
+}
+
+// ResizeBranchWithBodyWithResponse Resize a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Changes the compute allocation for a specific branch. Storage size is
+// shared with the parent and is not resized through this operation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+func (c *ClientWithResponses) ResizeBranchWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResizeBranchResponse, error) {
+	rsp, err := c.ResizeBranchWithBody(ctx, projectID, branchID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResizeBranchResponse(rsp)
+}
+
+// ResizeBranchWithResponse Resize a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Changes the compute allocation for a specific branch. Storage size is
+// shared with the parent and is not resized through this operation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/resize (the `ResizeBranch` operationId).
+func (c *ClientWithResponses) ResizeBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body ResizeBranchJSONRequestBody, reqEditors ...RequestEditorFn) (*ResizeBranchResponse, error) {
+	rsp, err := c.ResizeBranch(ctx, projectID, branchID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResizeBranchResponse(rsp)
+}
+
+// StartBranchWithResponse Start a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Starts a stopped branch. This is an asynchronous operation.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/start (the `StartBranch` operationId).
+func (c *ClientWithResponses) StartBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*StartBranchResponse, error) {
+	rsp, err := c.StartBranch(ctx, projectID, branchID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartBranchResponse(rsp)
+}
+
+// StopBranchWithResponse Stop a Branch
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Stops a running branch. This is an asynchronous operation.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/stop (the `StopBranch` operationId).
+func (c *ClientWithResponses) StopBranchWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, reqEditors ...RequestEditorFn) (*StopBranchResponse, error) {
+	rsp, err := c.StopBranch(ctx, projectID, branchID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopBranchResponse(rsp)
+}
+
+// UpdateBranchPasswordWithBodyWithResponse Update Branch Password
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets a new master password for the branch.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+func (c *ClientWithResponses) UpdateBranchPasswordWithBodyWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateBranchPasswordResponse, error) {
+	rsp, err := c.UpdateBranchPasswordWithBody(ctx, projectID, branchID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBranchPasswordResponse(rsp)
+}
+
+// UpdateBranchPasswordWithResponse Update Branch Password
+//
+// **Preview - this endpoint is experimental and may change without notice.**
+//
+// Sets a new master password for the branch.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project_id}/branches/{branch_id}/updatePassword (the `UpdateBranchPassword` operationId).
+func (c *ClientWithResponses) UpdateBranchPasswordWithResponse(ctx context.Context, projectID ProjectID, branchID BranchID, body UpdateBranchPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBranchPasswordResponse, error) {
+	rsp, err := c.UpdateBranchPassword(ctx, projectID, branchID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateBranchPasswordResponse(rsp)
+}
+
 // GetExportersWithResponse List All Exporters
 //
 // **Preview - this endpoint is experimental and may change without notice.**
@@ -11990,6 +13638,295 @@ func ParseUpdateAllowListResponse(rsp *http.Response) (*UpdateAllowListResponse,
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBranchesResponse parses an HTTP response from a GetBranchesWithResponse call
+func ParseGetBranchesResponse(rsp *http.Response) (*GetBranchesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBranchesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateBranchResponse parses an HTTP response from a CreateBranchWithResponse call
+func ParseCreateBranchResponse(rsp *http.Response) (*CreateBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBranchResponse parses an HTTP response from a DeleteBranchWithResponse call
+func ParseDeleteBranchResponse(rsp *http.Response) (*DeleteBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 202:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBranchResponse parses an HTTP response from a GetBranchWithResponse call
+func ParseGetBranchResponse(rsp *http.Response) (*GetBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRenameBranchResponse parses an HTTP response from a RenameBranchWithResponse call
+func ParseRenameBranchResponse(rsp *http.Response) (*RenameBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RenameBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResizeBranchResponse parses an HTTP response from a ResizeBranchWithResponse call
+func ParseResizeBranchResponse(rsp *http.Response) (*ResizeBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResizeBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartBranchResponse parses an HTTP response from a StartBranchWithResponse call
+func ParseStartBranchResponse(rsp *http.Response) (*StartBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStopBranchResponse parses an HTTP response from a StopBranchWithResponse call
+func ParseStopBranchResponse(rsp *http.Response) (*StopBranchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopBranchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Branch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ClientError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateBranchPasswordResponse parses an HTTP response from a UpdateBranchPasswordWithResponse call
+func ParseUpdateBranchPasswordResponse(rsp *http.Response) (*UpdateBranchPasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateBranchPasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ClientError

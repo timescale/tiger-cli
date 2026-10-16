@@ -515,6 +515,85 @@ func expectTaggedService(tag string, calls int) func(*mocks.MockClientWithRespon
 	}
 }
 
+// sampleBranch returns a branch of sampleService with reasonable defaults.
+// Use overrides to customize specific fields.
+func sampleBranch(overrides ...func(*api.Branch)) api.Branch {
+	branch := api.Branch{
+		ID:        "br4nch1d9x",
+		ProjectID: testProjectID,
+		ServiceID: "e6ue9697jf",
+		Name:      "test-branch",
+		Status:    api.DeployStatusREADY,
+		CPUMillis: 250,
+		MemoryGbs: 2,
+		Created:   time.Date(2025, 1, 16, 9, 0, 0, 0, time.UTC),
+		Endpoint: &api.Endpoint{
+			Host: new("br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com"),
+			Port: new(36956),
+		},
+	}
+	for _, o := range overrides {
+		o(&branch)
+	}
+	return branch
+}
+
+// sampleBranchDetail is the BranchDetail output of sampleBranch, with the
+// given status.
+func sampleBranchDetail(status api.DeployStatus) map[string]any {
+	return map[string]any{
+		"id":                "br4nch1d9x",
+		"name":              "test-branch",
+		"service_id":        "e6ue9697jf",
+		"status":            string(status),
+		"created":           "2025-01-16T09:00:00Z",
+		"resources":         map[string]any{"cpu": "0.25 cores", "memory": "2 GB"},
+		"direct_endpoint":   "br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956",
+		"connection_string": "postgresql://tsdbadmin@br4nch1d9x.test-project-123.branch.tsdb.cloud.timescale.com:36956/tsdb?sslmode=require",
+	}
+}
+
+// branchStatus returns a sampleBranch override setting the branch's status.
+func branchStatus(status api.DeployStatus) func(*api.Branch) {
+	return func(b *api.Branch) { b.Status = status }
+}
+
+// expectGetBranch expects one GetBranch call for branch's ID, returning
+// branch. The call is returned so a caller can adjust its cardinality (a wait
+// loop's poll).
+func expectGetBranch(m *mocks.MockClientWithResponsesInterface, branch api.Branch) *gomock.Call {
+	return m.EXPECT().GetBranchWithResponse(validCtx, testProjectID, branch.ID).
+		Return(&api.GetBranchResponse{
+			HTTPResponse: httpResponse(http.StatusOK),
+			JSON200:      &branch,
+		}, nil)
+}
+
+// withStoredPassword seeds a password for svc in the mock keyring before the
+// tool runs.
+func withStoredPassword(svc api.Service, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
+			t.Fatalf("failed to seed password: %v", err)
+		}
+	})
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// mock keyring for the given service or branch ID.
+func checkStoredPassword(id, want string) checkFunc {
+	return func(t *testing.T, result toolResult) {
+		t.Helper()
+		got, err := (&common.KeyringStorage{}).Get(api.Service{ServiceID: id, ProjectID: testProjectID}, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
+		}
+	}
+}
+
 // validCtx is a gomock matcher that verifies a context.Context parameter is
 // non-nil. Use this instead of gomock.Any() for context parameters.
 var validCtx = gomock.Cond(func(x any) bool {
