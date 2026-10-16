@@ -52,7 +52,7 @@ func (ServiceForkInput) Schema(experimental bool) *jsonschema.Schema {
 	schema.Properties["environment"].Enum = []any{api.EnvironmentTagDEV, api.EnvironmentTagPROD}
 	schema.Properties["environment"].Default = util.Must(json.Marshal(api.EnvironmentTagDEV))
 
-	setIOPSSchemaProperties(schema, experimental, "If not specified, the fork gets the default IOPS for the user's plan, rather than the source service's IOPS.")
+	setIOPSSchemaProperties(schema, experimental, "If not specified, inherits from the source service.")
 
 	schema.Properties["wait"].Description = "Whether to wait for the forked service to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying this database. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
@@ -81,10 +81,10 @@ func (ServiceForkOutput) Schema(experimental bool) *jsonschema.Schema {
 }
 
 func newServiceForkTool(experimental bool) *mcp.Tool {
-	// The platform is a preview, described only behind the gate.
+	// The platform and IOPS are a preview, described only behind the gate.
 	var platformHelp string
 	if experimental {
-		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations."
+		platformHelp = "\n\nThe fork is always created on the same platform as the source service, which determines the valid cpu_memory combinations. Provisioned IOPS (iops) are inherited from the source service unless specified."
 	}
 
 	return &mcp.Tool{

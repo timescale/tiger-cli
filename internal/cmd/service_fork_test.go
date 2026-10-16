@@ -56,11 +56,10 @@ Service is being forked. Use 'tiger service list' to check status.
 --cpu and --memory values must be valid for that platform.`),
 		},
 		{
-			name: "experimental help says the fork gets the plan's default IOPS",
+			name: "experimental help says the fork inherits the source's IOPS",
 			args: []string{"service", "fork", "--help"},
 			opts: []runOption{withEnv("TIGER_EXPERIMENTAL", "true")},
-			wantStdout: matchHelp(`If --iops is not given, the fork gets the default IOPS for your plan, rather than
-the source service's IOPS.
+			wantStdout: matchHelp(`If --iops is not given, the fork inherits the source service's IOPS.
 The allowed --iops values depend on your plan, the service's platform, and its
 CPU/memory allocation. See the Tiger Data documentation for details.`),
 		},
