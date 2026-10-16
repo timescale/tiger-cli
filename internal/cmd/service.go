@@ -15,9 +15,9 @@ import (
 )
 
 // buildServiceCmd creates the main service command with all subcommands.
-// experimental still gates `backups`, which is backed by a gateway endpoint
-// marked `x-tigerdata-preview: true`; when false, that subtree is not added to
-// the tree at all. See CLAUDE.md's "Experimental Feature Gating".
+// experimental still gates `backups` and `branch`, which are backed by gateway
+// endpoints marked `x-tigerdata-preview: true`; when false, they are not added
+// to the tree at all. See CLAUDE.md's "Experimental Feature Gating".
 func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
@@ -40,9 +40,10 @@ func buildServiceCmd(app *common.App) *cobra.Command {
 	cmd.AddCommand(buildServiceLogsCmd(app))
 	cmd.AddCommand(buildServiceMetricsCmd(app))
 
-	// Experimental command, unregistered until the preview graduates.
+	// Experimental commands, unregistered until the previews graduate.
 	if app.Experimental {
 		cmd.AddCommand(buildServiceBackupCmd(app))
+		cmd.AddCommand(buildServiceBranchCmd(app))
 	}
 
 	return cmd
@@ -246,22 +247,7 @@ func handlePasswordSaving(cmd *cobra.Command, cfg *config.Config, service api.Se
 	// Note: We don't fail the service creation if password saving fails
 	// The error is handled by displaying the appropriate message below
 	result, _ := common.SavePasswordWithResult(cfg, service, initialPassword, "tsdbadmin")
-
-	if result.Method == "none" && result.Message == "No password provided" {
-		// Don't output anything for empty password
-		return false
-	}
-
-	// Only a real storage failure is a warning; the "none" method is informational.
-	if result.Success {
-		cmd.PrintErrf("%s\n", result.Message)
-		return true
-	} else if result.Method == "none" {
-		cmd.PrintErrf("%s\n", result.Message)
-	} else {
-		cmd.PrintErrf("Warning: %s\n", result.Message)
-	}
-	return false
+	return printPasswordStorageResult(cmd, result)
 }
 
 // setDefaultService sets the given service as the default service in the configuration

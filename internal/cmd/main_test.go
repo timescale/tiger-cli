@@ -526,6 +526,32 @@ func checkDefaultService(want string) checkFunc {
 	}
 }
 
+// withStoredPassword seeds a password for svc in the mock keyring before the
+// command runs.
+func withStoredPassword(svc api.Service, password string) runOption {
+	return withSetup(func(t *testing.T) {
+		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
+			t.Fatalf("failed to seed password: %v", err)
+		}
+	})
+}
+
+// checkStoredPassword returns a check asserting the password stored in the
+// (mock) keyring for the given service.
+func checkStoredPassword(serviceID, want string) checkFunc {
+	return func(t *testing.T, result cmdResult) {
+		t.Helper()
+		svc := api.Service{ServiceID: serviceID, ProjectID: testProjectID}
+		got, err := (&common.KeyringStorage{}).Get(svc, "tsdbadmin")
+		if err != nil {
+			t.Fatalf("failed to read stored password: %v", err)
+		}
+		if got != want {
+			t.Errorf("stored password = %q, want %q", got, want)
+		}
+	}
+}
+
 // writeConfigFile writes exactly the given keys to the config file in
 // configDir, creating the directory if needed. Only these keys are written, so
 // unspecified ones still resolve from the environment or their defaults —

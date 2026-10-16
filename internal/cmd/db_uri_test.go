@@ -228,13 +228,3 @@ func TestDbURICmd(t *testing.T) {
 		},
 	})
 }
-
-// withStoredPassword seeds a password for svc in the mock keyring before the
-// command runs.
-func withStoredPassword(svc api.Service, password string) runOption {
-	return withSetup(func(t *testing.T) {
-		if err := (&common.KeyringStorage{}).Save(svc, password, "tsdbadmin"); err != nil {
-			t.Fatalf("failed to seed password: %v", err)
-		}
-	})
-}

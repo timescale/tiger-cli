@@ -269,6 +269,51 @@ func TestCompletion(t *testing.T) {
 			checks:     []checkFunc{checkNotLoaded},
 		},
 		{
+			// Only fluid services can be branched.
+			name:       "--cpu flag values for branches are the fluid platform's",
+			args:       []string{"__complete", "branch", "create", "--cpu", ""},
+			opts:       []runOption{withExperimental()},
+			wantStdout: "250\n500\n1000\n2000\n4000\n8000\n16000\n32000\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name:       "--memory flag values for branch resize are the fluid platform's",
+			args:       []string{"__complete", "branch", "resize", "--memory", ""},
+			opts:       []runOption{withExperimental()},
+			wantStdout: "2\n4\n8\n16\n32\n64\n128\n256\n" + keepOrder,
+			wantStderr: keepOrderDirective,
+			checks:     []checkFunc{checkNotLoaded},
+		},
+		{
+			name: "branch argument lists branch IDs with their names",
+			args: []string{"__complete", "branch", "get", "br-6"},
+			opts: []runOption{withExperimental()},
+			mock: func(m *mocks.MockClientWithResponsesInterface) {
+				branches := []api.Branch{
+					sampleBranch(),
+					sampleBranch(func(b *api.Branch) {
+						b.ID = "br-67890"
+						b.Name = "other-branch"
+					}),
+				}
+				m.EXPECT().GetBranchesWithResponse(validCtx, testProjectID, nil).
+					Return(&api.GetBranchesResponse{
+						HTTPResponse: httpResponse(http.StatusOK),
+						JSON200:      &branches,
+					}, nil)
+			},
+			wantStdout: "br-67890\tother-branch\n" + noFileComp,
+			wantStderr: directive,
+		},
+		{
+			name:       "branch argument offers nothing past the first",
+			args:       []string{"__complete", "branch", "get", "br-12345", ""},
+			opts:       []runOption{withExperimental()},
+			wantStdout: noFileComp,
+			wantStderr: directive,
+		},
+		{
 			name:       "--password-storage flag values",
 			args:       []string{"__complete", "service", "get", "--password-storage", ""},
 			wantStdout: "keyring\npgpass\nnone\n" + noFileComp,
