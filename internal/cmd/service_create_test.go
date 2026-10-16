@@ -51,17 +51,17 @@ func TestServiceCreateCmd(t *testing.T) {
 			name: "experimental help says where to find the allowed IOPS values",
 			args: []string{"service", "create", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`If --iops is not given, the service gets the baseline IOPS for your plan and its
-CPU allocation.
-The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details.`),
+			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the service gets the baseline IOPS for your plan and its CPU
+allocation.`),
 		},
 		{
 			name: "experimental help describes the fluid platform's defaults",
 			args: []string{"service", "create", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB
-memory by default.`),
+			wantStdout: matchHelp(`Services on the fluid platform (--platform fluid) are created with
+0.25 CPU / 2 GB memory by default.`),
 		},
 		{
 			name:    "invalid addon",

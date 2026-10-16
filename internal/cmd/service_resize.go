@@ -27,7 +27,11 @@ func buildServiceResizeCmd(app *common.App) *cobra.Command {
 	var iopsDescHelp, iopsSectionHelp, iopsExampleHelp string
 	if app.Experimental {
 		iopsDescHelp = ", memory, and provisioned IOPS\n"
-		iopsSectionHelp = "\n\n" + iopsHelp("If only --iops is given, the service keeps its current CPU and memory.")
+		iopsSectionHelp = `
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory.`
 		iopsExampleHelp = "\n\n  # Change only the provisioned IOPS\n  tiger service resize --iops 16000"
 	} else {
 		iopsDescHelp = " and memory "
@@ -48,7 +52,8 @@ increase costs.
 
 ` + cpuMemoryHelp(false, app.Experimental) + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).` + iopsSectionHelp,
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).` + iopsSectionHelp,
 		Example: `  # Resize default service to 2 CPU cores and 8GB memory
   tiger service resize --cpu 2000 --memory 8
 

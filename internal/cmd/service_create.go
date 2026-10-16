@@ -34,8 +34,13 @@ func buildServiceCreateCmd(app *common.App) *cobra.Command {
 	// only behind the experimental gate.
 	var fluidDefaultHelp, iopsSectionHelp, experimentalExampleHelp string
 	if app.Experimental {
-		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with 0.25 CPU / 2 GB\nmemory by default."
-		iopsSectionHelp = "\n\n" + iopsHelp("If --iops is not given, the service gets the baseline IOPS for your plan and its\nCPU allocation.")
+		fluidDefaultHelp = "\n\nServices on the fluid platform (--platform fluid) are created with\n0.25 CPU / 2 GB memory by default."
+		iopsSectionHelp = `
+
+The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the service gets the baseline IOPS for your plan and its CPU
+allocation.`
 		experimentalExampleHelp = "\n\n  # Create a service on the fluid platform\n  tiger service create --name fluid-db --platform fluid" +
 			"\n\n  # Create a service with provisioned IOPS\n  tiger service create --name fast-db --cpu 2000 --iops 16000"
 	}
@@ -49,12 +54,13 @@ The default type of service created depends on your plan:
 - Free plan: Creates a service with shared CPU/memory and the 'time-series' add-on
 - Paid plans: Creates a service with 0.5 CPU / 2 GB memory and the 'time-series' add-on` + fluidDefaultHelp + `
 
-By default, the newly created service will be set as your default service for future
-commands. Use --no-set-default to prevent this behavior.
+By default, the newly created service will be set as your default service for
+future commands. Use --no-set-default to prevent this behavior.
 
 ` + cpuMemoryHelp(true, app.Experimental) + `
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).` + iopsSectionHelp,
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).` + iopsSectionHelp,
 		Example: `  # Create a TimescaleDB service with all defaults (0.5 CPU, 2GB, us-east-1, auto-generated name)
   tiger service create
 

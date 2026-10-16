@@ -18,7 +18,8 @@ Allowed CPU/Memory Configurations:
   0.5 CPU (500m) / 2GB  |  1 CPU (1000m) / 4GB     |  2 CPU (2000m) / 8GB     |  4 CPU (4000m) / 16GB
   8 CPU (8000m) / 32GB  |  16 CPU (16000m) / 64GB  |  32 CPU (32000m) / 128GB
 
-Note: You can specify both CPU and memory together, or specify only one (the other will be automatically configured).
+Note: You can specify both CPU and memory together, or specify only one (the
+other will be automatically configured).
 
 ```
 tiger service resize [name-or-id] [flags]

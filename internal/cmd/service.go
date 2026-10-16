@@ -75,17 +75,6 @@ func cpuMemoryHelp(shared, experimental bool) string {
 		"\n\nAllowed CPU/Memory Configurations (fluid platform):\n" + fluidCPUMemoryHelp
 }
 
-// iopsHelp renders the provisioned IOPS paragraph of a command's help text:
-// defaultHelp, which says what happens when --iops is omitted, followed by
-// where to find the allowed values. Those depend on too much to list here, and
-// a list would go stale in installed CLIs. IOPS are a preview, so callers add
-// this only behind the experimental gate.
-func iopsHelp(defaultHelp string) string {
-	return defaultHelp + `
-The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details.`
-}
-
 // OutputService represents a service with computed fields for output
 type OutputService struct {
 	api.Service

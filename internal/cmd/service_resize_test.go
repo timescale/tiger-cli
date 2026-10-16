@@ -45,9 +45,9 @@ allocation.`),
 			name: "experimental help says where to find the allowed IOPS values",
 			args: []string{"service", "resize", "--help"},
 			opts: []runOption{experimental},
-			wantStdout: matchHelp(`If only --iops is given, the service keeps its current CPU and memory.
-The allowed --iops values depend on your plan, the service's platform, and its
-CPU/memory allocation. See the Tiger Data documentation for details.`),
+			wantStdout: matchHelp(`The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If only
+--iops is given, the service keeps its current CPU and memory.`),
 		},
 		{
 			name:    "not logged in",

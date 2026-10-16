@@ -34,7 +34,9 @@ func buildServiceForkCmd(app *common.App) *cobra.Command {
 	var platformHelp, iopsExampleHelp string
 	if app.Experimental {
 		platformHelp = "\n\nThe fork is always created on the same platform as the source service, so custom\n--cpu and --memory values must be valid for that platform.\n\n" +
-			iopsHelp("If --iops is not given, the fork inherits the source service's IOPS.")
+			`The allowed --iops values depend on your plan, the service's platform, and its
+CPU/memory allocation. See the Tiger Data documentation for details. If --iops
+is not given, the fork inherits the source service's IOPS.`
 		iopsExampleHelp = "\n\n  # Fork a service with more provisioned IOPS\n  tiger service fork svc-12345 --iops 16000"
 	}
 
