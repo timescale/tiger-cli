@@ -71,7 +71,7 @@ func TestBranchCreateTool(t *testing.T) {
 			// service.
 			name: "read-only prod allows branching a PROD service",
 			tool: toolBranchCreate,
-			args: map[string]any{"service_id": "e6ue9697jf", "set_default": false},
+			args: map[string]any{"service_id": "e6ue9697jf"},
 			opts: []runOption{experimental, withConfig(map[string]any{"read_only": "prod"}), parentPassword},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectTaggedService("PROD", 1)(m)
@@ -141,7 +141,8 @@ func TestBranchCreateTool(t *testing.T) {
 			wantErr: "empty response from API",
 		},
 		{
-			name: "copies the password and sets the default",
+			// Only service IDs go in the default, so a branch never becomes it.
+			name: "copies the password and leaves the default alone",
 			tool: toolBranchCreate,
 			args: args,
 			opts: []runOption{experimental, parentPassword},
@@ -151,14 +152,14 @@ func TestBranchCreateTool(t *testing.T) {
 				"message":          acceptedMsg,
 				"password_storage": storedPassword,
 			},
-			checks: []checkFunc{checkStoredPassword("br4nch1d9x", "parent-pw"), checkDefaultService("br4nch1d9x")},
+			checks: []checkFunc{checkStoredPassword("br4nch1d9x", "parent-pw"), checkDefaultService("")},
 		},
 		{
 			// A missing parent password isn't fatal: the branch exists either
 			// way, so the tool reports the failure rather than erroring.
 			name: "reports a parent password that isn't saved",
 			tool: toolBranchCreate,
-			args: map[string]any{"service_id": "e6ue9697jf", "set_default": false},
+			args: map[string]any{"service_id": "e6ue9697jf"},
 			opts: []runOption{experimental},
 			mock: setupCreate(baseReq, queued),
 			wantOutput: map[string]any{
@@ -170,12 +171,11 @@ func TestBranchCreateTool(t *testing.T) {
 					"message": "Failed to copy the password of parent service e6ue9697jf: no password found in keyring for this service",
 				},
 			},
-			checks: []checkFunc{checkDefaultService("")},
 		},
 		{
 			name: "custom name and compute",
 			tool: toolBranchCreate,
-			args: map[string]any{"service_id": "e6ue9697jf", "name": "ci-4821", "cpu_memory": "2 CPU/16 GB", "set_default": false},
+			args: map[string]any{"service_id": "e6ue9697jf", "name": "ci-4821", "cpu_memory": "2 CPU/16 GB"},
 			opts: []runOption{experimental, parentPassword},
 			mock: setupCreate(api.BranchCreate{
 				ServiceID: "e6ue9697jf",
@@ -193,7 +193,7 @@ func TestBranchCreateTool(t *testing.T) {
 			name:     "wait polls until ready",
 			synctest: true,
 			tool:     toolBranchCreate,
-			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true, "set_default": false},
+			args:     map[string]any{"service_id": "e6ue9697jf", "wait": true},
 			opts:     []runOption{experimental, parentPassword},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, queued)(m)

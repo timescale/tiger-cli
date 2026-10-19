@@ -24,10 +24,10 @@ func TestBranchDeleteCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
-			// No default fallback, even with one configured.
+			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "delete"},
-			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "br-12345"})},
+			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
 			wantErr: "branch ID is required",
 		},
 		{

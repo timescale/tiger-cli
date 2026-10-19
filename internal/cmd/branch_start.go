@@ -17,15 +17,12 @@ func buildBranchStartCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "start [branch-id]",
+		Use:     "start <branch-id>",
 		Aliases: []string{"resume"},
 		Short:   "Start a stopped branch",
 		Long: `Start a stopped branch.
 
-Starting a branch resumes charging for its compute.
-
-The branch is given by ID as an argument, or will use the default from your
-configuration.`,
+Starting a branch resumes charging for its compute.`,
 		Example: `  # Start a branch (waits for completion by default)
   tiger branch start br-12345
 
@@ -40,7 +37,7 @@ configuration.`,
 				return err
 			}
 
-			branchID, err := getBranchID(cfg, args)
+			branchID, err := getBranchID(args)
 			if err != nil {
 				return err
 			}

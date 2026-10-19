@@ -39,9 +39,6 @@ service from your configuration.`,
 				return err
 			}
 
-			// TODO: when the default is a branch, list its parent's branches.
-			// For now the default is assumed to be a service, and a branch
-			// fails to resolve as one.
 			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err

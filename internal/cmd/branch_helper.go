@@ -23,7 +23,6 @@ func newBranchCreateCmd(app *common.App, use, commandPath string) *cobra.Command
 	var name string
 	var cpu string
 	var memory string
-	var noSetDefault bool
 	var noWait bool
 	var waitTimeout time.Duration
 
@@ -40,7 +39,6 @@ is copied from the service's saved password.
 By default:
 - The name is auto-generated
 - The branch gets 0.25 CPU and 2GB of memory, whatever the service's size
-- The new branch is set as the default, in place of the default service
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. Branching from a branch isn't supported.
@@ -55,8 +53,8 @@ service from your configuration. Branching from a branch isn't supported.
   # Branch a service with custom compute
   %[1]s svc-12345 --cpu 2000 --memory 16
 
-  # Branch for a script, without changing the default
-  %[1]s svc-12345 --name ci-4821 --no-set-default -o json`, commandPath),
+  # Branch for a script
+  %[1]s svc-12345 --name ci-4821 -o json`, commandPath),
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: serviceRefCompletion(app),
 		SilenceUsage:      true,
@@ -78,9 +76,6 @@ service from your configuration. Branching from a branch isn't supported.
 				return err
 			}
 
-			// TODO: when the default is a branch, this fails as a service that
-			// doesn't exist. Once refs can be told apart, fail with "branching
-			// from a branch isn't supported yet; pass a service ID" instead.
 			serviceRef, err := getServiceRef(cmd, cfg, args)
 			if err != nil {
 				return err
@@ -127,17 +122,11 @@ service from your configuration. Branching from a branch isn't supported.
 			result, _ := common.CopyParentPassword(cfg, *parent, branch, "tsdbadmin")
 			printPasswordStorageResult(cmd, result)
 
-			if !noSetDefault {
-				if err := setDefaultBranch(cmd, cfg, branch.ID); err != nil {
-					cmd.PrintErrf("Warning: failed to set branch as default: %v\n", err)
-				}
-			}
-
 			// TODO: print "Connect with: tiger db psql" once the db commands
 			// can connect to a branch.
 			var waitErr error
 			if noWait {
-				cmd.PrintErrln("Branch is being created. Use 'tiger branch get' to check branch status.")
+				cmd.PrintErrf("Branch is being created. Use 'tiger branch get %s' to check branch status.\n", branch.ID)
 			} else {
 				cmd.PrintErrf("Waiting for branch to be ready (timeout: %v)...\n", waitTimeout)
 				if waitErr = common.WaitForBranch(cmd.Context(), common.WaitForBranchArgs{
@@ -170,7 +159,6 @@ service from your configuration. Branching from a branch isn't supported.
 	cmd.Flags().StringVar(&name, "name", "", "Name for the branch (auto-generated if not provided)")
 	cmd.Flags().StringVar(&cpu, "cpu", "", "CPU allocation in millicores (default 250)")
 	cmd.Flags().StringVar(&memory, "memory", "", "Memory allocation in gigabytes (default 2)")
-	cmd.Flags().BoolVar(&noSetDefault, "no-set-default", false, "Don't set this branch as the default")
 	cmd.Flags().BoolVar(&noWait, "no-wait", false, "Don't wait for the branch to be ready")
 	cmd.Flags().DurationVar(&waitTimeout, "wait-timeout", 10*time.Minute, "Wait timeout duration (e.g., 30m, 1h30m, 90s)")
 	cmd.Flags().VarP(new(outputWithEnvFlag), "output", "o", "Output format (json, yaml, env, table)")

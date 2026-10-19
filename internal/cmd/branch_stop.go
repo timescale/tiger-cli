@@ -17,16 +17,13 @@ func buildBranchStopCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:     "stop [branch-id]",
+		Use:     "stop <branch-id>",
 		Aliases: []string{"pause"},
 		Short:   "Stop a running branch",
 		Long: `Stop a running branch.
 
 A stopped branch no longer accepts connections and stops charging for compute,
-but keeps the changes made on it, whose storage is still billed.
-
-The branch is given by ID as an argument, or will use the default from your
-configuration.`,
+but keeps the changes made on it, whose storage is still billed.`,
 		Example: `  # Stop a branch (waits for completion by default)
   tiger branch stop br-12345
 
@@ -41,7 +38,7 @@ configuration.`,
 				return err
 			}
 
-			branchID, err := getBranchID(cfg, args)
+			branchID, err := getBranchID(args)
 			if err != nil {
 				return err
 			}

@@ -17,11 +17,10 @@ import (
 
 // BranchCreateInput represents input for branch_create
 type BranchCreateInput struct {
-	ServiceID  string `json:"service_id"`
-	Name       string `json:"name,omitempty"`
-	CPUMemory  string `json:"cpu_memory,omitempty"`
-	Wait       bool   `json:"wait,omitempty"`
-	SetDefault bool   `json:"set_default,omitempty"`
+	ServiceID string `json:"service_id"`
+	Name      string `json:"name,omitempty"`
+	CPUMemory string `json:"cpu_memory,omitempty"`
+	Wait      bool   `json:"wait,omitempty"`
 }
 
 func (BranchCreateInput) Schema() *jsonschema.Schema {
@@ -38,10 +37,6 @@ func (BranchCreateInput) Schema() *jsonschema.Schema {
 	schema.Properties["wait"].Description = "Whether to wait for the branch to be fully ready before returning. Default is false (recommended). Only set to true if your next steps require connecting to or querying the branch. When true, waits up to 10 minutes."
 	schema.Properties["wait"].Default = util.Must(json.Marshal(false))
 	schema.Properties["wait"].Examples = []any{false, true}
-
-	schema.Properties["set_default"].Description = "Whether to set the new branch as the default for future commands, in place of the default service."
-	schema.Properties["set_default"].Default = util.Must(json.Marshal(true))
-	schema.Properties["set_default"].Examples = []any{true, false}
 
 	return schema
 }
@@ -72,7 +67,6 @@ A branch is a lightweight, ephemeral copy of a service for development, testing,
 By default:
 - The name is auto-generated
 - The branch gets 0.25 CPU and 2 GB of memory
-- The new branch is set as the default
 
 WARNING: Creates billable resources.`,
 		InputSchema:  BranchCreateInput{}.Schema(),
@@ -144,12 +138,6 @@ func (s *Server) handleBranchCreate(ctx context.Context, req *mcp.CallToolReques
 	passwordStorage, err := common.CopyParentPassword(cfg, *parent, branch, "tsdbadmin")
 	if err != nil {
 		s.logger.Warn("MCP: Copying the parent's password failed", slog.Any("error", err))
-	}
-
-	if input.SetDefault {
-		if _, err := cfg.Set("service_id", branch.ID); err != nil {
-			s.logger.Warn("MCP: Failed to set branch as default", slog.Any("error", err))
-		}
 	}
 
 	message := "Branch creation request accepted. The branch may still be provisioning."

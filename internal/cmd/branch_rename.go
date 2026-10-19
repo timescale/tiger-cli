@@ -22,9 +22,7 @@ func buildBranchRenameCmd(app *common.App) *cobra.Command {
 Only the branch's name changes: its ID, endpoint, and data are untouched, so
 existing connections and connection strings keep working.
 
-Both the branch ID and the new name are required. There is no default
-fallback, since a single argument would be ambiguous between the branch to
-rename and the name to give it.`,
+Both the branch ID and the new name are required.`,
 		Example: `  # Rename a branch
   tiger branch rename br-12345 feature/rbac`,
 		Args:              cobra.ExactArgs(2),

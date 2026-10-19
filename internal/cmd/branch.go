@@ -17,9 +17,8 @@ import (
 	"github.com/timescale/tiger-cli/internal/util"
 )
 
-// errBranchRequired is returned when neither an argument nor a configured
-// default identifies a branch.
-var errBranchRequired = errors.New("branch ID is required. Provide it as an argument or set a default with 'tiger config set service_id <branch-id>'")
+// errBranchRequired is returned when no argument identifies a branch.
+var errBranchRequired = errors.New("branch ID is required")
 
 // buildBranchCmd creates the branch command with all subcommands. Branches are
 // backed by gateway endpoints marked `x-tigerdata-preview: true`, so the whole
@@ -58,25 +57,15 @@ type OutputBranch struct {
 	ConsoleURL       string `json:"console_url,omitempty"`
 }
 
-// getBranchID determines the branch ID from args or the configured default.
+// getBranchID returns the branch ID given as an argument. There is no default
+// branch: the service_id default only ever holds a service ID.
 //
-// The default lives in service_id, which holds whichever service or branch the
-// user is currently working on. Nothing here tells the two apart: a default
-// that's a service simply fails to resolve as a branch.
-//
-// TODO: accept branch names once there's a way to resolve them to IDs, and
-// replace this with a branchRef like serviceRef.
-func getBranchID(cfg *config.Config, args []string) (string, error) {
-	if len(args) > 0 {
-		if args[0] == "" {
-			return "", errBranchRequired
-		}
-		return args[0], nil
-	}
-	if cfg.ServiceID == "" {
+// TODO: accept branch names once there's a way to resolve them to IDs.
+func getBranchID(args []string) (string, error) {
+	if len(args) == 0 || args[0] == "" {
 		return "", errBranchRequired
 	}
-	return cfg.ServiceID, nil
+	return args[0], nil
 }
 
 // resolveBranch looks up the branch an ID names. It is the single place a
@@ -198,15 +187,4 @@ func prepareBranchForOutput(cmd *cobra.Command, cfg *config.Config, branch api.B
 	outputBr.ConsoleURL = fmt.Sprintf("%s/dashboard/services/%s/branches/%s", cfg.ConsoleURL, branch.ServiceID, branch.ID)
 
 	return outputBr
-}
-
-// setDefaultBranch sets the given branch as the default in the configuration.
-// It shares service_id with services (see getBranchID).
-func setDefaultBranch(cmd *cobra.Command, cfg *config.Config, branchID string) error {
-	if _, err := cfg.Set("service_id", branchID); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	cmd.PrintErrf("Default set to branch %s.\n", branchID)
-	return nil
 }

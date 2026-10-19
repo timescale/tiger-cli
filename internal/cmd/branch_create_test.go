@@ -33,6 +33,13 @@ func TestBranchCreateCmd(t *testing.T) {
 
 	runCmdTests(t, []cmdTest{
 		{
+			// A branch never becomes the default, so there's nothing to opt out of.
+			name:    "no --no-set-default flag",
+			args:    []string{"branch", "create", "svc-12345", "--no-set-default"},
+			opts:    []runOption{withExperimental()},
+			wantErr: "unknown flag: --no-set-default",
+		},
+		{
 			name:    "not logged in",
 			args:    []string{"branch", "create", "svc-12345"},
 			opts:    []runOption{withExperimental(), withNotLoggedIn()},
@@ -49,7 +56,7 @@ func TestBranchCreateCmd(t *testing.T) {
 			// A branch always counts as DEV, so prod allows branching a PROD
 			// service, as it allows forking one into a DEV fork.
 			name: "read-only prod allows branching a PROD service",
-			args: []string{"branch", "create", "svc-12345", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
 			opts: []runOption{withExperimental(), withConfig(map[string]any{"read_only": "prod"}), parentPassword},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				expectResolveRef(m, "svc-12345", sampleService(fluidPlatform, envTag("PROD")))
@@ -64,7 +71,7 @@ func TestBranchCreateCmd(t *testing.T) {
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
@@ -143,14 +150,13 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Default set to branch br-12345.
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
-			checks: []checkFunc{checkStoredPassword("br-12345", "parent-pw"), checkDefaultService("br-12345")},
+			checks: []checkFunc{checkStoredPassword("br-12345", "parent-pw"), checkDefaultService("")},
 		},
 		{
 			name:       "parent password not saved",
-			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--no-set-default", "-o", "env"},
+			args:       []string{"branch", "create", "svc-12345", "--no-wait", "-o", "env"},
 			opts:       []runOption{withExperimental()},
 			mock:       setupCreate(baseReq, provisioning),
 			wantStdout: sampleBranchEnv,
@@ -158,12 +164,12 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Warning: Failed to copy the password of parent service svc-12345: no password found in keyring for this service
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
 			name:       "password storage none",
-			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--no-set-default", "--password-storage", "none", "-o", "env"},
+			args:       []string{"branch", "create", "svc-12345", "--no-wait", "--password-storage", "none", "-o", "env"},
 			opts:       []runOption{withExperimental(), parentPassword},
 			mock:       setupCreate(baseReq, provisioning),
 			wantStdout: sampleBranchEnv,
@@ -171,12 +177,12 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password not saved (--password-storage=none)
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
 			name: "custom name and compute",
-			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2000", "--memory", "16", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"branch", "create", "svc-12345", "--name", "ci-4821", "--cpu", "2000", "--memory", "16", "--no-wait", "-o", "env"},
 			opts: []runOption{withExperimental(), parentPassword},
 			mock: setupCreate(api.BranchCreate{
 				ServiceID: "svc-12345",
@@ -189,12 +195,12 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
 			name: "memory alone sets the matching cpu",
-			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "--no-set-default", "-o", "env"},
+			args: []string{"branch", "create", "svc-12345", "--memory", "4", "--no-wait", "-o", "env"},
 			opts: []runOption{withExperimental(), parentPassword},
 			mock: setupCreate(api.BranchCreate{
 				ServiceID: "svc-12345",
@@ -206,13 +212,13 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
 		},
 		{
 			name:     "wait polls until ready",
 			synctest: true,
-			args:     []string{"branch", "create", "svc-12345", "--no-set-default"},
+			args:     []string{"branch", "create", "svc-12345"},
 			opts:     []runOption{withExperimental(), parentPassword},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, provisioning)(m)
@@ -231,7 +237,7 @@ Branch is ready.
 		{
 			name:     "wait timeout",
 			synctest: true,
-			args:     []string{"branch", "create", "svc-12345", "--no-set-default", "-o", "env"},
+			args:     []string{"branch", "create", "svc-12345", "-o", "env"},
 			opts:     []runOption{withExperimental(), parentPassword},
 			mock: func(m *mocks.MockClientWithResponsesInterface) {
 				setupCreate(baseReq, provisioning)(m)
@@ -255,7 +261,7 @@ Error: wait timeout reached after 10m0s - branch may still be provisioning
 		},
 		{
 			name:       "json",
-			args:       []string{"branch", "create", "svc-12345", "--no-set-default", "-o", "json"},
+			args:       []string{"branch", "create", "svc-12345", "-o", "json"},
 			opts:       []runOption{withExperimental(), parentPassword},
 			mock:       setupCreate(baseReq, sampleBranch()),
 			wantStdout: sampleBranchJSON,
@@ -269,7 +275,7 @@ Branch is ready.
 		},
 		{
 			name:       "default service from config",
-			args:       []string{"branch", "create", "--no-wait", "--no-set-default", "-o", "env"},
+			args:       []string{"branch", "create", "--no-wait", "-o", "env"},
 			opts:       []runOption{withExperimental(), parentPassword, withConfig(map[string]any{"service_id": "svc-12345"})},
 			mock:       setupCreate(baseReq, provisioning),
 			wantStdout: sampleBranchEnv,
@@ -277,8 +283,9 @@ Branch is ready.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
+			checks: []checkFunc{checkDefaultService("svc-12345")},
 		},
 		{
 			name:       "service branch is the same command",
@@ -290,10 +297,9 @@ Branch is being created. Use 'tiger branch get' to check branch status.
 Branch ID: br-12345
 Users and passwords are the same as service 'test-service' (svc-12345).
 Password saved to system keyring
-Default set to branch br-12345.
-Branch is being created. Use 'tiger branch get' to check branch status.
+Branch is being created. Use 'tiger branch get br-12345' to check branch status.
 `,
-			checks: []checkFunc{checkStoredPassword("br-12345", "parent-pw"), checkDefaultService("br-12345")},
+			checks: []checkFunc{checkStoredPassword("br-12345", "parent-pw"), checkDefaultService("")},
 		},
 	})
 }

@@ -34,10 +34,11 @@ func TestBranchStartCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
+			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "start"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "branch ID is required. Provide it as an argument or set a default with 'tiger config set service_id <branch-id>'",
+			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			wantErr: "branch ID is required",
 		},
 		{
 			name:    "read-only all refuses",

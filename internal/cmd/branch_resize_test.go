@@ -36,10 +36,11 @@ func TestBranchResizeCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
+			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "resize", "--cpu", "2000"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "branch ID is required. Provide it as an argument or set a default with 'tiger config set service_id <branch-id>'",
+			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			wantErr: "branch ID is required",
 		},
 		{
 			name:    "missing cpu and memory",
@@ -113,13 +114,6 @@ func TestBranchResizeCmd(t *testing.T) {
 				"Waiting for resize to complete (timeout: 10m0s)...\n" +
 				"⢎  Branch status: CONFIGURING\n" +
 				"Branch resized to 2 CPU/16 GB.\n",
-		},
-		{
-			name:       "default branch from config",
-			args:       []string{"branch", "resize", "--cpu", "2000", "--no-wait"},
-			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "br-12345"})},
-			mock:       setupResize(req2000, api.DeployStatusCONFIGURING),
-			wantStderr: noWaitStderr,
 		},
 	})
 }

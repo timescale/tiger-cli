@@ -24,10 +24,11 @@ func TestBranchGetCmd(t *testing.T) {
 			checks:  []checkFunc{checkExitCode(common.ExitAuthenticationError)},
 		},
 		{
+			// No default fallback: service_id only ever holds a service ID.
 			name:    "missing branch id",
 			args:    []string{"branch", "get"},
-			opts:    []runOption{withExperimental()},
-			wantErr: "branch ID is required. Provide it as an argument or set a default with 'tiger config set service_id <branch-id>'",
+			opts:    []runOption{withExperimental(), withConfig(map[string]any{"service_id": "svc-12345"})},
+			wantErr: "branch ID is required",
 		},
 		{
 			name: "network error",
@@ -141,13 +142,6 @@ status: READY
   "console_url": "https://console.cloud.tigerdata.com/dashboard/services/svc-12345/branches/br-12345"
 }
 `,
-		},
-		{
-			name:       "default branch from config",
-			args:       []string{"branch", "get", "-o", "env"},
-			opts:       []runOption{withExperimental(), withConfig(map[string]any{"service_id": "br-12345"})},
-			mock:       getSample,
-			wantStdout: sampleBranchEnv,
 		},
 		{
 			name:       "describe alias",

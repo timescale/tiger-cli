@@ -19,18 +19,15 @@ func buildBranchUpdatePasswordCmd(app *common.App) *cobra.Command {
 	var autoGenerate bool
 
 	cmd := &cobra.Command{
-		Use:   "update-password [branch-id]",
+		Use:   "update-password <branch-id>",
 		Short: "Update the master password for a branch",
 		Long: `Update the master password for the 'tsdbadmin' user of a branch.
 
 A branch starts with its parent service's password. Changing it here affects
 only the branch, and changing the parent's password doesn't change the
-branch's.
-
-The branch is given by ID as an argument, or will use the default from your
-configuration.`,
-		Example: `  # Update the default branch's password, interactively prompts
-  tiger branch update-password
+branch's.`,
+		Example: `  # Update a branch's password, interactively prompts
+  tiger branch update-password br-12345
 
   # Update a specific branch's password
   tiger branch update-password br-12345 --new-password new-secure-password
@@ -59,7 +56,7 @@ configuration.`,
 				return errors.New("cannot use --auto-generate and --new-password together")
 			}
 
-			branchID, err := getBranchID(cfg, args)
+			branchID, err := getBranchID(args)
 			if err != nil {
 				return err
 			}

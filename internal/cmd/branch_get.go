@@ -9,18 +9,12 @@ import (
 // buildBranchGetCmd creates the get subcommand
 func buildBranchGetCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "get [branch-id]",
+		Use:     "get <branch-id>",
 		Aliases: []string{"describe", "show"},
 		Short:   "Show detailed information about a branch",
 		Long: `Show detailed information about a branch, including its parent service, status,
-compute, and connection details.
-
-The branch is given by ID as an argument, or will use the default from your
-configuration.`,
-		Example: `  # Get the default branch's details
-  tiger branch get
-
-  # Get a specific branch's details
+compute, and connection details.`,
+		Example: `  # Get a branch's details
   tiger branch get br-12345
 
   # Get branch details in JSON format
@@ -34,7 +28,7 @@ configuration.`,
 				return err
 			}
 
-			branchID, err := getBranchID(cfg, args)
+			branchID, err := getBranchID(args)
 			if err != nil {
 				return err
 			}

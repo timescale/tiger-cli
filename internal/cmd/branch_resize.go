@@ -20,13 +20,12 @@ func buildBranchResizeCmd(app *common.App) *cobra.Command {
 	var waitTimeout time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "resize [branch-id]",
+		Use:   "resize <branch-id>",
 		Short: "Resize a branch",
 		Long: `Resize a branch by changing its CPU and memory allocation. A branch's storage is
 shared with its parent service and isn't resized.
 
-The branch is given by ID as an argument, or will use the default from your
-configuration. The branch may be temporarily unavailable during the resize.
+The branch may be temporarily unavailable during the resize.
 
 ` + branchCPUMemoryHelp + `
 
@@ -34,8 +33,8 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 		Example: `  # Resize a branch to 2 CPU cores and 16GB memory
   tiger branch resize br-12345 --cpu 2000 --memory 16
 
-  # Resize the default branch using only CPU (memory will be auto-configured)
-  tiger branch resize --cpu 2000
+  # Resize a branch using only CPU (memory will be auto-configured)
+  tiger branch resize br-12345 --cpu 2000
 
   # Resize without waiting for completion
   tiger branch resize br-12345 --cpu 2000 --no-wait`,
@@ -48,7 +47,7 @@ Note: You can specify both CPU and memory together, or specify only one (the oth
 				return err
 			}
 
-			branchID, err := getBranchID(cfg, args)
+			branchID, err := getBranchID(args)
 			if err != nil {
 				return err
 			}

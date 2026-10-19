@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -22,8 +21,6 @@ func buildBranchDeleteCmd(app *common.App) *cobra.Command {
 		Long: `Delete a branch permanently, along with any changes made on it. The parent
 service is not affected.
 
-The branch must be given explicitly by ID: there is no fallback to the default.
-
 This operation is irreversible. By default, you will be prompted to type the
 branch ID to confirm deletion, unless you use the --confirm flag.
 
@@ -37,9 +34,9 @@ Note for AI agents: Always confirm with the user before performing this destruct
 		ValidArgsFunction: branchIDCompletion(app),
 		SilenceUsage:      true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Require an explicit branch for safety: no default fallback.
-			if len(args) < 1 || args[0] == "" {
-				return errors.New("branch ID is required")
+			branchID, err := getBranchID(args)
+			if err != nil {
+				return err
 			}
 
 			cfg, client, projectID, err := app.GetAll()
@@ -49,7 +46,7 @@ Note for AI agents: Always confirm with the user before performing this destruct
 
 			// Gated here, ahead of the confirmation prompt, so read-only mode
 			// refuses without first asking the user to type the branch ID.
-			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, args[0])
+			branch, err := resolveBranchForWrite(cmd.Context(), cfg, client, projectID, branchID)
 			if err != nil {
 				return err
 			}
