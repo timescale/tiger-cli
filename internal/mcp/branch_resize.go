@@ -99,6 +99,8 @@ func (s *Server) handleBranchResize(ctx context.Context, req *mcp.CallToolReques
 
 	// The branch resize endpoint requires CPU and memory, so an IOPS-only
 	// resize sends the branch's current ones.
+	// TODO: omit them once the endpoint makes them optional, as the service
+	// resize endpoint does.
 	resizeReq := api.BranchResizeInput{
 		CPUMillis: strconv.Itoa(resolved.CPUMillis),
 		MemoryGbs: strconv.Itoa(resolved.MemoryGbs),
