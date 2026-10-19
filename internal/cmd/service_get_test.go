@@ -452,6 +452,33 @@ status: READY
 			wantStderr: "Warning: Failed to get connection details: service endpoint not available\n",
 		},
 		{
+			// No port is guessed, for the direct endpoint or the pooler, so
+			// an endpoint without one isn't shown or connected to.
+			name: "endpoints without a port",
+			args: []string{"service", "get", "svc-12345"},
+			mock: setupGet(sampleService(func(s *api.Service) {
+				s.Endpoint.Port = nil
+				s.ConnectionPooler = &api.ConnectionPooler{
+					Endpoint: &api.Endpoint{Host: new("svc-12345.project.pooler.tsdb.cloud.timescale.com")},
+				}
+			})),
+			wantStdout: `┌─────────────┬──────────────────────────────────────────────────────────────────┐
+│  PROPERTY   │                              VALUE                               │
+├─────────────┼──────────────────────────────────────────────────────────────────┤
+│ Service ID  │ svc-12345                                                        │
+│ Name        │ test-service                                                     │
+│ Status      │ READY                                                            │
+│ Type        │ TIMESCALEDB                                                      │
+│ Region      │ us-east-1                                                        │
+│ CPU         │ 1 cores (1000m)                                                  │
+│ Memory      │ 4 GB                                                             │
+│ Created     │ 2025-01-15 10:30:00 UTC                                          │
+│ Console URL │ https://console.cloud.tigerdata.com/dashboard/services/svc-12345 │
+└─────────────┴──────────────────────────────────────────────────────────────────┘
+`,
+			wantStderr: "Warning: Failed to get connection details: endpoint port not available\n",
+		},
+		{
 			// The ref reaches the API as typed: no client-side classification
 			// stands between a name and the service it names.
 			name: "name resolves to the service",

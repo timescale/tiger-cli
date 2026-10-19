@@ -106,7 +106,7 @@ func (k *KeyringStorage) GetStorageResult(err error, password string) PasswordSt
 type PgpassStorage struct{}
 
 func (p *PgpassStorage) Save(service api.Service, password string, role string) error {
-	if service.Endpoint == nil || service.Endpoint.Host == nil {
+	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
 		return fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -120,10 +120,7 @@ func (p *PgpassStorage) Save(service api.Service, password string, role string) 
 
 	pgpassPath := filepath.Join(homeDir, ".pgpass")
 	host := *service.Endpoint.Host
-	port := "5432" // default PostgreSQL port
-	if service.Endpoint.Port != nil {
-		port = fmt.Sprintf("%d", *service.Endpoint.Port)
-	}
+	port := fmt.Sprintf("%d", *service.Endpoint.Port)
 	database := "tsdb" // TimescaleDB database name
 	username := role   // Use the provided role as username
 
@@ -150,7 +147,7 @@ func (p *PgpassStorage) Save(service api.Service, password string, role string) 
 }
 
 func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
-	if service.Endpoint == nil || service.Endpoint.Host == nil {
+	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
 		return "", fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -170,10 +167,7 @@ func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
 	}
 
 	host := *service.Endpoint.Host
-	port := "5432"
-	if service.Endpoint.Port != nil {
-		port = fmt.Sprintf("%d", *service.Endpoint.Port)
-	}
+	port := fmt.Sprintf("%d", *service.Endpoint.Port)
 	username := role
 
 	// Read and parse .pgpass file
@@ -204,7 +198,7 @@ func (p *PgpassStorage) Get(service api.Service, role string) (string, error) {
 }
 
 func (p *PgpassStorage) Remove(service api.Service, role string) error {
-	if service.Endpoint == nil || service.Endpoint.Host == nil {
+	if service.Endpoint == nil || service.Endpoint.Host == nil || service.Endpoint.Port == nil {
 		return fmt.Errorf("service endpoint not available")
 	}
 	if role == "" {
@@ -218,10 +212,7 @@ func (p *PgpassStorage) Remove(service api.Service, role string) error {
 
 	pgpassPath := filepath.Join(homeDir, ".pgpass")
 	host := *service.Endpoint.Host
-	port := "5432"
-	if service.Endpoint.Port != nil {
-		port = fmt.Sprintf("%d", *service.Endpoint.Port)
-	}
+	port := fmt.Sprintf("%d", *service.Endpoint.Port)
 	username := role
 
 	return p.removeEntry(pgpassPath, host, port, username)

@@ -216,6 +216,24 @@ func TestPgpassStorage_Remove_NoEndpoint(t *testing.T) {
 	}
 }
 
+// An entry is keyed by host and port, and no port is guessed, so an endpoint
+// without one can't be saved, looked up, or removed.
+func TestPgpassStorage_NoPort(t *testing.T) {
+	storage := &PgpassStorage{}
+	service := createTestService("test-service-123")
+	service.Endpoint.Port = nil
+
+	if err := storage.Save(service, "secret", "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+		t.Errorf("PgpassStorage.Save() error = %v, want service endpoint not available", err)
+	}
+	if _, err := storage.Get(service, "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+		t.Errorf("PgpassStorage.Get() error = %v, want service endpoint not available", err)
+	}
+	if err := storage.Remove(service, "tsdbadmin"); err == nil || err.Error() != "service endpoint not available" {
+		t.Errorf("PgpassStorage.Remove() error = %v, want service endpoint not available", err)
+	}
+}
+
 func TestPgpassStorage_Remove_NoRole(t *testing.T) {
 	storage := &PgpassStorage{}
 	service := createTestService("test-service-123")

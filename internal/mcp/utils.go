@@ -199,21 +199,15 @@ func (s *Server) convertToServiceDetail(cfg *config.Config, service api.Service,
 	}
 
 	// Add endpoint information
-	if service.Endpoint != nil && service.Endpoint.Host != nil {
-		port := "5432"
-		if service.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *service.Endpoint.Port)
-		}
-		detail.DirectEndpoint = fmt.Sprintf("%s:%s", *service.Endpoint.Host, port)
+	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
+		detail.DirectEndpoint = fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port)
 	}
 
 	// Add connection pooler endpoint
-	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil && service.ConnectionPooler.Endpoint.Host != nil {
-		port := "6432"
-		if service.ConnectionPooler.Endpoint.Port != nil {
-			port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
+	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
+		if pooler := service.ConnectionPooler.Endpoint; pooler.Host != nil && pooler.Port != nil {
+			detail.PoolerEndpoint = fmt.Sprintf("%s:%d", *pooler.Host, *pooler.Port)
 		}
-		detail.PoolerEndpoint = fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port)
 	}
 
 	// Include password in ServiceDetail if requested. Setting it here ensures

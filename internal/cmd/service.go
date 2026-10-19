@@ -165,24 +165,14 @@ func outputServiceTable(service OutputService, output io.Writer) error {
 	}
 
 	// Endpoint information
-	if service.Endpoint != nil {
-		if service.Endpoint.Host != nil {
-			port := "5432"
-			if service.Endpoint.Port != nil {
-				port = fmt.Sprintf("%d", *service.Endpoint.Port)
-			}
-			table.Append("Direct Endpoint", fmt.Sprintf("%s:%s", *service.Endpoint.Host, port))
-		}
+	if service.Endpoint != nil && service.Endpoint.Host != nil && service.Endpoint.Port != nil {
+		table.Append("Direct Endpoint", fmt.Sprintf("%s:%d", *service.Endpoint.Host, *service.Endpoint.Port))
 	}
 
 	// Connection pooler information
 	if service.ConnectionPooler != nil && service.ConnectionPooler.Endpoint != nil {
-		if service.ConnectionPooler.Endpoint.Host != nil {
-			port := "6432"
-			if service.ConnectionPooler.Endpoint.Port != nil {
-				port = fmt.Sprintf("%d", *service.ConnectionPooler.Endpoint.Port)
-			}
-			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%s", *service.ConnectionPooler.Endpoint.Host, port))
+		if pooler := service.ConnectionPooler.Endpoint; pooler.Host != nil && pooler.Port != nil {
+			table.Append("Pooler Endpoint", fmt.Sprintf("%s:%d", *pooler.Host, *pooler.Port))
 		}
 	}
 
