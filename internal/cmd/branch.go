@@ -19,6 +19,10 @@ import (
 // errBranchRequired is returned when no argument identifies a branch.
 var errBranchRequired = errors.New("branch name or ID is required")
 
+// branchCPUMemoryHelp is the table of CPU/Memory configurations a branch can
+// be created or resized onto.
+const branchCPUMemoryHelp = "Allowed CPU/Memory Configurations:\n" + fluidCPUMemoryHelp
+
 // buildBranchCmd creates the branch command with all subcommands. Branches are
 // backed by gateway endpoints marked `x-tigerdata-preview: true`, so the whole
 // group is only added to the tree behind the experimental gate (see root.go).
